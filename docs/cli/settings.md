@@ -11,7 +11,9 @@ locations:
 - **User settings**: `~/.gemini/settings.json`
 - **Workspace settings**: `your-project/.gemini/settings.json`
 
-Note: Workspace settings override user settings.
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> Workspace settings override user settings.
 
 ## Settings reference
 

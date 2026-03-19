@@ -35,19 +35,17 @@ To launch Gemini CLI in Plan Mode once:
 To start Plan Mode while using Gemini CLI:
 
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle through approval modes
-  (`Default` -> `Auto-Edit` -> `Plan`).
-
-  > **Note:** Plan Mode is automatically removed from the rotation when Gemini
-  > CLI is actively processing or showing confirmation dialogs.
+  (`Default` -> `Auto-Edit` -> `Plan`). Plan Mode is automatically removed from
+  the rotation when Gemini CLI is actively processing or showing confirmation
+  dialogs.
 
 - **Command:** Type `/plan` in the input box.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode) tool
-  to switch modes.
-  > **Note:** This tool is not available when Gemini CLI is in
-  > [YOLO mode](../reference/configuration.md#command-line-arguments).
+  to switch modes. This tool is not available when Gemini CLI is in
+  [YOLO mode](../reference/configuration.md#command-line-arguments).
 
 ## How to use Plan Mode
 
@@ -407,7 +405,9 @@ To build a custom planning workflow, you can use:
   [custom plan directories](#custom-plan-directory-and-policies) and
   [custom policies](#custom-policies).
 
-> **Note:** Use [Conductor] as a reference when building your own custom
+<!-- prettier-ignore -->
+> [!TIP]
+> Use [Conductor] as a reference when building your own custom
 > planning workflow.
 
 By using Plan Mode as its execution environment, your custom methodology can

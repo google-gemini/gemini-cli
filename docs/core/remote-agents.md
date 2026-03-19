@@ -10,7 +10,9 @@ agents in the following repositories:
 - [ADK Samples (Python)](https://github.com/google/adk-samples/tree/main/python)
 - [ADK Python Contributing Samples](https://github.com/google/adk-python/tree/main/contributing/samples)
 
-> **Note: Remote subagents are currently an experimental feature.**
+<!-- prettier-ignore -->
+> [!NOTE]
+> Remote subagents are currently an experimental feature.
 
 ## Configuration
 
@@ -82,7 +84,8 @@ Markdown file.
 ---
 ```
 
-> **Note:** Mixed local and remote agents, or multiple local agents, are not
+<!-- prettier-ignore -->
+> [!NOTE] Mixed local and remote agents, or multiple local agents, are not
 > supported in a single file; the list format is currently remote-only.
 
 ## Authentication
@@ -362,5 +365,7 @@ Users can manage subagents using the following commands within the Gemini CLI:
 - `/agents enable <agent_name>`: Enables a specific subagent.
 - `/agents disable <agent_name>`: Disables a specific subagent.
 
-> **Tip:** You can use the `@cli_help` agent within Gemini CLI for assistance
+<!-- prettier-ignore -->
+> [!TIP]
+> You can use the `@cli_help` agent within Gemini CLI for assistance
 > with configuring subagents.
