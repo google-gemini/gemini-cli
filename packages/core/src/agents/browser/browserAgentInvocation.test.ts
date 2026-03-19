@@ -347,7 +347,7 @@ describe('BrowserAgentInvocation', () => {
       expect(thoughtProgress).toBeDefined();
     });
 
-    it('should add a space when concatenating distinct THOUGHT_CHUNK activities', async () => {
+    it('should overwrite the thought content with new THOUGHT_CHUNK activity', async () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 

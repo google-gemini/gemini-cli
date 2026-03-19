@@ -228,7 +228,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               content:
                 isCancellation || isRejection
                   ? sanitizedError
-                  : `Error: ${error}`,
+                  : `Error: ${sanitizedError}`,
               status: isCancellation || isRejection ? 'cancelled' : 'error',
             });
             updated = true;
