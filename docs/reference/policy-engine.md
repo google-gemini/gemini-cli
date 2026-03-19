@@ -159,7 +159,7 @@ For example:
 
 Approval modes allow the policy engine to apply different sets of rules based on
 the CLI's operational mode. A rule in a TOML policy file can be associated with
-one or more modes (e.g., `yolo`, `autoEdit`, `plan`). The rule will only be
+one or more modes (e.g., `autoEdit`, `plan`). The rule will only be
 active if the CLI is running in one of its specified modes. If a rule has no
 modes specified, it is always active.
 
@@ -169,7 +169,6 @@ modes specified, it is always active.
   auto-approved.
 - `plan`: A strict, read-only mode for research and design. See
   [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
-- `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching
 
@@ -430,6 +429,5 @@ out-of-the-box experience.
   checked individually.
 - **Write tools** (like `write_file`, `run_shell_command`) default to
   **`ask_user`**.
-- In **`yolo`** mode, a high-priority rule allows all tools.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.

@@ -21,7 +21,8 @@ preferred method for enforcing policy.
 
 **Enabled/Disabled** | Default: enabled
 
-If enabled, users will not be able to enter yolo mode.
+If enabled, users will not be able to use the `--yolo` flag or wildcard tool
+policies.
 
 ### Extensions
 
