@@ -104,8 +104,6 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   console.log('   - Injecting remote authentication context...');
   const dotEnvContent = `
 GEMINI_API_KEY=${remoteApiKey}
-GITHUB_TOKEN=${remoteGhToken}
-GH_TOKEN=${remoteGhToken}
 `.trim();
   await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`echo ${q(dotEnvContent)} > ${remoteWorktreeDir}/.env`)}`);
 

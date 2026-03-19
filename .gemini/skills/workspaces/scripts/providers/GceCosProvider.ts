@@ -104,6 +104,7 @@ export class GceCosProvider implements WorkspaceProvider {
         docker run -d --name maintainer-worker --restart always \\
           -v /mnt/disks/data:/home/node/.workspaces:rw \\
           -v /mnt/disks/data/gemini-cli-config/.gemini:/home/node/.gemini:rw \\
+          -v ~/.config/gh:/home/node/.config/gh:rw \\
           ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
       fi
       echo "✅ Unified Workspace is active."
@@ -190,6 +191,7 @@ export class GceCosProvider implements WorkspaceProvider {
           sudo docker run -d --name maintainer-worker --restart always \
             -v /mnt/disks/data:/home/node/.workspaces:rw \
             -v /mnt/disks/data/gemini-cli-config/.gemini:/home/node/.gemini:rw \
+            -v ~/.config/gh:/home/node/.config/gh:rw \
             ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
         `;
         const recoverRes = await this.exec(recoverCmd);
