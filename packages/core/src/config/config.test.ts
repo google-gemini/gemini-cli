@@ -100,6 +100,7 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
   McpClientManager: vi.fn().mockImplementation(() => ({
     startConfiguredMcpServers: vi.fn(),
     getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+    setMainRegistries: vi.fn(),
   })),
 }));
 
@@ -370,6 +371,7 @@ describe('Server Config (config.ts)', () => {
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
+            setMainRegistries: vi.fn(),
           }) as Partial<McpClientManager> as McpClientManager,
       );
 
@@ -403,6 +405,7 @@ describe('Server Config (config.ts)', () => {
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
+            setMainRegistries: vi.fn(),
           }) as Partial<McpClientManager> as McpClientManager,
       );
 
@@ -1520,7 +1523,7 @@ describe('Server Config (config.ts)', () => {
 
       const paramsWithProxy: ConfigParameters = {
         ...baseParams,
-        proxy: 'invalid-proxy',
+        proxy: 'http://invalid-proxy:8080',
       };
       new Config(paramsWithProxy);
 
@@ -3062,6 +3065,21 @@ describe('Config JIT Initialization', () => {
       extension: 'Extension Memory',
       project: 'Environment Memory\n\nMCP Instructions',
     });
+
+    // Tier 1: system instruction gets only global memory
+    expect(config.getSystemInstructionMemory()).toBe('Global Memory');
+
+    // Tier 2: session memory gets extension + project formatted with XML tags
+    const sessionMemory = config.getSessionMemory();
+    expect(sessionMemory).toContain('<loaded_context>');
+    expect(sessionMemory).toContain('<extension_context>');
+    expect(sessionMemory).toContain('Extension Memory');
+    expect(sessionMemory).toContain('</extension_context>');
+    expect(sessionMemory).toContain('<project_context>');
+    expect(sessionMemory).toContain('Environment Memory');
+    expect(sessionMemory).toContain('MCP Instructions');
+    expect(sessionMemory).toContain('</project_context>');
+    expect(sessionMemory).toContain('</loaded_context>');
 
     // Verify state update (delegated to ContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);

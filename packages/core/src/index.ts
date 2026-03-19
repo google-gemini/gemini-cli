@@ -118,6 +118,7 @@ export * from './utils/channel.js';
 export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
 export * from './utils/cache.js';
+export * from './utils/markdownUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -149,6 +150,12 @@ export * from './ide/types.js';
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
 export * from './services/sandboxManager.js';
+
+// Export Execution Lifecycle Service
+export * from './services/executionLifecycleService.js';
+
+// Export Injection Service
+export * from './config/injectionService.js';
 
 // Export Execution Lifecycle Service
 export * from './services/executionLifecycleService.js';
