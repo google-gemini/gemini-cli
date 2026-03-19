@@ -11,17 +11,12 @@ import { CliSpinner } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
 import { Colors } from '../colors.js';
 import tinygradient from 'tinygradient';
+import { inTmux } from '../utils/commandUtils.js';
 
 const COLOR_CYCLE_DURATION_MS = 4000;
 const SPINNER_UPDATE_INTERVAL_MS = 30;
 const TMUX_UPDATE_INTERVAL_MS = 750;
 const TMUX_FRAMES = ['.', '..', '...'] as const;
-
-function isTmuxEnvironment(): boolean {
-  return (
-    !!process.env['TMUX'] || (process.env['TERM'] ?? '').startsWith('tmux')
-  );
-}
 
 interface GeminiSpinnerProps {
   spinnerType?: SpinnerName;
@@ -33,7 +28,7 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
   altText,
 }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const isTmux = isTmuxEnvironment();
+  const isTmux = inTmux();
   const [time, setTime] = useState(0);
   const [tmuxFrameIndex, setTmuxFrameIndex] = useState(0);
 

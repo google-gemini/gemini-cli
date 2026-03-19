@@ -140,7 +140,7 @@ const getStdioTty = (): TtyTarget => {
   return null;
 };
 
-const inTmux = (): boolean =>
+export const inTmux = (): boolean =>
   Boolean(
     process.env['TMUX'] || (process.env['TERM'] ?? '').startsWith('tmux'),
   );
