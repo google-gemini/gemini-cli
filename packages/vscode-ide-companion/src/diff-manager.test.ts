@@ -70,7 +70,6 @@ describe('DiffManager', () => {
   });
 
   it('cancelDiff should fire a rejection notification', async () => {
-    // Use 'unknown' casting to avoid 'any' errors, which is standard for mock objects
     const mockUri = { toString: () => 'test-uri' } as unknown as vscode.Uri;
 
     (
@@ -89,6 +88,20 @@ describe('DiffManager', () => {
 
     await diffManager.cancelDiff(mockUri);
 
+    // Access the private emitter to verify the event was fired
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const emitter = (diffManager as any).onDidChangeEmitter;
+    expect(emitter.fire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonrpc: '2.0',
+        method: 'ide/diffRejected',
+        params: {
+          filePath: 'test.ts',
+        },
+      }),
+    );
+
+    // Also verify that the diff editor is closed
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       'setContext',
       'gemini.diff.isVisible',
