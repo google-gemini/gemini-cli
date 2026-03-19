@@ -33,10 +33,10 @@ See [Milestone 3 Sub-plan](./milestone-3-connectivity.md) for details.
 - [ ] Integrate `shpool` into the container entrypoint for session detachment.
 
 ### Milestone 4: Secure Sync & Identity (Phase 4)
-
 Make the remote workspace "feel like home" with secure credential forwarding.
-
+See [Milestone 4 Sub-plan](./milestone-4-sync-and-identity.md) for details.
 - [ ] Implement `~/.gemini/` configuration synchronization.
+
 - [ ] Implement SSH Agent Forwarding (`-A`) in the connectivity logic.
 - [ ] Implement secure GitHub PAT injection via `/dev/shm`.
 

@@ -5,7 +5,13 @@
  */
 
 import type { CommandModule, ArgumentsCamelCase } from 'yargs';
-import { WorkspaceHubClient, SSHService, type Config, type WorkspaceHubInfo } from '@google-gemini-cli-core';
+import { 
+  WorkspaceHubClient, 
+  SSHService, 
+  SyncService, 
+  type Config, 
+  type WorkspaceHubInfo 
+} from '@google-gemini-cli-core';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
 
@@ -14,6 +20,7 @@ interface ConnectArgs {
   id: string;
   forwardAgent?: boolean;
   wait?: boolean;
+  sync?: boolean;
 }
 
 async function waitForReady(client: WorkspaceHubClient, id: string): Promise<WorkspaceHubInfo> {
@@ -42,6 +49,7 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
     return;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const hubUrl = process.env['GEMINI_WORKSPACE_HUB_URL'] || 'http://localhost:8080';
   const client = new WorkspaceHubClient(hubUrl);
 
@@ -49,7 +57,11 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
     // eslint-disable-next-line no-console
     console.log(chalk.yellow(`Fetching workspace details for "${args.id}"...`));
     
-    let ws = await client.getWorkspace(args.id);
+    // We need to fetch the workspace info to get the instance name and zone
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const workspaces: WorkspaceHubInfo[] = await client.listWorkspaces();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const ws: WorkspaceHubInfo | undefined = workspaces.find(w => w.id === args.id || w.name === args.id);
 
     if (!ws) {
       // eslint-disable-next-line no-console
@@ -57,9 +69,10 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
       return;
     }
 
+    let readyWs = ws;
     if (ws.status !== 'READY') {
         if (args.wait) {
-            ws = await waitForReady(client, args.id);
+            readyWs = await waitForReady(client, args.id);
         } else {
             // eslint-disable-next-line no-console
             console.warn(chalk.yellow(`Warning: Workspace is in status ${ws.status}.`));
@@ -70,19 +83,41 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
         }
     }
 
-    const ssh = new SSHService();
-    // TODO: Get project from config once GCP settings are integrated into core Config
+    const { instance_name: instanceName, zone } = readyWs;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const project = process.env['GOOGLE_CLOUD_PROJECT'] || 'dev-project';
 
+    // 1. Sync settings if enabled
+    if (args.sync !== false) {
+      // eslint-disable-next-line no-console
+      console.log(chalk.yellow(`Syncing local settings (~/.gemini) to remote...`));
+      const sync = new SyncService();
+      try {
+        await sync.pushSettings({
+            instanceName,
+            zone,
+            project,
+        });
+        // eslint-disable-next-line no-console
+        console.log(chalk.green(`✓ Settings synced.`));
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(chalk.red(`Warning: Settings sync failed, continuing connection...`), (err as Error).message);
+      }
+    }
+
+    // 2. Connect via SSH
+    const ssh = new SSHService();
+
     // eslint-disable-next-line no-console
-    console.log(chalk.green(`🚀 Teleporting to ${ws.instance_name} (${ws.zone})...`));
+    console.log(chalk.green(`🚀 Teleporting to ${instanceName} (${zone})...`));
     
     // Command to run on the remote VM: attach to the shpool session
     const remoteCommand = 'shpool attach main || shpool attach';
 
     await ssh.connect({
-      instanceName: ws.instance_name,
-      zone: ws.zone,
+      instanceName,
+      zone,
       project,
       command: remoteCommand,
       forwardAgent: args.forwardAgent,
@@ -115,6 +150,11 @@ export const connectCommand: CommandModule<object, ConnectArgs> = {
       type: 'boolean',
       describe: 'Wait for the workspace to become READY if it is provisioning',
       default: false,
+    })
+    .option('sync', {
+      type: 'boolean',
+      describe: 'Synchronize local ~/.gemini settings to the remote workspace',
+      default: true,
     }),
   handler: async (argv) => {
     await connectToWorkspace(argv);
