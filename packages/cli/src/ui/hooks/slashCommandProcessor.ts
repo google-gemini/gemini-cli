@@ -196,6 +196,11 @@ export const useSlashCommandProcessor = (
           type: 'compression',
           compression: message.compression,
         };
+      } else if (message.type === MessageType.WORKSPACES_LIST) {
+        historyItemContent = {
+          type: 'workspaces_list',
+          workspaces: message.workspaces,
+        };
       } else {
         historyItemContent = {
           type: message.type,

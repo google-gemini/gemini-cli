@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand, CommandContext } from './types.js';
+import type { SlashCommand, CommandContext, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
 import { 
   type CommandActionReturn,
@@ -60,7 +60,7 @@ const createCommand: SlashCommand = {
   action: (async (
     context: CommandContext,
     args: string,
-  ): Promise<CommandActionReturn> => {
+  ): Promise<SlashCommandActionReturn> => {
     const name = args.trim();
     if (!name) {
       return {
@@ -78,7 +78,7 @@ const createCommand: SlashCommand = {
       context.ui.addItem({
         type: 'info',
         text: `Requesting creation of workspace "${name}"...`,
-      });
+      } as any);
       const ws = await client.createWorkspace(name);
       return {
         type: 'message',
@@ -105,7 +105,7 @@ const deleteCommand: SlashCommand = {
   action: (async (
     _context: CommandContext,
     args: string,
-  ): Promise<CommandActionReturn> => {
+  ): Promise<SlashCommandActionReturn> => {
     const id = args.trim();
     if (!id) {
       return {
@@ -120,11 +120,10 @@ const deleteCommand: SlashCommand = {
     const client = new WorkspaceHubClient(hubUrl);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      (_context.ui as any).addItem({
+      _context.ui.addItem({
         type: 'info',
         text: `Deleting workspace "${id}"...`,
-      });
+      } as any);
       await client.deleteWorkspace(id);
       return {
         type: 'message',
@@ -150,7 +149,7 @@ const connectCommand: SlashCommand = {
   action: (async (
     _context: CommandContext,
     args: string,
-  ): Promise<CommandActionReturn> => {
+  ): Promise<SlashCommandActionReturn> => {
     const id = args.trim();
     if (!id) {
       return {
@@ -173,5 +172,5 @@ export const workspaceSlashCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [listCommand, createCommand, deleteCommand, connectCommand],
-  action: (async (context: CommandContext) => listAction(context)) as any,
+  action: ((context: CommandContext) => listAction(context)) as any,
 };

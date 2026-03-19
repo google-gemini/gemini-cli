@@ -466,6 +466,11 @@ export type Message =
       type: MessageType.COMPRESSION;
       compression: CompressionProps;
       timestamp: Date;
+    }
+  | {
+      type: MessageType.WORKSPACES_LIST;
+      timestamp: Date;
+      workspaces: WorkspaceHubInfo[];
     };
 
 export interface ConsoleMessageItem {
