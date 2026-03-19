@@ -7,6 +7,7 @@
 import React from 'react';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionRegistryView } from './ExtensionRegistryView.js';
 import { type ExtensionManager } from '../../../config/extension-manager.js';
@@ -121,7 +122,7 @@ describe('ExtensionRegistryView', () => {
     );
   });
 
-  const renderView = () =>
+  const renderView = async () =>
     renderWithProviders(
       <ExtensionRegistryView
         extensionManager={mockExtensionManager}
@@ -129,6 +130,7 @@ describe('ExtensionRegistryView', () => {
         onClose={mockOnClose}
       />,
       {
+        config: makeFakeConfig(),
         uiState: {
           staticExtraHeight: 5,
           terminalHeight: 40,
@@ -137,7 +139,7 @@ describe('ExtensionRegistryView', () => {
     );
 
   it('should render extensions', async () => {
-    const { lastFrame, waitUntilReady } = renderView();
+    const { lastFrame, waitUntilReady } = await renderView();
     await waitUntilReady();
 
     await waitFor(() => {
@@ -146,8 +148,8 @@ describe('ExtensionRegistryView', () => {
     });
   });
 
-  it('should use useRegistrySearch hook', () => {
-    renderView();
+  it('should use useRegistrySearch hook', async () => {
+    await renderView();
     expect(useRegistrySearch).toHaveBeenCalled();
   });
 
@@ -185,7 +187,7 @@ describe('ExtensionRegistryView', () => {
       },
     );
 
-    renderView();
+    await renderView();
 
     await waitFor(() => {
       expect(useRegistrySearch).toHaveBeenCalledWith(
@@ -197,7 +199,7 @@ describe('ExtensionRegistryView', () => {
   });
 
   it('should call onSelect when extension is selected and Enter is pressed in details', async () => {
-    const { stdin, lastFrame } = renderView();
+    const { stdin, lastFrame } = await renderView();
 
     // Select the first extension in the list (Enter opens details)
     await React.act(async () => {

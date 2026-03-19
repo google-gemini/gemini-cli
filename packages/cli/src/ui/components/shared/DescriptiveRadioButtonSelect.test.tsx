@@ -75,7 +75,7 @@ describe('DescriptiveRadioButtonSelect', () => {
       onSelect: mockOnSelect,
       ...props,
     };
-    const result = renderWithProviders(
+    const result = await renderWithProviders(
       <DescriptiveRadioButtonSelect {...defaultProps} />,
     );
     await result.waitUntilReady();

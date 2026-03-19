@@ -43,7 +43,7 @@ describe('ConfigInitDisplay', () => {
   });
 
   it('renders initial state', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <ConfigInitDisplay />,
     );
     await waitUntilReady();
@@ -59,7 +59,7 @@ describe('ConfigInitDisplay', () => {
       return coreEvents;
     });
 
-    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
+    const { lastFrame } = await renderWithProviders(<ConfigInitDisplay />);
 
     // Wait for listener to be registered
     await waitFor(() => {
@@ -97,7 +97,7 @@ describe('ConfigInitDisplay', () => {
       return coreEvents;
     });
 
-    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
+    const { lastFrame } = await renderWithProviders(<ConfigInitDisplay />);
 
     await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');
@@ -133,7 +133,7 @@ describe('ConfigInitDisplay', () => {
       return coreEvents;
     });
 
-    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
+    const { lastFrame } = await renderWithProviders(<ConfigInitDisplay />);
 
     await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');

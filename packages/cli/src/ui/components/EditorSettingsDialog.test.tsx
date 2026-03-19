@@ -51,11 +51,11 @@ describe('EditorSettingsDialog', () => {
     vi.clearAllMocks();
   });
 
-  const renderWithProvider = (ui: React.ReactElement) =>
+  const renderWithProvider = async (ui: React.ReactElement) =>
     renderWithProviders(ui);
 
   it('renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProvider(
+    const { lastFrame, waitUntilReady } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
@@ -68,7 +68,7 @@ describe('EditorSettingsDialog', () => {
 
   it('calls onSelect when an editor is selected', async () => {
     const onSelect = vi.fn();
-    const { lastFrame, waitUntilReady } = renderWithProvider(
+    const { lastFrame, waitUntilReady } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={onSelect}
         settings={mockSettings}
@@ -81,7 +81,7 @@ describe('EditorSettingsDialog', () => {
   });
 
   it('switches focus between editor and scope sections on Tab', async () => {
-    const { lastFrame, stdin, waitUntilReady } = renderWithProvider(
+    const { lastFrame, stdin, waitUntilReady } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
@@ -127,7 +127,7 @@ describe('EditorSettingsDialog', () => {
 
   it('calls onExit when Escape is pressed', async () => {
     const onExit = vi.fn();
-    const { stdin, waitUntilReady } = renderWithProvider(
+    const { stdin, waitUntilReady } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
@@ -162,7 +162,7 @@ describe('EditorSettingsDialog', () => {
       },
     } as unknown as LoadedSettings;
 
-    const { lastFrame, waitUntilReady } = renderWithProvider(
+    const { lastFrame, waitUntilReady } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={settingsWithOtherScope}

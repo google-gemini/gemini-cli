@@ -91,7 +91,7 @@ describe('RewindViewer', () => {
       const conversation = createConversation([
         { type: 'user', content: 'Hello', id: '1', timestamp: '1' },
       ]);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <RewindViewer
           conversation={conversation}
           onExit={vi.fn()}
@@ -130,7 +130,7 @@ describe('RewindViewer', () => {
       const conversation = createConversation(messages as MessageRecord[]);
       const onExit = vi.fn();
       const onRewind = vi.fn();
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <RewindViewer
           conversation={conversation}
           onExit={onExit}
@@ -154,13 +154,14 @@ describe('RewindViewer', () => {
     ]);
     const onExit = vi.fn();
     const onRewind = vi.fn();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <RewindViewer
-        conversation={conversation}
-        onExit={onExit}
-        onRewind={onRewind}
-      />,
-    );
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <RewindViewer
+          conversation={conversation}
+          onExit={onExit}
+          onRewind={onRewind}
+        />,
+      );
     await waitUntilReady();
 
     // Initial state
@@ -188,13 +189,14 @@ describe('RewindViewer', () => {
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
         { type: 'user', content: 'Q3', id: '3', timestamp: '1' },
       ]);
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={vi.fn()}
-        />,
-      );
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={vi.fn()}
+          />,
+        );
       await waitUntilReady();
 
       act(() => {
@@ -220,13 +222,14 @@ describe('RewindViewer', () => {
         { type: 'user', content: 'Q2', id: '2', timestamp: '1' },
         { type: 'user', content: 'Q3', id: '3', timestamp: '1' },
       ]);
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={vi.fn()}
-        />,
-      );
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={vi.fn()}
+          />,
+        );
       await waitUntilReady();
 
       // Up from first -> Last
@@ -297,13 +300,14 @@ describe('RewindViewer', () => {
         { type: 'user', content: 'Original Prompt', id: '1', timestamp: '1' },
       ]);
       const onRewind = vi.fn();
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={onRewind}
-        />,
-      );
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={onRewind}
+          />,
+        );
       await waitUntilReady();
 
       // Select
@@ -354,13 +358,14 @@ describe('RewindViewer', () => {
         },
       ]);
       const onRewind = vi.fn();
-      const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-        <RewindViewer
-          conversation={conversation}
-          onExit={vi.fn()}
-          onRewind={onRewind}
-        />,
-      );
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderWithProviders(
+          <RewindViewer
+            conversation={conversation}
+            onExit={vi.fn()}
+            onRewind={onRewind}
+          />,
+        );
       await waitUntilReady();
 
       expect(lastFrame()).toMatchSnapshot();
@@ -398,7 +403,7 @@ describe('RewindViewer', () => {
     const onExit = vi.fn();
     const onRewind = vi.fn();
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <RewindViewer
         conversation={conversation}
         onExit={onExit}
@@ -421,7 +426,7 @@ describe('RewindViewer', () => {
       lastFrame: lastFrame2,
       waitUntilReady: waitUntilReady2,
       unmount: unmount2,
-    } = renderWithProviders(
+    } = await renderWithProviders(
       <RewindViewer
         conversation={conversation}
         onExit={onExit}
@@ -446,7 +451,7 @@ it('renders accessible screen reader view when screen reader is enabled', async 
   const onExit = vi.fn();
   const onRewind = vi.fn();
 
-  const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+  const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
     <RewindViewer
       conversation={conversation}
       onExit={onExit}

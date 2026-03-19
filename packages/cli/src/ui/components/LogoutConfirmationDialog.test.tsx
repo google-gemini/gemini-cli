@@ -23,7 +23,7 @@ describe('LogoutConfirmationDialog', () => {
   });
 
   it('should render the dialog with title, description, and hint', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={vi.fn()} />,
     );
     await waitUntilReady();
@@ -37,7 +37,7 @@ describe('LogoutConfirmationDialog', () => {
   });
 
   it('should render RadioButtonSelect with Login and Exit options', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={vi.fn()} />,
     );
     await waitUntilReady();
@@ -54,7 +54,7 @@ describe('LogoutConfirmationDialog', () => {
 
   it('should call onSelect with LOGIN when Login is selected', async () => {
     const onSelect = vi.fn();
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
     await waitUntilReady();
@@ -71,7 +71,7 @@ describe('LogoutConfirmationDialog', () => {
 
   it('should call onSelect with EXIT when Exit is selected', async () => {
     const onSelect = vi.fn();
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
     await waitUntilReady();
@@ -88,7 +88,7 @@ describe('LogoutConfirmationDialog', () => {
 
   it('should call onSelect with EXIT when escape key is pressed', async () => {
     const onSelect = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
     await waitUntilReady();

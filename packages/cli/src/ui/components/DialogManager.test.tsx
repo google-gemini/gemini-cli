@@ -104,7 +104,7 @@ describe('DialogManager', () => {
   };
 
   it('renders nothing by default', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <DialogManager {...defaultProps} />,
       { uiState: baseUiState as Partial<UIState> as UIState },
     );
@@ -197,7 +197,7 @@ describe('DialogManager', () => {
   it.each(testCases)(
     'renders %s when state is %o',
     async (uiStateOverride, expectedComponent) => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <DialogManager {...defaultProps} />,
         {
           uiState: {

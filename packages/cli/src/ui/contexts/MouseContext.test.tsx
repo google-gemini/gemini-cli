@@ -62,9 +62,9 @@ describe('MouseContext', () => {
     vi.restoreAllMocks();
   });
 
-  it('should subscribe and unsubscribe a handler', () => {
+  it('should subscribe and unsubscribe a handler', async () => {
     const handler = vi.fn();
-    const { result } = renderHookWithProviders(() => useMouseContext(), {
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
       mouseEventsEnabled: true,
     });
 
@@ -89,11 +89,14 @@ describe('MouseContext', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it('should not call handler if not active', () => {
+  it('should not call handler if not active', async () => {
     const handler = vi.fn();
-    renderHookWithProviders(() => useMouse(handler, { isActive: false }), {
-      mouseEventsEnabled: true,
-    });
+    await renderHookWithProviders(
+      () => useMouse(handler, { isActive: false }),
+      {
+        mouseEventsEnabled: true,
+      },
+    );
 
     act(() => {
       stdin.write('\x1b[<0;10;20M');
@@ -102,8 +105,8 @@ describe('MouseContext', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('should emit SelectionWarning when move event is unhandled and has coordinates', () => {
-    renderHookWithProviders(() => useMouseContext(), {
+  it('should emit SelectionWarning when move event is unhandled and has coordinates', async () => {
+    await renderHookWithProviders(() => useMouseContext(), {
       mouseEventsEnabled: true,
     });
 
@@ -115,9 +118,9 @@ describe('MouseContext', () => {
     expect(appEvents.emit).toHaveBeenCalledWith(AppEvent.SelectionWarning);
   });
 
-  it('should not emit SelectionWarning when move event is handled', () => {
+  it('should not emit SelectionWarning when move event is handled', async () => {
     const handler = vi.fn().mockReturnValue(true);
-    const { result } = renderHookWithProviders(() => useMouseContext(), {
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
       mouseEventsEnabled: true,
     });
 
@@ -217,11 +220,14 @@ describe('MouseContext', () => {
       }, // Shift + scroll up
     ])(
       'should recognize sequence "$sequence" as $expected.name',
-      ({ sequence, expected }) => {
+      async ({ sequence, expected }) => {
         const mouseHandler = vi.fn();
-        const { result } = renderHookWithProviders(() => useMouseContext(), {
-          mouseEventsEnabled: true,
-        });
+        const { result } = await renderHookWithProviders(
+          () => useMouseContext(),
+          {
+            mouseEventsEnabled: true,
+          },
+        );
         act(() => result.current.subscribe(mouseHandler));
 
         act(() => stdin.write(sequence));
@@ -233,9 +239,9 @@ describe('MouseContext', () => {
     );
   });
 
-  it('should emit a double-click event when two left-presses occur quickly at the same position', () => {
+  it('should emit a double-click event when two left-presses occur quickly at the same position', async () => {
     const handler = vi.fn();
-    const { result } = renderHookWithProviders(() => useMouseContext(), {
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
       mouseEventsEnabled: true,
     });
 
@@ -265,9 +271,9 @@ describe('MouseContext', () => {
     );
   });
 
-  it('should NOT emit a double-click event if clicks are too far apart', () => {
+  it('should NOT emit a double-click event if clicks are too far apart', async () => {
     const handler = vi.fn();
-    const { result } = renderHookWithProviders(() => useMouseContext(), {
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
       mouseEventsEnabled: true,
     });
 
@@ -294,7 +300,7 @@ describe('MouseContext', () => {
   it('should NOT emit a double-click event if too much time passes', async () => {
     vi.useFakeTimers();
     const handler = vi.fn();
-    const { result } = renderHookWithProviders(() => useMouseContext(), {
+    const { result } = await renderHookWithProviders(() => useMouseContext(), {
       mouseEventsEnabled: true,
     });
 

@@ -35,7 +35,7 @@ describe('colorizeCode', () => {
       hideLineNumbers: true,
     });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <>{result}</>,
     );
     await waitUntilReady();
@@ -76,7 +76,7 @@ describe('colorizeCode', () => {
       hideLineNumbers: true,
     });
 
-    const renderResult = renderWithProviders(<>{result}</>);
+    const renderResult = await renderWithProviders(<>{result}</>);
     await renderResult.waitUntilReady();
 
     await expect(renderResult).toMatchSvgSnapshot();

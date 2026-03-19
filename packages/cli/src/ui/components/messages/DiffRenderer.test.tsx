@@ -7,7 +7,6 @@
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
-import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../../test-utils/async.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
@@ -36,7 +35,7 @@ index 0000000..e69de29
 @@ -0,0 +1 @@
 +print("hello world")
 `;
-        renderWithProviders(
+        await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={newFileDiffContent}
@@ -45,7 +44,6 @@ index 0000000..e69de29
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -71,7 +69,7 @@ index 0000000..e69de29
 @@ -0,0 +1 @@
 +some content
 `;
-        renderWithProviders(
+        await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={newFileDiffContent}
@@ -80,7 +78,6 @@ index 0000000..e69de29
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -106,12 +103,11 @@ index 0000000..e69de29
 @@ -0,0 +1 @@
 +some text content
 `;
-        renderWithProviders(
+        await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer diffContent={newFileDiffContent} terminalWidth={80} />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -138,7 +134,7 @@ index 0000001..0000002 100644
 -old line
 +new line
 `;
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={existingFileDiffContent}
@@ -147,7 +143,6 @@ index 0000001..0000002 100644
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -172,7 +167,7 @@ index 1234567..1234567 100644
 --- a/file.txt
 +++ b/file.txt
 `;
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={noChangeDiff}
@@ -181,7 +176,6 @@ index 1234567..1234567 100644
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -191,12 +185,11 @@ index 1234567..1234567 100644
       });
 
       it('should handle empty diff content', async () => {
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer diffContent="" terminalWidth={80} />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -220,7 +213,7 @@ index 123..456 100644
  context line 10
  context line 11
 `;
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={diffWithGap}
@@ -229,7 +222,6 @@ index 123..456 100644
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -257,7 +249,7 @@ index abc..def 100644
  context line 14
  context line 15
 `;
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={diffWithSmallGap}
@@ -266,7 +258,6 @@ index abc..def 100644
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -309,7 +300,7 @@ index 123..789 100644
         ])(
           'with terminalWidth $terminalWidth and height $height',
           async ({ terminalWidth, height }) => {
-            const { lastFrame } = renderWithProviders(
+            const { lastFrame } = await renderWithProviders(
               <OverflowProvider>
                 <DiffRenderer
                   diffContent={diffWithMultipleHunks}
@@ -319,7 +310,6 @@ index 123..789 100644
                 />
               </OverflowProvider>,
               {
-                config: makeFakeConfig({ useAlternateBuffer }),
                 settings: createMockSettings({ ui: { useAlternateBuffer } }),
               },
             );
@@ -347,7 +337,7 @@ fileDiff Index: file.txt
 +const anotherNew = 'test';
 \\ No newline at end of file  
 `;
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={newFileDiff}
@@ -356,7 +346,6 @@ fileDiff Index: file.txt
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
@@ -377,7 +366,7 @@ fileDiff Index: Dockerfile
 +RUN npm run build
 \\ No newline at end of file  
 `;
-        const { lastFrame } = renderWithProviders(
+        const { lastFrame } = await renderWithProviders(
           <OverflowProvider>
             <DiffRenderer
               diffContent={newFileDiff}
@@ -386,7 +375,6 @@ fileDiff Index: Dockerfile
             />
           </OverflowProvider>,
           {
-            config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );

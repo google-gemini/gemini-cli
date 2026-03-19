@@ -59,7 +59,7 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { lastFrame, simulateClick, unmount } = renderWithProviders(
+      const { lastFrame, simulateClick, unmount } = await renderWithProviders(
         <ShellToolMessage {...baseProps} name={name} />,
         { uiActions, mouseEventsEnabled: true },
       );
@@ -86,7 +86,7 @@ describe('<ShellToolMessage />', () => {
         return <ShellToolMessage {...baseProps} status={status} ptyId={1} />;
       };
 
-      const { lastFrame, unmount } = renderWithProviders(<Wrapper />, {
+      const { lastFrame, unmount } = await renderWithProviders(<Wrapper />, {
         uiActions,
         uiState: {
           streamingState: StreamingState.Idle,
@@ -170,7 +170,7 @@ describe('<ShellToolMessage />', () => {
         },
       ],
     ])('%s', async (_, props, options) => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ShellToolMessage {...baseProps} {...props} />,
         { uiActions, ...options },
       );
@@ -219,26 +219,29 @@ describe('<ShellToolMessage />', () => {
         focused,
         constrainHeight,
       ) => {
-        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-          <ShellToolMessage
-            {...baseProps}
-            resultDisplay={LONG_OUTPUT}
-            renderOutputAsMarkdown={false}
-            availableTerminalHeight={availableTerminalHeight}
-            ptyId={1}
-            status={CoreToolCallStatus.Executing}
-          />,
-          {
-            uiActions,
-            config: makeFakeConfig({ useAlternateBuffer: true }),
-            settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-            uiState: {
-              activePtyId: focused ? 1 : 2,
-              embeddedShellFocused: focused,
-              constrainHeight,
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ShellToolMessage
+              {...baseProps}
+              resultDisplay={LONG_OUTPUT}
+              renderOutputAsMarkdown={false}
+              availableTerminalHeight={availableTerminalHeight}
+              ptyId={1}
+              status={CoreToolCallStatus.Executing}
+            />,
+            {
+              uiActions,
+              config: makeFakeConfig({ useAlternateBuffer: true }),
+              settings: createMockSettings({
+                ui: { useAlternateBuffer: true },
+              }),
+              uiState: {
+                activePtyId: focused ? 1 : 2,
+                embeddedShellFocused: focused,
+                constrainHeight,
+              },
             },
-          },
-        );
+          );
 
         await waitUntilReady();
         const frame = lastFrame();
@@ -249,7 +252,7 @@ describe('<ShellToolMessage />', () => {
     );
 
     it('fully expands in standard mode when availableTerminalHeight is undefined', async () => {
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <ShellToolMessage
           {...baseProps}
           resultDisplay={LONG_OUTPUT}
@@ -273,7 +276,7 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('fully expands in alternate buffer mode when constrainHeight is false and isExpandable is true', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ShellToolMessage
           {...baseProps}
           resultDisplay={LONG_OUTPUT}
@@ -303,7 +306,7 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('stays constrained in alternate buffer mode when isExpandable is false even if constrainHeight is false', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ShellToolMessage
           {...baseProps}
           resultDisplay={LONG_OUTPUT}

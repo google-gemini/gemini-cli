@@ -108,7 +108,7 @@ describe('AlternateBufferQuittingDisplay', () => {
 
   it('renders with active and pending tool messages', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -125,7 +125,7 @@ describe('AlternateBufferQuittingDisplay', () => {
 
   it('renders with empty history and no pending items', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -142,7 +142,7 @@ describe('AlternateBufferQuittingDisplay', () => {
 
   it('renders with history but no pending items', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -159,7 +159,7 @@ describe('AlternateBufferQuittingDisplay', () => {
 
   it('renders with pending items but no history', async () => {
     persistentStateMock.setData({ tipsShown: 0 });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -195,7 +195,7 @@ describe('AlternateBufferQuittingDisplay', () => {
         ],
       },
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -220,7 +220,7 @@ describe('AlternateBufferQuittingDisplay', () => {
       { id: 1, type: 'user', text: 'Hello Gemini' },
       { id: 2, type: 'gemini', text: 'Hello User!' },
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {

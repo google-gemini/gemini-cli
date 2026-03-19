@@ -25,7 +25,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('renders correctly with default settings', async () => {
     const settings = createMockSettings();
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -37,7 +37,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('toggles an item when enter is pressed', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -62,7 +62,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('reorders items with arrow keys', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -93,7 +93,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('closes on Esc', async () => {
     const settings = createMockSettings();
-    const { stdin, waitUntilReady } = renderWithProviders(
+    const { stdin, waitUntilReady } = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -110,7 +110,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('highlights the active item in the preview', async () => {
     const settings = createMockSettings();
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -148,7 +148,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('shows an empty preview when all items are deselected', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -178,7 +178,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('moves item correctly after trying to move up at the top', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
@@ -217,7 +217,7 @@ describe('<FooterConfigDialog />', () => {
 
   it('updates the preview when Show footer labels is toggled off', async () => {
     const settings = createMockSettings();
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );

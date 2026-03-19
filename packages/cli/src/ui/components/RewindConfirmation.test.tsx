@@ -23,7 +23,7 @@ describe('RewindConfirmation', () => {
       details: [{ fileName: 'test.ts', diff: '' }],
     };
     const onConfirm = vi.fn();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={stats}
         onConfirm={onConfirm}
@@ -40,7 +40,7 @@ describe('RewindConfirmation', () => {
 
   it('renders correctly without stats', async () => {
     const onConfirm = vi.fn();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -58,7 +58,7 @@ describe('RewindConfirmation', () => {
 
   it('calls onConfirm with Cancel on Escape', async () => {
     const onConfirm = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}
@@ -81,7 +81,7 @@ describe('RewindConfirmation', () => {
   it('renders timestamp when provided', async () => {
     const onConfirm = vi.fn();
     const timestamp = new Date().toISOString();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <RewindConfirmation
         stats={null}
         onConfirm={onConfirm}

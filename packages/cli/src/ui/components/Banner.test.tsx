@@ -14,7 +14,7 @@ describe('Banner', () => {
     ['info mode', false, 'Info Message'],
     ['multi-line warning', true, 'Title Line\\nBody Line 1\\nBody Line 2'],
   ])('renders in %s', async (_, isWarning, text) => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <Banner bannerText={text} isWarning={isWarning} width={80} />,
     );
     await renderResult.waitUntilReady();
@@ -24,7 +24,7 @@ describe('Banner', () => {
 
   it('handles newlines in text', async () => {
     const text = 'Line 1\\nLine 2';
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <Banner bannerText={text} isWarning={false} width={80} />,
     );
     await renderResult.waitUntilReady();

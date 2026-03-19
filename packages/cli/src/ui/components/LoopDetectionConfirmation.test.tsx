@@ -12,7 +12,7 @@ describe('LoopDetectionConfirmation', () => {
   const onComplete = vi.fn();
 
   it('renders correctly', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
       { width: 101 },
     );
@@ -22,7 +22,7 @@ describe('LoopDetectionConfirmation', () => {
   });
 
   it('contains the expected options', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
       { width: 100 },
     );
