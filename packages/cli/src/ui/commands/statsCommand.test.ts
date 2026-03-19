@@ -43,12 +43,15 @@ describe('statsCommand', () => {
   it('should display general session stats when run with no subcommand', async () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
-    mockContext.services.config = {
+    mockContext.services.agentContext = {
       refreshUserQuota: vi.fn(),
       refreshAvailableCredits: vi.fn(),
       getUserTierName: vi.fn(),
       getUserPaidTier: vi.fn(),
       getModel: vi.fn(),
+      get config() {
+        return this;
+      },
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');
@@ -80,7 +83,7 @@ describe('statsCommand', () => {
       .fn()
       .mockReturnValue('2025-01-01T12:00:00Z');
 
-    mockContext.services.config = {
+    mockContext.services.agentContext = {
       refreshUserQuota: mockRefreshUserQuota,
       getUserTierName: mockGetUserTierName,
       getModel: mockGetModel,
@@ -89,6 +92,9 @@ describe('statsCommand', () => {
       getQuotaResetTime: mockGetQuotaResetTime,
       getUserPaidTier: vi.fn(),
       refreshAvailableCredits: vi.fn(),
+      get config() {
+        return this;
+      },
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');
