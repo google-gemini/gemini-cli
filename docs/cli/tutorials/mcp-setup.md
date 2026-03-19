@@ -52,7 +52,7 @@ You tell Gemini about new servers by editing your `settings.json`.
         "--rm",
         "-e",
         "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/modelcontextprotocol/servers/github:latest"
+        "ghcr.io/github/github-mcp-server:latest"
       ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"

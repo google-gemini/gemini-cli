@@ -26,6 +26,8 @@ import {
   isHeadlessMode,
   FatalAuthenticationError,
   isCloudShell,
+  PolicyDecision,
+  PRIORITY_YOLO_ALLOW_ALL,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -60,6 +62,11 @@ export async function loadConfig(
     }
   }
 
+  const approvalMode =
+    process.env['GEMINI_YOLO_MODE'] === 'true'
+      ? ApprovalMode.YOLO
+      : ApprovalMode.DEFAULT;
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
     clientName: 'a2a-server',
@@ -74,10 +81,20 @@ export async function loadConfig(
     excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
     allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
-    approvalMode:
-      process.env['GEMINI_YOLO_MODE'] === 'true'
-        ? ApprovalMode.YOLO
-        : ApprovalMode.DEFAULT,
+    approvalMode,
+    policyEngineConfig: {
+      rules:
+        approvalMode === ApprovalMode.YOLO
+          ? [
+              {
+                decision: PolicyDecision.ALLOW,
+                priority: PRIORITY_YOLO_ALLOW_ALL,
+                modes: [ApprovalMode.YOLO],
+                allowRedirection: true,
+              },
+            ]
+          : [],
+    },
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
@@ -110,6 +127,7 @@ export async function loadConfig(
     interactive: !isHeadlessMode(),
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
+    enableAgents: settings.experimental?.enableAgents ?? true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {

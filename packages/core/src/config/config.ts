@@ -61,6 +61,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
+  isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -151,7 +152,8 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import { UserHintService } from './userHintService.js';
+import { InjectionService } from './injectionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
@@ -239,6 +241,8 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   enabled?: boolean;
+  tools?: string[];
+  mcpServers?: Record<string, MCPServerConfig>;
 }
 
 export interface AgentSettings {
@@ -401,6 +405,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { A2AClientManager } from '../agents/a2a-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -520,6 +525,7 @@ export interface ConfigParameters {
   question?: string;
 
   coreTools?: string[];
+  mainAgentTools?: string[];
   /** @deprecated Use Policy Engine instead */
   allowedTools?: string[];
   /** @deprecated Use Policy Engine instead */
@@ -648,13 +654,14 @@ export interface ConfigParameters {
 export class Config implements McpContext, AgentLoopContext {
   private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
+  private readonly a2aClientManager?: A2AClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private allowedEnvironmentVariables: string[];
   private blockedEnvironmentVariables: string[];
   private readonly enableEnvironmentVariableRedaction: boolean;
-  private promptRegistry!: PromptRegistry;
-  private resourceRegistry!: ResourceRegistry;
+  private _promptRegistry!: PromptRegistry;
+  private _resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
@@ -675,6 +682,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
+  private readonly mainAgentTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
   private readonly allowedTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -856,7 +864,7 @@ export class Config implements McpContext, AgentLoopContext {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
-  readonly userHintService: UserHintService;
+  readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -888,6 +896,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.question = params.question;
 
     this.coreTools = params.coreTools;
+    this.mainAgentTools = params.mainAgentTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
@@ -948,7 +957,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -975,6 +984,14 @@ export class Config implements McpContext, AgentLoopContext {
         ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
         ...modelConfigServiceConfig.modelDefinitions,
       };
+      const mergedModelIdResolutions = {
+        ...DEFAULT_MODEL_CONFIGS.modelIdResolutions,
+        ...modelConfigServiceConfig.modelIdResolutions,
+      };
+      const mergedClassifierIdResolutions = {
+        ...DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
+        ...modelConfigServiceConfig.classifierIdResolutions,
+      };
 
       modelConfigServiceConfig = {
         // Preserve other user settings like customAliases
@@ -986,6 +1003,8 @@ export class Config implements McpContext, AgentLoopContext {
           modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
         // Use the merged model definitions
         modelDefinitions: mergedModelDefinitions,
+        modelIdResolutions: mergedModelIdResolutions,
+        classifierIdResolutions: mergedClassifierIdResolutions,
       };
     }
 
@@ -993,12 +1012,13 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
-    this.userHintService = new UserHintService(() =>
+    this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
+    ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
@@ -1049,9 +1069,11 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.useWriteTodos = isPreviewModel(this.model, this)
-      ? false
-      : (params.useWriteTodos ?? true);
+    const isGemini2 = isGemini2Model(this.model);
+    this.useWriteTodos =
+      isGemini2 && !isPreviewModel(this.model, this) && !this.trackerEnabled
+        ? (params.useWriteTodos ?? true)
+        : false;
     this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
@@ -1164,7 +1186,11 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this._sandboxManager = createSandboxManager(
+      params.toolSandboxing ?? false,
+      this.targetDir,
+    );
+    this.a2aClientManager = new A2AClientManager(this);
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
   }
@@ -1219,8 +1245,8 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
-    this.promptRegistry = new PromptRegistry();
-    this.resourceRegistry = new ResourceRegistry();
+    this._promptRegistry = new PromptRegistry();
+    this._resourceRegistry = new ResourceRegistry();
 
     this.agentRegistry = new AgentRegistry(this);
     await this.agentRegistry.initialize();
@@ -1231,10 +1257,14 @@ export class Config implements McpContext, AgentLoopContext {
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
-      this._toolRegistry,
       this,
       this.eventEmitter,
     );
+    this.mcpClientManager.setMainRegistries({
+      toolRegistry: this._toolRegistry,
+      promptRegistry: this.promptRegistry,
+      resourceRegistry: this.resourceRegistry,
+    });
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
     this.mcpInitializationPromise = Promise.allSettled([
@@ -1373,6 +1403,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Fetch admin controls
     const experiments = await this.experimentsPromise;
+
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
@@ -1386,6 +1417,10 @@ export class Config implements McpContext, AgentLoopContext {
       },
     );
     this.setRemoteAdminSettings(adminControls);
+
+    if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
+      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -1445,6 +1480,22 @@ export class Config implements McpContext, AgentLoopContext {
    */
   get toolRegistry(): ToolRegistry {
     return this._toolRegistry;
+  }
+
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get promptRegistry(): PromptRegistry {
+    return this._promptRegistry;
+  }
+
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
+  get resourceRegistry(): ResourceRegistry {
+    return this._resourceRegistry;
   }
 
   /**
@@ -1759,7 +1810,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getPromptRegistry(): PromptRegistry {
-    return this.promptRegistry;
+    return this._promptRegistry;
   }
 
   getSkillManager(): SkillManager {
@@ -1767,7 +1818,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getResourceRegistry(): ResourceRegistry {
-    return this.resourceRegistry;
+    return this._resourceRegistry;
   }
 
   getDebugMode(): boolean {
@@ -1887,6 +1938,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.coreTools;
   }
 
+  getMainAgentTools(): string[] | undefined {
+    return this.mainAgentTools;
+  }
+
   getAllowedTools(): string[] | undefined {
     return this.allowedTools;
   }
@@ -1962,6 +2017,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
+  }
+
+  getA2AClientManager(): A2AClientManager | undefined {
+    return this.a2aClientManager;
   }
 
   setUserInteractedWithMcp(): void {
@@ -2043,6 +2102,43 @@ export class Config implements McpContext, AgentLoopContext {
 
   setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
+  }
+
+  /**
+   * Returns memory for the system instruction.
+   * When JIT is enabled, only global memory (Tier 1) goes in the system
+   * instruction. Extension and project memory (Tier 2) are placed in the
+   * first user message instead, per the tiered context model.
+   */
+  getSystemInstructionMemory(): string | HierarchicalMemory {
+    if (this.experimentalJitContext && this.contextManager) {
+      return this.contextManager.getGlobalMemory();
+    }
+    return this.userMemory;
+  }
+
+  /**
+   * Returns Tier 2 memory (extension + project) for injection into the first
+   * user message when JIT is enabled. Returns empty string when JIT is
+   * disabled (Tier 2 memory is already in the system instruction).
+   */
+  getSessionMemory(): string {
+    if (!this.experimentalJitContext || !this.contextManager) {
+      return '';
+    }
+    const sections: string[] = [];
+    const extension = this.contextManager.getExtensionMemory();
+    const project = this.contextManager.getEnvironmentMemory();
+    if (extension?.trim()) {
+      sections.push(
+        `<extension_context>\n${extension.trim()}\n</extension_context>`,
+      );
+    }
+    if (project?.trim()) {
+      sections.push(`<project_context>\n${project.trim()}\n</project_context>`);
+    }
+    if (sections.length === 0) return '';
+    return `\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
   }
 
   getGlobalMemory(): string {
@@ -2682,6 +2778,30 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns whether the user has access to Pro models.
+   * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
+   */
+  async getProModelNoAccess(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getProModelNoAccessSync();
+  }
+
+  /**
+   * Returns whether the user has access to Pro models synchronously.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getProModelNoAccessSync(): boolean {
+    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
+      return false;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.PRO_MODEL_NO_ACCESS]?.boolValue ??
+      false
+    );
+  }
+
+  /**
    * Returns whether Gemini 3.1 has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
@@ -2982,7 +3102,11 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.messageBus);
+    const registry = new ToolRegistry(
+      this,
+      this.messageBus,
+      /* isMainRegistry= */ true,
+    );
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (
@@ -3119,22 +3243,23 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    if (
-      this.isAgentsEnabled() ||
-      agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
-    ) {
-      const definitions = this.agentRegistry.getAllDefinitions();
+    const definitions = this.agentRegistry.getAllDefinitions();
 
-      for (const definition of definitions) {
-        try {
-          const tool = new SubagentTool(definition, this, this.messageBus);
-          registry.registerTool(tool);
-        } catch (e: unknown) {
-          debugLogger.warn(
-            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-          );
+    for (const definition of definitions) {
+      try {
+        if (
+          !this.isAgentsEnabled() ||
+          agentsOverrides[definition.name]?.enabled === false
+        ) {
+          continue;
         }
+
+        const tool = new SubagentTool(definition, this, this.messageBus);
+        registry.registerTool(tool);
+      } catch (e: unknown) {
+        debugLogger.warn(
+          `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+        );
       }
     }
   }
