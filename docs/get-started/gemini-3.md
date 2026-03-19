@@ -25,7 +25,7 @@ Get started by upgrading Gemini CLI to the latest version:
 npm install -g @google/gemini-cli@latest
 ```
 
-After you’ve confirmed your version is 0.21.1 or later:
+If your version is 0.21.1 or later:
 
 1. Run `/model`.
 2. Select **Auto (Gemini 3)**.
@@ -109,7 +109,7 @@ then:
 
 Restart Gemini CLI and you should have access to Gemini 3.
 
-## Need help?
+## Next steps
 
 If you need help, we recommend searching for an existing
 [GitHub issue](https://github.com/google-gemini/gemini-cli/issues). If you
