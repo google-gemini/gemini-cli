@@ -596,27 +596,27 @@ describe('Core System Prompt (prompts.ts)', () => {
       });
     });
 
-    it('should include YOLO mode instructions in interactive mode', () => {
+    it('should include wildcard policy instructions in interactive mode', () => {
       vi.mocked(mockConfig.getAllowedTools).mockReturnValue(['*']);
       vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
       const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).toContain('# Autonomous Mode (Wildcard Policy)');
       expect(prompt).toContain('Only use the `ask_user` tool if');
     });
 
-    it('should NOT include YOLO mode instructions in non-interactive mode', () => {
+    it('should NOT include wildcard policy instructions in non-interactive mode', () => {
       vi.mocked(mockConfig.getAllowedTools).mockReturnValue(['*']);
       vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
       const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).not.toContain('# Autonomous Mode (Wildcard Policy)');
     });
 
-    it('should NOT include YOLO mode instructions for DEFAULT mode', () => {
+    it('should NOT include wildcard policy instructions for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).not.toContain('# Autonomous Mode (Wildcard Policy)');
     });
   });
 

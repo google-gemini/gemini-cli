@@ -317,7 +317,7 @@ You are running outside of a sandbox container, directly on the user's system. F
 export function renderInteractiveYoloMode(enabled?: boolean): string {
   if (!enabled) return '';
   return `
-# Autonomous Mode (YOLO)
+# Autonomous Mode (Wildcard Policy)
 
 You are operating in **autonomous mode**. The user has requested minimal interruption.
 

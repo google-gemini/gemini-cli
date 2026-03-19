@@ -3097,8 +3097,8 @@
       "properties": {
         "secureModeEnabled": {
           "title": "Secure Mode Enabled",
-          "description": "If true, disallows YOLO mode and \"Always allow\" options from being used.",
-          "markdownDescription": "If true, disallows YOLO mode and \"Always allow\" options from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "If true, disallows YOLO mode (wildcard policies) and \"Always allow\" options from being used.",
+          "markdownDescription": "If true, disallows YOLO mode (wildcard policies) and \"Always allow\" options from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

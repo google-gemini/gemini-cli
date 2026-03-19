@@ -685,7 +685,7 @@ export async function loadCliConfig(
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${rawApprovalMode}. Valid values are: auto_edit, plan, default (yolo is mapped to allowed-tools)`,
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: auto_edit, plan, default`,
         );
     }
   } else {
@@ -698,20 +698,20 @@ export async function loadCliConfig(
     if (isYoloRequested || allowedTools.includes('*')) {
       if (settings.admin?.secureModeEnabled) {
         debugLogger.error(
-          'YOLO mode (wildcard policies) are disabled by "secureModeEnabled" setting.',
+          'Wildcard policies are disabled by "secureModeEnabled" setting.',
         );
       } else {
         debugLogger.error(
-          'YOLO mode (wildcard policies) are disabled by the "disableYolo" setting.',
+          'Wildcard policies are disabled by the "disableYolo" setting.',
         );
       }
       throw new FatalConfigError(
-        getAdminErrorMessage('YOLO mode', undefined /* config */),
+        getAdminErrorMessage('Wildcard policies', undefined /* config */),
       );
     }
   } else if (isYoloRequested) {
     debugLogger.warn(
-      'YOLO mode is enabled via flag or setting. All tool calls will be automatically approved by a wildcard policy.',
+      'Wildcard policy is enabled via flag or setting. All tool calls will be automatically approved.',
     );
     if (!allowedTools.includes('*')) {
       allowedTools = [...allowedTools, '*'];

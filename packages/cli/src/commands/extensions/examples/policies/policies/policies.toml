@@ -1,7 +1,7 @@
 # Example Policy Rules for Gemini CLI Extension
 #
 # Extensions run in Tier 2 (Extension Tier).
-# Security Note: 'allow' decisions and 'yolo' mode configurations are ignored.
+# Security Note: 'allow' decisions and wildcard policies are ignored.
 
 # Rule: Always ask the user before running a specific dangerous shell command.
 [[rule]]

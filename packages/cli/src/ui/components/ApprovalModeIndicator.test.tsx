@@ -38,7 +38,7 @@ describe('ApprovalModeIndicator', () => {
     const { lastFrame, waitUntilReady } = await render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.DEFAULT}
-        isYoloMode={true}
+        isWildcardPolicyEnabled={true}
       />,
     );
     expect(lastFrame()).toMatchSnapshot();

@@ -110,7 +110,7 @@ export interface InputPromptProps {
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
-  isYoloMode?: boolean;
+  isWildcardPolicyEnabled?: boolean;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
@@ -205,7 +205,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   shellModeActive,
   setShellModeActive,
   approvalMode,
-  isYoloMode,
+  isWildcardPolicyEnabled,
   onEscapePromptChange,
   onSuggestionsVisibilityChange,
   vimHandleInput,
@@ -1462,7 +1462,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const showAutoAcceptStyling =
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
-  const showYoloStyling = !shellModeActive && isYoloMode;
+  const showWildcardStyling = !shellModeActive && isWildcardPolicyEnabled;
   const showPlanStyling =
     !shellModeActive && approvalMode === ApprovalMode.PLAN;
 
@@ -1471,9 +1471,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   if (shellModeActive) {
     statusColor = theme.ui.symbol;
     statusText = 'Shell mode';
-  } else if (showYoloStyling) {
+  } else if (showWildcardStyling) {
     statusColor = theme.status.error;
-    statusText = 'YOLO mode';
+    statusText = 'Wildcard policy';
   } else if (showPlanStyling) {
     statusColor = theme.status.success;
     statusText = 'Plan mode';
@@ -1561,7 +1561,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               )
             ) : commandSearchActive ? (
               <Text color={theme.text.accent}>(r:) </Text>
-            ) : showYoloStyling ? (
+            ) : showWildcardStyling ? (
               '*'
             ) : (
               '>'

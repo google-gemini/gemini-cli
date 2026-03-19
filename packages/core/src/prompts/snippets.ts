@@ -440,7 +440,7 @@ export function renderSandbox(options?: SandboxOptions): string {
 export function renderInteractiveYoloMode(enabled?: boolean): string {
   if (!enabled) return '';
   return `
-# Autonomous Mode (YOLO)
+# Autonomous Mode (Wildcard Policy)
 
 You are operating in **autonomous mode**. The user has requested minimal interruption.
 
