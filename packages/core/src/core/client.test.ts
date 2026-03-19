@@ -180,12 +180,10 @@ describe('Gemini Client (client.ts)', () => {
     setSimulate429(false);
 
     mockRouterService = {
-      route: vi
-        .fn()
-        .mockResolvedValue({
-          model: PREVIEW_GEMINI_FLASH_MODEL,
-          reason: 'test',
-        }),
+      route: vi.fn().mockResolvedValue({
+        model: PREVIEW_GEMINI_FLASH_MODEL,
+        reason: 'test',
+      }),
     };
 
     mockContentGenerator = {
