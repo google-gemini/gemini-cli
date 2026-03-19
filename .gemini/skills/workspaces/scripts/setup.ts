@@ -310,7 +310,13 @@ and full builds) to a dedicated, high-performance GCP worker.
     security: {
       auth: {
         selectedType: authStrategy
+      },
+      folderTrust: {
+        enabled: false
       }
+    },
+    general: {
+      enableAutoUpdate: false
     }
   };
   
