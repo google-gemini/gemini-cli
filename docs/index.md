@@ -118,14 +118,15 @@ Support, release history, and legal information.
 - **[FAQ](./resources/faq.md):** Answers to frequently asked questions.
 - **[Quota and pricing](./resources/quota-and-pricing.md):** Limits and billing
   details.
-- **[Terms and privacy](./tos-privacy):** Official notices and terms.
+- **[Terms and privacy](./resources/tos-privacy.md):** Official notices and
+  terms.
 - **[Troubleshooting](./resources/troubleshooting.md):** Common issues and
   solutions.
 - **[Uninstall](./resources/uninstall.md):** How to uninstall Gemini CLI.
 
 ## Development
 
-- **[Contribution guide](/docs/contributing):** How to contribute to Gemini CLI.
+- **[Contribution guide](../CONTRIBUTING.md):** How to contribute to Gemini CLI.
 - **[Integration testing](./integration-tests.md):** Running integration tests.
 - **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for
   issues and pull requests.

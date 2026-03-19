@@ -187,11 +187,11 @@ visualize your telemetry.
 Find this dashboard under **Google Cloud Monitoring Dashboard Templates** as
 "**Gemini CLI Monitoring**".
 
-![Gemini CLI Monitoring Dashboard Overview](/docs/assets/monitoring-dashboard-overview.png)
+![Gemini CLI Monitoring Dashboard Overview](../assets/monitoring-dashboard-overview.png)
 
-![Gemini CLI Monitoring Dashboard Metrics](/docs/assets/monitoring-dashboard-metrics.png)
+![Gemini CLI Monitoring Dashboard Metrics](../assets/monitoring-dashboard-metrics.png)
 
-![Gemini CLI Monitoring Dashboard Logs](/docs/assets/monitoring-dashboard-logs.png)
+![Gemini CLI Monitoring Dashboard Logs](../assets/monitoring-dashboard-logs.png)
 
 To learn more, see
 [Instant insights: Gemini CLI’s pre-configured monitoring dashboards](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards/).
