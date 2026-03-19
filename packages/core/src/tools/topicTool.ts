@@ -18,25 +18,35 @@ import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getCreateNewTopicDeclaration } from './definitions/dynamic-declaration-helpers.js';
+import type { Config } from '../config/config.js';
 
 /**
- * Singleton to manage the current active topic title.
+ * Manages the current active topic title for a session.
+ * Hosted within the Config instance for session-scoping.
  */
-export class TopicManager {
-  private static instance: TopicManager;
+export class TopicState {
   private activeTopicTitle?: string;
 
-  private constructor() {}
+  /**
+   * Sanitizes and sets the topic title.
+   * @returns true if the title was valid and set, false otherwise.
+   */
+  setTopic(title: string): boolean {
+    if (!title) return false;
 
-  static getInstance(): TopicManager {
-    if (!TopicManager.instance) {
-      TopicManager.instance = new TopicManager();
+    // 1. Trim whitespace
+    let sanitized = title.trim();
+
+    // 2. Security: Strip newlines and carriage returns to prevent prompt injection/breakout
+    sanitized = sanitized.replace(/[\r\n]+/g, ' ');
+
+    // 3. Robustness check: Ensure it's not empty after sanitization
+    if (sanitized.length === 0) {
+      return false;
     }
-    return TopicManager.instance;
-  }
 
-  setTopic(title: string): void {
-    this.activeTopicTitle = title;
+    this.activeTopicTitle = sanitized;
+    return true;
   }
 
   getTopic(): string | undefined {
@@ -56,6 +66,15 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
   CreateNewTopicParams,
   ToolResult
 > {
+  constructor(
+    params: CreateNewTopicParams,
+    messageBus: MessageBus,
+    toolName: string,
+    private readonly config: Config,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
   getDescription(): string {
     return `Create new topic: "${this.params[TOPIC_PARAM_TITLE]}"`;
   }
@@ -63,10 +82,12 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
   async execute(): Promise<ToolResult> {
     const title = this.params[TOPIC_PARAM_TITLE];
 
-    if (!title) {
+    const success = this.config.topicState.setTopic(title);
+
+    if (!success) {
       return {
-        llmContent: 'Error: A valid topic title is required.',
-        returnDisplay: 'Error: A valid topic title is required.',
+        llmContent: 'Error: A valid, non-empty topic title is required.',
+        returnDisplay: 'Error: A valid, non-empty topic title is required.',
         error: {
           message: 'A valid topic title is required.',
           type: ToolErrorType.INVALID_TOOL_PARAMS,
@@ -74,12 +95,12 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
       };
     }
 
-    debugLogger.log(`[TopicTool] Changing topic to: "${title.trim()}"`);
-    TopicManager.getInstance().setTopic(title.trim());
+    const setTopic = this.config.topicState.getTopic()!;
+    debugLogger.log(`[TopicTool] Changing topic to: "${setTopic}"`);
 
     return {
-      llmContent: `Current topic: "${title.trim()}"`,
-      returnDisplay: `Current topic: **${title.trim()}**`,
+      llmContent: `Current topic: "${setTopic}"`,
+      returnDisplay: `Current topic: **${setTopic}**`,
     };
   }
 }
@@ -91,7 +112,10 @@ export class CreateNewTopicTool extends BaseDeclarativeTool<
   CreateNewTopicParams,
   ToolResult
 > {
-  constructor(messageBus: MessageBus) {
+  constructor(
+    private readonly config: Config,
+    messageBus: MessageBus,
+  ) {
     const declaration = getCreateNewTopicDeclaration();
     super(
       CREATE_NEW_TOPIC_TOOL_NAME,
@@ -107,6 +131,11 @@ export class CreateNewTopicTool extends BaseDeclarativeTool<
     params: CreateNewTopicParams,
     messageBus: MessageBus,
   ): CreateNewTopicInvocation {
-    return new CreateNewTopicInvocation(params, messageBus, this.name);
+    return new CreateNewTopicInvocation(
+      params,
+      messageBus,
+      this.name,
+      this.config,
+    );
   }
 }
