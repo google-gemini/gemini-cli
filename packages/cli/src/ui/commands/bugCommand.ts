@@ -32,8 +32,8 @@ export const bugCommand: SlashCommand = {
   autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();
-    const { config } = context.services;
-
+    const agentContext = context.services.agentContext;
+    const config = agentContext?.config;
     const osVersion = `${process.platform} ${process.version}`;
     let sandboxEnv = 'no sandbox';
     if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
@@ -73,7 +73,7 @@ export const bugCommand: SlashCommand = {
       info += `* **IDE Client:** ${ideClient}\n`;
     }
 
-    const chat = config?.getGeminiClient()?.getChat();
+    const chat = agentContext?.geminiClient?.getChat();
     const history = chat?.getHistory() || [];
     let historyFileMessage = '';
     let problemValue = bugDescription;
@@ -134,7 +134,7 @@ export const bugCommand: SlashCommand = {
 };
 
 async function getIdeClientName(context: CommandContext) {
-  if (!context.services.config?.getIdeMode()) {
+  if (!context.services.agentContext?.config.getIdeMode()) {
     return '';
   }
   const ideClient = await IdeClient.getInstance();

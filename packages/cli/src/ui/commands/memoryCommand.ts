@@ -29,7 +29,7 @@ export const memoryCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context) => {
-        const config = context.services.config;
+        const config = context.services.agentContext?.config;
         if (!config) return;
         const result = showMemory(config);
 
@@ -81,7 +81,7 @@ export const memoryCommand: SlashCommand = {
         );
 
         try {
-          const config = context.services.config;
+          const config = context.services.agentContext?.config;
           if (config) {
             const result = await refreshMemory(config);
 
@@ -111,7 +111,7 @@ export const memoryCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context) => {
-        const config = context.services.config;
+        const config = context.services.agentContext?.config;
         if (!config) return;
         const result = listMemoryFiles(config);
 
