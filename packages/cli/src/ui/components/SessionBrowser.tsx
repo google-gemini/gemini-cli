@@ -14,7 +14,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { type Config } from '@google/gemini-cli-core';
-import type { SessionInfo, TextMatch } from '../../utils/sessionUtils.js';
+import type { SessionInfo } from '../../utils/sessionUtils.js';
 import {
   formatRelativeTime,
   getSessionFiles,
