@@ -17,7 +17,9 @@ describe('<CliSpinner />', () => {
 
   it('should increment debugNumAnimatedComponents on mount and decrement on unmount', async () => {
     expect(debugState.debugNumAnimatedComponents).toBe(0);
-    const { waitUntilReady, unmount } = renderWithProviders(<CliSpinner />);
+    const { waitUntilReady, unmount } = await renderWithProviders(
+      <CliSpinner />,
+    );
     await waitUntilReady();
     expect(debugState.debugNumAnimatedComponents).toBe(1);
     unmount();
@@ -26,7 +28,7 @@ describe('<CliSpinner />', () => {
 
   it('should not render when showSpinner is false', async () => {
     const settings = createMockSettings({ ui: { showSpinner: false } });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <CliSpinner />,
       { settings },
     );
