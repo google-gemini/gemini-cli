@@ -88,12 +88,16 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
   const remoteConfigPath = `${hostWorkspaceRoot}/gemini-cli-config/.gemini/settings.json`;
   
-  // FIX: Dynamically retrieve the API key from the host-side config to inject it
+  // FIX: Dynamically retrieve the API key and GitHub token from the host-side config/disk
   const apiKeyRes = await provider.getExecOutput(`cat ${remoteConfigPath} | grep apiKey | cut -d '\"' -f 4`);
   const remoteApiKey = apiKeyRes.stdout.trim();
+  
+  const ghTokenRes = await provider.getExecOutput(`cat ${hostWorkspaceRoot}/.gh_token`);
+  const remoteGhToken = ghTokenRes.stdout.trim();
 
   // DEBUG: Run directly in foreground WITHOUT tmux to see immediate errors
-  const containerWrap = `sudo docker exec -it ${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey}` : ''} maintainer-worker sh -c ${q(`cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
+  const authEnv = `${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
+  const containerWrap = `sudo docker exec -it ${authEnv}maintainer-worker sh -c ${q(`cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 

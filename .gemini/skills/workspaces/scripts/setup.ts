@@ -337,12 +337,15 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   if (githubToken) {
     await provider.exec(`echo ${githubToken} | sudo tee ${workspaceRoot}/.gh_token > /dev/null && sudo chmod 600 ${workspaceRoot}/.gh_token`);
+    // Authenticate GH CLI on host
+    await provider.exec(`sudo -u $(whoami) gh auth login --with-token < ${workspaceRoot}/.gh_token`);
+    console.log('   ✅ Authenticated GitHub CLI on host.');
   }
 
   // Final Repo Sync
   console.log(`🚀 Finalizing Remote Repository (${userFork})...`);
   const repoUrl = `https://github.com/${userFork}.git`;
-  const cloneCmd = `sudo rm -rf ${workspaceRoot}/main && sudo git clone --quiet --filter=blob:none ${repoUrl} ${workspaceRoot}/main && cd ${workspaceRoot}/main && sudo git remote add upstream https://github.com/${upstreamRepo}.git && sudo git fetch --quiet upstream && sudo chown -R $(whoami):$(whoami) ${workspaceRoot}`;
+  const cloneCmd = `sudo rm -rf ${workspaceRoot}/main && sudo git clone --quiet --filter=blob:none ${repoUrl} ${workspaceRoot}/main && sudo git -C ${workspaceRoot}/main remote add upstream https://github.com/${upstreamRepo}.git && sudo git -C ${workspaceRoot}/main fetch --quiet upstream && sudo chown -R $(whoami):$(whoami) ${workspaceRoot}`;
   await provider.exec(cloneCmd);
 
   console.log('\n✨ ALL SYSTEMS GO! Your Gemini Workspace is ready.');

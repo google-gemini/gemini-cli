@@ -10,7 +10,7 @@ export async function runReviewPlaybook(prNumber: string, targetDir: string, pol
   runner.register([
     { id: 'build', name: 'Fast Build', cmd: `cd ${targetDir} && npm ci && npm run build` },
     { id: 'ci', name: 'CI Checks', cmd: `gh pr checks ${prNumber}` },
-    { id: 'review', name: 'Workspaceed Review', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "Please activate the 'review-pr' skill and use it to conduct a behavioral review of PR #${prNumber}."` }
+    { id: 'review', name: 'Workspaceed Review', cmd: `cd ${targetDir} && ${geminiBin} --policy ${policyPath} -p "Please activate the 'review-pr' skill and use it to conduct a behavioral review of PR #${prNumber}."` }
   ]);
 
   return runner.run();
