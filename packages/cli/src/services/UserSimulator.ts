@@ -24,7 +24,7 @@ export class UserSimulator {
       return;
     }
     this.isRunning = true;
-    this.timer = setInterval(() => this.tick(), 2000);
+    this.timer = setInterval(() => this.tick(), 1000);
   }
 
   stop() {
@@ -44,6 +44,7 @@ export class UserSimulator {
       const screen = this.getScreen();
       if (!screen || screen === this.lastScreenContent) return;
 
+      debugLogger.log('[SIMULATOR] Tick: Processing new screen content...');
       const strippedScreen = screen.replace(
         // eslint-disable-next-line no-control-regex
         /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
@@ -96,21 +97,44 @@ Do NOT output markdown, explanations of your thought process, or quotes. Output 
         LlmRole.UTILITY_SIMULATOR,
       );
 
-      const responseText = (response.text || '')
-        .trim()
-        .replace(/^[`"']+|[`"']+$/g, '');
-      if (responseText === '<DONE>') {
-        debugLogger.log('User simulator detected task completion. Exiting.');
+      const responseText = (response.text || '').replace(
+        /^[`"']+|[`"']+$/g,
+        '',
+      );
+      const trimmedResponse = responseText.trim();
+
+      debugLogger.log(
+        `[SIMULATOR] Raw model response: ${JSON.stringify(response.text)}`,
+      );
+      debugLogger.log(
+        `[SIMULATOR] Processed response: ${JSON.stringify(responseText)}`,
+      );
+
+      if (trimmedResponse === '<DONE>') {
+        debugLogger.log('[SIMULATOR] Detected task completion. Exiting.');
         // eslint-disable-next-line no-console
         console.log('\n[SIMULATOR] Task complete. Exiting.');
         this.stop();
         process.exit(0);
       }
 
-      if (responseText && responseText !== '<WAIT>') {
+      if (trimmedResponse === '<WAIT>') {
+        debugLogger.log(
+          '[SIMULATOR] Skipping action (model decided to <WAIT>)',
+        );
+        this.lastScreenContent = screen;
+        return;
+      }
+
+      if (responseText) {
         const keys = responseText.replace(/\\n/g, '\n');
+        debugLogger.log(
+          `[SIMULATOR] Sending to stdin: ${JSON.stringify(keys)}`,
+        );
         this.stdinBuffer.write(keys);
         this.lastScreenContent = screen;
+      } else {
+        debugLogger.log('[SIMULATOR] Skipping (empty response)');
       }
     } catch (e: unknown) {
       debugLogger.error('UserSimulator tick failed', e);
