@@ -544,7 +544,7 @@ async function linkAction(
   requestConsentOverride?: (consent: string) => Promise<boolean>,
 ) {
   const extensionLoader =
-    context.services.agentContext?.config?.getExtensionLoader();
+    context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
