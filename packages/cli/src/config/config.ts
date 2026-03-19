@@ -125,12 +125,19 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
-    .option('debug', {
-      alias: 'd',
-      type: 'boolean',
-      description: 'Run in debug mode (open debug console with F12)',
-      default: false,
-    })
+  if (settings.experimental?.extensionManagement) {
+    yargsInstance.command(extensionsCommand);
+  }
+
+  if (settings.skills?.enabled ?? true) {
+    yargsInstance.command(skillsCommand);
+  }
+  // Register hooks command if hooks are enabled
+  if (settings.hooksConfig.enabled) {
+    yargsInstance.command(hooksCommand);
+  }
+
+  yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
@@ -300,56 +307,6 @@ export async function parseArguments(
           description: 'Suppress the security warning when using --raw-output.',
         }),
     )
-    // Register MCP subcommands
-    .command(mcpCommand)
-    // Ensure validation flows through .fail() for clean UX
-    .fail((msg, err) => {
-      if (err) throw err;
-      throw new Error(msg);
-    })
-    .check((argv) => {
-      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-      // This guard safely checks if any positional argument was provided.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const query = argv['query'] as string | string[] | undefined;
-      const hasPositionalQuery = Array.isArray(query)
-        ? query.length > 0
-        : !!query;
-
-      if (argv['prompt'] && hasPositionalQuery) {
-        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-      }
-      if (argv['prompt'] && argv['promptInteractive']) {
-        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-      }
-      if (argv['yolo'] && argv['approvalMode']) {
-        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-      }
-      if (
-        argv['outputFormat'] &&
-        !['text', 'json', 'stream-json'].includes(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['outputFormat'] as string,
-        )
-      ) {
-        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
-      }
-      return true;
-    });
-
-  if (settings.experimental?.extensionManagement) {
-    yargsInstance.command(extensionsCommand);
-  }
-
-  if (settings.skills?.enabled ?? true) {
-    yargsInstance.command(skillsCommand);
-  }
-  // Register hooks command if hooks are enabled
-  if (settings.hooksConfig.enabled) {
-    yargsInstance.command(hooksCommand);
-  }
-
-  yargsInstance
     .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
