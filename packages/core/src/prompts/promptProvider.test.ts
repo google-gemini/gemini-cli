@@ -15,6 +15,8 @@ import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
+import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { TopicManager } from '../tools/topicTool.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
@@ -73,6 +75,8 @@ describe('PromptProvider', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 
@@ -232,6 +236,67 @@ describe('PromptProvider', () => {
       const prompt = provider.getCompressionPrompt(mockConfig);
 
       expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+  });
+
+  describe('Topic & Update Narration', () => {
+    beforeEach(() => {
+      TopicManager.getInstance().reset();
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue([CREATE_NEW_TOPIC_TOOL_NAME]),
+        getAllTools: vi
+          .fn()
+          .mockReturnValue([
+            new MockTool({
+              name: CREATE_NEW_TOPIC_TOOL_NAME,
+              displayName: 'Topic',
+            }),
+          ]),
+      });
+      vi.mocked(mockConfig.getHasAccessToPreviewModel).mockReturnValue(true);
+      vi.mocked(mockConfig.getGemini31LaunchedSync).mockReturnValue(true);
+    });
+
+    it('should include active topic context when narration is enabled', () => {
+      TopicManager.getInstance().setTopic('Active Chapter');
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('[Active Topic: Active Chapter]');
+    });
+
+    it('should NOT include active topic context when narration is disabled', () => {
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
+        false,
+      );
+      TopicManager.getInstance().setTopic('Active Chapter');
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).not.toContain('[Active Topic: Active Chapter]');
+    });
+
+    it('should filter out create_new_topic tool when narration is disabled', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
+        false,
+      );
+      const provider = new PromptProvider();
+
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain(CREATE_NEW_TOPIC_TOOL_NAME);
+    });
+
+    it('should NOT filter out create_new_topic tool when narration is enabled', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain(
+        `<tool>\`${CREATE_NEW_TOPIC_TOOL_NAME}\`</tool>`,
+      );
     });
   });
 });

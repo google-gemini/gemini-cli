@@ -57,7 +57,10 @@ import {
 } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  ACTIVATE_SKILL_TOOL_NAME,
+  CREATE_NEW_TOPIC_TOOL_NAME,
+} from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
@@ -1561,6 +1564,34 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxEnabled()).toBe(true);
       expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
       expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+  });
+
+  describe('Topic & Update Narration', () => {
+    it('should NOT exclude topic tool when narration is enabled', () => {
+      const config = new Config({
+        ...baseParams,
+        topicUpdateNarration: true,
+      });
+      const excluded = config.getExcludeTools();
+      expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(false);
+    });
+
+    it('should exclude topic tool when narration is disabled', () => {
+      const config = new Config({
+        ...baseParams,
+        topicUpdateNarration: false,
+      });
+      const excluded = config.getExcludeTools();
+      expect(excluded).toBeDefined();
+      expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(true);
+    });
+
+    it('should default to disabled and exclude topic tool', () => {
+      const config = new Config(baseParams);
+      expect(config.isTopicUpdateNarrationEnabled()).toBe(false);
+      const excluded = config.getExcludeTools();
+      expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(true);
     });
   });
 });

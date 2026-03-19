@@ -23,6 +23,7 @@ import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -36,6 +37,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { CreateNewTopicTool } from '../tools/topicTool.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -2112,6 +2114,10 @@ export class Config implements McpContext, AgentLoopContext {
       excludeToolsSet.add(tool);
     }
 
+    if (!this.isTopicUpdateNarrationEnabled()) {
+      excludeToolsSet.add(CREATE_NEW_TOPIC_TOOL_NAME);
+    }
+
     return excludeToolsSet;
   }
 
@@ -3314,6 +3320,10 @@ export class Config implements McpContext, AgentLoopContext {
         registerFn();
       }
     };
+
+    maybeRegister(CreateNewTopicTool, () =>
+      registry.registerTool(new CreateNewTopicTool(this.messageBus)),
+    );
 
     maybeRegister(LSTool, () =>
       registry.registerTool(new LSTool(this, this.messageBus)),

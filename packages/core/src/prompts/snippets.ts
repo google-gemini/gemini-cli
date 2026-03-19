@@ -10,6 +10,7 @@ import {
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  CREATE_NEW_TOPIC_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -615,18 +616,17 @@ function mandateConfirm(interactive: boolean): string {
 function mandateTopicUpdateModel(): string {
   return `
 - **Protocol: Topic Model**
-  You are an agentic system. You must maintain a visible state log that tracks broad logical phases using a specific header format.
+  You are an agentic system. You must organize your work into logical "Chapters" using the \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool.
 
-- **1. Topic Initialization & Persistence:**
-  - **The Trigger:** You MUST issue a \`Topic: <Phase> : <Brief Summary>\` header ONLY when beginning a task or when the broad logical nature of the task changes (e.g., transitioning from research to implementation).
-  - **The Format:** Use exactly \`Topic: <Phase> : <Brief Summary>\` (e.g., \`Topic: <Research> : Researching Agent Skills in the repo\`).
-  - **Persistence:** Once a Topic is declared, do NOT repeat it for subsequent tool calls or in subsequent messages within that same phase. 
-  - **Start of Task:** Your very first tool execution must be preceded by a Topic header.
+- **1. Chapter Initialization:**
+  - **The Trigger:** You MUST call \`${CREATE_NEW_TOPIC_TOOL_NAME}\` ONLY when beginning a new task or when the broad logical nature of your work changes (e.g., transitioning from Research to Strategy, or from Strategy to Implementation).
+  - **The Format:** Provide a concise, high-level title for the chapter (e.g., \`create_new_topic(title="Researching Agent Skills")\`).
+  - **Start of Task:** Your very first tool execution in a new session must be \`${CREATE_NEW_TOPIC_TOOL_NAME}\`.
 
-- **2. Tool Execution Protocol (Zero-Noise):**
-  - **No Per-Tool Headers:** It is a violation of protocol to print "Topic:" before every tool call. 
+- **2. Zero-Noise Execution:**
+  - **No Text Headers:** You are FORBIDDEN from printing "Topic: <Phase>" or any similar text-based headers in your response. The tool handles all UI narration.
   - **Silent Mode:** No conversational filler, no "I will now...", and no summaries between tools. 
-  - Only the Topic header at the start of a broad phase is permitted to break the silence. Everything in between must be silent.
+  - Only the tool execution is permitted to define the state. Everything in between must be silent.
 
 - **3. Thinking Protocol:**
   - Use internal thought blocks to keep track of what tools you have called, plan your next steps, and reason about the task.
@@ -636,24 +636,10 @@ function mandateTopicUpdateModel(): string {
 - **4. Completion:**
   - Only when the entire task is finalized do you provide a **Final Summary**.
 
-**IMPORTANT: Topic Headers vs. Thoughts**
-The \`Topic: <Phase> : <Brief Summary>\` header must **NOT** be placed inside a thought block. It must be standard text output so that it is properly rendered and displayed in the UI.
+**IMPORTANT: Tool Usage vs. Text**
+The \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool MUST be called as a proper tool. Do NOT simply write the tool name in your text response.
 
-**Correct State Log Example:**
-\`\`\`
-Topic: <Research> : Researching Agent Skills in the repo
-<tool_call 1>
-<tool_call 2>
-<tool_call 3>
-
-Topic: <Implementation> : Implementing the skill-creator logic
-<tool_call 1>
-<tool_call 2>
-
-The task is complete. [Final Summary]
-\`\`\`
-
-- **Constraint Enforcement:** If you repeat a "Topic:" line without a fundamental shift in work, or if you provide a Topic for every tool call, you have failed the system integrity protocol.`;
+- **Constraint Enforcement:** If you provide a manual "Topic:" text header, or if you call the tool for every single tool execution without a fundamental shift in work, you have failed the system integrity protocol.`;
 }
 
 function mandateExplainBeforeActing(): string {

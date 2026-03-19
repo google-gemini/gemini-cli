@@ -24,6 +24,8 @@ import {
   EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
+  CREATE_NEW_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
 } from './base-declarations.js';
 
 /**
@@ -202,5 +204,26 @@ export function getActivateSkillDeclaration(
     name: ACTIVATE_SKILL_TOOL_NAME,
     description: `Activates a specialized agent skill by name${availableSkillsHint}. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.`,
     parametersJsonSchema: zodToJsonSchema(schema),
+  };
+}
+
+/**
+ * Returns the FunctionDeclaration for creating a new topic.
+ */
+export function getCreateNewTopicDeclaration(): FunctionDeclaration {
+  return {
+    name: CREATE_NEW_TOPIC_TOOL_NAME,
+    description:
+      'Organizes work into a new "Chapter" or "Topic". Call this when transitioning between major phases (e.g., from Research to Implementation).',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [TOPIC_PARAM_TITLE]: {
+          type: 'string',
+          description: 'The title of the new topic or chapter.',
+        },
+      },
+      required: [TOPIC_PARAM_TITLE],
+    },
   };
 }

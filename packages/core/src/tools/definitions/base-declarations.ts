@@ -125,3 +125,7 @@ export const PLAN_MODE_PARAM_REASON = 'reason';
 
 // -- sandbox --
 export const PARAM_ADDITIONAL_PERMISSIONS = 'additional_permissions';
+
+// -- create_new_topic --
+export const CREATE_NEW_TOPIC_TOOL_NAME = 'create_new_topic';
+export const TOPIC_PARAM_TITLE = 'title';

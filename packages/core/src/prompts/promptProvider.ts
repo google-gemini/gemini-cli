@@ -26,11 +26,13 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  CREATE_NEW_TOPIC_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { TopicManager } from '../tools/topicTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -57,6 +59,10 @@ export class PromptProvider {
     const skills = context.config.getSkillManager().getSkills();
     const toolNames = context.toolRegistry.getAllToolNames();
     const enabledToolNames = new Set(toolNames);
+
+    if (!context.config.isTopicUpdateNarrationEnabled()) {
+      enabledToolNames.delete(CREATE_NEW_TOPIC_TOOL_NAME);
+    }
     const approvedPlanPath = context.config.getApprovedPlanPath();
 
     const desiredModel = resolveModel(
@@ -74,7 +80,15 @@ export class PromptProvider {
     // --- Context Gathering ---
     let planModeToolsList = '';
     if (isPlanMode) {
-      const allTools = context.toolRegistry.getAllTools();
+      const allTools = context.toolRegistry.getAllTools().filter((t) => {
+        if (
+          !context.config.isTopicUpdateNarrationEnabled() &&
+          t.name === CREATE_NEW_TOPIC_TOOL_NAME
+        ) {
+          return false;
+        }
+        return true;
+      });
       planModeToolsList = allTools
         .map((t) => {
           if (t instanceof DiscoveredMCPTool) {
@@ -232,7 +246,15 @@ export class PromptProvider {
     );
 
     // Sanitize erratic newlines from composition
-    const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+    let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+
+    // Context Reinjection (Active Topic)
+    if (context.config.isTopicUpdateNarrationEnabled()) {
+      const activeTopic = TopicManager.getInstance().getTopic();
+      if (activeTopic) {
+        sanitizedPrompt += `\n\n[Active Topic: ${activeTopic}]`;
+      }
+    }
 
     // Write back to file if requested
     this.maybeWriteSystemMd(
