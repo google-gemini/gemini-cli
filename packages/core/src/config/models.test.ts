@@ -190,14 +190,6 @@ describe('Dynamic Configuration Parity', () => {
     }
   });
 
-  it('supportsModernFeatures should match legacy behavior', () => {
-    for (const model of modelsToTest) {
-      const legacy = supportsModernFeatures(model);
-      const dynamic = supportsModernFeatures(model);
-      expect(dynamic).toBe(legacy);
-    }
-  });
-
   it('supportsMultimodalFunctionResponse should match legacy behavior', () => {
     for (const model of modelsToTest) {
       const legacy = supportsMultimodalFunctionResponse(model, legacyConfig);
