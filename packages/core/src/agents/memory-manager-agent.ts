@@ -136,7 +136,6 @@ When adding a memory, route it to the right store:
 # Insufficient context
 If you find that you have insufficient context to read or modify the memories as described,
 reply with what you need, and exit. Do not search the codebase for the missing context.
-${getInitialContext()}
 `.trim();
 
   return {
@@ -179,7 +178,7 @@ ${getInitialContext()}
     get promptConfig() {
       return {
         systemPrompt: buildSystemPrompt(),
-        query: '${request}',
+        query: `${getInitialContext()}\${request}`,
       };
     },
     runConfig: {

@@ -107,13 +107,13 @@ describe('MemoryManagerAgent', () => {
     );
 
     const agent = MemoryManagerAgent(projectRoot);
-    const prompt = agent.promptConfig.systemPrompt;
+    const query = agent.promptConfig.query;
 
-    expect(prompt).toContain('# Initial Context');
-    expect(prompt).toContain(`## File: ${globalFile}`);
-    expect(prompt).toContain('global context');
-    expect(prompt).toContain(`## File: ${projectFile}`);
-    expect(prompt).toContain('project context');
+    expect(query).toContain('# Initial Context');
+    expect(query).toContain(`## File: ${globalFile}`);
+    expect(query).toContain('global context');
+    expect(query).toContain(`## File: ${projectFile}`);
+    expect(query).toContain('project context');
   });
 
   it('should inject GEMINI.md files along the CWD up to project root', () => {
@@ -146,13 +146,13 @@ describe('MemoryManagerAgent', () => {
     );
 
     const agent = MemoryManagerAgent(projectRoot);
-    const prompt = agent.promptConfig.systemPrompt;
+    const query = agent.promptConfig.query;
 
-    expect(prompt).toContain('# Initial Context');
-    expect(prompt).toContain(`## File: ${srcFile}`);
-    expect(prompt).toContain('src context');
-    expect(prompt).toContain(`## File: ${moduleFile}`);
-    expect(prompt).toContain('module context');
+    expect(query).toContain('# Initial Context');
+    expect(query).toContain(`## File: ${srcFile}`);
+    expect(query).toContain('src context');
+    expect(query).toContain(`## File: ${moduleFile}`);
+    expect(query).toContain('module context');
   });
 
   it('should have file-management and search tools', () => {
