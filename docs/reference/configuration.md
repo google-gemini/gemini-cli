@@ -698,7 +698,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "pro",
         "family": "gemini-3",
         "isPreview": true,
-        "isVisible": false,
+        "isVisible": true,
         "features": {
           "thinking": true,
           "multimodalToolUse": true
