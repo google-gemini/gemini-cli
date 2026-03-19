@@ -1276,8 +1276,19 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Legacy full-process sandbox execution environment. Set to a
     boolean to enable or disable the sandbox, provide a string path to a sandbox
     profile, or specify an explicit sandbox command (e.g., "docker", "podman",
-    "lxc").
+    "lxc", "windows-native").
   - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`tools.sandboxAllowedPaths`** (array):
+  - **Description:** List of additional paths that the sandbox is allowed to
+    access.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`tools.sandboxNetworkAccess`** (boolean):
+  - **Description:** Whether the sandbox is allowed to access the network.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`tools.shell.enableInteractiveShell`** (boolean):
