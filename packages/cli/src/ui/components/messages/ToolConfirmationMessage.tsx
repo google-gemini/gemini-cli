@@ -88,13 +88,14 @@ export const ToolConfirmationMessage: React.FC<
   const settings = useSettings();
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval &&
-    !config.getDisableAlwaysAllow();
+    (config?.getDisableAlwaysAllow ? !config.getDisableAlwaysAllow() : true);
 
   const handlesOwnUI =
     confirmationDetails.type === 'ask_user' ||
     confirmationDetails.type === 'exit_plan_mode';
   const isTrustedFolder =
-    config.isTrustedFolder() && !config.getDisableAlwaysAllow();
+    config?.isTrustedFolder?.() &&
+    (config?.getDisableAlwaysAllow ? !config.getDisableAlwaysAllow() : true);
 
   const handleConfirm = useCallback(
     (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {

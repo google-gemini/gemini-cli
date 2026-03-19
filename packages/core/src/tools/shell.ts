@@ -45,6 +45,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { Config } from '../config/config.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -62,14 +63,23 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
+  private readonly config: Config;
+  private readonly geminiClient?: GeminiClient;
+
   constructor(
-    private readonly context: AgentLoopContext,
+    context: Config | AgentLoopContext,
     params: ShellToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+    if ('config' in context) {
+      this.config = context.config;
+      this.geminiClient = context.geminiClient;
+    } else {
+      this.config = context;
+    }
   }
 
   getDescription(): string {
@@ -168,7 +178,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       .toString('hex')}.tmp`;
     const tempFilePath = path.join(os.tmpdir(), tempFileName);
 
-    const timeoutMs = this.context.config.getShellToolInactivityTimeout();
+    const timeoutMs = this.config.getShellToolInactivityTimeout();
     const timeoutController = new AbortController();
     let timeoutTimer: NodeJS.Timeout | undefined;
 
@@ -189,10 +199,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
           })();
 
       const cwd = this.params.dir_path
-        ? path.resolve(this.context.config.getTargetDir(), this.params.dir_path)
-        : this.context.config.getTargetDir();
+        ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
+        : this.config.getTargetDir();
 
-      const validationError = this.context.config.validatePathAccess(cwd);
+      const validationError = this.config.validatePathAccess(cwd);
       if (validationError) {
         return {
           llmContent: validationError,
@@ -271,14 +281,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          this.config.getEnableInteractiveShell(),
           {
             ...shellExecutionConfig,
             pager: 'cat',
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
-              this.context.config.sanitizationConfig,
-            sandboxManager: this.context.config.sandboxManager,
+              this.config.sanitizationConfig,
+            sandboxManager: this.config.sandboxManager,
           },
         );
 
@@ -383,7 +393,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       let returnDisplayMessage = '';
-      if (this.context.config.getDebugMode()) {
+      if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
         if (this.params.is_background || result.backgrounded) {
@@ -412,8 +422,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      const summarizeConfig =
-        this.context.config.getSummarizeToolOutputConfig();
+      const summarizeConfig = this.config.getSummarizeToolOutputConfig();
       const executionError = result.error
         ? {
             error: {
@@ -424,10 +433,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
         : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
-          this.context.config,
+          this.config,
           { model: 'summarizer-shell' },
           llmContent,
-          this.context.geminiClient,
+          this.geminiClient ?? this.config.getGeminiClient(),
           signal,
         );
         return {
@@ -461,29 +470,37 @@ export class ShellTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = SHELL_TOOL_NAME;
+  private readonly config: Config;
+  private readonly geminiClient?: GeminiClient;
 
   constructor(
-    private readonly context: AgentLoopContext,
+    context: Config | AgentLoopContext,
     messageBus: MessageBus,
   ) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
+    const config = 'config' in context ? context.config : context;
     const definition = getShellDefinition(
-      context.config.getEnableInteractiveShell(),
-      context.config.getEnableShellOutputEfficiency(),
+      config.getEnableInteractiveShell(),
+      config.getEnableShellOutputEfficiency(),
     );
     super(
       ShellTool.Name,
       'Shell',
       definition.base.description!,
-      Kind.Execute,
+      Kind.Shell,
       definition.base.parametersJsonSchema,
       messageBus,
-      false, // output is not markdown
-      true, // output can be updated
+      false, // isOutputMarkdown
+      true, // canUpdateOutput
     );
+    this.config = config;
+    if ('config' in context) {
+      this.geminiClient = context.geminiClient;
+    }
   }
+
 
   protected override validateToolParamValues(
     params: ShellToolParams,
@@ -494,10 +511,10 @@ export class ShellTool extends BaseDeclarativeTool<
 
     if (params.dir_path) {
       const resolvedPath = path.resolve(
-        this.context.config.getTargetDir(),
+        this.config.getTargetDir(),
         params.dir_path,
       );
-      return this.context.config.validatePathAccess(resolvedPath);
+      return this.config.validatePathAccess(resolvedPath);
     }
     return null;
   }
@@ -509,7 +526,7 @@ export class ShellTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
-      this.context.config,
+      { config: this.config, geminiClient: this.geminiClient } as any,
       params,
       messageBus,
       _toolName,
@@ -519,8 +536,8 @@ export class ShellTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const definition = getShellDefinition(
-      this.context.config.getEnableInteractiveShell(),
-      this.context.config.getEnableShellOutputEfficiency(),
+      this.config.getEnableInteractiveShell(),
+      this.config.getEnableShellOutputEfficiency(),
     );
     return resolveToolDeclaration(definition, modelId);
   }

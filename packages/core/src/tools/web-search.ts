@@ -23,6 +23,8 @@ import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { Config } from '../config/config.js';
+import type { GeminiClient } from '../core/client.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -70,14 +72,23 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   WebSearchToolParams,
   WebSearchToolResult
 > {
+  private readonly config: Config;
+  private readonly geminiClient?: GeminiClient;
+
   constructor(
-    private readonly context: AgentLoopContext,
+    context: Config | AgentLoopContext,
     params: WebSearchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+    if ('config' in context) {
+      this.config = context.config;
+      this.geminiClient = context.geminiClient;
+    } else {
+      this.config = context;
+    }
   }
 
   override getDescription(): string {
@@ -85,7 +96,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
-    const geminiClient = this.context.geminiClient;
+    const geminiClient = this.geminiClient ?? this.config.getGeminiClient();
 
     try {
       const response = await geminiClient.generateContent(
@@ -205,11 +216,14 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolResult
 > {
   static readonly Name = WEB_SEARCH_TOOL_NAME;
+  private readonly config: Config;
+  private readonly geminiClient?: GeminiClient;
 
   constructor(
-    private readonly context: AgentLoopContext,
+    context: Config | AgentLoopContext,
     messageBus: MessageBus,
   ) {
+    const config = 'config' in context ? context.config : context;
     super(
       WebSearchTool.Name,
       'GoogleSearch',
@@ -220,6 +234,10 @@ export class WebSearchTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
+    this.config = config;
+    if ('config' in context) {
+      this.geminiClient = context.geminiClient;
+    }
   }
 
   /**
@@ -243,7 +261,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
-      this.context.config,
+      { config: this.config, geminiClient: this.geminiClient } as any,
       params,
       messageBus ?? this.messageBus,
       _toolName,
