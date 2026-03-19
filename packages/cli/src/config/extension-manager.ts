@@ -248,7 +248,7 @@ export class ExtensionManager extends ExtensionLoader {
       ) {
         tempDir = await ExtensionStorage.createTmpDir();
         const parsedGithubParts = tryParseGithubUrl(installMetadata.source);
-        if (!parsedGithubParts) {
+        if (!parsedGithubParts || installMetadata.ref) {
           await cloneFromGit(installMetadata, tempDir);
           installMetadata.type = 'git';
         } else {
