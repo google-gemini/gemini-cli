@@ -13,7 +13,6 @@ import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import {
   PolicyDecision,
-  ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
 } from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
@@ -342,28 +341,25 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'fill',
+          toolName: 'mcp_browser_agent_fill',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
         }),
       );
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'upload_file',
+          toolName: 'mcp_browser_agent_upload_file',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
         }),
       );
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'evaluate_script',
+          toolName: 'mcp_browser_agent_evaluate_script',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
         }),
       );
     });
@@ -373,13 +369,13 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'fill',
+          toolName: 'mcp_browser_agent_fill',
         }),
       );
 
       expect(mockPolicyEngine.addRule).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'upload_file',
+          toolName: 'mcp_browser_agent_upload_file',
         }),
       );
     });
@@ -395,7 +391,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'take_snapshot',
+          toolName: 'mcp_browser_agent_take_snapshot',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
@@ -403,7 +399,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'take_screenshot',
+          toolName: 'mcp_browser_agent_take_screenshot',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
@@ -411,7 +407,7 @@ describe('browserAgentFactory', () => {
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
-          toolName: 'list_pages',
+          toolName: 'mcp_browser_agent_list_pages',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
