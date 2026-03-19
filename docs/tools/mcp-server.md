@@ -176,8 +176,8 @@ Each server configuration supports the following properties:
   enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP
   server. Tools listed here will not be available to the model, even if they are
-  exposed by the server. **Note:** `excludeTools` takes precedence over
-  `includeTools` - if a tool is in both lists, it will be excluded.
+  exposed by the server. `excludeTools` takes precedence over `includeTools`. If
+  a tool is in both lists, it will be excluded.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
@@ -238,7 +238,9 @@ This follows the security principle that if a variable is explicitly configured
 by the user for a specific server, it constitutes informed consent to share that
 specific data with that server.
 
-> **Note:** Even when explicitly defined, you should avoid hardcoding secrets.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Even when explicitly defined, you should avoid hardcoding secrets.
 > Instead, use environment variable expansion (e.g., `"MY_KEY": "$MY_KEY"`) to
 > securely pull the value from your host environment at runtime.
 
@@ -283,10 +285,12 @@ When connecting to an OAuth-enabled server:
 
 #### Browser redirect requirements
 
-**Important:** OAuth authentication requires that your local machine can:
-
-- Open a web browser for authentication
-- Receive redirects on `http://localhost:7777/oauth/callback`
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> OAuth authentication requires that your local machine can:
+>
+> - Open a web browser for authentication
+> - Receive redirects on `http://localhost:7777/oauth/callback`
 
 This feature will not work in:
 
@@ -577,7 +581,9 @@ every discovered MCP tool is assigned a strict namespace.
    [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
    in the Policy Engine documentation.
 
-> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+<!-- prettier-ignore -->
+> [!WARNING]
+> Do not use underscores (`_`) in your MCP server names (e.g., use
 > `my-server` rather than `my_server`). The policy parser splits Fully Qualified
 > Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
 > prefix. If your server name contains an underscore, the parser will
@@ -1116,7 +1122,9 @@ command has no flags.
 gemini mcp list
 ```
 
-> **Note on Trust:** For security, `stdio` MCP servers (those using the
+<!-- prettier-ignore -->
+> [!NOTE]
+> For security, `stdio` MCP servers (those using the
 > `command` property) are only tested and displayed as "Connected" if the
 > current folder is trusted. If the folder is untrusted, they will show as
 > "Disconnected". Use `gemini trust` to trust the current folder.
