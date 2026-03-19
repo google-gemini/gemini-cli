@@ -2065,6 +2065,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      memoryManager: {
+        type: 'boolean',
+        label: 'Memory Manager Agent',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
       topicUpdateNarration: {
         type: 'boolean',
         label: 'Topic & Update Narration',

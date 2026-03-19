@@ -57,8 +57,8 @@ implementation, which does not support interactive commands.
 ### Showing color in output
 
 To show color in the shell output, you need to set the `tools.shell.showColor`
-setting to `true`. **Note: This setting only applies when
-`tools.shell.enableInteractiveShell` is enabled.**
+setting to `true`. This setting only applies when
+`tools.shell.enableInteractiveShell` is enabled.
 
 **Example `settings.json`:**
 
@@ -75,8 +75,8 @@ setting to `true`. **Note: This setting only applies when
 ### Setting the pager
 
 You can set a custom pager for the shell output by setting the
-`tools.shell.pager` setting. The default pager is `cat`. **Note: This setting
-only applies when `tools.shell.enableInteractiveShell` is enabled.**
+`tools.shell.pager` setting. The default pager is `cat`. This setting only
+applies when `tools.shell.enableInteractiveShell` is enabled.
 
 **Example `settings.json`:**
 

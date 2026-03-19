@@ -39,7 +39,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
@@ -51,7 +51,7 @@ describe('<UserIdentity />', () => {
     unmount();
   });
 
-  it('should render the user email on the very first frame (regression test)', () => {
+  it('should render the user email on the very first frame (regression test)', async () => {
     const mockConfig = makeFakeConfig();
     vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
       authType: AuthType.LOGIN_WITH_GOOGLE,
@@ -59,7 +59,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
-    const { lastFrameRaw, unmount } = renderWithProviders(
+    const { lastFrameRaw, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
 
@@ -85,7 +85,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
@@ -106,7 +106,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Premium Plan');
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
@@ -135,7 +135,7 @@ describe('<UserIdentity />', () => {
       {} as unknown as ContentGeneratorConfig,
     );
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
@@ -152,7 +152,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
@@ -172,7 +172,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Enterprise Tier');
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
@@ -191,7 +191,7 @@ describe('<UserIdentity />', () => {
     } as unknown as ContentGeneratorConfig);
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Advanced Ultra');
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserIdentity config={mockConfig} />,
     );
     await waitUntilReady();
