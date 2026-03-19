@@ -6,9 +6,11 @@
 
 import express from 'express';
 import { workspaceRouter } from './routes/workspaceRoutes.js';
+import { iapMiddleware } from './middleware/iap.js';
 
 export const app = express();
 app.use(express.json());
+app.use(iapMiddleware);
 
 const PORT = process.env['PORT'] || 8080;
 

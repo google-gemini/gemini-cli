@@ -45,7 +45,7 @@ describe('Workspace Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.name).toBe('test-workspace');
-      expect(response.body.owner_id).toBe('default-user');
+      expect(response.body.owner_id).toBe('dev-user-id');
       expect(response.body.status).toBe('PROVISIONING');
     });
 

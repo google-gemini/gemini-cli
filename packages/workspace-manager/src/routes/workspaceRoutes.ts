@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { WorkspaceService } from '../services/workspaceService.js';
 import { ComputeService } from '../services/computeService.js';
+import type { AuthenticatedRequest } from '../middleware/iap.js';
 
 const router = Router();
 const workspaceService = new WorkspaceService();
@@ -21,11 +22,10 @@ const CreateWorkspaceSchema = z.object({
   zone: z.string().optional().default('us-west1-a'),
 });
 
-const DEFAULT_OWNER = 'default-user'; // TODO: Replace with IAP identity middleware
-
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const workspaces = await workspaceService.listWorkspaces(DEFAULT_OWNER);
+    const authReq = req as AuthenticatedRequest;
+    const workspaces = await workspaceService.listWorkspaces(authReq.user.id);
     res.json(workspaces);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -35,6 +35,7 @@ router.get('/', async (_req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const validation = CreateWorkspaceSchema.safeParse(req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error.format() });
@@ -46,7 +47,7 @@ router.post('/', async (req, res) => {
     const instanceName = `workspace-${workspaceId.slice(0, 8)}`;
 
     const workspaceData = {
-      owner_id: DEFAULT_OWNER,
+      owner_id: authReq.user.id,
       name,
       instance_name: instanceName,
       status: 'PROVISIONING',
@@ -59,17 +60,15 @@ router.post('/', async (req, res) => {
     await workspaceService.createWorkspace(workspaceId, workspaceData);
 
     // 2. Trigger GCE provisioning (Async)
-    computeService
-      .createWorkspaceInstance({
-        instanceName,
-        machineType,
-        imageTag,
-        zone,
-      })
-      .catch((err) => {
+    computeService.createWorkspaceInstance({
+      instanceName,
+      machineType,
+      imageTag,
+      zone,
+    }).catch(err => {
         // eslint-disable-next-line no-console
         console.error(`Failed to provision GCE instance ${instanceName}:`, err);
-      });
+    });
 
     res.status(201).json({ id: workspaceId, ...workspaceData });
   } catch (error) {
@@ -80,6 +79,7 @@ router.post('/', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const { id } = req.params;
     const workspace = await workspaceService.getWorkspace(id);
 
@@ -89,16 +89,13 @@ router.delete('/:id', async (req, res) => {
     }
 
     // SECURITY: Ownership Check
-    if (workspace.owner_id !== DEFAULT_OWNER) {
+    if (workspace.owner_id !== authReq.user.id) {
       res.status(403).json({ error: 'Unauthorized to delete this workspace' });
       return;
     }
 
     // 1. Delete GCE instance
-    await computeService.deleteWorkspaceInstance(
-      workspace.instance_name,
-      workspace.zone,
-    );
+    await computeService.deleteWorkspaceInstance(workspace.instance_name, workspace.zone);
 
     // 2. Delete from state store
     await workspaceService.deleteWorkspace(id);
