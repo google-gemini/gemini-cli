@@ -33,7 +33,7 @@ describe('seatbeltArgsBuilder', () => {
   it('should allow network when networkAccess is true', () => {
     const args = buildSeatbeltArgs({ workspace: '/test', networkAccess: true });
     const profile = args[1];
-    expect(profile).toContain('(allow network*)');
+    expect(profile).toContain('(allow network-outbound)');
   });
 
   it('should parameterize allowed paths and normalize them', () => {

@@ -5,6 +5,8 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import { isDangerousCommand, isKnownSafeCommand } from '../sandbox/macos/commandSafety.js';
+import { parse as shellParse } from 'shell-quote';
 import {
   PolicyDecision,
   type PolicyEngineConfig,
@@ -223,6 +225,25 @@ export class PolicyEngine {
   /**
    * Check if a shell command is allowed.
    */
+
+  private async applyShellHeuristics(command: string, decision: PolicyDecision): Promise<PolicyDecision> {
+    await initializeShellParsers();
+    try {
+      const parsedArgs = shellParse(command).map(String);
+      if (isDangerousCommand(parsedArgs)) {
+        debugLogger.debug(`[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`);
+        return PolicyDecision.ASK_USER;
+      }
+      if (isKnownSafeCommand(parsedArgs) && decision === PolicyDecision.ASK_USER) {
+        debugLogger.debug(`[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`);
+        return PolicyDecision.ALLOW;
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return decision;
+  }
+
   private async checkShellCommand(
     toolName: string,
     command: string | undefined,
@@ -465,11 +486,16 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
+        let ruleDecision = rule.decision;
+        if (isShellCommand && command && !(rule as PolicyRule & { commandPrefix?: unknown }).commandPrefix && !rule.argsPattern) {
+          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+        }
+
         if (isShellCommand && toolName) {
           const shellResult = await this.checkShellCommand(
             toolName,
             command,
-            rule.decision,
+            ruleDecision,
             serverName,
             shellDirPath,
             rule.allowRedirection,
@@ -505,10 +531,15 @@ export class PolicyEngine {
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+        let heuristicDecision = this.defaultDecision;
+        if (command) {
+          heuristicDecision = await this.applyShellHeuristics(command, heuristicDecision);
+        }
+
         const shellResult = await this.checkShellCommand(
           toolName,
           command,
-          this.defaultDecision,
+          heuristicDecision,
           serverName,
           shellDirPath,
           false,
@@ -572,6 +603,17 @@ export class PolicyEngine {
           }
         }
       }
+    }
+
+    // Sandbox Expansion requests MUST always be confirmed by the user,
+    // even if the base command is otherwise ALLOWED by the policy engine.
+    if (
+      decision === PolicyDecision.ALLOW &&
+      toolCall.args &&
+      'additional_permissions' in toolCall.args &&
+      toolCall.args['additional_permissions']
+    ) {
+      decision = PolicyDecision.ASK_USER;
     }
 
     return {

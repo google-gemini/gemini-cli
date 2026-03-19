@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
@@ -702,7 +703,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
-  private readonly _sandboxManager: SandboxManager;
+  private _sandboxManager: SandboxManager;
+  private readonly _sandboxPolicyManager: SandboxPolicyManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
@@ -1186,9 +1188,13 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
+    this._sandboxPolicyManager = new SandboxPolicyManager();
+    this._sandboxPolicyManager = new SandboxPolicyManager();
     this._sandboxManager = createSandboxManager(
       params.toolSandboxing ?? false,
       this.targetDir,
+      this._sandboxPolicyManager,
+      this.getApprovalMode(),
     );
     this.a2aClientManager = new A2AClientManager(this);
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
@@ -1512,6 +1518,20 @@ export class Config implements McpContext, AgentLoopContext {
    */
   get geminiClient(): GeminiClient {
     return this._geminiClient;
+  }
+
+    private refreshSandboxManager(): void {
+    this._sandboxManager = createSandboxManager(
+      this.getSandboxEnabled(),
+      this.targetDir,
+      this._sandboxPolicyManager,
+      this.getApprovalMode(),
+    );
+    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+  }
+
+  get sandboxPolicyManager() {
+    return this._sandboxPolicyManager;
   }
 
   get sandboxManager(): SandboxManager {
@@ -2286,6 +2306,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     this.policyEngine.setApprovalMode(mode);
+    this.refreshSandboxManager();
 
     const isPlanModeTransition =
       currentMode !== mode &&

@@ -56,6 +56,8 @@ describe('MacOsSandboxManager', () => {
       workspace: mockWorkspace,
       allowedPaths: mockAllowedPaths,
       networkAccess: mockNetworkAccess,
+      workspaceWrite: false,
+      additionalPermissions: { fileSystem: { read: [], write: [] }, network: mockNetworkAccess }
     });
   });
 

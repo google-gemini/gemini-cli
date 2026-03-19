@@ -28,7 +28,7 @@ import {
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
 import { type EnvironmentSanitizationConfig } from './environmentSanitization.js';
-import { type SandboxManager } from './sandboxManager.js';
+import { type SandboxManager, type SandboxPermissions } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -58,7 +58,7 @@ export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
 export const SCROLLBACK_LIMIT = 300000;
 
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
-const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
+const BASH_SHOPT_GUARD = `set -o pipefail; shopt -u ${BASH_SHOPT_OPTIONS};`;
 
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   if (shell !== 'bash') {
@@ -88,6 +88,7 @@ export interface ShellExecutionConfig {
   defaultBg?: string;
   sanitizationConfig: EnvironmentSanitizationConfig;
   sandboxManager: SandboxManager;
+  additionalPermissions?: SandboxPermissions;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
@@ -284,8 +285,12 @@ export class ShellExecutionService {
             shellExecutionConfig,
             ptyInfo,
           );
-        } catch (_e) {
-          // Fallback to child_process
+        } catch (e) {
+          const error = e instanceof Error ? e : new Error(String(e));
+          if (error.message.includes('sandbox_apply') || error.message.includes('sandbox-exec')) {
+            throw e;
+          }
+          // Silently fallback to child_process
         }
       }
     }
@@ -354,6 +359,7 @@ export class ShellExecutionService {
       config: {
         sanitizationConfig:
           sanitizationConfigOverride ?? shellExecutionConfig.sanitizationConfig,
+        additionalPermissions: shellExecutionConfig.additionalPermissions,
       },
     });
 
@@ -1123,11 +1129,6 @@ export class ShellExecutionService {
       }
 
       if (error.message.includes('posix_spawnp failed')) {
-        onOutputEvent({
-          type: 'data',
-          chunk:
-            '[GEMINI_CLI_WARNING] PTY execution failed, falling back to child_process. This may be due to sandbox restrictions.\n',
-        });
         throw e;
       } else {
         return {

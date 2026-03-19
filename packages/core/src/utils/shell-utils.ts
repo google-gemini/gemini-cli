@@ -705,7 +705,7 @@ export function getCommandRoots(command: string): string[] {
 
 export function stripShellWrapper(command: string): string {
   const pattern =
-    /^\s*(?:(?:sh|bash|zsh)\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();

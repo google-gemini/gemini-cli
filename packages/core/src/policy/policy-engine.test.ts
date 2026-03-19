@@ -1422,14 +1422,14 @@ describe('PolicyEngine', () => {
 
       engine = new PolicyEngine({ rules });
 
-      // Atomic command "whoami" matches the wildcard rule (ASK_USER).
+      // Atomic command "unknown_command" matches the wildcard rule (ASK_USER).
       // It should NOT be upgraded to ALLOW.
       expect(
         (
           await engine.check(
             {
               name: 'run_shell_command',
-              args: { command: 'whoami' },
+              args: { command: 'unknown_command' },
             },
             undefined,
           )

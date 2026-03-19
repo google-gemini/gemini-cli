@@ -11,6 +11,7 @@ import {
   BASE_SEATBELT_PROFILE,
   NETWORK_SEATBELT_PROFILE,
 } from './baseProfile.js';
+import { type SandboxPermissions } from '../../services/sandboxManager.js';
 
 /**
  * Options for building macOS Seatbelt arguments.
@@ -22,6 +23,10 @@ export interface SeatbeltArgsOptions {
   allowedPaths?: string[];
   /** Whether to allow network access. */
   networkAccess?: boolean;
+  /** Granular additional permissions. */
+  additionalPermissions?: SandboxPermissions;
+  /** Whether to allow write access to the workspace. */
+  workspaceWrite?: boolean;
 }
 
 /**
@@ -59,9 +64,48 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   const workspacePath = tryRealpath(options.workspace);
   args.push('-D', `WORKSPACE=${workspacePath}`);
 
+  if (options.workspaceWrite) {
+    args.push('-D', 'WORKSPACE_WRITE=1');
+  }
+
   const tmpPath = tryRealpath(os.tmpdir());
   args.push('-D', `TMPDIR=${tmpPath}`);
 
+  const nodeRootPath = tryRealpath(path.dirname(path.dirname(process.execPath)));
+  args.push('-D', `NODE_ROOT=${nodeRootPath}`);
+  profile += `(allow file-read* (subpath (param "NODE_ROOT")))\n`;
+
+  // Add PATH directories as read-only to support nvm, homebrew, etc.
+  if (process.env['PATH']) {
+    const paths = process.env['PATH'].split(':');
+    let pathIndex = 0;
+    const addedPaths = new Set();
+    
+    for (const p of paths) {
+      if (!p.trim()) continue;
+      try {
+        let resolved = tryRealpath(p);
+        
+        // If this is a 'bin' directory (like /usr/local/bin or homebrew/bin), 
+        // also grant read access to its parent directory so that symlinked 
+        // assets (like Cellar or libexec) can be read.
+        if (resolved.endsWith('/bin')) {
+          resolved = path.dirname(resolved);
+        }
+        
+        if (!addedPaths.has(resolved)) {
+          addedPaths.add(resolved);
+          args.push('-D', `SYS_PATH_${pathIndex}=${resolved}`);
+          profile += `(allow file-read* (subpath (param "SYS_PATH_${pathIndex}")))\n`;
+          pathIndex++;
+        }
+      } catch (_e) {
+        // Ignore paths that do not exist or are inaccessible
+      }
+    }
+  }
+
+  // legacy allowedPaths (defaults to read/write)
   if (options.allowedPaths) {
     for (let i = 0; i < options.allowedPaths.length; i++) {
       const allowedPath = tryRealpath(options.allowedPaths[i]);
@@ -70,7 +114,48 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     }
   }
 
-  if (options.networkAccess) {
+  // Handle granular additional permissions
+  if (options.additionalPermissions?.fileSystem) {
+    const { read, write } = options.additionalPermissions.fileSystem;
+    if (read) {
+      read.forEach((p, i) => {
+        const resolved = tryRealpath(p);
+        const paramName = `ADDITIONAL_READ_${i}`;
+        args.push('-D', `${paramName}=${resolved}`);
+        let isFile = false;
+        try {
+          isFile = fs.statSync(resolved).isFile();
+        } catch {
+          // Ignore error
+        }
+        if (isFile) {
+          profile += `(allow file-read* (literal (param "${paramName}")))\n`;
+        } else {
+          profile += `(allow file-read* (subpath (param "${paramName}")))\n`;
+        }
+      });
+    }
+    if (write) {
+      write.forEach((p, i) => {
+        const resolved = tryRealpath(p);
+        const paramName = `ADDITIONAL_WRITE_${i}`;
+        args.push('-D', `${paramName}=${resolved}`);
+        let isFile = false;
+        try {
+          isFile = fs.statSync(resolved).isFile();
+        } catch {
+          // Ignore error
+        }
+        if (isFile) {
+          profile += `(allow file-read* file-write* (literal (param "${paramName}")))\n`;
+        } else {
+          profile += `(allow file-read* file-write* (subpath (param "${paramName}")))\n`;
+        }
+      });
+    }
+  }
+
+  if (options.networkAccess || options.additionalPermissions?.network) {
     profile += NETWORK_SEATBELT_PROFILE;
   }
 

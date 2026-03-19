@@ -12,6 +12,22 @@ import {
 } from './environmentSanitization.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
+import { type SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
+
+/**
+ * Granular permissions that can be granted to a sandboxed command.
+ */
+export interface SandboxPermissions {
+  /** Filesystem permissions. */
+  fileSystem?: {
+    /** Paths that should be readable by the command. */
+    read?: string[];
+    /** Paths that should be writable by the command. */
+    write?: string[];
+  };
+  /** Whether the command should have network access. */
+  network?: boolean;
+}
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -28,6 +44,8 @@ export interface SandboxRequest {
   /** Optional sandbox-specific configuration. */
   config?: {
     sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+    /** Additional permissions to grant to this command. */
+    additionalPermissions?: SandboxPermissions;
   };
 }
 
@@ -94,13 +112,23 @@ export class LocalSandboxManager implements SandboxManager {
 export function createSandboxManager(
   sandboxingEnabled: boolean,
   workspace: string,
+  policyManager?: SandboxPolicyManager,
+  approvalMode?: string,
 ): SandboxManager {
+  if (approvalMode === 'yolo') {
+    return new NoopSandboxManager();
+  }
   if (sandboxingEnabled) {
     if (os.platform() === 'linux') {
       return new LinuxSandboxManager({ workspace });
     }
     if (os.platform() === 'darwin') {
-      return new MacOsSandboxManager({ workspace });
+      const modeConfig = policyManager && approvalMode ? policyManager.getModeConfig(approvalMode) : undefined;
+      return new MacOsSandboxManager({ 
+        workspace,
+        modeConfig,
+        policyManager,
+      });
     }
     return new LocalSandboxManager();
   }

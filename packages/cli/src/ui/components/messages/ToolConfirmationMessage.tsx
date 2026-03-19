@@ -272,6 +272,31 @@ export const ToolConfirmationMessage: React.FC<
           key: 'No, suggest changes (esc)',
         });
       }
+    } else if (confirmationDetails.type === 'sandbox_expansion') {
+      options.push({
+        label: 'Allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+        key: 'Allow once',
+      });
+      if (isTrustedFolder) {
+        options.push({
+          label: 'Allow for this session',
+          value: ToolConfirmationOutcome.ProceedAlways,
+          key: 'Allow for this session',
+        });
+        if (allowPermanentApproval) {
+          options.push({
+            label: 'Allow for all future sessions',
+            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            key: 'Allow for all future sessions',
+          });
+        }
+      }
+      options.push({
+        label: 'No, suggest changes (esc)',
+        value: ToolConfirmationOutcome.Cancel,
+        key: 'No, suggest changes (esc)',
+      });
     } else if (confirmationDetails.type === 'exec') {
       options.push({
         label: 'Allow once',
@@ -491,6 +516,8 @@ export const ToolConfirmationMessage: React.FC<
         if (!confirmationDetails.isModifying) {
           question = `Apply this change?`;
         }
+      } else if (confirmationDetails.type === 'sandbox_expansion') {
+        question = `Allow sandbox expansion for: '${sanitizeForDisplay(confirmationDetails.rootCommand)}'?`;
       } else if (confirmationDetails.type === 'exec') {
         const executionProps = confirmationDetails;
 
@@ -518,6 +545,37 @@ export const ToolConfirmationMessage: React.FC<
             />
           );
         }
+      } else if (confirmationDetails.type === 'sandbox_expansion') {
+        const { additionalPermissions } = confirmationDetails;
+        const readPaths = additionalPermissions?.fileSystem?.read || [];
+        const writePaths = additionalPermissions?.fileSystem?.write || [];
+        const network = additionalPermissions?.network;
+
+        bodyContent = (
+          <Box flexDirection="column" padding={1}>
+            <Text color={theme.text.secondary} italic>The agent is requesting additional sandbox permissions to execute this command:</Text>
+            <Box paddingY={1}>
+              <Text color={theme.text.secondary}>{sanitizeForDisplay(confirmationDetails.command)}</Text>
+            </Box>
+            {network && (
+              <Box>
+                <Text color={theme.status.warning}>• Network Access</Text>
+              </Box>
+            )}
+            {readPaths.length > 0 && (
+              <Box flexDirection="column">
+                <Text color={theme.status.success}>• Read Access:</Text>
+                {readPaths.map((p, i) => <Text key={i} color={theme.text.secondary}>    {sanitizeForDisplay(p)}</Text>)}
+              </Box>
+            )}
+            {writePaths.length > 0 && (
+              <Box flexDirection="column">
+                <Text color={theme.status.error}>• Write Access:</Text>
+                {writePaths.map((p, i) => <Text key={i} color={theme.text.secondary}>    {sanitizeForDisplay(p)}</Text>)}
+              </Box>
+            )}
+          </Box>
+        );
       } else if (confirmationDetails.type === 'exec') {
         const executionProps = confirmationDetails;
 
