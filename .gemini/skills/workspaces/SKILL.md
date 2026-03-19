@@ -1,3 +1,8 @@
+---
+name: workspaces
+description: Expertise in managing and utilizing Gemini Workspaces for high-performance remote development tasks.
+---
+
 # Gemini Workspaces Skill
 
 This skill enables the agent to utilize **Gemini Workspaces**—a high-performance, persistent remote development platform. It allows the agent to move intensive tasks (PR reviews, complex repairs, full builds) from the local environment to a dedicated cloud worker.
@@ -24,6 +29,6 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
 3. **Check Status**: Poll the progress using `npm run workspace:check <PR_NUMBER>` or see the global state with `npm run workspace:status`.
 
 ## ⚠️ Important Constraints
-- **Absolute Paths**: Always use absolute paths (e.g., `/home/node/...`) when orchestrating remote commands.
+- **Absolute Paths**: Always use absolute paths (e.g., `/mnt/disks/data/...`) when orchestrating remote commands.
 - **Be Behavioral**: Prioritize results from live execution (behavioral proofs) over static reading.
 - **Multi-tasking**: Remind the user they can continue chatting in the main window while the heavy workspace task runs in the separate terminal window.
