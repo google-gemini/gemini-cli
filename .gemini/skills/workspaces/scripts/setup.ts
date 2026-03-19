@@ -288,8 +288,8 @@ and full builds) to a dedicated, high-performance GCP worker.
   const setupRes = await provider.setup({ projectId, zone, dnsSuffix: '.internal.gcpnode.com' });
   if (setupRes !== 0) return setupRes;
 
-  // Use the direct mount path to avoid symlink race conditions
-  const workspaceRoot = `/mnt/disks/data`;
+  // Use the unified path to ensure host and container match perfectly
+  const workspaceRoot = `/home/node/.workspaces`;
   
   const persistentScripts = `${workspaceRoot}/scripts`;
   const remoteConfigDir = `${workspaceRoot}/gemini-cli-config/.gemini`;
@@ -297,7 +297,7 @@ and full builds) to a dedicated, high-performance GCP worker.
   console.log(`\n📦 Synchronizing Logic & Credentials...`);
   // Ensure the directory structure exists on the host
   await provider.exec(`sudo mkdir -p ${workspaceRoot}/main ${workspaceRoot}/worktrees ${workspaceRoot}/policies ${workspaceRoot}/scripts ${remoteConfigDir}`);
-  await provider.exec(`sudo chown -R $(whoami):$(whoami) ${workspaceRoot}`);
+  await provider.exec(`sudo chown -R 1000:1000 ${workspaceRoot}`);
   await provider.exec(`sudo chmod -R 777 ${workspaceRoot}`);
   
   // 1. Sync Scripts & Policies
@@ -371,7 +371,7 @@ and full builds) to a dedicated, high-performance GCP worker.
   // Final Repo Sync
   console.log(`🚀 Finalizing Remote Repository (${userFork})...`);
   const repoUrl = `https://github.com/${userFork}.git`;
-  const cloneCmd = `sudo rm -rf ${workspaceRoot}/main && sudo git clone --quiet --filter=blob:none ${repoUrl} ${workspaceRoot}/main && sudo git -C ${workspaceRoot}/main remote add upstream https://github.com/${upstreamRepo}.git && sudo git -C ${workspaceRoot}/main fetch --quiet upstream && sudo chown -R $(whoami):$(whoami) ${workspaceRoot}`;
+  const cloneCmd = `sudo rm -rf ${workspaceRoot}/main && sudo git clone --quiet --filter=blob:none ${repoUrl} ${workspaceRoot}/main && sudo git -C ${workspaceRoot}/main remote add upstream https://github.com/${upstreamRepo}.git && sudo git -C ${workspaceRoot}/main fetch --quiet upstream && sudo chown -R 1000:1000 ${workspaceRoot}`;
   await provider.exec(cloneCmd);
 
   console.log('\n✨ ALL SYSTEMS GO! Your Gemini Workspace is ready.');

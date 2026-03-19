@@ -77,18 +77,19 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   if (check.status !== 0) {
     console.log(`   - Provisioning isolated git worktree for ${prNumber}...`);
     
-    // We run these on the host. We use the current remote user to ensure ownership is correct.
+    // We run these on the host. Since setup might have left the repo root-owned, we use sudo.
     const gitFetch = isShellMode 
-        ? `git -C ${hostWorkDir} fetch --quiet origin`
-        : `git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
+        ? `sudo git -C ${hostWorkDir} fetch --quiet origin`
+        : `sudo git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
     
     const gitTarget = isShellMode ? 'FETCH_HEAD' : 'FETCH_HEAD'; 
 
     const setupCmd = `
-      git -C ${hostWorkDir} config --add safe.directory ${hostWorkDir} && \
-      mkdir -p ${hostWorkspaceRoot}/worktrees && \
+      sudo git config --global --add safe.directory ${hostWorkDir} && \
+      sudo mkdir -p ${hostWorkspaceRoot}/worktrees && \
       ${gitFetch} && \
-      git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1
+      sudo git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1 && \
+      sudo chown -R 1000:1000 ${hostWorkspaceRoot}
     `;
     const setupRes = await provider.getExecOutput(setupCmd);
     if (setupRes.status !== 0) {
