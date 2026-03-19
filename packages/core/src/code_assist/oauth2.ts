@@ -21,14 +21,6 @@ import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import {
-  logOnboardingStart,
-  logOnboardingSuccess,
-} from '../telemetry/loggers.js';
-import {
-  OnboardingStartEvent,
-  OnboardingSuccessEvent,
-} from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import {
   getErrorMessage,
@@ -121,8 +113,6 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
-  let hasLoggedOnboardingStart = false;
-
   const credentials = await fetchCachedCredentials();
 
   if (
@@ -152,7 +142,6 @@ async function initOauthClient(
       proxy: config.getProxy(),
     },
   });
-
   const useEncryptedStorage = getUseEncryptedStorageFlag();
 
   if (
@@ -198,6 +187,7 @@ async function initOauthClient(
         }
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
+
         return client;
       }
     } catch (error) {
@@ -233,11 +223,6 @@ async function initOauthClient(
         )}`,
       );
     }
-  }
-
-  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-    logOnboardingStart(config, new OnboardingStartEvent());
-    hasLoggedOnboardingStart = true;
   }
 
   if (config.isBrowserLaunchSuppressed()) {
@@ -401,9 +386,7 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   }
-  if (hasLoggedOnboardingStart) {
-    logOnboardingSuccess(config, new OnboardingSuccessEvent());
-  }
+
   return client;
 }
 

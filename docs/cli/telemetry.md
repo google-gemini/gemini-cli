@@ -904,6 +904,20 @@ Logs keychain availability checks.
 
 - `available` (boolean)
 
+##### `gemini_cli.startup_stats`
+
+Logs detailed startup performance statistics.
+
+<details>
+<summary>Attributes</summary>
+
+- `phases` (json array of startup phases)
+- `os_platform` (string)
+- `os_release` (string)
+- `is_docker` (boolean)
+
+</details>
+
 </details>
 
 ### Metrics
@@ -920,15 +934,19 @@ Gemini CLI exports several custom metrics.
 
 Incremented once per CLI startup.
 
-##### Authentication
+##### Onboarding
 
-Tracks "Login with Google" OAuth flow initiation and completion.
+Tracks onboarding flow from authentication to the user
 
-- `gemini_cli.onboarding.start` (Counter, Int): Incremented when the "Login with
-  Google" OAuth flow begins.
+- `gemini_cli.onboarding.start` (Counter, Int): Incremented when the
+  authentication flow begins.
 
-- `gemini_cli.onboarding.success` (Counter, Int): Incremented when the "Login
-  with Google" OAuth flow completes successfully.
+- `gemini_cli.onboarding.success` (Counter, Int): Incremented when the user
+onboarding flow completes successfully.
+<details>
+<summary>Attributes (Success)</summary>
+
+- `user_tier` (string)
 
 ##### Tools
 

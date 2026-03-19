@@ -1801,13 +1801,28 @@ export class ClearcutLogger {
   }
 
   logOnboardingStartEvent(_event: OnboardingStartEvent): void {
-    this.enqueueLogEvent(this.createLogEvent(EventNames.ONBOARDING_START, []));
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        value: 'true',
+      },
+    ];
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_START, data),
+    );
     this.flushIfNeeded();
   }
 
-  logOnboardingSuccessEvent(_event: OnboardingSuccessEvent): void {
+  logOnboardingSuccessEvent(event: OnboardingSuccessEvent): void {
+    const data: EventValue[] = [];
+    if (event.userTier) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        value: event.userTier,
+      });
+    }
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.ONBOARDING_SUCCESS, []),
+      this.createLogEvent(EventNames.ONBOARDING_SUCCESS, data),
     );
     this.flushIfNeeded();
   }

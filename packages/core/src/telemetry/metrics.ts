@@ -302,13 +302,13 @@ const COUNTER_DEFINITIONS = {
     },
   },
   [EVENT_ONBOARDING_START]: {
-    description: 'Counts auth "Login with Google" started.',
+    description: 'Counts onboarding started',
     valueType: ValueType.INT,
     assign: (c: Counter) => (onboardingStartCounter = c),
     attributes: {} as Record<string, never>,
   },
   [EVENT_ONBOARDING_SUCCESS]: {
-    description: 'Counts auth "Login with Google" succeeded.',
+    description: 'Counts onboarding succeeded',
     valueType: ValueType.INT,
     assign: (c: Counter) => (onboardingSuccessCounter = c),
     attributes: {} as Record<string, never>,
