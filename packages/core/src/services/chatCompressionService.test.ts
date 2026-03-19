@@ -139,6 +139,7 @@ describe('ChatCompressionService', () => {
   let testTempDir: string;
   const mockModel = 'gemini-2.5-pro';
   const mockPromptId = 'test-prompt-id';
+  const mockAbortSignal = new AbortController().signal;
 
   beforeEach(() => {
     testTempDir = fs.mkdtempSync(
@@ -216,6 +217,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
     expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
     expect(result.newHistory).toBeNull();
@@ -232,6 +234,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
     // It should now attempt compression even if previously failed (logic removed)
     // But since history is small, it will be NOOP due to threshold
@@ -258,6 +261,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
     expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
     expect(result.newHistory).toBeNull();
@@ -281,6 +285,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
@@ -322,6 +327,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
@@ -349,6 +355,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     const firstCall = vi.mocked(mockConfig.getBaseLlmClient().generateContent)
@@ -380,6 +387,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     const firstCallText = (
@@ -407,6 +415,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     const firstCallText = (
@@ -433,6 +442,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
@@ -470,6 +480,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     expect(result.info.compressionStatus).toBe(
@@ -510,6 +521,7 @@ describe('ChatCompressionService', () => {
       mockModel,
       mockConfig,
       false,
+      mockAbortSignal,
     );
 
     expect(result.info.compressionStatus).toBe(
@@ -566,6 +578,7 @@ describe('ChatCompressionService', () => {
         mockModel,
         mockConfig,
         false,
+        mockAbortSignal,
       );
 
       expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
@@ -632,6 +645,7 @@ describe('ChatCompressionService', () => {
         mockModel,
         mockConfig,
         false,
+        mockAbortSignal,
       );
 
       // Verify it compressed
@@ -698,6 +712,7 @@ describe('ChatCompressionService', () => {
         mockModel,
         mockConfig,
         false,
+        mockAbortSignal,
       );
 
       expect(result.newHistory).not.toBeNull();
@@ -765,6 +780,7 @@ describe('ChatCompressionService', () => {
         mockModel,
         mockConfig,
         false,
+        mockAbortSignal,
       );
 
       expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
@@ -822,6 +838,7 @@ describe('ChatCompressionService', () => {
         mockModel,
         mockConfig,
         false,
+        mockAbortSignal,
       );
 
       expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
@@ -879,6 +896,7 @@ describe('ChatCompressionService', () => {
         mockModel,
         mockConfig,
         false,
+        mockAbortSignal,
       );
 
       expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
