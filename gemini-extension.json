@@ -5,7 +5,7 @@
   "author": "Google Gemini Team",
   "license": "Apache-2.0",
   "skills": [
-    "extensions/workspaces/skills/SKILL.md"
+    "skills/workspaces/SKILL.md"
   ],
   "contextFileName": "extensions/workspaces/docs/GEMINI.md"
 }

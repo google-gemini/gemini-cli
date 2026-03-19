@@ -1,6 +1,6 @@
 # Gemini Workspaces: Maintainer Onboarding
 
-Gemini Workspaces allow you to offload heavy tasks (PR reviews, agentic fixes,
+Gemini Workspaces allow you to delegate heavy tasks (PR reviews, agentic fixes,
 full builds) to a high-performance GCP worker. It uses a **Unified Data Disk**
 architecture to ensure your work persists even if the VM is deleted or
 recreated.

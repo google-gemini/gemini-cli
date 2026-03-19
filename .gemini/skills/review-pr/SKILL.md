@@ -1,7 +1,7 @@
 # Review PR Skill
 
 This skill enables the agent to conduct a high-fidelity, behavioral code review
-for a Pull Request. It is designed to be run in a dedicated, offloaded remote
+for a Pull Request. It is designed to be run in a dedicated, workspace remote
 session where parallel infrastructure validation (build, CI check) is already 
 underway.
 
@@ -21,7 +21,7 @@ The agent must follow these steps to conduct the review:
 - Run `/review-frontend <PR_NUMBER>` to get an initial static analysis report.
 
 ### 2. Infrastructure Validation
-- Trust the parallel worker results in `.gemini/logs/offload-<PR_NUMBER>/`.
+- Trust the parallel worker results in `.gemini/logs/workspace-<PR_NUMBER>/`.
 - Read `build.log` to ensure the environment is stable for testing.
 - Read `ci-status.exit`. 
 - **If CI is failing**: Use the extractor to identify failing tests:
