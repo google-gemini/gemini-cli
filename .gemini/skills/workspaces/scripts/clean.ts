@@ -46,7 +46,7 @@ export async function runCleanup(args: string[], env: NodeJS.ProcessEnv = proces
 
   if (prNumber && action) {
     const sessionName = `workspace-${prNumber}-${action}`;
-    const worktreePath = `/home/node/dev/worktrees/${sessionName}`;
+    const worktreePath = `/home/node/.workspaces/worktrees/${sessionName}`;
     
     console.log(`🧹 Surgically removing session and worktree for ${prNumber}-${action}...`);
     
@@ -54,7 +54,7 @@ export async function runCleanup(args: string[], env: NodeJS.ProcessEnv = proces
     await provider.exec(`tmux kill-session -t ${sessionName} 2>/dev/null`, { wrapContainer: 'maintainer-worker' });
     
     // Remove specific worktree inside container
-    await provider.exec(`cd /home/node/dev/main && git worktree remove -f ${worktreePath} 2>/dev/null && git worktree prune`, { wrapContainer: 'maintainer-worker' });
+    await provider.exec(`cd /home/node/.workspaces/main && git worktree remove -f ${worktreePath} 2>/dev/null && git worktree prune`, { wrapContainer: 'maintainer-worker' });
     
     console.log(`✅ Cleaned up ${prNumber}-${action}.`);
     return 0;
@@ -68,7 +68,7 @@ export async function runCleanup(args: string[], env: NodeJS.ProcessEnv = proces
   await provider.exec(`tmux kill-server`, { wrapContainer: 'maintainer-worker' });
 
   console.log('   - Cleaning up ALL Git Worktrees...');
-  await provider.exec(`cd /home/node/dev/main && git worktree prune && rm -rf /home/node/dev/worktrees/*`, { wrapContainer: 'maintainer-worker' });
+  await provider.exec(`cd /home/node/.workspaces/main && git worktree prune && rm -rf /home/node/.workspaces/worktrees/*`, { wrapContainer: 'maintainer-worker' });
 
   console.log('✅ Remote environment cleared.');
 
@@ -76,8 +76,8 @@ export async function runCleanup(args: string[], env: NodeJS.ProcessEnv = proces
   const shouldWipe = await confirm('\nWould you like to COMPLETELY wipe the remote workspace (main clone)?');
   
   if (shouldWipe) {
-    console.log(`🔥 Wiping /home/node/dev/main...`);
-    await provider.exec(`rm -rf /home/node/dev/main && mkdir -p /home/node/dev/main`, { wrapContainer: 'maintainer-worker' });
+    console.log(`🔥 Wiping /home/node/.workspaces/main...`);
+    await provider.exec(`rm -rf /home/node/.workspaces/main && mkdir -p /home/node/.workspaces/main`, { wrapContainer: 'maintainer-worker' });
     console.log('✅ Remote hub wiped. You will need to run npm run workspace:setup again.');
   }
   return 0;
