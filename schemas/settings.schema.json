@@ -2251,9 +2251,26 @@
       "properties": {
         "sandbox": {
           "title": "Sandbox",
-          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
-          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").",
+          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrStringOrObject"
+        },
+        "sandboxAllowedPaths": {
+          "title": "Sandbox Allowed Paths",
+          "description": "List of additional paths that the sandbox is allowed to access.",
+          "markdownDescription": "List of additional paths that the sandbox is allowed to access.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sandboxNetworkAccess": {
+          "title": "Sandbox Network Access",
+          "description": "Whether the sandbox is allowed to access the network.",
+          "markdownDescription": "Whether the sandbox is allowed to access the network.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         },
         "shell": {
           "title": "Shell",
