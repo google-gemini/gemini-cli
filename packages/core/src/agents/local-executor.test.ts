@@ -3265,7 +3265,7 @@ describe('LocalAgentExecutor', () => {
         expect(parts).toBeDefined();
         const memoryPart = parts.find((p) => p.text?.includes(mockMemory));
         expect(memoryPart).toBeDefined();
-        expect(memoryPart?.text).toContain('<loaded_context>');
+        expect(memoryPart?.text).toBe(mockMemory);
       });
 
       it('should inject session memory into the first message when JIT is enabled', async () => {
