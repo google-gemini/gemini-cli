@@ -138,28 +138,32 @@ export async function createBrowserAgentDefinition(
 
   function generateAskUserRules(toolName: string): PolicyRule {
     return {
-        toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
-        decision: PolicyDecision.ASK_USER,
-        priority: 999,
-        source: 'BrowserAgent (Sensitive Actions)',
-        mcpName: BROWSER_AGENT_NAME,
-      };
+      toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+      decision: PolicyDecision.ASK_USER,
+      priority: 999,
+      source: 'BrowserAgent (Sensitive Actions)',
+      mcpName: BROWSER_AGENT_NAME,
+    };
   }
 
   function generateAllowRules(toolName: string): PolicyRule {
     return {
-        toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
-        decision: PolicyDecision.ALLOW,
-        priority: PRIORITY_SUBAGENT_TOOL,
-        source: 'BrowserAgent (Read-Only)',
-        mcpName: BROWSER_AGENT_NAME,
-      };
+      toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+      decision: PolicyDecision.ALLOW,
+      priority: PRIORITY_SUBAGENT_TOOL,
+      source: 'BrowserAgent (Read-Only)',
+      mcpName: BROWSER_AGENT_NAME,
+    };
   }
 
   // Check if policy rule the same in all the attributes that we care about
   function isRuleEqual(rule1: PolicyRule, rule2: PolicyRule) {
-    return rule1.toolName === rule2.toolName && rule1.decision === rule2.decision && rule1.priority === rule2.priority && rule1.mcpName === rule2.mcpName;
-
+    return (
+      rule1.toolName === rule2.toolName &&
+      rule1.decision === rule2.decision &&
+      rule1.priority === rule2.priority &&
+      rule1.mcpName === rule2.mcpName
+    );
   }
 
   // Validate required semantic tools are available

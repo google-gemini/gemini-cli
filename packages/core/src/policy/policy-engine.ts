@@ -123,7 +123,9 @@ function ruleMatches(
       if (serverName && toolCall.name) {
         // Case 1: Rule uses short name + mcpName -> match FQN tool call
         if (rule.mcpName && !isMcpToolName(rule.toolName)) {
-          if (toolCall.name === formatMcpToolName(rule.mcpName, rule.toolName)) {
+          if (
+            toolCall.name === formatMcpToolName(rule.mcpName, rule.toolName)
+          ) {
             mcpMatch = true;
           }
         }
