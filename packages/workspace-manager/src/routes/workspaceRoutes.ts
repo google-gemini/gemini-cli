@@ -20,12 +20,17 @@ const CreateWorkspaceSchema = z.object({
   machineType: z.string().optional().default('e2-standard-4'),
   imageTag: z.string().optional().default('latest'),
   zone: z.string().optional().default('us-west1-a'),
+  orgId: z.string().optional(),
+  repoId: z.string().optional(),
 });
 
 router.get('/', async (req, res) => {
   try {
     const authReq = req as unknown as AuthenticatedRequest;
-    const workspaces = await workspaceService.listWorkspaces(authReq.user.id);
+    const workspaces = await workspaceService.listWorkspacesForUser(
+        authReq.user.id, 
+        authReq.user.org_id
+    );
     res.json(workspaces);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -42,7 +47,7 @@ router.post('/', async (req, res) => {
       return;
     }
 
-    const { name, machineType, imageTag, zone } = validation.data;
+    const { name, machineType, imageTag, zone, orgId, repoId } = validation.data;
     const workspaceId = uuidv4();
     const instanceName = `workspace-${workspaceId.slice(0, 8)}`;
 
@@ -57,6 +62,8 @@ router.post('/', async (req, res) => {
       project_id: computeService.getProjectId(),
       created_at: now,
       last_connected_at: now,
+      org_id: orgId || authReq.user.org_id,
+      repo_id: repoId,
     };
 
     // 1. Save to state store

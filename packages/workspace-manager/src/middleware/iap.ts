@@ -10,6 +10,7 @@ export interface AuthenticatedRequest extends Request {
   user: {
     id: string;
     email: string;
+    org_id?: string;
   };
 }
 
@@ -20,6 +21,7 @@ export interface AuthenticatedRequest extends Request {
 export const iapMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const userEmail = req.header('x-goog-authenticated-user-email');
   const userId = req.header('x-goog-authenticated-user-id');
+  const orgId = req.header('x-goog-authenticated-user-org');
 
   // If running locally or without IAP, use a dev user
   if (!userEmail || !userId) {
@@ -28,9 +30,10 @@ export const iapMiddleware = (req: Request, res: Response, next: NextFunction) =
         return;
     }
     
-    (req as AuthenticatedRequest).user = {
+    (req as unknown as AuthenticatedRequest).user = {
       id: 'dev-user-id',
       email: 'dev-user@google.com',
+      org_id: 'dev-org-id',
     };
     next();
     return;
@@ -40,9 +43,10 @@ export const iapMiddleware = (req: Request, res: Response, next: NextFunction) =
   const cleanId = userId.replace('accounts.google.com:', '');
   const cleanEmail = userEmail.replace('accounts.google.com:', '');
 
-  (req as AuthenticatedRequest).user = {
+  (req as unknown as AuthenticatedRequest).user = {
     id: cleanId,
     email: cleanEmail,
+    org_id: orgId,
   };
 
   next();

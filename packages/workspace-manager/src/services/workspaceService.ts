@@ -16,6 +16,9 @@ export interface WorkspaceData {
   project_id: string;
   created_at: string;
   last_connected_at: string;
+  team_id?: string;
+  org_id?: string;
+  repo_id?: string;
 }
 
 export interface WorkspaceRecord extends WorkspaceData {
@@ -44,6 +47,37 @@ export class WorkspaceService {
         ...data,
       };
     });
+  }
+
+  async listWorkspacesForUser(ownerId: string, orgId?: string): Promise<WorkspaceRecord[]> {
+    // 1. Get workspaces owned by user
+    const userSnapshot = await this.getCollection()
+      .where('owner_id', '==', ownerId)
+      .get();
+
+    const userWorkspaces = userSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as WorkspaceData),
+    }));
+
+    // 2. Get workspaces shared with user's org (if orgId provided)
+    if (orgId) {
+        const orgSnapshot = await this.getCollection()
+          .where('org_id', '==', orgId)
+          .get();
+        
+        const orgWorkspaces = orgSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...(doc.data() as WorkspaceData),
+        }));
+
+        // Combine and deduplicate by ID
+        const combined = [...userWorkspaces, ...orgWorkspaces];
+        const unique = Array.from(new Map(combined.map(ws => [ws.id, ws])).values());
+        return unique;
+    }
+
+    return userWorkspaces;
   }
 
   async listWorkspaces(ownerId: string): Promise<WorkspaceRecord[]> {
