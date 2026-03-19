@@ -311,6 +311,7 @@ describe('browserAgentFactory', () => {
       addRule: ReturnType<typeof vi.fn>;
       hasRuleForTool: ReturnType<typeof vi.fn>;
       removeRulesForTool: ReturnType<typeof vi.fn>;
+      getRules: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
@@ -318,6 +319,7 @@ describe('browserAgentFactory', () => {
         addRule: vi.fn(),
         hasRuleForTool: vi.fn().mockReturnValue(false),
         removeRulesForTool: vi.fn(),
+        getRules: vi.fn().mockReturnValue([]),
       };
       vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
         mockPolicyEngine as unknown as PolicyEngine,
