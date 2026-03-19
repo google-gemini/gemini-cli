@@ -10,8 +10,7 @@ import {
   SessionStartSource,
   flushTelemetry,
 } from '@google/gemini-cli-core';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
@@ -31,7 +30,7 @@ export const clearCommand: SlashCommand = {
     }
 
     // Reset user steering hints
-    config?.userHintService.clear();
+    config?.injectionService.clear();
 
     // Start a new conversation recording with a new session ID
     // We MUST do this before calling resetChat() so the new ChatRecordingService

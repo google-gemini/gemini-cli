@@ -24,6 +24,7 @@ const mockBrowserManager = {
     { name: 'click', description: 'Click element' },
     { name: 'fill', description: 'Fill form field' },
     { name: 'navigate_page', description: 'Navigate to URL' },
+    { name: 'type_text', description: 'Type text into an element' },
     // Visual tools (from --experimental-vision)
     { name: 'click_at', description: 'Click at coordinates' },
   ]),
@@ -70,6 +71,7 @@ describe('browserAgentFactory', () => {
       { name: 'click', description: 'Click element' },
       { name: 'fill', description: 'Fill form field' },
       { name: 'navigate_page', description: 'Navigate to URL' },
+      { name: 'type_text', description: 'Type text into an element' },
       // Visual tools (from --experimental-vision)
       { name: 'click_at', description: 'Click at coordinates' },
     ]);
@@ -135,7 +137,7 @@ describe('browserAgentFactory', () => {
       );
 
       expect(definition.name).toBe(BROWSER_AGENT_NAME);
-      // 5 MCP tools + 1 type_text composite tool (no analyze_screenshot without visualModel)
+      // 6 MCP tools (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(6);
     });
 
@@ -228,7 +230,7 @@ describe('browserAgentFactory', () => {
         mockMessageBus,
       );
 
-      // 5 MCP tools + 1 type_text + 1 analyze_screenshot
+      // 6 MCP tools + 1 analyze_screenshot
       expect(definition.toolConfig?.tools).toHaveLength(7);
       const toolNames =
         definition.toolConfig?.tools
@@ -237,6 +239,25 @@ describe('browserAgentFactory', () => {
           )
           .map((t) => t.name) ?? [];
       expect(toolNames).toContain('analyze_screenshot');
+    });
+
+    it('should include domain restrictions in system prompt when configured', async () => {
+      const configWithDomains = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['restricted.com'],
+          },
+        },
+      });
+
+      const { definition } = await createBrowserAgentDefinition(
+        configWithDomains,
+        mockMessageBus,
+      );
+
+      const systemPrompt = definition.promptConfig?.systemPrompt ?? '';
+      expect(systemPrompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
+      expect(systemPrompt).toContain('- restricted.com');
     });
 
     it('should include all MCP navigation tools (new_page, navigate_page) in definition', async () => {
@@ -249,6 +270,7 @@ describe('browserAgentFactory', () => {
         { name: 'close_page', description: 'Close page' },
         { name: 'select_page', description: 'Select page' },
         { name: 'press_key', description: 'Press key' },
+        { name: 'type_text', description: 'Type text into an element' },
         { name: 'hover', description: 'Hover element' },
       ]);
 
@@ -272,7 +294,6 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('click');
       expect(toolNames).toContain('take_snapshot');
       expect(toolNames).toContain('press_key');
-      // Custom composite tool must also be present
       expect(toolNames).toContain('type_text');
       // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(10);
@@ -322,5 +343,23 @@ describe('buildBrowserSystemPrompt', () => {
       expect(prompt).toContain('TERMINAL FAILURES');
       expect(prompt).toContain('complete_task');
     }
+  });
+
+  it('should include allowed domains restriction when provided', () => {
+    const prompt = buildBrowserSystemPrompt(false, [
+      'github.com',
+      '*.google.com',
+    ]);
+    expect(prompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
+    expect(prompt).toContain('- github.com');
+    expect(prompt).toContain('- *.google.com');
+  });
+
+  it('should exclude allowed domains restriction when not provided or empty', () => {
+    let prompt = buildBrowserSystemPrompt(false);
+    expect(prompt).not.toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
+
+    prompt = buildBrowserSystemPrompt(false, []);
+    expect(prompt).not.toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
   });
 });
