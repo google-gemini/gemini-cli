@@ -1,0 +1,11 @@
+{
+  "name": "workspaces",
+  "version": "0.1.0",
+  "description": "High-performance remote development workspaces for Gemini CLI.",
+  "author": "Google Gemini Team",
+  "license": "Apache-2.0",
+  "skills": [
+    "extensions/workspaces/skills/SKILL.md"
+  ],
+  "contextFileName": "extensions/workspaces/docs/GEMINI.md"
+}
