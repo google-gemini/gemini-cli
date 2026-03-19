@@ -104,7 +104,7 @@ import {
   useOverflowActions,
   useOverflowState,
 } from './contexts/OverflowContext.js';
-import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { useErrorCount } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
@@ -576,8 +576,7 @@ export const AppContainer = (props: AppContainerProps) => {
     };
   }, [settings]);
 
-  const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
-    useConsoleMessages();
+  const { errorCount, clearErrorCount } = useErrorCount();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
@@ -1034,10 +1033,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      const { memoryContent, fileCount } =
-        await refreshServerHierarchicalMemory(config);
+      let flattenedMemory: string;
+      let fileCount: number;
 
-      const flattenedMemory = flattenMemory(memoryContent);
+      if (config.isJitContextEnabled()) {
+        await config.getContextManager()?.refresh();
+        flattenedMemory = flattenMemory(config.getUserMemory());
+        fileCount = config.getGeminiMdFileCount();
+      } else {
+        const result = await refreshServerHierarchicalMemory(config);
+        flattenedMemory = flattenMemory(result.memoryContent);
+        fileCount = result.fileCount;
+      }
 
       historyManager.addItem(
         {
@@ -1398,11 +1405,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
     triggerExpandHint(null);
     historyManager.clearItems();
-    clearConsoleMessagesState();
+    clearErrorCount();
     refreshStatic();
   }, [
     historyManager,
-    clearConsoleMessagesState,
+    clearErrorCount,
     refreshStatic,
     reset,
     triggerExpandHint,
@@ -2030,22 +2037,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [historyManager]);
 
-  const filteredConsoleMessages = useMemo(() => {
-    if (config.getDebugMode()) {
-      return consoleMessages;
-    }
-    return consoleMessages.filter((msg) => msg.type !== 'debug');
-  }, [consoleMessages, config]);
-
-  // Computed values
-  const errorCount = useMemo(
-    () =>
-      filteredConsoleMessages
-        .filter((msg) => msg.type === 'error')
-        .reduce((total, msg) => total + msg.count, 0),
-    [filteredConsoleMessages],
-  );
-
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
@@ -2280,7 +2271,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
-      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
@@ -2408,7 +2398,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
-      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressCount,

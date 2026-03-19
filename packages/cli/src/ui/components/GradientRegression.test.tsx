@@ -72,7 +72,7 @@ useSessionStatsMock.mockReturnValue({
 
 describe('Gradient Crash Regression Tests', () => {
   it('<Header /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Header version="1.0.0" nightly={false} />,
       {
         width: 120,
@@ -84,7 +84,7 @@ describe('Gradient Crash Regression Tests', () => {
   });
 
   it('<ModelDialog /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ModelDialog onClose={async () => {}} />,
       {
         width: 120,
@@ -96,7 +96,7 @@ describe('Gradient Crash Regression Tests', () => {
   });
 
   it('<Banner /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Banner bannerText="Test Banner" isWarning={false} width={80} />,
       {
         width: 120,
@@ -108,7 +108,7 @@ describe('Gradient Crash Regression Tests', () => {
   });
 
   it('<Footer /> should not crash when theme.ui.gradient has only one color (or empty) and nightly is true', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Footer />,
       {
         width: 120,
@@ -127,7 +127,7 @@ describe('Gradient Crash Regression Tests', () => {
   });
 
   it('<StatsDisplay /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <StatsDisplay duration="1s" title="My Stats" />,
       {
         width: 120,

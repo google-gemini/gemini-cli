@@ -224,7 +224,7 @@ export const useSlashCommandProcessor = (
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
-        config,
+        agentContext: config,
         settings,
         git: gitService,
         logger,
@@ -521,9 +521,7 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
-                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['name'] !== 'string' ||
-                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
                       ) {
