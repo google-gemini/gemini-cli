@@ -123,9 +123,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         config.modelConfigService.getModelDefinitions?.() ?? {},
       )
         .filter(([_, m]) => {
+          // Basic visibility and Preview access
           if (m.isVisible !== true) return false;
-          if (m.tier !== 'auto') return false;
           if (m.isPreview && !shouldShowPreviewModels) return false;
+          // Only auto models are shown on the main menu
+          if (m.tier !== 'auto') return false;
           return true;
         })
         .map(([id, m]) => ({
@@ -191,19 +193,24 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       config?.getExperimentalDynamicModelConfiguration?.() === true &&
       config.modelConfigService
     ) {
-      return Object.entries(
+      const list = Object.entries(
         config.modelConfigService.getModelDefinitions?.() ?? {},
       )
-        .filter(([_, m]) => {
+        .filter(([id, m]) => {
+          // Basic visibility and Preview access
           if (m.isVisible !== true) return false;
-          // Remove auto models from manual selection.
-          if (m.tier === 'auto') return false;
-          // Remove preview models if user doesn't have access.
           if (m.isPreview && !shouldShowPreviewModels) return false;
-          // Remove pro models if user doesn't have access.
+          // Auto models are for main menu only
+          if (m.tier === 'auto') return false;
+          // Pro models are shown for users with pro access
           if (!hasAccessToProModel && m.tier === 'pro') return false;
-          // Remove flash-lite models if isn't in the free tier.
-          if (m.isPreview && m.tier === 'flash-lite' && !isFreeTier)
+          // 3.1 Preview Flash-lite is only available on free tier
+          if (m.tier === 'flash-lite' && m.isPreview && !isFreeTier)
+            return false;
+
+          // Flag Guard: Versioned models only show if their flag is active.
+          if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
+          if (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL && !useGemini31)
             return false;
 
           return true;
@@ -223,6 +230,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
             key: id,
           };
         });
+
+      // Deduplicate: only show one entry per unique resolved model value.
+      const seen = new Set<string>();
+      return list.filter((option) => {
+        if (seen.has(option.value)) return false;
+        seen.add(option.value);
+        return true;
+      });
     }
 
     // --- LEGACY PATH ---

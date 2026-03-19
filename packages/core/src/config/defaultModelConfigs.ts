@@ -262,8 +262,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       tier: 'pro',
       family: 'gemini-3',
       isPreview: true,
-      // gemini-3-pro-preview will resolve to 3.1 in ModelDialog if applicable.
-      isVisible: false,
+      isVisible: true,
       features: { thinking: true, multimodalToolUse: true },
     },
     'gemini-3.1-pro-preview-customtools': {
