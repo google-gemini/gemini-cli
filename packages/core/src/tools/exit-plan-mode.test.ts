@@ -364,7 +364,7 @@ Ask the user for specific feedback on how to improve the plan.`,
     it('should return YOLO when config.isInteractive() is false', async () => {
       mockConfig.isInteractive = vi.fn().mockReturnValue(false);
       const planRelativePath = createPlanFile('test.md', '# Content');
-      const invocation = tool.build({ plan_path: planRelativePath });
+      const invocation = tool.build({ plan_filename: planRelativePath });
 
       // Directly call execute to trigger the internal getAllowApprovalMode
       const result = await invocation.execute(new AbortController().signal);
@@ -378,7 +378,7 @@ Ask the user for specific feedback on how to improve the plan.`,
     it('should return DEFAULT when config.isInteractive() is true', async () => {
       mockConfig.isInteractive = vi.fn().mockReturnValue(true);
       const planRelativePath = createPlanFile('test.md', '# Content');
-      const invocation = tool.build({ plan_path: planRelativePath });
+      const invocation = tool.build({ plan_filename: planRelativePath });
 
       // Directly call execute to trigger the internal getAllowApprovalMode
       const result = await invocation.execute(new AbortController().signal);
