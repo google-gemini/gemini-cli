@@ -666,23 +666,24 @@ describe('ToolConfirmationMessage', () => {
         rootCommands: ['echo'],
       };
 
-      const renderResult = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={confirmationDetails}
-          config={mockConfig}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={40}
-          terminalWidth={80}
-        />,
-      );
-      await renderResult.waitUntilReady();
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationMessage
+            callId="test-call-id"
+            confirmationDetails={confirmationDetails}
+            config={mockConfig}
+            getPreferredEditor={vi.fn()}
+            availableTerminalHeight={40}
+            terminalWidth={80}
+          />,
+        );
+      await waitUntilReady();
 
-      const outputLines = renderResult.lastFrame().split('\n');
+      const outputLines = lastFrame().split('\n');
       expect(outputLines.length).toBe(40);
 
-      await expect(renderResult).toMatchSvgSnapshot();
-      renderResult.unmount();
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
     });
 
     it('should expand to available height for large edit diffs', async () => {
@@ -704,23 +705,24 @@ describe('ToolConfirmationMessage', () => {
         isModifying: false,
       };
 
-      const renderResult = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={confirmationDetails}
-          config={mockConfig}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={40}
-          terminalWidth={80}
-        />,
-      );
-      await renderResult.waitUntilReady();
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationMessage
+            callId="test-call-id"
+            confirmationDetails={confirmationDetails}
+            config={mockConfig}
+            getPreferredEditor={vi.fn()}
+            availableTerminalHeight={40}
+            terminalWidth={80}
+          />,
+        );
+      await waitUntilReady();
 
-      const outputLines = renderResult.lastFrame().split('\n');
+      const outputLines = lastFrame().split('\n');
       expect(outputLines.length).toBe(40);
 
-      await expect(renderResult).toMatchSvgSnapshot();
-      renderResult.unmount();
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
     });
   });
 

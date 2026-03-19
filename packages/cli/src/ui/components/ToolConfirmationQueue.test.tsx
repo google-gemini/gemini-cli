@@ -457,24 +457,25 @@ describe('ToolConfirmationQueue', () => {
         total: 1,
       };
 
-      const renderResult = renderWithProviders(
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />,
-        {
-          uiState: {
-            mainAreaWidth: 80,
-            terminalHeight: 50,
-            constrainHeight: true,
-            availableTerminalHeight: 40,
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
           },
-          config: mockConfig,
-        },
-      );
-      await renderResult.waitUntilReady();
+        );
+      await waitUntilReady();
 
-      await expect(renderResult).toMatchSvgSnapshot();
-      renderResult.unmount();
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
     });
 
     it('should render the full queue wrapper with borders and content for large exec commands', async () => {
@@ -503,24 +504,25 @@ describe('ToolConfirmationQueue', () => {
         total: 3,
       };
 
-      const renderResult = renderWithProviders(
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />,
-        {
-          uiState: {
-            mainAreaWidth: 80,
-            terminalHeight: 50,
-            constrainHeight: true,
-            availableTerminalHeight: 40,
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
           },
-          config: mockConfig,
-        },
-      );
-      await renderResult.waitUntilReady();
+        );
+      await waitUntilReady();
 
-      await expect(renderResult).toMatchSvgSnapshot();
-      renderResult.unmount();
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
     });
 
     it('should handle security warning height correctly', async () => {
@@ -550,24 +552,25 @@ describe('ToolConfirmationQueue', () => {
         total: 3,
       };
 
-      const renderResult = renderWithProviders(
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />,
-        {
-          uiState: {
-            mainAreaWidth: 80,
-            terminalHeight: 50,
-            constrainHeight: true,
-            availableTerminalHeight: 40,
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
           },
-          config: mockConfig,
-        },
-      );
-      await renderResult.waitUntilReady();
+        );
+      await waitUntilReady();
 
-      await expect(renderResult).toMatchSvgSnapshot();
-      renderResult.unmount();
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
     });
   });
 });
