@@ -2665,8 +2665,8 @@
         },
         "worktrees": {
           "title": "Enable Git Worktrees",
-          "description": "Enable git worktrees.",
-          "markdownDescription": "Enable git worktrees.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Enable automated Git worktree management for parallel work.",
+          "markdownDescription": "Enable automated Git worktree management for parallel work.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

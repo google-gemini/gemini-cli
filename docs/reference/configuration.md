@@ -1528,7 +1528,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.worktrees`** (boolean):
-  - **Description:** Enable git worktrees.
+  - **Description:** Enable automated Git worktree management for parallel work.
   - **Default:** `false`
   - **Requires restart:** Yes
 

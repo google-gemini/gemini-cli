@@ -1912,7 +1912,8 @@ const SETTINGS_SCHEMA = {
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable git worktrees.',
+        description:
+          'Enable automated Git worktree management for parallel work.',
         showInDialog: true,
       },
       extensionManagement: {
