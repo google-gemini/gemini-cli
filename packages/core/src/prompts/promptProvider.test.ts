@@ -61,6 +61,7 @@ describe('PromptProvider', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),

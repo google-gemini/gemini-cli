@@ -64,7 +64,7 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
   ])(
     'renders with renderMarkdown=$renderMarkdown, useAlternateBuffer=$useAlternateBuffer $description',
     async ({ renderMarkdown, useAlternateBuffer, availableTerminalHeight }) => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <StreamingContext.Provider value={StreamingState.Idle}>
           <ToolMessage
             {...baseProps}
