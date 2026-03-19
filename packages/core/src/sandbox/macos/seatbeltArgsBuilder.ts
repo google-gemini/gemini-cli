@@ -68,10 +68,45 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     args.push('-D', 'WORKSPACE_WRITE=1');
   }
 
+  // Auto-detect and support git worktrees by granting access to the underlying git directory
+  try {
+    const gitPath = path.join(workspacePath, '.git');
+    const gitStat = fs.statSync(gitPath);
+    if (gitStat.isFile()) {
+      const gitContent = fs.readFileSync(gitPath, 'utf8');
+      const match = gitContent.match(/^gitdir:\s*(.+)$/m);
+      if (match && match[1]) {
+        let worktreeGitDir = match[1].trim();
+        if (!path.isAbsolute(worktreeGitDir)) {
+          worktreeGitDir = path.resolve(workspacePath, worktreeGitDir);
+        }
+        const resolvedWorktreeGitDir = tryRealpath(worktreeGitDir);
+
+        // Grant write access to the worktree's specific .git directory
+        args.push('-D', `WORKTREE_GIT_DIR=${resolvedWorktreeGitDir}`);
+        profile += `(allow file-read* file-write* (subpath (param "WORKTREE_GIT_DIR")))\n`;
+
+        // Grant write access to the main repository's .git directory (objects, refs, etc. are shared)
+        // resolvedWorktreeGitDir is usually like: /path/to/main-repo/.git/worktrees/worktree-name
+        const mainGitDir = tryRealpath(
+          path.dirname(path.dirname(resolvedWorktreeGitDir)),
+        );
+        if (mainGitDir && mainGitDir.endsWith('.git')) {
+          args.push('-D', `MAIN_GIT_DIR=${mainGitDir}`);
+          profile += `(allow file-read* file-write* (subpath (param "MAIN_GIT_DIR")))\n`;
+        }
+      }
+    }
+  } catch (_e) {
+    // Ignore if .git doesn't exist, isn't readable, etc.
+  }
+
   const tmpPath = tryRealpath(os.tmpdir());
   args.push('-D', `TMPDIR=${tmpPath}`);
 
-  const nodeRootPath = tryRealpath(path.dirname(path.dirname(process.execPath)));
+  const nodeRootPath = tryRealpath(
+    path.dirname(path.dirname(process.execPath)),
+  );
   args.push('-D', `NODE_ROOT=${nodeRootPath}`);
   profile += `(allow file-read* (subpath (param "NODE_ROOT")))\n`;
 
@@ -80,19 +115,19 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     const paths = process.env['PATH'].split(':');
     let pathIndex = 0;
     const addedPaths = new Set();
-    
+
     for (const p of paths) {
       if (!p.trim()) continue;
       try {
         let resolved = tryRealpath(p);
-        
-        // If this is a 'bin' directory (like /usr/local/bin or homebrew/bin), 
-        // also grant read access to its parent directory so that symlinked 
+
+        // If this is a 'bin' directory (like /usr/local/bin or homebrew/bin),
+        // also grant read access to its parent directory so that symlinked
         // assets (like Cellar or libexec) can be read.
         if (resolved.endsWith('/bin')) {
           resolved = path.dirname(resolved);
         }
-        
+
         if (!addedPaths.has(resolved)) {
           addedPaths.add(resolved);
           args.push('-D', `SYS_PATH_${pathIndex}=${resolved}`);
