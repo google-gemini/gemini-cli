@@ -226,23 +226,15 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   WebFetchToolParams,
   ToolResult
 > {
-  private readonly config: Config;
-  private readonly geminiClient?: GeminiClient;
-
   constructor(
-    context: Config | AgentLoopContext,
+    private readonly config: Config,
     params: WebFetchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly geminiClient?: GeminiClient,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    if ('config' in context) {
-      this.config = context.config;
-      this.geminiClient = context.geminiClient;
-    } else {
-      this.config = context;
-    }
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
@@ -318,7 +310,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
           this.handleRetry(attempt, error, delayMs),
         signal,
       },
-      );
+    );
     const bodyBuffer = await this.readResponseWithLimit(
       response,
       MAX_EXPERIMENTAL_FETCH_SIZE,
@@ -897,10 +889,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   private readonly config: Config;
   private readonly geminiClient?: GeminiClient;
 
-  constructor(
-    context: Config | AgentLoopContext,
-    messageBus: MessageBus,
-  ) {
+  constructor(context: Config | AgentLoopContext, messageBus: MessageBus) {
     const config = 'config' in context ? context.config : context;
     super(
       WebFetchTool.Name,
@@ -957,11 +946,12 @@ export class WebFetchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
     return new WebFetchToolInvocation(
-      { config: this.config, geminiClient: this.geminiClient } as any,
+      this.config,
       params,
       messageBus,
       _toolName,
       _toolDisplayName,
+      this.geminiClient,
     );
   }
 

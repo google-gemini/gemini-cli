@@ -72,23 +72,15 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  private readonly config: Config;
-  private readonly geminiClient?: GeminiClient;
-
   constructor(
-    context: Config | AgentLoopContext,
+    private readonly config: Config,
     params: WebSearchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly geminiClient?: GeminiClient,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    if ('config' in context) {
-      this.config = context.config;
-      this.geminiClient = context.geminiClient;
-    } else {
-      this.config = context;
-    }
   }
 
   override getDescription(): string {
@@ -219,10 +211,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
   private readonly config: Config;
   private readonly geminiClient?: GeminiClient;
 
-  constructor(
-    context: Config | AgentLoopContext,
-    messageBus: MessageBus,
-  ) {
+  constructor(context: Config | AgentLoopContext, messageBus: MessageBus) {
     const config = 'config' in context ? context.config : context;
     super(
       WebSearchTool.Name,
@@ -261,11 +250,12 @@ export class WebSearchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
-      { config: this.config, geminiClient: this.geminiClient } as any,
+      this.config,
       params,
       messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
+      this.geminiClient,
     );
   }
 

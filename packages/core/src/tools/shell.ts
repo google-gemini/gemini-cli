@@ -46,6 +46,7 @@ import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { Config } from '../config/config.js';
+import type { GeminiClient } from '../core/client.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -63,23 +64,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
-  private readonly config: Config;
-  private readonly geminiClient?: GeminiClient;
-
   constructor(
-    context: Config | AgentLoopContext,
+    private readonly config: Config,
     params: ShellToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly geminiClient?: GeminiClient,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    if ('config' in context) {
-      this.config = context.config;
-      this.geminiClient = context.geminiClient;
-    } else {
-      this.config = context;
-    }
   }
 
   getDescription(): string {
@@ -473,10 +466,7 @@ export class ShellTool extends BaseDeclarativeTool<
   private readonly config: Config;
   private readonly geminiClient?: GeminiClient;
 
-  constructor(
-    context: Config | AgentLoopContext,
-    messageBus: MessageBus,
-  ) {
+  constructor(context: Config | AgentLoopContext, messageBus: MessageBus) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
@@ -489,7 +479,7 @@ export class ShellTool extends BaseDeclarativeTool<
       ShellTool.Name,
       'Shell',
       definition.base.description!,
-      Kind.Shell,
+      Kind.Execute,
       definition.base.parametersJsonSchema,
       messageBus,
       false, // isOutputMarkdown
@@ -500,7 +490,6 @@ export class ShellTool extends BaseDeclarativeTool<
       this.geminiClient = context.geminiClient;
     }
   }
-
 
   protected override validateToolParamValues(
     params: ShellToolParams,
@@ -526,11 +515,12 @@ export class ShellTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
-      { config: this.config, geminiClient: this.geminiClient } as any,
+      this.config,
       params,
       messageBus,
       _toolName,
       _toolDisplayName,
+      this.geminiClient,
     );
   }
 
