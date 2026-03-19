@@ -415,12 +415,12 @@ Ask the user for specific feedback on how to improve the plan.`,
   });
 
   describe('validateToolParams', () => {
-    it('should reject empty plan_path', () => {
+    it('should reject empty plan_filename', () => {
       const result = tool.validateToolParams({ plan_filename: '' });
       expect(result).toBe('plan_filename is required.');
     });
 
-    it('should reject whitespace-only plan_path', () => {
+    it('should reject whitespace-only plan_filename', () => {
       const result = tool.validateToolParams({ plan_filename: '   ' });
       expect(result).toBe('plan_filename is required.');
     });
