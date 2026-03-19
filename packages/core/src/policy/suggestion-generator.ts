@@ -141,33 +141,46 @@ export async function suggestPolicyScope(
     return null;
   }
 
+  const TIMEOUT_MS = 5000;
+
   try {
-    const result = await contentGenerator.generateContent(
-      {
-        model: DEFAULT_GEMINI_FLASH_MODEL,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: zodToJsonSchema(PolicySuggestionSchema, {
-            target: 'openApi3',
-          }),
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: safeTemplateReplace(SUGGESTION_PROMPT, {
-                  tool_type: confirmationDetails.type,
-                  tool_context: toolContext,
-                }),
-              },
-            ],
+    // Time-box the Flash call — the user may confirm before it responds.
+    const result = await Promise.race([
+      contentGenerator.generateContent(
+        {
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: zodToJsonSchema(PolicySuggestionSchema, {
+              target: 'openApi3',
+            }),
           },
-        ],
-      },
-      'policy-suggestion',
-      LlmRole.SUBAGENT,
-    );
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: safeTemplateReplace(SUGGESTION_PROMPT, {
+                    tool_type: confirmationDetails.type,
+                    tool_context: toolContext,
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+        'policy-suggestion',
+        LlmRole.SUBAGENT,
+      ),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), TIMEOUT_MS),
+      ),
+    ]);
+
+    if (!result) {
+      debugLogger.debug('[PolicySuggestion] Timed out');
+      return null;
+    }
 
     const responseText = getResponseText(result);
     debugLogger.debug(`[PolicySuggestion] Raw response: ${responseText}`);
@@ -200,7 +213,7 @@ export async function suggestPolicyScope(
         return safeSuggestion;
       }
 
-      debugLogger.debug('[PolicySuggestion] Parsed:', parsed);
+      debugLogger.debug(`[PolicySuggestion] Parsed: ${JSON.stringify(parsed)}`);
       logPolicySuggestion(
         config,
         new PolicySuggestionEvent(toolContext, JSON.stringify(parsed)),

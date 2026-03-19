@@ -173,6 +173,11 @@ export async function resolveConfirmation(
     // Fire LLM-based policy suggestion in the background (non-blocking).
     // The suggestion is published on the message bus for the UI to display,
     // and also captured locally for use in updatePolicy().
+    //
+    // Known limitation: if the user confirms before Flash responds,
+    // policySuggestion will still be null and updatePolicy() falls back to
+    // the heuristic. The UI shows "Suggesting scope..." to hint that
+    // waiting a moment may yield a better-scoped rule.
     if (deps.config.enableSmartPolicyScoping) {
       void suggestPolicyScope(
         serializableDetails,
