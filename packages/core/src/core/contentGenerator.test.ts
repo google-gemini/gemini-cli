@@ -725,6 +725,26 @@ describe('createContentGeneratorConfig', () => {
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
   });
+  it('should configure for GATEWAY using dummy placeholder if GEMINI_API_KEY is set', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'env-gemini-key');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.GATEWAY,
+    );
+    expect(config.apiKey).toBe('gateway-placeholder-key');
+    expect(config.vertexai).toBe(false);
+  });
+
+  it('should configure for GATEWAY using dummy placeholder if GEMINI_API_KEY is not set', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    vi.mocked(loadApiKey).mockResolvedValue(null);
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.GATEWAY,
+    );
+    expect(config.apiKey).toBe('gateway-placeholder-key');
+    expect(config.vertexai).toBe(false);
+  });
 });
 
 describe('validateBaseUrl', () => {
