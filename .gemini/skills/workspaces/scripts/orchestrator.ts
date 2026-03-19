@@ -18,11 +18,18 @@ function q(str: string) {
 }
 
 export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = process.env) {
-  const prNumber = args[0];
-  const action = args[1] || 'review';
+  let prNumber = args[0];
+  let action = args[1] || 'review';
+
+  // Handle "shell" mode: npm run workspace:shell [identifier]
+  const isShellMode = prNumber === 'shell';
+  if (isShellMode) {
+      prNumber = args[1] || `adhoc-${Math.floor(Math.random() * 10000)}`;
+      action = 'shell';
+  }
 
   if (!prNumber) {
-    console.error('❌ Usage: npm run workspace <PR_NUMBER> [action]');
+    console.error('❌ Usage: npm run workspace <PR_NUMBER> [action] OR npm run workspace:shell [identifier]');
     return 1;
   }
 
@@ -54,26 +61,32 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const hostWorktreeDir = `${hostWorkspaceRoot}/worktrees/${sessionName}`;
 
   // 3. Remote Context Setup (Executed on HOST for permission simplicity)
-  console.log(`🚀 Preparing remote environment for ${action} on #${prNumber}...`);
+  console.log(`🚀 Preparing remote environment for ${action} on ${isShellMode ? 'branch/id' : '#'}${prNumber}...`);
   
   // FIX: Use the host path to check for existence
   const check = await provider.getExecOutput(`ls -d ${hostWorktreeDir}/.git`);
   
   // FIX: Ensure container user (node) owns the workspaces directories
-  // This resolves EACCES errors across all shared volumes.
   console.log('   - Synchronizing container permissions...');
   await provider.exec(`sudo chown -R 1000:1000 /mnt/disks/data`);
 
   if (check.status !== 0) {
-    console.log('   - Provisioning isolated git worktree...');
+    console.log(`   - Provisioning isolated git worktree for ${prNumber}...`);
     
     // We run these on the host because the host user owns the data directory
+    // If it's a PR, we fetch specifically. If it's a shell, we just branch from main.
+    const gitFetch = isShellMode 
+        ? `sudo -u chronos git -C ${hostWorkDir} fetch --quiet origin`
+        : `sudo -u chronos git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
+    
+    const gitTarget = isShellMode ? 'FETCH_HEAD' : 'FETCH_HEAD'; // For now just use main/fetched state
+
     const setupCmd = `
       sudo -u chronos git -C ${hostWorkDir} config --add safe.directory ${hostWorkDir} && \
       sudo mkdir -p ${hostWorkspaceRoot}/worktrees && \
       sudo chown chronos:chronos ${hostWorkspaceRoot}/worktrees && \
-      sudo -u chronos git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head && \
-      sudo -u chronos git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} FETCH_HEAD 2>&1
+      ${gitFetch} && \
+      sudo -u chronos git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1
     `;
     const setupRes = await provider.getExecOutput(setupCmd);
     if (setupRes.status !== 0) {
@@ -88,7 +101,6 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   }
 
   // REPAIR: Git worktrees use absolute paths. If the host and container paths differ, they break.
-  // We repair the worktree context inside the container.
   console.log('   - Repairing remote worktree context...');
   await provider.exec(`sudo docker exec maintainer-worker git -C ${remoteWorktreeDir} worktree repair ${containerWorkspaceRoot}/main`);
 
@@ -100,22 +112,23 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const ghTokenRes = await provider.getExecOutput(`cat ${hostWorkspaceRoot}/.gh_token`);
   const remoteGhToken = ghTokenRes.stdout.trim();
 
-  // AUTH: Inject credentials into a local .env in the worktree for all tools to find
+  // AUTH: Inject credentials into a local .env in the worktree
   console.log('   - Injecting remote authentication context...');
-  const dotEnvContent = `
-GEMINI_API_KEY=${remoteApiKey}
-`.trim();
+  const dotEnvContent = `GEMINI_API_KEY=${remoteApiKey}`;
   await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`echo ${q(dotEnvContent)} > ${remoteWorktreeDir}/.env`)}`);
 
   // 4. Execution Logic
-  const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
+  // In shell mode, we just start gemini. In action mode, we run the entrypoint.
+  const remoteWorker = isShellMode 
+    ? `gemini`
+    : `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
   
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
   const tmuxStyle = `
     tmux set -g status-bg colour238; 
     tmux set -g status-fg colour136; 
     tmux set -g status-left-length 50;
-    tmux set -g status-left '#[fg=colour238,bg=colour136,bold] WORKSPACE #[fg=colour136,bg=colour238,nobold] PR #${prNumber} (${action}) ';
+    tmux set -g status-left '#[fg=colour238,bg=colour136,bold] WORKSPACE #[fg=colour136,bg=colour238,nobold] ${isShellMode ? 'SHELL' : 'PR'} ${prNumber} ';
     tmux set -g status-right '#[fg=colour245] %H:%M #[fg=colour238,bg=colour245,bold] #H ';
     tmux setw -g window-status-current-format '#[fg=colour238,bg=colour136,bold] #I:#W #[fg=colour136,bg=colour238,nobold]';
   `.replace(/\n/g, '');
@@ -157,7 +170,7 @@ GEMINI_API_KEY=${remoteApiKey}
                 end run
             `;
     spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
-    console.log(`✅ iTerm2 ${terminalTarget} opened for job #${prNumber}.`);
+    console.log(`✅ iTerm2 ${terminalTarget} opened for job ${prNumber}.`);
     return 0;
   }
 

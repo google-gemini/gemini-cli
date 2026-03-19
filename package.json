@@ -66,6 +66,7 @@
     "clean": "node scripts/clean.js",
     "workspace": "tsx .gemini/skills/workspaces/scripts/orchestrator.ts",
     "workspace:setup": "tsx .gemini/skills/workspaces/scripts/setup.ts",
+    "workspace:shell": "tsx .gemini/skills/workspaces/scripts/orchestrator.ts shell",
     "workspace:check": "tsx .gemini/skills/workspaces/scripts/check.ts",
     "workspace:clean-all": "tsx .gemini/skills/workspaces/scripts/clean.ts",
     "workspace:kill": "tsx .gemini/skills/workspaces/scripts/clean.ts",
