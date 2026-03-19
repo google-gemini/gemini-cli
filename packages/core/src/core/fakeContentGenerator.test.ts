@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   FakeContentGenerator,
+  MockExhaustedError,
   type FakeResponse,
 } from './fakeContentGenerator.js';
 import { promises } from 'node:fs';
@@ -142,7 +143,7 @@ describe('FakeContentGenerator', () => {
     }
   });
 
-  it('should throw error when no more responses', async () => {
+  it('should throw MockExhaustedError when no more responses', async () => {
     const generator = new FakeContentGenerator([fakeGenerateContentResponse]);
     await generator.generateContent(
       {} as GenerateContentParameters,
@@ -151,24 +152,45 @@ describe('FakeContentGenerator', () => {
     );
     await expect(
       generator.embedContent({} as EmbedContentParameters),
-    ).rejects.toThrowError('No more mock responses for embedContent');
+    ).rejects.toThrow(MockExhaustedError);
     await expect(
       generator.countTokens({} as CountTokensParameters),
-    ).rejects.toThrowError('No more mock responses for countTokens');
+    ).rejects.toThrow(MockExhaustedError);
     await expect(
       generator.generateContentStream(
         {} as GenerateContentParameters,
         'id',
         LlmRole.MAIN,
       ),
-    ).rejects.toThrow('No more mock responses for generateContentStream');
+    ).rejects.toThrow(MockExhaustedError);
     await expect(
       generator.generateContent(
         {} as GenerateContentParameters,
         'id',
         LlmRole.MAIN,
       ),
-    ).rejects.toThrowError('No more mock responses for generateContent');
+    ).rejects.toThrow(MockExhaustedError);
+  });
+
+  it('should track sent requests via getSentRequests', async () => {
+    const generator = new FakeContentGenerator([
+      fakeGenerateContentResponse,
+      fakeGenerateContentStreamResponse,
+    ]);
+    const req1 = {
+      contents: [{ role: 'user', parts: [{ text: 'a' }] }],
+    } as GenerateContentParameters;
+    const req2 = {
+      contents: [{ role: 'user', parts: [{ text: 'b' }] }],
+    } as GenerateContentParameters;
+
+    await generator.generateContent(req1, 'id1', LlmRole.MAIN);
+    await generator.generateContentStream(req2, 'id2', LlmRole.MAIN);
+
+    const sent = generator.getSentRequests();
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toBe(req1);
+    expect(sent[1]).toBe(req2);
   });
 
   describe('fromFile', () => {

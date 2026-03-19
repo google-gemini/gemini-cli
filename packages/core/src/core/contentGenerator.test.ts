@@ -53,6 +53,7 @@ describe('createContentGenerator', () => {
     );
     const fakeResponsesFile = 'fake/responses.yaml';
     const mockConfigWithFake = {
+      ...mockConfig,
       fakeResponses: fakeResponsesFile,
       getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
@@ -74,6 +75,7 @@ describe('createContentGenerator', () => {
     const fakeResponsesFile = 'fake/responses.yaml';
     const recordResponsesFile = 'record/responses.yaml';
     const mockConfigWithRecordResponses = {
+      ...mockConfig,
       fakeResponses: fakeResponsesFile,
       recordResponses: recordResponsesFile,
       getClientName: vi.fn().mockReturnValue(undefined),

@@ -262,5 +262,47 @@ describe('useReverseSearchCompletion', () => {
       expect(result.current.suggestions).toEqual([]);
       expect(result.current.showSuggestions).toBe(false);
     });
+    it('does not cause state updates or timeouts when reverseSearchActive is false', async () => {
+      const history = ['alpha', 'beta'];
+
+      const { result, rerender } = await renderHookWithProviders(
+        ({ active }) => {
+          const textBuffer = useTextBufferForTest('');
+          return {
+            search: useReverseSearchCompletion(textBuffer, history, active),
+            buffer: textBuffer,
+          };
+        },
+        { initialProps: { active: false } },
+      );
+
+      // Typing while inactive should NOT update debounced search state.
+      // We change text to 'a', advance time past the debounce period (100ms),
+      // and ensure suggestions remain empty because the debounced value never changed.
+      act(() => {
+        result.current.buffer.setText('a');
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(result.current.search.suggestions).toEqual([]);
+
+      // Activating reverse search and setting text to 'alpha' forces useDebouncedValue
+      // to receive 'alpha', scheduling the timeout.
+      act(() => {
+        result.current.buffer.setText('alpha');
+      });
+      rerender({ active: true });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(result.current.search.suggestions.map((s) => s.value)).toEqual([
+        'alpha',
+      ]);
+    });
   });
 });
