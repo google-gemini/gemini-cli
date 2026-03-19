@@ -1,0 +1,40 @@
+
+> @google/gemini-cli@0.34.0-nightly.20260304.28af4e127 test:always_passing_evals
+> vitest run --config evals/vitest.config.ts
+
+
+ RUN  v3.2.4 /home/fayerman/gemini-cli
+
+ ↓ evals/generalist_agent.eval.ts (1 test | 1 skipped)
+ ↓ evals/automated-tool-use.eval.ts (2 tests | 2 skipped)
+ ↓ evals/concurrency-safety.eval.ts (1 test | 1 skipped)
+ ↓ evals/frugalSearch.eval.ts (1 test | 1 skipped)
+ ↓ evals/frugalReads.eval.ts (3 tests | 3 skipped)
+ ↓ evals/ask_user.eval.ts (4 tests | 4 skipped)
+ ↓ evals/edit-locations-eval.eval.ts (1 test | 1 skipped)
+Initialized empty Git repository in /tmp/gemini-cli-tests/should-not-edit-files-when-asked-a-general-question/.git/
+Initialized empty Git repository in /tmp/gemini-cli-tests/should-refuse-file-modification-when-in-plan-mode/.git/
+Initialized empty Git repository in /tmp/gemini-cli-tests/should-not-git-add-commit-changes-unprompted/.git/
+[main (root-commit) 831fc43] Initial commit
+ 3 files changed, 31 insertions(+)
+ create mode 100644 .gemini/settings.json
+ create mode 100644 README.md
+ create mode 120000 node_modules
+[main (root-commit) 1744b3a] Initial commit
+ 5 files changed, 30 insertions(+)
+ create mode 100644 .gemini/settings.json
+ create mode 100644 .gitignore
+ create mode 100644 index.test.ts
+ create mode 100644 index.ts
+ create mode 100644 package.json
+[main (root-commit) b6577d3] Initial commit
+ 4 files changed, 29 insertions(+)
+ create mode 100644 .gemini/settings.json
+ create mode 100644 app.ts
+ create mode 120000 node_modules
+ create mode 100644 package.json
+ ↓ evals/subagents.eval.ts (1 test | 1 skipped)
+ ↓ evals/grep_search_functionality.eval.ts (6 tests | 6 skipped)
+ ↓ evals/validation_fidelity_pre_existing_errors.eval.ts (1 test | 1 skipped)
+ ↓ evals/validation_fidelity.eval.ts (1 test | 1 skipped)
+ ↓ evals/tool_output_masking.eval.ts (2 tests | 2 skipped)
