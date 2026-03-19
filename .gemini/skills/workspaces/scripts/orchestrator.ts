@@ -48,10 +48,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 2. Wake Worker & Verify Container
   await provider.ensureReady();
 
-  // Paths
-  const hostWorkspaceRoot = `/mnt/disks/data`;
+  // Paths - Unified across host and container
+  const hostWorkspaceRoot = `/home/node/.workspaces`;
   const hostWorkDir = `${hostWorkspaceRoot}/main`;
-  const containerHome = '/home/node';
   const containerWorkspaceRoot = `/home/node/.workspaces`;
   
   const remotePolicyPath = `${containerWorkspaceRoot}/policies/workspace-policy.toml`;
@@ -68,7 +67,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   // FIX: Ensure container user (node) owns the workspaces directories
   console.log('   - Synchronizing container permissions...');
-  await provider.exec(`sudo chown -R 1000:1000 /mnt/disks/data`);
+  await provider.exec(`sudo chown -R 1000:1000 /home/node/.workspaces`);
 
   if (check.status !== 0) {
     console.log(`   - Provisioning isolated git worktree for ${prNumber}...`);
@@ -99,10 +98,6 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   } else {
     console.log('   ✅ Remote worktree ready.');
   }
-
-  // REPAIR: Git worktrees use absolute paths. If the host and container paths differ, they break.
-  console.log('   - Repairing remote worktree context...');
-  await provider.exec(`sudo docker exec maintainer-worker git -C ${remoteWorktreeDir} worktree repair ${containerWorkspaceRoot}/main`);
 
   // AUTH: Dynamically retrieve credentials from host-side config/disk
   const remoteConfigPath = `${hostWorkspaceRoot}/gemini-cli-config/.gemini/settings.json`;
