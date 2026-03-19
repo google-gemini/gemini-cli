@@ -505,7 +505,9 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
+                         
                         typeof props['name'] !== 'string' ||
+                         
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
                       ) {

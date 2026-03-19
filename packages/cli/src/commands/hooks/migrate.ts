@@ -79,7 +79,7 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
     migrated['command'] = hook['command'];
 
     // Replace CLAUDE_PROJECT_DIR with GEMINI_PROJECT_DIR in command
-
+     
     if (typeof migrated['command'] === 'string') {
       migrated['command'] = migrated['command'].replace(
         /\$CLAUDE_PROJECT_DIR/g,
@@ -94,7 +94,7 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
   }
 
   // Map timeout field (Claude uses seconds, Gemini uses seconds)
-
+   
   if ('timeout' in hook && typeof hook['timeout'] === 'number') {
     migrated['timeout'] = hook['timeout'];
   }
@@ -142,6 +142,7 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
       // Transform matcher
       if (
         'matcher' in definition &&
+         
         typeof definition['matcher'] === 'string'
       ) {
         migratedDef['matcher'] = transformMatcher(definition['matcher']);

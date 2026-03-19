@@ -62,7 +62,7 @@ export class MockMessageBus {
       if (!this.subscriptions.has(type)) {
         this.subscriptions.set(type, new Set());
       }
-
+       
       this.subscriptions.get(type)!.add(listener as (message: Message) => void);
     },
   );
@@ -74,6 +74,7 @@ export class MockMessageBus {
     <T extends Message>(type: T['type'], listener: (message: T) => void) => {
       const listeners = this.subscriptions.get(type);
       if (listeners) {
+         
         listeners.delete(listener as (message: Message) => void);
       }
     },
@@ -102,6 +103,7 @@ export class MockMessageBus {
  * Create a mock MessageBus for testing
  */
 export function createMockMessageBus(): MessageBus {
+   
   return new MockMessageBus() as unknown as MessageBus;
 }
 
@@ -111,5 +113,6 @@ export function createMockMessageBus(): MessageBus {
 export function getMockMessageBusInstance(
   messageBus: MessageBus,
 ): MockMessageBus {
+   
   return messageBus as unknown as MockMessageBus;
 }

@@ -584,10 +584,12 @@ export class LoopDetectionService {
     }
 
     const flashConfidence =
+       
       typeof flashResult['unproductive_state_confidence'] === 'number'
         ? flashResult['unproductive_state_confidence']
         : 0;
     const flashAnalysis =
+       
       typeof flashResult['unproductive_state_analysis'] === 'string'
         ? flashResult['unproductive_state_analysis']
         : '';
@@ -634,11 +636,13 @@ export class LoopDetectionService {
 
     const mainModelConfidence =
       mainModelResult &&
+       
       typeof mainModelResult['unproductive_state_confidence'] === 'number'
         ? mainModelResult['unproductive_state_confidence']
         : 0;
     const mainModelAnalysis =
       mainModelResult &&
+       
       typeof mainModelResult['unproductive_state_analysis'] === 'string'
         ? mainModelResult['unproductive_state_analysis']
         : undefined;
@@ -687,6 +691,7 @@ export class LoopDetectionService {
 
       if (
         result &&
+         
         typeof result['unproductive_state_confidence'] === 'number'
       ) {
         return result;

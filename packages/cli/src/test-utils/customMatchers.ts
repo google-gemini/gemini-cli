@@ -108,6 +108,7 @@ function toHaveOnlyValidCharacters(this: Assertion, buffer: TextBuffer) {
   };
 }
 
+ 
 expect.extend({
   toHaveOnlyValidCharacters,
   toMatchSvgSnapshot,
