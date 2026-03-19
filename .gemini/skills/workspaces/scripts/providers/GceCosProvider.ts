@@ -59,29 +59,54 @@ export class GceCosProvider implements WorkspaceProvider {
             '--project', this.projectId, '--network', vpcName, '--allow=tcp:22', '--source-ranges=0.0.0.0/0'], { stdio: 'inherit' });
     }
 
-    console.log(`🚀 Provisioning GCE COS worker: ${this.instanceName}...`);
+    console.log(`🚀 Provisioning GCE COS worker: ${this.instanceName} (Unified Workspace Setup)...`);
 
     const startupScriptContent = `#!/bin/bash
       set -e
-      echo "🚀 Starting Maintainer Worker Resilience Loop..."
+      echo "🚀 Initializing Unified Workspace..."
 
-      # Wait for Docker to be ready
+      # 1. Mount Data Disk
+      mkdir -p /mnt/disks/data
+      if ! mountpoint -q /mnt/disks/data; then
+        DATA_DISK="/dev/disk/by-id/google-data"
+        [ -e "$DATA_DISK" ] || DATA_DISK="/dev/sdb"
+        
+        while [ ! -e "$DATA_DISK" ]; do echo "Waiting for data disk..."; sleep 1; done
+        blkid "$DATA_DISK" || mkfs.ext4 -m 0 -F "$DATA_DISK"
+        mount -o discard,defaults "$DATA_DISK" /mnt/disks/data
+      fi
+
+      # 2. Prepare Stateful Directories (on the persistent disk)
+      mkdir -p /mnt/disks/data/main /mnt/disks/data/worktrees /mnt/disks/data/scripts /mnt/disks/data/config /mnt/disks/data/policies
+      chmod -R 777 /mnt/disks/data
+      
+      # 3. Handle Global Persistence Symlink
+      # We create a global /workspaces link that points to the data disk.
+      # This avoids dependencies on ephemeral home directories.
+      ln -sfn /mnt/disks/data /workspaces
+      chmod 777 /workspaces
+      
+      # Ensure host users can find it via their home too (if directory exists)
+      for h in /home/*_google_com; do
+        [ -d "$h" ] || continue
+        ln -sfn /mnt/disks/data "$h/.workspaces"
+        chown -h $(basename $h):$(basename $h) "$h/.workspaces"
+      done
+
+      # 4. Container Resilience Loop
       until docker info >/dev/null 2>&1; do echo "Waiting for docker..."; sleep 2; done
 
-      # Pull with retries
       for i in {1..5}; do
         docker pull ${imageUri} && break || (echo "Pull failed, retry $i..." && sleep 5)
       done
 
-      # Run if not already exists
       if ! docker ps -a | grep -q "maintainer-worker"; then
         docker run -d --name maintainer-worker --restart always \\
-          -v ~/.workspaces:/home/node/.workspaces:rw \\
-          -v ~/dev:/home/node/dev:rw \\
-          -v ~/.gemini:/home/node/.gemini:rw \\
+          -v /mnt/disks/data:/home/node/.workspaces:rw \\
+          -v /mnt/disks/data/gemini-cli-config/.gemini:/home/node/.gemini:rw \\
           ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
       fi
-      echo "✅ Maintainer Worker is active."
+      echo "✅ Unified Workspace is active."
     `;
 
     const tmpScriptPath = path.join(os.tmpdir(), `gcli-startup-${Date.now()}.sh`);
@@ -92,7 +117,11 @@ export class GceCosProvider implements WorkspaceProvider {
       '--project', this.projectId,
       '--zone', this.zone,
       '--machine-type', 'n2-standard-8',
-      '--create-disk', `auto-delete=yes,boot=yes,device-name=${this.instanceName},image=projects/cos-cloud/global/images/family/cos-stable,mode=rw,size=200,type=projects/${this.projectId}/zones/${this.zone}/diskTypes/pd-balanced`,
+      '--image-family', 'cos-stable',
+      '--image-project', 'cos-cloud',
+      '--boot-disk-size', '10GB',
+      '--boot-disk-type', 'pd-balanced',
+      '--create-disk', `name=${this.instanceName}-data,size=200,type=pd-balanced,device-name=data,auto-delete=yes`,
       '--metadata-from-file', `startup-script=${tmpScriptPath}`,
       '--metadata', 'enable-oslogin=TRUE',
       '--network-interface', `network=${vpcName},subnet=${subnetName},no-address`,
@@ -132,13 +161,19 @@ export class GceCosProvider implements WorkspaceProvider {
     
     let needsUpdate = false;
     if (containerCheck.status === 0 && containerCheck.stdout.trim()) {
-        // Check if the running image is stale
-        const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-        // For simplicity in this environment, we'll just check if tmux is missing as a proxy for "stale image"
-        const tmuxCheck = await this.getExecOutput('sudo docker exec maintainer-worker which tmux');
-        if (tmuxCheck.status !== 0) {
-            console.log('   ⚠️ Remote container is stale (missing tmux). Triggering update...');
+        // Check if the volume mounts are correct by checking for files inside .workspaces/main
+        const mountCheck = await this.getExecOutput('sudo docker exec maintainer-worker ls -A /home/node/.workspaces/main');
+        if (mountCheck.status !== 0 || !mountCheck.stdout.trim()) {
+            console.log('   ⚠️ Remote container has incorrect or empty mounts. Triggering refresh...');
             needsUpdate = true;
+        } else {
+            // Check if the running image is stale
+            const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
+            const tmuxCheck = await this.getExecOutput('sudo docker exec maintainer-worker which tmux');
+            if (tmuxCheck.status !== 0) {
+                console.log('   ⚠️ Remote container is stale (missing tmux). Triggering update...');
+                needsUpdate = true;
+            }
         }
     } else {
         needsUpdate = true;
@@ -147,7 +182,16 @@ export class GceCosProvider implements WorkspaceProvider {
     if (needsUpdate) {
         console.log('   ⚠️ Container missing or stale. Attempting refresh...');
         const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-        const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.workspaces:/home/node/.workspaces:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
+        // Ensure data mount is available before running
+        const recoverCmd = `
+          (mountpoint -q /mnt/disks/data || sudo mount /dev/disk/by-id/google-data /mnt/disks/data) && \
+          sudo docker pull ${imageUri} && \
+          (sudo docker rm -f maintainer-worker || true) && \
+          sudo docker run -d --name maintainer-worker --restart always \
+            -v /mnt/disks/data:/home/node/.workspaces:rw \
+            -v /mnt/disks/data/gemini-cli-config/.gemini:/home/node/.gemini:rw \
+            ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
+        `;
         const recoverRes = await this.exec(recoverCmd);
         if (recoverRes !== 0) {
             console.error('   ❌ Critical: Failed to refresh maintainer container.');
@@ -172,7 +216,8 @@ Host ${this.sshAlias}
     UserKnownHostsFile /dev/null
     CheckHostIP no
     StrictHostKeyChecking no
-    ConnectTimeout 15
+    ConnectTimeout 60
+    ServerAliveInterval 30
 `;
 
     fs.writeFileSync(this.sshConfigPath, sshEntry);
@@ -184,7 +229,8 @@ Host ${this.sshAlias}
         console.error('\n❌ All connection attempts failed. Please ensure you have "gcert" and IAP permissions.');
         return 1;
     }
-    console.log('   ✅ Connection verified.');
+    console.log('   ✅ Connection verified. Waiting 10s for remote disk initialization...');
+    await new Promise(r => setTimeout(r, 10000));
     return 0;
   }
 
@@ -204,7 +250,7 @@ Host ${this.sshAlias}
   async getExecOutput(command: string, options: ExecOptions = {}): Promise<{ status: number; stdout: string; stderr: string }> {
     let finalCmd = command;
     if (options.wrapContainer) {
-        finalCmd = `docker exec ${options.interactive ? '-it' : ''} ${options.cwd ? `-w ${options.cwd}` : ''} ${options.wrapContainer} sh -c ${this.quote(command)}`;
+        finalCmd = `sudo docker exec ${options.interactive ? '-it' : ''} ${options.cwd ? `-w ${options.cwd}` : ''} ${options.wrapContainer} sh -c ${this.quote(command)}`;
     }
 
     return this.conn.run(finalCmd, { interactive: options.interactive, stdio: options.interactive ? 'inherit' : 'pipe' });

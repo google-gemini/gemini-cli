@@ -39,48 +39,61 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   await provider.ensureReady();
 
   // Paths
-  const hostHome = `~`;
-  const hostWorkDir = `${hostHome}/dev/main`;
+  const hostWorkspaceRoot = `/mnt/disks/data`;
+  const hostWorkDir = `${hostWorkspaceRoot}/main`;
   const containerHome = '/home/node';
-  const remotePolicyPath = `${containerHome}/.gemini/policies/workspace-policy.toml`;
-  const persistentScripts = `${containerHome}/.workspaces/scripts`;
+  const containerWorkspaceRoot = `/home/node/.workspaces`;
+  
+  const remotePolicyPath = `${containerWorkspaceRoot}/policies/workspace-policy.toml`;
+  const persistentScripts = `${containerWorkspaceRoot}/scripts`;
   const sessionName = `workspace-${prNumber}-${action}`;
-  const remoteWorktreeDir = `${containerHome}/dev/worktrees/${sessionName}`;
-  const hostWorktreeDir = `${hostHome}/dev/worktrees/${sessionName}`;
+  const remoteWorktreeDir = `${containerWorkspaceRoot}/worktrees/${sessionName}`;
+  const hostWorktreeDir = `${hostWorkspaceRoot}/worktrees/${sessionName}`;
 
   // 3. Remote Context Setup (Executed on HOST for permission simplicity)
   console.log(`🚀 Preparing remote environment for ${action} on #${prNumber}...`);
   
+  // FIX: Use the host path to check for existence
   const check = await provider.getExecOutput(`ls -d ${hostWorktreeDir}/.git`);
   
-  // FIX: Ensure container user (node) owns the workspaces, config, and dev directories
+  // FIX: Ensure container user (node) owns the workspaces directories
   // This resolves EACCES errors across all shared volumes.
-  await provider.exec(`sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/.workspaces ${containerHome}/.gemini ${containerHome}/dev`);
+  console.log('   - Synchronizing container permissions...');
+  await provider.exec(`sudo chown -R 1000:1000 /mnt/disks/data`);
 
   if (check.status !== 0) {
     console.log('   - Provisioning isolated git worktree...');
     
-    // We run these on the host because the host user owns the ~/dev/main directory
+    // We run these on the host because the host user owns the data directory
     const setupCmd = `
-      mkdir -p ${hostHome}/dev/worktrees && \
-      cd ${hostWorkDir} && \
-      git fetch upstream pull/${prNumber}/head && \
-      git worktree add -f ${hostWorktreeDir} FETCH_HEAD
+      sudo -u chronos git -C ${hostWorkDir} config --add safe.directory ${hostWorkDir} && \
+      sudo mkdir -p ${hostWorkspaceRoot}/worktrees && \
+      sudo chown chronos:chronos ${hostWorkspaceRoot}/worktrees && \
+      sudo -u chronos git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head && \
+      sudo -u chronos git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} FETCH_HEAD 2>&1
     `;
-    const setupRes = await provider.exec(setupCmd);
-    if (setupRes !== 0) {
+    const setupRes = await provider.getExecOutput(setupCmd);
+    if (setupRes.status !== 0) {
         console.error('   ❌ Failed to provision remote worktree.');
+        console.error('   STDOUT:', setupRes.stdout);
+        console.error('   STDERR:', setupRes.stderr);
         return 1;
     }
+    console.log('   ✅ Worktree provisioned successfully.');
   } else {
     console.log('   ✅ Remote worktree ready.');
   }
 
   // 4. Execution Logic
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
+  const remoteConfigPath = `${hostWorkspaceRoot}/gemini-cli-config/.gemini/settings.json`;
   
+  // FIX: Dynamically retrieve the API key from the host-side config to inject it
+  const apiKeyRes = await provider.getExecOutput(`cat ${remoteConfigPath} | grep apiKey | cut -d '\"' -f 4`);
+  const remoteApiKey = apiKeyRes.stdout.trim();
+
   // DEBUG: Run directly in foreground WITHOUT tmux to see immediate errors
-  const containerWrap = `sudo docker exec -it maintainer-worker sh -c 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
+  const containerWrap = `sudo docker exec -it ${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey}` : ''} maintainer-worker sh -c ${q(`cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 

@@ -9,6 +9,33 @@ import { ProviderFactory } from './providers/ProviderFactory.ts';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
+/**
+ * Loads and parses a local .env file from the repository root and the home directory.
+ */
+function loadDotEnv() {
+  const envPaths = [
+    path.join(REPO_ROOT, '.env'),
+    path.join(os.homedir(), '.env')
+  ];
+
+  envPaths.forEach(envPath => {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      content.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return;
+        
+        const match = trimmed.match(/^([^=]+)=(.*)$/);
+        if (match) {
+          const key = match[1].trim();
+          const val = match[2].trim().replace(/^["'](.*)["']$/, '$1');
+          if (!process.env[key]) process.env[key] = val;
+        }
+      });
+    }
+  });
+}
+
 async function prompt(question: string, defaultValue: string, explanation?: string, sensitive: boolean = false): Promise<string> {
   const autoAccept = process.argv.includes('--yes') || process.argv.includes('-y');
   if (autoAccept && defaultValue) return defaultValue;
@@ -19,8 +46,13 @@ async function prompt(question: string, defaultValue: string, explanation?: stri
 
   const displayDefault = sensitive && defaultValue ? `${defaultValue.substring(0, 4)}...${defaultValue.substring(defaultValue.length - 4)}` : defaultValue;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  
+  const promptMsg = defaultValue 
+    ? `❓ ${question} [Detected: ${displayDefault}] (Press <Enter> to keep, or type new value): `
+    : `❓ ${question} (<Enter> for none): `;
+
   return new Promise((resolve) => {
-    rl.question(`❓ ${question} (default: ${displayDefault || 'none'}, <Enter> to use default): `, (answer) => {
+    rl.question(promptMsg, (answer) => {
       rl.close();
       resolve(answer.trim() || defaultValue);
     });
@@ -52,6 +84,8 @@ async function createFork(upstream: string): Promise<string> {
 }
 
 export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
+  loadDotEnv();
+  
   console.log(`
 ================================================================================
 🚀 GEMINI WORKSPACES: HIGH-PERFORMANCE REMOTE DEVELOPMENT
@@ -154,30 +188,32 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   // 3. Security & Auth (Always check for token if init is needed)
   let githubToken = env.WORKSPACE_GH_TOKEN || '';
-  if (!githubToken && !skipConfig) {
-      const hasToken = await confirm('\nDo you already have a GitHub Personal Access Token (PAT) with "Read/Write" access to contents & PRs?');
-      if (hasToken) {
-          githubToken = await prompt('Paste Scoped Token', '');
-      } else {
-          const shouldGenToken = await confirm('Would you like to generate a new scoped token now? (Highly Recommended)');
-          if (shouldGenToken) {
-              const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
-              const name = `Workspace-${env.USER}`;
-              const repoParams = userFork !== upstreamRepo 
-                  ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
-                  : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
-
-              const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+Workspaces+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
-              const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
-
-              console.log(`\n🔐 ACTION REQUIRED: Create a token with the required permissions:`);
-              console.log(`\n${terminalLink}\n`);
-              
+  if (!skipConfig) {
+      if (!githubToken) {
+          const hasToken = await confirm('\nDo you already have a GitHub Personal Access Token (PAT) with "Read/Write" access to contents & PRs?');
+          if (hasToken) {
               githubToken = await prompt('Paste Scoped Token', '');
+          } else {
+              const shouldGenToken = await confirm('Would you like to generate a new scoped token now? (Highly Recommended)');
+              if (shouldGenToken) {
+                  const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
+                  const name = `Workspace-${env.USER}`;
+                  const repoParams = userFork !== upstreamRepo 
+                      ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
+                      : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
+
+                  const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+Workspaces+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
+                  const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
+
+                  console.log(`\n🔐 ACTION REQUIRED: Create a token with the required permissions:`);
+                  console.log(`\n${terminalLink}\n`);
+                  
+                  githubToken = await prompt('Paste Scoped Token', '');
+              }
           }
+      } else {
+          githubToken = await prompt('GitHub Token', githubToken, 'A GitHub PAT is required for remote repository access and PR operations.', true);
       }
-  } else if (githubToken) {
-      console.log('   ✅ Using GitHub token from environment (WORKSPACE_GH_TOKEN).');
   }
 
   // 4. Gemini API Auth Strategy
@@ -190,13 +226,23 @@ and full builds) to a dedicated, high-performance GCP worker.
       try {
           const localSettings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
           authStrategy = localSettings.security?.auth?.selectedType || 'google_accounts';
+          if (!geminiApiKey && localSettings.security?.auth?.apiKey) {
+              geminiApiKey = localSettings.security.auth.apiKey;
+          }
           console.log(`   - Local Auth Method: ${authStrategy}`);
       } catch (e) {}
   }
 
-  if (authStrategy === 'gemini-api-key' && !geminiApiKey) {
-      console.log('\n📖 In API Key mode, the remote worker needs your Gemini API Key to authenticate.');
-      geminiApiKey = await prompt('Paste Gemini API Key', '', undefined, true);
+  if (authStrategy === 'gemini-api-key') {
+      if (geminiApiKey) {
+          console.log('\n🔐 Found Gemini API Key in environment or settings.');
+          geminiApiKey = await prompt('Gemini API Key', geminiApiKey, 'Enter to use? Or paste a new one', true);
+      } else {
+          console.log('\n📖 In API Key mode, the remote worker needs your Gemini API Key to authenticate.');
+          geminiApiKey = await prompt('Gemini API Key', '', 'Paste your Gemini API Key', true);
+      }
+  } else {
+      console.log(`   - Using current auth strategy: ${authStrategy}`);
   }
 
   // 5. Save Confirmed State
@@ -242,31 +288,42 @@ and full builds) to a dedicated, high-performance GCP worker.
   const setupRes = await provider.setup({ projectId, zone, dnsSuffix: '.internal.gcpnode.com' });
   if (setupRes !== 0) return setupRes;
 
-  const persistentScripts = `~/.workspaces/scripts`;
-  const remoteConfigDir = `~/.workspaces/gemini-cli-config/.gemini`;
+  // Use the direct mount path to avoid symlink race conditions
+  const workspaceRoot = `/mnt/disks/data`;
+  
+  const persistentScripts = `${workspaceRoot}/scripts`;
+  const remoteConfigDir = `${workspaceRoot}/gemini-cli-config/.gemini`;
 
   console.log(`\n📦 Synchronizing Logic & Credentials...`);
-  await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.workspaces/scripts ${remoteConfigDir}`);
+  // Ensure the directory structure exists on the host
+  await provider.exec(`sudo mkdir -p ${workspaceRoot}/main ${workspaceRoot}/worktrees ${workspaceRoot}/policies ${workspaceRoot}/scripts ${remoteConfigDir}`);
+  await provider.exec(`sudo chown -R $(whoami):$(whoami) ${workspaceRoot}`);
+  await provider.exec(`sudo chmod -R 777 ${workspaceRoot}`);
   
   // 1. Sync Scripts & Policies
   await provider.sync('.gemini/skills/workspaces/scripts/', `${persistentScripts}/`, { delete: true, sudo: true });
-  await provider.sync('.gemini/skills/workspaces/policy.toml', `~/.gemini/policies/workspace-policy.toml`, { sudo: true });
+  await provider.sync('.gemini/skills/workspaces/policy.toml', `${workspaceRoot}/policies/workspace-policy.toml`, { sudo: true });
 
   // 2. Initialize Remote Gemini Config with Auth
   console.log('⚙️  Initializing remote Gemini configuration...');
   const remoteSettings: any = {
-    general: {
-      authMethod: authStrategy
+    security: {
+      auth: {
+        selectedType: authStrategy
+      }
     }
   };
   
   if (authStrategy === 'gemini-api-key' && geminiApiKey) {
-      remoteSettings.general.apiKey = geminiApiKey;
+      remoteSettings.security.auth.apiKey = geminiApiKey;
       console.log('   ✅ Configuring remote for API Key authentication.');
   }
 
   const tmpSettingsPath = path.join(os.tmpdir(), `remote-settings-${Date.now()}.json`);
   fs.writeFileSync(tmpSettingsPath, JSON.stringify(remoteSettings, null, 2));
+  
+  // Ensure the remote config dir exists before syncing
+  await provider.exec(`sudo mkdir -p ${remoteConfigDir} && sudo chmod 777 ${remoteConfigDir}`);
   await provider.sync(tmpSettingsPath, `${remoteConfigDir}/settings.json`, { sudo: true });
   fs.unlinkSync(tmpSettingsPath);
 
@@ -279,13 +336,13 @@ and full builds) to a dedicated, high-performance GCP worker.
   }
 
   if (githubToken) {
-    await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
+    await provider.exec(`echo ${githubToken} | sudo tee ${workspaceRoot}/.gh_token > /dev/null && sudo chmod 600 ${workspaceRoot}/.gh_token`);
   }
 
   // Final Repo Sync
   console.log(`🚀 Finalizing Remote Repository (${userFork})...`);
   const repoUrl = `https://github.com/${userFork}.git`;
-  const cloneCmd = `rm -rf ~/dev/main && git clone --filter=blob:none ${repoUrl} ~/dev/main && cd ~/dev/main && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
+  const cloneCmd = `sudo rm -rf ${workspaceRoot}/main && sudo git clone --quiet --filter=blob:none ${repoUrl} ${workspaceRoot}/main && cd ${workspaceRoot}/main && sudo git remote add upstream https://github.com/${upstreamRepo}.git && sudo git fetch --quiet upstream && sudo chown -R $(whoami):$(whoami) ${workspaceRoot}`;
   await provider.exec(cloneCmd);
 
   console.log('\n✨ ALL SYSTEMS GO! Your Gemini Workspace is ready.');

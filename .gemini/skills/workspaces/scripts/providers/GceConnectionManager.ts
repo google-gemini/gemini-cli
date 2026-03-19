@@ -34,7 +34,10 @@ export class GceConnectionManager {
       '-o', 'StrictHostKeyChecking=no',
       '-o', 'UserKnownHostsFile=/dev/null',
       '-o', 'LogLevel=ERROR',
-      '-o', 'ConnectTimeout=15',
+      '-o', 'ConnectTimeout=60',
+      '-o', 'ServerAliveInterval=30',
+      '-o', 'ServerAliveCountMax=3',
+      '-o', 'SendEnv=USER',
       '-i', `${os.homedir()}/.ssh/google_compute_engine`
     ];
   }
