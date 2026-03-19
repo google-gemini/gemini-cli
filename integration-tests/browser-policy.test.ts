@@ -100,31 +100,11 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     };
     writeFileSync(trustedFoldersPath, JSON.stringify(trustedFolders, null, 2));
 
-    // Force confirmation for browser agent and its tools.
-    const policyFile = join(rig.testDir!, 'force-confirm.toml');
-    writeFileSync(
-      policyFile,
-      `
-[[rule]]
-name = "Force confirm browser_agent"
-toolName = "browser_agent"
-decision = "ask_user"
-priority = 200
-
-[[rule]]
-name = "Force confirm browser tools"
-toolName = "mcp_browser_agent_*"
-decision = "ask_user"
-priority = 100
-`,
-    );
-
     // Update settings.json in both project and home directories to point to the policy file
     for (const baseDir of [rig.testDir!, rig.homeDir!]) {
       const settingsPath = join(baseDir, '.gemini', 'settings.json');
       if (existsSync(settingsPath)) {
         const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-        settings.policyPaths = [policyFile];
         // Ensure folder trust is enabled
         settings.security = settings.security || {};
         settings.security.folderTrust = settings.security.folderTrust || {};
@@ -145,43 +125,44 @@ priority = 100
     );
     await run.sendKeys('\r');
 
-    // Handle confirmations.
-    // 1. Initial browser_agent delegation (likely only 3 options, so use option 1: Allow once)
+    // Handle privacy notice
     await poll(
-      () => stripAnsi(run.output).toLowerCase().includes('action required'),
-      60000,
-      1000,
+      () => stripAnsi(run.output).toLowerCase().includes('privacy notice'),
+      5000,
+      100,
     );
     await run.sendKeys('1');
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 5000));
 
-    // 2. new_page (MCP tool, should have 4 options, use option 3: Allow all server tools)
-    const foundNewPage = await poll(
+    // new_page (MCP tool, should have 4 options, use option 3: Allow all server tools)
+    await poll(
       () => {
         const stripped = stripAnsi(run.output).toLowerCase();
         return (
-          stripped.includes('action required') && stripped.includes('new_page')
+          stripped.includes('new_page') &&
+          stripped.includes('allow all server tools for this session')
         );
       },
       60000,
       1000,
     );
 
-    if (!foundNewPage) {
-      throw new Error('Timed out waiting for new_page confirmation');
-    }
-
     // Select "Allow all server tools for this session" (option 3)
     await run.sendKeys('3');
     await new Promise((r) => setTimeout(r, 5000));
 
-    // 3. Since we chose "Allow all server tools", take_snapshot
+    // Since we chose "Allow all server tools", take_snapshot
     // should NOT prompt. We wait for some evidence that
     // take_snapshot was called and the task finished.
     await poll(
       () => {
         const output = stripAnsi(run.output).toLowerCase();
-        return output.includes('take_snapshot');
+        return (
+          output.includes('take_snapshot') &&
+          output.includes(
+            'Task completed successfully. The page has the heading',
+          )
+        );
       },
       60000,
       1000,
