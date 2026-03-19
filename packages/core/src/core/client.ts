@@ -61,7 +61,6 @@ import {
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
-import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
@@ -74,6 +73,7 @@ import {
   getDisplayString,
   resolveModel,
   isGemini2Model,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
@@ -681,22 +681,13 @@ export class GeminiClient {
       );
     }
 
-    const routingContext: RoutingContext = {
-      history: this.getChat().getHistory(/*curated=*/ true),
-      request,
-      signal,
-      requestedModel: this.config.getModel(),
-    };
-
     let modelToUse: string;
 
     // Determine Model (Stickiness vs. Routing)
     if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
-      const router = this.config.getModelRouterService();
-      const decision = await router.route(routingContext);
-      modelToUse = decision.model;
+      modelToUse = PREVIEW_GEMINI_FLASH_MODEL;
     }
 
     // availability logic

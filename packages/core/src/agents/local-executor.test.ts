@@ -110,7 +110,7 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { getModelConfigAlias, type AgentRegistry } from './registry.js';
-import type { ModelRouterService } from '../routing/modelRouterService.js';
+import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 let mockChatHistory: Content[] = [];
 const mockSetHistory = vi.fn((newHistory: Content[]) => {
@@ -1659,20 +1659,10 @@ describe('LocalAgentExecutor', () => {
     });
   });
 
-  describe('Model Routing', () => {
-    it('should use model routing when the agent model is "auto"', async () => {
+  describe('Model Selection', () => {
+    it('should use PREVIEW_GEMINI_FLASH_MODEL when the agent model is "auto"', async () => {
       const definition = createTestDefinition();
       definition.modelConfig.model = 'auto';
-
-      const mockRouter = {
-        route: vi.fn().mockResolvedValue({
-          model: 'routed-model',
-          metadata: { source: 'test', reasoning: 'test' },
-        }),
-      };
-      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
-        mockRouter as unknown as ModelRouterService,
-      );
 
       // Mock resolved config to return 'auto'
       vi.spyOn(
@@ -1699,9 +1689,8 @@ describe('LocalAgentExecutor', () => {
 
       await executor.run({ goal: 'test' }, signal);
 
-      expect(mockRouter.route).toHaveBeenCalled();
       expect(mockSendMessageStream).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'routed-model' }),
+        expect.objectContaining({ model: PREVIEW_GEMINI_FLASH_MODEL }),
         expect.any(Array),
         expect.any(String),
         expect.any(AbortSignal),
@@ -1709,16 +1698,9 @@ describe('LocalAgentExecutor', () => {
       );
     });
 
-    it('should NOT use model routing when the agent model is NOT "auto"', async () => {
+    it('should use concrete-model when the agent model is NOT "auto"', async () => {
       const definition = createTestDefinition();
       definition.modelConfig.model = 'concrete-model';
-
-      const mockRouter = {
-        route: vi.fn(),
-      };
-      vi.spyOn(mockConfig, 'getModelRouterService').mockReturnValue(
-        mockRouter as unknown as ModelRouterService,
-      );
 
       // Mock resolved config to return 'concrete-model'
       vi.spyOn(
@@ -1745,7 +1727,6 @@ describe('LocalAgentExecutor', () => {
 
       await executor.run({ goal: 'test' }, signal);
 
-      expect(mockRouter.route).not.toHaveBeenCalled();
       expect(mockSendMessageStream).toHaveBeenCalledWith(
         expect.objectContaining({ model: 'concrete-model' }),
         expect.any(Array),

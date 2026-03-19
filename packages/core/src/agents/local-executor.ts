@@ -60,8 +60,11 @@ import {
 } from './types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
-import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
-import type { RoutingContext } from '../routing/routingStrategy.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  isAutoModel,
+  PREVIEW_GEMINI_FLASH_MODEL,
+} from '../config/models.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -865,25 +868,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let modelToUse: string;
     if (isAutoModel(requestedModel)) {
-      // TODO(joshualitt): This try / catch is inconsistent with the routing
-      // behavior for the main agent. Ideally, we would have a universal
-      // policy for routing failure. Given routing failure does not necessarily
-      // mean generation will fail, we may want to share this logic with
-      // other places we use model routing.
-      try {
-        const routingContext: RoutingContext = {
-          history: chat.getHistory(/*curated=*/ true),
-          request: message.parts || [],
-          signal,
-          requestedModel,
-        };
-        const router = this.context.config.getModelRouterService();
-        const decision = await router.route(routingContext);
-        modelToUse = decision.model;
-      } catch (error) {
-        debugLogger.warn(`Error during model routing: ${error}`);
-        modelToUse = DEFAULT_GEMINI_MODEL;
-      }
+      modelToUse = PREVIEW_GEMINI_FLASH_MODEL;
     } else {
       modelToUse = requestedModel;
     }
