@@ -24,7 +24,7 @@ describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
   ])(
     'renders with renderMarkdown=$renderMarkdown $description',
     async ({ renderMarkdown }) => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <GeminiMessage {...baseProps} />,
         {
           uiState: { renderMarkdown, streamingState: StreamingState.Idle },
@@ -39,7 +39,7 @@ describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
   it.each([{ renderMarkdown: true }, { renderMarkdown: false }])(
     'renders pending state with renderMarkdown=$renderMarkdown',
     async ({ renderMarkdown }) => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <GeminiMessage {...baseProps} isPending={true} />,
         {
           uiState: { renderMarkdown, streamingState: StreamingState.Idle },
@@ -55,7 +55,7 @@ describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
     const terminalWidth = 20;
     const text =
       'This is a long line that should wrap correctly without truncation';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <GeminiMessage
         text={text}
         isPending={false}

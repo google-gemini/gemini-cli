@@ -51,7 +51,7 @@ describe('ThemeDialog Snapshots', () => {
     async (isDev) => {
       mockIsDevelopment.value = isDev;
       const settings = createMockSettings();
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ThemeDialog {...baseProps} settings={settings} />,
         { settings },
       );
@@ -64,10 +64,11 @@ describe('ThemeDialog Snapshots', () => {
 
   it('should render correctly in scope selector mode', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <ThemeDialog {...baseProps} settings={settings} />,
-      { settings },
-    );
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <ThemeDialog {...baseProps} settings={settings} />,
+        { settings },
+      );
     await waitUntilReady();
 
     // Press Tab to switch to scope selector mode
@@ -85,7 +86,7 @@ describe('ThemeDialog Snapshots', () => {
   it('should call onCancel when ESC is pressed', async () => {
     const mockOnCancel = vi.fn();
     const settings = createMockSettings();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog
         {...baseProps}
         onCancel={mockOnCancel}
@@ -112,7 +113,7 @@ describe('ThemeDialog Snapshots', () => {
 
   it('should call onSelect when a theme is selected', async () => {
     const settings = createMockSettings();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -148,7 +149,7 @@ describe('Initial Theme Selection', () => {
 
   it('should default to a light theme when terminal background is light and no theme is set', async () => {
     const settings = createMockSettings(); // No theme set
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -165,7 +166,7 @@ describe('Initial Theme Selection', () => {
 
   it('should default to a dark theme when terminal background is dark and no theme is set', async () => {
     const settings = createMockSettings(); // No theme set
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -181,7 +182,7 @@ describe('Initial Theme Selection', () => {
 
   it('should use the theme from settings even if terminal background suggests a different theme type', async () => {
     const settings = createMockSettings({ ui: { theme: 'DefaultLight' } }); // Light theme set
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -207,7 +208,7 @@ describe('Hint Visibility', () => {
 
   it('should show hint when theme background matches terminal background', async () => {
     const settings = createMockSettings({ ui: { theme: 'Default' } });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
@@ -222,7 +223,7 @@ describe('Hint Visibility', () => {
 
   it('should not show hint when theme background does not match terminal background', async () => {
     const settings = createMockSettings({ ui: { theme: 'Default' } });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,

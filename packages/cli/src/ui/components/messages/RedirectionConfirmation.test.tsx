@@ -33,7 +33,7 @@ describe('ToolConfirmationMessage Redirection', () => {
       rootCommands: ['echo'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}

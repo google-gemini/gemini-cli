@@ -64,7 +64,7 @@ describe('<SubagentGroupDisplay />', () => {
     },
   ];
 
-  const renderSubagentGroup = (
+  const renderSubagentGroup = async (
     toolCallsToRender: IndividualToolCallDisplay[],
     height?: number,
   ) =>
@@ -78,12 +78,12 @@ describe('<SubagentGroupDisplay />', () => {
     );
 
   it('renders nothing if there are no agent tool calls', async () => {
-    const { lastFrame } = renderSubagentGroup([], 40);
+    const { lastFrame } = await renderSubagentGroup([], 40);
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders collapsed view by default with correct agent counts and states', async () => {
-    const { lastFrame, waitUntilReady } = renderSubagentGroup(
+    const { lastFrame, waitUntilReady } = await renderSubagentGroup(
       mockToolCalls,
       40,
     );
@@ -92,7 +92,10 @@ describe('<SubagentGroupDisplay />', () => {
   });
 
   it('expands when availableTerminalHeight is undefined', async () => {
-    const { lastFrame, rerender } = renderSubagentGroup(mockToolCalls, 40);
+    const { lastFrame, rerender } = await renderSubagentGroup(
+      mockToolCalls,
+      40,
+    );
 
     // Default collapsed view
     await waitFor(() => {

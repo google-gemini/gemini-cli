@@ -72,7 +72,7 @@ describe('PermissionsModifyTrustDialog', () => {
   });
 
   it('should render the main dialog with current trust level', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
     await waitUntilReady();
@@ -96,7 +96,7 @@ describe('PermissionsModifyTrustDialog', () => {
       commitTrustLevelChange: mockCommitTrustLevelChange,
       isFolderTrustEnabled: true,
     });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
     await waitUntilReady();
@@ -120,7 +120,7 @@ describe('PermissionsModifyTrustDialog', () => {
       commitTrustLevelChange: mockCommitTrustLevelChange,
       isFolderTrustEnabled: true,
     });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
     await waitUntilReady();
@@ -134,7 +134,7 @@ describe('PermissionsModifyTrustDialog', () => {
   });
 
   it('should render the labels with folder names', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
     await waitUntilReady();
@@ -148,9 +148,10 @@ describe('PermissionsModifyTrustDialog', () => {
 
   it('should call onExit when escape is pressed', async () => {
     const onExit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
     await waitUntilReady();
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
@@ -186,9 +187,10 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     const onExit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
     await waitUntilReady();
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
@@ -220,9 +222,10 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     const onExit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
     await waitUntilReady();
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));

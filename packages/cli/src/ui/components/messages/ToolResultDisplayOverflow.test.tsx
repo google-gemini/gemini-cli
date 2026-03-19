@@ -13,7 +13,7 @@ import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
 describe('ToolResultDisplay Overflow', () => {
   it('shows the head of the content when overflowDirection is bottom (string)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={content}
         terminalWidth={80}
@@ -40,7 +40,7 @@ describe('ToolResultDisplay Overflow', () => {
 
   it('shows the tail of the content when overflowDirection is top (string default)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={content}
         terminalWidth={80}
@@ -78,7 +78,7 @@ describe('ToolResultDisplay Overflow', () => {
         inverse: false,
       },
     ]);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}

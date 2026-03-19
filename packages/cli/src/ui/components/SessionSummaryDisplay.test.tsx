@@ -51,7 +51,7 @@ const renderWithMockedStats = async (
     startNewPrompt: vi.fn(),
   });
 
-  const result = renderWithProviders(
+  const result = await renderWithProviders(
     <SessionSummaryDisplay duration="1h 23m 45s" />,
     {
       width: 100,

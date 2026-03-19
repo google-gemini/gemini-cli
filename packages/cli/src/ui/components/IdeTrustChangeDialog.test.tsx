@@ -17,7 +17,7 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('renders the correct message for CONNECTION_CHANGE', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
     await waitUntilReady();
@@ -31,7 +31,7 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('renders the correct message for TRUST_CHANGE', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="TRUST_CHANGE" />,
     );
     await waitUntilReady();
@@ -48,7 +48,7 @@ describe('IdeTrustChangeDialog', () => {
     const debugLoggerWarnSpy = vi
       .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="NONE" />,
     );
     await waitUntilReady();
@@ -65,7 +65,7 @@ describe('IdeTrustChangeDialog', () => {
     const relaunchAppSpy = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="NONE" />,
     );
     await waitUntilReady();
@@ -83,7 +83,7 @@ describe('IdeTrustChangeDialog', () => {
     const relaunchAppSpy = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
     await waitUntilReady();
@@ -101,7 +101,7 @@ describe('IdeTrustChangeDialog', () => {
     const relaunchAppSpy = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
     await waitUntilReady();

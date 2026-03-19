@@ -15,7 +15,7 @@ vi.mock('../../utils/commandUtils.js', () => ({
 
 describe('UserMessage', () => {
   it('renders normal user message with correct prefix', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserMessage text="Hello Gemini" width={80} />,
       { width: 80 },
     );
@@ -27,7 +27,7 @@ describe('UserMessage', () => {
   });
 
   it('renders slash command message', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserMessage text="/help" width={80} />,
       { width: 80 },
     );
@@ -40,7 +40,7 @@ describe('UserMessage', () => {
 
   it('renders multiline user message', async () => {
     const message = 'Line 1\nLine 2';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserMessage text={message} width={80} />,
       { width: 80 },
     );
@@ -53,7 +53,7 @@ describe('UserMessage', () => {
 
   it('transforms image paths in user message', async () => {
     const message = 'Check out this image: @/path/to/my-image.png';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <UserMessage text={message} width={80} />,
       { width: 80 },
     );

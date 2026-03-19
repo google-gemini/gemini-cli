@@ -19,7 +19,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 describe('ContextUsageDisplay', () => {
   it('renders correct percentage used', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={5000}
         model="gemini-pro"
@@ -33,7 +33,7 @@ describe('ContextUsageDisplay', () => {
   });
 
   it('renders correctly when usage is 0%', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={0}
         model="gemini-pro"
@@ -47,7 +47,7 @@ describe('ContextUsageDisplay', () => {
   });
 
   it('renders abbreviated label when terminal width is small', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={2000}
         model="gemini-pro"
@@ -63,7 +63,7 @@ describe('ContextUsageDisplay', () => {
   });
 
   it('renders 80% correctly', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={8000}
         model="gemini-pro"
@@ -77,7 +77,7 @@ describe('ContextUsageDisplay', () => {
   });
 
   it('renders 100% when full', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={10000}
         model="gemini-pro"

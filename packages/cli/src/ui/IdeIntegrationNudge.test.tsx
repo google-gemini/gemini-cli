@@ -53,7 +53,7 @@ describe('IdeIntegrationNudge', () => {
   });
 
   it('renders correctly with default options', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} />,
     );
     await waitUntilReady();
@@ -68,7 +68,7 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles "Yes" selection', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
 
@@ -89,7 +89,7 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles "No" selection', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
 
@@ -115,7 +115,7 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles "Dismiss" selection', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
 
@@ -146,7 +146,7 @@ describe('IdeIntegrationNudge', () => {
 
   it('handles Escape key press', async () => {
     const onComplete = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
 
@@ -173,9 +173,10 @@ describe('IdeIntegrationNudge', () => {
     vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/tmp');
 
     const onComplete = vi.fn();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
-    );
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
+      );
 
     await waitUntilReady();
 

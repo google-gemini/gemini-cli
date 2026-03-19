@@ -48,7 +48,7 @@ describe('AskUserDialog', () => {
   ];
 
   it('renders question and options', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -140,7 +140,7 @@ describe('AskUserDialog', () => {
   ])('Submission: $name', ({ name, questions, actions, expectedSubmit }) => {
     it(`submits correct values for ${name}`, async () => {
       const onSubmit = vi.fn();
-      const { stdin } = renderWithProviders(
+      const { stdin } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={onSubmit}
@@ -172,7 +172,7 @@ describe('AskUserDialog', () => {
       },
     ] as Question[];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={questions}
         onSubmit={vi.fn()}
@@ -196,7 +196,7 @@ describe('AskUserDialog', () => {
 
   it('handles custom option in single select with inline typing', async () => {
     const onSubmit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={onSubmit}
@@ -245,7 +245,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestionWithOther}
         onSubmit={onSubmit}
@@ -307,7 +307,7 @@ describe('AskUserDialog', () => {
           },
         ];
 
-        const { lastFrame, waitUntilReady } = renderWithProviders(
+        const { lastFrame, waitUntilReady } = await renderWithProviders(
           <AskUserDialog
             questions={questions}
             onSubmit={vi.fn()}
@@ -341,7 +341,7 @@ describe('AskUserDialog', () => {
   );
 
   it('navigates to custom option when typing unbound characters (Type-to-Jump)', async () => {
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -397,7 +397,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -412,7 +412,7 @@ describe('AskUserDialog', () => {
   });
 
   it('hides progress header for single question', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -427,7 +427,7 @@ describe('AskUserDialog', () => {
   });
 
   it('shows keyboard hints', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -461,7 +461,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -508,7 +508,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
@@ -582,7 +582,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -614,7 +614,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -664,7 +664,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -703,7 +703,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
@@ -736,7 +736,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -759,7 +759,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -782,7 +782,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -820,7 +820,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -853,7 +853,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={mixedQuestions}
           onSubmit={vi.fn()}
@@ -903,7 +903,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onSubmit = vi.fn();
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={mixedQuestions}
           onSubmit={onSubmit}
@@ -959,7 +959,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onSubmit = vi.fn();
-      const { stdin } = renderWithProviders(
+      const { stdin } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={onSubmit}
@@ -986,7 +986,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onCancel = vi.fn();
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -1036,7 +1036,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={multiQuestions}
           onSubmit={vi.fn()}
@@ -1102,7 +1102,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onSubmit = vi.fn();
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={multiQuestions}
           onSubmit={onSubmit}
@@ -1154,7 +1154,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1184,7 +1184,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1217,7 +1217,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1248,7 +1248,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1287,7 +1287,7 @@ describe('AskUserDialog', () => {
       availableTerminalHeight: 5, // Small height to force scroll arrows
     } as UIState;
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <UIStateContext.Provider value={mockUIState}>
         <AskUserDialog
           questions={questions}
@@ -1326,7 +1326,7 @@ describe('AskUserDialog', () => {
       availableTerminalHeight: 5,
     } as UIState;
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <UIStateContext.Provider value={mockUIState}>
         <AskUserDialog
           questions={questions}
@@ -1365,7 +1365,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1399,7 +1399,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1432,7 +1432,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <AskUserDialog
         questions={questions}
         onSubmit={onSubmit}

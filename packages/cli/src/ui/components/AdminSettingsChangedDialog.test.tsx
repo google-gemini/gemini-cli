@@ -17,7 +17,7 @@ describe('AdminSettingsChangedDialog', () => {
   });
 
   it('renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <AdminSettingsChangedDialog />,
     );
     await waitUntilReady();
@@ -25,7 +25,7 @@ describe('AdminSettingsChangedDialog', () => {
   });
 
   it('restarts on "r" key press', async () => {
-    const { stdin, waitUntilReady } = renderWithProviders(
+    const { stdin, waitUntilReady } = await renderWithProviders(
       <AdminSettingsChangedDialog />,
       {
         uiActions: {
@@ -43,7 +43,7 @@ describe('AdminSettingsChangedDialog', () => {
   });
 
   it.each(['r', 'R'])('restarts on "%s" key press', async (key) => {
-    const { stdin, waitUntilReady } = renderWithProviders(
+    const { stdin, waitUntilReady } = await renderWithProviders(
       <AdminSettingsChangedDialog />,
       {
         uiActions: {

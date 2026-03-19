@@ -13,7 +13,7 @@ describe('StickyHeader', () => {
   it.each([true, false])(
     'renders children with isFirst=%s',
     async (isFirst) => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <StickyHeader
           isFirst={isFirst}
           width={80}
