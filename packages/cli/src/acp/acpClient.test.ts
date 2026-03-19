@@ -177,6 +177,9 @@ describe('GeminiAgent', () => {
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
+      get config() {
+        return this;
+      },
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -656,6 +659,12 @@ describe('Session', () => {
       getGitService: vi.fn().mockResolvedValue({} as GitService),
       waitForMcpInit: vi.fn(),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
+      get config() {
+        return this;
+      },
+      get toolRegistry() {
+        return mockToolRegistry;
+      },
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),

@@ -20,8 +20,8 @@ export const clearCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {
-    const geminiClient = context.services.config?.getGeminiClient();
-    const config = context.services.config;
+    const geminiClient = context.services.agentContext?.geminiClient;
+    const config = context.services.agentContext?.config;
 
     // Fire SessionEnd hook before clearing
     const hookSystem = config?.getHookSystem();

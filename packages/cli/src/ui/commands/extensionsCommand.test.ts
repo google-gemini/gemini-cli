@@ -161,14 +161,16 @@ describe('extensionsCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getExtensions: mockGetExtensions,
-          getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
-          getWorkingDir: () => '/test/dir',
-          reloadSkills: mockReloadSkills,
-          getAgentRegistry: vi.fn().mockReturnValue({
-            reload: mockReloadAgents,
-          }),
+        agentContext: {
+          config: {
+            getExtensions: mockGetExtensions,
+            getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
+            getWorkingDir: () => '/test/dir',
+            reloadSkills: mockReloadSkills,
+            getAgentRegistry: vi.fn().mockReturnValue({
+              reload: mockReloadAgents,
+            }),
+          },
         },
       },
       ui: {
@@ -917,7 +919,7 @@ describe('extensionsCommand', () => {
       expect(restartAction).not.toBeNull();
 
       mockRestartExtension = vi.fn();
-      mockContext.services.config!.getExtensionLoader = vi
+      mockContext.services.agentContext!.config.getExtensionLoader = vi
         .fn()
         .mockImplementation(() => ({
           getExtensions: mockGetExtensions,
@@ -927,7 +929,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show a message if no extensions are installed', async () => {
-      mockContext.services.config!.getExtensionLoader = vi
+      mockContext.services.agentContext!.config.getExtensionLoader = vi
         .fn()
         .mockImplementation(() => ({
           getExtensions: () => [],
@@ -1017,7 +1019,7 @@ describe('extensionsCommand', () => {
     });
 
     it('shows an error if no extension loader is available', async () => {
-      mockContext.services.config!.getExtensionLoader = vi.fn();
+      mockContext.services.agentContext!.config.getExtensionLoader = vi.fn();
 
       await restartAction!(mockContext, '--all');
 

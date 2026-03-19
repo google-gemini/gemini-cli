@@ -423,7 +423,7 @@ describe('useSlashCommandProcessor', () => {
       expect(childAction).toHaveBeenCalledWith(
         expect.objectContaining({
           services: expect.objectContaining({
-            config: mockConfig,
+            agentContext: mockConfig,
           }),
           ui: expect.objectContaining({
             addItem: mockAddItem,
