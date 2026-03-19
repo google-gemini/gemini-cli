@@ -3040,12 +3040,22 @@
             },
             "config": {
               "title": "MCP Config",
-              "description": "Admin-configured MCP servers.",
-              "markdownDescription": "Admin-configured MCP servers.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "description": "Admin-configured MCP servers (allowlist).",
+              "markdownDescription": "Admin-configured MCP servers (allowlist).\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
               "default": {},
               "type": "object",
               "additionalProperties": {
                 "$ref": "#/$defs/MCPServerConfig"
+              }
+            },
+            "requiredConfig": {
+              "title": "Required MCP Config",
+              "description": "Admin-required MCP servers that are always injected.",
+              "markdownDescription": "Admin-required MCP servers that are always injected.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/RequiredMcpServerConfig"
               }
             }
           },
@@ -3165,6 +3175,77 @@
         "authProviderType": {
           "type": "string",
           "description": "Authentication provider used for acquiring credentials (for example `dynamic_discovery`).",
+          "enum": [
+            "dynamic_discovery",
+            "google_credentials",
+            "service_account_impersonation"
+          ]
+        },
+        "targetAudience": {
+          "type": "string",
+          "description": "OAuth target audience (CLIENT_ID.apps.googleusercontent.com)."
+        },
+        "targetServiceAccount": {
+          "type": "string",
+          "description": "Service account email to impersonate (name@project.iam.gserviceaccount.com)."
+        }
+      }
+    },
+    "RequiredMcpServerConfig": {
+      "type": "object",
+      "description": "Admin-required MCP server configuration (remote transports only).",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL for the required MCP server."
+        },
+        "type": {
+          "type": "string",
+          "description": "Transport type for the required server.",
+          "enum": ["sse", "http"]
+        },
+        "headers": {
+          "type": "object",
+          "description": "Additional HTTP headers sent to the server.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "timeout": {
+          "type": "number",
+          "description": "Timeout in milliseconds for MCP requests."
+        },
+        "trust": {
+          "type": "boolean",
+          "description": "Marks the server as trusted. Defaults to true for admin-required servers."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the server."
+        },
+        "includeTools": {
+          "type": "array",
+          "description": "Subset of tools enabled for this server.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeTools": {
+          "type": "array",
+          "description": "Tools disabled for this server.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oauth": {
+          "type": "object",
+          "description": "OAuth configuration for authenticating with the server.",
+          "additionalProperties": true
+        },
+        "authProviderType": {
+          "type": "string",
+          "description": "Authentication provider used for acquiring credentials.",
           "enum": [
             "dynamic_discovery",
             "google_credentials",

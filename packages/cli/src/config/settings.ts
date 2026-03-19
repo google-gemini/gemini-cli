@@ -480,6 +480,7 @@ export class LoadedSettings {
     admin.mcp = {
       enabled: mcpSetting?.mcpEnabled,
       config: mcpSetting?.mcpConfig?.mcpServers,
+      requiredConfig: mcpSetting?.requiredMcpConfig,
     };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,

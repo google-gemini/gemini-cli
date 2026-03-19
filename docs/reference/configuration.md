@@ -1728,7 +1728,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`admin.mcp.config`** (object):
-  - **Description:** Admin-configured MCP servers.
+  - **Description:** Admin-configured MCP servers (allowlist).
+  - **Default:** `{}`
+
+- **`admin.mcp.requiredConfig`** (object):
+  - **Description:** Admin-required MCP servers that are always injected.
   - **Default:** `{}`
 
 - **`admin.skills.enabled`** (boolean):
