@@ -114,7 +114,7 @@ export async function createBrowserAgentDefinition(
 
     for (const toolName of restrictedTools) {
       const rule = generateAskUserRules(toolName);
-      if (!existingRules.some((r) => JSON.stringify(r) === JSON.stringify(rule.toolName))) {
+      if (!existingRules.some((r) => isRuleEqual(r, rule))) {
         policyEngine.addRule(rule);
       }
     }
@@ -129,7 +129,7 @@ export async function createBrowserAgentDefinition(
     for (const toolName of readOnlyTools) {
       if (availableToolNames.includes(toolName)) {
         const rule = generateAllowRules(toolName);
-        if (!existingRules.some((r) => JSON.stringify(r) === JSON.stringify(rule.toolName))) {
+        if (!existingRules.some((r) => isRuleEqual(r, rule))) {
           policyEngine.addRule(rule);
         }
       }
@@ -154,6 +154,12 @@ export async function createBrowserAgentDefinition(
         source: 'BrowserAgent (Read-Only)',
         mcpName: BROWSER_AGENT_NAME,
       };
+  }
+
+  // Check if policy rule the same in all the attributes that we care about
+  function isRuleEqual(rule1: PolicyRule, rule2: PolicyRule) {
+    return rule1.toolName === rule2.toolName && rule1.decision === rule2.decision && rule1.priority === rule2.priority && rule1.mcpName === rule2.mcpName;
+
   }
 
   // Validate required semantic tools are available
