@@ -370,9 +370,12 @@ describe('InputPrompt', () => {
 
   it('should call shellHistory.getPreviousCommand on up arrow in shell mode', async () => {
     props.shellModeActive = true;
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\u001B[A');
@@ -385,9 +388,12 @@ describe('InputPrompt', () => {
 
   it('should call shellHistory.getNextCommand on down arrow in shell mode', async () => {
     props.shellModeActive = true;
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\u001B[B');
@@ -403,9 +409,12 @@ describe('InputPrompt', () => {
     vi.mocked(mockShellHistory.getPreviousCommand).mockReturnValue(
       'previous command',
     );
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\u001B[A');
@@ -420,9 +429,12 @@ describe('InputPrompt', () => {
   it('should call shellHistory.addCommandToHistory on submit in shell mode', async () => {
     props.shellModeActive = true;
     props.buffer.setText('ls -l');
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -450,9 +462,12 @@ describe('InputPrompt', () => {
       activeSuggestionIndex: 0,
     });
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     // Press Enter without navigating — should dismiss suggestions and fall
     // through to the main submit handler.
@@ -481,9 +496,12 @@ describe('InputPrompt', () => {
       activeSuggestionIndex: 1,
     });
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     // Press ArrowDown to navigate, then Enter to accept
     await act(async () => {
@@ -505,9 +523,12 @@ describe('InputPrompt', () => {
 
   it('should NOT call shell history methods when not in shell mode', async () => {
     props.buffer.setText('some text');
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\u0010'); // Ctrl+P
@@ -540,7 +561,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [0, 5]; // First line, not at start
       mockBuffer.visualScrollRow = 0;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -563,7 +584,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [0, 0]; // First line, at start
       mockBuffer.visualScrollRow = 0;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -586,7 +607,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [1, 0]; // Last line, not at end
       mockBuffer.visualScrollRow = 0;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -609,7 +630,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [1, 6]; // Last line, at end ("line 2" is length 6)
       mockBuffer.visualScrollRow = 0;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -640,9 +661,12 @@ describe('InputPrompt', () => {
 
     props.buffer.setText('/mem');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     // Test up arrow
     await act(async () => {
@@ -674,9 +698,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.setText('/mem');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     // Test down arrow
     await act(async () => {
@@ -703,9 +730,12 @@ describe('InputPrompt', () => {
       showSuggestions: false,
     });
     props.buffer.setText('some text');
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\u0010'); // Ctrl+P
@@ -733,9 +763,12 @@ describe('InputPrompt', () => {
 
   it('should clear the buffer and reset completion on Ctrl+C', async () => {
     mockBuffer.text = 'some text';
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\u0003'); // Ctrl+C
@@ -763,7 +796,7 @@ describe('InputPrompt', () => {
         '/test/.gemini-clipboard/clipboard-123.png',
       );
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -787,7 +820,7 @@ describe('InputPrompt', () => {
     it('should not insert anything when clipboard has no image', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -806,7 +839,7 @@ describe('InputPrompt', () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -836,7 +869,7 @@ describe('InputPrompt', () => {
       mockBuffer.lines = ['Hello world'];
       mockBuffer.replaceRangeByOffset = vi.fn();
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -867,7 +900,7 @@ describe('InputPrompt', () => {
         new Error('Clipboard error'),
       );
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -893,7 +926,7 @@ describe('InputPrompt', () => {
       vi.mocked(clipboardy.read).mockResolvedValue('pasted text');
       vi.mocked(mockBuffer.replaceRangeByOffset).mockClear();
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -917,7 +950,7 @@ describe('InputPrompt', () => {
         experimental: { useOSC52Paste: true },
       });
 
-      const { stdout, stdin, unmount } = renderWithProviders(
+      const { stdout, stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { settings },
       );
@@ -976,9 +1009,12 @@ describe('InputPrompt', () => {
       activeSuggestionIndex: activeIndex,
     });
     props.buffer.setText(bufferText);
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => stdin.write('\t'));
     await waitFor(() =>
@@ -998,9 +1034,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.setText('/mem');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1032,9 +1071,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.setText('/?');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\t'); // Press Tab for autocomplete
@@ -1048,9 +1090,12 @@ describe('InputPrompt', () => {
   it('should not submit on Enter when the buffer is empty or only contains whitespace', async () => {
     props.buffer.setText('   '); // Set buffer to whitespace
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Press Enter
@@ -1070,9 +1115,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.setText('/clear');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1094,9 +1142,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.text = '/review';
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1121,9 +1172,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.text = '/review';
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1146,9 +1200,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.setText('/clear');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1168,9 +1225,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.text = '@file.txt';
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1194,9 +1254,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.text = '@file.txt';
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       // Simulate Shift+Enter using CSI u sequence
@@ -1241,9 +1304,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/ab'];
     props.buffer.cursor = [0, 3];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -1282,9 +1348,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/sh'];
     props.buffer.cursor = [0, 3];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -1322,9 +1391,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/ab'];
     props.buffer.cursor = [0, 3];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\t'); // Tab
@@ -1353,9 +1425,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/ab'];
     props.buffer.cursor = [0, 3];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\x1b[Z'); // Shift+Tab
@@ -1392,9 +1467,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/find'];
     props.buffer.cursor = [0, 5];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -1441,9 +1519,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/mcp auth '];
     props.buffer.cursor = [0, 10];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -1495,9 +1576,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/extensions enable '];
     props.buffer.cursor = [0, 19];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -1544,9 +1628,12 @@ describe('InputPrompt', () => {
     props.buffer.lines = ['/chat resu'];
     props.buffer.cursor = [0, 10];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r'); // Enter
@@ -1569,9 +1656,12 @@ describe('InputPrompt', () => {
     });
     props.buffer.setText('@src/components/');
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1589,9 +1679,12 @@ describe('InputPrompt', () => {
     mockBuffer.cursor = [0, 11];
     mockBuffer.lines = ['first line\\'];
 
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\r');
@@ -1609,9 +1702,12 @@ describe('InputPrompt', () => {
     await act(async () => {
       props.buffer.setText('some text to clear');
     });
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\x03'); // Ctrl+C character
@@ -1626,7 +1722,9 @@ describe('InputPrompt', () => {
 
   it('should render correctly in plan mode', async () => {
     props.approvalMode = ApprovalMode.PLAN;
-    const { stdout, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    const { stdout, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+    );
 
     await waitFor(() => {
       const frame = stdout.lastFrameRaw();
@@ -1641,9 +1739,12 @@ describe('InputPrompt', () => {
 
   it('should NOT clear the buffer on Ctrl+C if it is empty', async () => {
     props.buffer.text = '';
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\x03'); // Ctrl+C character
@@ -1656,9 +1757,12 @@ describe('InputPrompt', () => {
   });
 
   it('should call setBannerVisible(false) when clear screen key is pressed', async () => {
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      uiActions,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
 
     await act(async () => {
       stdin.write('\x0C'); // Ctrl+L
@@ -1680,7 +1784,7 @@ describe('InputPrompt', () => {
     });
 
     it('should render with background color by default', async () => {
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -1704,7 +1808,7 @@ describe('InputPrompt', () => {
       async ({ color }) => {
         vi.mocked(isLowColorDepth).mockReturnValue(true);
 
-        const { stdout, unmount } = renderWithProviders(
+        const { stdout, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
           {
             uiState: {
@@ -1740,7 +1844,7 @@ describe('InputPrompt', () => {
     it('should NOT render with background color but SHOULD render horizontal lines when color depth is < 24 and background is NOT black', async () => {
       vi.mocked(isLowColorDepth).mockReturnValue(true);
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiState: {
@@ -1763,7 +1867,7 @@ describe('InputPrompt', () => {
     it('should handle 4-bit color mode (16 colors) as low color depth', async () => {
       vi.mocked(isLowColorDepth).mockReturnValue(true);
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiState: {
@@ -1786,7 +1890,7 @@ describe('InputPrompt', () => {
     it('should render horizontal lines (but NO background) in 8-bit mode when background is blue', async () => {
       vi.mocked(isLowColorDepth).mockReturnValue(true);
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
 
         {
@@ -1821,7 +1925,7 @@ describe('InputPrompt', () => {
 
     it('should render with plain borders when useBackgroundColor is false', async () => {
       props.config.getUseBackgroundColor = () => false;
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -1929,9 +2033,12 @@ describe('InputPrompt', () => {
           : [],
       });
 
-      const { unmount } = renderWithProviders(<InputPrompt {...props} />, {
-        uiActions,
-      });
+      const { unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
 
       await waitFor(() => {
         expect(mockedUseCommandCompletion).toHaveBeenCalledWith({
@@ -1969,7 +2076,7 @@ describe('InputPrompt', () => {
       },
     ])('$name', async ({ vimHandled, expectBufferHandleInput }) => {
       props.vimHandleInput = vi.fn().mockReturnValue(vimHandled);
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -1989,7 +2096,7 @@ describe('InputPrompt', () => {
   describe('unfocused paste', () => {
     it('should handle bracketed paste when not focused', async () => {
       props.focus = false;
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2009,7 +2116,7 @@ describe('InputPrompt', () => {
 
     it('should ignore regular keypresses when not focused', async () => {
       props.focus = false;
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2095,7 +2202,7 @@ describe('InputPrompt', () => {
           mockBuffer.visualCursor = visualCursor as [number, number];
           props.config.getUseBackgroundColor = () => false;
 
-          const { stdout, unmount } = renderWithProviders(
+          const { stdout, unmount } = await renderWithProviders(
             <InputPrompt {...props} />,
           );
           await waitFor(() => {
@@ -2158,7 +2265,7 @@ describe('InputPrompt', () => {
           >;
           props.config.getUseBackgroundColor = () => false;
 
-          const { stdout, unmount } = renderWithProviders(
+          const { stdout, unmount } = await renderWithProviders(
             <InputPrompt {...props} />,
           );
           await waitFor(() => {
@@ -2188,7 +2295,7 @@ describe('InputPrompt', () => {
         ];
         props.config.getUseBackgroundColor = () => false;
 
-        const { stdout, unmount } = renderWithProviders(
+        const { stdout, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
         );
         await waitFor(() => {
@@ -2220,7 +2327,7 @@ describe('InputPrompt', () => {
       ];
       props.config.getUseBackgroundColor = () => false;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
@@ -2254,7 +2361,7 @@ describe('InputPrompt', () => {
         pastedText: 'This\r\nis\r\na\r\nmultiline\r\npaste.',
       },
     ])('should handle multiline paste $description', async ({ pastedText }) => {
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2283,7 +2390,7 @@ describe('InputPrompt', () => {
       const largeText = '1\n2\n3\n4\n5\n6';
       vi.mocked(clipboardy.read).mockResolvedValue(largeText);
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2306,7 +2413,7 @@ describe('InputPrompt', () => {
       const largeText = 'a'.repeat(501);
       vi.mocked(clipboardy.read).mockResolvedValue(largeText);
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2329,7 +2436,7 @@ describe('InputPrompt', () => {
       const smallText = 'hello world';
       vi.mocked(clipboardy.read).mockResolvedValue(smallText);
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2354,7 +2461,7 @@ describe('InputPrompt', () => {
       mockBuffer.text = `Check this: ${id}`;
       mockBuffer.pastedContent = { [id]: largeText };
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2388,7 +2495,7 @@ describe('InputPrompt', () => {
       // isTerminalPasteTrusted will be false due to beforeEach setup.
       props.buffer.text = 'some command';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await act(async () => {
@@ -2424,7 +2531,7 @@ describe('InputPrompt', () => {
       });
       props.buffer.text = '@file.txt';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2449,7 +2556,7 @@ describe('InputPrompt', () => {
       // isTerminalPasteTrusted will be false due to beforeEach setup.
       props.buffer.text = 'pasted text';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await act(async () => {
@@ -2498,7 +2605,7 @@ describe('InputPrompt', () => {
         setup();
         props.buffer.text = 'pasted command';
 
-        const { stdin, unmount } = renderWithProviders(
+        const { stdin, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
         );
         await act(async () => {
@@ -2531,7 +2638,7 @@ describe('InputPrompt', () => {
       // Set up buffer with text before rendering to ensure submission works
       props.buffer.text = 'normal command';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await act(async () => {
@@ -2562,7 +2669,7 @@ describe('InputPrompt', () => {
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('text to clear');
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2582,7 +2689,7 @@ describe('InputPrompt', () => {
       props.buffer.setText('');
       vi.mocked(props.buffer.setText).mockClear();
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiState: {
@@ -2608,7 +2715,7 @@ describe('InputPrompt', () => {
       props.buffer.setText('some text');
       vi.mocked(props.buffer.setText).mockClear();
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2627,7 +2734,7 @@ describe('InputPrompt', () => {
       props.onEscapePromptChange = onEscapePromptChange;
       props.buffer.setText('some text');
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2650,7 +2757,7 @@ describe('InputPrompt', () => {
     it('should handle ESC in shell mode by disabling shell mode', async () => {
       props.shellModeActive = true;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2670,7 +2777,7 @@ describe('InputPrompt', () => {
         suggestions: [{ label: 'suggestion', value: 'suggestion' }],
       });
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2687,7 +2794,7 @@ describe('InputPrompt', () => {
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await act(async () => {
@@ -2705,7 +2812,7 @@ describe('InputPrompt', () => {
     });
 
     it('should not interfere with existing keyboard shortcuts', async () => {
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2750,7 +2857,7 @@ describe('InputPrompt', () => {
         activeSuggestionIndex: 0,
       });
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2776,7 +2883,7 @@ describe('InputPrompt', () => {
     ])(
       'resets reverse search state on Escape ($name)',
       async ({ escapeSequence }) => {
-        const { stdin, stdout, unmount } = renderWithProviders(
+        const { stdin, stdout, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
         );
 
@@ -2824,7 +2931,7 @@ describe('InputPrompt', () => {
         }),
       );
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2860,7 +2967,7 @@ describe('InputPrompt', () => {
         handleAutocomplete: mockHandleAutocomplete,
       });
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -2894,7 +3001,7 @@ describe('InputPrompt', () => {
         activeSuggestionIndex: 0,
       });
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2936,7 +3043,7 @@ describe('InputPrompt', () => {
         }),
       );
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2970,7 +3077,7 @@ describe('InputPrompt', () => {
       props.buffer.cursor = [1, 2];
       props.buffer.lines = ['line 1', 'line 2', 'line 3'];
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -2989,7 +3096,7 @@ describe('InputPrompt', () => {
       props.buffer.cursor = [0, 5];
       props.buffer.lines = ['single line text'];
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3022,7 +3129,7 @@ describe('InputPrompt', () => {
         }),
       );
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3052,7 +3159,7 @@ describe('InputPrompt', () => {
         isLoadingSuggestions: false,
       });
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3101,7 +3208,7 @@ describe('InputPrompt', () => {
         isLoadingSuggestions: false,
       });
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3142,7 +3249,7 @@ describe('InputPrompt', () => {
         isLoadingSuggestions: false,
       });
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3163,7 +3270,7 @@ describe('InputPrompt', () => {
       props.shellModeActive = false;
       props.userMessages = ['oldest', 'middle', 'newest'];
 
-      renderWithProviders(<InputPrompt {...props} />);
+      await renderWithProviders(<InputPrompt {...props} />);
 
       const calls = vi.mocked(useReverseSearchCompletion).mock.calls;
       const commandSearchCall = calls.find(
@@ -3225,7 +3332,7 @@ describe('InputPrompt', () => {
           },
         });
 
-        const { stdin, unmount } = renderWithProviders(
+        const { stdin, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
           {
             uiActions,
@@ -3273,7 +3380,7 @@ describe('InputPrompt', () => {
         },
       });
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -3305,7 +3412,7 @@ describe('InputPrompt', () => {
         },
       });
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -3340,7 +3447,7 @@ describe('InputPrompt', () => {
         },
       });
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           uiActions,
@@ -3403,7 +3510,7 @@ describe('InputPrompt', () => {
         props.buffer.visualCursor = [0, 11];
         props.buffer.visualScrollRow = 0;
 
-        const { stdin, stdout, unmount } = renderWithProviders(
+        const { stdin, stdout, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
           { uiActions },
         );
@@ -3437,7 +3544,7 @@ describe('InputPrompt', () => {
       props.buffer.visualToLogicalMap = [[0, 0]];
       props.isEmbeddedShellFocused = true;
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -3509,7 +3616,7 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdout, unmount, simulateClick } = renderWithProviders(
+      const { stdout, unmount, simulateClick } = await renderWithProviders(
         <TestWrapper />,
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
@@ -3600,7 +3707,7 @@ describe('InputPrompt', () => {
         return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
       };
 
-      const { stdout, unmount, simulateClick } = renderWithProviders(
+      const { stdout, unmount, simulateClick } = await renderWithProviders(
         <TestWrapper />,
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
@@ -3636,7 +3743,7 @@ describe('InputPrompt', () => {
       props.buffer.visualCursor = [0, 11];
       props.buffer.visualScrollRow = 0;
 
-      const { stdin, stdout, unmount } = renderWithProviders(
+      const { stdin, stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -3666,7 +3773,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3686,7 +3793,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = 'some text';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3706,7 +3813,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3728,7 +3835,7 @@ describe('InputPrompt', () => {
       props.buffer.visualCursor = [0, 0];
       props.buffer.visualScrollRow = 0;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3745,7 +3852,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3763,7 +3870,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '   '; // Whitespace only
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3778,7 +3885,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = undefined;
       props.buffer.text = '';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3797,7 +3904,7 @@ describe('InputPrompt', () => {
       props.popAllMessages = mockPopAllMessages;
       props.buffer.text = '';
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
 
@@ -3816,7 +3923,7 @@ describe('InputPrompt', () => {
   describe('snapshots', () => {
     it('should render correctly in shell mode', async () => {
       props.shellModeActive = true;
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => expect(stdout.lastFrame()).toContain('!'));
@@ -3826,7 +3933,7 @@ describe('InputPrompt', () => {
 
     it('should render correctly when accepting edits', async () => {
       props.approvalMode = ApprovalMode.AUTO_EDIT;
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => expect(stdout.lastFrame()).toContain('>'));
@@ -3836,7 +3943,7 @@ describe('InputPrompt', () => {
 
     it('should render correctly in yolo mode', async () => {
       props.approvalMode = ApprovalMode.YOLO;
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => expect(stdout.lastFrame()).toContain('*'));
@@ -3846,7 +3953,7 @@ describe('InputPrompt', () => {
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
@@ -3858,9 +3965,12 @@ describe('InputPrompt', () => {
   });
 
   it('should still allow input when shell is not focused', async () => {
-    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
-      shellFocus: false,
-    });
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        shellFocus: false,
+      },
+    );
 
     await act(async () => {
       stdin.write('a');
@@ -3910,7 +4020,7 @@ describe('InputPrompt', () => {
         props.buffer.text = bufferText;
         props.shellModeActive = shellMode;
 
-        const { stdin, unmount } = renderWithProviders(
+        const { stdin, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
         );
         await act(async () => {
@@ -3942,7 +4052,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [0, 3]; // Cursor after 'hel'
       mockBuffer.visualScrollRow = 0;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -3972,7 +4082,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [0, 2]; // Cursor after '👍h' (Note: '👍' is one code point but width 2)
       mockBuffer.visualScrollRow = 0;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -4001,7 +4111,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [0, 2]; // Cursor after 2 emojis (each 1 code point, width 2)
       mockBuffer.visualScrollRow = 0;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -4034,7 +4144,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [1, 7]; // Second line, after 'hello 😀' (6 chars + 1 emoji = 7 code points)
       mockBuffer.visualScrollRow = 0;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -4071,7 +4181,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [1, 7]; // Cursor on second line, after 'second '
       mockBuffer.visualScrollRow = 0;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -4108,7 +4218,7 @@ describe('InputPrompt', () => {
       mockBuffer.visualCursor = [0, 0];
       mockBuffer.visualScrollRow = 0;
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} placeholder="Type here" />,
         { uiActions },
       );
@@ -4153,7 +4263,7 @@ describe('InputPrompt', () => {
       );
       applyVisualState(transformedLine, transformations[0].logEnd + 5);
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
@@ -4172,7 +4282,7 @@ describe('InputPrompt', () => {
       );
       applyVisualState(transformedLine, transformations[0].logStart + 1);
 
-      const { stdout, unmount } = renderWithProviders(
+      const { stdout, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
@@ -4213,7 +4323,7 @@ describe('InputPrompt', () => {
         togglePasteExpansion: toggleFn,
       } as unknown as TextBuffer;
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} buffer={buffer} />,
         { uiActions },
       );
@@ -4265,7 +4375,7 @@ describe('InputPrompt', () => {
         });
       }
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt
           {...props}
           buffer={method === 'terminal-paste' ? buffer : props.buffer}
@@ -4459,9 +4569,12 @@ describe('InputPrompt', () => {
     ])(
       'should move cursor to $position on $name (older history)',
       async ({ key, position }) => {
-        const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
-          uiActions,
-        });
+        const { stdin } = await renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiActions,
+          },
+        );
 
         await act(async () => {
           stdin.write(key);
@@ -4482,9 +4595,12 @@ describe('InputPrompt', () => {
     ])(
       'should move cursor to $position on $name (newer history)',
       async ({ key, position }) => {
-        const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
-          uiActions,
-        });
+        const { stdin } = await renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiActions,
+          },
+        );
 
         // First go up
         await act(async () => {
@@ -4510,7 +4626,7 @@ describe('InputPrompt', () => {
     );
 
     it('should suppress completion after history navigation', async () => {
-      const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+      const { stdin } = await renderWithProviders(<InputPrompt {...props} />, {
         uiActions,
       });
 
@@ -4542,7 +4658,7 @@ describe('InputPrompt', () => {
           : [],
       }));
 
-      const { stdout, stdin, unmount } = renderWithProviders(
+      const { stdout, stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         { uiActions },
       );
@@ -4567,7 +4683,7 @@ describe('InputPrompt', () => {
     });
 
     it('should continue to suppress completion after manual cursor movement', async () => {
-      const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+      const { stdin } = await renderWithProviders(<InputPrompt {...props} />, {
         uiActions,
       });
 
@@ -4610,7 +4726,7 @@ describe('InputPrompt', () => {
     });
 
     it('should re-enable completion after typing', async () => {
-      const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+      const { stdin } = await renderWithProviders(<InputPrompt {...props} />, {
         uiActions,
       });
 
@@ -4646,7 +4762,7 @@ describe('InputPrompt', () => {
         ui: { showShortcutsHint: false },
       });
 
-      const { stdin, unmount } = renderWithProviders(
+      const { stdin, unmount } = await renderWithProviders(
         <InputPrompt {...props} />,
         {
           settings,
@@ -4702,7 +4818,7 @@ describe('InputPrompt', () => {
       async ({ input, setupMocks }) => {
         setupMocks?.();
         const setShortcutsHelpVisible = vi.fn();
-        const { stdin, unmount } = renderWithProviders(
+        const { stdin, unmount } = await renderWithProviders(
           <InputPrompt {...props} />,
           {
             uiState: { shortcutsHelpVisible: true },
