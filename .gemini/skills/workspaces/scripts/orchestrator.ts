@@ -123,6 +123,8 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     ? `gemini`
     : `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
 
+  const authEnv = `${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
+  
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
   const tmuxStyle = `
     tmux set -g status-bg colour238; 
