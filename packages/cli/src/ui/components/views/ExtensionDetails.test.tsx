@@ -10,7 +10,6 @@ import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionDetails } from './ExtensionDetails.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
 
 const mockExtension: RegistryExtension = {
   id: 'ext1',
@@ -51,15 +50,13 @@ describe('ExtensionDetails', () => {
 
   const renderDetails = async (isInstalled = false) =>
     renderWithProviders(
-      <KeypressProvider>
-        <ExtensionDetails
-          extension={mockExtension}
-          onBack={mockOnBack}
-          onInstall={mockOnInstall}
-          onLink={mockOnLink}
-          isInstalled={isInstalled}
-        />
-      </KeypressProvider>,
+      <ExtensionDetails
+        extension={mockExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={isInstalled}
+      />,
     );
 
   it('should render extension details correctly', async () => {
