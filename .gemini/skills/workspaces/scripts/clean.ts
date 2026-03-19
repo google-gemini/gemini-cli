@@ -67,6 +67,10 @@ export async function runCleanup(args: string[], env: NodeJS.ProcessEnv = proces
   console.log('   - Killing ALL remote tmux sessions...');
   await provider.exec(`tmux kill-server`, { wrapContainer: 'maintainer-worker' });
 
+  console.log('   - Cleaning up Docker resources...');
+  await provider.exec(`sudo docker rm -f maintainer-worker || true`);
+  await provider.exec(`sudo docker system prune -af --volumes`);
+
   console.log('   - Cleaning up ALL Git Worktrees...');
   await provider.exec(`cd /home/node/.workspaces/main && git worktree prune && rm -rf /home/node/.workspaces/worktrees/*`, { wrapContainer: 'maintainer-worker' });
 
