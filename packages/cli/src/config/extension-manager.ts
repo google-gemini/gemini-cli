@@ -1284,7 +1284,9 @@ export async function inferInstallMetadata(
     source.startsWith('http://') ||
     source.startsWith('https://') ||
     source.startsWith('git@') ||
-    source.startsWith('sso://')
+    source.startsWith('sso://') ||
+    source.startsWith('github:') ||
+    source.startsWith('gitlab:')
   ) {
     return {
       source,
