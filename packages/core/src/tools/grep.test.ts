@@ -471,16 +471,16 @@ describe('GrepTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Found 2 matches');
-      expect(result.llmContent).toContain(
-        'results limited to 2 matches for performance',
-      );
+      expect(result.llmContent).toContain('RESULTS TRUNCATED');
       // It should find matches in fileA.txt first (2 matches)
       expect(result.llmContent).toContain('File: fileA.txt');
       expect(result.llmContent).toContain('L1: hello world');
       expect(result.llmContent).toContain('L2: second line with world');
       // And sub/fileC.txt should be excluded because limit reached
       expect(result.llmContent).not.toContain('File: sub/fileC.txt');
-      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+      expect(result.returnDisplay).toBe(
+        'Found 2 matches (truncated at 2, more exist)',
+      );
     });
 
     it('should respect max_matches_per_file in JS fallback', async () => {

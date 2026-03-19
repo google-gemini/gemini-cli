@@ -33,6 +33,7 @@ import {
   PARAM_RESPECT_GIT_IGNORE,
   PARAM_RESPECT_GEMINI_IGNORE,
   PARAM_FILE_FILTERING_OPTIONS,
+  GLOB_PARAM_MAX_RESULTS,
   // Tool-specific parameter names
   READ_FILE_PARAM_START_LINE,
   READ_FILE_PARAM_END_LINE,
@@ -292,6 +293,12 @@ export const GEMINI_3_SET: CoreToolSet = {
           description:
             'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
           type: 'boolean',
+        },
+        [GLOB_PARAM_MAX_RESULTS]: {
+          description:
+            'Optional: Maximum number of file paths to return. Use this to limit the size of the response for broad patterns in large repositories. Defaults to 500 if omitted.',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_PATTERN],

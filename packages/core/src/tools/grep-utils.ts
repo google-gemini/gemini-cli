@@ -175,20 +175,20 @@ export async function formatGrepResults(
       include_pattern ? ` (filter: "${include_pattern}")` : ''
     }${
       wasTruncated
-        ? ` (results limited to ${totalMaxMatches} matches for performance)`
+        ? `\n⚠️ RESULTS TRUNCATED: Showing files from the first ${totalMaxMatches} matches only. More matching files may exist. Use a more specific pattern or increase total_max_matches.`
         : ''
     }:\n`;
     llmContent += filePaths.join('\n');
     return {
       llmContent: llmContent.trim(),
-      returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+      returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ` (truncated at ${totalMaxMatches} matches)` : ''}`,
     };
   }
 
   let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${pattern}" ${searchLocationDescription}${include_pattern ? ` (filter: "${include_pattern}")` : ''}`;
 
   if (wasTruncated) {
-    llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
+    llmContent += `\n⚠️ RESULTS TRUNCATED: Returned ${totalMaxMatches} matches but more exist. The results are INCOMPLETE. To see all matches, either:\n- Use a more specific pattern or include_pattern to narrow the search\n- Set total_max_matches to a higher value (current: ${totalMaxMatches})`;
   }
 
   llmContent += `:\n---\n`;
@@ -214,7 +214,7 @@ export async function formatGrepResults(
   return {
     llmContent: llmContent.trim(),
     returnDisplay: `Found ${matchCount} ${matchTerm}${
-      wasTruncated ? ' (limited)' : ''
+      wasTruncated ? ` (truncated at ${totalMaxMatches}, more exist)` : ''
     }`,
   };
 }

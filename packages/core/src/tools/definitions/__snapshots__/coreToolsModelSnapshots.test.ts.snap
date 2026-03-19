@@ -212,6 +212,11 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
         "type": "string",
       },
+      "max_results": {
+        "description": "Optional: Maximum number of file paths to return. Use this to limit the size of the response for broad patterns in large repositories. Defaults to 500 if omitted.",
+        "minimum": 1,
+        "type": "integer",
+      },
       "pattern": {
         "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
         "type": "string",
@@ -1000,6 +1005,11 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       "dir_path": {
         "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
         "type": "string",
+      },
+      "max_results": {
+        "description": "Optional: Maximum number of file paths to return. Use this to limit the size of the response for broad patterns in large repositories. Defaults to 500 if omitted.",
+        "minimum": 1,
+        "type": "integer",
       },
       "pattern": {
         "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
