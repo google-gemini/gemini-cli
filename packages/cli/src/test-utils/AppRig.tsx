@@ -204,6 +204,7 @@ export class AppRig {
       enableEventDrivenScheduler: true,
       extensionLoader: new MockExtensionManager(),
       excludeTools: this.options.configOverrides?.excludeTools,
+      useAlternateBuffer: false,
       ...this.options.configOverrides,
     };
     this.config = makeFakeConfig(configParams);
@@ -275,19 +276,22 @@ export class AppRig {
           enabled: false,
           hasSeenNudge: true,
         },
+        ui: {
+          useAlternateBuffer: false,
+        },
       },
     });
   }
 
   private stubRefreshAuth() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const gcConfig = this.config as any;
     gcConfig.refreshAuth = async (authMethod: AuthType) => {
       gcConfig.modelAvailabilityService.reset();
 
       const newContentGeneratorConfig = {
         authType: authMethod,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
       };
@@ -410,7 +414,6 @@ export class AppRig {
           config: this.config!,
           settings: this.settings!,
           width: this.options.terminalWidth ?? 120,
-          useAlternateBuffer: false,
           uiState: {
             terminalHeight: this.options.terminalHeight ?? 40,
           },
@@ -456,7 +459,7 @@ export class AppRig {
     const actualToolName = toolName === '*' ? undefined : toolName;
     this.config
       .getPolicyEngine()
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
       .removeRulesForTool(actualToolName as string, source);
     this.breakpointTools.delete(toolName);
   }
@@ -729,7 +732,7 @@ export class AppRig {
         .getGeminiClient()
         ?.getChatRecordingService();
       if (recordingService) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (recordingService as any).conversationFile = null;
       }
     }
@@ -749,7 +752,7 @@ export class AppRig {
     MockShellExecutionService.reset();
     ideContextStore.clear();
     // Forcefully clear IdeClient singleton promise
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (IdeClient as any).instancePromise = null;
     vi.clearAllMocks();
 
