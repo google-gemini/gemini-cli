@@ -60,17 +60,7 @@ async function finishAddingDirectories(
   }
 
   if (added.length > 0) {
-    const gemini = config.getGeminiClient();
-    if (gemini) {
-      await gemini.addDirectoryContext();
-
-      // Persist directories to session file for resume support
-      const chatRecordingService = gemini.getChatRecordingService();
-      const workspaceContext = config.getWorkspaceContext();
-      chatRecordingService?.recordDirectories(
-        workspaceContext.getDirectories(),
-      );
-    }
+    await persistWorkspaceDirectories(config);
     addItem({
       type: MessageType.INFO,
       text: `Successfully added directories:\n- ${added.join('\n- ')}`,
@@ -80,6 +70,28 @@ async function finishAddingDirectories(
   if (errors.length > 0) {
     addItem({ type: MessageType.ERROR, text: errors.join('\n') });
   }
+}
+
+async function persistWorkspaceDirectories(config: Config) {
+  const gemini = config.getGeminiClient();
+  if (!gemini) {
+    return;
+  }
+
+  await gemini.addDirectoryContext();
+
+  const chatRecordingService = gemini.getChatRecordingService();
+  const workspaceContext = config.getWorkspaceContext();
+  chatRecordingService?.recordDirectories(workspaceContext.getDirectories());
+}
+
+function updateWorkspaceDirectories(
+  config: Config,
+  directories: readonly string[],
+) {
+  const workspaceContext = config.getWorkspaceContext();
+  workspaceContext.setDirectories(directories);
+  return persistWorkspaceDirectories(config);
 }
 
 export const directoryCommand: SlashCommand = {
@@ -290,6 +302,124 @@ export const directoryCommand: SlashCommand = {
         addItem({
           type: MessageType.INFO,
           text: `Current workspace directories:\n${directoryList}`,
+        });
+      },
+    },
+    {
+      name: 'remove',
+      description: 'Remove a manually added directory from the workspace',
+      kind: CommandKind.BUILT_IN,
+      action: async (context: CommandContext, args: string) => {
+        const {
+          ui: { addItem },
+          services: { config },
+        } = context;
+
+        if (!config) {
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Configuration is not available.',
+          });
+          return;
+        }
+
+        const pathToRemove = args.trim();
+        if (!pathToRemove) {
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Please provide a path to remove.',
+          });
+          return;
+        }
+
+        const workspaceContext = config.getWorkspaceContext();
+        const currentDirectories = workspaceContext.getDirectories();
+        const initialDirectories = new Set(
+          workspaceContext.getInitialDirectories(),
+        );
+
+        let resolvedPath: string;
+        try {
+          resolvedPath = fs.realpathSync(
+            path.resolve(
+              workspaceContext.targetDir,
+              expandHomeDir(pathToRemove),
+            ),
+          );
+        } catch {
+          addItem({
+            type: MessageType.ERROR,
+            text: `Directory is not in the workspace: ${pathToRemove}`,
+          });
+          return;
+        }
+
+        if (!currentDirectories.includes(resolvedPath)) {
+          addItem({
+            type: MessageType.ERROR,
+            text: `Directory is not in the workspace: ${pathToRemove}`,
+          });
+          return;
+        }
+
+        if (initialDirectories.has(resolvedPath)) {
+          addItem({
+            type: MessageType.ERROR,
+            text: `Cannot remove the initial workspace directory: ${resolvedPath}`,
+          });
+          return;
+        }
+
+        await updateWorkspaceDirectories(
+          config,
+          currentDirectories.filter((dir) => dir !== resolvedPath),
+        );
+
+        addItem({
+          type: MessageType.INFO,
+          text: `Successfully removed directory:\n- ${resolvedPath}`,
+        });
+      },
+    },
+    {
+      name: 'clear',
+      description: 'Remove all manually added directories from the workspace',
+      kind: CommandKind.BUILT_IN,
+      action: async (context: CommandContext) => {
+        const {
+          ui: { addItem },
+          services: { config },
+        } = context;
+
+        if (!config) {
+          addItem({
+            type: MessageType.ERROR,
+            text: 'Configuration is not available.',
+          });
+          return;
+        }
+
+        const workspaceContext = config.getWorkspaceContext();
+        const currentDirectories = workspaceContext.getDirectories();
+        const initialDirectories = workspaceContext.getInitialDirectories();
+        const initialDirectorySet = new Set(initialDirectories);
+        const removedDirectories = currentDirectories.filter(
+          (dir) => !initialDirectorySet.has(dir),
+        );
+
+        if (removedDirectories.length === 0) {
+          addItem({
+            type: MessageType.INFO,
+            text: 'No manually added directories to clear.',
+          });
+          return;
+        }
+
+        await updateWorkspaceDirectories(config, initialDirectories);
+
+        addItem({
+          type: MessageType.INFO,
+          text: `Successfully cleared directories:\n- ${removedDirectories.join('\n- ')}`,
         });
       },
     },

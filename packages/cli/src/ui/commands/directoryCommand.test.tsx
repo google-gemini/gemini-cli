@@ -52,15 +52,32 @@ describe('directoryCommand', () => {
   const addCommand = directoryCommand.subCommands?.find(
     (c) => c.name === 'add',
   );
+  const removeCommand = directoryCommand.subCommands?.find(
+    (c) => c.name === 'remove',
+  );
+  const clearCommand = directoryCommand.subCommands?.find(
+    (c) => c.name === 'clear',
+  );
   const showCommand = directoryCommand.subCommands?.find(
     (c) => c.name === 'show',
   );
+  let mockGeminiClient: {
+    addDirectoryContext: Mock;
+    getChatRecordingService: Mock;
+  };
+  let mockChatRecordingService: {
+    recordDirectories: Mock;
+  };
 
   beforeEach(() => {
     mockWorkspaceContext = {
       targetDir: path.resolve('/test/dir'),
       addDirectory: vi.fn(),
       addDirectories: vi.fn().mockReturnValue({ added: [], failed: [] }),
+      getInitialDirectories: vi
+        .fn()
+        .mockReturnValue([path.resolve('/test/dir')]),
+      setDirectories: vi.fn(),
       getDirectories: vi
         .fn()
         .mockReturnValue([
@@ -69,15 +86,21 @@ describe('directoryCommand', () => {
         ]),
     } as unknown as WorkspaceContext;
 
+    mockChatRecordingService = {
+      recordDirectories: vi.fn(),
+    };
+
+    mockGeminiClient = {
+      addDirectoryContext: vi.fn(),
+      getChatRecordingService: vi
+        .fn()
+        .mockReturnValue(mockChatRecordingService),
+    };
+
     mockConfig = {
       getWorkspaceContext: () => mockWorkspaceContext,
       isRestrictiveSandbox: vi.fn().mockReturnValue(false),
-      getGeminiClient: vi.fn().mockReturnValue({
-        addDirectoryContext: vi.fn(),
-        getChatRecordingService: vi.fn().mockReturnValue({
-          recordDirectories: vi.fn(),
-        }),
-      }),
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getWorkingDir: () => path.resolve('/test/dir'),
       shouldLoadMemoryFromIncludeDirectories: () => false,
       getDebugMode: () => false,
@@ -119,6 +142,125 @@ describe('directoryCommand', () => {
           text: `Current workspace directories:\n- ${path.resolve(
             '/home/user/project1',
           )}\n- ${path.resolve('/home/user/project2')}`,
+        }),
+      );
+    });
+  });
+
+  describe('remove', () => {
+    it('should remove a manually added directory and persist the change', async () => {
+      const addedPath = path.resolve('/home/user/project1');
+      const updatedDirs = [path.resolve('/home/user/project2')];
+      if (!removeCommand?.action) throw new Error('No action');
+
+      // Simulate setDirectories updating the workspace so that the subsequent
+      // getDirectories() call inside persistWorkspaceDirectories returns the
+      // post-removal list, not the original one.
+      vi.mocked(mockWorkspaceContext.setDirectories).mockImplementation(() => {
+        vi.mocked(mockWorkspaceContext.getDirectories).mockReturnValue(
+          updatedDirs,
+        );
+      });
+
+      await removeCommand.action(mockContext, addedPath);
+
+      expect(mockWorkspaceContext.setDirectories).toHaveBeenCalledWith(
+        updatedDirs,
+      );
+      expect(mockGeminiClient.addDirectoryContext).toHaveBeenCalledOnce();
+      expect(mockChatRecordingService.recordDirectories).toHaveBeenCalledWith(
+        updatedDirs,
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Successfully removed directory:\n- ${addedPath}`,
+        }),
+      );
+    });
+
+    it('should reject removing the initial workspace directory', async () => {
+      const initialPath = path.resolve('/test/dir');
+      vi.mocked(mockWorkspaceContext.getDirectories).mockReturnValue([
+        initialPath,
+        path.resolve('/home/user/project1'),
+      ]);
+      vi.mocked(mockWorkspaceContext.getInitialDirectories).mockReturnValue([
+        initialPath,
+      ]);
+
+      if (!removeCommand?.action) throw new Error('No action');
+      await removeCommand.action(mockContext, initialPath);
+
+      expect(mockWorkspaceContext.setDirectories).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `Cannot remove the initial workspace directory: ${initialPath}`,
+        }),
+      );
+    });
+
+    it('should show an error when removing a directory not in the workspace', async () => {
+      const missingPath = path.resolve('/home/user/missing-project');
+      if (!removeCommand?.action) throw new Error('No action');
+
+      await removeCommand.action(mockContext, missingPath);
+
+      expect(mockWorkspaceContext.setDirectories).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: `Directory is not in the workspace: ${missingPath}`,
+        }),
+      );
+    });
+  });
+
+  describe('clear', () => {
+    it('should clear all manually added directories and persist the change', async () => {
+      const initialPath = path.resolve('/test/dir');
+      vi.mocked(mockWorkspaceContext.getDirectories).mockReturnValue([
+        initialPath,
+        path.resolve('/home/user/project1'),
+        path.resolve('/home/user/project2'),
+      ]);
+      vi.mocked(mockWorkspaceContext.getInitialDirectories).mockReturnValue([
+        initialPath,
+      ]);
+
+      if (!clearCommand?.action) throw new Error('No action');
+      await clearCommand.action(mockContext, '');
+
+      expect(mockWorkspaceContext.setDirectories).toHaveBeenCalledWith([
+        initialPath,
+      ]);
+      expect(mockGeminiClient.addDirectoryContext).toHaveBeenCalledOnce();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: `Successfully cleared directories:\n- ${path.resolve('/home/user/project1')}\n- ${path.resolve('/home/user/project2')}`,
+        }),
+      );
+    });
+
+    it('should show an info message when there are no manually added directories', async () => {
+      const initialPath = path.resolve('/test/dir');
+      vi.mocked(mockWorkspaceContext.getDirectories).mockReturnValue([
+        initialPath,
+      ]);
+      vi.mocked(mockWorkspaceContext.getInitialDirectories).mockReturnValue([
+        initialPath,
+      ]);
+
+      if (!clearCommand?.action) throw new Error('No action');
+      await clearCommand.action(mockContext, '');
+
+      expect(mockWorkspaceContext.setDirectories).not.toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'No manually added directories to clear.',
         }),
       );
     });
@@ -350,7 +492,6 @@ describe('directoryCommand', () => {
 
     beforeEach(() => {
       vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(true);
-      // isWorkspaceTrusted is no longer checked, so we don't need to mock it returning true
       mockIsPathTrusted = vi.fn();
       const mockLoadedFolders = {
         isPathTrusted: mockIsPathTrusted,
@@ -382,7 +523,7 @@ describe('directoryCommand', () => {
 
     it('should return a custom dialog for an explicitly untrusted directory (upgrade flow)', async () => {
       if (!addCommand?.action) throw new Error('No action');
-      mockIsPathTrusted.mockReturnValue(false); // DO_NOT_TRUST
+      mockIsPathTrusted.mockReturnValue(false);
       const newPath = path.resolve('/home/user/untrusted-project');
 
       const result = await addCommand.action(mockContext, newPath);
@@ -391,7 +532,7 @@ describe('directoryCommand', () => {
         expect.objectContaining({
           type: 'custom_dialog',
           component: expect.objectContaining({
-            type: expect.any(Function), // React component for MultiFolderTrustDialog
+            type: expect.any(Function),
           }),
         }),
       );
@@ -414,7 +555,7 @@ describe('directoryCommand', () => {
         expect.objectContaining({
           type: 'custom_dialog',
           component: expect.objectContaining({
-            type: expect.any(Function), // React component for MultiFolderTrustDialog
+            type: expect.any(Function),
           }),
         }),
       );
@@ -428,7 +569,6 @@ describe('directoryCommand', () => {
 
     it('should prompt for directory even if workspace is untrusted', async () => {
       if (!addCommand?.action) throw new Error('No action');
-      // Even if workspace is untrusted, we should still check directory trust
       vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: false,
         source: 'file',
