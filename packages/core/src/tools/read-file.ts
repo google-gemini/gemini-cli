@@ -3,7 +3,6 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -19,7 +18,6 @@ import {
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
-
 import type { PartListUnion } from '@google/genai';
 import {
   processSingleFileContent,
@@ -39,6 +37,10 @@ import {
   appendJitContext,
   appendJitContextToParts,
 } from './jit-context.js';
+import {
+  detectPromptInjection,
+  wrapWithInjectionWarning,
+} from '../utils/prompt-injection-detector.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -48,18 +50,15 @@ export interface ReadFileToolParams {
    * The path to the file to read
    */
   file_path: string;
-
   /**
    * The line number to start reading from (optional, 1-based)
    */
   start_line?: number;
-
   /**
    * The line number to end reading at (optional, 1-based, inclusive)
    */
   end_line?: number;
 }
-
 class ReadFileToolInvocation extends BaseToolInvocation<
   ReadFileToolParams,
   ToolResult
@@ -78,7 +77,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.params.file_path,
     );
   }
-
   getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
@@ -86,7 +84,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     );
     return shortenPath(relativePath);
   }
-
   override toolLocations(): ToolLocation[] {
     return [
       {
@@ -95,7 +92,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       },
     ];
   }
-
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
@@ -103,7 +99,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       argsPattern: buildFilePathArgsPattern(this.params.file_path),
     };
   }
-
   async execute(): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(
       this.resolvedPath,
@@ -119,7 +114,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
         },
       };
     }
-
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
@@ -127,7 +121,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.params.start_line,
       this.params.end_line,
     );
-
     if (result.error) {
       return {
         llmContent: result.llmContent,
@@ -138,23 +131,32 @@ class ReadFileToolInvocation extends BaseToolInvocation<
         },
       };
     }
-
     let llmContent: PartListUnion;
     if (result.isTruncated) {
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
-
       llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
-
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
     } else {
       llmContent = result.llmContent || '';
     }
-
+    // --- Prompt-injection defense ---
+    // Only text content can be scanned; binary/multipart results are skipped.
+    if (typeof llmContent === 'string' && llmContent.length > 0) {
+      const detection = detectPromptInjection(llmContent);
+      if (detection.suspicious) {
+        llmContent = wrapWithInjectionWarning(
+          llmContent,
+          detection.reasons,
+          this.params.file_path,
+        );
+      }
+    }
+    // --- End prompt-injection defense ---
     const lines =
       typeof result.llmContent === 'string'
         ? result.llmContent.split('\n').length
@@ -174,7 +176,6 @@ ${result.llmContent}`;
         programming_language,
       ),
     );
-
     // Discover JIT subdirectory context for the accessed file path
     const jitContext = await discoverJitContext(this.config, this.resolvedPath);
     if (jitContext) {
@@ -184,14 +185,12 @@ ${result.llmContent}`;
         llmContent = appendJitContextToParts(llmContent, jitContext);
       }
     }
-
     return {
       llmContent,
       returnDisplay: result.returnDisplay || '',
     };
   }
 }
-
 /**
  * Implementation of the ReadFile tool logic
  */
@@ -201,7 +200,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
 > {
   static readonly Name = READ_FILE_TOOL_NAME;
   private readonly fileDiscoveryService: FileDiscoveryService;
-
   constructor(
     private config: Config,
     messageBus: MessageBus,
@@ -221,19 +219,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
       config.getFileFilteringOptions(),
     );
   }
-
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
     if (params.file_path.trim() === '') {
       return "The 'file_path' parameter must be non-empty.";
     }
-
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.file_path,
     );
-
     const validationError = this.config.validatePathAccess(
       resolvedPath,
       'read',
@@ -241,7 +236,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
     if (validationError) {
       return validationError;
     }
-
     if (params.start_line !== undefined && params.start_line < 1) {
       return 'start_line must be at least 1';
     }
@@ -255,7 +249,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
     ) {
       return 'start_line cannot be greater than end_line';
     }
-
     const fileFilteringOptions = this.config.getFileFilteringOptions();
     if (
       this.fileDiscoveryService.shouldIgnoreFile(
@@ -265,10 +258,8 @@ export class ReadFileTool extends BaseDeclarativeTool<
     ) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
     }
-
     return null;
   }
-
   protected createInvocation(
     params: ReadFileToolParams,
     messageBus: MessageBus,
@@ -283,7 +274,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       _toolDisplayName,
     );
   }
-
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
   }
