@@ -16,3 +16,8 @@ variable "hub_image_uri" {
   description = "The Docker image URI for the Workspace Hub"
   type        = string
 }
+
+variable "compute_default_sa" {
+  description = "The Compute Engine default service account email"
+  type        = string
+}

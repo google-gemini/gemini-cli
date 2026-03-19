@@ -18,10 +18,10 @@ resource "google_project_iam_member" "firestore_user" {
   member  = "serviceAccount:${google_service_account.hub_sa.email}"
 }
 
-resource "google_project_iam_member" "sa_user" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${google_service_account.hub_sa.email}"
+resource "google_service_account_iam_member" "sa_user" {
+  service_account_id = "projects/${var.project_id}/serviceAccounts/${var.compute_default_sa}"
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.hub_sa.email}"
 }
 
 resource "google_cloud_run_v2_service" "hub" {
