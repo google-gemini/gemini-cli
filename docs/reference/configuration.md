@@ -677,6 +677,324 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
+- **`modelConfigs.modelDefinitions`** (object):
+  - **Description:** Registry of model metadata, including tier, family, and
+    features.
+  - **Default:**
+
+    ```json
+    {
+      "gemini-3.1-pro-preview": {
+        "tier": "pro",
+        "family": "gemini-3",
+        "isPreview": true,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "tier": "pro",
+        "family": "gemini-3",
+        "isPreview": true,
+        "isVisible": false,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3-pro-preview": {
+        "tier": "pro",
+        "family": "gemini-3",
+        "isPreview": true,
+        "isVisible": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3-flash-preview": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": true,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-2.5-pro": {
+        "tier": "pro",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "gemini-2.5-flash": {
+        "tier": "flash",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "gemini-2.5-flash-lite": {
+        "tier": "flash-lite",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "auto": {
+        "tier": "auto",
+        "isPreview": true,
+        "isVisible": false,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "pro": {
+        "tier": "pro",
+        "isPreview": false,
+        "isVisible": false,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "flash": {
+        "tier": "flash",
+        "isPreview": false,
+        "isVisible": false,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "flash-lite": {
+        "tier": "flash-lite",
+        "isPreview": false,
+        "isVisible": false,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "auto-gemini-3": {
+        "displayName": "Auto (Gemini 3)",
+        "tier": "auto",
+        "isPreview": true,
+        "isVisible": true,
+        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash",
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "auto-gemini-2.5": {
+        "displayName": "Auto (Gemini 2.5)",
+        "tier": "auto",
+        "isPreview": false,
+        "isVisible": true,
+        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      }
+    }
+    ```
+
+  - **Requires restart:** Yes
+
+- **`modelConfigs.modelIdResolutions`** (object):
+  - **Description:** Rules for resolving requested model names to concrete model
+    IDs based on context.
+  - **Default:**
+
+    ```json
+    {
+      "gemini-3-pro-preview": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      },
+      "auto-gemini-3": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      },
+      "auto": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      },
+      "pro": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      },
+      "auto-gemini-2.5": {
+        "default": "gemini-2.5-pro"
+      },
+      "flash": {
+        "default": "gemini-3-flash-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-flash"
+          }
+        ]
+      },
+      "flash-lite": {
+        "default": "gemini-2.5-flash-lite"
+      }
+    }
+    ```
+
+  - **Requires restart:** Yes
+
+- **`modelConfigs.classifierIdResolutions`** (object):
+  - **Description:** Rules for resolving classifier tiers (flash, pro) to
+    concrete model IDs.
+  - **Default:**
+
+    ```json
+    {
+      "flash": {
+        "default": "gemini-3-flash-preview",
+        "contexts": [
+          {
+            "condition": {
+              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+            },
+            "target": "gemini-2.5-flash"
+          },
+          {
+            "condition": {
+              "requestedModels": ["auto-gemini-3", "gemini-3-pro-preview"]
+            },
+            "target": "gemini-3-flash-preview"
+          }
+        ]
+      },
+      "pro": {
+        "default": "gemini-3-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "requestedModels": ["auto-gemini-2.5", "gemini-2.5-pro"]
+            },
+            "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true,
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
+          },
+          {
+            "condition": {
+              "useGemini3_1": true
+            },
+            "target": "gemini-3.1-pro-preview"
+          }
+        ]
+      }
+    }
+    ```
+
+  - **Requires restart:** Yes
+
 #### `agents`
 
 - **`agents.overrides`** (object):
@@ -704,6 +1022,17 @@ their corresponding top-level category object in your `settings.json` file.
 - **`agents.browser.visualModel`** (string):
   - **Description:** Model override for the visual agent.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.allowedDomains`** (array):
+  - **Description:** A list of allowed domains for the browser agent (e.g.,
+    ["github.com", "*.google.com"]).
+  - **Default:**
+
+    ```json
+    ["github.com", "*.google.com", "localhost"]
+    ```
+
   - **Requires restart:** Yes
 
 - **`agents.browser.disableUserInput`** (boolean):
@@ -773,9 +1102,10 @@ their corresponding top-level category object in your `settings.json` file.
 #### `tools`
 
 - **`tools.sandbox`** (string):
-  - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, provide a string path to a sandbox profile, or
-    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+  - **Description:** Legacy full-process sandbox execution environment. Set to a
+    boolean to enable or disable the sandbox, provide a string path to a sandbox
+    profile, or specify an explicit sandbox command (e.g., "docker", "podman",
+    "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -879,8 +1209,19 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `security`
 
+- **`security.toolSandboxing`** (boolean):
+  - **Description:** Experimental tool-level sandboxing (implementation in
+    progress).
+  - **Default:** `false`
+
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.disableAlwaysAllow`** (boolean):
+  - **Description:** Disable "Always allow" options in tool confirmation
+    dialogs.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1000,9 +1341,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
-  - **Description:** Enable local and remote subagents. Warning: Experimental
-    feature, uses YOLO mode for subagents
-  - **Default:** `false`
+  - **Description:** Enable local and remote subagents.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.extensionManagement`** (boolean):
@@ -1033,7 +1373,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.jitContext`** (boolean):
   - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
@@ -1068,6 +1408,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.dynamicModelConfiguration`** (boolean):
+  - **Description:** Enable dynamic model configuration (definitions,
+    resolutions, and chains) via settings.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
   - **Description:** Enable the Gemma Model Router (experimental). Requires a
     local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
@@ -1084,6 +1430,11 @@ their corresponding top-level category object in your `settings.json` file.
     `gemma3-1b-gpu-custom`.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
+
+- **`experimental.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the experimental Topic & Update communication model
+    for reduced chattiness and structured progress reporting.
+  - **Default:** `false`
 
 #### `skills`
 
@@ -1174,7 +1525,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `admin`
 
 - **`admin.secureModeEnabled`** (boolean):
-  - **Description:** If true, disallows yolo mode from being used.
+  - **Description:** If true, disallows YOLO mode and "Always allow" options
+    from being used.
   - **Default:** `false`
 
 - **`admin.extensions.enabled`** (boolean):

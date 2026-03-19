@@ -53,9 +53,22 @@ When you need to identify elements by visual attributes not in the AX tree (e.g.
  * Extracted from prototype (computer_use_subagent_cdt branch).
  *
  * @param visionEnabled Whether visual tools (analyze_screenshot, click_at) are available.
+ * @param allowedDomains Optional list of allowed domains to restrict navigation.
  */
-export function buildBrowserSystemPrompt(visionEnabled: boolean): string {
-  return `You are an expert browser automation agent (Orchestrator). Your goal is to completely fulfill the user's request.
+export function buildBrowserSystemPrompt(
+  visionEnabled: boolean,
+  allowedDomains?: string[],
+): string {
+  const allowedDomainsInstruction =
+    allowedDomains && allowedDomains.length > 0
+      ? `\n\nSECURITY DOMAIN RESTRICTION - CRITICAL:\nYou are strictly limited to the following allowed domains (and their subdomains if specified with '*.'):\n${allowedDomains
+          .map((d) => `- ${d}`)
+          .join(
+            '\n',
+          )}\nDo NOT attempt to navigate to any other domains using new_page or navigate_page, as it will be rejected. This is a hard security constraint.`
+      : '';
+
+  return `You are an expert browser automation agent (Orchestrator). Your goal is to completely fulfill the user's request.${allowedDomainsInstruction}
 
 IMPORTANT: You will receive an accessibility tree snapshot showing elements with uid values (e.g., uid=87_4 button "Login"). 
 Use these uid values directly with your tools:
@@ -109,7 +122,7 @@ export const BrowserAgentDefinition = (
 ): LocalAgentDefinition<typeof BrowserTaskResultSchema> => {
   // Use Preview Flash model if the main model is any of the preview models.
   // If the main model is not a preview model, use the default flash model.
-  const model = isPreviewModel(config.getModel())
+  const model = isPreviewModel(config.getModel(), config)
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_FLASH_MODEL;
 
@@ -118,7 +131,7 @@ export const BrowserAgentDefinition = (
     kind: 'local',
     experimental: true,
     displayName: 'Browser Agent',
-    description: `Specialized autonomous agent for end-to-end web browser automation and objective-driven problem solving. Delegate complete, high-level tasks to this agent — it independently plans, executes multi-step interactions, interprets dynamic page feedback (e.g., game states, form validation errors, search results), and iterates until the goal is achieved. It perceives page structure through the Accessibility Tree, handles overlays and popups, and supports complex web apps.`,
+    description: `Specialized autonomous agent for interactive web browser automation requiring real browser rendering. Delegate tasks that require clicking, form-filling, navigating multi-step flows, or interacting with JavaScript-heavy web applications that cannot be accessed via simple HTTP fetching. Do NOT delegate to this agent for simply reading, summarizing, or extracting content from URLs — use the web_fetch tool or other available tools for that instead. This agent independently plans, executes multi-step interactions, interprets dynamic page feedback (e.g., game states, form validation errors, search results), and iterates until the goal is achieved. It perceives page structure through the Accessibility Tree, handles overlays and popups, and supports complex web apps.`,
 
     inputConfig: {
       inputSchema: {
@@ -166,7 +179,10 @@ export const BrowserAgentDefinition = (
 </task>
 
 First, use new_page to open the relevant URL. Then call take_snapshot to see the page and proceed with your task.`,
-      systemPrompt: buildBrowserSystemPrompt(visionEnabled),
+      systemPrompt: buildBrowserSystemPrompt(
+        visionEnabled,
+        config.getBrowserAgentConfig().customConfig.allowedDomains,
+      ),
     },
   };
 };
