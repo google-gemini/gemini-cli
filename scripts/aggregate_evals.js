@@ -16,6 +16,28 @@ const artifactsDir = args.find((arg) => !arg.startsWith('--')) || '.';
 const isPrComment = args.includes('--pr-comment');
 const MAX_HISTORY = 7;
 
+// Extract policies from the source code
+function getTestPolicies() {
+  const policies = {};
+  try {
+    const evalFiles = fs
+      .readdirSync('evals')
+      .filter((f) => f.endsWith('.eval.ts'));
+    for (const file of evalFiles) {
+      const content = fs.readFileSync(path.join('evals', file), 'utf-8');
+      const matches = content.matchAll(
+        /evalTest\s*\(\s*['"](ALWAYS_PASSES|USUALLY_PASSES)['"]\s*,\s*\{\s*name:\s*['"](.+?)['"]/g,
+      );
+      for (const match of matches) {
+        policies[match[2]] = match[1];
+      }
+    }
+  } catch {
+    // Ignore errors in policy extraction
+  }
+  return policies;
+}
+
 // Find all report.json files recursively
 function findReports(dir) {
   const reports = [];
@@ -131,8 +153,6 @@ function fetchHistoricalData() {
         if (runReports.length > 0) {
           const stats = getStats(runReports);
 
-          // --- Infrastructure Failure Check ---
-          // If the overall pass rate for this run is 0%, ignore it as a "poisoned" baseline.
           let totalPassed = 0;
           let totalTests = 0;
           Object.values(stats).forEach((modelStats) => {
@@ -164,6 +184,7 @@ function fetchHistoricalData() {
 function generateMarkdown(currentStatsByModel, history) {
   const reversedHistory = [...history].reverse();
   const models = Object.keys(currentStatsByModel).sort();
+  const policies = getTestPolicies();
 
   const getConsolidatedBaseline = (model) => {
     const consolidated = {};
@@ -202,40 +223,46 @@ function generateMarkdown(currentStatsByModel, history) {
   if (isPrComment) {
     console.log('### 🤖 Model Steering Impact Report\n');
 
-    let overallRegression = false;
+    let blockerRegression = false;
     for (const model of models) {
       const currentStats = currentStatsByModel[model];
       const baselineStats = getConsolidatedBaseline(model);
       for (const [name, curr] of Object.entries(currentStats)) {
+        const policy = policies[name] || 'USUALLY_PASSES';
+        const currRate = (curr.passed / curr.total) * 100;
         const base = baselineStats ? baselineStats[name] : null;
-        if (base) {
-          const delta =
-            (curr.passed / curr.total) * 100 - (base.passed / base.total) * 100;
-          if (delta < -15) overallRegression = true;
+        const baseRate = base ? (base.passed / base.total) * 100 : null;
+
+        if (policy === 'ALWAYS_PASSES' && currRate < 100) {
+          blockerRegression = true;
+        } else if (
+          policy === 'USUALLY_PASSES' &&
+          baseRate !== null &&
+          baseRate > 90 &&
+          currRate < 60
+        ) {
+          blockerRegression = true; // Significant drop in a highly stable test
         }
       }
     }
 
-    if (overallRegression) {
-      console.log('**Status: ⚠️ Investigation Recommended**\n');
+    if (blockerRegression) {
+      console.log('**Status: 🔴 Regression Detected (Blocking)**\n');
       console.log(
-        'This PR modifies core prompt or tool logic and has introduced significant regressions in behavioral stability. Please review the delta below.\n',
+        'This PR has introduced regressions in stable behavioral evaluations. These must be resolved before merging.\n',
       );
     } else {
       console.log('**Status: ✅ Stable**\n');
       console.log(
-        'This PR modifies core prompt or tool logic. Behavioral evaluations remain stable compared to the `main` baseline.\n',
+        'Behavioral evaluations remain stable compared to the `main` baseline.\n',
       );
     }
 
     console.log(
-      `> **Note:** The baseline is an average of the last ${history.length} healthy nightly runs on \`main\` (ignoring infrastructure failures).\n`,
+      `> **Note:** Baseline is averaged from the last ${history.length} healthy nightly runs on \`main\`.\n`,
     );
   } else {
     console.log('### Evals Nightly Summary\n');
-    console.log(
-      'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
-    );
   }
 
   for (const model of models) {
@@ -255,24 +282,48 @@ function generateMarkdown(currentStatsByModel, history) {
     let stableCount = 0;
 
     for (const name of Array.from(allTestNames).sort()) {
+      const policy = policies[name] || 'USUALLY_PASSES';
       const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
       const curr = currentStats[name];
       const base = baselineStats ? baselineStats[name] : null;
 
       const currRate = curr ? (curr.passed / curr.total) * 100 : null;
       const baseRate = base ? (base.passed / base.total) * 100 : null;
-
       const delta =
         currRate !== null && baseRate !== null ? currRate - baseRate : null;
-      const isInteresting =
-        currRate === null || baseRate === null || Math.abs(delta) >= 15;
+
+      // Smart Noise Filtering
+      let status = '⚪ Stable';
+      let isInteresting = false;
+
+      if (policy === 'ALWAYS_PASSES') {
+        if (currRate !== null && currRate < 100) {
+          status = '🔴 Regression';
+          isInteresting = true;
+        }
+      } else {
+        // USUALLY_PASSES: Only interesting if drop is > 30% OR it's a new failure
+        if (delta !== null && delta < -30) {
+          status = '🔴 Regression';
+          isInteresting = true;
+        } else if (delta !== null && delta > 30) {
+          status = '🟢 Improved';
+          isInteresting = true;
+        } else if (baseRate !== null && baseRate > 80 && currRate === 0) {
+          status = '🔴 Regression';
+          isInteresting = true;
+        }
+      }
+
+      // Always show new or missing tests
+      if (currRate === null || baseRate === null) isInteresting = true;
 
       if (isPrComment && !isInteresting) {
         stableCount++;
         continue;
       }
 
-      let row = `| [${name}](${searchUrl}) |`;
+      let row = `| [${name}](${searchUrl}) | ${policy === 'ALWAYS_PASSES' ? '🔒' : '🎲'} |`;
 
       if (!isPrComment) {
         for (const item of reversedHistory) {
@@ -280,18 +331,10 @@ function generateMarkdown(currentStatsByModel, history) {
           row += ` ${stat ? ((stat.passed / stat.total) * 100).toFixed(0) + '%' : '-'} |`;
         }
       } else if (baselinePassRate !== null) {
-        row += ` ${formatPassRate(baseRate)} (${base?.total || 0}n) |`;
+        row += ` ${formatPassRate(baseRate)} |`;
       }
 
-      row += ` ${formatPassRate(currRate)} (${curr?.total || 0}n) |`;
-
-      if (delta !== null) {
-        if (delta > 10) row += ` 🟢 +${delta.toFixed(0)}% |`;
-        else if (delta < -15) row += ` 🔴 ${delta.toFixed(0)}% |`;
-        else row += ' ⚪ Stable |';
-      } else {
-        row += ' - |';
-      }
+      row += ` ${formatPassRate(currRate)} | ${status} |`;
       rows.push(row);
     }
 
@@ -304,19 +347,15 @@ function generateMarkdown(currentStatsByModel, history) {
       console.log(
         `**Pass Rate: ${formatPassRate(currentPassRate)}** vs. ${formatPassRate(baselinePassRate)} Baseline${deltaStr}\n`,
       );
-    } else if (!isPrComment) {
-      console.log(`**Total Pass Rate: ${formatPassRate(currentPassRate)}**\n`);
     }
 
     if (isPrComment && rows.length === 0) {
-      console.log(
-        '✅ No interesting behavioral shifts detected for this model.\n',
-      );
+      console.log('✅ All behavioral evaluations are stable.\n');
       continue;
     }
 
-    let header = '| Test Name |';
-    let separator = '| :--- |';
+    let header = `| Test Name | Policy |`;
+    let separator = `| :--- | :---: |`;
 
     if (!isPrComment) {
       for (const item of reversedHistory) {
@@ -324,7 +363,7 @@ function generateMarkdown(currentStatsByModel, history) {
         separator += ' :---: |';
       }
     } else if (baselinePassRate !== null) {
-      header += ' Baseline (Avg) |';
+      header += ' Baseline |';
       separator += ' :---: |';
     }
 
@@ -337,7 +376,7 @@ function generateMarkdown(currentStatsByModel, history) {
 
     if (isPrComment && stableCount > 0) {
       console.log(
-        `\n> **Note:** ${stableCount} stable tests were hidden from this report to reduce noise.\n`,
+        `\n> **Note:** ${stableCount} stable tests were hidden from this report.\n`,
       );
     }
     console.log('\n');
@@ -345,7 +384,10 @@ function generateMarkdown(currentStatsByModel, history) {
 
   if (isPrComment) {
     console.log(
-      '---\n💡 To investigate regressions locally, run: `gemini /fix-behavioral-eval`',
+      '---\n💡 **Policy Key:** 🔒 `ALWAYS_PASSES` (PR Blocker) | 🎲 `USUALLY_PASSES` (Informational)\n',
+    );
+    console.log(
+      '💡 To investigate regressions locally, run: `gemini /fix-behavioral-eval`',
     );
   }
 }
