@@ -40,28 +40,9 @@ export function geminiPartsToContentParts(parts: Part[]): ContentPart[] {
         mimeType: part.fileData.mimeType,
       });
     } else if ('functionCall' in part && part.functionCall) {
-      // Function calls are serialized to text so consumers can inspect them
-      result.push({
-        type: 'text',
-        text: JSON.stringify({
-          functionCall: {
-            name: part.functionCall.name,
-            args: part.functionCall.args,
-          },
-        }),
-        _meta: { partType: 'functionCall' },
-      });
+      continue; // Skip function calls, they are emitted as distinct tool_request events
     } else if ('functionResponse' in part && part.functionResponse) {
-      result.push({
-        type: 'text',
-        text: JSON.stringify({
-          functionResponse: {
-            name: part.functionResponse.name,
-            response: part.functionResponse.response,
-          },
-        }),
-        _meta: { partType: 'functionResponse' },
-      });
+      continue; // Skip function responses, they are tied to tool_response events
     } else {
       // Fallback: serialize any unrecognized part type to text
       result.push({

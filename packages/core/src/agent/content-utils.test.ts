@@ -69,21 +69,15 @@ describe('geminiPartsToContentParts', () => {
     ]);
   });
 
-  it('converts functionCall parts to text with metadata', () => {
+  it('skips functionCall parts', () => {
     const parts: Part[] = [
       { functionCall: { name: 'myFunc', args: { key: 'value' } } },
     ];
     const result = geminiPartsToContentParts(parts);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.type).toBe('text');
-    expect(result[0]?._meta).toEqual({ partType: 'functionCall' });
-    const parsed = JSON.parse(
-      (result[0] as { type: 'text'; text: string }).text,
-    );
-    expect(parsed.functionCall.name).toBe('myFunc');
+    expect(result).toEqual([]);
   });
 
-  it('converts functionResponse parts to text with metadata', () => {
+  it('skips functionResponse parts', () => {
     const parts: Part[] = [
       {
         functionResponse: {
@@ -93,9 +87,7 @@ describe('geminiPartsToContentParts', () => {
       },
     ];
     const result = geminiPartsToContentParts(parts);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.type).toBe('text');
-    expect(result[0]?._meta).toEqual({ partType: 'functionResponse' });
+    expect(result).toEqual([]);
   });
 
   it('serializes unknown part types to text with _meta', () => {
