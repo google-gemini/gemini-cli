@@ -53,7 +53,6 @@ describe('ToolConfirmationMessage', () => {
       getIdeMode: () => false,
       getDisableAlwaysAllow: () => false,
       getApprovalMode: () => 'default',
-      getApprovalMode: () => 'default',
     } as unknown as Config;
 
     it('shows permanent approval option for safe commands', async () => {

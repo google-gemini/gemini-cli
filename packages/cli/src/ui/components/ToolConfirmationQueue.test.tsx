@@ -54,6 +54,7 @@ describe('ToolConfirmationQueue', () => {
       getPlansDir: () => '/mock/temp/plans',
     },
     getUseAlternateBuffer: () => false,
+    getApprovalMode: () => 'default',
   } as unknown as Config;
 
   beforeEach(() => {
