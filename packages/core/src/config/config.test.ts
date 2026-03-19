@@ -1355,6 +1355,57 @@ describe('Server Config (config.ts)', () => {
       expect(SubAgentToolMock).not.toHaveBeenCalled();
     });
 
+    it('should unregister subagents as tools when they are disabled after being enabled (simulating reload)', async () => {
+      const mockAgentDefinition = {
+        name: 'codebase_investigator',
+        description: 'Agent 1',
+        instructions: 'Inst 1',
+      };
+
+      const AgentRegistryMock = (
+        (await vi.importMock('../agents/registry.js')) as {
+          AgentRegistry: Mock;
+        }
+      ).AgentRegistry;
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
+        mockAgentDefinition,
+      ]);
+
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: true },
+          },
+        },
+      };
+      const config = new Config(params);
+
+      await config.initialize();
+      const toolRegistry = config.getToolRegistry();
+
+      // Clear mock history before we trigger the refresh
+      vi.mocked(toolRegistry.unregisterTool).mockClear();
+
+      // Now disable the agent in config and refresh
+      vi.stubEnv('GEMINI_AGENTS_CODEBASE_INVESTIGATOR_ENABLED', 'false');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (config as any).agents = {
+        overrides: {
+          codebase_investigator: { enabled: false },
+        },
+      };
+
+      // @ts-expect-error accessing private method for testing
+      await config.onAgentsRefreshed();
+
+      // Verify unregisterTool was called with the agent name
+      expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
+        'codebase_investigator',
+      );
+      vi.unstubAllEnvs();
+    });
+
     it('should register EnterPlanModeTool and ExitPlanModeTool when plan is enabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,

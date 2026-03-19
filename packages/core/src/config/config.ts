@@ -3303,6 +3303,16 @@ export class Config implements McpContext, AgentLoopContext {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
     const definitions = this.agentRegistry.getAllDefinitions();
 
+    // First, unregister any agents that are now disabled
+    for (const definition of definitions) {
+      if (
+        !this.isAgentsEnabled() ||
+        agentsOverrides[definition.name]?.enabled === false
+      ) {
+        registry.unregisterTool(definition.name);
+      }
+    }
+
     for (const definition of definitions) {
       try {
         if (
