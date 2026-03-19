@@ -22,6 +22,7 @@ import {
   ActivateSkillTool,
   type ResumedSessionData,
   PolicyDecision,
+  debugLogger, //Added to fix Logging of Errors.
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
@@ -108,9 +109,8 @@ export class GeminiCliSession {
             return await loadSkillsFromDir(ref.path);
           }
         } catch (e) {
-          // TODO: refactor this to use a proper logger interface
-          // eslint-disable-next-line no-console
-          console.error(`Failed to load skills from ${ref.path}:`, e);
+          // Refactored to use the proper internal telemetry logger
+          debugLogger.error(`Failed to load skills from ${ref.path}:`, e);
         }
         return [];
       });
