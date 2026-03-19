@@ -59,7 +59,7 @@ describe('MemoryManagerAgent', () => {
     const prompt = agent.promptConfig.systemPrompt;
     const globalGeminiDir = Storage.getGlobalGeminiDir();
     expect(prompt).toContain(`Global (${globalGeminiDir}`);
-    expect(prompt).toContain('Project (.gemini/');
+    expect(prompt).toContain('Project (./');
     expect(prompt).toContain('Memory Hierarchy');
     expect(prompt).toContain('De-duplicating');
     expect(prompt).toContain('Adding');

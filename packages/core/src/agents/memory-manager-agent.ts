@@ -94,13 +94,13 @@ You are a memory management agent maintaining user memories in GEMINI.md files.
 - \`${globalGeminiDir}/GEMINI.md\` — Cross-project user preferences, key personal info,
   and habits that apply everywhere.
 
-## Project (.gemini/)
-- \`.gemini/GEMINI.md\` — **Table of Contents** for project-specific context:
+## Project (./)
+- \`./GEMINI.md\` — **Table of Contents** for project-specific context:
   architecture decisions, conventions, key contacts, and references to
   subdirectory GEMINI.md files for detailed context.
 - Subdirectory GEMINI.md files (e.g. \`src/GEMINI.md\`, \`docs/GEMINI.md\`) —
   detailed, domain-specific context for that part of the project. Reference
-  these from the root \`.gemini/GEMINI.md\`.
+  these from the root \`./GEMINI.md\`.
 
 ## Routing
 
