@@ -102,6 +102,32 @@ describe('policy.ts', () => {
       );
     });
 
+    it('should respect disableAlwaysAllow from config', async () => {
+      const mockPolicyEngine = {
+        check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ALLOW }),
+      } as unknown as Mocked<PolicyEngine>;
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getDisableAlwaysAllow: vi.fn().mockReturnValue(true),
+      } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
+      const toolCall = {
+        request: { name: 'test-tool', args: {} },
+        tool: { name: 'test-tool' },
+      } as ValidatingToolCall;
+
+      // Note: checkPolicy calls config.getPolicyEngine().check()
+      // The PolicyEngine itself is already configured with disableAlwaysAllow
+      // when created in Config. Here we are just verifying that checkPolicy
+      // doesn't somehow bypass it.
+      await checkPolicy(toolCall, mockConfig);
+      expect(mockPolicyEngine.check).toHaveBeenCalled();
+    });
+
     it('should throw if ASK_USER is returned in non-interactive mode', async () => {
       const mockPolicyEngine = {
         check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ASK_USER }),
@@ -673,6 +699,43 @@ describe('policy.ts', () => {
           toolName: 'write_file',
           argsPattern:
             '\\\\0' + escapeRegex('"file_path":"src/foo.ts"') + '\\\\0',
+        }),
+      );
+    });
+
+    it('should work when context is created via Object.create (prototype chain)', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+
+      const baseContext = {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      };
+      const protoContext: AgentLoopContext = Object.create(baseContext);
+
+      expect(Object.keys(protoContext)).toHaveLength(0);
+      expect(protoContext.config).toBe(mockConfig);
+      expect(protoContext.messageBus).toBe(mockMessageBus);
+
+      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        undefined,
+        protoContext,
+        mockMessageBus,
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'test-tool',
+          persist: false,
         }),
       );
     });

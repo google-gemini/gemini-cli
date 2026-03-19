@@ -16,10 +16,10 @@ import {
   type ToolInvocation,
   type ToolLiveOutput,
   type ToolResult,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import { createMockMessageBus } from './mock-message-bus.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 
 interface MockToolOptions {
   name: string;
@@ -35,7 +35,7 @@ interface MockToolOptions {
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ) => Promise<ToolResult>;
   params?: object;
   messageBus?: MessageBus;
@@ -56,13 +56,13 @@ class MockToolInvocation extends BaseToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<ToolResult> {
     return this.tool.execute(
       this.params,
       signal,
       updateOutput as ((output: string) => void) | undefined,
-      shellExecutionConfig,
+      options,
     );
   }
 
@@ -93,7 +93,7 @@ export class MockTool extends BaseDeclarativeTool<
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ) => Promise<ToolResult>;
 
   constructor(options: MockToolOptions) {
@@ -157,7 +157,11 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
     super(params, messageBus, tool.name, tool.displayName);
   }
 
-  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    _signal: AbortSignal,
+    _updateOutput?: (output: ToolLiveOutput) => void,
+    _options?: ExecuteOptions,
+  ): Promise<ToolResult> {
     const result = this.tool.executeFn(this.params);
     return (
       result ?? {

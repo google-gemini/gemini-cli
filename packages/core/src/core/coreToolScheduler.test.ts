@@ -34,6 +34,7 @@ import {
   GeminiCliOperation,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   MockModifiableTool,
   MockTool,
@@ -274,6 +275,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
         allowedEnvironmentVariables: [],
         blockedEnvironmentVariables: [],
       },
+      sandboxManager: new NoopSandboxManager(),
     }),
     storage: {
       getProjectTempDir: () => '/tmp',
@@ -1227,6 +1229,7 @@ describe('CoreToolScheduler request queueing', () => {
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },
+        sandboxManager: new NoopSandboxManager(),
       }),
       isInteractive: () => false,
     });
@@ -1341,6 +1344,7 @@ describe('CoreToolScheduler request queueing', () => {
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },
+        sandboxManager: new NoopSandboxManager(),
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,
