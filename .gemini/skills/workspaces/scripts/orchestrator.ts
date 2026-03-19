@@ -131,12 +131,13 @@ GEMINI_HOST=${targetVM}
   await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`mkdir -p ${remoteWorktreeDir}/.gemini && echo ${q(remoteSettingsJson)} > ${remoteWorktreeDir}/.gemini/settings.json`)}`);
 
   // 4. Execution Logic
-  // In shell mode, we just start gemini. In action mode, we run the entrypoint.
+  // In shell mode, we use the local built binary to ensure version consistency.
+  // In action mode, we run the entrypoint script.
   const remoteWorker = isShellMode 
-    ? `gemini`
+    ? `node bundle/gemini.js`
     : `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
 
-  const authEnv = `${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
+  const authEnv = `-e GEMINI_AUTO_UPDATE=0 ${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
   
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
   // We HIDE the tmux status bar to reduce visual noise
@@ -169,7 +170,7 @@ GEMINI_HOST=${targetVM}
                 tell application "iTerm"
                     set newWindow to (create window with default profile)
                     tell current session of newWindow
-                    write text (item 1 of argv) & return
+                    write text (quoted form of item 1 of argv) & return
                     end tell
                     activate
                 end tell
@@ -180,7 +181,7 @@ GEMINI_HOST=${targetVM}
                     tell current window
                     set newTab to (create tab with default profile)
                     tell current session of newTab
-                        write text (item 1 of argv) & return
+                        write text (quoted form of item 1 of argv) & return
                     end tell
                     end tell
                     activate
