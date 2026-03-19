@@ -1,39 +1,42 @@
+/**
+ * Workspace Orchestrator (Local)
+ * 
+ * Central coordination of remote tasks.
+ * Wakes workers, prepares worktrees, and launches tmux sessions.
+ */
+import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-const q = (str: string) => `'${str.replace(/'/g, "'\\''")}'`;
+function q(str: string) {
+    return `'${str.replace(/'/g, "'\\''")}'`;
+}
 
 export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = process.env) {
   const prNumber = args[0];
   const action = args[1] || 'review';
-  
+
   if (!prNumber) {
-    console.error('Usage: npm run workspace <PR_NUMBER> [action]');
+    console.error('❌ Usage: npm run workspace <PR_NUMBER> [action]');
     return 1;
   }
 
   // 1. Load Settings
   const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
+    console.error('❌ Workspace settings not found. Run "npm run workspace:setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
   const config = settings.workspace;
-  if (!config) {
-    console.error('❌ Workspace configuration not found.');
-    return 1;
-  }
 
-  const { projectId, zone } = config;
   const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
-  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
+  const provider = ProviderFactory.getProvider({ projectId: config.projectId, zone: config.zone, instanceName: targetVM });
 
   // 2. Wake Worker & Verify Container
   await provider.ensureReady();
@@ -84,21 +87,32 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     console.log('   ✅ Remote worktree ready.');
   }
 
-  // 4. Execution Logic
-  const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
+  // REPAIR: Git worktrees use absolute paths. If the host and container paths differ, they break.
+  // We repair the worktree context inside the container.
+  console.log('   - Repairing remote worktree context...');
+  await provider.exec(`sudo docker exec maintainer-worker git -C ${remoteWorktreeDir} worktree repair ${containerWorkspaceRoot}/main`);
+
+  // AUTH: Dynamically retrieve credentials from host-side config/disk
   const remoteConfigPath = `${hostWorkspaceRoot}/gemini-cli-config/.gemini/settings.json`;
-  
-  // FIX: Dynamically retrieve the API key and GitHub token from the host-side config/disk
   const apiKeyRes = await provider.getExecOutput(`cat ${remoteConfigPath} | grep apiKey | cut -d '\"' -f 4`);
   const remoteApiKey = apiKeyRes.stdout.trim();
   
   const ghTokenRes = await provider.getExecOutput(`cat ${hostWorkspaceRoot}/.gh_token`);
   const remoteGhToken = ghTokenRes.stdout.trim();
 
-  const authEnv = `${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
+  // AUTH: Inject credentials into a local .env in the worktree for all tools to find
+  console.log('   - Injecting remote authentication context...');
+  const dotEnvContent = `
+GEMINI_API_KEY=${remoteApiKey}
+GITHUB_TOKEN=${remoteGhToken}
+GH_TOKEN=${remoteGhToken}
+`.trim();
+  await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`echo ${q(dotEnvContent)} > ${remoteWorktreeDir}/.env`)}`);
+
+  // 4. Execution Logic
+  const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
   
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
-  // We also style the tmux bar here to be less intrusive and more informative
   const tmuxStyle = `
     tmux set -g status-bg colour238; 
     tmux set -g status-fg colour136; 
@@ -109,7 +123,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   `.replace(/\n/g, '');
 
   const tmuxCmd = `tmux new-session -A -s ${sessionName} ${q(`${tmuxStyle} cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
-  const containerWrap = `sudo docker exec -it ${authEnv}maintainer-worker sh -c ${q(tmuxCmd)}`;
+  const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(tmuxCmd)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 
