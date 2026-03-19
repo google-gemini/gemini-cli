@@ -48,9 +48,14 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 2. Wake Worker & Verify Container
   await provider.ensureReady();
 
+  // Retrieve the remote user to ensure we run git commands correctly
+  const whoamiRes = await provider.getExecOutput('whoami');
+  const remoteUser = whoamiRes.stdout.trim();
+
   // Paths - Unified across host and container
   const hostWorkspaceRoot = `/home/node/.workspaces`;
   const hostWorkDir = `${hostWorkspaceRoot}/main`;
+  const containerHome = '/home/node';
   const containerWorkspaceRoot = `/home/node/.workspaces`;
   
   const remotePolicyPath = `${containerWorkspaceRoot}/policies/workspace-policy.toml`;
@@ -72,20 +77,18 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   if (check.status !== 0) {
     console.log(`   - Provisioning isolated git worktree for ${prNumber}...`);
     
-    // We run these on the host because the host user owns the data directory
-    // If it's a PR, we fetch specifically. If it's a shell, we just branch from main.
+    // We run these on the host. We use the current remote user to ensure ownership is correct.
     const gitFetch = isShellMode 
-        ? `sudo -u chronos git -C ${hostWorkDir} fetch --quiet origin`
-        : `sudo -u chronos git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
+        ? `git -C ${hostWorkDir} fetch --quiet origin`
+        : `git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
     
-    const gitTarget = isShellMode ? 'FETCH_HEAD' : 'FETCH_HEAD'; // For now just use main/fetched state
+    const gitTarget = isShellMode ? 'FETCH_HEAD' : 'FETCH_HEAD'; 
 
     const setupCmd = `
-      sudo -u chronos git -C ${hostWorkDir} config --add safe.directory ${hostWorkDir} && \
-      sudo mkdir -p ${hostWorkspaceRoot}/worktrees && \
-      sudo chown chronos:chronos ${hostWorkspaceRoot}/worktrees && \
+      git -C ${hostWorkDir} config --add safe.directory ${hostWorkDir} && \
+      mkdir -p ${hostWorkspaceRoot}/worktrees && \
       ${gitFetch} && \
-      sudo -u chronos git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1
+      git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1
     `;
     const setupRes = await provider.getExecOutput(setupCmd);
     if (setupRes.status !== 0) {
