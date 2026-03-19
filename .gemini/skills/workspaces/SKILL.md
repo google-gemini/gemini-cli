@@ -26,8 +26,11 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
    npm run workspace <PR_NUMBER> [action]
    ```
    - Actions: `review` (default), `fix`, `ready`.
-3. **Check Status**: Poll the progress using `npm run workspace:check <PR_NUMBER>` or see the global state with `npm run workspace:status`.
-4. **Prune/Clean**: Cleanup old worktrees and dead sessions with `npm run workspace:clean` (all) or `npm run workspace:remove <PR_NUMBER>` (specific).
+3. **Check Status**: See global state and active sessions with `npm run workspace:status`, or deep-dive into specific PR logs with `npm run workspace:check <PR_NUMBER>`.
+4. **Cleanup**: 
+   - **Bulk**: Clear all sessions/worktrees with `npm run workspace:clean-all`.
+   - **Surgical**: Kill a specific PR task with `npm run workspace:kill <PR_NUMBER> <action>`.
+5. **Fleet**: Manage VM lifecycle with `npm run workspace:fleet [stop|provision|list]`.
 
 ## ⚠️ Important Constraints
 - **Absolute Paths**: Always use absolute paths (e.g., `/mnt/disks/data/...`) when orchestrating remote commands.

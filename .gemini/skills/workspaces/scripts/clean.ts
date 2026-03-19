@@ -61,7 +61,14 @@ export async function runCleanup(args: string[], env: NodeJS.ProcessEnv = proces
   }
 
   // --- Bulk Cleanup ---
-  console.log(`🧹 Starting BULK cleanup on ${targetVM}...`);
+  console.log(`⚠️  DANGER: You are about to perform a BULK cleanup on ${targetVM}.`);
+  const confirmed = await confirm('   Are you sure you want to kill ALL sessions and worktrees?');
+  if (!confirmed) {
+      console.log('❌ Cleanup cancelled.');
+      return 0;
+  }
+
+  console.log(`🧹 Starting BULK cleanup...`);
 
   // 1. Standard Cleanup
   console.log('   - Killing ALL remote tmux sessions...');

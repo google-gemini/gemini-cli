@@ -67,13 +67,12 @@
     "workspace": "tsx .gemini/skills/workspaces/scripts/orchestrator.ts",
     "workspace:setup": "tsx .gemini/skills/workspaces/scripts/setup.ts",
     "workspace:check": "tsx .gemini/skills/workspaces/scripts/check.ts",
-    "workspace:clean": "tsx .gemini/skills/workspaces/scripts/clean.ts",
-    "workspace:prune": "tsx .gemini/skills/workspaces/scripts/clean.ts",
+    "workspace:clean-all": "tsx .gemini/skills/workspaces/scripts/clean.ts",
+    "workspace:kill": "tsx .gemini/skills/workspaces/scripts/clean.ts",
     "workspace:fleet": "tsx .gemini/skills/workspaces/scripts/fleet.ts",
     "workspace:status": "tsx .gemini/skills/workspaces/scripts/status.ts",
     "workspace:attach": "tsx .gemini/skills/workspaces/scripts/attach.ts",
     "workspace:logs": "tsx .gemini/skills/workspaces/scripts/logs.ts",
-    "workspace:remove": "tsx .gemini/skills/workspaces/scripts/clean.ts",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
