@@ -41,10 +41,10 @@ See [Milestone 4 Sub-plan](./milestone-4-sync-and-identity.md) for details.
 - [ ] Implement secure GitHub PAT injection via `/dev/shm`.
 
 ### Milestone 5: UI & Advanced Hub Features (Phase 5)
-
 Polish the developer experience and add enterprise-grade Hub capabilities.
-
+See [Milestone 5 Sub-plan](./milestone-5-ui-and-advanced.md) for details.
 - [ ] Implement the "Workspaces Ability" in the CLI (interactive React UI).
+
 - [ ] Implement multi-tenancy models (User, Team, Repo) in the Hub.
 - [ ] Add auto-cleanup (TTL) and resource monitoring to the Hub.
 

@@ -24,7 +24,7 @@ const CreateWorkspaceSchema = z.object({
 
 router.get('/', async (req, res) => {
   try {
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const workspaces = await workspaceService.listWorkspaces(authReq.user.id);
     res.json(workspaces);
   } catch (error) {
@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const validation = CreateWorkspaceSchema.safeParse(req.body);
     if (!validation.success) {
       res.status(400).json({ error: validation.error.format() });
@@ -80,7 +80,7 @@ router.post('/', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const authReq = req as AuthenticatedRequest;
+    const authReq = req as unknown as AuthenticatedRequest;
     const { id } = req.params;
     const workspace = await workspaceService.getWorkspace(id);
 

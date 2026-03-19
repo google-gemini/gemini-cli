@@ -6,7 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import { WorkspaceHubClient } from '../services/workspaceHubClient.js';
-import type { MessageActionReturn } from './types.js';
+import type { CommandActionReturn } from './types.js';
 
 function getHubUrl(config: Config): string {
   if (process.env['GEMINI_WORKSPACE_HUB_URL']) {
@@ -26,7 +26,7 @@ function getHubUrl(config: Config): string {
 
 export async function listWorkspaces(
   config: Config,
-): Promise<MessageActionReturn> {
+): Promise<CommandActionReturn> {
   const hubUrl = getHubUrl(config);
   const client = new WorkspaceHubClient(hubUrl);
 
@@ -41,17 +41,9 @@ export async function listWorkspaces(
       };
     }
 
-    let content = 'Active Workspaces:\n';
-    content += '------------------------------------------------------------\n';
-    for (const ws of workspaces) {
-      content += `${ws.name.padEnd(20)} | ${ws.status.padEnd(12)} | ${ws.id}\n`;
-    }
-    content += '------------------------------------------------------------';
-
     return {
-      type: 'message',
-      messageType: 'info',
-      content,
+      type: 'workspaces_list',
+      workspaces,
     };
   } catch (error: unknown) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -68,7 +60,7 @@ export async function createWorkspace(
   config: Config,
   name: string,
   machineType?: string,
-): Promise<MessageActionReturn> {
+): Promise<CommandActionReturn> {
   const hubUrl = getHubUrl(config);
   const client = new WorkspaceHubClient(hubUrl);
 
@@ -93,7 +85,7 @@ export async function createWorkspace(
 export async function deleteWorkspace(
   config: Config,
   id: string,
-): Promise<MessageActionReturn> {
+): Promise<CommandActionReturn> {
   const hubUrl = getHubUrl(config);
   const client = new WorkspaceHubClient(hubUrl);
 

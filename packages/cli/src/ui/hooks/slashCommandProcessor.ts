@@ -662,6 +662,16 @@ export const useSlashCommandProcessor = (
                   setCustomDialog(result.component);
                   return { type: 'handled' };
                 }
+                case 'workspaces_list': {
+                  addItem(
+                    {
+                      type: MessageType.WORKSPACES_LIST,
+                      workspaces: result.workspaces,
+                    } as any,
+                    Date.now(),
+                  );
+                  return { type: 'handled' };
+                }
                 default: {
                   const unhandled: never = result;
                   throw new Error(

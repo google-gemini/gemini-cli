@@ -16,6 +16,7 @@ import {
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
+  type WorkspaceHubInfo,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -272,6 +273,11 @@ export type HistoryItemChatList = HistoryItemBase & {
   chats: ChatDetail[];
 };
 
+export type HistoryItemWorkspacesList = HistoryItemBase & {
+  type: 'workspaces_list';
+  workspaces: WorkspaceHubInfo[];
+};
+
 export interface ToolDefinition {
   name: string;
   displayName: string;
@@ -379,6 +385,7 @@ export type HistoryItemWithoutId =
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
+  | HistoryItemWorkspacesList
   | HistoryItemThinking
   | HistoryItemHint;
 
@@ -404,6 +411,7 @@ export enum MessageType {
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  WORKSPACES_LIST = 'workspaces_list',
   HINT = 'hint',
 }
 

@@ -6,12 +6,14 @@
 
 import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
-import type { MessageActionReturn } from '@google/gemini-cli-core';
-import { WorkspaceHubClient } from '@google/gemini-cli-core';
+import { 
+  type CommandActionReturn,
+  WorkspaceHubClient 
+} from '@google-gemini-cli-core';
 
 const listAction = async (
   _context: CommandContext,
-): Promise<void | MessageActionReturn> => {
+): Promise<CommandActionReturn> => {
   const hubUrl =
     process.env['GEMINI_WORKSPACE_HUB_URL'] || 'http://localhost:8080';
   const client = new WorkspaceHubClient(hubUrl);
@@ -27,21 +29,12 @@ const listAction = async (
       };
     }
 
-    let content = 'Active Workspaces:\n';
-    content += '------------------------------------------------------------\n';
-    for (const ws of workspaces) {
-      content += `${ws.name.padEnd(20)} | ${ws.status.padEnd(12)} | ${ws.id}\n`;
-    }
-    content += '------------------------------------------------------------';
-
     return {
-      type: 'message',
-      messageType: 'info',
-      content,
+      type: 'workspaces_list',
+      workspaces,
     };
   } catch (error: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const message = (error as Error).message;
+    const message = error instanceof Error ? error.message : String(error);
     return {
       type: 'message',
       messageType: 'error',
@@ -56,7 +49,7 @@ const listCommand: SlashCommand = {
   description: 'List remote workspaces',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (context) => listAction(context),
+  action: ((context: CommandContext) => listAction(context)) as any,
 };
 
 const createCommand: SlashCommand = {
@@ -64,10 +57,10 @@ const createCommand: SlashCommand = {
   description: 'Create a new remote workspace',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (
+  action: (async (
     context: CommandContext,
     args: string,
-  ): Promise<MessageActionReturn> => {
+  ): Promise<CommandActionReturn> => {
     const name = args.trim();
     if (!name) {
       return {
@@ -93,15 +86,14 @@ const createCommand: SlashCommand = {
         content: `✅ Workspace created successfully!\nID:   ${ws.id}\nName: ${ws.name}\nGCE:  ${ws.instance_name}`,
       };
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const message = (error as Error).message;
+      const message = error instanceof Error ? error.message : String(error);
       return {
         type: 'message',
         messageType: 'error',
         content: `Failed to create workspace: ${message}`,
       };
     }
-  },
+  }) as any,
 };
 
 const deleteCommand: SlashCommand = {
@@ -110,10 +102,10 @@ const deleteCommand: SlashCommand = {
   description: 'Delete a remote workspace',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (
-    context: CommandContext,
+  action: (async (
+    _context: CommandContext,
     args: string,
-  ): Promise<MessageActionReturn> => {
+  ): Promise<CommandActionReturn> => {
     const id = args.trim();
     if (!id) {
       return {
@@ -128,7 +120,8 @@ const deleteCommand: SlashCommand = {
     const client = new WorkspaceHubClient(hubUrl);
 
     try {
-      context.ui.addItem({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      (_context.ui as any).addItem({
         type: 'info',
         text: `Deleting workspace "${id}"...`,
       });
@@ -139,15 +132,14 @@ const deleteCommand: SlashCommand = {
         content: `✅ Workspace ${id} deleted successfully.`,
       };
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const message = (error as Error).message;
+      const message = error instanceof Error ? error.message : String(error);
       return {
         type: 'message',
         messageType: 'error',
         content: `Failed to delete workspace: ${message}`,
       };
     }
-  },
+  }) as any,
 };
 
 const connectCommand: SlashCommand = {
@@ -155,10 +147,10 @@ const connectCommand: SlashCommand = {
   description: 'Connect to a remote workspace',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (
+  action: (async (
     _context: CommandContext,
     args: string,
-  ): Promise<MessageActionReturn> => {
+  ): Promise<CommandActionReturn> => {
     const id = args.trim();
     if (!id) {
       return {
@@ -171,7 +163,7 @@ const connectCommand: SlashCommand = {
       type: 'submit_prompt',
       content: `I want to connect to remote workspace "${id}". Please run the connect command.`,
     };
-  },
+  }) as any,
 };
 
 export const workspaceSlashCommand: SlashCommand = {
@@ -181,5 +173,5 @@ export const workspaceSlashCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [listCommand, createCommand, deleteCommand, connectCommand],
-  action: async (context: CommandContext) => listAction(context),
+  action: (async (context: CommandContext) => listAction(context)) as any,
 };

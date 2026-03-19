@@ -12,6 +12,7 @@ import {
   type Config, 
   type WorkspaceHubInfo 
 } from '@google-gemini-cli-core';
+
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
 import { execSync } from 'node:child_process';

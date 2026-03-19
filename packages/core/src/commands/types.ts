@@ -5,6 +5,8 @@
  */
 
 import type { Content, PartListUnion } from '@google/genai';
+import type { WorkspaceHubInfo } from '../services/workspaceHubClient.js';
+
 /**
  * The return type for a command action that results in scheduling a tool call.
  */
@@ -17,6 +19,11 @@ export interface ToolActionReturn {
    * after the tool call completes.
    */
   postSubmitPrompt?: PartListUnion;
+}
+
+export interface WorkspacesListActionReturn {
+  type: 'workspaces_list';
+  workspaces: WorkspaceHubInfo[];
 }
 
 /**
@@ -50,6 +57,7 @@ export interface SubmitPromptActionReturn {
 
 export type CommandActionReturn<HistoryType = unknown> =
   | ToolActionReturn
+  | WorkspacesListActionReturn
   | MessageActionReturn
   | LoadHistoryActionReturn<HistoryType>
   | SubmitPromptActionReturn;
