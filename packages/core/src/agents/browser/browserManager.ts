@@ -23,6 +23,7 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
+import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -385,6 +386,11 @@ export class BrowserManager {
         BROWSER_PROFILE_DIR,
       );
       mcpArgs.push('--userDataDir', defaultProfilePath);
+    }
+
+    // Respect the user's privacy.usageStatisticsEnabled setting
+    if (!this.config.getUsageStatisticsEnabled()) {
+      mcpArgs.push('--no-usage-statistics', '--no-performance-crux');
     }
 
     if (
