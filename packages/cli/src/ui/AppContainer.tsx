@@ -469,6 +469,19 @@ export const AppContainer = (props: AppContainerProps) => {
       generateSummary(config).catch((e) => {
         debugLogger.warn('Background summary generation failed:', e);
       });
+
+      // Show handoff prompt for recent external sessions
+      if (initializationResult.recentExternalSession) {
+        const { prefix, id, displayName } =
+          initializationResult.recentExternalSession;
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: `🛸 You have a recent session in ${displayName || 'an external tool'}. Type "/resume ${prefix}${id}" to bring it into the terminal.`,
+          },
+          Date.now(),
+        );
+      }
     })();
     registerCleanup(async () => {
       // Turn off mouse scroll.

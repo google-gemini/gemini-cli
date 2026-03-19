@@ -19,12 +19,16 @@ import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
 import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
 
+import { pathToFileURL } from 'node:url';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 export interface InitializationResult {
   authError: string | null;
   accountSuspensionInfo: AccountSuspensionInfo | null;
   themeError: string | null;
   shouldOpenAuthDialog: boolean;
   geminiMdFileCount: number;
+  recentExternalSession?: { prefix: string; id: string; displayName?: string };
 }
 
 /**
@@ -60,11 +64,34 @@ export async function initializeApp(
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
+  // Check for recent external sessions to prompt for resume
+  let recentExternalSession:
+    | { prefix: string; id: string; displayName?: string }
+    | undefined;
+  if (config.getEnableExtensionReloading() !== false) {
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+    const extensionLoader = (config as any)._extensionLoader;
+    if (extensionLoader) {
+      const workspaceUri = pathToFileURL(process.cwd()).toString();
+      const recent =
+        await extensionLoader.getRecentExternalSession(workspaceUri);
+      if (recent) {
+        recentExternalSession = {
+          prefix: recent.prefix,
+          id: recent.id,
+          displayName: recent.displayName,
+        };
+      }
+    }
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+  }
+
   return {
     authError,
     accountSuspensionInfo,
     themeError,
     shouldOpenAuthDialog,
     geminiMdFileCount: config.getGeminiMdFileCount(),
+    recentExternalSession,
   };
 }
