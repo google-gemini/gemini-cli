@@ -313,11 +313,16 @@ export function renderPrimaryWorkflows(
   options?: PrimaryWorkflowsOptions,
 ): string {
   if (!options) return '';
+
+  const transitionOverride = options.approvedPlan
+    ? `\n\n**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.`
+    : '';
+
   return `
 # Primary Workflows
 
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.${transitionOverride}
 
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
@@ -530,7 +535,6 @@ ${options.planModeToolsList}
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
-7. **State Transition Override:** If the conversation history shows a successful execution of the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool, this signifies that the user has approved the plan and you are now in **Execution Mode**. In Execution Mode, all previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.

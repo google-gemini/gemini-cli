@@ -117,7 +117,6 @@ The following tools are available in Plan Mode:
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use \`exit_plan_mode\` to request approval.
-7. **State Transition Override:** If the conversation history shows a successful execution of the \`exit_plan_mode\` tool, this signifies that the user has approved the plan and you are now in **Execution Mode**. In Execution Mode, all previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
@@ -289,7 +288,6 @@ The following tools are available in Plan Mode:
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use \`exit_plan_mode\` to request approval.
-7. **State Transition Override:** If the conversation history shows a successful execution of the \`exit_plan_mode\` tool, this signifies that the user has approved the plan and you are now in **Execution Mode**. In Execution Mode, all previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
@@ -580,7 +578,6 @@ The following tools are available in Plan Mode:
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
 5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use \`exit_plan_mode\` to request approval.
-7. **State Transition Override:** If the conversation history shows a successful execution of the \`exit_plan_mode\` tool, this signifies that the user has approved the plan and you are now in **Execution Mode**. In Execution Mode, all previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.
 
 ## Planning Workflow
 Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
@@ -2411,6 +2408,8 @@ For example:
 
 ## Development Lifecycle
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+
+**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use \`grep_search\` and \`glob\` search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use \`read_file\` to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
 2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').
