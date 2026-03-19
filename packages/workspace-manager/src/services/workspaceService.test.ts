@@ -57,6 +57,7 @@ describe('WorkspaceService', () => {
         zone: 'us1',
         project_id: 'p1',
         created_at: 'now',
+        last_connected_at: 'now',
       };
       await service.createWorkspace('id1', data);
       expect(mockCollection.doc).toHaveBeenCalledWith('id1');

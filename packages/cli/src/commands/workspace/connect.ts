@@ -130,7 +130,14 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
         }
     }
 
-    // 3. Connect via SSH
+    // 3. Notify Hub of connection (refresh TTL)
+    try {
+        await client.notifyConnect(readyWs.id);
+    } catch (err) {
+        debugLogger.warn(`[Connect] Failed to notify Hub of connection:`, err);
+    }
+
+    // 4. Connect via SSH
     // eslint-disable-next-line no-console
     console.log(chalk.green(`🚀 Teleporting to ${instanceName} (${zone})...`));
     

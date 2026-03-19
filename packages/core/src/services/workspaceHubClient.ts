@@ -94,6 +94,21 @@ export class WorkspaceHubClient {
   }
 
   /**
+   * Notify the hub that a user is connecting to a workspace
+   */
+  async notifyConnect(id: string): Promise<void> {
+    const url = `${this.hubUrl}/workspaces/${id}/connect`;
+    const response = await fetchWithTimeout(url, 5000, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Hub API error (${response.status}): ${errorText}`);
+    }
+  }
+
+  /**
    * Delete a workspace
    */
   async deleteWorkspace(id: string): Promise<void> {
