@@ -125,12 +125,13 @@ export class MockAgentProtocol implements AgentProtocol {
     const eventsToEmit: AgentEvent[] = [];
 
     // Helper to normalize and prepare for emission
-    const normalize = (eventData: MockAgentEvent): AgentEvent => ({
+    const normalize = (eventData: MockAgentEvent): AgentEvent =>
+      ({
         ...eventData,
         id: eventData.id ?? `e-${this._nextEventId++}`,
         timestamp: eventData.timestamp ?? now,
         streamId: eventData.streamId ?? streamId,
-      } as AgentEvent);
+      }) as AgentEvent;
 
     // 1. User/Update event (BEFORE agent_start)
     if ('message' in payload && payload.message) {

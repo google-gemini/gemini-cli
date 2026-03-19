@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { MockAgentProtocol } from './mock.js';
 import type { AgentEvent, AgentProtocol } from './types.js';
 
-const waitForStreamEnd = (session: AgentProtocol): Promise<AgentEvent[]> => new Promise((resolve) => {
+const waitForStreamEnd = (session: AgentProtocol): Promise<AgentEvent[]> =>
+  new Promise((resolve) => {
     const events: AgentEvent[] = [];
     const unsubscribe = session.subscribe((e) => {
       events.push(e);

@@ -50,7 +50,7 @@ export class AgentSession implements AgentProtocol {
       resolve = res;
     });
 
-    const eventQueue: AgentEvent[] = [];
+    let eventQueue: AgentEvent[] = [];
     const earlyEvents: AgentEvent[] = [];
     let streamId: string | null | undefined;
     let done = false;
@@ -109,8 +109,12 @@ export class AgentSession implements AgentProtocol {
 
       while (true) {
         // Yield what we have.
-        while (started && eventQueue.length > 0) {
-          yield eventQueue.shift()!;
+        if (started && eventQueue.length > 0) {
+          const eventsToYield = eventQueue;
+          eventQueue = [];
+          for (const event of eventsToYield) {
+            yield event;
+          }
         }
 
         if (done) break;
