@@ -131,10 +131,9 @@ GEMINI_HOST=${targetVM}
   await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`mkdir -p ${remoteWorktreeDir}/.gemini && echo ${q(remoteSettingsJson)} > ${remoteWorktreeDir}/.gemini/settings.json`)}`);
 
   // 4. Execution Logic
-  // In shell mode, we use the local built binary to ensure version consistency.
-  // In action mode, we run the entrypoint script.
+  // In shell mode, we just start gemini. In action mode, we run the entrypoint.
   const remoteWorker = isShellMode 
-    ? `node bundle/gemini.js`
+    ? `gemini`
     : `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
 
   const authEnv = `-e GEMINI_AUTO_UPDATE=0 ${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
