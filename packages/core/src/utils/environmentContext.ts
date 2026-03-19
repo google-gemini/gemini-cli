@@ -21,6 +21,18 @@ export async function getDirectoryContextString(
   const workspaceContext = config.getWorkspaceContext();
   const workspaceDirectories = workspaceContext.getDirectories();
 
+  
+  try {
+    const { execSync } = await import('child_process');
+    // We try to run tilth using npx (which installs if missing)
+    const tilthOutput = execSync('npx -y tilth --map --scope ' + workspaceDirectories[0]).toString();
+    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
+    return `Use the following map to skip the need to read files and folders:
+    - **Workspace Directories:**\n${dirList}\n- **Directory Structure:**\n\n${tilthOutput}`;
+  } catch (e) {
+    // fallback if tilth fails
+  }
+
   const folderStructures = await Promise.all(
     workspaceDirectories.map((dir) =>
       getFolderStructure(dir, {
@@ -75,6 +87,17 @@ Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 The project's temporary directory is: ${tempDir}
 ${directoryContext}
+
+
+You have access to a tool called \`tilth\` via \`run_shell_command\`.
+It is a structural code reader designed for AI agents.
+It understands code semantics (functions, classes, imports, etc.).
+
+Useful \`tilth\` commands:
+1. \`tilth <file_path>\` - Reads a file. If large, returns a structural outline (functions/classes) instead of truncating.
+2. \`tilth <symbol> --scope .\` - Finds definition and usages of a specific function or class across the codebase.
+3. \`tilth <file_path> --section 45-89\` - Reads a specific line range or markdown heading.
+
 
 ${environmentMemory}
 </session_context>`.trim();
