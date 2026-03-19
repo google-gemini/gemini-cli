@@ -50,6 +50,38 @@ function fmtNum(n: number): string {
 }
 
 /**
+ * Builds the sub-bar annotation line, aligning the compress label with
+ * the │ marker on the bar above. Prefers └ to the right of the marker;
+ * falls back to ┘ on the left if the label would extend past the bar.
+ */
+function buildSubBarLine(
+  data: ContextWindowData,
+  total: number,
+  markerPos: number,
+): string {
+  const leftLabel = ` used (${((data.tokensUsed / total) * 100).toFixed(0)}%)`;
+  const pctText =
+    'compress at ' + (data.compressionThreshold * 100).toFixed(0) + '%';
+  const lineWidth = BAR_WIDTH + 2;
+
+  // +1 for the ▐ border character
+  const markerCol = markerPos + 1;
+
+  // Try placing └ label to the RIGHT of the marker
+  const rightLabel = '\u2514 ' + pctText;
+  if (markerCol + rightLabel.length <= lineWidth) {
+    const gap = Math.max(1, markerCol - leftLabel.length);
+    return leftLabel + ' '.repeat(gap) + rightLabel;
+  }
+
+  // Fall back to placing ┘ label to the LEFT of the marker
+  const leftArrow = pctText + ' \u2518';
+  const arrowStart = markerCol - leftArrow.length + 1;
+  const gap = Math.max(1, arrowStart - leftLabel.length);
+  return leftLabel + ' '.repeat(gap) + leftArrow;
+}
+
+/**
  * Renders a segmented bar showing proportional usage by category,
  * with a compression threshold marker.
  */
@@ -124,17 +156,10 @@ const SegmentedBar: React.FC<{ data: ContextWindowData }> = ({ data }) => {
         <Text color={categoryColors.free}>{'\u258C'}</Text>
       </Box>
 
-      <Box
-        flexDirection="row"
-        justifyContent="space-between"
-        width={BAR_WIDTH + 2}
-      >
+      {/* Sub-bar labels: position the ┘/└ to align with the │ marker */}
+      <Box flexDirection="row" width={BAR_WIDTH + 2}>
         <Text color={theme.text.secondary}>
-          {' '}
-          used ({((data.tokensUsed / total) * 100).toFixed(0)}%)
-        </Text>
-        <Text color={theme.text.secondary}>
-          compress at {(data.compressionThreshold * 100).toFixed(0)}%{' \u2518'}
+          {buildSubBarLine(data, total, markerPos)}
         </Text>
       </Box>
     </Box>
