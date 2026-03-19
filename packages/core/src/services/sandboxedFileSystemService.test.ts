@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { SandboxedFileSystemService } from './sandboxedFileSystemService.js';
 import type {
   SandboxManager,
@@ -92,9 +100,9 @@ describe('SandboxedFileSystemService', () => {
 
     await writePromise;
     expect(
-      (mockStdin as unknown as { write: vi.Mock }).write,
+      (mockStdin as unknown as { write: Mock }).write,
     ).toHaveBeenCalledWith('new content');
-    expect((mockStdin as unknown as { end: vi.Mock }).end).toHaveBeenCalled();
+    expect((mockStdin as unknown as { end: Mock }).end).toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledWith(
       'sandbox.exe',
       ['0', cwd, '__write', '/test/file.txt'],
