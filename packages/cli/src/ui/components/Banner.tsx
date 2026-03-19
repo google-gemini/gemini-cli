@@ -14,20 +14,21 @@ export function getFormattedBannerContent(
   isWarning: boolean,
   subsequentLineColor: string,
 ): ReactNode {
-  if (isWarning) {
-    return (
-      <Text color={theme.status.warning}>{rawText.replace(/\\n/g, '\n')}</Text>
-    );
-  }
-
   const text = rawText.replace(/\\n/g, '\n');
   const lines = text.split('\n');
 
   return lines.map((line, index) => {
     if (index === 0) {
+      if (isWarning) {
+        return (
+          <Text key={index} bold color={theme.status.warning}>
+            {line}
+          </Text>
+        );
+      }
       return (
         <ThemedGradient key={index}>
-          <Text>{line}</Text>
+          <Text bold>{line}</Text>
         </ThemedGradient>
       );
     }

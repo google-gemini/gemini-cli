@@ -5,18 +5,19 @@
  */
 
 import React, { useMemo } from 'react';
-import { Text, Box } from 'ink';
+import { styledCharsToString } from '@alcalzone/ansi-tokenize';
 import {
+  Text,
+  Box,
   type StyledChar,
   toStyledCharacters,
-  styledCharsToString,
   styledCharsWidth,
   wordBreakStyledChars,
   wrapStyledChars,
   widestLineFromStyledChars,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { RenderInline } from './InlineMarkdownRenderer.js';
+import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
 
 interface TableRendererProps {
@@ -28,6 +29,19 @@ interface TableRendererProps {
 const MIN_COLUMN_WIDTH = 5;
 const COLUMN_PADDING = 2;
 const TABLE_MARGIN = 2;
+
+/**
+ * Parses markdown to StyledChar array by first converting to ANSI.
+ * This ensures character counts are accurate (markdown markers are removed
+ * and styles are applied to the character's internal style object).
+ */
+const parseMarkdownToStyledChars = (
+  text: string,
+  defaultColor?: string,
+): StyledChar[] => {
+  const ansi = parseMarkdownToANSI(text, defaultColor);
+  return toStyledCharacters(ansi);
+};
 
 const calculateWidths = (styledChars: StyledChar[]) => {
   const contentWidth = styledCharsWidth(styledChars);
@@ -53,25 +67,26 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  // Clean headers: remove bold markers since we already render headers as bold
-  // and having them can break wrapping when the markers are split across lines.
-  const cleanedHeaders = useMemo(
-    () => headers.map((header) => header.replace(/\*\*(.*?)\*\*/g, '$1')),
-    [headers],
-  );
-
   const styledHeaders = useMemo(
     () =>
-      cleanedHeaders.map((header) =>
-        toStyledCharacters(stripUnsafeCharacters(header)),
+      headers.map((header) =>
+        parseMarkdownToStyledChars(
+          stripUnsafeCharacters(header),
+          theme.text.link,
+        ),
       ),
-    [cleanedHeaders],
+    [headers],
   );
 
   const styledRows = useMemo(
     () =>
       rows.map((row) =>
-        row.map((cell) => toStyledCharacters(stripUnsafeCharacters(cell))),
+        row.map((cell) =>
+          parseMarkdownToStyledChars(
+            stripUnsafeCharacters(cell),
+            theme.text.primary,
+          ),
+        ),
       ),
     [rows],
   );
@@ -132,7 +147,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
       const scale =
         (availableWidth - finalTotalShortColumnWidth) /
-        (totalMinWidth - finalTotalShortColumnWidth);
+          (totalMinWidth - finalTotalShortColumnWidth) || 0;
       finalContentWidths = constraints.map((c) => {
         if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
           return c.minWidth;
@@ -201,6 +216,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
+
   // Helper function to render a cell with proper width
   const renderCell = (
     content: ProcessedLine,
@@ -216,10 +232,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       <Text>
         {isHeader ? (
           <Text bold color={theme.text.link}>
-            <RenderInline text={content.text} />
+            {content.text}
           </Text>
         ) : (
-          <RenderInline text={content.text} />
+          <Text>{content.text}</Text>
         )}
         {' '.repeat(paddingNeeded)}
       </Text>
@@ -253,18 +269,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     });
 
     return (
-      <Text color={theme.text.primary}>
-        <Text color={theme.border.default}>│</Text>{' '}
+      <Box flexDirection="row">
+        <Text color={theme.border.default}>│</Text>
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
-            {cell}
+            <Box paddingX={1}>{cell}</Box>
             {index < renderedCells.length - 1 && (
-              <Text color={theme.border.default}>{' │ '}</Text>
+              <Text color={theme.border.default}>│</Text>
             )}
           </React.Fragment>
-        ))}{' '}
+        ))}
         <Text color={theme.border.default}>│</Text>
-      </Text>
+      </Box>
     );
   };
 
@@ -274,7 +290,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     rowIndex?: number,
     isHeader = false,
   ): React.ReactNode => {
-    const key = isHeader ? 'header' : `${rowIndex}`;
+    const key = rowIndex === -1 ? 'header' : `${rowIndex}`;
     const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
 
     const visualRows: React.ReactNode[] = [];

@@ -13,26 +13,24 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { coreEvents } from '@google/gemini-cli-core';
+import { coreEvents, getErrorMessage } from '@google/gemini-cli-core';
 import { type Argv } from 'yargs';
 import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
-import { getErrorMessage } from '../../utils/errors.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const { mockCoreDebugLogger } = await import(
     '../../test-utils/mockDebugLogger.js'
   );
-  return mockCoreDebugLogger(
-    await importOriginal<typeof import('@google/gemini-cli-core')>(),
-    { stripAnsi: true },
-  );
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mocked = mockCoreDebugLogger(actual, { stripAnsi: true });
+  return { ...mocked, getErrorMessage: vi.fn() };
 });
 
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
-vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
 }));

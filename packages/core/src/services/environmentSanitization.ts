@@ -14,11 +14,9 @@ export function sanitizeEnvironment(
   processEnv: NodeJS.ProcessEnv,
   config: EnvironmentSanitizationConfig,
 ): NodeJS.ProcessEnv {
-  // Enable strict sanitization in GitHub actions.
   const isStrictSanitization =
     !!processEnv['GITHUB_SHA'] || processEnv['SURFACE'] === 'Github';
 
-  // Always sanitize when in GitHub actions.
   if (!config.enableEnvironmentVariableRedaction && !isStrictSanitization) {
     return { ...processEnv };
   }
@@ -71,6 +69,10 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'TMPDIR',
     'USER',
     'LOGNAME',
+    // Terminal capability variables (needed by editors like vim/emacs and
+    // interactive commands like top)
+    'TERM',
+    'COLORTERM',
     // GitHub Action-related variables
     'ADDITIONAL_CONTEXT',
     'AVAILABLE_LABELS',
@@ -123,7 +125,7 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /-----BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY-----/i,
   /-----BEGIN CERTIFICATE-----/i,
   // Credentials in URL
-  /(https?|ftp|smtp):\/\/[^:]+:[^@]+@/i,
+  /(https?|ftp|smtp):\/\/[^:\s]{1,1024}:[^@\s]{1,1024}@/i,
   // GitHub tokens (classic, fine-grained, OAuth, etc.)
   /(ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,}/i,
   // Google API keys
@@ -131,7 +133,7 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   // Amazon AWS Access Key ID
   /AKIA[A-Z0-9]{16}/i,
   // Generic OAuth/JWT tokens
-  /eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/i,
+  /eyJ[a-zA-Z0-9_-]{0,10240}\.[a-zA-Z0-9_-]{0,10240}\.[a-zA-Z0-9_-]{0,10240}/i,
   // Stripe API keys
   /(s|r)k_(live|test)_[0-9a-zA-Z]{24}/i,
   // Slack tokens (bot, user, etc.)
@@ -148,7 +150,22 @@ function shouldRedactEnvironmentVariable(
   key = key.toUpperCase();
   value = value?.toUpperCase();
 
-  // User overrides take precedence.
+  if (key.startsWith('GEMINI_CLI_')) {
+    return false;
+  }
+
+  if (value) {
+    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
+      if (pattern.test(value)) {
+        return true;
+      }
+    }
+  }
+
+  if (key.startsWith('GIT_CONFIG_')) {
+    return false;
+  }
+
   if (allowedSet?.has(key)) {
     return false;
   }
@@ -156,20 +173,14 @@ function shouldRedactEnvironmentVariable(
     return true;
   }
 
-  // These are never redacted.
-  if (
-    ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key) ||
-    key.startsWith('GEMINI_CLI_')
-  ) {
+  if (ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
     return false;
   }
 
-  // These are always redacted.
   if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
     return true;
   }
 
-  // If in strict mode (e.g. GitHub Action), and not explicitly allowed, redact it.
   if (isStrictSanitization) {
     return true;
   }
@@ -180,14 +191,45 @@ function shouldRedactEnvironmentVariable(
     }
   }
 
-  // Redact if the value looks like a key/cert.
-  if (value) {
-    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
-      if (pattern.test(value)) {
-        return true;
+  return false;
+}
+
+/**
+ * Merges a partial sanitization config with secure defaults and validates it.
+ * This ensures that sensitive environment variables cannot be bypassed by
+ * request-provided configurations.
+ */
+export function getSecureSanitizationConfig(
+  requestedConfig: Partial<EnvironmentSanitizationConfig> = {},
+  baseConfig?: EnvironmentSanitizationConfig,
+): EnvironmentSanitizationConfig {
+  const allowed = [
+    ...(baseConfig?.allowedEnvironmentVariables ?? []),
+    ...(requestedConfig.allowedEnvironmentVariables ?? []),
+  ].filter((key) => {
+    const upperKey = key.toUpperCase();
+    // Never allow variables that are explicitly forbidden by name
+    if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(upperKey)) {
+      return false;
+    }
+    // Never allow variables that match sensitive name patterns
+    for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
+      if (pattern.test(upperKey)) {
+        return false;
       }
     }
-  }
+    return true;
+  });
 
-  return false;
+  const blocked = [
+    ...(baseConfig?.blockedEnvironmentVariables ?? []),
+    ...(requestedConfig.blockedEnvironmentVariables ?? []),
+  ];
+
+  return {
+    allowedEnvironmentVariables: [...new Set(allowed)],
+    blockedEnvironmentVariables: [...new Set(blocked)],
+    // Redaction must be enabled for secure configurations
+    enableEnvironmentVariableRedaction: true,
+  };
 }

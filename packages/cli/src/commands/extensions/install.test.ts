@@ -17,8 +17,10 @@ import {
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import * as core from '@google/gemini-cli-core';
-import type { inferInstallMetadata } from '../../config/extension-manager.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  type inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import type {
   promptForConsentNonInteractive,
   requestConsentNonInteractive,
@@ -135,6 +137,7 @@ describe('handleInstall', () => {
       mcps: [],
       hooks: [],
       skills: [],
+      agents: [],
       settings: [],
       securityWarnings: [],
       discoveryErrors: [],
@@ -377,6 +380,7 @@ describe('handleInstall', () => {
       mcps: [],
       hooks: [],
       skills: ['cool-skill'],
+      agents: ['cool-agent'],
       settings: [],
       securityWarnings: ['Security risk!'],
       discoveryErrors: ['Read error'],
@@ -404,6 +408,10 @@ describe('handleInstall', () => {
     );
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(
       expect.stringContaining('cool-skill'),
+      false,
+    );
+    expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(
+      expect.stringContaining('cool-agent'),
       false,
     );
     expect(mockPromptForConsentNonInteractive).toHaveBeenCalledWith(

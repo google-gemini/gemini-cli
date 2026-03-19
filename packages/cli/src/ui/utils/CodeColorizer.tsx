@@ -14,6 +14,7 @@ import type {
   ElementContent,
   RootContent,
 } from 'hast';
+import stripAnsi from 'strip-ansi';
 import { themeManager } from '../themes/theme-manager.js';
 import type { Theme } from '../themes/theme.js';
 import {
@@ -98,16 +99,17 @@ function highlightAndRenderLine(
   theme: Theme,
 ): React.ReactNode {
   try {
+    const strippedLine = stripAnsi(line);
     const getHighlightedLine = () =>
       !language || !lowlight.registered(language)
-        ? lowlight.highlightAuto(line)
-        : lowlight.highlight(language, line);
+        ? lowlight.highlightAuto(strippedLine)
+        : lowlight.highlight(language, strippedLine);
 
     const renderedNode = renderHastNode(getHighlightedLine(), theme, undefined);
 
-    return renderedNode !== null ? renderedNode : line;
+    return renderedNode !== null ? renderedNode : strippedLine;
   } catch (_error) {
-    return line;
+    return stripAnsi(line);
   }
 }
 
@@ -154,7 +156,7 @@ export function colorizeCode({
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
-    let lines = codeToHighlight.split('\n');
+    let lines = codeToHighlight.split(/\r?\n/);
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
 
     let hiddenLinesCount = 0;
@@ -223,7 +225,7 @@ export function colorizeCode({
     );
     // Fall back to plain text with default color on error
     // Also display line numbers in fallback
-    const lines = codeToHighlight.split('\n');
+    const lines = codeToHighlight.split(/\r?\n/);
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     const fallbackLines = lines.map((line, index) => (
       <Box key={index} minHeight={1}>
@@ -238,7 +240,7 @@ export function colorizeCode({
             <Text color={activeTheme.defaultColor}>{`${index + 1}`}</Text>
           </Box>
         )}
-        <Text color={activeTheme.colors.Gray}>{line}</Text>
+        <Text color={activeTheme.colors.Gray}>{stripAnsi(line)}</Text>
       </Box>
     ));
 

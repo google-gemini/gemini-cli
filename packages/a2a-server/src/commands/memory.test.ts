@@ -9,6 +9,9 @@ import {
   listMemoryFiles,
   refreshMemory,
   showMemory,
+  type AnyDeclarativeTool,
+  type Config,
+  type ToolRegistry,
 } from '@google/gemini-cli-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -19,11 +22,6 @@ import {
   ShowMemoryCommand,
 } from './memory.js';
 import type { CommandContext } from './types.js';
-import type {
-  AnyDeclarativeTool,
-  Config,
-  ToolRegistry,
-} from '@google/gemini-cli-core';
 
 // Mock the core functions
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -61,6 +59,9 @@ describe('a2a-server memory commands', () => {
     } as unknown as ToolRegistry;
 
     mockConfig = {
+      get toolRegistry() {
+        return mockToolRegistry;
+      },
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
     } as unknown as Config;
 
@@ -170,17 +171,19 @@ describe('a2a-server memory commands', () => {
       ]);
 
       expect(mockAddMemory).toHaveBeenCalledWith(fact);
-      expect(mockConfig.getToolRegistry).toHaveBeenCalled();
       expect(mockToolRegistry.getTool).toHaveBeenCalledWith('save_memory');
       expect(mockSaveMemoryTool.buildAndExecute).toHaveBeenCalledWith(
         { fact },
         expect.any(AbortSignal),
         undefined,
         {
-          sanitizationConfig: {
-            allowedEnvironmentVariables: [],
-            blockedEnvironmentVariables: [],
-            enableEnvironmentVariableRedaction: false,
+          shellExecutionConfig: {
+            sanitizationConfig: {
+              allowedEnvironmentVariables: [],
+              blockedEnvironmentVariables: [],
+              enableEnvironmentVariableRedaction: false,
+            },
+            sandboxManager: undefined,
           },
         },
       );

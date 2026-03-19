@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import type {
-  SerializableConfirmationDetails,
-  ToolCallConfirmationDetails,
-  Config,
+import {
+  type SerializableConfirmationDetails,
+  type ToolCallConfirmationDetails,
+  type Config,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
+import { act } from 'react';
 
 vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
   const actual =
@@ -37,6 +39,7 @@ describe('ToolConfirmationMessage', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
   } as unknown as Config;
 
   it('should not display urls if prompt and url are the same', async () => {
@@ -240,6 +243,37 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
+  it('should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot)', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Multiline Script',
+      command: 'echo "hello"\nfor i in 1 2 3; do\n  echo $i\ndone',
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+    };
+
+    const result = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await result.waitUntilReady();
+
+    const output = result.lastFrame();
+    expect(output).toContain('echo "hello"');
+    expect(output).toContain('for i in 1 2 3; do');
+    expect(output).toContain('echo $i');
+    expect(output).toContain('done');
+
+    await expect(result).toMatchSvgSnapshot();
+    result.unmount();
+  });
+
   describe('with folder trust', () => {
     const editConfirmationDetails: SerializableConfirmationDetails = {
       type: 'edit',
@@ -300,8 +334,8 @@ describe('ToolConfirmationMessage', () => {
         const mockConfig = {
           isTrustedFolder: () => true,
           getIdeMode: () => false,
+          getDisableAlwaysAllow: () => false,
         } as unknown as Config;
-
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
           <ToolConfirmationMessage
             callId="test-call-id"
@@ -322,6 +356,7 @@ describe('ToolConfirmationMessage', () => {
         const mockConfig = {
           isTrustedFolder: () => false,
           getIdeMode: () => false,
+          getDisableAlwaysAllow: () => false,
         } as unknown as Config;
 
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -357,8 +392,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -380,12 +415,12 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
 
-    it('should show "Allow for all future sessions" when setting is true', async () => {
+    it('should show "Allow for all future sessions" when trusted', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -403,7 +438,10 @@ describe('ToolConfirmationMessage', () => {
       );
       await waitUntilReady();
 
-      expect(lastFrame()).toContain('Allow for all future sessions');
+      const output = lastFrame();
+      expect(output).toContain('future sessions');
+      // Verify it is the default selection (matching the indicator in the snapshot)
+      expect(output).toMatchSnapshot();
       unmount();
     });
   });
@@ -423,8 +461,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -451,8 +489,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -479,8 +517,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -609,5 +647,64 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('(press Ctrl+O to expand MCP tool details)');
     expect(output).not.toContain('Invocation Arguments:');
     unmount();
+  });
+
+  describe('ESCAPE key behavior', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('should call confirm(Cancel) asynchronously via useEffect when ESC is pressed', async () => {
+      const mockConfirm = vi.fn().mockResolvedValue(undefined);
+
+      vi.mocked(useToolActions).mockReturnValue({
+        confirm: mockConfirm,
+        cancel: vi.fn(),
+        isDiffingEnabled: false,
+      });
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'info',
+        title: 'Confirm Web Fetch',
+        prompt: 'https://example.com',
+        urls: ['https://example.com'],
+      };
+
+      const { stdin, waitUntilReady, unmount } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={confirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+      );
+      await waitUntilReady();
+
+      stdin.write('\x1b');
+
+      // To assert that the confirmation happens asynchronously (via useEffect) rather than
+      // synchronously (directly inside the keystroke handler), we must run our assertion
+      // *inside* the act() block.
+      await act(async () => {
+        await vi.runAllTimersAsync();
+        expect(mockConfirm).not.toHaveBeenCalled();
+      });
+
+      // Now that the act() block has returned, React flushes the useEffect, calling handleConfirm.
+      expect(mockConfirm).toHaveBeenCalledWith(
+        'test-call-id',
+        ToolConfirmationOutcome.Cancel,
+        undefined,
+      );
+
+      unmount();
+    });
   });
 });
