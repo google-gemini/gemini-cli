@@ -10,7 +10,6 @@ import {
   type GeminiClient,
   GeminiEventType,
   ToolConfirmationOutcome,
-  ApprovalMode,
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
@@ -89,7 +88,8 @@ export class Task {
   autoExecute: boolean;
   private get isYoloMatch(): boolean {
     return (
-      this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO
+      this.autoExecute ||
+      (this.config.getAllowedTools()?.includes('*') ?? false)
     );
   }
 
@@ -877,22 +877,25 @@ export class Task {
   }
 
   private async _handleToolConfirmationPart(part: Part): Promise<boolean> {
-    if (
-      part.kind !== 'data' ||
-      !part.data ||
-      // eslint-disable-next-line no-restricted-syntax
-      typeof part.data['callId'] !== 'string' ||
-      // eslint-disable-next-line no-restricted-syntax
-      typeof part.data['outcome'] !== 'string'
-    ) {
+    const isToolConfirmationData = (
+      data: unknown,
+    ): data is { callId: string; outcome: string; newContent?: unknown } => {
+      if (typeof data !== 'object' || data === null) return false;
+      const record = data as { callId?: unknown; outcome?: unknown };
+      return (
+        typeof record.callId === 'string' && typeof record.outcome === 'string'
+      );
+    };
+
+    if (part.kind !== 'data' || !isToolConfirmationData(part.data)) {
       return false;
     }
-    if (!part.data['outcome']) {
+    if (!part.data.outcome) {
       return false;
     }
 
-    const callId = part.data['callId'];
-    const outcomeString = part.data['outcome'];
+    const callId = part.data.callId;
+    const outcomeString = part.data.outcome;
 
     this.toolsAlreadyConfirmed.add(callId);
 

@@ -2550,11 +2550,8 @@ export class Config implements McpContext, AgentLoopContext {
     const isPlanModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    const isYoloModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
 
-    if (isPlanModeTransition || isYoloModeTransition) {
+    if (isPlanModeTransition) {
       if (this._geminiClient?.isInitialized()) {
         this._geminiClient.clearCurrentSequenceModel();
         this._geminiClient.setTools().catch((err) => {

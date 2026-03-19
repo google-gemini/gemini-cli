@@ -87,12 +87,9 @@ export function handleAutoUpdate(
   );
 
   if (
-    [
-      PackageManager.NPX,
-      PackageManager.PNPX,
-      PackageManager.BUNX,
-      PackageManager.BINARY,
-    ].includes(installationInfo.packageManager)
+    [PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX].includes(
+      installationInfo.packageManager,
+    )
   ) {
     return;
   }

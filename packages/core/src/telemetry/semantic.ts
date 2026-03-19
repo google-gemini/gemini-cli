@@ -63,26 +63,35 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
         });
       }
     } else if (part instanceof GenericPart) {
-      // eslint-disable-next-line no-restricted-syntax
-      if (part.type === 'executableCode' && typeof part['code'] === 'string') {
-        refs.push({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          get: () => part['code'] as string,
-          set: (val: string) => (part['code'] = val),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          len: () => (part['code'] as string).length,
-        });
-      } else if (
-        part.type === 'codeExecutionResult' &&
-        // eslint-disable-next-line no-restricted-syntax
-        typeof part['output'] === 'string'
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const partObj = part as unknown as {
+        type?: unknown;
+        code?: unknown;
+        output?: unknown;
+      };
+      if (
+        partObj.type === 'executableCode' &&
+        'code' in partObj &&
+        typeof partObj.code === 'string'
       ) {
         refs.push({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          get: () => part['output'] as string,
+          get: () => partObj.code as string,
+          set: (val: string) => (part['code'] = val),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          len: () => (partObj.code as string).length,
+        });
+      } else if (
+        partObj.type === 'codeExecutionResult' &&
+        'output' in partObj &&
+        typeof partObj.output === 'string'
+      ) {
+        refs.push({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          get: () => partObj.output as string,
           set: (val: string) => (part['output'] = val),
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          len: () => (part['output'] as string).length,
+          len: () => (partObj.output as string).length,
         });
       }
     }

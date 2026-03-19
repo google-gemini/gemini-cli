@@ -583,16 +583,12 @@ export class LoopDetectionService {
       return { isLoop: false };
     }
 
+    const confidenceVal = flashResult['unproductive_state_confidence'];
     const flashConfidence =
-      // eslint-disable-next-line no-restricted-syntax
-      typeof flashResult['unproductive_state_confidence'] === 'number'
-        ? flashResult['unproductive_state_confidence']
-        : 0;
-    const flashAnalysis =
-      // eslint-disable-next-line no-restricted-syntax
-      typeof flashResult['unproductive_state_analysis'] === 'string'
-        ? flashResult['unproductive_state_analysis']
-        : '';
+      typeof confidenceVal === 'number' ? confidenceVal : 0;
+
+    const analysisVal = flashResult['unproductive_state_analysis'];
+    const flashAnalysis = typeof analysisVal === 'string' ? analysisVal : '';
 
     const doubleCheckModelName =
       this.context.config.modelConfigService.getResolvedConfig({
@@ -634,17 +630,22 @@ export class LoopDetectionService {
       signal,
     );
 
+    const mainModelObj = mainModelResult as {
+      unproductive_state_confidence?: unknown;
+      unproductive_state_analysis?: unknown;
+    } | null;
+
     const mainModelConfidence =
-      mainModelResult &&
-      // eslint-disable-next-line no-restricted-syntax
-      typeof mainModelResult['unproductive_state_confidence'] === 'number'
-        ? mainModelResult['unproductive_state_confidence']
+      mainModelObj &&
+      'unproductive_state_confidence' in mainModelObj &&
+      typeof mainModelObj.unproductive_state_confidence === 'number'
+        ? mainModelObj.unproductive_state_confidence
         : 0;
     const mainModelAnalysis =
-      mainModelResult &&
-      // eslint-disable-next-line no-restricted-syntax
-      typeof mainModelResult['unproductive_state_analysis'] === 'string'
-        ? mainModelResult['unproductive_state_analysis']
+      mainModelObj &&
+      'unproductive_state_analysis' in mainModelObj &&
+      typeof mainModelObj.unproductive_state_analysis === 'string'
+        ? mainModelObj.unproductive_state_analysis
         : undefined;
 
     logLlmLoopCheck(
@@ -689,10 +690,11 @@ export class LoopDetectionService {
         role: LlmRole.UTILITY_LOOP_DETECTOR,
       });
 
+      const resultObj = result as { unproductive_state_confidence?: unknown };
       if (
-        result &&
-        // eslint-disable-next-line no-restricted-syntax
-        typeof result['unproductive_state_confidence'] === 'number'
+        resultObj &&
+        'unproductive_state_confidence' in resultObj &&
+        typeof resultObj.unproductive_state_confidence === 'number'
       ) {
         return result;
       }

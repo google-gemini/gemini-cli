@@ -360,12 +360,12 @@ export class HookAggregator {
     }
 
     // Extract additionalContext from various hook types
+    const specificObj = specific as { additionalContext?: unknown };
     if (
-      'additionalContext' in specific &&
-      // eslint-disable-next-line no-restricted-syntax
-      typeof specific['additionalContext'] === 'string'
+      'additionalContext' in specificObj &&
+      typeof specificObj.additionalContext === 'string'
     ) {
-      contexts.push(specific['additionalContext']);
+      contexts.push(specificObj.additionalContext);
     }
   }
 }

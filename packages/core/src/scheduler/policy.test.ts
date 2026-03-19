@@ -896,24 +896,15 @@ describe('Plan Mode Denial Consistency', () => {
     const testCases = [
       {
         currentMode: ApprovalMode.DEFAULT,
-        expectedModes: [
-          ApprovalMode.DEFAULT,
-          ApprovalMode.AUTO_EDIT,
-          ApprovalMode.YOLO,
-        ],
+        expectedModes: [ApprovalMode.DEFAULT, ApprovalMode.AUTO_EDIT],
         description:
           'include current and more permissive modes in DEFAULT mode',
       },
       {
         currentMode: ApprovalMode.AUTO_EDIT,
-        expectedModes: [ApprovalMode.AUTO_EDIT, ApprovalMode.YOLO],
+        expectedModes: [ApprovalMode.AUTO_EDIT],
         description:
           'include current and more permissive modes in AUTO_EDIT mode',
-      },
-      {
-        currentMode: ApprovalMode.YOLO,
-        expectedModes: [ApprovalMode.YOLO],
-        description: 'include current and more permissive modes in YOLO mode',
       },
       {
         currentMode: ApprovalMode.PLAN,
@@ -921,7 +912,6 @@ describe('Plan Mode Denial Consistency', () => {
           ApprovalMode.PLAN,
           ApprovalMode.DEFAULT,
           ApprovalMode.AUTO_EDIT,
-          ApprovalMode.YOLO,
         ],
         description: 'include all modes explicitly when granted in PLAN mode',
       },

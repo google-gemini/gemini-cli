@@ -110,13 +110,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
       role: LlmRole.UTILITY_EDIT_CORRECTOR,
     });
 
+    const resultObj = result as { corrected_string_escaping?: unknown };
+
     if (
-      result &&
-      // eslint-disable-next-line no-restricted-syntax
-      typeof result['corrected_string_escaping'] === 'string' &&
-      result['corrected_string_escaping'].length > 0
+      resultObj &&
+      'corrected_string_escaping' in resultObj &&
+      typeof resultObj.corrected_string_escaping === 'string' &&
+      resultObj.corrected_string_escaping.length > 0
     ) {
-      return result['corrected_string_escaping'];
+      return resultObj.corrected_string_escaping;
     } else {
       return potentiallyProblematicString;
     }

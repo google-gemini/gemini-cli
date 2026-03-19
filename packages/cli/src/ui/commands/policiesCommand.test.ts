@@ -32,7 +32,10 @@ describe('policiesCommand', () => {
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
-      mockContext.services.agentContext = null;
+      mockContext.services.agentContext = {
+        config: null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
       const listCommand = policiesCommand.subCommands![0];
 
       await listCommand.action!(mockContext, '');
@@ -51,11 +54,11 @@ describe('policiesCommand', () => {
         getRules: vi.fn().mockReturnValue([]),
       };
       mockContext.services.agentContext = {
-        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-        get config() {
-          return this;
-        },
-      } as unknown as Config;
+        config: {
+          getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        } as unknown as Config,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
 
       const listCommand = policiesCommand.subCommands![0];
       await listCommand.action!(mockContext, '');
@@ -89,11 +92,11 @@ describe('policiesCommand', () => {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
       mockContext.services.agentContext = {
-        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-        get config() {
-          return this;
-        },
-      } as unknown as Config;
+        config: {
+          getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        } as unknown as Config,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
 
       const listCommand = policiesCommand.subCommands![0];
       await listCommand.action!(mockContext, '');
@@ -113,12 +116,7 @@ describe('policiesCommand', () => {
       expect(content).toContain(
         '### Auto Edit Mode Policies (combined with normal mode policies)',
       );
-      expect(content).toContain(
-        '### Yolo Mode Policies (combined with normal mode policies)',
-      );
-      expect(content).toContain(
-        '### Plan Mode Policies (combined with normal mode policies)',
-      );
+      expect(content).toContain('### Plan Mode Policies');
       expect(content).toContain(
         '**DENY** tool: `dangerousTool` [Priority: 10]',
       );
@@ -151,11 +149,11 @@ describe('policiesCommand', () => {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
       mockContext.services.agentContext = {
-        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-        get config() {
-          return this;
-        },
-      } as unknown as Config;
+        config: {
+          getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        } as unknown as Config,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
 
       const listCommand = policiesCommand.subCommands![0];
       await listCommand.action!(mockContext, '');
@@ -164,9 +162,7 @@ describe('policiesCommand', () => {
       const content = (call[0] as { text: string }).text;
 
       // Plan-only rules appear under Plan Mode section
-      expect(content).toContain(
-        '### Plan Mode Policies (combined with normal mode policies)',
-      );
+      expect(content).toContain('### Plan Mode Policies');
       // glob ALLOW is plan-only, should appear in plan section
       expect(content).toContain('**ALLOW** tool: `glob` [Priority: 70]');
       // shell ALLOW has no modes (applies to all), appears in normal section

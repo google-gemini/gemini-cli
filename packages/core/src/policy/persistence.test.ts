@@ -253,15 +253,14 @@ decision = "deny"
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'test_tool',
       persist: true,
-      modes: [ApprovalMode.DEFAULT, ApprovalMode.YOLO],
+      modes: [ApprovalMode.DEFAULT, ApprovalMode.AUTO_EDIT],
     });
 
     await vi.advanceTimersByTimeAsync(100);
 
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
-    expect(content).toContain('modes = [ "default", "yolo" ]');
+    expect(content).toContain('modes = [ "default", "autoEdit" ]');
   });
-
   it('should update existing rule modes instead of appending redundant rule', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
@@ -279,12 +278,12 @@ modes = [ "autoEdit", "yolo" ]
     memfs.mkdirSync(dir, { recursive: true });
     memfs.writeFileSync(policyFile, existingContent);
 
-    // Now grant in DEFAULT mode, which should include [default, autoEdit, yolo]
+    // Now grant in DEFAULT mode, which should include [default, autoEdit]
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'test_tool',
       persist: true,
-      modes: [ApprovalMode.DEFAULT, ApprovalMode.AUTO_EDIT, ApprovalMode.YOLO],
+      modes: [ApprovalMode.DEFAULT, ApprovalMode.AUTO_EDIT],
     });
 
     await vi.advanceTimersByTimeAsync(100);

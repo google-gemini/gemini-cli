@@ -18,9 +18,7 @@ import {
   type FetchAdminControlsResponse,
   AuthType,
   isHeadlessMode,
-  FatalAuthenticationError,
-  PolicyDecision,
-  PRIORITY_YOLO_ALLOW_ALL,
+  isCloudShell,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -57,6 +55,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       flush: vi.fn(),
     },
     isHeadlessMode: vi.fn().mockReturnValue(false),
+    isCloudShell: vi.fn().mockReturnValue(false),
     FileDiscoveryService: vi.fn(),
     getCodeAssistServer: vi.fn(),
     fetchAdminControlsOnce: vi.fn(),
@@ -352,12 +351,12 @@ describe('loadConfig', () => {
     });
 
     describe('interactivity', () => {
-      it('should always set interactive true', async () => {
+      it('should set interactive false when headless', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(true);
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            interactive: true,
+            interactive: false,
           }),
         );
 
@@ -390,35 +389,24 @@ describe('loadConfig', () => {
     });
 
     describe('YOLO mode', () => {
-      it('should enable YOLO mode and add policy rule when GEMINI_YOLO_MODE is true', async () => {
+      it('should enable wildcard allowedTools when GEMINI_YOLO_MODE is true', async () => {
         vi.stubEnv('GEMINI_YOLO_MODE', 'true');
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            approvalMode: 'yolo',
-            policyEngineConfig: expect.objectContaining({
-              rules: expect.arrayContaining([
-                expect.objectContaining({
-                  decision: PolicyDecision.ALLOW,
-                  priority: PRIORITY_YOLO_ALLOW_ALL,
-                  modes: ['yolo'],
-                  allowRedirection: true,
-                }),
-              ]),
-            }),
+            approvalMode: 'default',
+            allowedTools: expect.arrayContaining(['*']),
           }),
         );
       });
 
-      it('should use default approval mode and empty rules when GEMINI_YOLO_MODE is not true', async () => {
+      it('should use default approval mode and undefined allowedTools when GEMINI_YOLO_MODE is not true', async () => {
         vi.stubEnv('GEMINI_YOLO_MODE', 'false');
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
             approvalMode: 'default',
-            policyEngineConfig: expect.objectContaining({
-              rules: [],
-            }),
+            allowedTools: undefined,
           }),
         );
       });
@@ -449,69 +437,55 @@ describe('loadConfig', () => {
         vi.unstubAllEnvs();
       });
 
-      it('should attempt COMPUTE_ADC by default and bypass LOGIN_WITH_GOOGLE if successful', async () => {
+      it('should attempt LOGIN_WITH_GOOGLE by default in interactive mode', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
         const refreshAuthMock = vi.fn().mockResolvedValue(undefined);
         setupConfigMock(refreshAuthMock);
 
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
-        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
-        expect(refreshAuthMock).not.toHaveBeenCalledWith(
+        expect(refreshAuthMock).toHaveBeenCalledWith(
           AuthType.LOGIN_WITH_GOOGLE,
         );
+        expect(refreshAuthMock).not.toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
       });
 
-      it('should fallback to LOGIN_WITH_GOOGLE if COMPUTE_ADC fails and interactive mode is available', async () => {
+      it('should attempt COMPUTE_ADC directly if GEMINI_CLI_USE_COMPUTE_ADC is true', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(false);
-        const refreshAuthMock = vi.fn().mockImplementation((authType) => {
-          if (authType === AuthType.COMPUTE_ADC) {
-            return Promise.reject(new Error('ADC failed'));
-          }
-          return Promise.resolve();
-        });
+        vi.stubEnv('GEMINI_CLI_USE_COMPUTE_ADC', 'true');
+        const refreshAuthMock = vi.fn().mockResolvedValue(undefined);
         setupConfigMock(refreshAuthMock);
 
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
-        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
-        expect(refreshAuthMock).toHaveBeenCalledWith(
+        expect(refreshAuthMock).not.toHaveBeenCalledWith(
           AuthType.LOGIN_WITH_GOOGLE,
         );
+        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
       });
 
-      it('should throw FatalAuthenticationError in headless mode if COMPUTE_ADC fails', async () => {
+      it('should throw error in headless mode if not in CloudShell and USE_COMPUTE_ADC is false', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(true);
+        vi.mocked(isCloudShell).mockReturnValue(false);
 
-        const refreshAuthMock = vi.fn().mockImplementation((authType) => {
-          if (authType === AuthType.COMPUTE_ADC) {
-            return Promise.reject(new Error('ADC not found'));
-          }
-          return Promise.resolve();
-        });
+        const refreshAuthMock = vi.fn().mockResolvedValue(undefined);
         setupConfigMock(refreshAuthMock);
 
         await expect(
           loadConfig(mockSettings, mockExtensionLoader, taskId),
         ).rejects.toThrow(
-          'COMPUTE_ADC failed: ADC not found. (LOGIN_WITH_GOOGLE fallback skipped due to headless mode. Run in an interactive terminal to use OAuth.)',
-        );
-
-        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
-        expect(refreshAuthMock).not.toHaveBeenCalledWith(
-          AuthType.LOGIN_WITH_GOOGLE,
+          'Interactive terminal required for LOGIN_WITH_GOOGLE',
         );
       });
 
-      it('should include both original and fallback error when LOGIN_WITH_GOOGLE fallback fails', async () => {
+      it('should throw error when COMPUTE_ADC fails directly', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(false);
+        vi.stubEnv('GEMINI_CLI_USE_COMPUTE_ADC', 'true');
 
         const refreshAuthMock = vi.fn().mockImplementation((authType) => {
           if (authType === AuthType.COMPUTE_ADC) {
             throw new Error('ADC failed');
           }
-          if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-            throw new FatalAuthenticationError('OAuth failed');
-          }
           return Promise.resolve();
         });
         setupConfigMock(refreshAuthMock);
@@ -519,7 +493,7 @@ describe('loadConfig', () => {
         await expect(
           loadConfig(mockSettings, mockExtensionLoader, taskId),
         ).rejects.toThrow(
-          'OAuth failed. The initial COMPUTE_ADC attempt also failed: ADC failed',
+          'COMPUTE_ADC failed: ADC failed. (Skipped LOGIN_WITH_GOOGLE due to GEMINI_CLI_USE_COMPUTE_ADC)',
         );
       });
     });

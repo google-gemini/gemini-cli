@@ -25,9 +25,7 @@ overridden by higher numbers):
 Gemini CLI uses JSON settings files for persistent configuration. There are four
 locations for these files:
 
-<!-- prettier-ignore -->
-> [!TIP]
-> JSON-aware editors can use autocomplete and validation by pointing to
+> **Tip:** JSON-aware editors can use autocomplete and validation by pointing to
 > the generated schema at `schemas/settings.schema.json` in this repository.
 > When working outside the repo, reference the hosted schema at
 > `https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json`.
@@ -62,17 +60,15 @@ locations for these files:
 
 **Note on environment variables in settings:** String values within your
 `settings.json` and `gemini-extension.json` files can reference environment
-variables using `$VAR_NAME`, `${VAR_NAME}`, or `${VAR_NAME:-DEFAULT_VALUE}`
-syntax. These variables will be automatically resolved when the settings are
-loaded. For example, if you have an environment variable `MY_API_TOKEN`, you
-could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`. If you
-want to provide a fallback value, use `${MY_API_TOKEN:-default-token}`.
-Additionally, each extension can have its own `.env` file in its directory,
-which will be loaded automatically.
+variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
+be automatically resolved when the settings are loaded. For example, if you have
+an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
+this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
+`.env` file in its directory, which will be loaded automatically.
 
-**Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
-in a corporate environment, please see the
-[Enterprise Configuration](../cli/enterprise.md) documentation.
+> **Note for Enterprise Users:** For guidance on deploying and managing Gemini
+> CLI in a corporate environment, please see the
+> [Enterprise Configuration](../cli/enterprise.md) documentation.
 
 ### The `.gemini` directory in your project
 
@@ -1908,9 +1904,7 @@ for compatibility. At least one of `command`, `url`, or `httpUrl` must be
 provided. If multiple are specified, the order of precedence is `httpUrl`, then
 `url`, then `command`.
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> Avoid using underscores (`_`) in your server aliases (e.g., use
+> **Warning:** Avoid using underscores (`_`) in your server aliases (e.g., use
 > `my-server` instead of `my_server`). The underlying policy engine parses Fully
 > Qualified Names (`mcp_server_tool`) using the first underscore after the
 > `mcp_` prefix. An underscore in your server alias will cause the parser to
@@ -2259,71 +2253,9 @@ You can customize this behavior in your `settings.json` file:
 Arguments passed directly when running the CLI can override other configurations
 for that specific session.
 
-- **`--acp`**:
-  - Starts the agent in Agent Communication Protocol (ACP) mode.
-- **`--allowed-mcp-server-names`**:
-  - A comma-separated list of MCP server names to allow for the session.
-- **`--allowed-tools <tool1,tool2,...>`**:
-  - A comma-separated list of tool names that will bypass the confirmation
-    dialog.
-  - Example: `gemini --allowed-tools "ShellTool(git status)"`
-- **`--approval-mode <mode>`**:
-  - Sets the approval mode for tool calls. Available modes:
-    - `default`: Prompt for approval on each tool call (default behavior)
-    - `auto_edit`: Automatically approve edit tools (replace, write_file) while
-      prompting for others
-    - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
-    - `plan`: Read-only mode for tool calls (requires experimental planning to
-      be enabled).
-      > **Note:** This mode is currently under development and not yet fully
-      > functional.
-  - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of
-    `--yolo` for the new unified approach.
-  - Example: `gemini --approval-mode auto_edit`
-- **`--debug`** (**`-d`**):
-  - Enables debug mode for this session, providing more verbose output. Open the
-    debug console with F12 to see the additional logging.
-- **`--delete-session <identifier>`**:
-  - Delete a specific chat session by its index number or full session UUID.
-  - Use `--list-sessions` first to see available sessions, their indices, and
-    UUIDs.
-  - Example: `gemini --delete-session 3` or
-    `gemini --delete-session a1b2c3d4-e5f6-7890-abcd-ef1234567890`
-- **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
-  - Specifies a list of extensions to use for the session. If not provided, all
-    available extensions are used.
-  - Use the special term `gemini -e none` to disable all extensions.
-  - Example: `gemini -e my-extension -e my-other-extension`
-- **`--fake-responses`**:
-  - Path to a file with fake model responses for testing.
-- **`--help`** (or **`-h`**):
-  - Displays help information about command-line arguments.
-- **`--include-directories <dir1,dir2,...>`**:
-  - Includes additional directories in the workspace for multi-directory
-    support.
-  - Can be specified multiple times or as comma-separated values.
-  - 5 directories can be added at maximum.
-  - Example: `--include-directories /path/to/project1,/path/to/project2` or
-    `--include-directories /path/to/project1 --include-directories /path/to/project2`
-- **`--list-extensions`** (**`-l`**):
-  - Lists all available extensions and exits.
-- **`--list-sessions`**:
-  - List all available chat sessions for the current project and exit.
-  - Shows session indices, dates, message counts, and preview of first user
-    message.
-  - Example: `gemini --list-sessions`
 - **`--model <model_name>`** (**`-m <model_name>`**):
   - Specifies the Gemini model to use for this session.
   - Example: `npm start -- --model gemini-3-pro-preview`
-- **`--output-format <format>`**:
-  - **Description:** Specifies the format of the CLI output for non-interactive
-    mode.
-  - **Values:**
-    - `text`: (Default) The standard human-readable output.
-    - `json`: A machine-readable JSON output.
-    - `stream-json`: A streaming JSON output that emits real-time events.
-  - **Note:** For structured output and scripting, use the
-    `--output-format json` or `--output-format stream-json` flag.
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - **Deprecated:** Use positional arguments instead.
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a
@@ -2333,8 +2265,44 @@ for that specific session.
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "explain this code"`
-- **`--record-responses`**:
-  - Path to a file to record model responses for testing.
+- **`--output-format <format>`**:
+  - **Description:** Specifies the format of the CLI output for non-interactive
+    mode.
+  - **Values:**
+    - `text`: (Default) The standard human-readable output.
+    - `json`: A machine-readable JSON output.
+    - `stream-json`: A streaming JSON output that emits real-time events.
+  - **Note:** For structured output and scripting, use the
+    `--output-format json` or `--output-format stream-json` flag.
+- **`--sandbox`** (**`-s`**):
+  - Enables sandbox mode for this session.
+- **`--debug`** (**`-d`**):
+  - Enables debug mode for this session, providing more verbose output. Open the
+    debug console with F12 to see the additional logging.
+
+- **`--help`** (or **`-h`**):
+  - Displays help information about command-line arguments.
+- **`--yolo`**:
+  - Automatically approves all actions. Equivalent to `--allowed-tools=*`.
+- **`--approval-mode <mode>`**:
+  - Sets the approval mode for tool calls. Available modes:
+    - `default`: Prompt for approval on each tool call (default behavior)
+    - `auto_edit`: Automatically approve edit tools (replace, write_file) while
+      prompting for others
+    - `plan`: Read-only mode for tool calls (requires experimental planning to
+      be enabled).
+  - Example: `gemini --approval-mode auto_edit`
+- **`--allowed-tools <tool1,tool2,...>`**:
+  - A comma-separated list of tool names that will bypass the confirmation
+    dialog.
+  - Example: `gemini --allowed-tools "ShellTool(git status)"`
+- **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
+  - Specifies a list of extensions to use for the session. If not provided, all
+    available extensions are used.
+  - Use the special term `gemini -e none` to disable all extensions.
+  - Example: `gemini -e my-extension -e my-other-extension`
+- **`--list-extensions`** (**`-l`**):
+  - Lists all available extensions and exits.
 - **`--resume [session_id]`** (**`-r [session_id]`**):
   - Resume a previous chat session. Use "latest" for the most recent session,
     provide a session index number, or provide a full session UUID.
@@ -2342,15 +2310,37 @@ for that specific session.
   - Example: `gemini --resume 5` or `gemini --resume latest` or
     `gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890` or `gemini --resume`
   - See [Session Management](../cli/session-management.md) for more details.
-- **`--sandbox`** (**`-s`**):
-  - Enables sandbox mode for this session.
+- **`--list-sessions`**:
+  - List all available chat sessions for the current project and exit.
+  - Shows session indices, dates, message counts, and preview of first user
+    message.
+  - Example: `gemini --list-sessions`
+- **`--delete-session <identifier>`**:
+  - Delete a specific chat session by its index number or full session UUID.
+  - Use `--list-sessions` first to see available sessions, their indices, and
+    UUIDs.
+  - Example: `gemini --delete-session 3` or
+    `gemini --delete-session a1b2c3d4-e5f6-7890-abcd-ef1234567890`
+- **`--include-directories <dir1,dir2,...>`**:
+  - Includes additional directories in the workspace for multi-directory
+    support.
+  - Can be specified multiple times or as comma-separated values.
+  - 5 directories can be added at maximum.
+  - Example: `--include-directories /path/to/project1,/path/to/project2` or
+    `--include-directories /path/to/project1 --include-directories /path/to/project2`
 - **`--screen-reader`**:
   - Enables screen reader mode, which adjusts the TUI for better compatibility
     with screen readers.
 - **`--version`**:
   - Displays the version of the CLI.
-- **`--yolo`**:
-  - Enables YOLO mode, which automatically approves all tool calls.
+- **`--experimental-acp`**:
+  - Starts the agent in ACP mode.
+- **`--allowed-mcp-server-names`**:
+  - Allowed MCP server names.
+- **`--fake-responses`**:
+  - Path to a file with fake model responses for testing.
+- **`--record-responses`**:
+  - Path to a file to record model responses for testing.
 
 ## Context files (hierarchical instructional context)
 
@@ -2464,7 +2454,7 @@ Sandboxing is disabled by default, but you can enable it in a few ways:
 
 - Using `--sandbox` or `-s` flag.
 - Setting `GEMINI_SANDBOX` environment variable.
-- Sandbox is enabled when using `--yolo` or `--approval-mode=yolo` by default.
+- Sandbox is enabled when using `--yolo` by default.
 
 By default, it uses a pre-built `gemini-cli-sandbox` Docker image.
 
@@ -2475,13 +2465,9 @@ can be based on the base sandbox image:
 ```dockerfile
 FROM gemini-cli-sandbox
 
-# Add your custom dependencies or configurations here.
-# Note: The base image runs as the non-root 'node' user.
-# You must switch to 'root' to install system packages.
+# Add your custom dependencies or configurations here
 # For example:
-# USER root
 # RUN apt-get update && apt-get install -y some-package
-# USER node
 # COPY ./my-config /app/my-config
 ```
 

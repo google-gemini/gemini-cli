@@ -121,6 +121,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
+      getAllowedTools: vi.fn().mockReturnValue([]),
       get config() {
         return this;
       },
@@ -443,6 +444,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         }),
         getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
         isTrackerEnabled: vi.fn().mockReturnValue(false),
+        getAllowedTools: vi.fn().mockReturnValue([]),
         get config() {
           return this;
         },
@@ -598,7 +600,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     });
 
     it('should include YOLO mode instructions in interactive mode', () => {
-      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.getAllowedTools).mockReturnValue(['*']);
       vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Autonomous Mode (YOLO)');
@@ -606,7 +608,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     });
 
     it('should NOT include YOLO mode instructions in non-interactive mode', () => {
-      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.getAllowedTools).mockReturnValue(['*']);
       vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Autonomous Mode (YOLO)');

@@ -1986,11 +1986,6 @@ function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
       name: 'Auto Edit',
       description: 'Auto-approves edit tools',
     },
-    {
-      id: ApprovalMode.YOLO,
-      name: 'YOLO',
-      description: 'Auto-approves all tools',
-    },
   ];
 
   if (isPlanEnabled) {
