@@ -687,6 +687,7 @@ export const AppContainer = (props: AppContainerProps) => {
     config,
     initializationResult.authError,
     initializationResult.accountSuspensionInfo,
+    initializationResult.initialAuthSucceeded,
   );
   const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
     {},

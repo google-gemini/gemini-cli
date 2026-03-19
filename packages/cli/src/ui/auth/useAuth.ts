@@ -43,9 +43,14 @@ export const useAuthCommand = (
   config: Config,
   initialAuthError: string | null = null,
   initialAccountSuspensionInfo: AccountSuspensionInfo | null = null,
+  initialAuthSucceeded = false,
 ) => {
   const [authState, setAuthState] = useState<AuthState>(
-    initialAuthError ? AuthState.Updating : AuthState.Unauthenticated,
+    initialAuthError
+      ? AuthState.Updating
+      : initialAuthSucceeded
+        ? AuthState.Authenticated
+        : AuthState.Unauthenticated,
   );
 
   const [authError, setAuthError] = useState<string | null>(initialAuthError);

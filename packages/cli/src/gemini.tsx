@@ -302,14 +302,20 @@ export async function main() {
 
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
+    skipMemoryLoad: true,
+    skipExtensionLoad: true,
   });
   adminControlsListner.setConfig(partialConfig);
+  const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
+  const shouldPreAuthenticate =
+    !settings.merged.security.auth.useExternal &&
+    (!!sandboxConfig || !process.env['GEMINI_CLI_NO_RELAUNCH']);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
+  if (shouldPreAuthenticate) {
     try {
       if (
         partialConfig.isInteractive() &&
@@ -365,7 +371,6 @@ export async function main() {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
-    const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
     // We intentionally omit the list of extensions here because extensions
     // should not impact auth or setting up the sandbox.
     // TODO(jacobr): refactor loadCliConfig so there is a minimal version
