@@ -22,6 +22,7 @@ import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { AnyDeclarativeTool } from '../../tools/tools.js';
 import { BrowserManager } from './browserManager.js';
 import { BROWSER_AGENT_NAME } from './browserAgentDefinition.js';
+import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
 import {
   BrowserAgentDefinition,
   type BrowserTaskResultSchema,
@@ -32,9 +33,9 @@ import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import {
-  ApprovalMode,
   PolicyDecision,
   PRIORITY_SUBAGENT_TOOL,
+  type PolicyRule,
 } from '../../policy/types.js';
 
 /**
@@ -99,47 +100,26 @@ export async function createBrowserAgentDefinition(
   // Register high-priority policy rules for sensitive actions which is not
   // able to be overwrite by YOLO mode.
   const policyEngine = config.getPolicyEngine();
-  if (policyEngine) {
-    // ASK_USER for fill/fill_form in YOLO
-    policyEngine.addRule({
-      toolName: 'fill',
-      decision: PolicyDecision.ASK_USER,
-      priority: 999,
-      modes: [ApprovalMode.YOLO],
-      source: 'BrowserAgent (Sensitive Actions)',
-      subagent: BROWSER_AGENT_NAME,
-    });
 
-    policyEngine.addRule({
-      toolName: 'fill_form',
-      decision: PolicyDecision.ASK_USER,
-      priority: 999,
-      modes: [ApprovalMode.YOLO],
-      source: 'BrowserAgent (Sensitive Actions)',
-      subagent: BROWSER_AGENT_NAME,
-    });
+  if (policyEngine) {
+    const existingRules = policyEngine.getRules();
+
+    const restrictedTools = ['fill', 'fill_form'];
 
     // ASK_USER for upload_file and evaluate_script when sensitive action
     // need confirmation.
     if (browserConfig.customConfig.confirmSensitiveActions) {
-      policyEngine.addRule({
-        toolName: 'upload_file',
-        decision: PolicyDecision.ASK_USER,
-        priority: 999,
-        modes: [ApprovalMode.YOLO],
-        source: 'BrowserAgent (Sensitive Actions)',
-      });
-
-      policyEngine.addRule({
-        toolName: 'evaluate_script',
-        decision: PolicyDecision.ASK_USER,
-        priority: 999,
-        modes: [ApprovalMode.YOLO],
-        source: 'BrowserAgent (Sensitive Actions)',
-      });
+      restrictedTools.push('upload_file', 'evaluate_script');
     }
 
-    // 4. Reduce noise for read-only tools in default mode
+    for (const toolName of restrictedTools) {
+      const rule = generateAskUserRules(toolName);
+      if (!existingRules.some((r) => JSON.stringify(r) === JSON.stringify(rule.toolName))) {
+        policyEngine.addRule(rule);
+      }
+    }
+
+    // Reduce noise for read-only tools in default mode
     const readOnlyTools = [
       'take_snapshot',
       'take_screenshot',
@@ -148,14 +128,32 @@ export async function createBrowserAgentDefinition(
     ];
     for (const toolName of readOnlyTools) {
       if (availableToolNames.includes(toolName)) {
-        policyEngine.addRule({
-          toolName,
-          decision: PolicyDecision.ALLOW,
-          priority: PRIORITY_SUBAGENT_TOOL,
-          source: 'BrowserAgent (Read-Only)',
-        });
+        const rule = generateAllowRules(toolName);
+        if (!existingRules.some((r) => JSON.stringify(r) === JSON.stringify(rule.toolName))) {
+          policyEngine.addRule(rule);
+        }
       }
     }
+  }
+
+  function generateAskUserRules(toolName: string): PolicyRule {
+    return {
+        toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+        decision: PolicyDecision.ASK_USER,
+        priority: 999,
+        source: 'BrowserAgent (Sensitive Actions)',
+        mcpName: BROWSER_AGENT_NAME,
+      };
+  }
+
+  function generateAllowRules(toolName: string): PolicyRule {
+    return {
+        toolName: `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+        decision: PolicyDecision.ALLOW,
+        priority: PRIORITY_SUBAGENT_TOOL,
+        source: 'BrowserAgent (Read-Only)',
+        mcpName: BROWSER_AGENT_NAME,
+      };
   }
 
   // Validate required semantic tools are available
