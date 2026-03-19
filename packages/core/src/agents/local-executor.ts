@@ -88,10 +88,11 @@ const MAX_VALIDATION_RETRIES_PER_TURN = 3;
  * Extracts missing required fields from a schema validation error.
  */
 function extractMissingFieldsFromError(error: string): string[] {
-  // Match patterns like "'objective' is required" or "must have required property 'objective'"
-
-  const matches = error.match(/'([^']+)'\s*(?:is required|must be defined)/gi);
-  return matches ? matches.map((m) => m.replace(/['"]/g, '').trim()) : [];
+  // AJV error messages for missing properties are typically in the format:
+  // "data must have required property 'fieldName'"
+  const regex = /must have required property '([^']+)'/g;
+  const matches = error.matchAll(regex);
+  return Array.from(matches, (match) => match[1]);
 }
 
 /**
