@@ -72,11 +72,13 @@ describe('SandboxedFileSystemService', () => {
 
   it('should write a file through the sandbox', async () => {
     const mockChild = new EventEmitter() as unknown as ChildProcess;
+    const mockStdin = new EventEmitter();
+    Object.assign(mockStdin, {
+      write: vi.fn(),
+      end: vi.fn(),
+    });
     Object.assign(mockChild, {
-      stdin: {
-        write: vi.fn(),
-        end: vi.fn(),
-      } as unknown as Writable,
+      stdin: mockStdin as unknown as Writable,
       stderr: new EventEmitter(),
     });
 
@@ -89,8 +91,10 @@ describe('SandboxedFileSystemService', () => {
     });
 
     await writePromise;
-    expect(mockChild.stdin!.write).toHaveBeenCalledWith('new content');
-    expect(mockChild.stdin!.end).toHaveBeenCalled();
+    expect(
+      (mockStdin as unknown as { write: vi.Mock }).write,
+    ).toHaveBeenCalledWith('new content');
+    expect((mockStdin as unknown as { end: vi.Mock }).end).toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledWith(
       'sandbox.exe',
       ['0', cwd, '__write', '/test/file.txt'],
