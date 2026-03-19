@@ -40,8 +40,8 @@ Select the authentication method that matches your situation in the table below:
 
 If you run Gemini CLI on your local machine, the simplest authentication method
 is logging in with your Google account. This method requires a web browser on a
-machine that can communicate with the terminal running Gemini CLI (e.g., your
-local machine).
+machine that can communicate with the terminal running Gemini CLI (for example,
+your local machine).
 
 > **Important:** If you are a **Google AI Pro** or **Google AI Ultra**
 > subscriber, use the Google account associated with your subscription.
@@ -130,7 +130,7 @@ For example:
 **macOS/Linux**
 
 ```bash
-# Replace with your project ID and desired location (e.g., us-central1)
+# Replace with your project ID and desired location (for example, us-central1)
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -138,7 +138,7 @@ export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 **Windows (PowerShell)**
 
 ```powershell
-# Replace with your project ID and desired location (e.g., us-central1)
+# Replace with your project ID and desired location (for example, us-central1)
 $env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 $env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -325,14 +325,14 @@ persist them with the following methods:
 1.  **Add your environment variables to your shell configuration file:** Append
     the environment variable commands to your shell's startup file.
 
-    **macOS/Linux** (e.g., `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
+    **macOS/Linux** (for example, `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
 
     ```bash
     echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
     source ~/.bashrc
     ```
 
-    **Windows (PowerShell)** (e.g., `$PROFILE`):
+    **Windows (PowerShell)** (for example, `$PROFILE`):
 
     ```powershell
     Add-Content -Path $PROFILE -Value '$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"'
@@ -346,8 +346,8 @@ persist them with the following methods:
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
     directory or home directory. Gemini CLI automatically loads variables from
     the first `.env` file it finds, searching up from the current directory,
-    then in your home directory's `.gemini/.env` (e.g., `~/.gemini/.env` or
-    `%USERPROFILE%\.gemini\.env`).
+    then in your home directory's `.gemini/.env` (for example, `~/.gemini/.env`
+    or `%USERPROFILE%\.gemini\.env`).
 
     Example for user-wide settings:
 
