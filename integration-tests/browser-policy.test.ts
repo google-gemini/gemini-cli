@@ -152,7 +152,7 @@ priority = 200
       60000,
       1000,
     );
-    await run.sendKeys('1');
+    await run.sendKeys('1\r');
     await new Promise((r) => setTimeout(r, 2000));
 
     // Handle privacy notice
