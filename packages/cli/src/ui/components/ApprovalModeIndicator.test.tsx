@@ -11,50 +11,59 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 
 describe('ApprovalModeIndicator', () => {
   it('renders correctly for AUTO_EDIT mode', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for AUTO_EDIT mode with plan enabled', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = await render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.AUTO_EDIT}
         allowPlanMode={true}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for PLAN mode', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for YOLO mode', async () => {
-    const { lastFrame } = await render(
-      <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
+    const { lastFrame, waitUntilReady } = await render(
+      <ApprovalModeIndicator
+        approvalMode={ApprovalMode.DEFAULT}
+        isYoloMode={true}
+      />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for DEFAULT mode', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for DEFAULT mode with plan enabled', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = await render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.DEFAULT}
         allowPlanMode={true}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

@@ -86,7 +86,6 @@ export enum Command {
   TOGGLE_MARKDOWN = 'app.toggleMarkdown',
   TOGGLE_COPY_MODE = 'app.toggleCopyMode',
   TOGGLE_MOUSE_MODE = 'app.toggleMouseMode',
-  TOGGLE_YOLO = 'app.toggleYolo',
   CYCLE_APPROVAL_MODE = 'app.cycleApprovalMode',
   SHOW_MORE_LINES = 'app.showMoreLines',
   EXPAND_PASTE = 'app.expandPaste',
@@ -392,7 +391,6 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
   [Command.TOGGLE_COPY_MODE, [new KeyBinding('f9')]],
   [Command.TOGGLE_MOUSE_MODE, [new KeyBinding('ctrl+s')]],
-  [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
   [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
   [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
   [Command.EXPAND_PASTE, [new KeyBinding('ctrl+o')]],
@@ -522,7 +520,6 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_MARKDOWN,
       Command.TOGGLE_COPY_MODE,
       Command.TOGGLE_MOUSE_MODE,
-      Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
       Command.EXPAND_PASTE,
@@ -635,7 +632,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_MARKDOWN]: 'Toggle Markdown rendering.',
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_MOUSE_MODE]: 'Toggle mouse mode (scrolling and clicking).',
-  [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy.',
   [Command.SHOW_MORE_LINES]:

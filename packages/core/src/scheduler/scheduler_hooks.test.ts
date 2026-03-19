@@ -103,7 +103,7 @@ describe('Scheduler Hooks', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => toolRegistry,
       getMessageBus: () => mockMessageBus,
-      getApprovalMode: () => ApprovalMode.YOLO,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     });
 
     const hookSystem = new HookSystem(mockConfig);
@@ -172,7 +172,7 @@ describe('Scheduler Hooks', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => toolRegistry,
       getMessageBus: () => mockMessageBus,
-      getApprovalMode: () => ApprovalMode.YOLO,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     });
 
     const hookSystem = new HookSystem(mockConfig);
@@ -243,7 +243,7 @@ describe('Scheduler Hooks', () => {
     const mockConfig = createMockConfig({
       getToolRegistry: () => toolRegistry,
       getMessageBus: () => mockMessageBus,
-      getApprovalMode: () => ApprovalMode.YOLO,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
     });
 
     const hookSystem = new HookSystem(mockConfig);

@@ -63,8 +63,6 @@ export const useComposerStatus = () => {
     if (hideMinimalModeHintWhileBusy) return null;
 
     switch (showApprovalModeIndicator) {
-      case ApprovalMode.YOLO:
-        return { text: 'YOLO', color: theme.status.error };
       case ApprovalMode.PLAN:
         return { text: 'plan', color: theme.status.success };
       case ApprovalMode.AUTO_EDIT:

@@ -9,7 +9,6 @@ import {
   type Config,
   MessageBusType,
   ToolConfirmationOutcome,
-  ApprovalMode,
   Scheduler,
   type MessageBus,
 } from '@google/gemini-cli-core';
@@ -358,7 +357,7 @@ describe('Task Event-Driven Scheduler', () => {
     // Enable YOLO mode
     const yoloConfig = createMockConfig({
       isEventDrivenSchedulerEnabled: () => true,
-      getApprovalMode: () => ApprovalMode.YOLO,
+      getAllowedTools: () => ['*'],
     }) as Config;
     const yoloMessageBus = yoloConfig.messageBus;
 

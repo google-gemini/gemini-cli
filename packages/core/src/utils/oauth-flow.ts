@@ -357,29 +357,39 @@ async function parseTokenEndpointResponse(
   // Try to parse as JSON first, fall back to form-urlencoded
   try {
     const data: unknown = JSON.parse(responseText);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const obj = data as {
+      access_token?: unknown;
+      token_type?: unknown;
+      expires_in?: unknown;
+      refresh_token?: unknown;
+      scope?: unknown;
+    };
     if (
-      data &&
-      typeof data === 'object' &&
-      'access_token' in data &&
-      // eslint-disable-next-line no-restricted-syntax
-      typeof (data as Record<string, unknown>)['access_token'] === 'string'
+      obj &&
+      typeof obj === 'object' &&
+      'access_token' in obj &&
+      typeof obj.access_token === 'string'
     ) {
-      const obj = data as Record<string, unknown>;
       const result: OAuthTokenResponse = {
-        access_token: String(obj['access_token']),
+        access_token: String(obj.access_token),
         token_type:
-          // eslint-disable-next-line no-restricted-syntax
-          typeof obj['token_type'] === 'string' ? obj['token_type'] : 'Bearer',
+          'token_type' in obj && typeof obj.token_type === 'string'
+            ? obj.token_type
+            : 'Bearer',
         expires_in:
-          // eslint-disable-next-line no-restricted-syntax
-          typeof obj['expires_in'] === 'number' ? obj['expires_in'] : undefined,
-        refresh_token:
-          // eslint-disable-next-line no-restricted-syntax
-          typeof obj['refresh_token'] === 'string'
-            ? obj['refresh_token']
+          'expires_in' in obj && typeof obj.expires_in === 'number'
+            ? obj.expires_in
             : undefined,
-        // eslint-disable-next-line no-restricted-syntax
-        scope: typeof obj['scope'] === 'string' ? obj['scope'] : undefined,
+        refresh_token:
+          'refresh_token' in obj && typeof obj.refresh_token === 'string'
+            ? obj.refresh_token
+            : undefined,
+
+        scope:
+          'scope' in obj && typeof obj.scope === 'string'
+            ? obj.scope
+            : undefined,
       };
       return result;
     }

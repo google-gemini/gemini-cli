@@ -285,13 +285,9 @@ export class PolicyEngine {
     if (allowRedirection) return false;
     if (!hasRedirection(command)) return false;
 
-    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT
     const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
-    if (
-      sandboxEnabled &&
-      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
-        this.approvalMode === ApprovalMode.YOLO)
-    ) {
+    if (sandboxEnabled && this.approvalMode === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
@@ -357,14 +353,6 @@ export class PolicyEngine {
       // If the matched rule says DENY, we should respect it immediately even if parsing fails.
       if (ruleDecision === PolicyDecision.DENY) {
         return { decision: PolicyDecision.DENY, rule };
-      }
-
-      // In YOLO mode, we should proceed anyway even if we can't parse the command.
-      if (this.approvalMode === ApprovalMode.YOLO) {
-        return {
-          decision: PolicyDecision.ALLOW,
-          rule,
-        };
       }
 
       debugLogger.debug(
@@ -611,15 +599,6 @@ export class PolicyEngine {
 
     // Default if no rule matched
     if (decision === undefined) {
-      if (this.approvalMode === ApprovalMode.YOLO) {
-        debugLogger.debug(
-          `[PolicyEngine.check] NO MATCH in YOLO mode - using ALLOW`,
-        );
-        return {
-          decision: PolicyDecision.ALLOW,
-        };
-      }
-
       debugLogger.debug(
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );

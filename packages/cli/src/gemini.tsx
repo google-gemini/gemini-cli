@@ -9,7 +9,6 @@ import {
   WarningPriority,
   type Config,
   type ResumedSessionData,
-  type WorktreeInfo,
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
@@ -65,7 +64,6 @@ import {
   registerTelemetryConfig,
   setupSignalHandlers,
 } from './utils/cleanup.js';
-import { setupWorktree } from './utils/worktreeSetup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
@@ -212,17 +210,6 @@ export async function main() {
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
   loadSettingsHandle?.end();
-
-  // If a worktree is requested and enabled, set it up early.
-  // This must be awaited before any other async tasks that depend on CWD (like loadCliConfig)
-  // because setupWorktree calls process.chdir().
-  const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
-  let worktreeInfo: WorktreeInfo | undefined;
-  if (requestedWorktree !== undefined) {
-    const worktreeHandle = startupProfiler.start('setup_worktree');
-    worktreeInfo = await setupWorktree(requestedWorktree || undefined);
-    worktreeHandle?.end();
-  }
 
   const cleanupOpsHandle = startupProfiler.start('cleanup_ops');
   Promise.all([
@@ -453,7 +440,6 @@ export async function main() {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
-      worktreeSettings: worktreeInfo,
     });
     loadConfigHandle?.end();
 

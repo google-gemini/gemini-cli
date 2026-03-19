@@ -48,7 +48,6 @@ export function getHookSource(input: Record<string, unknown>): HookSource {
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
-  YOLO = 'yolo',
   PLAN = 'plan',
 }
 
@@ -61,7 +60,6 @@ export const MODES_BY_PERMISSIVENESS = [
   ApprovalMode.PLAN,
   ApprovalMode.DEFAULT,
   ApprovalMode.AUTO_EDIT,
-  ApprovalMode.YOLO,
 ];
 
 /**

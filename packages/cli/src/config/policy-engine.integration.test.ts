@@ -274,20 +274,21 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should handle YOLO mode correctly', async () => {
+    it('should handle wildcard policy (YOLO mode) correctly', async () => {
       const settings: Settings = {
         tools: {
-          exclude: ['dangerous-tool'], // Even in YOLO, excludes should be respected
+          allowed: ['*'],
+          exclude: ['dangerous-tool'], // Even in wildcard, excludes should be respected
         },
       };
 
       const config = await createPolicyEngineConfig(
         settings,
-        ApprovalMode.YOLO,
+        ApprovalMode.DEFAULT,
       );
       const engine = new PolicyEngine(config);
 
-      // Most tools should be allowed in YOLO mode
+      // Most tools should be allowed in wildcard mode
       expect(
         (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);

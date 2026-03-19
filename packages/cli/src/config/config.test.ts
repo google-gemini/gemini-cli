@@ -233,51 +233,6 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
-  describe('worktree', () => {
-    it('should parse --worktree flag when provided with a name', async () => {
-      process.argv = ['node', 'script.js', '--worktree', 'my-feature'];
-      const settings = createTestMergedSettings();
-      settings.experimental.worktrees = true;
-      const argv = await parseArguments(settings);
-      expect(argv.worktree).toBe('my-feature');
-    });
-
-    it('should generate a random name when --worktree is provided without a name', async () => {
-      process.argv = ['node', 'script.js', '--worktree'];
-      const settings = createTestMergedSettings();
-      settings.experimental.worktrees = true;
-      const argv = await parseArguments(settings);
-      expect(argv.worktree).toBeDefined();
-      expect(argv.worktree).not.toBe('');
-      expect(typeof argv.worktree).toBe('string');
-    });
-
-    it('should throw an error when --worktree is used but experimental.worktrees is not enabled', async () => {
-      process.argv = ['node', 'script.js', '--worktree', 'feature'];
-      const settings = createTestMergedSettings();
-      settings.experimental.worktrees = false;
-
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('process.exit called');
-      });
-      const mockConsoleError = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      await expect(parseArguments(settings)).rejects.toThrow(
-        'process.exit called',
-      );
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'The --worktree flag is only available when experimental.worktrees is enabled in your settings.',
-        ),
-      );
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
-    });
-  });
-
   it.each([
     {
       description: 'long flags',
@@ -983,7 +938,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       expect.any(String),
       [],
       expect.any(Object),
-      expect.any(ExtensionManager),
+      expect.any(Object),
       true,
       'tree',
       expect.objectContaining({
@@ -991,7 +946,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200, // maxDirs
-      ['.git'], // boundaryMarkers
     );
   });
 
@@ -1013,7 +967,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       expect.any(String),
       [includeDir],
       expect.any(Object),
-      expect.any(ExtensionManager),
+      expect.any(Object),
       true,
       'tree',
       expect.objectContaining({
@@ -1021,7 +975,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200,
-      ['.git'], // boundaryMarkers
     );
   });
 
@@ -1042,7 +995,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       expect.any(String),
       [],
       expect.any(Object),
-      expect.any(ExtensionManager),
+      expect.any(Object),
       true,
       'tree',
       expect.objectContaining({
@@ -1050,7 +1003,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200,
-      ['.git'], // boundaryMarkers
     );
   });
 });
@@ -1445,7 +1397,7 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
-  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should gracefully downgrade if YOLO mode is attempted when disableYoloMode is true', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
@@ -1454,9 +1406,9 @@ describe('Approval mode tool exclusion logic', () => {
       },
     });
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(config.getAllowedTools() || []).not.toContain('*');
   });
 
   it('should throw an error for invalid approval mode values in loadCliConfig', async () => {
@@ -1472,7 +1424,7 @@ describe('Approval mode tool exclusion logic', () => {
     await expect(
       loadCliConfig(settings, 'test-session', invalidArgv as CliArgs),
     ).rejects.toThrow(
-      'Invalid approval mode: invalid_mode. Valid values are: yolo, auto_edit, plan, default',
+      'Invalid approval mode: invalid_mode. Valid values are: auto_edit, plan, default (yolo is mapped to allowed-tools)',
     );
   });
 
@@ -2750,7 +2702,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should set YOLO approval mode when -y flag is used', async () => {
@@ -2761,7 +2713,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should set DEFAULT approval mode when --approval-mode=default', async () => {
@@ -2794,7 +2746,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should prioritize --approval-mode over --yolo when both would be valid (but validation prevents this)', async () => {
@@ -2820,7 +2772,7 @@ describe('loadCliConfig approval mode', () => {
       'test-session',
       argv,
     );
-    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
   });
 
   it('should set Plan approval mode when --approval-mode=plan is used and plan is enabled', async () => {
@@ -2971,7 +2923,7 @@ describe('loadCliConfig approval mode', () => {
       });
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, 'test-session', argv);
-      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should respect plan mode from settings when plan is enabled', async () => {
@@ -3629,15 +3581,15 @@ describe('loadCliConfig disableYoloMode', () => {
     expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
   });
 
-  it('should throw if YOLO mode is attempted when disableYoloMode is true', async () => {
+  it('should gracefully downgrade if YOLO mode is attempted when disableYoloMode is true', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       security: { disableYoloMode: true },
     });
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(config.getAllowedTools() || []).not.toContain('*');
   });
 });
 
@@ -3667,12 +3619,12 @@ describe('loadCliConfig secureModeEnabled', () => {
       },
     });
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(config.getAllowedTools() || []).not.toContain('*');
   });
 
-  it('should throw an error if approval-mode=yolo is attempted when secureModeEnabled is true', async () => {
+  it('should gracefully downgrade if approval-mode=yolo is attempted when secureModeEnabled is true', async () => {
     process.argv = ['node', 'script.js', '--approval-mode=yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
@@ -3681,9 +3633,9 @@ describe('loadCliConfig secureModeEnabled', () => {
       },
     });
 
-    await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(config.getAllowedTools() || []).not.toContain('*');
   });
 
   it('should set disableYoloMode to true when secureModeEnabled is true', async () => {

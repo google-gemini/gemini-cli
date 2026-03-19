@@ -22,7 +22,7 @@ export class MockMessageBus {
   /**
    * Mock publish method that captures messages and simulates responses
    */
-  publish = vi.fn(async (message: Message) => {
+  publish = vi.fn((message: Message) => {
     this.publishedMessages.push(message);
 
     // Handle tool confirmation requests
@@ -62,6 +62,7 @@ export class MockMessageBus {
       if (!this.subscriptions.has(type)) {
         this.subscriptions.set(type, new Set());
       }
+
       this.subscriptions.get(type)!.add(listener as (message: Message) => void);
     },
   );

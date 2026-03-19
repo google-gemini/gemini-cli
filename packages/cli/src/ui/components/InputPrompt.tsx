@@ -114,6 +114,7 @@ export interface InputPromptProps {
   focus?: boolean;
   setShellModeActive: (value: boolean) => void;
   approvalMode: ApprovalMode;
+  isYoloMode?: boolean;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   onSuggestionsVisibilityChange?: (visible: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
@@ -203,6 +204,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   focus = true,
   setShellModeActive,
   approvalMode,
+  isYoloMode,
   onEscapePromptChange,
   onSuggestionsVisibilityChange,
   vimHandleInput,
@@ -1693,8 +1695,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const showAutoAcceptStyling =
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
-  const showYoloStyling =
-    !shellModeActive && approvalMode === ApprovalMode.YOLO;
+  const showYoloStyling = !shellModeActive && isYoloMode;
   const showPlanStyling =
     !shellModeActive && approvalMode === ApprovalMode.PLAN;
 

@@ -47,18 +47,4 @@ describe('Topic Tool Policy', () => {
     );
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
-
-  it('should allow update_topic in YOLO mode', async () => {
-    const rules = await loadDefaultPolicies();
-    const engine = new PolicyEngine({
-      rules,
-      approvalMode: ApprovalMode.YOLO,
-    });
-
-    const result = await engine.check(
-      { name: UPDATE_TOPIC_TOOL_NAME },
-      undefined,
-    );
-    expect(result.decision).toBe(PolicyDecision.ALLOW);
-  });
 });

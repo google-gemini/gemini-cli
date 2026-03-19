@@ -231,8 +231,10 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
             }
             // Basic structural check before casting.
             // Since the proto definitions are loose, we primarily rely on @type presence.
-            // eslint-disable-next-line no-restricted-syntax
-            if (typeof detailObj['@type'] === 'string') {
+            const typeCast = detailObj as { '@type'?: unknown };
+
+            const atType = typeCast['@type'];
+            if ('@type' in typeCast && typeof atType === 'string') {
               // We can just cast it; the consumer will have to switch on @type
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               details.push(detailObj as unknown as GoogleApiErrorDetail);

@@ -11,7 +11,7 @@ import { MessageType } from '../types.js';
 interface CategorizedRules {
   normal: PolicyRule[];
   autoEdit: PolicyRule[];
-  yolo: PolicyRule[];
+
   plan: PolicyRule[];
 }
 
@@ -21,7 +21,7 @@ const categorizeRulesByMode = (
   const result: CategorizedRules = {
     normal: [],
     autoEdit: [],
-    yolo: [],
+
     plan: [],
   };
   const ALL_MODES = Object.values(ApprovalMode);
@@ -30,7 +30,7 @@ const categorizeRulesByMode = (
     const modeSet = new Set(modes);
     if (modeSet.has(ApprovalMode.DEFAULT)) result.normal.push(rule);
     if (modeSet.has(ApprovalMode.AUTO_EDIT)) result.autoEdit.push(rule);
-    if (modeSet.has(ApprovalMode.YOLO)) result.yolo.push(rule);
+
     if (modeSet.has(ApprovalMode.PLAN)) result.plan.push(rule);
   });
   return result;
@@ -51,8 +51,7 @@ const listPoliciesCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {
-    const agentContext = context.services.agentContext;
-    const config = agentContext?.config;
+    const config = context.services.agentContext?.config;
     if (!config) {
       context.ui.addItem(
         {
@@ -83,9 +82,6 @@ const listPoliciesCommand: SlashCommand = {
     const uniqueAutoEdit = categorized.autoEdit.filter(
       (rule) => !normalRulesSet.has(rule),
     );
-    const uniqueYolo = categorized.yolo.filter(
-      (rule) => !normalRulesSet.has(rule),
-    );
     const uniquePlan = categorized.plan.filter(
       (rule) => !normalRulesSet.has(rule),
     );
@@ -96,14 +92,7 @@ const listPoliciesCommand: SlashCommand = {
       'Auto Edit Mode Policies (combined with normal mode policies)',
       uniqueAutoEdit,
     );
-    content += formatSection(
-      'Yolo Mode Policies (combined with normal mode policies)',
-      uniqueYolo,
-    );
-    content += formatSection(
-      'Plan Mode Policies (combined with normal mode policies)',
-      uniquePlan,
-    );
+    content += formatSection('Plan Mode Policies', uniquePlan);
 
     context.ui.addItem(
       {
