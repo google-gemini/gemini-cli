@@ -65,6 +65,18 @@ export type RemoteAgentInputs = { query: string };
 /**
  * Structured events emitted during subagent execution for user observability.
  */
+export enum SubagentActivityErrorType {
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+  GENERIC = 'GENERIC',
+}
+
+/**
+ * Standard error messages for subagent activities.
+ */
+export const SUBAGENT_REJECTED_ERROR_PREFIX = 'User rejected this operation.';
+export const SUBAGENT_CANCELLED_ERROR_MESSAGE = 'Request cancelled.';
+
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;

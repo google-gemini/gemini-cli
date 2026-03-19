@@ -19,6 +19,8 @@ import {
   type SubagentActivityEvent,
   type AgentInputs,
   type SubagentProgress,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
@@ -299,6 +301,48 @@ describe('LocalSubagentInvocation', () => {
           type: 'thought',
           content: 'Error: Failed',
           status: 'error',
+        }),
+      );
+    });
+
+    it('should reflect tool rejections in the activity stream as cancelled but not abort the agent', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_START',
+            data: { name: 'ls', args: {}, callId: 'call1' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'ERROR',
+            data: {
+              name: 'ls',
+              callId: 'call1',
+              error: `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`complete_task\` to report your findings and the blocker.`,
+              errorType: SubagentActivityErrorType.REJECTED,
+            },
+          } as SubagentActivityEvent);
+        }
+        return {
+          result: 'Rethinking...',
+          terminate_reason: AgentTerminateMode.GOAL,
+        };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledTimes(4);
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'tool_call',
+          content: 'ls',
+          status: 'cancelled',
         }),
       );
     });
