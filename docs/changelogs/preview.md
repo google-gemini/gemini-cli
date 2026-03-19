@@ -1,6 +1,6 @@
-# Preview release: v0.35.0-preview.1
+# Preview release: v0.35.0-preview.2
 
-Released: March 17, 2026
+Released: March 19, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -33,6 +33,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 4e5dfd0 to release/v0.35.0-preview.1-pr-23074 to patch
+  version v0.35.0-preview.1 and create version 0.35.0-preview.2 by
+  @gemini-cli-robot in
+  [#23134](https://github.com/google-gemini/gemini-cli/pull/23134)
 - feat(cli): customizable keyboard shortcuts by @scidomino in
   [#21945](https://github.com/google-gemini/gemini-cli/pull/21945)
 - feat(core): Thread `AgentLoopContext` through core. by @joshualitt in
@@ -373,4 +377,4 @@ npm install -g @google/gemini-cli@preview
   [#22815](https://github.com/google-gemini/gemini-cli/pull/22815)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.34.0-preview.4...v0.35.0-preview.1
+https://github.com/google-gemini/gemini-cli/compare/v0.34.0-preview.4...v0.35.0-preview.2
