@@ -14,7 +14,7 @@ import os from 'node:os';
 const args = process.argv.slice(2);
 const artifactsDir = args.find((arg) => !arg.startsWith('--')) || '.';
 const isPrComment = args.includes('--pr-comment');
-const MAX_HISTORY = 7; // Use last 7 runs for a stable baseline
+const MAX_HISTORY = 7;
 
 // Find all report.json files recursively
 function findReports(dir) {
@@ -36,7 +36,6 @@ function findReports(dir) {
 
 function getModelFromPath(reportPath) {
   const parts = reportPath.split(path.sep);
-  // Find the part that starts with 'eval-logs-'
   const artifactDir = parts.find((p) => p.startsWith('eval-logs-'));
   if (!artifactDir) return 'unknown';
 
@@ -44,13 +43,12 @@ function getModelFromPath(reportPath) {
   if (matchNew) return matchNew[1];
 
   const matchOld = artifactDir.match(/^eval-logs-(\d+)$/);
-  if (matchOld) return 'gemini-2.5-pro'; // Legacy default
+  if (matchOld) return 'gemini-2.5-pro';
 
   return 'unknown';
 }
 
 function getStats(reports) {
-  // Structure: { [model]: { [testName]: { passed, failed, total } } }
   const statsByModel = {};
 
   for (const reportPath of reports) {
@@ -89,7 +87,6 @@ function fetchHistoricalData() {
   const history = [];
 
   try {
-    // Check if gh is available
     try {
       execSync('gh --version', { stdio: 'ignore' });
     } catch {
@@ -103,32 +100,28 @@ function fetchHistoricalData() {
 
     const branch = 'main';
 
-    // Get recent runs
     const cmd = `gh run list --workflow evals-nightly.yml --branch "${branch}" --limit ${
-      MAX_HISTORY + 5
+      MAX_HISTORY + 10
     } --json databaseId,createdAt,url,displayTitle,status,conclusion`;
     const runsJson = execSync(cmd, { encoding: 'utf-8' });
     let runs = JSON.parse(runsJson);
 
-    // Filter out current run
     const currentRunId = process.env.GITHUB_RUN_ID;
     if (currentRunId) {
       runs = runs.filter((r) => r.databaseId.toString() !== currentRunId);
     }
 
-    // Filter for runs that likely have artifacts (completed) and take top N
-    // We accept 'failure' too because we want to see stats.
-    runs = runs.filter((r) => r.status === 'completed').slice(0, MAX_HISTORY);
+    runs = runs
+      .filter((r) => r.status === 'completed')
+      .slice(0, MAX_HISTORY + 5);
 
-    // Fetch artifacts for each run
     for (const run of runs) {
+      if (history.length >= MAX_HISTORY) break;
+
       const tmpDir = fs.mkdtempSync(
         path.join(os.tmpdir(), `gemini-evals-${run.databaseId}-`),
       );
       try {
-        // Download report.json files.
-        // The artifacts are named 'eval-logs-X' or 'eval-logs-MODEL-X'.
-        // We use -p to match pattern.
         execSync(
           `gh run download ${run.databaseId} -p "eval-logs-*" -D "${tmpDir}"`,
           { stdio: 'ignore' },
@@ -136,16 +129,27 @@ function fetchHistoricalData() {
 
         const runReports = findReports(tmpDir);
         if (runReports.length > 0) {
-          history.push({
-            run,
-            stats: getStats(runReports), // Now returns stats grouped by model
+          const stats = getStats(runReports);
+
+          // --- Infrastructure Failure Check ---
+          // If the overall pass rate for this run is 0%, ignore it as a "poisoned" baseline.
+          let totalPassed = 0;
+          let totalTests = 0;
+          Object.values(stats).forEach((modelStats) => {
+            Object.values(modelStats).forEach((s) => {
+              totalPassed += s.passed;
+              totalTests += s.total;
+            });
           });
+
+          if (totalTests > 0 && totalPassed === 0) {
+            continue;
+          }
+
+          history.push({ run, stats });
         }
-      } catch (error) {
-        console.error(
-          `Failed to download or process artifacts for run ${run.databaseId}:`,
-          error,
-        );
+      } catch {
+        // Ignore download errors
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
@@ -161,7 +165,6 @@ function generateMarkdown(currentStatsByModel, history) {
   const reversedHistory = [...history].reverse();
   const models = Object.keys(currentStatsByModel).sort();
 
-  // Helper to aggregate stats from multiple runs into a single "Consolidated Stats" object
   const getConsolidatedBaseline = (model) => {
     const consolidated = {};
     for (const item of history) {
@@ -199,7 +202,6 @@ function generateMarkdown(currentStatsByModel, history) {
   if (isPrComment) {
     console.log('### 🤖 Model Steering Impact Report\n');
 
-    // Determine overall status
     let overallRegression = false;
     for (const model of models) {
       const currentStats = currentStatsByModel[model];
@@ -227,7 +229,7 @@ function generateMarkdown(currentStatsByModel, history) {
     }
 
     console.log(
-      '> **Note:** The baseline is calculated as a moving average from the last 7 nightly runs on `main` to reduce noise from flakiness.\n',
+      `> **Note:** The baseline is an average of the last ${history.length} healthy nightly runs on \`main\` (ignoring infrastructure failures).\n`,
     );
   } else {
     console.log('### Evals Nightly Summary\n');
@@ -239,7 +241,6 @@ function generateMarkdown(currentStatsByModel, history) {
   for (const model of models) {
     const currentStats = currentStatsByModel[model];
     const currentPassRate = getPassRate(currentStats);
-
     const baselineStats = getConsolidatedBaseline(model);
     const baselinePassRate = getPassRate(baselineStats);
 
@@ -263,9 +264,6 @@ function generateMarkdown(currentStatsByModel, history) {
 
       const delta =
         currRate !== null && baseRate !== null ? currRate - baseRate : null;
-
-      // Filter: Uninteresting if change is < 15% AND both rates exist.
-      // New tests or missing tests are always interesting.
       const isInteresting =
         currRate === null || baseRate === null || Math.abs(delta) >= 15;
 
@@ -276,20 +274,17 @@ function generateMarkdown(currentStatsByModel, history) {
 
       let row = `| [${name}](${searchUrl}) |`;
 
-      // History / Baseline
       if (!isPrComment) {
         for (const item of reversedHistory) {
           const stat = item.stats[model] ? item.stats[model][name] : null;
           row += ` ${stat ? ((stat.passed / stat.total) * 100).toFixed(0) + '%' : '-'} |`;
         }
       } else if (baselinePassRate !== null) {
-        row += ` ${formatPassRate(baseRate)} |`;
+        row += ` ${formatPassRate(baseRate)} (${base?.total || 0}n) |`;
       }
 
-      // Current
-      row += ` ${formatPassRate(currRate)} |`;
+      row += ` ${formatPassRate(currRate)} (${curr?.total || 0}n) |`;
 
-      // Impact
       if (delta !== null) {
         if (delta > 10) row += ` 🟢 +${delta.toFixed(0)}% |`;
         else if (delta < -15) row += ` 🔴 ${delta.toFixed(0)}% |`;
@@ -320,7 +315,6 @@ function generateMarkdown(currentStatsByModel, history) {
       continue;
     }
 
-    // Print Header
     let header = '| Test Name |';
     let separator = '| :--- |';
 
@@ -330,7 +324,7 @@ function generateMarkdown(currentStatsByModel, history) {
         separator += ' :---: |';
       }
     } else if (baselinePassRate !== null) {
-      header += ' Baseline (7d Avg) |';
+      header += ' Baseline (Avg) |';
       separator += ' :---: |';
     }
 
@@ -346,19 +340,15 @@ function generateMarkdown(currentStatsByModel, history) {
         `\n> **Note:** ${stableCount} stable tests were hidden from this report to reduce noise.\n`,
       );
     }
-
     console.log('\n');
   }
 
   if (isPrComment) {
-    console.log('---');
     console.log(
-      '💡 To investigate regressions locally, run: `gemini /fix-behavioral-eval`',
+      '---\n💡 To investigate regressions locally, run: `gemini /fix-behavioral-eval`',
     );
   }
 }
-
-// --- Main ---
 
 const currentReports = findReports(artifactsDir);
 if (currentReports.length === 0) {
