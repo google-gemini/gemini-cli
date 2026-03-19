@@ -225,14 +225,14 @@ describe('AuthDialog', () => {
 
   describe('handleAuthSelect', () => {
     it('calls onAuthError if validation fails', async () => {
-      mockedValidateAuthMethod.mockReturnValue('Invalid method');
+      mockedValidateAuthMethod.mockResolvedValue('Invalid method');
       const { waitUntilReady, unmount } = renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
-      handleAuthSelect(AuthType.USE_GEMINI);
+      await handleAuthSelect(AuthType.USE_GEMINI);
 
       expect(mockedValidateAuthMethod).toHaveBeenCalledWith(
         AuthType.USE_GEMINI,

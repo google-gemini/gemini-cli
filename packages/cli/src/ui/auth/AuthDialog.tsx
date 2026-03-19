@@ -151,8 +151,8 @@ export function AuthDialog({
     [settings, config, setAuthState, exiting, setAuthContext],
   );
 
-  const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethodWithSettings(authMethod, settings);
+  const handleAuthSelect = async (authMethod: AuthType) => {
+    const error = await validateAuthMethodWithSettings(authMethod, settings);
     if (error) {
       onAuthError(error);
     } else {
