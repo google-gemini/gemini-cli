@@ -122,7 +122,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const remoteWorker = isShellMode 
     ? `gemini`
     : `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
-  
+
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
   const tmuxStyle = `
     tmux set -g status-bg colour238; 
@@ -134,7 +134,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   `.replace(/\n/g, '');
 
   const tmuxCmd = `tmux new-session -A -s ${sessionName} ${q(`${tmuxStyle} cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
-  const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(tmuxCmd)}`;
+  const containerWrap = `sudo docker exec -it -e COLORTERM=truecolor -e TERM=xterm-256color ${authEnv}maintainer-worker sh -c ${q(tmuxCmd)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 
