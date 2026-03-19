@@ -83,16 +83,18 @@ describe('bugCommand', () => {
   it('should generate the default GitHub issue URL', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+          },
+          geminiClient: {
             getChat: () => ({
               getHistory: () => [],
             }),
-          }),
-          getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+          },
         },
       },
     });
@@ -126,18 +128,20 @@ describe('bugCommand', () => {
     ];
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => undefined,
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+            storage: {
+              getProjectTempDir: () => '/tmp/gemini',
+            },
+          },
+          geminiClient: {
             getChat: () => ({
               getHistory: () => history,
             }),
-          }),
-          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
-          storage: {
-            getProjectTempDir: () => '/tmp/gemini',
           },
         },
       },
@@ -172,16 +176,18 @@ describe('bugCommand', () => {
       'https://internal.bug-tracker.com/new?desc={title}&details={info}';
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => ({ urlTemplate: customTemplate }),
-          getIdeMode: () => true,
-          getGeminiClient: () => ({
+        agentContext: {
+          config: {
+            getModel: () => 'gemini-pro',
+            getBugCommand: () => ({ urlTemplate: customTemplate }),
+            getIdeMode: () => true,
+            getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+          },
+          geminiClient: {
             getChat: () => ({
               getHistory: () => [],
             }),
-          }),
-          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
+          },
         },
       },
     });
