@@ -1,0 +1,27 @@
+{
+  "name": "@google/gemini-cli-workspace-manager",
+  "version": "0.1.0",
+  "description": "Workspace Hub for Gemini CLI",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@google-cloud/compute": "^4.10.0",
+    "@google-cloud/firestore": "^7.11.0",
+    "express": "^4.21.2",
+    "uuid": "^13.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  }
+}
