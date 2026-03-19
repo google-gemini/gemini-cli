@@ -1218,6 +1218,48 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should allow redirected shell commands with allowRedirection even when a lower-priority catch-all rule exists', async () => {
+      vi.mocked(initializeShellParsers).mockResolvedValue(undefined);
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      // Before the fix, splitCommands would return redirect details as separate entries,
+      // e.g., ['echo "hello"', '> file.txt']. The redirect sub-command '> file.txt'
+      // would not match the user's commandPrefix rule and would fall through to
+      // the built-in catch-all ASK_USER rule, defeating allowRedirection.
+      //
+      // After the fix, splitCommands filters out redirect entries, so only
+      // actual command sub-commands are returned.
+      vi.mocked(splitCommands).mockReturnValueOnce(['echo "hello"']);
+
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo/,
+          decision: PolicyDecision.ALLOW,
+          allowRedirection: true,
+          priority: 100,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > file.txt' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should NOT downgrade ALLOW to ASK_USER for quoted redirection chars', async () => {
       const rules: PolicyRule[] = [
         {
