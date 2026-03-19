@@ -921,7 +921,21 @@ describe('LoopDetectionService LLM Checks', () => {
     await service.turnStarted(abortController.signal); // fires early check (call #1)
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
 
-    // A subsequent turn should NOT re-fire immediately (flag was reset)
+    // Calling the same tool even more times (counts 9, 10, ...) must NOT re-arm the flag
+    for (let i = 8; i < 12; i++) {
+      service.addAndCheck({
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          name: 'write_todos',
+          args: { todos: [`attempt ${i}`] },
+          callId: `call-${i}`,
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+      });
+    }
+
+    // A subsequent turn should NOT re-fire immediately (flag was reset and not re-armed)
     await service.turnStarted(abortController.signal);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
   });
