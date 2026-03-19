@@ -328,6 +328,8 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Maximum number of actions (tool calls) allowed per task. Default: 100 */
+  maxActionsPerTask?: number;
 }
 
 /**
@@ -3085,6 +3087,7 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        maxActionsPerTask: customConfig.maxActionsPerTask ?? 100,
       },
     };
   }

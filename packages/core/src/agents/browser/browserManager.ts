@@ -95,6 +95,13 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
+  /** State for action rate limiting and loop detection */
+  private actionCounter = 0;
+  private readonly maxActionsPerTask: number;
+  private lastAction: { toolName: string; args: string } | undefined;
+  private repeatedActionCount = 0;
+  private readonly MAX_REPEATED_ACTIONS = 5;
+
   /**
    * Whether to inject the automation overlay.
    * Always false in headless mode (no visible window to decorate).
@@ -106,6 +113,8 @@ export class BrowserManager {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
+    this.maxActionsPerTask =
+      browserConfig?.customConfig?.maxActionsPerTask ?? 100;
   }
 
   /**
@@ -147,6 +156,35 @@ export class BrowserManager {
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
+    }
+
+    // Hard enforcement of per-action rate limit
+    this.actionCounter++;
+    if (this.actionCounter > this.maxActionsPerTask) {
+      throw new Error(
+        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+          `Task terminated to prevent runaway execution.`,
+      );
+    }
+
+    // Detect rapid repeated identical actions (loop detection)
+    const currentArgsJson = JSON.stringify(args);
+    if (
+      this.lastAction &&
+      this.lastAction.toolName === toolName &&
+      this.lastAction.args === currentArgsJson
+    ) {
+      this.repeatedActionCount++;
+      if (this.repeatedActionCount >= this.MAX_REPEATED_ACTIONS) {
+        throw new Error(
+          `Browser agent detected a potential runaway loop: tool '${toolName}' ` +
+            `was called ${this.MAX_REPEATED_ACTIONS} times with identical arguments. ` +
+            `Task terminated.`,
+        );
+      }
+    } else {
+      this.lastAction = { toolName, args: currentArgsJson };
+      this.repeatedActionCount = 1;
     }
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
