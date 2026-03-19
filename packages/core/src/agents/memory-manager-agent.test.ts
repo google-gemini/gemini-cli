@@ -148,6 +148,6 @@ describe('MemoryManagerAgent', () => {
 
   it('should use a fast model', () => {
     const agent = MemoryManagerAgent(createMockConfig());
-    expect(agent.modelConfig.model).toBe('gemini-3-flash-preview');
+    expect(agent.modelConfig.model).toBe('flash');
   });
 });

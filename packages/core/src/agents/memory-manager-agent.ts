@@ -17,6 +17,7 @@ import {
 } from '../tools/tool-names.js';
 import { Storage } from '../config/storage.js';
 import { flattenMemory } from '../config/memory.js';
+import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
 import type { Config } from '../config/config.js';
 
 const MemoryManagerSchema = z.object({
@@ -128,7 +129,7 @@ reply with what you need, and exit. Do not search the codebase for the missing c
       schema: MemoryManagerSchema,
     },
     modelConfig: {
-      model: 'gemini-3-flash-preview',
+      model: GEMINI_MODEL_ALIAS_FLASH,
     },
     toolConfig: {
       tools: [
