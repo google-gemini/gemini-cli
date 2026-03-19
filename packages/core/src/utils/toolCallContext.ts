@@ -16,6 +16,8 @@ export interface ToolCallContext {
   schedulerId: string;
   /** The ID of the parent tool call, if this is a nested execution (e.g., in a subagent). */
   parentCallId?: string;
+  /** The name of the subagent executing the tool, if applicable. */
+  subagent?: string;
 }
 
 /**
