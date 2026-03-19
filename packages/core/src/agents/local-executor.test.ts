@@ -3373,5 +3373,104 @@ describe('LocalAgentExecutor', () => {
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
     });
+
+    describe('Memory Injection', () => {
+      it('should inject system instruction memory into system prompt', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const mockMemory = 'Global memory constraint';
+        vi.spyOn(mockConfig, 'getSystemInstructionMemory').mockReturnValue(
+          mockMemory,
+        );
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+        const systemInstruction = chatConstructorArgs[1] as string;
+
+        expect(systemInstruction).toContain(mockMemory);
+        expect(systemInstruction).toContain('<loaded_context>');
+      });
+
+      it('should inject environment memory into the first message when JIT is disabled', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const mockMemory = 'Project memory rule';
+        vi.spyOn(mockConfig, 'getEnvironmentMemory').mockReturnValue(
+          mockMemory,
+        );
+        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(false);
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+
+        expect(parts).toBeDefined();
+        const memoryPart = parts.find((p) => p.text?.includes(mockMemory));
+        expect(memoryPart).toBeDefined();
+        expect(memoryPart?.text).toBe(mockMemory);
+      });
+
+      it('should inject session memory into the first message when JIT is enabled', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const mockMemory =
+          '<loaded_context>\nExtension memory rule\n</loaded_context>';
+        vi.spyOn(mockConfig, 'getSessionMemory').mockReturnValue(mockMemory);
+        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+
+        expect(parts).toBeDefined();
+        const memoryPart = parts.find((p) =>
+          p.text?.includes('Extension memory rule'),
+        );
+        expect(memoryPart).toBeDefined();
+        expect(memoryPart?.text).toContain(mockMemory);
+      });
+    });
   });
 });
