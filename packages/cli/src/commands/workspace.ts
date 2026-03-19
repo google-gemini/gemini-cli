@@ -16,6 +16,9 @@ export const remoteWorkspaceCommand: CommandModule = {
   describe: 'Manage remote workspaces',
   builder: (yargs: Argv) =>
     yargs
+      .middleware((argv) => {
+        argv['isCommand'] = true;
+      })
       .command(defer(listCommand, 'wsr'))
       .command(defer(createCommand, 'wsr'))
       .command(defer(deleteCommand, 'wsr'))

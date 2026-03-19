@@ -10,7 +10,6 @@ import type { MessageActionReturn } from '@google/gemini-cli-core';
 import { WorkspaceHubClient } from '@google/gemini-cli-core';
 
 const listAction = async (
-   
   _context: CommandContext,
 ): Promise<void | MessageActionReturn> => {
   const hubUrl =
@@ -153,6 +152,7 @@ const deleteCommand: SlashCommand = {
 
 export const workspaceSlashCommand: SlashCommand = {
   name: 'workspace',
+  altNames: ['wsr'],
   description: 'Manage remote workspaces',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
