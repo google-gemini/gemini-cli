@@ -31,6 +31,8 @@ import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { suspendInputBlocker, resumeInputBlocker } from './inputBlocker.js';
+import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
+import { BROWSER_AGENT_NAME } from './browserAgentDefinition.js';
 
 /**
  * Tools that interact with page elements and require the input blocker
@@ -62,7 +64,13 @@ class McpToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
   ) {
-    super(params, messageBus, toolName, toolName);
+    super(
+      params,
+      messageBus,
+      `${MCP_TOOL_PREFIX}${BROWSER_AGENT_NAME}_${toolName}`,
+      toolName,
+      BROWSER_AGENT_NAME,
+    );
   }
 
   getDescription(): string {
@@ -79,7 +87,7 @@ class McpToolInvocation extends BaseToolInvocation<
     return {
       type: 'mcp',
       title: `Confirm MCP Tool: ${this.toolName}`,
-      serverName: 'browser-agent',
+      serverName: BROWSER_AGENT_NAME,
       toolName: this.toolName,
       toolDisplayName: this.toolName,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
@@ -92,7 +100,7 @@ class McpToolInvocation extends BaseToolInvocation<
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
-      mcpName: 'browser-agent',
+      mcpName: BROWSER_AGENT_NAME,
     };
   }
 
@@ -200,6 +208,14 @@ class McpDeclarativeTool extends DeclarativeTool<
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
     );
+  }
+
+  // Used for determining tool identity in the policy engine to check if a tool
+  // call is allowed based on policy.
+  override get toolAnnotations(): Record<string, unknown> {
+    return {
+      _serverName: BROWSER_AGENT_NAME,
+    };
   }
 
   build(

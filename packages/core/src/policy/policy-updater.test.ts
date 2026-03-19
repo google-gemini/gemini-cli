@@ -30,6 +30,8 @@ vi.mock('../utils/shell-utils.js', () => ({
 interface ParsedPolicy {
   rule?: Array<{
     commandPrefix?: string | string[];
+    mcpName?: string;
+    toolName?: string;
   }>;
 }
 
@@ -67,6 +69,7 @@ describe('createPolicyUpdater', () => {
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'run_shell_command',
       commandPrefix: ['echo', 'ls'],
+      mcpName: 'test-mcp',
       persist: false,
     });
 
@@ -76,6 +79,7 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
+        mcpName: 'test-mcp',
         argsPattern: new RegExp(
           escapeRegex('"command":"echo') + '(?:[\\s"]|\\\\")',
         ),
@@ -86,11 +90,69 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
+        mcpName: 'test-mcp',
         argsPattern: new RegExp(
           escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
         ),
       }),
     );
+  });
+
+  it('should pass mcpName to policyEngine.addRule for argsPattern updates', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      argsPattern: '"foo":"bar"',
+      mcpName: 'test-mcp',
+      persist: false,
+    });
+
+    expect(policyEngine.addRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'test_tool',
+        mcpName: 'test-mcp',
+        argsPattern: /"foo":"bar"/,
+      }),
+    );
+  });
+
+  it('should persist mcpName to TOML', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+    vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(fs.open).mockResolvedValue(
+      mockFileHandle as unknown as fs.FileHandle,
+    );
+    vi.mocked(fs.rename).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'mcp_test-mcp_tool',
+      mcpName: 'test-mcp',
+      commandPrefix: 'ls',
+      persist: true,
+    });
+
+    // Wait for the async listener to complete
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fs.open).toHaveBeenCalled();
+    const [content] = mockFileHandle.writeFile.mock.calls[0] as [
+      string,
+      string,
+    ];
+    const parsed = toml.parse(content) as unknown as ParsedPolicy;
+
+    expect(parsed.rule).toHaveLength(1);
+    expect(parsed.rule![0].mcpName).toBe('test-mcp');
+    expect(parsed.rule![0].toolName).toBe('tool'); // toolName should be stripped of MCP prefix
   });
 
   it('should add a single rule when commandPrefix is a string', async () => {
