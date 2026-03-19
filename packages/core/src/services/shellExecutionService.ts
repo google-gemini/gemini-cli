@@ -377,7 +377,14 @@ export class ShellExecutionService {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+      // Trap SIGHUP to prevent premature termination in environments where
+      // the parent terminal may send SIGHUP unexpectedly (e.g., WSL2 with
+      // VS Code). This is safe because Gemini CLI uses explicit
+      // SIGTERM/SIGKILL via killProcessGroup() for process cleanup.
+      const hupGuardedCommand = isWindows
+        ? guardedCommand
+        : `trap '' HUP; ${guardedCommand}`;
+      const spawnArgs = [...argsPrefix, hupGuardedCommand];
 
       // Specifically allow GIT_CONFIG_* variables to pass through sanitization
       // in non-interactive mode so we can safely append our overrides.
@@ -735,7 +742,15 @@ export class ShellExecutionService {
       const { executable, argsPrefix, shell } = getShellConfiguration();
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
+      // Trap SIGHUP to prevent premature termination in environments where
+      // PTY lifecycle may send SIGHUP unexpectedly (e.g., WSL2 with nested
+      // PTYs in VS Code). This is safe because Gemini CLI uses explicit
+      // SIGTERM/SIGKILL via killProcessGroup() for process cleanup.
+      const isWindows = os.platform() === 'win32';
+      const hupGuardedCommand = isWindows
+        ? guardedCommand
+        : `trap '' HUP; ${guardedCommand}`;
+      const args = [...argsPrefix, hupGuardedCommand];
 
       const env = {
         ...process.env,
