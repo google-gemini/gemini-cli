@@ -106,16 +106,26 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
 
   // AUTH: Dynamically retrieve credentials from host-side config/disk
   const remoteConfigPath = `${hostWorkspaceRoot}/gemini-cli-config/.gemini/settings.json`;
+  const remoteSettingsRes = await provider.getExecOutput(`cat ${remoteConfigPath}`);
+  const remoteSettingsJson = remoteSettingsRes.stdout.trim();
+  
   const apiKeyRes = await provider.getExecOutput(`cat ${remoteConfigPath} | grep apiKey | cut -d '\"' -f 4`);
   const remoteApiKey = apiKeyRes.stdout.trim();
   
   const ghTokenRes = await provider.getExecOutput(`cat ${hostWorkspaceRoot}/.gh_token`);
   const remoteGhToken = ghTokenRes.stdout.trim();
 
-  // AUTH: Inject credentials into a local .env in the worktree
-  console.log('   - Injecting remote authentication context...');
-  const dotEnvContent = `GEMINI_API_KEY=${remoteApiKey}`;
+  // AUTH: Inject credentials and settings directly into the worktree
+  console.log('   - Injecting remote authentication and UI context...');
+  const dotEnvContent = `
+GEMINI_API_KEY=${remoteApiKey}
+COLORTERM=truecolor
+TERM=xterm-256color
+`.trim();
   await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`echo ${q(dotEnvContent)} > ${remoteWorktreeDir}/.env`)}`);
+  
+  // Also inject the settings.json into the worktree's .gemini folder for maximum reliability
+  await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`mkdir -p ${remoteWorktreeDir}/.gemini && echo ${q(remoteSettingsJson)} > ${remoteWorktreeDir}/.gemini/settings.json`)}`);
 
   // 4. Execution Logic
   // In shell mode, we just start gemini. In action mode, we run the entrypoint.
@@ -126,13 +136,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const authEnv = `${remoteApiKey ? `-e GEMINI_API_KEY=${remoteApiKey} ` : ''}${remoteGhToken ? `-e GITHUB_TOKEN=${remoteGhToken} -e GH_TOKEN=${remoteGhToken} ` : ''}`;
   
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
+  // We HIDE the tmux status bar to reduce visual noise
   const tmuxStyle = `
-    tmux set -g status-bg colour238; 
-    tmux set -g status-fg colour136; 
-    tmux set -g status-left-length 50;
-    tmux set -g status-left '#[fg=colour238,bg=colour136,bold] WORKSPACE #[fg=colour136,bg=colour238,nobold] ${isShellMode ? 'SHELL' : 'PR'} ${prNumber} ';
-    tmux set -g status-right '#[fg=colour245] %H:%M #[fg=colour238,bg=colour245,bold] #H ';
-    tmux setw -g window-status-current-format '#[fg=colour238,bg=colour136,bold] #I:#W #[fg=colour136,bg=colour238,nobold]';
+    tmux set -g status off;
   `.replace(/\n/g, '');
 
   const tmuxCmd = `tmux new-session -A -s ${sessionName} ${q(`${tmuxStyle} cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
