@@ -17,7 +17,6 @@ import {
   type ToolLiveOutput,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
@@ -33,7 +32,7 @@ import {
   type SuccessfulToolCall,
   type CancelledToolCall,
 } from './types.js';
-import type { PartListUnion, Part } from '@google/genai';
+import type { PartListUnion, Part, PartUnion } from '@google/genai';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,
@@ -188,21 +187,16 @@ export class ToolExecutor {
     }
 
     let textToTruncate: string | undefined;
-    let isMCP = false;
-    let firstPart: Part | undefined;
+    let isPartArray = false;
+    let firstPart: PartUnion | undefined;
 
     if (typeof content === 'string') {
       textToTruncate = content;
-    } else if (
-      Array.isArray(content) &&
-      content.length === 1 &&
-      'tool' in call &&
-      call.tool instanceof DiscoveredMCPTool
-    ) {
+    } else if (Array.isArray(content) && content.length === 1) {
       firstPart = content[0];
       if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
         textToTruncate = firstPart.text;
-        isMCP = true;
+        isPartArray = true;
       }
     }
 
@@ -231,9 +225,10 @@ export class ToolExecutor {
         }),
       );
 
-      const truncatedContent: PartListUnion = isMCP
-        ? [{ ...firstPart!, text: truncatedText }]
-        : truncatedText;
+      const truncatedContent: PartListUnion =
+        isPartArray && typeof firstPart === 'object'
+          ? [{ ...firstPart, text: truncatedText }]
+          : truncatedText;
 
       return { truncatedContent, outputFile: savedPath };
     }
