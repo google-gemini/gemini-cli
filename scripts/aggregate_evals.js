@@ -14,7 +14,7 @@ import os from 'node:os';
 const args = process.argv.slice(2);
 const artifactsDir = args.find((arg) => !arg.startsWith('--')) || '.';
 const isPrComment = args.includes('--pr-comment');
-const MAX_HISTORY = isPrComment ? 1 : 10;
+const MAX_HISTORY = 7; // Use last 7 runs for a stable baseline
 
 // Find all report.json files recursively
 function findReports(dir) {
@@ -102,7 +102,6 @@ function fetchHistoricalData() {
     }
 
     const branch = 'main';
-    // ... rest of the function ...
 
     // Get recent runs
     const cmd = `gh run list --workflow evals-nightly.yml --branch "${branch}" --limit ${
@@ -159,20 +158,25 @@ function fetchHistoricalData() {
 }
 
 function generateMarkdown(currentStatsByModel, history) {
-  if (isPrComment) {
-    console.log('### 🤖 Model Steering Impact Report\n');
-    console.log(
-      "This PR modifies files that affect the model's behavior. Below is the impact on behavioral evaluations.\n",
-    );
-  } else {
-    console.log('### Evals Nightly Summary\n');
-    console.log(
-      'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
-    );
-  }
-
   const reversedHistory = [...history].reverse();
   const models = Object.keys(currentStatsByModel).sort();
+
+  // Helper to aggregate stats from multiple runs into a single "Consolidated Stats" object
+  const getConsolidatedBaseline = (model) => {
+    const consolidated = {};
+    for (const item of history) {
+      const stats = item.stats[model];
+      if (!stats) continue;
+      for (const [name, stat] of Object.entries(stats)) {
+        if (!consolidated[name]) {
+          consolidated[name] = { passed: 0, total: 0 };
+        }
+        consolidated[name].passed += stat.passed;
+        consolidated[name].total += stat.total;
+      }
+    }
+    return Object.keys(consolidated).length > 0 ? consolidated : null;
+  };
 
   const getPassRate = (statsForModel) => {
     if (!statsForModel) return null;
@@ -192,32 +196,131 @@ function generateMarkdown(currentStatsByModel, history) {
   const formatPassRate = (rate) =>
     rate === null ? '-' : rate.toFixed(1) + '%';
 
+  if (isPrComment) {
+    console.log('### 🤖 Model Steering Impact Report\n');
+
+    // Determine overall status
+    let overallRegression = false;
+    for (const model of models) {
+      const currentStats = currentStatsByModel[model];
+      const baselineStats = getConsolidatedBaseline(model);
+      for (const [name, curr] of Object.entries(currentStats)) {
+        const base = baselineStats ? baselineStats[name] : null;
+        if (base) {
+          const delta =
+            (curr.passed / curr.total) * 100 - (base.passed / base.total) * 100;
+          if (delta < -15) overallRegression = true;
+        }
+      }
+    }
+
+    if (overallRegression) {
+      console.log('**Status: ⚠️ Investigation Recommended**\n');
+      console.log(
+        'This PR modifies core prompt or tool logic and has introduced significant regressions in behavioral stability. Please review the delta below.\n',
+      );
+    } else {
+      console.log('**Status: ✅ Stable**\n');
+      console.log(
+        'This PR modifies core prompt or tool logic. Behavioral evaluations remain stable compared to the `main` baseline.\n',
+      );
+    }
+
+    console.log(
+      '> **Note:** The baseline is calculated as a moving average from the last 7 nightly runs on `main` to reduce noise from flakiness.\n',
+    );
+  } else {
+    console.log('### Evals Nightly Summary\n');
+    console.log(
+      'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
+    );
+  }
+
   for (const model of models) {
     const currentStats = currentStatsByModel[model];
     const currentPassRate = getPassRate(currentStats);
 
-    // Baseline is the most recent history entry
-    const baselineStats =
-      reversedHistory.length > 0
-        ? reversedHistory[reversedHistory.length - 1].stats[model]
-        : null;
+    const baselineStats = getConsolidatedBaseline(model);
     const baselinePassRate = getPassRate(baselineStats);
 
     console.log(`#### Model: ${model}`);
+
+    const allTestNames = new Set(Object.keys(currentStats));
+    if (baselineStats) {
+      Object.keys(baselineStats).forEach((name) => allTestNames.add(name));
+    }
+
+    const rows = [];
+    let stableCount = 0;
+
+    for (const name of Array.from(allTestNames).sort()) {
+      const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
+      const curr = currentStats[name];
+      const base = baselineStats ? baselineStats[name] : null;
+
+      const currRate = curr ? (curr.passed / curr.total) * 100 : null;
+      const baseRate = base ? (base.passed / base.total) * 100 : null;
+
+      const delta =
+        currRate !== null && baseRate !== null ? currRate - baseRate : null;
+
+      // Filter: Uninteresting if change is < 15% AND both rates exist.
+      // New tests or missing tests are always interesting.
+      const isInteresting =
+        currRate === null || baseRate === null || Math.abs(delta) >= 15;
+
+      if (isPrComment && !isInteresting) {
+        stableCount++;
+        continue;
+      }
+
+      let row = `| [${name}](${searchUrl}) |`;
+
+      // History / Baseline
+      if (!isPrComment) {
+        for (const item of reversedHistory) {
+          const stat = item.stats[model] ? item.stats[model][name] : null;
+          row += ` ${stat ? ((stat.passed / stat.total) * 100).toFixed(0) + '%' : '-'} |`;
+        }
+      } else if (baselinePassRate !== null) {
+        row += ` ${formatPassRate(baseRate)} |`;
+      }
+
+      // Current
+      row += ` ${formatPassRate(currRate)} |`;
+
+      // Impact
+      if (delta !== null) {
+        if (delta > 10) row += ` 🟢 +${delta.toFixed(0)}% |`;
+        else if (delta < -15) row += ` 🔴 ${delta.toFixed(0)}% |`;
+        else row += ' ⚪ Stable |';
+      } else {
+        row += ' - |';
+      }
+      rows.push(row);
+    }
+
     if (isPrComment && baselinePassRate !== null) {
       const delta = currentPassRate - baselinePassRate;
       const deltaStr =
-        delta === 0
-          ? ' (No Change)'
+        Math.abs(delta) < 5
+          ? ' (Stable)'
           : ` (${delta > 0 ? '↑' : '↓'} ${Math.abs(delta).toFixed(1)}%)`;
       console.log(
-        `**Pass Rate: ${formatPassRate(currentPassRate)}** from ${formatPassRate(baselinePassRate)}${deltaStr}\n`,
+        `**Pass Rate: ${formatPassRate(currentPassRate)}** vs. ${formatPassRate(baselinePassRate)} Baseline${deltaStr}\n`,
       );
-    } else {
+    } else if (!isPrComment) {
       console.log(`**Total Pass Rate: ${formatPassRate(currentPassRate)}**\n`);
     }
 
-    // Header
+    if (isPrComment && rows.length === 0) {
+      console.log(
+        '✅ No interesting behavioral shifts detected for this model.\n',
+      );
+      continue;
+    }
+
+    // Print Header
     let header = '| Test Name |';
     let separator = '| :--- |';
 
@@ -227,7 +330,7 @@ function generateMarkdown(currentStatsByModel, history) {
         separator += ' :---: |';
       }
     } else if (baselinePassRate !== null) {
-      header += ' Baseline |';
+      header += ' Baseline (7d Avg) |';
       separator += ' :---: |';
     }
 
@@ -236,45 +339,22 @@ function generateMarkdown(currentStatsByModel, history) {
 
     console.log(header);
     console.log(separator);
+    rows.forEach((row) => console.log(row));
 
-    const allTestNames = new Set(Object.keys(currentStats));
-    if (baselineStats) {
-      Object.keys(baselineStats).forEach((name) => allTestNames.add(name));
+    if (isPrComment && stableCount > 0) {
+      console.log(
+        `\n> **Note:** ${stableCount} stable tests were hidden from this report to reduce noise.\n`,
+      );
     }
 
-    for (const name of Array.from(allTestNames).sort()) {
-      const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
-      let row = `| [${name}](${searchUrl}) |`;
-
-      const curr = currentStats[name];
-      const base = baselineStats ? baselineStats[name] : null;
-
-      if (!isPrComment) {
-        for (const item of reversedHistory) {
-          const stat = item.stats[model] ? item.stats[model][name] : null;
-          row += ` ${stat ? ((stat.passed / stat.total) * 100).toFixed(0) + '%' : '-'} |`;
-        }
-      } else if (baselinePassRate !== null) {
-        row += ` ${base ? ((base.passed / base.total) * 100).toFixed(0) + '%' : '-'} |`;
-      }
-
-      const currRate = curr ? (curr.passed / curr.total) * 100 : null;
-      const baseRate = base ? (base.passed / base.total) * 100 : null;
-
-      row += ` ${formatPassRate(currRate)} |`;
-
-      if (currRate !== null && baseRate !== null) {
-        const delta = currRate - baseRate;
-        if (delta > 0) row += ` 🟢 +${delta.toFixed(0)}% |`;
-        else if (delta < 0) row += ` 🔴 ${delta.toFixed(0)}% |`;
-        else row += ' ⚪ 0% |';
-      } else {
-        row += ' - |';
-      }
-
-      console.log(row);
-    }
     console.log('\n');
+  }
+
+  if (isPrComment) {
+    console.log('---');
+    console.log(
+      '💡 To investigate regressions locally, run: `gemini /fix-behavioral-eval`',
+    );
   }
 }
 
