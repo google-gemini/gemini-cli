@@ -39,7 +39,7 @@ export const ShowMoreLines = ({
   }
 
   return (
-    <Box paddingX={1}>
+    <Box paddingX={1} marginBottom={1}>
       <Text color={theme.text.accent} wrap="truncate">
         Press Ctrl+O to show more lines
       </Text>

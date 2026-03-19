@@ -20,12 +20,12 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 │ ● 1. Allow once                                                                                  │
 │   2. Allow for this session                                                                      │
 │   3. Allow for this file in all future sessions                                                  │
-│   4. Modify with external editor                                                                 ▄
+│   4. Modify with external editor                                                                 │
 │   5. No, suggest changes (esc)                                                                   █
 │                                                                                                  █
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────█
  Press Ctrl+O to show more lines                                                                   █
-
+                                                                                                   █
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  Shift+Tab to accept edits
  workspace (/directory)            sandbox               /model                             context

@@ -154,18 +154,21 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
         uiState: mockUIState,
         config: mockConfig,
         settings: createMockSettings({
-          ui: {
-            useAlternateBuffer: true,
-            theme: 'default',
-            showUserIdentity: false,
-            footer: {
-              hideContextPercentage: false,
-              hideTokens: false,
-              hideModel: false,
+          merged: {
+            ui: {
+              useAlternateBuffer: true,
+              theme: 'default',
+              showUserIdentity: false,
+              showShortcutsHint: false,
+              footer: {
+                hideContextPercentage: false,
+                hideTokens: false,
+                hideModel: false,
+              },
             },
-          },
-          security: {
-            enablePermanentToolApproval: true,
+            security: {
+              enablePermanentToolApproval: true,
+            },
           },
         }),
       });

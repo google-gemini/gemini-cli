@@ -127,7 +127,7 @@
     <text x="0" y="325" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="36" y="325" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">4.</text>
     <text x="63" y="325" fill="#ffffff" textLength="243" lengthAdjust="spacingAndGlyphs">Modify with external editor</text>
-    <text x="891" y="325" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
+    <text x="891" y="325" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="342" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="36" y="342" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">5.</text>
     <text x="63" y="342" fill="#ffffff" textLength="225" lengthAdjust="spacingAndGlyphs">No, suggest changes (esc)</text>
@@ -138,6 +138,7 @@
     <text x="891" y="376" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
     <text x="9" y="393" fill="#d7afff" textLength="279" lengthAdjust="spacingAndGlyphs">Press Ctrl+O to show more lines</text>
     <text x="891" y="393" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
+    <text x="891" y="410" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">█</text>
     <text x="0" y="427" fill="#333333" textLength="900" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
     <text x="9" y="444" fill="#afafaf" textLength="225" lengthAdjust="spacingAndGlyphs">Shift+Tab to accept edits</text>
     <text x="9" y="461" fill="#afafaf" textLength="198" lengthAdjust="spacingAndGlyphs">workspace (/directory)</text>

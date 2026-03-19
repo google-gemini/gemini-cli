@@ -420,6 +420,7 @@ export const ToolConfirmationMessage: React.FC<
     const HEIGHT_QUESTION = 1; // The question text is one line.
     const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
     const SECURITY_WARNING_BOTTOM_MARGIN = 1; // Margin on the securityWarnings container.
+    const SHOW_MORE_LINES_HEIGHT = 1; // The "Press Ctrl+O to show more lines" hint.
 
     const optionsCount = getOptions().length;
 
@@ -433,6 +434,7 @@ export const ToolConfirmationMessage: React.FC<
       PADDING_OUTER_Y +
       HEIGHT_QUESTION +
       MARGIN_QUESTION_BOTTOM +
+      SHOW_MORE_LINES_HEIGHT +
       optionsCount +
       securityWarningsHeight;
 
