@@ -74,6 +74,7 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
           },
         },
         general: {
+          defaultApprovalMode: 'default',
           enableAutoUpdate: false,
           enableAutoUpdateNotification: false,
           useRipgrep: false,
