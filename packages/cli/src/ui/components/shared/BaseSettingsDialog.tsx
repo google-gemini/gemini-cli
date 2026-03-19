@@ -401,13 +401,13 @@ export function BaseSettingsDialog({
       // Tab - switch focus section
       if (key.name === 'tab' && finalShowScopeSelector) {
         setFocusSection((s) => (s === 'settings' ? 'scope' : 'settings'));
-        return;
+        return true;
       }
 
       // Escape - close dialog
       if (keyMatchers[Command.ESCAPE](key)) {
         onClose();
-        return;
+        return true;
       }
 
       return;
