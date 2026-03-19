@@ -8,10 +8,9 @@
   `packages/cli/src/ui/key/keyBindings.ts`
 - Do not implement any logic performing custom string measurement or string
   truncation. Use Ink layout instead leveraging ResizeObserver as needed. When
-  using ResizeObserver, DO NOT use `useEffect` to attach it to a ref. Instead,
-  use the `useCallback` ref pattern (like in `MaxSizedBox.tsx`) to ensure the
-  size is measured as soon as the element is available, preventing rendering
-  timing bugs.
+  using `ResizeObserver`, prefer the `useCallback` ref pattern (as seen in
+  `MaxSizedBox.tsx`) to ensure size measurements are captured as soon as the
+  element is available, avoiding potential rendering timing issues.
 - Avoid prop drilling when at all possible.
 
 ## Testing
