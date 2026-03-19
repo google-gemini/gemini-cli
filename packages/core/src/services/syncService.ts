@@ -23,8 +23,8 @@ export class SyncService {
     const { instanceName, zone, project } = options;
     const localDir = Storage.getGlobalGeminiDir();
     
-    // Fix: Using the home directory as destination to avoid nested .gemini/.gemini
-    const remotePath = `${instanceName}:`;
+    // Fix: Ensure files are placed in the .gemini directory on the remote
+    const remotePath = `${instanceName}:.gemini/`;
 
     // Performance/Robustness: Exclude large and local-only folders.
     // Since gcloud scp doesn't support --exclude, we could either:

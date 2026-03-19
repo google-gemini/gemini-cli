@@ -14,6 +14,7 @@ export interface WorkspaceHubInfo {
   status: string;
   machine_type: string;
   zone: string;
+  project_id: string;
   created_at: string;
   owner_id: string;
 }

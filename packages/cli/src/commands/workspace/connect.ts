@@ -92,9 +92,7 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
         }
     }
 
-    const { instance_name: instanceName, zone } = readyWs;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const project = process.env['GOOGLE_CLOUD_PROJECT'] || 'dev-project';
+    const { instance_name: instanceName, zone, project_id: projectId } = readyWs;
     const ssh = new SSHService();
 
     // 1. Sync settings if enabled
@@ -106,7 +104,7 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
         await sync.pushSettings({
             instanceName,
             zone,
-            project,
+            project: projectId,
         });
         // eslint-disable-next-line no-console
         console.log(chalk.green(`✓ Settings synced.`));
@@ -122,7 +120,7 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
         // eslint-disable-next-line no-console
         console.log(chalk.yellow('Injecting GitHub credentials...'));
         try {
-            await ssh.pushSecret({ instanceName, zone, project }, '.gh_token', pat);
+            await ssh.pushSecret({ instanceName, zone, project: projectId }, '.gh_token', pat);
             // eslint-disable-next-line no-console
             console.log(chalk.green('✓ Credentials injected.'));
         } catch (err) {
@@ -141,7 +139,7 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
     await ssh.connect({
       instanceName,
       zone,
-      project,
+      project: projectId,
       command: remoteCommand,
       forwardAgent: args.forwardAgent,
     });

@@ -55,6 +55,7 @@ describe('WorkspaceService', () => {
         status: 'READY',
         machine_type: 'e2',
         zone: 'us1',
+        project_id: 'p1',
         created_at: 'now',
       };
       await service.createWorkspace('id1', data);

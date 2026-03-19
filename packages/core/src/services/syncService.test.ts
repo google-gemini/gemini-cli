@@ -50,7 +50,7 @@ describe('SyncService', () => {
         'scp',
         '--recurse',
         '/mock/local/dir/settings.json',
-        'test-inst:',
+        'test-inst:.gemini/',
         '--zone=us-west1-a',
         '--project=test-project',
         '--tunnel-through-iap',

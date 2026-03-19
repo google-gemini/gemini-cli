@@ -23,6 +23,10 @@ export class ComputeService {
     this.projectId = process.env['GOOGLE_CLOUD_PROJECT'] || 'dev-project';
   }
 
+  getProjectId(): string {
+    return this.projectId;
+  }
+
   /**
    * Provision a new GCE VM with the Workspace Container
    */

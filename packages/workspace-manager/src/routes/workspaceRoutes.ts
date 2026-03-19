@@ -53,6 +53,7 @@ router.post('/', async (req, res) => {
       status: 'PROVISIONING',
       machine_type: machineType,
       zone,
+      project_id: computeService.getProjectId(),
       created_at: new Date().toISOString(),
     };
 
