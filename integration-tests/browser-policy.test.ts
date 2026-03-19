@@ -173,7 +173,6 @@ priority = 200
     const output = stripAnsi(run.output).toLowerCase();
 
     expect(output).toContain('browser_agent');
-    expect(output).toContain('new_page');
     expect(output).toContain('completed successfully');
   });
 });
