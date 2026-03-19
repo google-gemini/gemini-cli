@@ -7,6 +7,8 @@
 import { spawn } from 'node:child_process';
 import { type FileSystemService } from './fileSystemService.js';
 import { type SandboxManager } from './sandboxManager.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
 
 /**
  * A FileSystemService implementation that performs operations through a sandbox.
@@ -80,6 +82,18 @@ export class SandboxedFileSystemService implements FileSystemService {
       const child = spawn(prepared.program, prepared.args, {
         cwd: this.cwd,
         env: prepared.env,
+      });
+
+      child.stdin?.on('error', (err) => {
+        // Silently ignore EPIPE errors on stdin, they will be caught by the process error/close listeners
+        if (isNodeError(err) && err.code === 'EPIPE') {
+          return;
+        }
+        debugLogger.error(
+          `Sandbox Error: stdin error for '${filePath}': ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       });
 
       child.stdin?.write(content);
