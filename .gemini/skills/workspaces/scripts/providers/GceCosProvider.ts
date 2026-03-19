@@ -80,13 +80,15 @@ export class GceCosProvider implements WorkspaceProvider {
       mkdir -p /mnt/disks/data/main /mnt/disks/data/worktrees /mnt/disks/data/scripts /mnt/disks/data/config /mnt/disks/data/policies
       chmod -R 777 /mnt/disks/data
       
-      # 3. Handle Global Persistence Symlink
-      # We create a global /workspaces link that points to the data disk.
-      # This avoids dependencies on ephemeral home directories.
+      # 3. Handle Unified Path Symlink (/home/node/.workspaces)
+      # This ensures absolute paths match perfectly between host and container.
+      mkdir -p /home/node
+      ln -sfn /mnt/disks/data /home/node/.workspaces
+      chown -R 1000:1000 /home/node
+      
+      # Also ensure host users can find it
       ln -sfn /mnt/disks/data /workspaces
       chmod 777 /workspaces
-      
-      # Ensure host users can find it via their home too (if directory exists)
       for h in /home/*_google_com; do
         [ -d "$h" ] || continue
         ln -sfn /mnt/disks/data "$h/.workspaces"
