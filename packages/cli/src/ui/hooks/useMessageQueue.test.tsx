@@ -29,6 +29,7 @@ describe('useMessageQueue', () => {
     streamingState: StreamingState;
     submitQuery: (query: string) => void;
     isMcpReady: boolean;
+    isAuthenticating?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useMessageQueue>;
     function TestComponent(props: typeof initialProps) {
@@ -262,6 +263,56 @@ describe('useMessageQueue', () => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
       expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('should not submit queued messages if isAuthenticating is true', () => {
+    const { result, rerender } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Responding,
+      submitQuery: mockSubmitQuery,
+      isMcpReady: true,
+      isAuthenticating: true,
+    });
+
+    act(() => {
+      result.current.addMessage('Message 1');
+    });
+
+    rerender({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Idle,
+      submitQuery: mockSubmitQuery,
+      isMcpReady: true,
+      isAuthenticating: true,
+    });
+
+    expect(mockSubmitQuery).not.toHaveBeenCalled();
+    expect(result.current.messageQueue).toEqual(['Message 1']);
+  });
+
+  it('should submit queued messages when isAuthenticating becomes false', () => {
+    const { result, rerender } = renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Idle,
+      submitQuery: mockSubmitQuery,
+      isMcpReady: true,
+      isAuthenticating: true,
+    });
+
+    act(() => {
+      result.current.addMessage('Message 1');
+    });
+
+    rerender({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Idle,
+      submitQuery: mockSubmitQuery,
+      isMcpReady: true,
+      isAuthenticating: false,
+    });
+
+    expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1');
+    expect(result.current.messageQueue).toEqual([]);
   });
 
   describe('popAllMessages', () => {

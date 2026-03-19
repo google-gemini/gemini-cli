@@ -1312,7 +1312,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      if (isSlash || (isIdle && isMcpReady)) {
+      if (
+        isSlash ||
+        (isIdle && isMcpReady && !isAuthenticating && isConfigInitialized)
+      ) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1335,11 +1338,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpReady && messageQueue.length === 0) {
-          coreEvents.emitFeedback(
-            'info',
-            'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
-          );
+        if (
+          isIdle &&
+          (!isMcpReady || isAuthenticating || !isConfigInitialized) &&
+          messageQueue.length === 0
+        ) {
+          const message = isAuthenticating
+            ? 'Authentication is still in progress... Slash commands are still available and prompts will be queued.'
+            : !isConfigInitialized
+              ? 'Initializing... Slash commands are still available and prompts will be queued.'
+              : 'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.';
+          coreEvents.emitFeedback('info', message);
         }
         addMessage(submittedValue);
       }
@@ -1364,6 +1373,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       reset,
       handleHintSubmit,
       triggerExpandHint,
+      isAuthenticating,
+      isConfigInitialized,
     ],
   );
 
@@ -1392,15 +1403,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
    * - Tool confirmations (WaitingForConfirmation state)
    * - Any future streaming states not explicitly allowed
    */
-  const isInputActive =
-    isConfigInitialized &&
-    !initError &&
-    !isProcessing &&
-    !isResuming &&
-    !!slashCommands &&
-    (streamingState === StreamingState.Idle ||
-      streamingState === StreamingState.Responding) &&
-    !proQuotaRequest;
+  const isInputActive = !initError && !isProcessing && !proQuotaRequest;
 
   const [controlsHeight, setControlsHeight] = useState(0);
 
@@ -2018,7 +2021,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isModelDialogOpen ||
     isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
-    isAuthenticating ||
     isAuthDialogOpen ||
     isEditorDialogOpen ||
     showPrivacyNotice ||
@@ -2184,6 +2186,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       themeError,
       isAuthenticating,
       isConfigInitialized,
+      isMcpReady,
       authError,
       accountSuspensionInfo,
       isAuthDialogOpen,
@@ -2314,6 +2317,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       themeError,
       isAuthenticating,
       isConfigInitialized,
+      isMcpReady,
       authError,
       accountSuspensionInfo,
       isAuthDialogOpen,
