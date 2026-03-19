@@ -1,4 +1,4 @@
-# Parallel sessions with Git worktrees (experimental)
+# Git Worktrees (experimental)
 
 When working on multiple tasks at once, you can use Git worktrees to give each
 Gemini session its own copy of the codebase. Git worktrees create separate
@@ -64,7 +64,7 @@ CLI in it.
 > might include running dependency installation (`npm install`, `yarn`), setting
 > up virtual environments, or following your project's standard build process.
 
-## How to exit a worktree session
+## How to exit a Git worktree session
 
 When you exit a worktree session (using `/quit` or `Ctrl+C`), Gemini
 automatically determines whether to clean up or preserve the worktree based on
@@ -84,7 +84,7 @@ Gemini prioritizes a fast and safe exit: it **does not display an interactive
 prompt** to ask whether to keep the worktree. Instead, it ensures your work is
 safely preserved by default if any modifications are detected.
 
-## Resuming work in a worktree
+## Resuming work in a Git worktree
 
 If a worktree was preserved because it contained changes, Gemini displays
 instructions on how to resume your work when you exit.
@@ -97,17 +97,17 @@ cd .gemini/worktrees/feature-search
 gemini --resume <session_id>
 ```
 
-## Managing worktrees manually
+## Managing Git worktrees manually
 
 For more control over worktree location and branch configuration, or to clean up
 a preserved worktree, you can use Git directly:
 
-- **Clean up a preserved worktree:**
+- **Clean up a preserved Git worktree:**
   ```bash
   git worktree remove .gemini/worktrees/feature-search --force
   git branch -D worktree-feature-search
   ```
-- **Create a worktree manually:**
+- **Create a Git worktree manually:**
   ```bash
   git worktree add ../project-feature-search -b feature-search
   cd ../project-feature-search && gemini
