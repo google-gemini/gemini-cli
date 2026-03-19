@@ -47,6 +47,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   getDisplayString,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -104,7 +105,7 @@ export class GeminiAgent {
   private customHeaders: Record<string, string> | undefined;
 
   constructor(
-    private config: Config,
+    private context: AgentLoopContext,
     private settings: LoadedSettings,
     private argv: CliArgs,
     private connection: acp.AgentSideConnection,
@@ -148,7 +149,7 @@ export class GeminiAgent {
       },
     ];
 
-    await this.config.initialize();
+    await this.context.config.initialize();
     const version = await getVersion();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
@@ -220,7 +221,7 @@ export class GeminiAgent {
       this.baseUrl = baseUrl;
       this.customHeaders = headers;
 
-      await this.config.refreshAuth(
+      await this.context.config.refreshAuth(
         method,
         apiKey ?? this.apiKey,
         baseUrl,
@@ -537,7 +538,7 @@ export class Session {
   constructor(
     private readonly id: string,
     private readonly chat: GeminiChat,
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     private readonly connection: acp.AgentSideConnection,
     private readonly settings: LoadedSettings,
   ) {}
@@ -552,13 +553,15 @@ export class Session {
   }
 
   setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
-    const availableModes = buildAvailableModes(this.config.isPlanEnabled());
+    const availableModes = buildAvailableModes(
+      this.context.config.isPlanEnabled(),
+    );
     const mode = availableModes.find((m) => m.id === modeId);
     if (!mode) {
       throw new Error(`Invalid or unavailable mode: ${modeId}`);
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    this.config.setApprovalMode(mode.id as ApprovalMode);
+    this.context.config.setApprovalMode(mode.id as ApprovalMode);
     return {};
   }
 
@@ -579,7 +582,7 @@ export class Session {
   }
 
   setModel(modelId: acp.ModelId): acp.SetSessionModelResponse {
-    this.config.setModel(modelId);
+    this.context.config.setModel(modelId);
     return {};
   }
 
@@ -634,7 +637,7 @@ export class Session {
               }
             }
 
-            const tool = this.config.getToolRegistry().getTool(toolCall.name);
+            const tool = this.context.toolRegistry.getTool(toolCall.name);
 
             await this.sendUpdate({
               sessionUpdate: 'tool_call',
@@ -658,7 +661,7 @@ export class Session {
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
 
-    await this.config.waitForMcpInit();
+    await this.context.config.waitForMcpInit();
 
     const promptId = Math.random().toString(16).slice(2);
     const chat = this.chat;
@@ -712,8 +715,8 @@ export class Session {
 
       try {
         const model = resolveModel(
-          this.config.getModel(),
-          (await this.config.getGemini31Launched?.()) ?? false,
+          this.context.config.getModel(),
+          (await this.context.config.getGemini31Launched?.()) ?? false,
         );
         const responseStream = await chat.sendMessageStream(
           { model },
@@ -804,9 +807,9 @@ export class Session {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     parts: Part[],
   ): Promise<boolean> {
-    const gitService = await this.config.getGitService();
+    const gitService = await this.context.config.getGitService();
     const commandContext = {
-      config: this.config,
+      agentContext: this.context,
       settings: this.settings,
       git: gitService,
       sendMessage: async (text: string) => {
@@ -842,7 +845,7 @@ export class Session {
     const errorResponse = (error: Error) => {
       const durationMs = Date.now() - startTime;
       logToolCall(
-        this.config,
+        this.context.config,
         new ToolCallEvent(
           undefined,
           fc.name ?? '',
@@ -872,7 +875,7 @@ export class Session {
       return errorResponse(new Error('Missing function name'));
     }
 
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const tool = toolRegistry.getTool(fc.name);
 
     if (!tool) {
@@ -908,7 +911,10 @@ export class Session {
 
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
-          options: toPermissionOptions(confirmationDetails, this.config),
+          options: toPermissionOptions(
+            confirmationDetails,
+            this.context.config,
+          ),
           toolCall: {
             toolCallId: callId,
             status: 'pending',
@@ -974,7 +980,7 @@ export class Session {
 
       const durationMs = Date.now() - startTime;
       logToolCall(
-        this.config,
+        this.context.config,
         new ToolCallEvent(
           undefined,
           fc.name ?? '',
@@ -988,7 +994,7 @@ export class Session {
         ),
       );
 
-      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+      this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
         {
           status: CoreToolCallStatus.Success,
           request: {
@@ -1006,8 +1012,8 @@ export class Session {
               fc.name,
               callId,
               toolResult.llmContent,
-              this.config.getActiveModel(),
-              this.config,
+              this.context.config.getActiveModel(),
+              this.context.config,
             ),
             resultDisplay: toolResult.returnDisplay,
             error: undefined,
@@ -1020,8 +1026,8 @@ export class Session {
         fc.name,
         callId,
         toolResult.llmContent,
-        this.config.getActiveModel(),
-        this.config,
+        this.context.config.getActiveModel(),
+        this.context.config,
       );
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -1036,7 +1042,7 @@ export class Session {
         kind: toAcpToolKind(tool.kind),
       });
 
-      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+      this.chat.recordCompletedToolCalls(this.context.config.getActiveModel(), [
         {
           status: CoreToolCallStatus.Error,
           request: {
@@ -1122,18 +1128,18 @@ export class Session {
     const atPathToResolvedSpecMap = new Map<string, string>();
 
     // Get centralized file discovery service
-    const fileDiscovery = this.config.getFileService();
+    const fileDiscovery = this.context.config.getFileService();
     const fileFilteringOptions: FilterFilesOptions =
-      this.config.getFileFilteringOptions();
+      this.context.config.getFileFilteringOptions();
 
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
     const ignoredPaths: string[] = [];
 
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const readManyFilesTool = new ReadManyFilesTool(
-      this.config,
-      this.config.getMessageBus(),
+      this.context.config,
+      this.context.messageBus,
     );
     const globTool = toolRegistry.getTool('glob');
 
@@ -1152,8 +1158,11 @@ export class Session {
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
       try {
-        const absolutePath = path.resolve(this.config.getTargetDir(), pathName);
-        if (isWithinRoot(absolutePath, this.config.getTargetDir())) {
+        const absolutePath = path.resolve(
+          this.context.config.getTargetDir(),
+          pathName,
+        );
+        if (isWithinRoot(absolutePath, this.context.config.getTargetDir())) {
           const stats = await fs.stat(absolutePath);
           if (stats.isDirectory()) {
             currentPathSpec = pathName.endsWith('/')
@@ -1173,7 +1182,7 @@ export class Session {
         }
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (this.config.getEnableRecursiveFileSearch() && globTool) {
+          if (this.context.config.getEnableRecursiveFileSearch() && globTool) {
             this.debug(
               `Path ${pathName} not found directly, attempting glob search.`,
             );
@@ -1181,7 +1190,7 @@ export class Session {
               const globResult = await globTool.buildAndExecute(
                 {
                   pattern: `**/*${pathName}*`,
-                  path: this.config.getTargetDir(),
+                  path: this.context.config.getTargetDir(),
                 },
                 abortSignal,
               );
@@ -1195,7 +1204,7 @@ export class Session {
                 if (lines.length > 1 && lines[1]) {
                   const firstMatchAbsolute = lines[1].trim();
                   currentPathSpec = path.relative(
-                    this.config.getTargetDir(),
+                    this.context.config.getTargetDir(),
                     firstMatchAbsolute,
                   );
                   this.debug(
@@ -1410,7 +1419,7 @@ export class Session {
   }
 
   debug(msg: string) {
-    if (this.config.getDebugMode()) {
+    if (this.context.config.getDebugMode()) {
       debugLogger.warn(msg);
     }
   }

@@ -23,14 +23,14 @@ export const initCommand: SlashCommand = {
     context: CommandContext,
     _args: string,
   ): Promise<SlashCommandActionReturn> => {
-    if (!context.services.config) {
+    if (!context.services.agentContext?.config) {
       return {
         type: 'message',
         messageType: 'error',
         content: 'Configuration not available.',
       };
     }
-    const targetDir = context.services.config.getTargetDir();
+    const targetDir = context.services.agentContext.config.getTargetDir();
     const geminiMdPath = path.join(targetDir, 'GEMINI.md');
 
     const result = performInit(fs.existsSync(geminiMdPath));

@@ -74,7 +74,7 @@ export class ShellProcessor implements IPromptProcessor {
       ];
     }
 
-    const config = context.services.config;
+    const config = context.services.agentContext?.config;
     if (!config) {
       throw new Error(
         `Security configuration not loaded. Cannot verify shell command permissions for '${this.commandName}'. Aborting.`,
