@@ -880,9 +880,7 @@ export class Task {
     if (
       part.kind !== 'data' ||
       !part.data ||
-       
       typeof part.data['callId'] !== 'string' ||
-       
       typeof part.data['outcome'] !== 'string'
     ) {
       return false;

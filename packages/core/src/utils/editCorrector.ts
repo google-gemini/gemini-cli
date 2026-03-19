@@ -112,7 +112,6 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-       
       typeof result['corrected_string_escaping'] === 'string' &&
       result['corrected_string_escaping'].length > 0
     ) {
