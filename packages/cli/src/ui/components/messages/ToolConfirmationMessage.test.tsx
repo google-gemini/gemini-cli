@@ -4,18 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  beforeAll,
+} from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import {
   type SerializableConfirmationDetails,
   type ToolCallConfirmationDetails,
   type Config,
   ToolConfirmationOutcome,
+  initializeShellParsers,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { act } from 'react';
+import '../../../test-utils/customMatchers.js';
 
 vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
   const actual =
@@ -29,6 +39,141 @@ vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
 });
 
 describe('ToolConfirmationMessage', () => {
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
+
+  describe('Auto-approve checkbox for exec tools', () => {
+    const mockSettingsWithPermanent = createMockSettings({
+      merged: { security: { enablePermanentToolApproval: true } },
+    });
+
+    const mockConfigWithPermanent = {
+      isTrustedFolder: () => true,
+      getIdeMode: () => false,
+      getDisableAlwaysAllow: () => false,
+      getApprovalMode: () => 'default',
+      getApprovalMode: () => 'default',
+    } as unknown as Config;
+
+    it('shows permanent approval option for safe commands', async () => {
+      const execSafe: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: 'ls -la',
+        rootCommand: 'ls',
+        rootCommands: ['ls'],
+      };
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={execSafe}
+          config={mockConfigWithPermanent}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        { settings: mockSettingsWithPermanent },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('Allow this command for all future sessions');
+      unmount();
+    });
+
+    it('hides permanent approval option for unsafe commands', async () => {
+      const execUnsafe: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: 'rm -rf /',
+        rootCommand: 'rm',
+        rootCommands: ['rm'],
+      };
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={execUnsafe}
+          config={mockConfigWithPermanent}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        { settings: mockSettingsWithPermanent },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).not.toContain(
+        'Allow this command for all future sessions',
+      );
+      unmount();
+    });
+
+    it('shows permanent approval option for edit commands in AUTO_EDIT mode', async () => {
+      const mockConfigAutoEdit = {
+        ...mockConfigWithPermanent,
+        getApprovalMode: () => 'autoEdit',
+      } as unknown as Config;
+
+      const execEdit: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: 'mkdir test',
+        rootCommand: 'mkdir',
+        rootCommands: ['mkdir'],
+      };
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={execEdit}
+          config={mockConfigAutoEdit}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        { settings: mockSettingsWithPermanent },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('Allow this command for all future sessions');
+      unmount();
+    });
+
+    it('hides permanent approval option for edit commands in DEFAULT mode', async () => {
+      const execEdit: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: 'mkdir test',
+        rootCommand: 'mkdir',
+        rootCommands: ['mkdir'],
+      };
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={execEdit}
+          config={mockConfigWithPermanent}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        { settings: mockSettingsWithPermanent },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).not.toContain(
+        'Allow this command for all future sessions',
+      );
+      unmount();
+    });
+  });
+
   const mockConfirm = vi.fn();
   vi.mocked(useToolActions).mockReturnValue({
     confirm: mockConfirm,
@@ -40,6 +185,7 @@ describe('ToolConfirmationMessage', () => {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
     getDisableAlwaysAllow: () => false,
+    getApprovalMode: () => 'default',
   } as unknown as Config;
 
   it('should not display urls if prompt and url are the same', async () => {
@@ -335,6 +481,7 @@ describe('ToolConfirmationMessage', () => {
           isTrustedFolder: () => true,
           getIdeMode: () => false,
           getDisableAlwaysAllow: () => false,
+          getApprovalMode: () => 'default',
         } as unknown as Config;
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
           <ToolConfirmationMessage
@@ -357,6 +504,7 @@ describe('ToolConfirmationMessage', () => {
           isTrustedFolder: () => false,
           getIdeMode: () => false,
           getDisableAlwaysAllow: () => false,
+          getApprovalMode: () => 'default',
         } as unknown as Config;
 
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -393,6 +541,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
@@ -420,6 +569,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
@@ -462,6 +612,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
@@ -490,6 +641,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
@@ -518,6 +670,7 @@ describe('ToolConfirmationMessage', () => {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
         getDisableAlwaysAllow: () => false,
+        getApprovalMode: () => 'default',
       } as unknown as Config;
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
