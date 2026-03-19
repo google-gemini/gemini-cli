@@ -179,3 +179,47 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
 
   return { consoleMessages, clearConsoleMessages };
 }
+
+export interface UseErrorCountReturn {
+  errorCount: number;
+  clearErrorCount: () => void;
+}
+
+export function useErrorCount(): UseErrorCountReturn {
+  const [errorCount, dispatch] = useReducer(
+    (state: number, action: 'INCREMENT' | 'CLEAR') => {
+      switch (action) {
+        case 'INCREMENT':
+          return state + 1;
+        case 'CLEAR':
+          return 0;
+        default:
+          return state;
+      }
+    },
+    0,
+  );
+
+  useEffect(() => {
+    const handleConsoleLog = (payload: ConsoleLogPayload) => {
+      if (payload.type === 'error') {
+        startTransition(() => {
+          dispatch('INCREMENT');
+        });
+      }
+    };
+
+    coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
+    return () => {
+      coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
+    };
+  }, []);
+
+  const clearErrorCount = useCallback(() => {
+    startTransition(() => {
+      dispatch('CLEAR');
+    });
+  }, []);
+
+  return { errorCount, clearErrorCount };
+}
