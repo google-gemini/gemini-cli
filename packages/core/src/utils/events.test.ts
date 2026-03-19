@@ -425,4 +425,159 @@ describe('CoreEventEmitter', () => {
       expect(listener).toHaveBeenCalledExactlyOnceWith(payload);
     });
   });
+
+  describe('Memory-bounded Backlog', () => {
+    it('should strip older events when MAX_BACKLOG_PAYLOAD_BYTES is exceeded', () => {
+      // Set small budget: 64KB
+
+      (
+        events as unknown as {
+          _setBudgetsForTesting: (
+            maxBacklog: number,
+            maxSingle: number,
+          ) => void;
+          _currentBacklogPayloadBytes: number;
+        }
+      )._setBudgetsForTesting(64 * 1024, 1024 * 1024);
+
+      const payloadSize = 20 * 1024; // 20KB each
+      const chunk = 'a'.repeat(payloadSize);
+
+      // Emit 5 events (total 100KB > 64KB)
+      for (let i = 0; i < 5; i++) {
+        events.emitOutput(false, chunk);
+      }
+
+      const listener = vi.fn();
+      events.on(CoreEvent.Output, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(5);
+
+      // The first 2 events should be stripped to stay within the 64KB budget
+      expect(listener.mock.calls[0][0]).toMatchObject({
+        chunk: '',
+        omitted: true,
+        originalByteLength: payloadSize,
+      });
+      expect(listener.mock.calls[1][0]).toMatchObject({
+        chunk: '',
+        omitted: true,
+        originalByteLength: payloadSize,
+      });
+
+      // The last 3 events should be intact (3 * 20KB = 60KB <= 64KB)
+      expect(listener.mock.calls[2][0]).toMatchObject({ chunk });
+      expect(listener.mock.calls[3][0]).toMatchObject({ chunk });
+      expect(listener.mock.calls[4][0]).toMatchObject({ chunk });
+
+      // Verify internal byte counter is reset
+
+      expect(
+        (
+          events as unknown as {
+            _setBudgetsForTesting: (
+              maxBacklog: number,
+              maxSingle: number,
+            ) => void;
+            _currentBacklogPayloadBytes: number;
+          }
+        )._currentBacklogPayloadBytes,
+      ).toBe(0);
+    });
+
+    it('should truncate a single huge event that exceeds MAX_SINGLE_EVENT_PAYLOAD_BYTES', () => {
+      (
+        events as unknown as {
+          _setBudgetsForTesting: (
+            maxBacklog: number,
+            maxSingle: number,
+          ) => void;
+          _currentBacklogPayloadBytes: number;
+        }
+      )._setBudgetsForTesting(10 * 1024 * 1024, 1 * 1024 * 1024); // 1MB single event budget
+
+      const payloadSize = 5 * 1024 * 1024; // 5MB
+      const chunk = 'b'.repeat(payloadSize);
+
+      events.emitOutput(false, chunk);
+
+      const listener = vi.fn();
+      events.on(CoreEvent.Output, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const output = listener.mock.calls[0][0];
+
+      // Should be truncated to 1MB
+      expect(output.chunk.length).toBe(1 * 1024 * 1024);
+      expect(output.truncated).toBe(true);
+      expect(output.originalByteLength).toBe(payloadSize);
+
+      expect(
+        (
+          events as unknown as {
+            _setBudgetsForTesting: (
+              maxBacklog: number,
+              maxSingle: number,
+            ) => void;
+            _currentBacklogPayloadBytes: number;
+          }
+        )._currentBacklogPayloadBytes,
+      ).toBe(0);
+    });
+
+    it('should preserve MAX_BACKLOG_SIZE events while staying within memory budget', () => {
+      (
+        events as unknown as {
+          _setBudgetsForTesting: (
+            maxBacklog: number,
+            maxSingle: number,
+          ) => void;
+          _currentBacklogPayloadBytes: number;
+        }
+      )._setBudgetsForTesting(64 * 1024, 1024 * 1024);
+
+      const MAX_BACKLOG_SIZE = 10000;
+      const smallChunk = 'c'.repeat(10); // 10 bytes
+
+      // Emit enough to fill the backlog entirely
+      for (let i = 0; i < MAX_BACKLOG_SIZE; i++) {
+        events.emitOutput(false, smallChunk);
+      }
+
+      // Total bytes = 100,000 > 65,536 (64KB budget)
+      // Older items will be stripped to respect the memory budget.
+
+      const listener = vi.fn();
+      events.on(CoreEvent.Output, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
+
+      // Verify the first item was stripped
+      expect(listener.mock.calls[0][0]).toMatchObject({
+        chunk: '',
+        omitted: true,
+        originalByteLength: 10,
+      });
+
+      // Verify the latest items are preserved
+      expect(listener.mock.calls[MAX_BACKLOG_SIZE - 1][0]).toMatchObject({
+        chunk: smallChunk,
+      });
+
+      expect(
+        (
+          events as unknown as {
+            _setBudgetsForTesting: (
+              maxBacklog: number,
+              maxSingle: number,
+            ) => void;
+            _currentBacklogPayloadBytes: number;
+          }
+        )._currentBacklogPayloadBytes,
+      ).toBe(0);
+    });
+  });
 });
