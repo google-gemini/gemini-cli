@@ -73,24 +73,26 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // FIX: Ensure container user (node) owns the workspaces directories
   console.log('   - Synchronizing container permissions...');
   await provider.exec(`sudo chown -R 1000:1000 /home/node/.workspaces`);
+if (check.status !== 0) {
+  console.log(`   - Provisioning isolated git worktree for ${prNumber}...`);
 
-  if (check.status !== 0) {
-    console.log(`   - Provisioning isolated git worktree for ${prNumber}...`);
-    
-    // We run these on the host. Since setup might have left the repo root-owned, we use sudo.
-    const gitFetch = isShellMode 
-        ? `sudo git -C ${hostWorkDir} fetch --quiet origin`
-        : `sudo git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
-    
-    const gitTarget = isShellMode ? 'FETCH_HEAD' : 'FETCH_HEAD'; 
+  // We run these on the host. Since setup might have left the repo root-owned, we use sudo.
+  // We use environment variables to bypass safe.directory checks on a read-only filesystem.
+  const gitEnv = `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=${hostWorkDir}`;
 
-    const setupCmd = `
-      sudo git config --global --add safe.directory ${hostWorkDir} && \
-      sudo mkdir -p ${hostWorkspaceRoot}/worktrees && \
-      ${gitFetch} && \
-      sudo git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1 && \
-      sudo chown -R 1000:1000 ${hostWorkspaceRoot}
-    `;
+  const gitFetch = isShellMode 
+      ? `sudo ${gitEnv} git -C ${hostWorkDir} fetch --quiet origin`
+      : `sudo ${gitEnv} git -C ${hostWorkDir} fetch --quiet upstream pull/${prNumber}/head`;
+
+  const gitTarget = isShellMode ? 'FETCH_HEAD' : 'FETCH_HEAD'; 
+
+  const setupCmd = `
+    sudo mkdir -p ${hostWorkspaceRoot}/worktrees && \
+    sudo chown chronos:chronos ${hostWorkspaceRoot}/worktrees && \
+    ${gitFetch} && \
+    sudo ${gitEnv} git -C ${hostWorkDir} worktree add --quiet -f ${hostWorktreeDir} ${gitTarget} 2>&1 && \
+    sudo chown -R 1000:1000 ${hostWorkspaceRoot}
+  `;
     const setupRes = await provider.getExecOutput(setupCmd);
     if (setupRes.status !== 0) {
         console.error('   ❌ Failed to provision remote worktree.');
