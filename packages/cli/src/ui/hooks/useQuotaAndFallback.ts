@@ -150,15 +150,38 @@ export function useQuotaAndFallback({
         }
       } else {
         const messageLines = [
-          `We are currently experiencing high demand.`,
-          'We apologize and appreciate your patience.',
+          `Server capacity exceeded for ${failedModel}.`,
+          'This is a temporary server-side issue, not a quota limit.',
+          failedModel !== fallbackModel
+            ? `Tip: Try /model ${fallbackModel} for a less congested model.`
+            : null,
+          contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+            ? '/auth to switch to API key (separate capacity pool).'
+            : null,
           '/model to switch models.',
-        ];
+        ].filter(Boolean);
         message = messageLines.join('\n');
       }
 
+      // Auto-fallback for capacity errors when a different fallback model is available
+      if (
+        !isTerminalQuotaError &&
+        !isModelNotFoundError &&
+        fallbackModel !== failedModel
+      ) {
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: `Server capacity exceeded for ${failedModel}. Auto-switching to ${fallbackModel}.`,
+          },
+          Date.now(),
+        );
+        setModelSwitchedFromQuotaError(true);
+        return 'retry_always';
+      }
+
       // In low verbosity mode, auto-retry transient capacity failures
-      // without interrupting with a dialog.
+      // without interrupting with a dialog, if models are the same.
       if (
         errorVerbosity === 'low' &&
         !isTerminalQuotaError &&
@@ -243,6 +266,11 @@ export function useQuotaAndFallback({
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
 
+      if (choice === 'change_auth') {
+        onShowAuthSelection();
+        return;
+      }
+
       if (choice === 'retry_always' || choice === 'retry_once') {
         // Reset quota error flags to allow the agent loop to continue.
         setModelSwitchedFromQuotaError(false);
@@ -259,7 +287,13 @@ export function useQuotaAndFallback({
         }
       }
     },
-    [proQuotaRequest, historyManager, config, setModelSwitchedFromQuotaError],
+    [
+      proQuotaRequest,
+      historyManager,
+      config,
+      setModelSwitchedFromQuotaError,
+      onShowAuthSelection,
+    ],
   );
 
   const handleValidationChoice = useCallback(

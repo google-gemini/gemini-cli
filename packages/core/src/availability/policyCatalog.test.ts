@@ -48,7 +48,7 @@ describe('policyCatalog', () => {
   it('returns default chain when preview disabled', () => {
     const chain = getModelPolicyChain({ previewEnabled: false });
     expect(chain[0]?.model).toBe(DEFAULT_GEMINI_MODEL);
-    expect(chain).toHaveLength(2);
+    expect(chain).toHaveLength(3);
   });
 
   it('marks preview transients as sticky retries', () => {

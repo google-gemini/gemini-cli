@@ -20,7 +20,12 @@ interface ProQuotaDialogProps {
   authType?: AuthType;
   tierName?: string;
   onChoice: (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+    choice:
+      | 'retry_later'
+      | 'retry_once'
+      | 'retry_always'
+      | 'upgrade'
+      | 'change_auth',
   ) => void;
 }
 
@@ -87,6 +92,15 @@ export function ProQuotaDialog({
         value: 'retry_always' as const,
         key: 'retry_always',
       },
+      ...(authType === AuthType.LOGIN_WITH_GOOGLE
+        ? [
+            {
+              label: 'Switch to API key (/auth)',
+              value: 'change_auth' as const,
+              key: 'change_auth',
+            },
+          ]
+        : []),
       {
         label: 'Stop',
         value: 'retry_later' as const,
@@ -96,7 +110,12 @@ export function ProQuotaDialog({
   }
 
   const handleSelect = (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+    choice:
+      | 'retry_later'
+      | 'retry_once'
+      | 'retry_always'
+      | 'upgrade'
+      | 'change_auth',
   ) => {
     onChoice(choice);
   };

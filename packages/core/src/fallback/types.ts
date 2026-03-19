@@ -20,7 +20,8 @@ export type FallbackIntent =
   | 'retry_with_credits' // Retry the current request using Google One AI credits (and potentially future ones if strategy is 'always').
   | 'stop' // Switch to fallback for future requests, but stop the current request.
   | 'retry_later' // Stop the current request and do not fallback. Intend to try again later with the same model.
-  | 'upgrade'; // Give user an option to upgrade the tier.
+  | 'upgrade' // Give user an option to upgrade the tier.
+  | 'change_auth'; // Give user an option to switch auth method.
 
 export interface FallbackRecommendation extends ModelSelectionResult {
   action: FallbackAction;

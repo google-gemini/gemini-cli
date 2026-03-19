@@ -239,7 +239,7 @@ describe('ProQuotaDialog', () => {
     });
 
     describe('when it is a capacity error', () => {
-      it('should render keep trying, switch, and stop options', () => {
+      it('should render keep trying, switch, and stop options (no auth)', () => {
         const { unmount } = render(
           <ProQuotaDialog
             failedModel="gemini-2.5-pro"
@@ -263,6 +263,45 @@ describe('ProQuotaDialog', () => {
                 label: 'Switch to gemini-2.5-flash',
                 value: 'retry_always',
                 key: 'retry_always',
+              },
+              { label: 'Stop', value: 'retry_later', key: 'retry_later' },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
+
+      it('should render switch to API key option for LOGIN_WITH_GOOGLE', () => {
+        const { unmount } = render(
+          <ProQuotaDialog
+            failedModel="gemini-2.5-pro"
+            fallbackModel="gemini-2.5-flash"
+            message="capacity error"
+            isTerminalQuotaError={false}
+            isModelNotFoundError={false}
+            authType={AuthType.LOGIN_WITH_GOOGLE}
+            onChoice={mockOnChoice}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Keep trying',
+                value: 'retry_once',
+                key: 'retry_once',
+              },
+              {
+                label: 'Switch to gemini-2.5-flash',
+                value: 'retry_always',
+                key: 'retry_always',
+              },
+              {
+                label: 'Switch to API key (/auth)',
+                value: 'change_auth',
+                key: 'change_auth',
               },
               { label: 'Stop', value: 'retry_later', key: 'retry_later' },
             ],
