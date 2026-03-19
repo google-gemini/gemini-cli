@@ -9,6 +9,7 @@ import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
@@ -42,6 +43,7 @@ describe('ToolConfirmationQueue', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
     getTargetDir: () => '/mock/target/dir',
@@ -161,8 +163,11 @@ describe('ToolConfirmationQueue', () => {
         />
       </Box>,
       {
-        config: mockConfig,
-        useAlternateBuffer: true,
+        config: {
+          ...mockConfig,
+          getUseAlternateBuffer: () => true,
+        } as unknown as Config,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -211,7 +216,7 @@ describe('ToolConfirmationQueue', () => {
       />,
       {
         config: mockConfig,
-        useAlternateBuffer: false,
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 40,
@@ -282,7 +287,10 @@ describe('ToolConfirmationQueue', () => {
     // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
     // availableContentHeight = 19 - 4 = 15
     // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
-    // AskUserDialog uses 15 lines to render its multi-line question and options.
+    // AskUserDialog allocates questionHeight = availableHeight - overhead - DIALOG_PADDING.
+    // listHeight = 15 - overhead (Header:0, Margin:1, Footer:2) = 12.
+    // maxQuestionHeight = listHeight - 4 = 8.
+    // 8 lines is enough for the 6-line question.
     await waitFor(() => {
       expect(lastFrame()).toContain('Line 6');
       expect(lastFrame()).not.toContain('lines hidden');

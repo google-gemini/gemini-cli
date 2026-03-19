@@ -353,6 +353,7 @@ export class TestRig {
     testName: string,
     options: {
       settings?: Record<string, unknown>;
+      state?: Record<string, unknown>;
       fakeResponsesPath?: string;
     } = {},
   ) {
@@ -382,6 +383,9 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+
+    // Create persistent state file
+    this._createStateFile(options.state);
   }
 
   private _cleanDir(dir: string) {
@@ -473,6 +477,24 @@ export class TestRig {
     );
   }
 
+  private _createStateFile(overrideState?: Record<string, unknown>) {
+    if (!this.homeDir) throw new Error('TestRig homeDir is not initialized');
+    const userGeminiDir = join(this.homeDir, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
+    const state = deepMerge(
+      {
+        terminalSetupPromptShown: true, // Default to true in tests to avoid blocking prompts
+      },
+      overrideState ?? {},
+    );
+
+    writeFileSync(
+      join(userGeminiDir, 'state.json'),
+      JSON.stringify(state, null, 2),
+    );
+  }
+
   createFile(fileName: string, content: string) {
     const filePath = join(this.testDir!, fileName);
     writeFileSync(filePath, content);
@@ -498,13 +520,19 @@ export class TestRig {
     command: string;
     initialArgs: string[];
   } {
+    const binaryPath = env['INTEGRATION_TEST_GEMINI_BINARY_PATH'];
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
     const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
-    const command = isNpmReleaseTest ? geminiCommand : 'node';
-    const initialArgs = isNpmReleaseTest
-      ? extraInitialArgs
-      : [BUNDLE_PATH, ...extraInitialArgs];
+    let command = 'node';
+    let initialArgs = [BUNDLE_PATH, ...extraInitialArgs];
+    if (binaryPath) {
+      command = binaryPath;
+      initialArgs = extraInitialArgs;
+    } else if (isNpmReleaseTest) {
+      command = geminiCommand;
+      initialArgs = extraInitialArgs;
+    }
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);

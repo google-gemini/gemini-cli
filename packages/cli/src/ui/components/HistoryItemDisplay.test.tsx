@@ -6,17 +6,17 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { type HistoryItem } from '../types.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItem } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 import {
+  CoreToolCallStatus,
   type Config,
   type ToolExecuteConfirmationDetails,
-  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
@@ -85,7 +85,10 @@ describe('<HistoryItemDisplay />', () => {
       };
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} />,
-        { useAlternateBuffer },
+        {
+          config: makeFakeConfig({ useAlternateBuffer }),
+          settings: createMockSettings({ ui: { useAlternateBuffer } }),
+        },
       );
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
@@ -279,9 +282,7 @@ describe('<HistoryItemDisplay />', () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} />,
         {
-          settings: createMockSettings({
-            merged: { ui: { inlineThinkingMode: 'full' } },
-          }),
+          settings: createMockSettings({ ui: { inlineThinkingMode: 'full' } }),
         },
       );
       await waitUntilReady();
@@ -290,6 +291,24 @@ describe('<HistoryItemDisplay />', () => {
       unmount();
     });
 
+    it('renders "Thinking..." header when isFirstThinking is true', async () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} isFirstThinking={true} />,
+        {
+          settings: createMockSettings({ ui: { inlineThinkingMode: 'full' } }),
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain(' Thinking...');
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
     it('does not render thinking item when disabled', async () => {
       const item: HistoryItem = {
         ...baseItem,
@@ -299,9 +318,7 @@ describe('<HistoryItemDisplay />', () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} />,
         {
-          settings: createMockSettings({
-            merged: { ui: { inlineThinkingMode: 'off' } },
-          }),
+          settings: createMockSettings({ ui: { inlineThinkingMode: 'off' } }),
         },
       );
       await waitUntilReady();
@@ -333,7 +350,10 @@ describe('<HistoryItemDisplay />', () => {
             terminalWidth={80}
             availableTerminalHeight={10}
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitUntilReady();
 
@@ -355,7 +375,10 @@ describe('<HistoryItemDisplay />', () => {
             availableTerminalHeight={10}
             availableTerminalHeightGemini={Number.MAX_SAFE_INTEGER}
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitUntilReady();
 
@@ -376,7 +399,10 @@ describe('<HistoryItemDisplay />', () => {
             terminalWidth={80}
             availableTerminalHeight={10}
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitUntilReady();
 
@@ -398,7 +424,10 @@ describe('<HistoryItemDisplay />', () => {
             availableTerminalHeight={10}
             availableTerminalHeightGemini={Number.MAX_SAFE_INTEGER}
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
         await waitUntilReady();
 

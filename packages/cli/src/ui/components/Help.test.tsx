@@ -7,8 +7,7 @@
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Help } from './Help.js';
-import type { SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import { CommandKind, type SlashCommand } from '../commands/types.js';
 
 const mockCommands: readonly SlashCommand[] = [
   {
@@ -77,7 +76,7 @@ describe('Help Component', () => {
     expect(output).toContain('Keyboard Shortcuts:');
     expect(output).toContain('Ctrl+C');
     expect(output).toContain('Ctrl+S');
-    expect(output).toContain('Page Up/Down');
+    expect(output).toContain('Page Up/Page Down');
     unmount();
   });
 });

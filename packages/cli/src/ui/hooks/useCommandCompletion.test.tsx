@@ -24,10 +24,14 @@ import type { CommandContext } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { UseAtCompletionProps } from './useAtCompletion.js';
-import { useAtCompletion } from './useAtCompletion.js';
-import type { UseSlashCompletionProps } from './useSlashCompletion.js';
-import { useSlashCompletion } from './useSlashCompletion.js';
+import {
+  useAtCompletion,
+  type UseAtCompletionProps,
+} from './useAtCompletion.js';
+import {
+  useSlashCompletion,
+  type UseSlashCompletionProps,
+} from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
@@ -46,6 +50,7 @@ vi.mock('./useShellCompletion', () => ({
     completionStart: 0,
     completionEnd: 0,
     query: '',
+    activeStart: 0,
   })),
 }));
 
@@ -57,7 +62,12 @@ const setupMocks = ({
   isLoading = false,
   isPerfectMatch = false,
   slashCompletionRange = { completionStart: 0, completionEnd: 0 },
-  shellCompletionRange = { completionStart: 0, completionEnd: 0, query: '' },
+  shellCompletionRange = {
+    completionStart: 0,
+    completionEnd: 0,
+    query: '',
+    activeStart: 0,
+  },
 }: {
   atSuggestions?: Suggestion[];
   slashSuggestions?: Suggestion[];
@@ -69,6 +79,7 @@ const setupMocks = ({
     completionStart: number;
     completionEnd: number;
     query: string;
+    activeStart?: number;
   };
 }) => {
   // Mock for @-completions
@@ -116,7 +127,10 @@ const setupMocks = ({
           setSuggestions(shellSuggestions);
         }
       }, [enabled, setSuggestions, setIsLoadingSuggestions]);
-      return shellCompletionRange;
+      return {
+        ...shellCompletionRange,
+        activeStart: shellCompletionRange.activeStart ?? 0,
+      };
     },
   );
 };
@@ -139,38 +153,57 @@ describe('useCommandCompletion', () => {
     });
   }
 
+  let hookResult: ReturnType<typeof useCommandCompletion> & {
+    textBuffer: ReturnType<typeof useTextBuffer>;
+  };
+
+  function TestComponent({
+    initialText,
+    cursorOffset,
+    shellModeActive,
+    active,
+  }: {
+    initialText: string;
+    cursorOffset?: number;
+    shellModeActive: boolean;
+    active: boolean;
+  }) {
+    const textBuffer = useTextBufferForTest(initialText, cursorOffset);
+    const completion = useCommandCompletion({
+      buffer: textBuffer,
+      cwd: testRootDir,
+      slashCommands: [],
+      commandContext: mockCommandContext,
+      reverseSearchActive: false,
+      shellModeActive,
+      config: mockConfig,
+      active,
+    });
+    hookResult = { ...completion, textBuffer };
+    return null;
+  }
+
   const renderCommandCompletionHook = (
     initialText: string,
     cursorOffset?: number,
     shellModeActive = false,
     active = true,
   ) => {
-    let hookResult: ReturnType<typeof useCommandCompletion> & {
-      textBuffer: ReturnType<typeof useTextBuffer>;
-    };
-
-    function TestComponent() {
-      const textBuffer = useTextBufferForTest(initialText, cursorOffset);
-      const completion = useCommandCompletion({
-        buffer: textBuffer,
-        cwd: testRootDir,
-        slashCommands: [],
-        commandContext: mockCommandContext,
-        reverseSearchActive: false,
-        shellModeActive,
-        config: mockConfig,
-        active,
-      });
-      hookResult = { ...completion, textBuffer };
-      return null;
-    }
-    renderWithProviders(<TestComponent />);
+    const renderResult = renderWithProviders(
+      <TestComponent
+        initialText={initialText}
+        cursorOffset={cursorOffset}
+        shellModeActive={shellModeActive}
+        active={active}
+      />,
+    );
     return {
       result: {
         get current() {
           return hookResult;
         },
       },
+      ...renderResult,
     };
   };
 
@@ -464,6 +497,31 @@ describe('useCommandCompletion', () => {
       expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
     });
 
+    it('should insert canonical slash command text when suggestion provides insertValue', async () => {
+      setupMocks({
+        slashSuggestions: [
+          {
+            label: 'list',
+            value: 'list',
+            insertValue: 'resume list',
+          },
+        ],
+        slashCompletionRange: { completionStart: 1, completionEnd: 5 },
+      });
+
+      const { result } = renderCommandCompletionHook('/resu');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/resume list ');
+    });
+
     it('should complete a file path when cursor is not at the end of the line', async () => {
       const text = '@src/fi is a good file';
       const cursorOffset = 7; // after "i"
@@ -523,6 +581,129 @@ describe('useCommandCompletion', () => {
       });
 
       expect(result.current.textBuffer.text).toBe('@src\\components\\');
+    });
+
+    it('should show ghost text for a single shell completion', async () => {
+      const text = 'l';
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 1,
+          query: 'l',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook(
+        text,
+        text.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Should show "ls " as ghost text (including trailing space)
+      expect(result.current.promptCompletion.text).toBe('ls ');
+    });
+
+    it('should not show ghost text if there are multiple completions', async () => {
+      const text = 'l';
+      setupMocks({
+        shellSuggestions: [
+          { label: 'ls', value: 'ls' },
+          { label: 'ln', value: 'ln' },
+        ],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 1,
+          query: 'l',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook(
+        text,
+        text.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(result.current.promptCompletion.text).toBe('');
+    });
+
+    it('should not show ghost text if the typed text extends past the completion', async () => {
+      // "ls " is already typed.
+      const text = 'ls ';
+      const cursorOffset = text.length;
+
+      const { result } = renderCommandCompletionHook(
+        text,
+        cursorOffset,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(result.current.promptCompletion.text).toBe('');
+    });
+
+    it('should clear ghost text after user types a space when exact match ghost text was showing', async () => {
+      const textWithoutSpace = 'ls';
+
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 2,
+          query: 'ls',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook(
+        textWithoutSpace,
+        textWithoutSpace.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Initially no ghost text because "ls" perfectly matches "ls"
+      expect(result.current.promptCompletion.text).toBe('');
+
+      // Now simulate typing a space.
+      // In the real app, shellCompletionRange.completionStart would change immediately to 3,
+      // but suggestions (and activeStart) would still be from the previous token for a few ms.
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }], // Stale suggestions
+        shellCompletionRange: {
+          completionStart: 3, // New token position
+          completionEnd: 3,
+          query: '',
+          activeStart: 0, // Stale active start
+        },
+      });
+
+      act(() => {
+        result.current.textBuffer.setText('ls ', 'end');
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Should STILL be empty because completionStart (3) !== activeStart (0)
+      expect(result.current.promptCompletion.text).toBe('');
     });
   });
 
