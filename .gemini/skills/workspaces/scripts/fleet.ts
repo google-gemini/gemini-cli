@@ -78,25 +78,6 @@ async function stopWorker() {
   await provider.stop();
 }
 
-async function remoteStatus() {
-  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
-  if (!fs.existsSync(settingsPath)) {
-      console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
-      return;
-  }
-  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.workspace;
-  
-  const provider = ProviderFactory.getProvider({ 
-    projectId: config?.projectId || getProjectId(), 
-    zone: config?.zone || DEFAULT_ZONE, 
-    instanceName: INSTANCE_PREFIX 
-  });
-
-  console.log(`📡 Fetching remote status from ${INSTANCE_PREFIX}...`);
-  await provider.exec('tsx /mnt/disks/data/scripts/status.ts');
-}
-
 async function rebuildWorker() {
   const projectId = getProjectId();
   console.log(`🔥 Rebuilding worker ${INSTANCE_PREFIX}...`);
@@ -126,9 +107,6 @@ async function main() {
       break;
     case 'stop':
       await stopWorker();
-      break;
-    case 'status':
-      await remoteStatus();
       break;
     default:
       console.error(`❌ Unknown fleet action: ${action}`);

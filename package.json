@@ -69,7 +69,7 @@
     "workspace:check": "tsx .gemini/skills/workspaces/scripts/check.ts",
     "workspace:clean": "tsx .gemini/skills/workspaces/scripts/clean.ts",
     "workspace:fleet": "tsx .gemini/skills/workspaces/scripts/fleet.ts",
-    "workspace:status": "npm run workspace:fleet status",
+    "workspace:status": "tsx .gemini/skills/workspaces/scripts/status.ts",
     "workspace:attach": "tsx .gemini/skills/workspaces/scripts/attach.ts",
     "workspace:logs": "tsx .gemini/skills/workspaces/scripts/logs.ts",
     "workspace:remove": "tsx .gemini/skills/workspaces/scripts/clean.ts",
