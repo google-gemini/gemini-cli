@@ -3241,9 +3241,9 @@ describe('Transformation Utilities', () => {
       },
     ])(
       'should invalidate cache when line content changes $desc',
-      ({ actFn, expected }) => {
+      async ({ actFn, expected }) => {
         const viewport = { width: 80, height: 24 };
-        const { result } = renderHookWithProviders(() =>
+        const { result } = await renderHookWithProviders(() =>
           useTextBuffer({
             initialText: 'original line',
             viewport,
@@ -3262,9 +3262,9 @@ describe('Transformation Utilities', () => {
       },
     );
 
-    it('should invalidate cache when viewport width changes', () => {
+    it('should invalidate cache when viewport width changes', async () => {
       const viewport = { width: 80, height: 24 };
-      const { result, rerender } = renderHookWithProviders(
+      const { result, rerender } = await renderHookWithProviders(
         ({ vp }) =>
           useTextBuffer({
             initialText:
@@ -3284,10 +3284,10 @@ describe('Transformation Utilities', () => {
       expect(result.current.allVisualLines.length).toBeGreaterThan(1);
     });
 
-    it('should correctly handle cursor expansion/collapse in cached layout', () => {
+    it('should correctly handle cursor expansion/collapse in cached layout', async () => {
       const viewport = { width: 80, height: 24 };
       const text = 'Check @image.png here';
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useTextBuffer({
           initialText: text,
           viewport,
@@ -3317,10 +3317,10 @@ describe('Transformation Utilities', () => {
       expect(result.current.allVisualLines[0]).toContain('[Image image.png]');
     });
 
-    it('should reuse cache for unchanged lines during editing', () => {
+    it('should reuse cache for unchanged lines during editing', async () => {
       const viewport = { width: 80, height: 24 };
       const initialText = 'line 1\nline 2\nline 3';
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useTextBuffer({
           initialText,
           viewport,

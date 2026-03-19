@@ -25,7 +25,7 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = (metrics: SessionMetrics) => {
+const renderWithMockedStats = async (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session-id',
@@ -39,7 +39,9 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return renderWithProviders(<StatsDisplay duration="1s" />, { width: 100 });
+  return renderWithProviders(<StatsDisplay duration="1s" />, {
+    width: 100,
+  });
 };
 
 // Helper to create metrics with default zero values
@@ -79,7 +81,8 @@ describe('<StatsDisplay />', () => {
   it('renders only the Performance section in its zero state', async () => {
     const zeroMetrics = createTestMetrics();
 
-    const { lastFrame, waitUntilReady } = renderWithMockedStats(zeroMetrics);
+    const { lastFrame, waitUntilReady } =
+      await renderWithMockedStats(zeroMetrics);
     await waitUntilReady();
     const output = lastFrame();
 
@@ -120,7 +123,7 @@ describe('<StatsDisplay />', () => {
       },
     });
 
-    const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+    const { lastFrame, waitUntilReady } = await renderWithMockedStats(metrics);
     await waitUntilReady();
     const output = lastFrame();
 
@@ -176,7 +179,7 @@ describe('<StatsDisplay />', () => {
       },
     });
 
-    const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+    const { lastFrame, waitUntilReady } = await renderWithMockedStats(metrics);
     await waitUntilReady();
     const output = lastFrame();
 
@@ -218,7 +221,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       const output = lastFrame();
 
@@ -247,7 +251,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       const output = lastFrame();
 
@@ -272,7 +277,8 @@ describe('<StatsDisplay />', () => {
           byName: {},
         },
       });
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -293,7 +299,8 @@ describe('<StatsDisplay />', () => {
           byName: {},
         },
       });
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -314,7 +321,8 @@ describe('<StatsDisplay />', () => {
           byName: {},
         },
       });
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
@@ -342,7 +350,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       const output = lastFrame();
 
@@ -369,7 +378,8 @@ describe('<StatsDisplay />', () => {
         },
       });
 
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(metrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(metrics);
       await waitUntilReady();
       const output = lastFrame();
 
@@ -382,7 +392,8 @@ describe('<StatsDisplay />', () => {
     const zeroMetrics = createTestMetrics();
 
     it('renders the default title when no title prop is provided', async () => {
-      const { lastFrame, waitUntilReady } = renderWithMockedStats(zeroMetrics);
+      const { lastFrame, waitUntilReady } =
+        await renderWithMockedStats(zeroMetrics);
       await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('Session Stats');
@@ -404,7 +415,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <StatsDisplay duration="1s" title="Agent powering down. Goodbye!" />,
         { width: 100 },
       );
@@ -466,7 +477,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <StatsDisplay duration="1s" quotas={quotas} />,
         { width: 100 },
       );
@@ -514,7 +525,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <StatsDisplay
           duration="1s"
           quotas={quotas}
@@ -570,7 +581,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <StatsDisplay duration="1s" quotas={quotas} />,
         { width: 100 },
       );
@@ -603,7 +614,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <StatsDisplay
           duration="1s"
           selectedAuthType="oauth"
@@ -636,7 +647,7 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <StatsDisplay duration="1s" selectedAuthType="Google API Key" />,
         { width: 100 },
       );

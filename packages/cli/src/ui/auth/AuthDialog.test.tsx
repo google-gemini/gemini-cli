@@ -143,7 +143,7 @@ describe('AuthDialog', () => {
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value as string);
         }
-        const { waitUntilReady, unmount } = renderWithProviders(
+        const { waitUntilReady, unmount } = await renderWithProviders(
           <AuthDialog {...props} />,
         );
         await waitUntilReady();
@@ -161,7 +161,7 @@ describe('AuthDialog', () => {
 
   it('filters auth types when enforcedType is set', async () => {
     props.settings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <AuthDialog {...props} />,
     );
     await waitUntilReady();
@@ -173,7 +173,7 @@ describe('AuthDialog', () => {
 
   it('sets initial index to 0 when enforcedType is set', async () => {
     props.settings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <AuthDialog {...props} />,
     );
     await waitUntilReady();
@@ -213,7 +213,7 @@ describe('AuthDialog', () => {
       },
     ])('selects initial auth type $desc', async ({ setup, expected }) => {
       setup();
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -226,7 +226,7 @@ describe('AuthDialog', () => {
   describe('handleAuthSelect', () => {
     it('calls onAuthError if validation fails', async () => {
       mockedValidateAuthMethod.mockReturnValue('Invalid method');
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -245,7 +245,7 @@ describe('AuthDialog', () => {
 
     it('sets auth context with requiresRestart: true for LOGIN_WITH_GOOGLE', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -261,7 +261,7 @@ describe('AuthDialog', () => {
 
     it('sets auth context with empty object for other auth types', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -278,7 +278,7 @@ describe('AuthDialog', () => {
       vi.stubEnv('GEMINI_API_KEY', 'test-key-from-env');
       // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
 
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -297,7 +297,7 @@ describe('AuthDialog', () => {
       vi.stubEnv('GEMINI_API_KEY', ''); // Empty string
       // props.settings.merged.security.auth.selectedType is undefined here
 
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -316,7 +316,7 @@ describe('AuthDialog', () => {
       // process.env['GEMINI_API_KEY'] is not set
       // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
 
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -337,7 +337,7 @@ describe('AuthDialog', () => {
       props.settings.merged.security.auth.selectedType =
         AuthType.LOGIN_WITH_GOOGLE;
 
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -360,7 +360,7 @@ describe('AuthDialog', () => {
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
       mockedValidateAuthMethod.mockReturnValue(null);
 
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -383,7 +383,7 @@ describe('AuthDialog', () => {
 
   it('displays authError when provided', async () => {
     props.authError = 'Something went wrong';
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AuthDialog {...props} />,
     );
     await waitUntilReady();
@@ -429,7 +429,7 @@ describe('AuthDialog', () => {
       },
     ])('$desc', async ({ setup, expectations }) => {
       setup();
-      const { waitUntilReady, unmount } = renderWithProviders(
+      const { waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -442,7 +442,7 @@ describe('AuthDialog', () => {
 
   describe('Snapshots', () => {
     it('renders correctly with default props', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -452,7 +452,7 @@ describe('AuthDialog', () => {
 
     it('renders correctly with auth error', async () => {
       props.authError = 'Something went wrong';
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();
@@ -462,7 +462,7 @@ describe('AuthDialog', () => {
 
     it('renders correctly with enforced auth type', async () => {
       props.settings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <AuthDialog {...props} />,
       );
       await waitUntilReady();

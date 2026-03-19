@@ -30,7 +30,7 @@ vi.mock('./shared/ScrollableList.js', () => ({
 
 describe('DetailedMessagesDisplay', () => {
   it('renders nothing when messages are empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay
         messages={[]}
         maxHeight={10}
@@ -54,7 +54,7 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'debug', content: 'Debug message', count: 1 },
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={20}
@@ -77,7 +77,7 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'error', content: 'Error message', count: 1 },
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={20}
@@ -98,7 +98,7 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'error', content: 'Error message', count: 1 },
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={20}
@@ -119,7 +119,7 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'log', content: 'Repeated message', count: 5 },
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={10}

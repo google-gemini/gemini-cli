@@ -12,7 +12,7 @@ import { type UIState } from '../contexts/UIStateContext.js';
 import { type TextBuffer } from './shared/text-buffer.js';
 import { type HistoryItem } from '../types.js';
 
-const renderToastDisplay = (uiState: Partial<UIState> = {}) =>
+const renderToastDisplay = async (uiState: Partial<UIState> = {}) =>
   renderWithProviders(<ToastDisplay />, {
     uiState: {
       buffer: { text: '' } as TextBuffer,
@@ -112,13 +112,13 @@ describe('ToastDisplay', () => {
   });
 
   it('renders nothing by default', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay();
+    const { lastFrame, waitUntilReady } = await renderToastDisplay();
     await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders Ctrl+C prompt', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       ctrlCPressedOnce: true,
     });
     await waitUntilReady();
@@ -126,7 +126,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders warning message', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       transientMessage: {
         text: 'This is a warning',
         type: TransientMessageType.Warning,
@@ -137,7 +137,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders hint message', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       transientMessage: {
         text: 'This is a hint',
         type: TransientMessageType.Hint,
@@ -148,7 +148,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders Ctrl+D prompt', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       ctrlDPressedOnce: true,
     });
     await waitUntilReady();
@@ -156,7 +156,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders Escape prompt when buffer is empty', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       showEscapePrompt: true,
       history: [{ id: 1, type: 'user', text: 'test' }] as HistoryItem[],
     });
@@ -165,7 +165,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders Escape prompt when buffer is NOT empty', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       showEscapePrompt: true,
       buffer: { text: 'some text' } as TextBuffer,
     });
@@ -174,7 +174,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders Queue Error Message', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       queueErrorMessage: 'Queue Error',
     });
     await waitUntilReady();
@@ -182,7 +182,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders expansion hint when showIsExpandableHint is true', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       showIsExpandableHint: true,
       constrainHeight: true,
     });
@@ -193,7 +193,7 @@ describe('ToastDisplay', () => {
   });
 
   it('renders collapse hint when showIsExpandableHint is true and constrainHeight is false', async () => {
-    const { lastFrame, waitUntilReady } = renderToastDisplay({
+    const { lastFrame, waitUntilReady } = await renderToastDisplay({
       showIsExpandableHint: true,
       constrainHeight: false,
     });

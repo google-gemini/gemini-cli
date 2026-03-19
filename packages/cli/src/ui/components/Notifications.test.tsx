@@ -63,6 +63,14 @@ vi.mock('node:path', async () => {
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const MockStorage = vi.fn().mockImplementation(() => ({
+    getExtensionsDir: () => '/mock/home/.gemini/extensions',
+  }));
+  Object.assign(MockStorage, {
+    getGlobalTempDir: () => '/mock/temp',
+    getGlobalSettingsPath: () => '/mock/home/.gemini/settings.json',
+    getGlobalGeminiDir: () => '/mock/home/.gemini',
+  });
   return {
     ...actual,
     GEMINI_DIR: '.gemini',
@@ -71,11 +79,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       Low: 'low',
       High: 'high',
     },
-    Storage: {
-      ...actual.Storage,
-      getGlobalTempDir: () => '/mock/temp',
-      getGlobalSettingsPath: () => '/mock/home/.gemini/settings.json',
-    },
+    Storage: MockStorage,
   };
 });
 
@@ -107,7 +111,7 @@ describe('Notifications', () => {
   });
 
   it('renders nothing when no notifications', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         settings,
@@ -133,7 +137,7 @@ describe('Notifications', () => {
       version: '1.0.0',
     } as AppState;
     mockUseAppContext.mockReturnValue(appState);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         appState,
@@ -159,11 +163,14 @@ describe('Notifications', () => {
     } as AppState;
     mockUseAppContext.mockReturnValue(appState);
 
-    const { waitUntilReady, unmount } = renderWithProviders(<Notifications />, {
-      appState,
-      settings,
-      width: 100,
-    });
+    const { waitUntilReady, unmount } = await renderWithProviders(
+      <Notifications />,
+      {
+        appState,
+        settings,
+        width: 100,
+      },
+    );
     await waitUntilReady();
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
@@ -192,7 +199,7 @@ describe('Notifications', () => {
       startupWarningCounts: { 'low-1': 3 },
     });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         appState,
@@ -221,14 +228,12 @@ describe('Notifications', () => {
     } as AppState;
     mockUseAppContext.mockReturnValue(appState);
 
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <Notifications />,
-      {
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(<Notifications />, {
         appState,
         settings,
         width: 100,
-      },
-    );
+      });
     await waitUntilReady();
     expect(lastFrame()).toContain('High priority 1');
 
@@ -248,7 +253,7 @@ describe('Notifications', () => {
       updateInfo: null,
     } as unknown as UIState;
     mockUseUIState.mockReturnValue(uiState);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         uiState,
@@ -268,7 +273,7 @@ describe('Notifications', () => {
       updateInfo: null,
     } as unknown as UIState;
     mockUseUIState.mockReturnValue(uiState);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         uiState,
@@ -288,7 +293,7 @@ describe('Notifications', () => {
       updateInfo: { message: 'Update available' },
     } as unknown as UIState;
     mockUseUIState.mockReturnValue(uiState);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         uiState,
@@ -306,7 +311,7 @@ describe('Notifications', () => {
     persistentStateMock.setData({ hasSeenScreenReaderNudge: false });
     mockFsAccess.mockRejectedValue(new Error('No legacy file'));
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         settings,
@@ -330,29 +335,24 @@ describe('Notifications', () => {
     persistentStateMock.setData({ hasSeenScreenReaderNudge: undefined });
     mockFsAccess.mockResolvedValue(undefined);
 
-    const { waitUntilReady, unmount } = renderWithProviders(<Notifications />, {
-      settings,
-      width: 100,
-    });
-
     await act(async () => {
-      await waitUntilReady();
-      await waitFor(() => {
-        expect(persistentStateMock.set).toHaveBeenCalledWith(
-          'hasSeenScreenReaderNudge',
-          true,
-        );
-        expect(mockFsUnlink).toHaveBeenCalled();
+      await renderWithProviders(<Notifications />, {
+        settings,
+        width: 100,
       });
     });
-    unmount();
+
+    await waitFor(() => {
+      expect(persistentStateMock.get('hasSeenScreenReaderNudge')).toBe(true);
+    });
+    expect(mockFsUnlink).toHaveBeenCalled();
   });
 
   it('does not render screen reader nudge when already seen in persistent state', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
     persistentStateMock.setData({ hasSeenScreenReaderNudge: true });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Notifications />,
       {
         settings,

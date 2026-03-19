@@ -49,7 +49,7 @@ describe('NewAgentsNotification', () => {
   const onSelect = vi.fn();
 
   it('renders agent list', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <NewAgentsNotification agents={mockAgents} onSelect={onSelect} />,
     );
     await waitUntilReady();
@@ -68,7 +68,7 @@ describe('NewAgentsNotification', () => {
       inputConfig: { inputSchema: {} },
     }));
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = await render(
       <NewAgentsNotification agents={manyAgents} onSelect={onSelect} />,
     );
     await waitUntilReady();
@@ -86,7 +86,7 @@ describe('NewAgentsNotification', () => {
         }),
     );
 
-    const { lastFrame, stdin, unmount } = render(
+    const { lastFrame, stdin, unmount } = await render(
       <NewAgentsNotification agents={mockAgents} onSelect={asyncOnSelect} />,
     );
 

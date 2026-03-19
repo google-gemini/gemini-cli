@@ -28,7 +28,7 @@ describe('<HalfLinePaddedBox />', () => {
   it('renders standard background and blocks when not iTerm2', async () => {
     vi.mocked(isITerm2).mockReturnValue(false);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
         <Text>Content</Text>
       </HalfLinePaddedBox>,
@@ -44,7 +44,7 @@ describe('<HalfLinePaddedBox />', () => {
   it('renders iTerm2-specific blocks when iTerm2 is detected', async () => {
     vi.mocked(isITerm2).mockReturnValue(true);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
         <Text>Content</Text>
       </HalfLinePaddedBox>,
@@ -58,7 +58,7 @@ describe('<HalfLinePaddedBox />', () => {
   });
 
   it('renders nothing when useBackgroundColor is false', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <HalfLinePaddedBox
         backgroundBaseColor="blue"
         backgroundOpacity={0.5}
@@ -78,7 +78,7 @@ describe('<HalfLinePaddedBox />', () => {
   it('renders nothing when screen reader is enabled', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
         <Text>Content</Text>
       </HalfLinePaddedBox>,

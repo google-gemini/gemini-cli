@@ -25,7 +25,7 @@ describe('AboutBox', () => {
   };
 
   it('renders with required props', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AboutBox {...defaultProps} />,
     );
     await waitUntilReady();
@@ -46,7 +46,7 @@ describe('AboutBox', () => {
     ['tier', 'Enterprise', 'Tier'],
   ])('renders optional prop %s', async (prop, value, label) => {
     const props = { ...defaultProps, [prop]: value };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AboutBox {...props} />,
     );
     await waitUntilReady();
@@ -58,7 +58,7 @@ describe('AboutBox', () => {
 
   it('renders Auth Method with email when userEmail is provided', async () => {
     const props = { ...defaultProps, userEmail: 'test@example.com' };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AboutBox {...props} />,
     );
     await waitUntilReady();
@@ -69,7 +69,7 @@ describe('AboutBox', () => {
 
   it('renders Auth Method correctly when not oauth', async () => {
     const props = { ...defaultProps, selectedAuthType: 'api-key' };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <AboutBox {...props} />,
     );
     await waitUntilReady();

@@ -29,7 +29,7 @@ describe('OverageMenuDialog', () => {
 
   describe('rendering', () => {
     it('should match snapshot with fallback available', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -45,7 +45,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should match snapshot without fallback', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={500}
@@ -59,7 +59,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display the credit balance', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={200}
@@ -75,7 +75,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display the model name', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -91,7 +91,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display reset time when provided', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           resetTime="3:45 PM"
@@ -108,7 +108,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should not display reset time when not provided', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -123,7 +123,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display slash command hints', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -143,7 +143,7 @@ describe('OverageMenuDialog', () => {
   describe('onChoice handling', () => {
     it('should call onChoice with use_credits when selected', async () => {
       // use_credits is the first item, so just press Enter
-      const { unmount, stdin, waitUntilReady } = renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -162,7 +162,7 @@ describe('OverageMenuDialog', () => {
 
     it('should call onChoice with manage when selected', async () => {
       // manage is the second item: Down + Enter
-      const { unmount, stdin, waitUntilReady } = renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -183,7 +183,7 @@ describe('OverageMenuDialog', () => {
     it('should call onChoice with use_fallback when selected', async () => {
       // With fallback: items are [use_credits, manage, use_fallback, stop]
       // use_fallback is the third item: Down x2 + Enter
-      const { unmount, stdin, waitUntilReady } = renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -206,7 +206,7 @@ describe('OverageMenuDialog', () => {
     it('should call onChoice with stop when selected', async () => {
       // Without fallback: items are [use_credits, manage, stop]
       // stop is the third item: Down x2 + Enter
-      const { unmount, stdin, waitUntilReady } = renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = await renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}

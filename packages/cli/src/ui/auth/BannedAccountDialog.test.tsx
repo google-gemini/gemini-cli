@@ -73,7 +73,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('renders the suspension message from accountSuspensionInfo', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -89,7 +89,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('renders menu options with appeal link text from response', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -109,7 +109,7 @@ describe('BannedAccountDialog', () => {
     const infoWithoutUrl: AccountSuspensionInfo = {
       message: 'Account suspended.',
     };
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={infoWithoutUrl}
         onExit={onExit}
@@ -129,7 +129,7 @@ describe('BannedAccountDialog', () => {
       message: 'Account suspended.',
       appealUrl: 'https://example.com/appeal',
     };
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={infoWithoutLinkText}
         onExit={onExit}
@@ -143,7 +143,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('opens browser when appeal option is selected', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -162,7 +162,7 @@ describe('BannedAccountDialog', () => {
 
   it('shows URL when browser cannot be launched', async () => {
     mockedShouldLaunchBrowser.mockReturnValue(false);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -180,7 +180,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('calls onExit when "Exit" is selected', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -196,7 +196,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('calls onChangeAuth when "Change authentication" is selected', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -212,7 +212,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('exits on escape key', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
@@ -227,7 +227,7 @@ describe('BannedAccountDialog', () => {
   });
 
   it('renders snapshot correctly', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
