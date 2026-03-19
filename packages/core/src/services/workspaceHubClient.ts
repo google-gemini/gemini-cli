@@ -54,6 +54,16 @@ export class WorkspaceHubClient {
   }
 
   /**
+   * Fetch a specific workspace by ID or name
+   */
+  async getWorkspace(idOrName: string): Promise<WorkspaceHubInfo | null> {
+    const workspaces = await this.listWorkspaces();
+    return (
+      workspaces.find((w) => w.id === idOrName || w.name === idOrName) || null
+    );
+  }
+
+  /**
    * Create a new workspace
    */
   async createWorkspace(

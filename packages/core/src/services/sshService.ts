@@ -21,7 +21,7 @@ export class SSHService {
    * This method spawns a child process and inherits stdio to allow interactive shell.
    */
   async connect(options: SSHOptions): Promise<number> {
-    const { instanceName, zone, project, command, forwardAgent = true } = options;
+    const { instanceName, zone, project, command, forwardAgent = false } = options;
 
     const args = [
       'compute',
@@ -32,6 +32,7 @@ export class SSHService {
       '--tunnel-through-iap',
     ];
 
+    // Security: Only forward agent if explicitly requested
     if (forwardAgent) {
       args.push('--ssh-flag=-A');
     }
@@ -43,9 +44,9 @@ export class SSHService {
     debugLogger.log(`[SSHService] Executing: gcloud ${args.join(' ')}`);
 
     return new Promise((resolve, reject) => {
+      // Security: Do NOT use shell: true to prevent command injection
       const child = spawn('gcloud', args, {
         stdio: 'inherit',
-        shell: true,
       });
 
       child.on('exit', (code) => {
@@ -57,7 +58,11 @@ export class SSHService {
       });
 
       child.on('error', (err) => {
-        reject(err);
+        if ((err as any).code === 'ENOENT') {
+            reject(new Error('gcloud CLI not found. Please install the Google Cloud SDK.'));
+        } else {
+            reject(err);
+        }
       });
     });
   }

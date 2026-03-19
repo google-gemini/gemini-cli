@@ -12,6 +12,27 @@ import chalk from 'chalk';
 interface ConnectArgs {
   config?: Config;
   id: string;
+  forwardAgent?: boolean;
+  wait?: boolean;
+}
+
+async function waitForReady(client: WorkspaceHubClient, id: string): Promise<WorkspaceHubInfo> {
+  let attempts = 0;
+  const maxAttempts = 30; // 5 minutes with 10s interval
+
+  while (attempts < maxAttempts) {
+    const ws = await client.getWorkspace(id);
+    if (!ws) throw new Error(`Workspace ${id} disappeared.`);
+    if (ws.status === 'READY') return ws;
+    if (ws.status === 'ERROR') throw new Error(`Workspace ${id} entered ERROR state.`);
+
+    // eslint-disable-next-line no-console
+    console.log(chalk.blue(`  Status: ${ws.status}. Waiting for READY... (${attempts + 1}/${maxAttempts})`));
+    await new Promise(resolve => setTimeout(resolve, 10000));
+    attempts++;
+  }
+
+  throw new Error(`Timeout waiting for workspace ${id} to become READY.`);
 }
 
 export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>): Promise<void> {
@@ -21,16 +42,14 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
     return;
   }
 
-  const hubUrl = 'http://localhost:8080';
+  const hubUrl = process.env['GEMINI_WORKSPACE_HUB_URL'] || 'http://localhost:8080';
   const client = new WorkspaceHubClient(hubUrl);
 
   try {
     // eslint-disable-next-line no-console
     console.log(chalk.yellow(`Fetching workspace details for "${args.id}"...`));
     
-    // We need to fetch the workspace info to get the instance name and zone
-    const workspaces = await client.listWorkspaces() as WorkspaceHubInfo[];
-    const ws = workspaces.find(w => w.id === args.id || w.name === args.id);
+    let ws = await client.getWorkspace(args.id);
 
     if (!ws) {
       // eslint-disable-next-line no-console
@@ -38,27 +57,35 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
       return;
     }
 
-    const { status, instance_name: instanceName, zone } = ws;
-
-    if (status !== 'READY' && status !== 'PROVISIONING') {
-        // eslint-disable-next-line no-console
-        console.warn(chalk.yellow(`Warning: Workspace is in status ${status}. Connection might fail.`));
+    if (ws.status !== 'READY') {
+        if (args.wait) {
+            ws = await waitForReady(client, args.id);
+        } else {
+            // eslint-disable-next-line no-console
+            console.warn(chalk.yellow(`Warning: Workspace is in status ${ws.status}.`));
+            if (ws.status === 'PROVISIONING') {
+                // eslint-disable-next-line no-console
+                console.log(chalk.blue('Use --wait to automatically wait for provisioning to complete.'));
+            }
+        }
     }
 
     const ssh = new SSHService();
-    const project = 'dev-project';
+    // TODO: Get project from config once GCP settings are integrated into core Config
+    const project = process.env['GOOGLE_CLOUD_PROJECT'] || 'dev-project';
 
     // eslint-disable-next-line no-console
-    console.log(chalk.green(`🚀 Teleporting to ${instanceName} (${zone})...`));
+    console.log(chalk.green(`🚀 Teleporting to ${ws.instance_name} (${ws.zone})...`));
     
     // Command to run on the remote VM: attach to the shpool session
     const remoteCommand = 'shpool attach main || shpool attach';
 
     await ssh.connect({
-      instanceName,
-      zone,
+      instanceName: ws.instance_name,
+      zone: ws.zone,
       project,
       command: remoteCommand,
+      forwardAgent: args.forwardAgent,
     });
 
   } catch (error: unknown) {
@@ -71,11 +98,24 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
 export const connectCommand: CommandModule<object, ConnectArgs> = {
   command: 'connect <id>',
   describe: 'Connect to a remote workspace',
-  builder: (yargs) => yargs.positional('id', {
-    type: 'string',
-    describe: 'ID or Name of the workspace to connect to',
-    demandOption: true,
-  }),
+  builder: (yargs) => yargs
+    .positional('id', {
+      type: 'string',
+      describe: 'ID or Name of the workspace to connect to',
+      demandOption: true,
+    })
+    .option('forward-agent', {
+      alias: 'A',
+      type: 'boolean',
+      describe: 'Forward SSH agent to the remote workspace',
+      default: false,
+    })
+    .option('wait', {
+      alias: 'w',
+      type: 'boolean',
+      describe: 'Wait for the workspace to become READY if it is provisioning',
+      default: false,
+    }),
   handler: async (argv) => {
     await connectToWorkspace(argv);
     await exitCli();
