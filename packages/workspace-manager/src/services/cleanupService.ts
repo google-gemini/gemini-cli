@@ -13,41 +13,37 @@ export class CleanupService {
 
   /**
    * Identifies and deletes workspaces that have been idle for too long.
+   * Targets READY, PROVISIONING, and ERROR statuses to prevent leaks.
    * @param ttlMinutes Threshold for idleness in minutes.
    */
   async cleanupIdleWorkspaces(ttlMinutes: number = 240): Promise<number> {
-    // 1. Get all workspaces (Note: in a huge system we'd need to paginate or use a query)
-    // For now, we list all, but in prod we'd query by last_connected_at
     const now = new Date();
     const threshold = new Date(now.getTime() - ttlMinutes * 60 * 1000);
     
-    // Using simple approach: list all, filter in code.
-    // Real implementation should use Firestore .where('last_connected_at', '<', threshold.toISOString())
-    // but Firestore where requires composite indexes for some queries.
-    
-    // We'll just list active ones for now
-    const snapshot = await (this.workspaceService as any).collection
-        .where('status', '==', 'READY')
-        .get();
+    // Fetch all workspaces for evaluation
+    const workspaces = await this.workspaceService.listAllWorkspaces();
 
     let cleanedCount = 0;
-    for (const doc of snapshot.docs) {
-        const data = doc.data();
-        const lastConnected = new Date(data.last_connected_at);
+    for (const ws of workspaces) {
+        const lastConnected = new Date(ws.last_connected_at);
         
+        // Cleanup if idle past TTL
         if (lastConnected < threshold) {
             // eslint-disable-next-line no-console
-            console.log(`[Cleanup] Workspace ${doc.id} (${data.name}) is idle since ${data.last_connected_at}. Cleaning up...`);
+            console.log(`[Cleanup] Workspace ${ws.id} (${ws.name}) is idle since ${ws.last_connected_at} (Status: ${ws.status}). Cleaning up...`);
             
             try {
-                // Delete GCE
-                await this.computeService.deleteWorkspaceInstance(data.instance_name, data.zone);
-                // Update status or delete from DB
-                await this.workspaceService.deleteWorkspace(doc.id);
+                // 1. Delete GCE instance if it exists (or attempts to)
+                // ComputeService handles missing instances gracefully
+                await this.computeService.deleteWorkspaceInstance(ws.instance_name, ws.zone);
+                
+                // 2. Delete record from Firestore
+                await this.workspaceService.deleteWorkspace(ws.id);
+                
                 cleanedCount++;
             } catch (err) {
                 // eslint-disable-next-line no-console
-                console.error(`[Cleanup] Failed to clean up ${doc.id}:`, err);
+                console.error(`[Cleanup] Failed to clean up ${ws.id}:`, err);
             }
         }
     }

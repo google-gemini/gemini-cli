@@ -10,7 +10,8 @@ import {
   SSHService, 
   SyncService, 
   type Config, 
-  type WorkspaceHubInfo 
+  type WorkspaceHubInfo,
+  debugLogger
 } from '@google-gemini-cli-core';
 
 import { exitCli } from '../utils.js';

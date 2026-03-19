@@ -22,6 +22,7 @@ vi.mock('../services/computeService.js', () => ({
     ComputeService: vi.fn().mockImplementation(() => ({
       createWorkspaceInstance: vi.fn().mockResolvedValue(undefined),
       deleteWorkspaceInstance: vi.fn().mockResolvedValue(undefined),
+      getProjectId: vi.fn().mockReturnValue('dev-project'),
     })),
   }));
 

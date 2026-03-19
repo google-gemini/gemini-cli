@@ -23,11 +23,12 @@ app.get('/health', (_req, res) => {
  * Endpoint to trigger cleanup of idle workspaces.
  * Typically called by a Cloud Scheduler job.
  */
-app.post('/cleanup', async (_req, res) => {
+app.post('/cleanup', async (req, res) => {
     try {
         const cleanupService = new CleanupService();
-        const count = await cleanupService.cleanupIdleWorkspaces();
-        res.json({ status: 'ok', cleaned_count: count });
+        const ttlMinutes = req.body.ttl_minutes ? Number(req.body.ttl_minutes) : 240;
+        const count = await cleanupService.cleanupIdleWorkspaces(ttlMinutes);
+        res.json({ status: 'ok', cleaned_count: count, ttl_minutes: ttlMinutes });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         res.status(500).json({ error: message });

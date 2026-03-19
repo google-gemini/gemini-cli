@@ -29,12 +29,25 @@ export class WorkspaceService {
     this.firestore = new Firestore();
   }
 
-  private get collection() {
+  getCollection() {
     return this.firestore.collection('workspaces');
   }
 
+  async listAllWorkspaces(): Promise<WorkspaceRecord[]> {
+    const snapshot = await this.getCollection().get();
+
+    return snapshot.docs.map((doc) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const data = doc.data() as WorkspaceData;
+      return {
+        id: doc.id,
+        ...data,
+      };
+    });
+  }
+
   async listWorkspaces(ownerId: string): Promise<WorkspaceRecord[]> {
-    const snapshot = await this.collection
+    const snapshot = await this.getCollection()
       .where('owner_id', '==', ownerId)
       .get();
 
@@ -56,14 +69,14 @@ export class WorkspaceService {
   }
 
   async createWorkspace(id: string, data: WorkspaceData): Promise<void> {
-    await this.collection.doc(id).set(data);
+    await this.getCollection().doc(id).set(data);
   }
 
   async updateWorkspace(id: string, data: Partial<WorkspaceData>): Promise<void> {
-    await this.collection.doc(id).update(data);
+    await this.getCollection().doc(id).update(data);
   }
 
   async deleteWorkspace(id: string): Promise<void> {
-    await this.collection.doc(id).delete();
+    await this.getCollection().doc(id).delete();
   }
 }

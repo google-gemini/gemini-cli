@@ -97,7 +97,7 @@ export class WorkspaceHubClient {
    * Notify the hub that a user is connecting to a workspace
    */
   async notifyConnect(id: string): Promise<void> {
-    const url = `${this.hubUrl}/workspaces/${id}/connect`;
+    const url = new URL(`/workspaces/${id}/connect`, this.hubUrl).toString();
     const response = await fetchWithTimeout(url, 5000, {
       method: 'POST',
     });
