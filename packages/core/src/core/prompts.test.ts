@@ -457,7 +457,7 @@ describe('Core System Prompt (prompts.ts)', () => {
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).toContain(
-          'Use `grep_search` and `glob` search tools extensively',
+          'Use the `tilth` CLI command (for structural maps and symbol discovery), `grep_search` and `glob` search tools extensively',
         );
       }
       expect(prompt).toMatchSnapshot();

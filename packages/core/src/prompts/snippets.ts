@@ -202,7 +202,9 @@ Consider the following when estimating the cost of your approach:
 Use the following guidelines to optimize your search and read patterns.
 <guidelines>
 - Combine turns whenever possible by utilizing parallel searching and reading and by requesting enough context by passing context, before, or after to ${GREP_TOOL_NAME}, to enable you to skip using an extra turn reading the file.
-- Prefer using tools like ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
+- Prefer using the \`tilth\` CLI command (via \`${SHELL_TOOL_NAME}\`) and ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
+- Utilize \`tilth\` for structural awareness. Use \`${SHELL_TOOL_NAME}\` to run \`tilth <path>\` to get an AST-aware outline of large files, which is more token-efficient than \`${READ_FILE_TOOL_NAME}\`. Run \`tilth --map\` for a high-level codebase overview and \`tilth <query>\` for smart symbol searching that ranks definitions first.
+- **CRITICAL:** Always actively manage your context size when using \`tilth\`. Use the \`--budget <tokens>\` flag (e.g., \`--budget 2000\`) to force \`tilth\` to summarize or truncate its output if it gets too large. Use the \`--section <range>\` flag (e.g., \`--section 10-50\`) to drill down into specific lines.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
 - ${READ_FILE_TOOL_NAME} fails if ${EDIT_PARAM_OLD_STRING} is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
@@ -211,10 +213,12 @@ Use the following guidelines to optimize your search and read patterns.
 </guidelines>
 
 <examples>
+- **Initial Discovery:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth --map --budget 2000\` to quickly understand the project structure and token distribution across files safely.
+- **Symbol Exploration:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth <symbol> --budget 1500\` to find both definitions and usages with structural context in a single turn.
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize \`${SHELL_TOOL_NAME}\` to run \`tilth <path> --budget 2000\` to see a file's "skeleton" (imports, types, functions) before deciding which specific sections to read in detail with \`${READ_FILE_TOOL_NAME}\` or \`tilth <path> --section 45-89\`. Alternatively, use ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -656,17 +660,17 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   if (searchTools.length > 0) {
     const toolsStr = searchTools.join(' and ');
     const toolOrTools = searchTools.length > 1 ? 'tools' : 'tool';
-    searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
+    searchSentence = ` Use the \`tilth\` CLI command (for structural maps and symbol discovery), ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
   }
 
   if (options.enableCodebaseInvestigator) {
     let subAgentSearch = '';
     if (searchTools.length > 0) {
       const toolsStr = searchTools.join(' or ');
-      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
+      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use the \`tilth\` CLI command or ${toolsStr} directly in parallel.`;
     }
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. ${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
   return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
