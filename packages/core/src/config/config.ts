@@ -275,13 +275,13 @@ export interface CustomTheme {
 export interface BrowserAgentCustomConfig {
   /**
    * Session mode:
-   * - 'persistent': Launch Chrome with a persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
-   * - 'isolated': Launch Chrome with a temporary profile, cleaned up after session
+   * - 'persistent': Launch Chrome with a persistent profile at ~/.cache/chrome-devtools-mcp/
+   * - 'isolated': Launch Chrome with a temporary profile, cleaned up after session (default)
    * - 'existing': Attach to an already-running Chrome instance (requires remote debugging
    *   enabled at chrome://inspect/#remote-debugging)
    */
   sessionMode?: 'isolated' | 'persistent' | 'existing';
-  /** Run browser in headless mode. Default: false */
+  /** Run browser in headless mode. Default: true */
   headless?: boolean;
   /** Path to Chrome profile directory for session persistence. */
   profilePath?: string;
@@ -2602,8 +2602,8 @@ export class Config {
       enabled: override?.enabled ?? false,
       model: override?.modelConfig?.model,
       customConfig: {
-        sessionMode: customConfig.sessionMode ?? 'persistent',
-        headless: customConfig.headless ?? false,
+        sessionMode: customConfig.sessionMode ?? 'isolated',
+        headless: customConfig.headless ?? true,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
       },
