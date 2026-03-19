@@ -947,6 +947,23 @@ export class Session {
     try {
       const invocation = tool.build(args);
 
+      const displayTitle =
+        typeof invocation.getDisplayTitle === 'function'
+          ? invocation.getDisplayTitle()
+          : invocation.getDescription();
+
+      const explanation =
+        typeof invocation.getExplanation === 'function'
+          ? invocation.getExplanation()
+          : '';
+
+      if (explanation) {
+        await this.sendUpdate({
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: explanation },
+        });
+      }
+
       const confirmationDetails =
         await invocation.shouldConfirmExecute(abortSignal);
 
@@ -978,7 +995,7 @@ export class Session {
           toolCall: {
             toolCallId: callId,
             status: 'pending',
-            title: invocation.getDescription(),
+            title: displayTitle,
             content,
             locations: invocation.toolLocations(),
             kind: toAcpToolKind(tool.kind),
@@ -1014,12 +1031,14 @@ export class Session {
           }
         }
       } else {
+        const content: acp.ToolCallContent[] = [];
+
         await this.sendUpdate({
           sessionUpdate: 'tool_call',
           toolCallId: callId,
           status: 'in_progress',
-          title: invocation.getDescription(),
-          content: [],
+          title: displayTitle,
+          content,
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(tool.kind),
         });
@@ -1028,12 +1047,14 @@ export class Session {
       const toolResult: ToolResult = await invocation.execute(abortSignal);
       const content = toToolCallContent(toolResult);
 
+      const updateContent: acp.ToolCallContent[] = content ? [content] : [];
+
       await this.sendUpdate({
         sessionUpdate: 'tool_call_update',
         toolCallId: callId,
         status: 'completed',
-        title: invocation.getDescription(),
-        content: content ? [content] : [],
+        title: displayTitle,
+        content: updateContent,
         locations: invocation.toolLocations(),
         kind: toAcpToolKind(tool.kind),
       });
