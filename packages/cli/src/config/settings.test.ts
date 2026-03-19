@@ -1573,6 +1573,32 @@ describe('Settings Loading and Merging', () => {
       delete process.env['DB_PORT'];
     });
 
+    it('should resolve ${VAR-default} to default when unset, but keep empty string', () => {
+      delete process.env['UNSET_VAR'];
+      process.env['EMPTY_VAR'] = '';
+      const userSettingsContent: TestSettings = {
+        apiKey: '${UNSET_VAR-default-key-123}',
+        endpoint: '${EMPTY_VAR-fallback}',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        'default-key-123',
+      );
+      expect((settings.user.settings as TestSettings)['endpoint']).toBe('');
+      delete process.env['EMPTY_VAR'];
+    });
+
     describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
       const MOCK_ENV_SYSTEM_SETTINGS_PATH = '/mock/env/system/settings.json';
 
