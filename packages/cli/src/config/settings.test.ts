@@ -2751,6 +2751,28 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.config).toEqual(mcpServers);
     });
 
+    it('should map requiredMcpConfig from remote settings', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const requiredMcpConfig = {
+        'corp-tool': {
+          url: 'https://mcp.corp/tool',
+          type: 'http' as const,
+          trust: true,
+        },
+      };
+
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {
+          mcpEnabled: true,
+          requiredMcpConfig,
+        },
+      });
+
+      expect(loadedSettings.merged.admin?.mcp?.requiredConfig).toEqual(
+        requiredMcpConfig,
+      );
+    });
+
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
       const loadedSettings = loadSettings();
       loadedSettings.setRemoteAdminSettings({

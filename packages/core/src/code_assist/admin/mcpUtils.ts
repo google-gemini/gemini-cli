@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MCPServerConfig } from '../../config/config.js';
+import { MCPServerConfig } from '../../config/config.js';
+import type { RequiredMcpServerConfig } from '../types.js';
 
 /**
  * Applies the admin allowlist to the local MCP servers.
@@ -64,4 +65,59 @@ export function applyAdminAllowlist(
     }
   }
   return { mcpServers: filteredMcpServers, blockedServerNames };
+}
+
+/**
+ * Applies admin-required MCP servers by injecting them into the MCP server
+ * list. Required servers always take precedence over locally configured servers
+ * with the same name and cannot be disabled by the user.
+ *
+ * @param mcpServers The current MCP servers (after allowlist filtering).
+ * @param requiredServers The admin-required MCP server configurations.
+ * @returns The MCP servers with required servers injected, and the list of
+ *   required server names for informational purposes.
+ */
+export function applyRequiredServers(
+  mcpServers: Record<string, MCPServerConfig>,
+  requiredServers: Record<string, RequiredMcpServerConfig> | undefined,
+): {
+  mcpServers: Record<string, MCPServerConfig>;
+  requiredServerNames: string[];
+} {
+  if (!requiredServers || Object.keys(requiredServers).length === 0) {
+    return { mcpServers, requiredServerNames: [] };
+  }
+
+  const result: Record<string, MCPServerConfig> = { ...mcpServers };
+  const requiredServerNames: string[] = [];
+
+  for (const [serverId, requiredConfig] of Object.entries(requiredServers)) {
+    requiredServerNames.push(serverId);
+
+    // Convert RequiredMcpServerConfig to MCPServerConfig.
+    // Required servers completely override any local config with the same name.
+    result[serverId] = new MCPServerConfig(
+      undefined, // command (stdio not supported for required servers)
+      undefined, // args
+      undefined, // env
+      undefined, // cwd
+      requiredConfig.url, // url
+      undefined, // httpUrl (use url + type instead)
+      requiredConfig.headers, // headers
+      undefined, // tcp
+      requiredConfig.type, // type
+      requiredConfig.timeout, // timeout
+      requiredConfig.trust ?? true, // trust defaults to true for admin-forced
+      requiredConfig.description, // description
+      requiredConfig.includeTools, // includeTools
+      requiredConfig.excludeTools, // excludeTools
+      undefined, // extension
+      requiredConfig.oauth, // oauth
+      requiredConfig.authProviderType, // authProviderType
+      requiredConfig.targetAudience, // targetAudience
+      requiredConfig.targetServiceAccount, // targetServiceAccount
+    );
+  }
+
+  return { mcpServers: result, requiredServerNames };
 }

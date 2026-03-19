@@ -224,6 +224,89 @@ describe('Admin Controls', () => {
       const result = sanitizeAdminSettings(input);
       expect(result.strictModeDisabled).toBe(true);
     });
+
+    it('should parse requiredMcpServers from mcpConfigJson', () => {
+      const mcpConfig = {
+        mcpServers: {
+          'allowed-server': {
+            url: 'http://allowed.com',
+            type: 'sse' as const,
+          },
+        },
+        requiredMcpServers: {
+          'corp-tool': {
+            url: 'https://mcp.corp/tool',
+            type: 'http' as const,
+            trust: true,
+            description: 'Corp compliance tool',
+          },
+        },
+      };
+
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig),
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting?.mcpConfig?.mcpServers).toEqual(
+        mcpConfig.mcpServers,
+      );
+      expect(result.mcpSetting?.requiredMcpConfig).toEqual(
+        mcpConfig.requiredMcpServers,
+      );
+    });
+
+    it('should sort requiredMcpServers tool lists for stable comparison', () => {
+      const mcpConfig = {
+        requiredMcpServers: {
+          'corp-tool': {
+            url: 'https://mcp.corp/tool',
+            type: 'http' as const,
+            includeTools: ['toolC', 'toolA', 'toolB'],
+            excludeTools: ['toolZ', 'toolX'],
+          },
+        },
+      };
+
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig),
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      const corpTool = result.mcpSetting?.requiredMcpConfig?.['corp-tool'];
+      expect(corpTool?.includeTools).toEqual(['toolA', 'toolB', 'toolC']);
+      expect(corpTool?.excludeTools).toEqual(['toolX', 'toolZ']);
+    });
+
+    it('should handle mcpConfigJson with only requiredMcpServers and no mcpServers', () => {
+      const mcpConfig = {
+        requiredMcpServers: {
+          'required-only': {
+            url: 'https://required.corp/tool',
+            type: 'http' as const,
+          },
+        },
+      };
+
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig),
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting?.mcpConfig?.mcpServers).toBeUndefined();
+      expect(result.mcpSetting?.requiredMcpConfig).toEqual(
+        mcpConfig.requiredMcpServers,
+      );
+    });
   });
 
   describe('isDeepStrictEqual verification', () => {
