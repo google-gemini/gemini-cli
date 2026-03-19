@@ -7,7 +7,7 @@ automate complex workflows, and manage background processes safely.
 ## Prerequisites
 
 - Gemini CLI installed and authenticated.
-- Basic familiarity with your system's shell (Bash, Zsh, PowerShell, etc.).
+- Basic familiarity with your system's shell (Bash, Zsh, PowerShell, and so on).
 
 ## How to run commands directly (`!`)
 
@@ -49,7 +49,7 @@ You want to run tests and fix any failures.
 6.  Gemini uses `replace` to fix the bug.
 7.  Gemini runs `npm test` again to verify the fix.
 
-This loop turns Gemini into an autonomous engineer.
+This loop lets Gemini work autonomously.
 
 ## How to manage background processes
 
@@ -75,7 +75,7 @@ confirmation prompts) by streaming the output to you. However, for highly
 interactive tools (like `vim` or `top`), it's often better to run them yourself
 in a separate terminal window or use the `!` prefix.
 
-## Safety first
+## Safety features
 
 Giving an AI access to your shell is powerful but risky. Gemini CLI includes
 several safety layers.
