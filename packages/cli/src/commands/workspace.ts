@@ -9,6 +9,7 @@ import type { CommandModule, Argv } from 'yargs';
 import { listCommand } from './workspace/list.js';
 import { createCommand } from './workspace/create.js';
 import { deleteCommand } from './workspace/delete.js';
+import { connectCommand } from './workspace/connect.js';
 import { defer } from '../deferred.js';
 
 export const remoteWorkspaceCommand: CommandModule = {
@@ -22,6 +23,7 @@ export const remoteWorkspaceCommand: CommandModule = {
       .command(defer(listCommand, 'wsr'))
       .command(defer(createCommand, 'wsr'))
       .command(defer(deleteCommand, 'wsr'))
+      .command(defer(connectCommand, 'wsr'))
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
 

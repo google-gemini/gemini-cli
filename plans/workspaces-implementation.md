@@ -25,10 +25,10 @@ Enable developers to manage their remote fleet from the local CLI. See
 - [x] Add local configuration for Hub discovery (`settings.json`).
 
 ### Milestone 3: Connectivity & Persistence (Phase 3)
-
 Enable the "Teleport" experience with session persistence.
-
+See [Milestone 3 Sub-plan](./milestone-3-connectivity.md) for details.
 - [ ] Implement `gemini workspace connect`.
+
 - [ ] Setup `gcloud compute ssh --tunnel-through-iap` logic in the client.
 - [ ] Integrate `shpool` into the container entrypoint for session detachment.
 

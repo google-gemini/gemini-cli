@@ -150,12 +150,36 @@ const deleteCommand: SlashCommand = {
   },
 };
 
+const connectCommand: SlashCommand = {
+  name: 'connect',
+  description: 'Connect to a remote workspace',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (
+    _context: CommandContext,
+    args: string,
+  ): Promise<MessageActionReturn> => {
+    const id = args.trim();
+    if (!id) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Workspace ID is required. Usage: /workspace connect <id>',
+      };
+    }
+    return {
+      type: 'submit_prompt',
+      content: `I want to connect to remote workspace "${id}". Please run the connect command.`,
+    };
+  },
+};
+
 export const workspaceSlashCommand: SlashCommand = {
   name: 'workspace',
   altNames: ['wsr'],
   description: 'Manage remote workspaces',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  subCommands: [listCommand, createCommand, deleteCommand],
+  subCommands: [listCommand, createCommand, deleteCommand, connectCommand],
   action: async (context: CommandContext) => listAction(context),
 };

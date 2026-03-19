@@ -134,6 +134,7 @@ export * from './services/trackerTypes.js';
 export * from './services/keychainService.js';
 export * from './services/keychainTypes.js';
 export * from './services/workspaceHubClient.js';
+export * from './services/sshService.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
