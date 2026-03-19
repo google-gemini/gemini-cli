@@ -68,6 +68,7 @@
     "workspace:setup": "tsx .gemini/skills/workspaces/scripts/setup.ts",
     "workspace:check": "tsx .gemini/skills/workspaces/scripts/check.ts",
     "workspace:clean": "tsx .gemini/skills/workspaces/scripts/clean.ts",
+    "workspace:prune": "tsx .gemini/skills/workspaces/scripts/clean.ts",
     "workspace:fleet": "tsx .gemini/skills/workspaces/scripts/fleet.ts",
     "workspace:status": "tsx .gemini/skills/workspaces/scripts/status.ts",
     "workspace:attach": "tsx .gemini/skills/workspaces/scripts/attach.ts",
