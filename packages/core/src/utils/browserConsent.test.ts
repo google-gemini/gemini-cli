@@ -47,7 +47,7 @@ describe('browserConsent', () => {
     expect(emitSpy).not.toHaveBeenCalled();
   });
 
-  it('should auto-accept in non-interactive mode (no listeners)', async () => {
+  it('should auto-accept in non-interactive mode (no listeners) without persisting consent', async () => {
     // Consent file does not exist
     vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
     // No listeners registered
@@ -56,11 +56,9 @@ describe('browserConsent', () => {
     const result = await getBrowserConsentIfNeeded();
 
     expect(result).toBe(true);
-    // Should persist the consent
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringContaining('browser-consent-acknowledged.txt'),
-      expect.stringContaining('consent acknowledged'),
-    );
+    // Should NOT persist the consent — an interactive user on the same machine
+    // must still see the dialog the first time they use the browser agent.
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 
   it('should request consent interactively and return true when accepted', async () => {
