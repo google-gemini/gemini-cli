@@ -46,6 +46,11 @@ export interface ExtensionConfig {
    * Used to migrate an extension to a new repository source.
    */
   migratedTo?: string;
+  /**
+   * Path to a module that implements the TrajectoryProvider interface.
+   * Used for importing binary chat histories like Jetski Teleportation.
+   */
+  trajectoryProvider?: string;
 }
 
 export interface ExtensionUpdateInfo {
