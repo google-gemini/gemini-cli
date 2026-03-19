@@ -166,15 +166,9 @@ export class FileCommandLoader implements ICommandLoader {
 
     // 2. Project commands (skip if same directory as user commands, e.g. when
     //    cwd is the user's home directory, to avoid false conflict warnings)
-    const projectCommandsDir = storage.getProjectCommandsDir();
-    const userDirResolved = normalizePath(resolveToRealPath(userCommandsDir));
-    const projectDirResolved = normalizePath(
-      resolveToRealPath(projectCommandsDir),
-    );
-
-    if (userDirResolved !== projectDirResolved) {
+    if (!storage.isWorkspaceHomeDir()) {
       dirs.push({
-        path: projectCommandsDir,
+        path: storage.getProjectCommandsDir(),
         kind: CommandKind.WORKSPACE_FILE,
       });
     }
