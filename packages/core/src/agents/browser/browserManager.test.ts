@@ -49,7 +49,7 @@ vi.mock('../../telemetry/metrics.js', () => ({
 }));
 
 // Mock browser consent to always grant consent by default
-vi.mock('../../../utils/browserConsent.js', () => ({
+vi.mock('../../utils/browserConsent.js', () => ({
   getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
 }));
 
