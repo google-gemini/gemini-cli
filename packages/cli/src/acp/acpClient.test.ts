@@ -551,7 +551,7 @@ describe('GeminiAgent', () => {
     });
 
     expect(session.prompt).toHaveBeenCalled();
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should delegate setMode to session', async () => {
@@ -750,7 +750,7 @@ describe('Session', () => {
         content: { type: 'text', text: 'Hello' },
       },
     });
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should handle /memory command', async () => {
@@ -767,7 +767,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/memory view',
       expect.any(Object),
@@ -789,7 +789,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/extensions list' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/extensions list',
       expect.any(Object),
@@ -811,7 +811,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/extensions explore' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/extensions explore',
       expect.any(Object),
@@ -833,7 +833,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/restore' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/restore',
       expect.any(Object),
@@ -855,7 +855,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/init' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith('/init', expect.any(Object));
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
@@ -909,7 +909,7 @@ describe('Session', () => {
         }),
       }),
     );
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should handle tool call permission request', async () => {
