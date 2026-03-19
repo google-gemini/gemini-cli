@@ -84,6 +84,23 @@ describe('Memory Manager Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
+  it('should not match paths where .gemini is a substring (e.g. not.gemini)', async () => {
+    const toolCall = {
+      name: 'read_file',
+      args: { file_path: '/tmp/not.gemini/evil' },
+    };
+    const result = await engine.check(
+      toolCall,
+      undefined,
+      undefined,
+      'save_memory',
+    );
+    // The tighter argsPattern requires .gemini/ to be preceded by start-of-string
+    // or a path separator, so "not.gemini/" should NOT match the memory-manager rule.
+    // It falls through to the global read_file allow rule instead.
+    expect(result.decision).toBe(PolicyDecision.ALLOW);
+  });
+
   it('should fall through to global allow rule for other agents accessing ~/.gemini/', async () => {
     const toolCall = {
       name: 'read_file',

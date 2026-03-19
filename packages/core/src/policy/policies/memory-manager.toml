@@ -6,5 +6,5 @@ subagent = "save_memory"
 toolName = ["read_file", "write_file", "replace", "list_directory", "glob", "grep_search"]
 decision = "allow"
 priority = 100
-argsPattern = ".*\\.gemini/.*"
+argsPattern = "(^|.*/)\\.gemini/.*"
 deny_message = "Memory Manager is only allowed to access the .gemini folder."
