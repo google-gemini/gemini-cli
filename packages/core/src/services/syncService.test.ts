@@ -27,33 +27,38 @@ describe('SyncService', () => {
     service = new SyncService();
   });
 
-  it('should construct correct gcloud scp command', async () => {
-    const mockChild = new EventEmitter() as any;
-    vi.mocked(spawn).mockReturnValue(mockChild);
+  it('should construct correct gcloud scp command for each essential item', async () => {
+    // We need to simulate multiple successful exits for the multiple spawn calls
+    vi.mocked(spawn).mockImplementation(() => {
+        const child = new EventEmitter() as any;
+        // Emit exit on next tick to ensure promise resolves correctly
+        process.nextTick(() => child.emit('exit', 0));
+        return child;
+    });
 
-    const promise = service.pushSettings({
+    await service.pushSettings({
       instanceName: 'test-inst',
       zone: 'us-west1-a',
       project: 'test-project',
     });
 
-    setTimeout(() => mockChild.emit('exit', 0), 10);
-
-    await promise;
-
+    // Check first call (settings.json)
     expect(spawn).toHaveBeenCalledWith(
       'gcloud',
       [
         'compute',
         'scp',
         '--recurse',
-        '/mock/local/dir',
-        'test-inst:.gemini',
+        '/mock/local/dir/settings.json',
+        'test-inst:',
         '--zone=us-west1-a',
         '--project=test-project',
         '--tunnel-through-iap',
       ],
       expect.any(Object)
     );
+
+    // Check total number of calls matches the essentials list
+    expect(spawn).toHaveBeenCalledTimes(5); 
   });
 });

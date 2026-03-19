@@ -23,44 +23,44 @@ export class SyncService {
     const { instanceName, zone, project } = options;
     const localDir = Storage.getGlobalGeminiDir();
     
-    // We want to sync the contents of ~/.gemini to ~/.gemini on the remote.
-    // gcloud compute scp local-dir remote-instance:remote-dir
-    const remotePath = `${instanceName}:.gemini`;
+    // Fix: Using the home directory as destination to avoid nested .gemini/.gemini
+    const remotePath = `${instanceName}:`;
 
-    // Note: gcloud scp doesn't have a native "exclude" flag like rsync, 
-    // so we might need to be selective or use a tarball approach if it's too slow.
-    // For v1, we just push the whole thing but excluding the 'tmp' and 'logs' folder if possible
-    // via a manual scp of subdirectories, or just the whole thing for simplicity now.
+    // Performance/Robustness: Exclude large and local-only folders.
+    // Since gcloud scp doesn't support --exclude, we could either:
+    // 1. scp specific sub-folders (settings.json, commands, skills, policies)
+    // 2. Use a temporary tarball on the local side, scp it, and extract remotely.
+    // For now, let's just sync the essential sub-directories to keep it fast.
     
-    const args = [
-      'compute',
-      'scp',
-      '--recurse',
-      localDir,
-      remotePath,
-      `--zone=${zone}`,
-      `--project=${project}`,
-      '--tunnel-through-iap',
-    ];
+    const essentials = ['settings.json', 'commands', 'skills', 'policies', 'memory.md'];
+    
+    debugLogger.log(`[SyncService] Syncing essential settings to ${instanceName}...`);
 
-    debugLogger.log(`[SyncService] Syncing settings: gcloud ${args.join(' ')}`);
+    for (const item of essentials) {
+        const localItem = `${localDir}/${item}`;
+        const args = [
+            'compute',
+            'scp',
+            '--recurse',
+            localItem,
+            remotePath,
+            `--zone=${zone}`,
+            `--project=${project}`,
+            '--tunnel-through-iap',
+        ];
 
-    return new Promise((resolve, reject) => {
-      const child = spawn('gcloud', args, {
-        stdio: 'inherit',
-      });
-
-      child.on('exit', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`gcloud scp exited with code ${code}`));
-        }
-      });
-
-      child.on('error', (err) => {
-        reject(err);
-      });
-    });
+        await new Promise<void>((resolve, reject) => {
+            const child = spawn('gcloud', args, { stdio: 'ignore' });
+            child.on('exit', (code) => {
+                if (code === 0) resolve();
+                else debugLogger.warn(`[SyncService] Failed to sync ${item}, skipping...`);
+                resolve(); // Don't fail the whole sync if one item fails
+            });
+            child.on('error', (err) => {
+                debugLogger.error(`[SyncService] Error syncing ${item}:`, err);
+                resolve();
+            });
+        });
+    }
   }
 }
