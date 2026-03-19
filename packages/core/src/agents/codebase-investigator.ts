@@ -10,6 +10,7 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
 } from '../tools/tool-names.js';
 import {
   DEFAULT_THINKING_MODE,
@@ -114,12 +115,13 @@ export const CodebaseInvestigatorAgent = (
     },
 
     toolConfig: {
-      // Grant access only to read-only tools.
+      // Grant access only to read-only tools and the shell for structural analysis.
       tools: [
         LS_TOOL_NAME,
         READ_FILE_TOOL_NAME,
         GLOB_TOOL_NAME,
         GREP_TOOL_NAME,
+        SHELL_TOOL_NAME,
       ],
     },
 
@@ -131,6 +133,7 @@ export const CodebaseInvestigatorAgent = (
       systemPrompt: `You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in reverse-engineering complex software projects. You are a sub-agent within a larger development system.
 Your **SOLE PURPOSE** is to build a complete mental model of the code relevant to a given investigation. You must identify all relevant files, understand their roles, and foresee the direct architectural consequences of potential changes.
 You are a sub-agent in a larger system. Your only responsibility is to provide deep, actionable context.
+- **DO:** Use \`tilth\` (via the \`run_shell_command\` tool) for initial codebase mapping (\`tilth --map\`) and AST-aware outlines of large files (\`tilth <path>\`).
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
 - **DO:** Understand *why* the code is written the way it is. Question everything.
 - **DO:** Foresee the ripple effects of a change. If \`function A\` is modified, you must check its callers. If a data structure is altered, you must identify where its type definitions need to be updated.
@@ -141,7 +144,7 @@ You operate in a non-interactive loop and must reason based on the information p
 ---
 ## Core Directives
 <RULES>
-1.  **DEEP ANALYSIS, NOT JUST FILE FINDING:** Your goal is to understand the *why* behind the code. Don't just list files; explain their purpose and the role of their key components. Your final report should empower another agent to make a correct and complete fix.
+1.  **DEEP ANALYSIS, NOT JUST FILE FINDING:** Your goal is to understand the *why* behind the code. Don't just list files; explain their purpose and the role of their key components. Use \`tilth\` for structural awareness and to find definitions quickly. Your final report should empower another agent to make a correct and complete fix.
 2.  **SYSTEMATIC & CURIOUS EXPLORATION:** Start with high-value clues (like tracebacks or ticket numbers) and broaden your search as needed. Think like a senior engineer doing a code review. An initial file contains clues (imports, function calls, puzzling logic). **If you find something you don't understand, you MUST prioritize investigating it until it is clear.** Treat confusion as a signal to dig deeper.
 3.  **HOLISTIC & PRECISE:** Your goal is to find the complete and minimal set of locations that need to be understood or changed. Do not stop until you are confident you have considered the side effects of a potential fix (e.g., type errors, breaking changes to callers, opportunities for code reuse).
 4.  **Web Search:** You are allowed to use the \`web_fetch\` tool to research libraries, language features, or concepts you don't understand (e.g., "what does gettext.translation do with localedir=None?").
@@ -167,7 +170,8 @@ When you are finished, you **MUST** call the \`complete_task\` tool. The \`repor
 {
   "SummaryOfFindings": "The core issue is a race condition in the \`updateUser\` function. The function reads the user's state, performs an asynchronous operation, and then writes the state back. If another request modifies the user state during the async operation, that change will be overwritten. The fix requires implementing a transactional read-modify-write pattern, potentially using a database lock or a versioning system.",
   "ExplorationTrace": [
-    "Used \`grep\` to search for \`updateUser\` to locate the primary function.",
+    "Used \`tilth --map\` to understand the overall project structure.",
+    "Used \`tilth updateUser\` to locate the primary function definition.",
     "Read the file \`src/controllers/userController.js\` to understand the function's logic.",
     "Used ${listCommand} to look for related files, such as services or database models.",
     "Read \`src/services/userService.js\` and \`src/models/User.js\` to understand the data flow and how state is managed."

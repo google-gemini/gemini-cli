@@ -23,8 +23,6 @@ import {
   GREP_PARAM_CONTEXT,
   GREP_PARAM_BEFORE,
   GREP_PARAM_AFTER,
-  READ_FILE_PARAM_START_LINE,
-  READ_FILE_PARAM_END_LINE,
   SHELL_PARAM_IS_BACKGROUND,
   EDIT_PARAM_OLD_STRING,
   TRACKER_CREATE_TASK_TOOL_NAME,
@@ -202,9 +200,11 @@ Consider the following when estimating the cost of your approach:
 Use the following guidelines to optimize your search and read patterns.
 <guidelines>
 - Combine turns whenever possible by utilizing parallel searching and reading and by requesting enough context by passing context, before, or after to ${GREP_TOOL_NAME}, to enable you to skip using an extra turn reading the file.
-- Prefer using the \`tilth\` CLI command (via \`${SHELL_TOOL_NAME}\`) and ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
-- Utilize \`tilth\` for structural awareness. Use \`${SHELL_TOOL_NAME}\` to run \`tilth <path>\` to get an AST-aware outline of large files, which is more token-efficient than \`${READ_FILE_TOOL_NAME}\`. Run \`tilth --map\` for a high-level codebase overview and \`tilth <query>\` for smart symbol searching that ranks definitions first.
-- **CRITICAL:** Always actively manage your context size when using \`tilth\`. Use the \`--budget <tokens>\` flag (e.g., \`--budget 2000\`) to force \`tilth\` to summarize or truncate its output if it gets too large. Use the \`--section <range>\` flag (e.g., \`--section 10-50\`) to drill down into specific lines.
+- **Structural Awareness:** Prefer the \`tilth\` CLI command (via \`${SHELL_TOOL_NAME}\`) over search tools for initial discovery. \`tilth\` understands code structure (AST) and provides higher signal-to-noise context for symbol discovery and codebase mapping.
+- **Search First:** To explore code, always search first. \`tilth <symbol>\` finds definitions, usages, and file locations in one call. Use directory listing or glob tools ONLY when you have no specific symbol or text to search for.
+- **Avoid Redundancy:** DO NOT use \`${READ_FILE_TOOL_NAME}\` or re-read files if the content you need is already shown in expanded \`tilth\` search results.
+- **AST-Aware Outlines:** Use \`tilth <path>\` via \`${SHELL_TOOL_NAME}\` to get a structural outline of large files. This is significantly more token-efficient than reading the whole file as it shows imports, types, and function signatures while omitting implementation details.
+- **Context Management:** Always manage context size with \`tilth\`. Use \`--budget <tokens>\` (e.g., \`--budget 2000\`) to force truncation/summarization, and \`--section <range>\` (e.g., \`--section 10-50\`) to drill into specific lines.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
 - ${READ_FILE_TOOL_NAME} fails if ${EDIT_PARAM_OLD_STRING} is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
@@ -213,12 +213,12 @@ Use the following guidelines to optimize your search and read patterns.
 </guidelines>
 
 <examples>
-- **Initial Discovery:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth --map --budget 2000\` to quickly understand the project structure and token distribution across files safely.
-- **Symbol Exploration:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth <symbol> --budget 1500\` to find both definitions and usages with structural context in a single turn.
+- **Initial Discovery:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth --map --budget 2000\` to get a structural overview of the project and token distribution. This is the fastest way to build a "big picture" mental model.
+- **Symbol Exploration:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth <symbol> --budget 1500\` to find definitions and usages with structural context in a single turn. This is more precise than standard grep.
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize \`${SHELL_TOOL_NAME}\` to run \`tilth <path> --budget 2000\` to see a file's "skeleton" (imports, types, functions) before deciding which specific sections to read in detail with \`${READ_FILE_TOOL_NAME}\` or \`tilth <path> --section 45-89\`. Alternatively, use ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context.
+- **Large files:** Use \`${SHELL_TOOL_NAME}\` to run \`tilth <path> --budget 2000\` to see a file's "skeleton" (imports, types, functions) before deciding which specific sections to read in detail with specialized tools or \`tilth <path> --section 45-89\`.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
