@@ -10,6 +10,12 @@ import { glob } from 'glob';
 import { load } from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import {
+  buildSkillResourceIndex,
+  type SkillResourceIndex,
+} from './skillResourceIndex.js';
+
+export type { SkillResourceIndex } from './skillResourceIndex.js';
 
 /**
  * Represents the definition of an Agent Skill.
@@ -29,6 +35,12 @@ export interface SkillDefinition {
   isBuiltin?: boolean;
   /** The name of the extension that provided this skill, if any. */
   extensionName?: string;
+  /**
+   * Indexed bundled files under the skill root (relative POSIX paths), if
+   * built at load time (e.g. from disk). Undefined for programmatically
+   * injected skills.
+   */
+  resources?: SkillResourceIndex;
 }
 
 export const FRONTMATTER_REGEX =
@@ -179,11 +191,29 @@ export async function loadSkillFromFile(
     // Sanitize name for use as a filename/directory name (e.g. replace ':' with '-')
     const sanitizedName = frontmatter.name.replace(/[:\\/<>*?"|]/g, '-');
 
+    const root = path.dirname(filePath);
+    let resources: SkillResourceIndex;
+    try {
+      resources = await buildSkillResourceIndex(root);
+    } catch (error) {
+      debugLogger.debug(
+        `Failed to build skill resource index for ${filePath}:`,
+        error,
+      );
+      resources = {
+        scripts: [],
+        references: [],
+        assets: [],
+        other: [],
+      };
+    }
+
     return {
       name: sanitizedName,
       description: frontmatter.description,
       location: filePath,
       body: match[2]?.trim() ?? '',
+      resources,
     };
   } catch (error) {
     debugLogger.log(`Error parsing skill file ${filePath}:`, error);

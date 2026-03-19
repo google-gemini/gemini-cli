@@ -18,9 +18,15 @@ import {
 } from '../config/constants.js';
 import { debugLogger } from './debugLogger.js';
 
-const MAX_ITEMS = 200;
+/** Default cap on files + folders shown in folder-structure summaries. */
+export const MAX_ITEMS = 200;
 const TRUNCATION_INDICATOR = '...';
-const DEFAULT_IGNORED_FOLDERS = new Set([
+/**
+ * Basenames of directories skipped when walking a tree (case-sensitive).
+ * Exported for skill resource indexing so ignore rules stay aligned with
+ * {@link getFolderStructure}.
+ */
+export const DEFAULT_IGNORED_FOLDERS = new Set([
   'node_modules',
   '.git',
   'dist',
