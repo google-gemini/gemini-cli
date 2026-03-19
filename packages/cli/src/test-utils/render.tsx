@@ -18,7 +18,7 @@ import type React from 'react';
 import { act, useState } from 'react';
 import os from 'node:os';
 import path from 'node:path';
-import { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -418,11 +418,10 @@ export const render = (
   stdout.clear();
   act(() => {
     instance = inkRenderDirect(tree, {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       stdout: stdout as unknown as NodeJS.WriteStream,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
       stderr: stderr as unknown as NodeJS.WriteStream,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
       stdin: stdin as unknown as NodeJS.ReadStream,
       debug: false,
       exitOnCtrlC: false,
@@ -501,7 +500,6 @@ const getMockConfigInternal = (): Config => {
   return mockConfigInternal;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const configProxy = new Proxy({} as Config, {
   get(_target, prop) {
     if (prop === 'getTargetDir') {
@@ -528,21 +526,13 @@ const configProxy = new Proxy({} as Config, {
     }
     const internal = getMockConfigInternal();
     if (prop in internal) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return internal[prop as keyof typeof internal];
     }
     throw new Error(`mockConfig does not have property ${String(prop)}`);
   },
 });
 
-export const mockSettings = new LoadedSettings(
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  true,
-  [],
-);
+export const mockSettings = createMockSettings();
 
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
@@ -672,9 +662,8 @@ export const renderWithProviders = (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
     config = configProxy as unknown as Config,
-    useAlternateBuffer = true,
     uiActions,
     persistentState,
     appState = mockAppState,
@@ -686,7 +675,6 @@ export const renderWithProviders = (
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
-    useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
@@ -702,20 +690,17 @@ export const renderWithProviders = (
     button?: 0 | 1 | 2,
   ) => Promise<void>;
 } => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
       get(target, prop) {
         if (prop in target) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return target[prop as keyof typeof target];
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but
         // unprovided property, and if not, throw.
         if (prop in baseMockUiState) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return baseMockUiState[prop as keyof typeof baseMockUiState];
         }
         throw new Error(`mockUiState does not have property ${String(prop)}`);
@@ -733,31 +718,8 @@ export const renderWithProviders = (
   persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
-  let finalSettings = settings;
-  if (useAlternateBuffer !== undefined) {
-    finalSettings = createMockSettings({
-      ...settings.merged,
-      ui: {
-        ...settings.merged.ui,
-        useAlternateBuffer,
-      },
-    });
-  }
-
-  // Wrap config in a Proxy so useAlternateBuffer hook (which reads from Config) gets the correct value,
-  // without replacing the entire config object and its other values.
-  let finalConfig = config;
-  if (useAlternateBuffer !== undefined) {
-    finalConfig = new Proxy(config, {
-      get(target, prop, receiver) {
-        if (prop === 'getUseAlternateBuffer') {
-          return () => useAlternateBuffer;
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return Reflect.get(target, prop, receiver);
-      },
-    });
-  }
+  const finalSettings = settings;
+  const finalConfig = config;
 
   const mainAreaWidth = terminalWidth;
 
@@ -785,7 +747,7 @@ export const renderWithProviders = (
   capturedOverflowState = undefined;
   capturedOverflowActions = undefined;
 
-  const renderResult = render(
+  const wrapWithProviders = (comp: React.ReactElement) => (
     <AppContext.Provider value={appState}>
       <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={finalSettings}>
@@ -821,7 +783,7 @@ export const renderWithProviders = (
                                           flexGrow={0}
                                           flexDirection="column"
                                         >
-                                          {component}
+                                          {comp}
                                         </Box>
                                       </ContextCapture>
                                     </ScrollProvider>
@@ -840,12 +802,16 @@ export const renderWithProviders = (
           </UIStateContext.Provider>
         </SettingsContext.Provider>
       </ConfigContext.Provider>
-    </AppContext.Provider>,
-    terminalWidth,
+    </AppContext.Provider>
   );
+
+  const renderResult = render(wrapWithProviders(component), terminalWidth);
 
   return {
     ...renderResult,
+    rerender: (newComponent: React.ReactElement) => {
+      renderResult.rerender(wrapWithProviders(newComponent));
+    },
     capturedOverflowState,
     capturedOverflowActions,
     simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
@@ -866,9 +832,8 @@ export function renderHook<Result, Props>(
   waitUntilReady: () => Promise<void>;
   generateSvg: () => string;
 } {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
   let currentProps = options?.initialProps as Props;
 
   function TestComponent({
@@ -903,7 +868,6 @@ export function renderHook<Result, Props>(
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       currentProps = props as Props;
     }
     act(() => {
@@ -930,7 +894,6 @@ export function renderHookWithProviders<Result, Props>(
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
-    useAlternateBuffer?: boolean;
   } = {},
 ): {
   result: { current: Result };
@@ -939,7 +902,6 @@ export function renderHookWithProviders<Result, Props>(
   waitUntilReady: () => Promise<void>;
   generateSvg: () => string;
 } {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
@@ -961,7 +923,7 @@ export function renderHookWithProviders<Result, Props>(
   act(() => {
     renderResult = renderWithProviders(
       <Wrapper>
-        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
+        {}
         <TestComponent initialProps={options.initialProps as Props} />
       </Wrapper>,
       options,
@@ -971,7 +933,6 @@ export function renderHookWithProviders<Result, Props>(
   function rerender(newProps?: Props) {
     act(() => {
       if (arguments.length > 0 && setPropsFn) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         setPropsFn(newProps as Props);
       } else if (forceUpdateFn) {
         forceUpdateFn();
