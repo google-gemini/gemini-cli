@@ -176,7 +176,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName ?? definition.name,
     );
-    this.startIndex = context.config.userHintService.getLatestHintIndex();
+    this.startIndex = context.config.injectionService.getLatestInjectionIndex();
   }
 
   private get config(): Config {
@@ -256,8 +256,9 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       return agentArgs;
     }
 
-    const userHints = this.config.userHintService.getUserHintsAfter(
+    const userHints = this.config.injectionService.getInjectionsAfter(
       this.startIndex,
+      'user_steering',
     );
     const formattedHints = formatUserHintsForModel(userHints);
     if (!formattedHints) {

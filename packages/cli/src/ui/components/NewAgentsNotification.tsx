@@ -80,16 +80,35 @@ export const NewAgentsNotification = ({
             borderStyle="single"
             padding={1}
           >
-            {displayAgents.map((agent) => (
-              <Box key={agent.name}>
-                <Box flexShrink={0}>
-                  <Text bold color={theme.text.primary}>
-                    - {agent.name}:{' '}
-                  </Text>
+            {displayAgents.map((agent) => {
+              const mcpServers =
+                agent.kind === 'local' ? agent.mcpServers : undefined;
+              const hasMcpServers =
+                mcpServers && Object.keys(mcpServers).length > 0;
+              return (
+                <Box key={agent.name} flexDirection="column">
+                  <Box>
+                    <Box flexShrink={0}>
+                      <Text bold color={theme.text.primary}>
+                        - {agent.name}:{' '}
+                      </Text>
+                    </Box>
+                    <Text color={theme.text.secondary}>
+                      {' '}
+                      {agent.description}
+                    </Text>
+                  </Box>
+                  {hasMcpServers && (
+                    <Box marginLeft={2}>
+                      <Text color={theme.text.secondary}>
+                        (Includes MCP servers:{' '}
+                        {Object.keys(mcpServers).join(', ')})
+                      </Text>
+                    </Box>
+                  )}
                 </Box>
-                <Text color={theme.text.secondary}> {agent.description}</Text>
-              </Box>
-            ))}
+              );
+            })}
             {remaining > 0 && (
               <Text color={theme.text.secondary}>
                 ... and {remaining} more.

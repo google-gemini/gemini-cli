@@ -5,9 +5,8 @@
  */
 
 import { act } from 'react';
-import { render } from '../../test-utils/render.js';
+import { renderHookWithProviders } from '../../test-utils/render.js';
 import { useKeypress } from './useKeypress.js';
-import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
 import type { Mock } from 'vitest';
@@ -44,17 +43,8 @@ describe(`useKeypress`, () => {
   const onKeypress = vi.fn();
   let originalNodeVersion: string;
 
-  const renderKeypressHook = (isActive = true) => {
-    function TestComponent() {
-      useKeypress(onKeypress, { isActive });
-      return null;
-    }
-    return render(
-      <KeypressProvider>
-        <TestComponent />
-      </KeypressProvider>,
-    );
-  };
+  const renderKeypressHook = (isActive = true) =>
+    renderHookWithProviders(() => useKeypress(onKeypress, { isActive }));
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -21,6 +21,7 @@ describe('ToolConfirmationMessage Redirection', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
   } as unknown as Config;
 
   it('should display redirection warning and tip for redirected commands', async () => {

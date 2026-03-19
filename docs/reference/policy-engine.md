@@ -60,7 +60,7 @@ command.
 ```toml
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "git "
+commandPrefix = "git"
 decision = "ask_user"
 priority = 100
 ```
@@ -89,6 +89,17 @@ The `toolName` in the rule must match the name of the tool being called.
 If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
 the arguments don't match the pattern, the rule does not apply.
+
+#### Execution environment
+
+If `interactive` is specified, the rule will only apply if the CLI's execution
+environment matches the specified boolean value:
+
+- `true`: The rule applies only in interactive mode.
+- `false`: The rule applies only in non-interactive (headless) mode.
+
+If omitted, the rule applies to both interactive and non-interactive
+environments.
 
 ### Decisions
 
@@ -264,7 +275,7 @@ argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
 # This is syntactic sugar for `toolName = "run_shell_command"` and an `argsPattern`.
-commandPrefix = "git "
+commandPrefix = "git"
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
@@ -286,6 +297,10 @@ deny_message = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
+
+# (Optional) A boolean to restrict the rule to interactive (true) or non-interactive (false) environments.
+# If omitted, the rule applies to both.
+interactive = true
 ```
 
 ### Using arrays (lists)
@@ -321,7 +336,7 @@ This rule will ask for user confirmation before executing any `git` command.
 ```toml
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "git "
+commandPrefix = "git"
 decision = "ask_user"
 priority = 100
 ```
@@ -359,6 +374,8 @@ priority = 200
 
 Specify only the `mcpName` to apply a rule to every tool provided by that
 server.
+
+**Note:** This applies to all decision types (`allow`, `deny`, `ask_user`).
 
 ```toml
 # Denies all tools from the `untrusted-server` MCP
