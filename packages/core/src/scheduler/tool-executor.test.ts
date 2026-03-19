@@ -10,6 +10,7 @@ import {
   type Config,
   type ToolResult,
   type AnyToolInvocation,
+  ToolErrorType,
 } from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -765,6 +766,148 @@ describe('ToolExecutor', () => {
         ?.response as Record<string, unknown>;
       expect(response['output']).toBe('TruncatedContent...');
       expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
+    }
+  });
+
+  it('should include structured error fields for typed tool errors', async () => {
+    const mockTool = new MockTool({
+      name: 'readFile',
+      description: 'Read a file',
+    });
+    const invocation = mockTool.build({});
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: '',
+      returnDisplay: 'File not found',
+      error: {
+        message: 'File not found: /src/utils/halper.ts',
+        type: ToolErrorType.FILE_NOT_FOUND,
+      },
+    } as ToolResult);
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-structured-err',
+        name: 'readFile',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-structured-err',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    if (result.status === CoreToolCallStatus.Error) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['error']).toBe('File not found: /src/utils/halper.ts');
+      expect(response['error_type']).toBe('file_not_found');
+      expect(response['recoverable']).toBe(true);
+      expect(response['hint']).toBe(
+        'Verify the file path exists. Use glob or list_directory to find the correct path.',
+      );
+    }
+  });
+
+  it('should include structured error fields for fatal errors', async () => {
+    const mockTool = new MockTool({
+      name: 'writeFile',
+      description: 'Write a file',
+    });
+    const invocation = mockTool.build({});
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: '',
+      returnDisplay: 'No space left',
+      error: {
+        message: 'No space left on device',
+        type: ToolErrorType.NO_SPACE_LEFT,
+      },
+    } as ToolResult);
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-fatal-err',
+        name: 'writeFile',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-fatal-err',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    if (result.status === CoreToolCallStatus.Error) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['error']).toBe('No space left on device');
+      expect(response['error_type']).toBe('no_space_left');
+      expect(response['recoverable']).toBe(false);
+      expect(response['hint']).toBe(
+        'The disk is full. Cannot write files until space is freed.',
+      );
+    }
+  });
+
+  it('should include structured error fields for unhandled exceptions', async () => {
+    const mockTool = new MockTool({
+      name: 'failTool',
+      description: 'A failing tool',
+    });
+    const invocation = mockTool.build({});
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockRejectedValue(
+      new Error('Unexpected crash'),
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-unhandled',
+        name: 'failTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-unhandled',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    if (result.status === CoreToolCallStatus.Error) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['error']).toBe('Unexpected crash');
+      expect(response['error_type']).toBe('unhandled_exception');
+      expect(response['recoverable']).toBe(true);
+      expect(response['hint']).toBe(
+        'Review the error message and adjust your approach.',
+      );
     }
   });
 });

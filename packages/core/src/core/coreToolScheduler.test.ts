@@ -2309,6 +2309,11 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(result.response.error.message).toBe(
         'Tool execution denied by policy.',
       );
+      const responsePayload =
+        result.response.responseParts[0].functionResponse.response;
+      expect(responsePayload.error_type).toBe(ToolErrorType.POLICY_VIOLATION);
+      expect(responsePayload.recoverable).toBe(true);
+      expect(responsePayload.hint).toBeDefined();
     });
 
     it('should return custom deny message when denied in Plan Mode with a specific rule message', async () => {
