@@ -72,6 +72,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       High: 'high',
     },
     Storage: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.Storage,
       getGlobalTempDir: () => '/mock/temp',
       getGlobalSettingsPath: () => '/mock/home/.gemini/settings.json',
