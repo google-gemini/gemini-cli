@@ -714,6 +714,16 @@ input.
 
     ```json
     {
+      "gemini-3.1-flash-lite-preview": {
+        "tier": "flash-lite",
+        "family": "gemini-3",
+        "isPreview": true,
+        "isVisible": true,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
       "gemini-3.1-pro-preview": {
         "tier": "pro",
         "family": "gemini-3",
@@ -825,7 +835,7 @@ input.
         "tier": "auto",
         "isPreview": true,
         "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash",
+        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash",
         "features": {
           "thinking": true,
           "multimodalToolUse": false
@@ -854,6 +864,39 @@ input.
 
     ```json
     {
+      "gemini-3.1-pro-preview": {
+        "default": "gemini-3.1-pro-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          }
+        ]
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "default": "gemini-3.1-pro-preview-customtools",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-pro"
+          }
+        ]
+      },
+      "gemini-3-flash-preview": {
+        "default": "gemini-3-flash-preview",
+        "contexts": [
+          {
+            "condition": {
+              "hasAccessToPreview": false
+            },
+            "target": "gemini-2.5-flash"
+          }
+        ]
+      },
       "gemini-3-pro-preview": {
         "default": "gemini-3-pro-preview",
         "contexts": [
@@ -1025,6 +1068,132 @@ input.
 
   - **Requires restart:** Yes
 
+- **`modelConfigs.modelChains`** (object):
+  - **Description:** Availability policy chains defining fallback behavior for
+    models.
+  - **Default:**
+
+    ```json
+    {
+      "preview": [
+        {
+          "model": "gemini-3-pro-preview",
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-3-flash-preview",
+          "isLastResort": true,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ],
+      "default": [
+        {
+          "model": "gemini-2.5-pro",
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "isLastResort": true,
+          "actions": {
+            "terminal": "prompt",
+            "transient": "prompt",
+            "not_found": "prompt",
+            "unknown": "prompt"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ],
+      "lite": [
+        {
+          "model": "gemini-2.5-flash-lite",
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-flash",
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        },
+        {
+          "model": "gemini-2.5-pro",
+          "isLastResort": true,
+          "actions": {
+            "terminal": "silent",
+            "transient": "silent",
+            "not_found": "silent",
+            "unknown": "silent"
+          },
+          "stateTransitions": {
+            "terminal": "terminal",
+            "transient": "terminal",
+            "not_found": "terminal",
+            "unknown": "terminal"
+          }
+        }
+      ]
+    }
+    ```
+
+  - **Requires restart:** Yes
+
 #### `agents`
 
 - **`agents.overrides`** (object):
@@ -1135,8 +1304,19 @@ input.
   - **Description:** Legacy full-process sandbox execution environment. Set to a
     boolean to enable or disable the sandbox, provide a string path to a sandbox
     profile, or specify an explicit sandbox command (e.g., "docker", "podman",
-    "lxc").
+    "lxc", "windows-native").
   - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`tools.sandboxAllowedPaths`** (array):
+  - **Description:** List of additional paths that the sandbox is allowed to
+    access.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
+- **`tools.sandboxNetworkAccess`** (boolean):
+  - **Description:** Whether the sandbox is allowed to access the network.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`tools.shell.enableInteractiveShell`** (boolean):
@@ -1576,7 +1756,11 @@ input.
   - **Default:** `true`
 
 - **`admin.mcp.config`** (object):
-  - **Description:** Admin-configured MCP servers.
+  - **Description:** Admin-configured MCP servers (allowlist).
+  - **Default:** `{}`
+
+- **`admin.mcp.requiredConfig`** (object):
+  - **Description:** Admin-required MCP servers that are always injected.
   - **Default:** `{}`
 
 - **`admin.skills.enabled`** (boolean):
