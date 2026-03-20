@@ -1922,6 +1922,116 @@ describe('useGeminiStream', () => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
+
+    it('should record client-initiated tool calls in GeminiChat history', async () => {
+      const { result, client: mockGeminiClient } = await renderTestHook();
+
+      mockHandleSlashCommand.mockResolvedValue({
+        type: 'schedule_tool',
+        toolName: 'activate_skill',
+        toolArgs: { name: 'test-skill' },
+      });
+
+      await act(async () => {
+        await result.current.submitQuery('/test-skill');
+      });
+
+      // Simulate tool completion
+      const completedTool: any = {
+        request: {
+          callId: 'test-call-id',
+          name: 'activate_skill',
+          args: { name: 'test-skill' },
+          isClientInitiated: true,
+        },
+        status: CoreToolCallStatus.Success,
+        invocation: {
+          getDescription: () => 'Activating skill test-skill',
+        },
+        tool: {
+          isOutputMarkdown: true,
+        },
+        response: {
+          responseParts: [
+            {
+              functionResponse: {
+                name: 'activate_skill',
+                response: { content: 'skill instructions' },
+              },
+            },
+          ],
+        },
+      };
+
+      await act(async () => {
+        await capturedOnComplete([completedTool]);
+      });
+
+      // Verify that the tool call and response were added to GeminiChat history
+      expect(mockGeminiClient.addHistory).toHaveBeenCalledWith({
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'activate_skill',
+              args: { name: 'test-skill' },
+            },
+          },
+        ],
+      });
+      expect(mockGeminiClient.addHistory).toHaveBeenCalledWith({
+        role: 'user',
+        parts: completedTool.response.responseParts,
+      });
+    });
+
+    it('should NOT record other client-initiated tool calls (like save_memory) in history', async () => {
+      const { result, client: mockGeminiClient } = await renderTestHook();
+
+      mockHandleSlashCommand.mockResolvedValue({
+        type: 'schedule_tool',
+        toolName: 'save_memory',
+        toolArgs: { fact: 'test fact' },
+      });
+
+      await act(async () => {
+        await result.current.submitQuery('/memory add "test fact"');
+      });
+
+      // Simulate tool completion
+      const completedTool: any = {
+        request: {
+          callId: 'test-call-id',
+          name: 'save_memory',
+          args: { fact: 'test fact' },
+          isClientInitiated: true,
+        },
+        status: CoreToolCallStatus.Success,
+        invocation: {
+          getDescription: () => 'Saving memory',
+        },
+        tool: {
+          isOutputMarkdown: true,
+        },
+        response: {
+          responseParts: [
+            {
+              functionResponse: {
+                name: 'save_memory',
+                response: { success: true },
+              },
+            },
+          ],
+        },
+      };
+
+      await act(async () => {
+        await capturedOnComplete([completedTool]);
+      });
+
+      // Verify that addHistory was NOT called
+      expect(mockGeminiClient.addHistory).not.toHaveBeenCalled();
+    });
   });
 
   describe('Memory Refresh on save_memory', () => {
