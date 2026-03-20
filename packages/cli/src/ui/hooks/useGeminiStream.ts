@@ -1736,8 +1736,7 @@ export const useGeminiStream = (
             // Add both the call (model turn) and the result (user turn) to history.
             // Client-initiated calls are essentially "synthetic" turns that let
             // subsequent model calls understand what just happened in the UI.
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            geminiClient.addHistory({
+            await geminiClient.addHistory({
               role: 'model',
               parts: [
                 {
@@ -1748,8 +1747,7 @@ export const useGeminiStream = (
                 },
               ],
             });
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            geminiClient.addHistory({
+            await geminiClient.addHistory({
               role: 'user',
               parts: tool.response.responseParts,
             });
