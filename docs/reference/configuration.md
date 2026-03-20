@@ -1210,6 +1210,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable user input on browser window during automation.
   - **Default:** `true`
 
+- **`agents.browser.maxActionsPerTask`** (number):
+  - **Description:** The maximum number of tool calls allowed per browser task.
+    Enforcement is hard: the agent will be terminated when the limit is reached.
+  - **Default:** `100`
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
