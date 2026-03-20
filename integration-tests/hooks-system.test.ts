@@ -1998,6 +1998,48 @@ console.log(JSON.stringify({
           args: 'Create a file called disabled-test.txt with content "test"',
         });
 
+      const activeScript = `console.log(JSON.stringify(${activeJson}));`;
+      const disabledScript = `console.log(JSON.stringify(${disabledJson}));`;
+      const activeFilename = 'active_hook.js';
+      const disabledFilename = 'disabled_hook.js';
+      const activeCmd = `node ${activeFilename}`;
+      const disabledCmd = `node ${disabledFilename}`;
+
+      // 3. Final setup with full settings
+      // Add fakeResponsesPath and disable routing to run without API key locally
+      rig.setup('Hook Disabling Multiple Ops', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.disabled-via-command.responses',
+        ),
+        settings: {
+          routing: { strategy: 'default' },
+          hooksConfig: {
+            enabled: true,
+            disabled: ['multi-hook-disabled'],
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    name: 'multi-hook-active',
+                    command: activeCmd,
+                    timeout: 60000,
+                  },
+                  {
+                    type: 'command',
+                    name: 'multi-hook-disabled',
+                    command: disabledCmd,
+                    timeout: 60000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
         // Tool should execute (enabled hook allows it)
         const foundWriteFile = await rig.waitForToolCall('write_file');
         expect(foundWriteFile).toBeTruthy();
