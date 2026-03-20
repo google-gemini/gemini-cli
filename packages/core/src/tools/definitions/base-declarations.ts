@@ -56,6 +56,18 @@ export const READ_FILE_PARAM_END_LINE = 'end_line';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const SHELL_PARAM_COMMAND = 'command';
 export const SHELL_PARAM_IS_BACKGROUND = 'is_background';
+export const SHELL_PARAM_WAIT_SECONDS = 'wait_for_output_seconds';
+
+// -- write_to_shell --
+export const WRITE_TO_SHELL_TOOL_NAME = 'write_to_shell';
+export const WRITE_TO_SHELL_PARAM_PID = 'pid';
+export const WRITE_TO_SHELL_PARAM_INPUT = 'input';
+export const WRITE_TO_SHELL_PARAM_SPECIAL_KEYS = 'special_keys';
+
+// -- read_shell --
+export const READ_SHELL_TOOL_NAME = 'read_shell';
+export const READ_SHELL_PARAM_PID = 'pid';
+export const READ_SHELL_PARAM_WAIT_SECONDS = 'wait_seconds';
 
 // -- write_file --
 export const WRITE_FILE_TOOL_NAME = 'write_file';

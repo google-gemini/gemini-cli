@@ -541,6 +541,10 @@ export const useShellCommandProcessor = (
     state.backgroundShells.values(),
   ).filter((s: BackgroundShell) => s.status === 'running').length;
 
+  const showBackgroundShell = useCallback(() => {
+    dispatch({ type: 'SET_VISIBILITY', visible: true });
+  }, [dispatch]);
+
   return {
     handleShellCommand,
     activeShellPtyId: state.activeShellPtyId,
@@ -548,6 +552,7 @@ export const useShellCommandProcessor = (
     backgroundShellCount,
     isBackgroundShellVisible: state.isBackgroundShellVisible,
     toggleBackgroundShell,
+    showBackgroundShell,
     backgroundCurrentShell,
     registerBackgroundShell,
     dismissBackgroundShell,

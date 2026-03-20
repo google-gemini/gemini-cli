@@ -85,7 +85,23 @@ export function shellReducer(
         nextShells.delete(action.pid);
       }
       nextShells.set(action.pid, updatedShell);
-      return { ...state, backgroundShells: nextShells };
+
+      // Auto-hide panel when all shells have exited
+      let nextVisible = state.isBackgroundShellVisible;
+      if (action.update.status === 'exited') {
+        const hasRunning = Array.from(nextShells.values()).some(
+          (s) => s.status === 'running',
+        );
+        if (!hasRunning) {
+          nextVisible = false;
+        }
+      }
+
+      return {
+        ...state,
+        backgroundShells: nextShells,
+        isBackgroundShellVisible: nextVisible,
+      };
     }
     case 'APPEND_SHELL_OUTPUT': {
       const shell = state.backgroundShells.get(action.pid);

@@ -56,12 +56,14 @@ export interface ShellToolParams {
   description?: string;
   dir_path?: string;
   is_background?: boolean;
+  wait_for_output_seconds?: number;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
+  private _autoPromoteTimer?: NodeJS.Timeout;
   constructor(
     private readonly context: AgentLoopContext,
     params: ShellToolParams,
@@ -87,6 +89,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     }
     if (this.params.is_background) {
       description += ' [background]';
+    }
+    if (this.params.wait_for_output_seconds !== undefined) {
+      description += ` [auto-background after ${this.params.wait_for_output_seconds}s]`;
     }
     return description;
   }
@@ -293,6 +298,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
             ShellExecutionService.background(pid);
           }, BACKGROUND_DELAY_MS);
         }
+
+        // In AI mode with wait_for_output_seconds, set up auto-promotion timer.
+        // When the timer fires, promote to background instead of cancelling.
+        if (this.params.wait_for_output_seconds !== undefined) {
+          const waitMs = (this.params.wait_for_output_seconds ?? 5) * 1000;
+          const autoPromoteTimer = setTimeout(() => {
+            ShellExecutionService.background(pid);
+          }, waitMs);
+          // Store so we can clear on normal completion
+          this._autoPromoteTimer = autoPromoteTimer;
+        }
       }
 
       const result = await resultPromise;
@@ -346,7 +362,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
           llmContent += ' There was no output before it was cancelled.';
         }
       } else if (this.params.is_background || result.backgrounded) {
-        llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        const isAutoPromoted =
+          this.params.wait_for_output_seconds !== undefined;
+        if (isAutoPromoted) {
+          llmContent = `Command auto-promoted to background (PID: ${result.pid}). The process is still running. To check its screen state, call the read_shell tool with pid ${result.pid}. To send input or keystrokes, call the write_to_shell tool with pid ${result.pid}. If the process does not exit on its own when done, kill it with write_to_shell using special_keys=["Ctrl-C"].`;
+        } else {
+          llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        }
         data = {
           pid: result.pid,
           command: this.params.command,
@@ -387,7 +409,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         returnDisplayMessage = llmContent;
       } else {
         if (this.params.is_background || result.backgrounded) {
-          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+          const isAutoPromotedDisplay =
+            this.params.wait_for_output_seconds !== undefined;
+          if (isAutoPromotedDisplay) {
+            returnDisplayMessage = `Command auto-promoted to background (PID: ${result.pid}).`;
+          } else {
+            returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+          }
         } else if (result.aborted) {
           const cancelMsg = timeoutMessage || 'Command cancelled by user.';
           if (result.output.trim()) {
@@ -445,6 +473,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      const autoTimer = this._autoPromoteTimer;
+      if (autoTimer) clearTimeout(autoTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       try {
@@ -521,6 +551,7 @@ export class ShellTool extends BaseDeclarativeTool<
     const definition = getShellDefinition(
       this.context.config.getEnableInteractiveShell(),
       this.context.config.getEnableShellOutputEfficiency(),
+      this.context.config.getInteractiveShellMode(),
     );
     return resolveToolDeclaration(definition, modelId);
   }

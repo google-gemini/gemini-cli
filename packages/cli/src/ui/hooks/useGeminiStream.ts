@@ -363,6 +363,7 @@ export const useGeminiStream = (
     toggleBackgroundShell,
     backgroundCurrentShell,
     registerBackgroundShell,
+    showBackgroundShell,
     dismissBackgroundShell,
     backgroundShells,
   } = useShellCommandProcessor(
@@ -1740,6 +1741,7 @@ export const useGeminiStream = (
             backgroundedTool.command,
             backgroundedTool.initialOutput,
           );
+          showBackgroundShell();
         }
       }
 
@@ -1870,6 +1872,7 @@ export const useGeminiStream = (
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundShell,
+      showBackgroundShell,
       consumeUserHint,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,

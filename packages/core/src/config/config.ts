@@ -28,6 +28,8 @@ import { GlobTool } from '../tools/glob.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
+import { WriteToShellTool } from '../tools/write-to-shell.js';
+import { ReadShellTool } from '../tools/read-shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
@@ -610,6 +612,7 @@ export interface ConfigParameters {
   useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
+  interactiveShellMode?: 'human' | 'ai' | 'off';
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -807,6 +810,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
+  private readonly interactiveShellMode: 'human' | 'ai' | 'off';
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
@@ -1103,6 +1107,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
+    // interactiveShellMode takes precedence over enableInteractiveShell.
+    // If not set, derive from enableInteractiveShell for backward compat.
+    if (params.interactiveShellMode) {
+      this.interactiveShellMode = params.interactiveShellMode;
+    } else {
+      this.interactiveShellMode = this.enableInteractiveShell ? 'human' : 'off';
+    }
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -2916,8 +2927,12 @@ export class Config implements McpContext, AgentLoopContext {
     return (
       this.interactive &&
       this.ptyInfo !== 'child_process' &&
-      this.enableInteractiveShell
+      this.interactiveShellMode !== 'off'
     );
+  }
+
+  getInteractiveShellMode(): 'human' | 'ai' | 'off' {
+    return this.interactiveShellMode;
   }
 
   isSkillsSupportEnabled(): boolean {
@@ -3234,6 +3249,15 @@ export class Config implements McpContext, AgentLoopContext {
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),
     );
+    // Register AI-driven interactive shell tools when mode is 'ai'
+    if (this.getInteractiveShellMode() === 'ai') {
+      maybeRegister(WriteToShellTool, () =>
+        registry.registerTool(new WriteToShellTool(this.messageBus)),
+      );
+      maybeRegister(ReadShellTool, () =>
+        registry.registerTool(new ReadShellTool(this.messageBus)),
+      );
+    }
     if (!this.isMemoryManagerEnabled()) {
       maybeRegister(MemoryTool, () =>
         registry.registerTool(new MemoryTool(this.messageBus)),

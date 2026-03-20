@@ -1243,6 +1243,28 @@ export class ShellExecutionService {
   }
 
   /**
+   * Reads the current rendered screen state of a running process.
+   * Returns the full terminal buffer text for PTY processes,
+   * or the accumulated output for child processes.
+   *
+   * @param pid The process ID of the target process.
+   * @returns The screen text, or null if the process is not found.
+   */
+  static readScreen(pid: number): string | null {
+    const activePty = this.activePtys.get(pid);
+    if (activePty) {
+      return getFullBufferText(activePty.headlessTerminal);
+    }
+
+    const activeChild = this.activeChildProcesses.get(pid);
+    if (activeChild) {
+      return activeChild.state.output;
+    }
+
+    return null;
+  }
+
+  /**
    * Resizes the pseudo-terminal (PTY) of a running process.
    *
    * @param pid The process ID of the target PTY.

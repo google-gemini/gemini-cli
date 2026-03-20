@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { type BackgroundShell } from './shellCommandProcessor.js';
 
 export interface BackgroundShellManagerProps {
@@ -32,6 +32,8 @@ export function useBackgroundShellManager({
     number | null
   >(null);
 
+  const prevShellCountRef = useRef(backgroundShellCount);
+
   useEffect(() => {
     if (backgroundShells.size === 0) {
       if (activeBackgroundShellPid !== null) {
@@ -44,9 +46,17 @@ export function useBackgroundShellManager({
       activeBackgroundShellPid === null ||
       !backgroundShells.has(activeBackgroundShellPid)
     ) {
-      // If active shell is closed or none selected, select the first one (last added usually, or just first in iteration)
+      // If active shell is closed or none selected, select the first one
       setActiveBackgroundShellPid(backgroundShells.keys().next().value ?? null);
+    } else if (backgroundShellCount > prevShellCountRef.current) {
+      // A new shell was added — auto-switch to the newest one (last in the map)
+      const pids = Array.from(backgroundShells.keys());
+      const newestPid = pids[pids.length - 1];
+      if (newestPid !== undefined && newestPid !== activeBackgroundShellPid) {
+        setActiveBackgroundShellPid(newestPid);
+      }
     }
+    prevShellCountRef.current = backgroundShellCount;
   }, [
     backgroundShells,
     activeBackgroundShellPid,

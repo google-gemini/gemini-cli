@@ -338,8 +338,16 @@ export const GEMINI_3_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    interactiveShellMode,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      interactiveShellMode,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,
