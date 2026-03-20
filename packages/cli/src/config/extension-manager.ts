@@ -982,18 +982,11 @@ Would you like to attempt to install via "git clone" instead?`,
         plan: config.plan,
       };
     } catch (e) {
-      const extName = path.basename(extensionDir);
-      debugLogger.warn(
-        `Warning: Removing broken extension ${extName}: ${getErrorMessage(e)}`,
+      debugLogger.error(
+        `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
+          e,
+        )}`,
       );
-      try {
-        await fs.promises.rm(extensionDir, { recursive: true, force: true });
-      } catch (rmError) {
-        debugLogger.error(
-          `Failed to remove broken extension directory ${extensionDir}:`,
-          rmError,
-        );
-      }
       return null;
     }
   }
