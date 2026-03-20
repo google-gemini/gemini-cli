@@ -168,6 +168,7 @@ import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
 import {
+  getLastTurnToolCallIds,
   isToolExecuting,
   isToolAwaitingConfirmation,
   getAllToolCalls,
@@ -237,6 +238,39 @@ export const AppContainer = (props: AppContainerProps) => {
   const backgroundTasksRef = useRef<Map<number, BackgroundTask>>(new Map());
 
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
+
+  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
+
+  const toggleExpansion = useCallback((callId: string) => {
+    setExpandedTools((prev) => {
+      const next = new Set(prev);
+      if (next.has(callId)) {
+        next.delete(callId);
+      } else {
+        next.add(callId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAllExpansion = useCallback((callIds: string[]) => {
+    setExpandedTools((prev) => {
+      const next = new Set(prev);
+      const anyCollapsed = callIds.some((id) => !next.has(id));
+
+      if (anyCollapsed) {
+        callIds.forEach((id) => next.add(id));
+      } else {
+        callIds.forEach((id) => next.delete(id));
+      }
+      return next;
+    });
+  }, []);
+
+  const isExpanded = useCallback(
+    (callId: string) => expandedTools.has(callId),
+    [expandedTools],
+  );
 
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
@@ -1137,11 +1171,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
 
-  const hasPendingToolConfirmation = useMemo(
-    () => isToolAwaitingConfirmation(pendingHistoryItems),
-    [pendingHistoryItems],
-  );
-
   toggleBackgroundTasksRef.current = toggleBackgroundTasks;
   isBackgroundTaskVisibleRef.current = isBackgroundTaskVisible;
   backgroundTasksRef.current = backgroundTasks;
@@ -1727,13 +1756,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       }
 
+      const toggleLastTurnTools = () => {
+        // If the user manually collapses/expands the view, show the hint and reset the x-second timer.
+        triggerExpandHint(true);
+
+        const targetToolCallIds = getLastTurnToolCallIds(
+          historyManager.history,
+          pendingHistoryItems,
+        );
+
+        if (targetToolCallIds.length > 0) {
+          toggleAllExpansion(targetToolCallIds);
+        }
+      };
+
       let enteringConstrainHeightMode = false;
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
-          // If the user manually collapses the view, show the hint and reset the x-second timer.
-          triggerExpandHint(true);
+          toggleLastTurnTools();
         }
         if (!isAlternateBuffer) {
           refreshStatic();
@@ -1781,11 +1823,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
-        // If the user manually expands the view, show the hint and reset the x-second timer.
-        triggerExpandHint(true);
-        if (!isAlternateBuffer) {
+        toggleLastTurnTools();
+
+        // Force layout refresh after a short delay to allow the terminal layout to settle.
+        // Minimize "blank screen" issue after any async subview updates are complete.
+        setTimeout(() => {
           refreshStatic();
-        }
+        }, 250);
+
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
@@ -1890,6 +1935,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       triggerExpandHint,
       keyMatchers,
       isHelpDismissKey,
+      historyManager.history,
+      pendingHistoryItems,
+      toggleAllExpansion,
     ],
   );
 
@@ -2032,6 +2080,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
+
+  const hasPendingToolConfirmation = useMemo(
+    () => isToolAwaitingConfirmation(pendingHistoryItems),
+    [pendingHistoryItems],
+  );
 
   const hasConfirmUpdateExtensionRequests =
     confirmUpdateExtensionRequests.length > 0;
@@ -2639,7 +2692,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+            <ToolActionsProvider
+              config={config}
+              toolCalls={allToolCalls}
+              isExpanded={isExpanded}
+              toggleExpansion={toggleExpansion}
+              toggleAllExpansion={toggleAllExpansion}
+            >
               <ShellFocusContext.Provider value={isFocused}>
                 <App key={`app-${forceRerenderKey}`} />
               </ShellFocusContext.Provider>
