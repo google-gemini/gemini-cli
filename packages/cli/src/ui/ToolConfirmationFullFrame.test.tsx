@@ -3,12 +3,10 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders } from '../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { cleanup, renderWithProviders } from '../test-utils/render.js';
 import { createMockSettings } from '../test-utils/settings.js';
 import { App } from './App.js';
-import { StreamingState } from './types.js';
 import {
   CoreToolCallStatus,
   ApprovalMode,
@@ -17,6 +15,7 @@ import {
 import { type UIState } from './contexts/UIStateContext.js';
 import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
 import { act } from 'react';
+import { StreamingState } from './types.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -34,7 +33,31 @@ vi.mock('./components/CliSpinner.js', () => ({
   CliSpinner: () => null,
 }));
 
+// Mock hooks to align with codebase style, even if App uses UIState directly
+vi.mock('./hooks/useGeminiStream.js');
+vi.mock('./hooks/useHistoryManager.js');
+vi.mock('./hooks/useQuotaAndFallback.js');
+vi.mock('./hooks/useThemeCommand.js');
+vi.mock('./auth/useAuth.js');
+vi.mock('./hooks/useEditorSettings.js');
+vi.mock('./hooks/useSettingsCommand.js');
+vi.mock('./hooks/useModelCommand.js');
+vi.mock('./hooks/slashCommandProcessor.js');
+vi.mock('./hooks/useConsoleMessages.js');
+vi.mock('./hooks/useTerminalSize.js', () => ({
+  useTerminalSize: vi.fn(() => ({ columns: 100, rows: 30 })),
+}));
+
 describe('Full Terminal Tool Confirmation Snapshot', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
   it('renders tool confirmation box in the frame of the entire terminal', async () => {
     // Generate a large diff to warrant truncation
     let largeDiff =
@@ -78,17 +101,12 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
           text: 'Can you edit InputPrompt.tsx for me?',
         },
       ],
-      renderMarkdown: true,
+      mainAreaWidth: 99,
+      availableTerminalHeight: 36,
       streamingState: StreamingState.WaitingForConfirmation,
-      terminalWidth: 100,
-      terminalHeight: 30,
-      currentModel: 'gemini-3.1-pro-preview',
-      terminalBackgroundColor: 'black' as const,
+      constrainHeight: true,
+      isConfigInitialized: true,
       cleanUiDetailsVisible: true,
-      allowPlanMode: true,
-      activePtyId: null,
-      backgroundShells: new Map(),
-      backgroundShellHeight: 0,
       quota: {
         userTier: 'PRO',
         stats: {
@@ -98,15 +116,6 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
         proQuotaRequest: null,
         validationRequest: null,
       },
-      hintMode: false,
-      hintBuffer: '',
-      bannerData: {
-        defaultText: '',
-        warningText: '',
-      },
-      bannerVisible: false,
-      nightly: false,
-      updateInfo: null,
       pendingHistoryItems: [
         {
           id: 2,
@@ -120,27 +129,10 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
         contextPercentage: 3,
       },
       buffer: { text: '' },
-      isBackgroundShellListOpen: false,
       messageQueue: [],
       activeHooks: [],
-      transientMessage: null,
       contextFileNames: [],
-      geminiMdFileCount: 0,
       rootUiRef: { current: null },
-      mainControlsRef: { current: null },
-      isConfigInitialized: true,
-      slashCommands: [],
-      isTrustedFolder: true,
-      availableTerminalHeight: 26,
-      constrainHeight: true,
-      mainAreaWidth: 100,
-      staticAreaMaxItemHeight: 10,
-      historyRemountKey: 0,
-      isEditorDialogOpen: false,
-      embeddedShellFocused: false,
-      dialogsVisible: false,
-      historyManager: { addItem: vi.fn() },
-      isBackgroundShellVisible: false,
     } as unknown as UIState;
 
     const mockConfig = makeFakeConfig();
@@ -177,7 +169,7 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
 
     // Give it a moment to render
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
     await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();

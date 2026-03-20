@@ -669,7 +669,7 @@ export const renderWithProviders = async (
     );
   }
 
-  const mainAreaWidth = terminalWidth;
+  const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
   const finalUiState = {
     ...baseState,

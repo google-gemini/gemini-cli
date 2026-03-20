@@ -17,8 +17,7 @@ Apply this change?
 `;
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large edit diffs 1`] = `
-"... first 8 lines hidden (Ctrl+O to show) ...
- 5 - const oldLine5 = true;
+"... first 9 lines hidden (Ctrl+O to show) ...
  5 + const newLine5 = true;
  6 - const oldLine6 = true;
  6 + const newLine6 = true;
@@ -60,8 +59,7 @@ Apply this change?
 `;
 
 exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large exec commands 1`] = `
-"... first 17 lines hidden (Ctrl+O to show) ...
-echo "Line 18"
+"... first 18 lines hidden (Ctrl+O to show) ...
 echo "Line 19"
 echo "Line 20"
 echo "Line 21"

@@ -49,7 +49,6 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 │ ?  run_shell_command Executes a bash command with a deceptive URL                                │
 │                                                                                                  │
 │ ... first 6 lines hidden (Ctrl+O to show) ...                                                    │
-│ echo "Line 36"                                                                                   │
 │ echo "Line 37"                                                                                   │
 │ echo "Line 38"                                                                                   │
 │ echo "Line 39"                                                                                   │
@@ -88,8 +87,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │                                                                                                  │
 │ ?  replace Replaces content in a file                                                            │
 │                                                                                                  │
-│ ... first 14 lines hidden (Ctrl+O to show) ...                                                   │
-│  8 - const oldLine8 = true;                                                                      │
+│ ... first 15 lines hidden (Ctrl+O to show) ...                                                   │
 │  8 + const newLine8 = true;                                                                      │
 │  9 - const oldLine9 = true;                                                                      │
 │  9 + const newLine9 = true;                                                                      │
@@ -133,8 +131,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │                                                                                                  │
 │ ?  run_shell_command Executes a bash command                                                     │
 │                                                                                                  │
-│ ... first 23 lines hidden (Ctrl+O to show) ...                                                   │
-│ echo "Line 24"                                                                                   │
+│ ... first 24 lines hidden (Ctrl+O to show) ...                                                   │
 │ echo "Line 25"                                                                                   │
 │ echo "Line 26"                                                                                   │
 │ echo "Line 27"                                                                                   │
