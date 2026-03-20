@@ -295,14 +295,17 @@ describe('translateEvent', () => {
   });
 
   describe('ModelInfo events', () => {
-    it('emits stream_start when no stream started yet', () => {
+    it('emits stream_start and session_update when no stream started yet', () => {
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.ModelInfo,
         value: 'gemini-2.5-pro',
       };
       const result = translateEvent(event, state);
-      expect(result).toHaveLength(1);
+      expect(result).toHaveLength(2);
       expect(result[0]?.type).toBe('stream_start');
+      expect(result[1]?.type).toBe('session_update');
+      const sessionUpdate = result[1] as AgentEvent<'session_update'>;
+      expect(sessionUpdate.model).toBe('gemini-2.5-pro');
       expect(state.model).toBe('gemini-2.5-pro');
       expect(state.streamStartEmitted).toBe(true);
     });

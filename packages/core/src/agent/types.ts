@@ -92,6 +92,8 @@ export type AgentEvent<
   [K in EventType]: AgentEventCommon & AgentEvents[K] & { type: K };
 }[EventType];
 
+export type AgentEventType = keyof AgentEvents;
+
 export interface AgentEvents {
   /** MUST be the first event emitted in a session. */
   initialize: Initialize;

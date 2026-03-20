@@ -19,7 +19,13 @@ import type {
   StructuredError,
   GeminiFinishedEventValue,
 } from '../core/turn.js';
-import type { AgentEvent, StreamEndReason, ErrorData, Usage } from './types.js';
+import type {
+  AgentEvent,
+  StreamEndReason,
+  ErrorData,
+  Usage,
+  AgentEventType,
+} from './types.js';
 import {
   geminiPartsToContentParts,
   toolResultDisplayToContentParts,
@@ -54,7 +60,7 @@ export function createTranslationState(streamId?: string): TranslationState {
 // ---------------------------------------------------------------------------
 
 function makeEvent(
-  type: AgentEvent['type'],
+  type: AgentEventType,
   state: TranslationState,
   payload: Partial<AgentEvent>,
 ): AgentEvent {
@@ -71,7 +77,7 @@ function makeEvent(
 
 function ensureStreamStart(state: TranslationState, out: AgentEvent[]): void {
   if (!state.streamStartEmitted) {
-    out.push(makeEvent('stream_start', state, { streamId: state.streamId }));
+    out.push(makeEvent('stream_start', state, {}));
     state.streamStartEmitted = true;
   }
 }
@@ -93,14 +99,8 @@ export function translateEvent(
   switch (event.type) {
     case GeminiEventType.ModelInfo:
       state.model = event.value;
-      if (!state.streamStartEmitted) {
-        out.push(
-          makeEvent('stream_start', state, { streamId: state.streamId }),
-        );
-        state.streamStartEmitted = true;
-      } else {
-        out.push(makeEvent('session_update', state, { model: event.value }));
-      }
+      ensureStreamStart(state, out);
+      out.push(makeEvent('session_update', state, { model: event.value }));
       break;
 
     case GeminiEventType.Content:
@@ -149,7 +149,6 @@ export function translateEvent(
       ensureStreamStart(state, out);
       out.push(
         makeEvent('stream_end', state, {
-          streamId: state.streamId,
           reason: 'aborted',
         }),
       );
@@ -193,7 +192,6 @@ export function translateEvent(
       ensureStreamStart(state, out);
       out.push(
         makeEvent('stream_end', state, {
-          streamId: state.streamId,
           reason: 'completed',
           data: {
             message: event.value.systemMessage?.trim() || event.value.reason,
@@ -269,6 +267,9 @@ export function translateEvent(
       break;
 
     default:
+      ((x: never) => {
+        throw new Error(`Unhandled event type: ${JSON.stringify(x)}`);
+      })(event);
       break;
   }
 
@@ -293,7 +294,6 @@ function handleFinished(
 
   out.push(
     makeEvent('stream_end', state, {
-      streamId: state.streamId,
       reason: mapFinishReason(value.reason),
     }),
   );
@@ -343,6 +343,7 @@ export function mapFinishReason(
     case 'OTHER':
       return 'failed';
     default:
+      ((_x: never) => {})(reason);
       return 'failed';
   }
 }
@@ -383,7 +384,7 @@ export function mapHttpToGrpcStatus(
 
 /**
  * Maps a StructuredError (or unknown error value) to an ErrorData payload.
- * Review fix #4: preserves error metadata (name, code, stack) in _meta.
+ * Preserves error metadata (name, code, stack) in _meta.
  */
 export function mapError(
   error: unknown,
