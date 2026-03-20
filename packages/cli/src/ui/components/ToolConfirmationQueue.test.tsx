@@ -466,6 +466,7 @@ describe('ToolConfirmationQueue', () => {
             uiState: {
               mainAreaWidth: 80,
               terminalHeight: 50,
+              terminalWidth: 80,
               constrainHeight: true,
               availableTerminalHeight: 40,
             },
@@ -512,6 +513,7 @@ describe('ToolConfirmationQueue', () => {
           {
             uiState: {
               mainAreaWidth: 80,
+              terminalWidth: 80,
               terminalHeight: 50,
               constrainHeight: true,
               availableTerminalHeight: 40,
@@ -560,6 +562,7 @@ describe('ToolConfirmationQueue', () => {
           {
             uiState: {
               mainAreaWidth: 80,
+              terminalWidth: 80,
               terminalHeight: 50,
               constrainHeight: true,
               availableTerminalHeight: 40,
