@@ -431,8 +431,8 @@ describe('BrowserManager', () => {
       expect(args).not.toContain('--isolated');
 
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'warning',
-        expect.stringContaining('sessionMode: existing'),
+        'info',
+        expect.stringContaining('saved logins will be visible'),
       );
     });
 

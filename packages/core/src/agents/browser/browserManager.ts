@@ -347,10 +347,10 @@ export class BrowserManager {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
       mcpArgs.push('--autoConnect');
-      const warningMessage =
-        "Warning: 'sessionMode: existing' is enabled. The agent will have access to your logged-in browser sessions, cookies, and saved credentials.";
-      coreEvents.emitFeedback('warning', warningMessage);
-      coreEvents.emitConsoleLog('warn', warningMessage);
+      const message =
+        '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
+      coreEvents.emitFeedback('info', message);
+      coreEvents.emitConsoleLog('info', message);
     }
 
     // Add optional settings from config
