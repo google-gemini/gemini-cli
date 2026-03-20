@@ -156,6 +156,8 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         modelAlias,
         useGemini3_1,
         useCustomToolModel,
+        config.getHasAccessToPreviewModel?.() ?? true,
+        config,
       );
 
       const latencyMs = Date.now() - startTime;
