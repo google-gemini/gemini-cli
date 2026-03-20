@@ -58,12 +58,6 @@ const mockSchedulerSchedule = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const { LegacyAgentSession } = await import(
-    '../../core/src/agent/legacy-agent-session.js'
-  );
-  const { geminiPartsToContentParts } = await import(
-    '../../core/src/agent/content-utils.js'
-  );
 
   class MockChatRecordingService {
     initialize = vi.fn();
@@ -83,8 +77,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     uiTelemetryService: {
       getMetrics: vi.fn(),
     },
-    LegacyAgentSession,
-    geminiPartsToContentParts,
+    LegacyAgentSession: original.LegacyAgentSession,
+    geminiPartsToContentParts: original.geminiPartsToContentParts,
     coreEvents: mockCoreEvents,
     createWorkingStdio: vi.fn(() => ({
       stdout: process.stdout,
@@ -278,9 +272,7 @@ describe('runNonInteractive', () => {
   });
 
   it('should stream the specific stream started by send', async () => {
-    const { LegacyAgentSession } = await import(
-      '../../core/src/agent/legacy-agent-session.js'
-    );
+    const { LegacyAgentSession } = await import('@google/gemini-cli-core');
     const streamSpy = vi.spyOn(LegacyAgentSession.prototype, 'stream');
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Hello again' },
@@ -1794,7 +1786,7 @@ describe('runNonInteractive', () => {
       .mockReturnValue('model-1');
 
     // Mock debugLogger.error
-    const { debugLogger } = await import('../../core/src/utils/debugLogger.js');
+    const { debugLogger } = await import('@google/gemini-cli-core');
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
