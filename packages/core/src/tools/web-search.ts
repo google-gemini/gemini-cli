@@ -23,8 +23,6 @@ import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import type { Config } from '../config/config.js';
-import type { GeminiClient } from '../core/client.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -73,12 +71,11 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   WebSearchToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: WebSearchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
-    private readonly geminiClient?: GeminiClient,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
   }
@@ -88,7 +85,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
-    const geminiClient = this.geminiClient ?? this.config.getGeminiClient();
+    const geminiClient = this.context.geminiClient;
 
     try {
       const response = await geminiClient.generateContent(
@@ -208,11 +205,11 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolResult
 > {
   static readonly Name = WEB_SEARCH_TOOL_NAME;
-  private readonly config: Config;
-  private readonly geminiClient?: GeminiClient;
 
-  constructor(context: Config | AgentLoopContext, messageBus: MessageBus) {
-    const config = 'config' in context ? context.config : context;
+  constructor(
+    private readonly context: AgentLoopContext,
+    messageBus: MessageBus,
+  ) {
     super(
       WebSearchTool.Name,
       'GoogleSearch',
@@ -223,10 +220,6 @@ export class WebSearchTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-    this.config = config;
-    if ('config' in context) {
-      this.geminiClient = context.geminiClient;
-    }
   }
 
   /**
@@ -250,12 +243,11 @@ export class WebSearchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
-      this.config,
+      this.context,
       params,
       messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
-      this.geminiClient,
     );
   }
 

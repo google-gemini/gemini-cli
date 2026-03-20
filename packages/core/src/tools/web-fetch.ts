@@ -38,8 +38,6 @@ import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import type { Config } from '../config/config.js';
-import type { GeminiClient } from '../core/client.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 250000;
@@ -227,18 +225,17 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: WebFetchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
-    private readonly geminiClient?: GeminiClient,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
-    const maxAttempts = this.config.getMaxAttempts();
+    const maxAttempts = this.context.config.getMaxAttempts();
     const modelName = 'Web Fetch';
     const errorType = getRetryErrorType(error);
 
@@ -251,7 +248,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     });
 
     logNetworkRetryAttempt(
-      this.config,
+      this.context.config,
       new NetworkRetryAttemptEvent(
         attempt,
         maxAttempts,
@@ -305,7 +302,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         return res;
       },
       {
-        retryFetchErrors: this.config.getRetryFetchErrors(),
+        retryFetchErrors: this.context.config.getRetryFetchErrors(),
         onRetry: (attempt, error, delayMs) =>
           this.handleRetry(attempt, error, delayMs),
         signal,
@@ -352,7 +349,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
         logWebFetchFallbackAttempt(
-          this.config,
+          this.context.config,
           new WebFetchFallbackAttemptEvent('private_ip_skipped'),
         );
         skipped.push(`[Blocked Host] ${url}`);
@@ -437,7 +434,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       .join('\n');
 
     try {
-      const geminiClient = this.geminiClient ?? this.config.getGeminiClient();
+      const geminiClient = this.context.geminiClient;
       const fallbackPrompt = `Follow the user's instructions below using the provided webpage content.
 
 <user_instructions>
@@ -520,7 +517,7 @@ ${aggregatedContent}
   ): Promise<ToolCallConfirmationDetails | false> {
     // Check for AUTO_EDIT approval mode. This tool has a specific behavior
     // where ProceedAlways switches the entire session to AUTO_EDIT.
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
@@ -643,7 +640,7 @@ ${aggregatedContent}
           return res;
         },
         {
-          retryFetchErrors: this.config.getRetryFetchErrors(),
+          retryFetchErrors: this.context.config.getRetryFetchErrors(),
           onRetry: (attempt, error, delayMs) =>
             this.handleRetry(attempt, error, delayMs),
           signal,
@@ -754,7 +751,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    if (this.config.getDirectWebFetch()) {
+    if (this.context.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
     }
     const userPrompt = this.params.prompt!;
@@ -777,7 +774,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     }
 
     try {
-      const geminiClient = this.geminiClient ?? this.config.getGeminiClient();
+      const geminiClient = this.context.geminiClient;
       const sanitizedPrompt = `Follow the user's instructions to process the authorized URLs.
 
 <user_instructions>
@@ -869,7 +866,7 @@ ${toFetch.join('\n')}
         `[WebFetchTool] Primary fetch failed, falling back: ${getErrorMessage(error)}`,
       );
       logWebFetchFallbackAttempt(
-        this.config,
+        this.context.config,
         new WebFetchFallbackAttemptEvent('primary_failed'),
       );
       // Simple All-or-Nothing Fallback
@@ -886,11 +883,11 @@ export class WebFetchTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = WEB_FETCH_TOOL_NAME;
-  private readonly config: Config;
-  private readonly geminiClient?: GeminiClient;
 
-  constructor(context: Config | AgentLoopContext, messageBus: MessageBus) {
-    const config = 'config' in context ? context.config : context;
+  constructor(
+    private readonly context: AgentLoopContext,
+    messageBus: MessageBus,
+  ) {
     super(
       WebFetchTool.Name,
       'WebFetch',
@@ -901,16 +898,12 @@ export class WebFetchTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
-    this.config = config;
-    if ('config' in context) {
-      this.geminiClient = context.geminiClient;
-    }
   }
 
   protected override validateToolParamValues(
     params: WebFetchToolParams,
   ): string | null {
-    if (this.config.getDirectWebFetch()) {
+    if (this.context.config.getDirectWebFetch()) {
       if (!params.url) {
         return "The 'url' parameter is required.";
       }
@@ -946,18 +939,17 @@ export class WebFetchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
     return new WebFetchToolInvocation(
-      this.config,
+      this.context,
       params,
       messageBus,
       _toolName,
       _toolDisplayName,
-      this.geminiClient,
     );
   }
 
   override getSchema(modelId?: string) {
     const schema = resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
-    if (this.config.getDirectWebFetch()) {
+    if (this.context.config.getDirectWebFetch()) {
       return {
         ...schema,
         description:

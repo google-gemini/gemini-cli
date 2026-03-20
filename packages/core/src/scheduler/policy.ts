@@ -119,7 +119,7 @@ export async function updatePolicy(
 ): Promise<void> {
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
-    context.config?.setApprovalMode?.(ApprovalMode.AUTO_EDIT);
+    context.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
     return;
   }
 
@@ -128,8 +128,8 @@ export async function updatePolicy(
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
     // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
     if (
-      context.config?.isTrustedFolder?.() &&
-      context.config?.getWorkspacePoliciesDir?.() !== undefined
+      context.config.isTrustedFolder() &&
+      context.config.getWorkspacePoliciesDir() !== undefined
     ) {
       persistScope = 'workspace';
     } else {
