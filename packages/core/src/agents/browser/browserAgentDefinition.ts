@@ -131,7 +131,7 @@ export const BrowserAgentDefinition = (
     kind: 'local',
     experimental: true,
     displayName: 'Browser Agent',
-    description: `Specialized autonomous agent for end-to-end web browser automation and objective-driven problem solving. Delegate complete, high-level tasks to this agent — it independently plans, executes multi-step interactions, interprets dynamic page feedback (e.g., game states, form validation errors, search results), and iterates until the goal is achieved. It perceives page structure through the Accessibility Tree, handles overlays and popups, and supports complex web apps.`,
+    description: `Specialized autonomous agent for interactive web browser automation requiring real browser rendering. Delegate tasks that require clicking, form-filling, navigating multi-step flows, or interacting with JavaScript-heavy web applications that cannot be accessed via simple HTTP fetching. Do NOT delegate to this agent for simply reading, summarizing, or extracting content from URLs — use the web_fetch tool or other available tools for that instead. This agent independently plans, executes multi-step interactions, interprets dynamic page feedback (e.g., game states, form validation errors, search results), and iterates until the goal is achieved. It perceives page structure through the Accessibility Tree, handles overlays and popups, and supports complex web apps.`,
 
     inputConfig: {
       inputSchema: {

@@ -5,7 +5,6 @@
  */
 
 import { describe, it, afterEach, expect } from 'vitest';
-import { act } from 'react';
 import { AppRig } from './AppRig.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +30,7 @@ describe('AppRig', () => {
       configOverrides: { modelSteering: true },
     });
     await rig.initialize();
-    rig.render();
+    await rig.render();
     await rig.waitForIdle();
 
     // Set breakpoints on the canonical tool names
@@ -69,12 +68,7 @@ describe('AppRig', () => {
     );
     rig = new AppRig({ fakeResponsesPath });
     await rig.initialize();
-    await act(async () => {
-      rig!.render();
-      // Allow async initializations (like banners) to settle within the act boundary
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
+    await rig.render();
     // Wait for initial render
     await rig.waitForIdle();
 

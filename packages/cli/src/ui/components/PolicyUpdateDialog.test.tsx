@@ -57,7 +57,7 @@ describe('PolicyUpdateDialog', () => {
   });
 
   it('renders correctly and matches snapshot', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PolicyUpdateDialog
         config={mockConfig}
         request={mockRequest}
@@ -75,7 +75,7 @@ describe('PolicyUpdateDialog', () => {
   });
 
   it('handles ACCEPT correctly', async () => {
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <PolicyUpdateDialog
         config={mockConfig}
         request={mockRequest}
@@ -98,7 +98,7 @@ describe('PolicyUpdateDialog', () => {
   });
 
   it('handles IGNORE correctly', async () => {
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <PolicyUpdateDialog
         config={mockConfig}
         request={mockRequest}
@@ -122,7 +122,7 @@ describe('PolicyUpdateDialog', () => {
   });
 
   it('calls onClose when Escape key is pressed', async () => {
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <PolicyUpdateDialog
         config={mockConfig}
         request={mockRequest}

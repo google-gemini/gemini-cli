@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, type Mock, beforeEach } from 'vitest';
 import type React from 'react';
 import { renderWithProviders } from '../test-utils/render.js';
+import { createMockSettings } from '../test-utils/settings.js';
 import { Text, useIsScreenReaderEnabled, type DOMElement } from 'ink';
 import { App } from './App.js';
 import { type UIState } from './contexts/UIStateContext.js';
@@ -93,11 +94,11 @@ describe('App', () => {
   };
 
   it('should render main content and composer when not quitting', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: mockUIState,
-        useAlternateBuffer: false,
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -114,11 +115,11 @@ describe('App', () => {
       quittingMessages: [{ id: 1, type: 'user', text: 'test' }],
     } as UIState;
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: quittingUIState,
-        useAlternateBuffer: false,
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -135,11 +136,11 @@ describe('App', () => {
       pendingHistoryItems: [{ type: 'user', text: 'pending item' }],
     } as UIState;
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: quittingUIState,
-        useAlternateBuffer: true,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -155,10 +156,11 @@ describe('App', () => {
       dialogsVisible: true,
     } as UIState;
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: dialogUIState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -181,10 +183,11 @@ describe('App', () => {
         [stateKey]: true,
       } as UIState;
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <App />,
         {
           uiState,
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();
@@ -197,10 +200,11 @@ describe('App', () => {
   it('should render ScreenReaderAppLayout when screen reader is enabled', async () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: mockUIState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -215,10 +219,11 @@ describe('App', () => {
   it('should render DefaultAppLayout when screen reader is not enabled', async () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: mockUIState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -265,15 +270,16 @@ describe('App', () => {
       ],
     } as UIState;
 
-    const configWithExperiment = makeFakeConfig();
+    const configWithExperiment = makeFakeConfig({ useAlternateBuffer: true });
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <App />,
       {
         uiState: stateWithConfirmingTool,
         config: configWithExperiment,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -289,10 +295,11 @@ describe('App', () => {
   describe('Snapshots', () => {
     it('renders default layout correctly', async () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <App />,
         {
           uiState: mockUIState,
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();
@@ -302,10 +309,11 @@ describe('App', () => {
 
     it('renders screen reader layout correctly', async () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <App />,
         {
           uiState: mockUIState,
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();
@@ -318,10 +326,11 @@ describe('App', () => {
         ...mockUIState,
         dialogsVisible: true,
       } as UIState;
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <App />,
         {
           uiState: dialogUIState,
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();

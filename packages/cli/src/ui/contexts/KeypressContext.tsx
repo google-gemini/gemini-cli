@@ -13,6 +13,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
 } from 'react';
 
@@ -21,6 +22,7 @@ import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+import { useSettingsStore } from './SettingsContext.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
@@ -766,12 +768,13 @@ export function useKeypressContext() {
 export function KeypressProvider({
   children,
   config,
-  debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
   config?: Config;
-  debugKeystrokeLogging?: boolean;
 }) {
+  const { settings } = useSettingsStore();
+  const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
+
   const { stdin, setRawMode } = useStdin();
 
   const subscribersToPriority = useRef<Map<KeypressHandler, number>>(
@@ -828,6 +831,9 @@ export function KeypressProvider({
 
   const broadcast = useCallback(
     (key: Key) => {
+      if (debugKeystrokeLogging) {
+        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
       // Use cached sorted priorities to avoid sorting on every keypress
       for (const p of sortedPriorities.current) {
         const set = subscribers.get(p);
@@ -842,7 +848,7 @@ export function KeypressProvider({
         }
       }
     },
-    [subscribers],
+    [subscribers, debugKeystrokeLogging],
   );
 
   useEffect(() => {
@@ -882,8 +888,13 @@ export function KeypressProvider({
     };
   }, [stdin, setRawMode, config, debugKeystrokeLogging, broadcast]);
 
+  const contextValue = useMemo(
+    () => ({ subscribe, unsubscribe }),
+    [subscribe, unsubscribe],
+  );
+
   return (
-    <KeypressContext.Provider value={{ subscribe, unsubscribe }}>
+    <KeypressContext.Provider value={contextValue}>
       {children}
     </KeypressContext.Provider>
   );
