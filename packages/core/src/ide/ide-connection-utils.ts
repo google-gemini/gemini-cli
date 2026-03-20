@@ -292,8 +292,9 @@ export async function createProxyAwareFetch(ideServerHost: string) {
   undiciPromise.catch(() => {});
   return async (url: string | URL, init?: RequestInit): Promise<Response> => {
     const undiciExports = await undiciPromise;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    const fetchFn = undiciExports.fetch ?? (undiciExports as any).default?.fetch;
+    const fetchFn =
+      undiciExports.fetch ??
+      (undiciExports as { default?: { fetch?: typeof undiciExports.fetch } }).default?.fetch;
     const fetchOptions: RequestInit & { dispatcher?: unknown } = {
       ...init,
       dispatcher: agent,
