@@ -150,6 +150,13 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
+  if (authType === AuthType.GATEWAY) {
+    contentGeneratorConfig.apiKey = apiKey || 'gateway-placeholder-key';
+    contentGeneratorConfig.vertexai = false;
+
+    return contentGeneratorConfig;
+  }
+
   return contentGeneratorConfig;
 }
 
@@ -171,6 +178,9 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
         config.authType === AuthType.USE_VERTEX_AI ||
         ((await gcConfig.getGemini31Launched?.()) ?? false),
+      false,
+      gcConfig.getHasAccessToPreviewModel?.() ?? true,
+      gcConfig,
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;

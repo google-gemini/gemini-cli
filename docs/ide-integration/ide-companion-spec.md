@@ -132,9 +132,11 @@ to the CLI whenever the user's context changes.
   }
   ```
 
-  **Note:** The `openFiles` list should only include files that exist on disk.
-  Virtual files (e.g., unsaved files without a path, editor settings pages)
-  **MUST** be excluded.
+<!-- prettier-ignore -->
+> [!NOTE]
+> The `openFiles` list should only include files that exist on disk.
+> Virtual files (e.g., unsaved files without a path, editor settings pages)
+> **MUST** be excluded.
 
 ### How the CLI uses this context
 

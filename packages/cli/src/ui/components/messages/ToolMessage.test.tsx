@@ -13,8 +13,10 @@ import {
   type AnsiOutput,
   CoreToolCallStatus,
   Kind,
+  makeFakeConfig,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
@@ -56,7 +58,7 @@ describe('<ToolMessage />', () => {
   };
 
   // Helper to render with context
-  const renderWithContext = (
+  const renderWithContext = async (
     ui: React.ReactElement,
     streamingState: StreamingState,
   ) =>
@@ -76,7 +78,7 @@ describe('<ToolMessage />', () => {
   });
 
   it('renders basic tool information', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
       <ToolMessage {...baseProps} />,
       StreamingState.Idle,
     );
@@ -89,7 +91,7 @@ describe('<ToolMessage />', () => {
   describe('JSON rendering', () => {
     it('pretty prints valid JSON', async () => {
       const testJSONstring = '{"a": 1, "b": [2, 3]}';
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -111,7 +113,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('renders pretty JSON in ink frame', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} resultDisplay='{"a":1,"b":2}' />,
         StreamingState.Idle,
       );
@@ -125,7 +127,7 @@ describe('<ToolMessage />', () => {
 
     it('uses JSON renderer even when renderOutputAsMarkdown=true is true', async () => {
       const testJSONstring = '{"a": 1, "b": [2, 3]}';
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -147,7 +149,7 @@ describe('<ToolMessage />', () => {
     });
     it('falls back to plain text for malformed JSON', async () => {
       const testJSONstring = 'a": 1, "b": [2, 3]}';
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -166,7 +168,7 @@ describe('<ToolMessage />', () => {
 
     it('rejects mixed text + JSON renders as plain text', async () => {
       const testJSONstring = `{"result":  "count": 42,"items": ["apple", "banana"]},"meta": {"timestamp": "2025-09-28T12:34:56Z"}}End.`;
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -186,7 +188,7 @@ describe('<ToolMessage />', () => {
     it('rejects ANSI-tained JSON renders as plain text', async () => {
       const testJSONstring =
         '\u001b[32mOK\u001b[0m {"status": "success", "data": {"id": 123, "values": [10, 20, 30]}}';
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={testJSONstring}
@@ -205,7 +207,7 @@ describe('<ToolMessage />', () => {
 
     it('pretty printing 10kb JSON completes in <50ms', async () => {
       const large = '{"key": "' + 'x'.repeat(10000) + '"}';
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           resultDisplay={large}
@@ -224,7 +226,7 @@ describe('<ToolMessage />', () => {
 
   describe('ToolStatusIndicator rendering', () => {
     it('shows ✓ for Success status', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Success} />,
         StreamingState.Idle,
       );
@@ -234,7 +236,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows o for Pending status', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Scheduled} />,
         StreamingState.Idle,
       );
@@ -244,7 +246,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows ? for Confirming status', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage
           {...baseProps}
           status={CoreToolCallStatus.AwaitingApproval}
@@ -257,7 +259,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows - for Canceled status', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Cancelled} />,
         StreamingState.Idle,
       );
@@ -267,7 +269,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows x for Error status', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Error} />,
         StreamingState.Idle,
       );
@@ -277,7 +279,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows paused spinner for Executing status when streamingState is Idle', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.Idle,
       );
@@ -287,7 +289,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows paused spinner for Executing status when streamingState is WaitingForConfirmation', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.WaitingForConfirmation,
       );
@@ -297,7 +299,7 @@ describe('<ToolMessage />', () => {
     });
 
     it('shows MockRespondingSpinner for Executing status when streamingState is Responding', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
         <ToolMessage {...baseProps} status={CoreToolCallStatus.Executing} />,
         StreamingState.Responding, // Simulate app still responding
       );
@@ -315,7 +317,7 @@ describe('<ToolMessage />', () => {
       newContent: 'new',
       filePath: 'file.txt',
     };
-    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={diffResult} />,
       StreamingState.Idle,
     );
@@ -330,7 +332,7 @@ describe('<ToolMessage />', () => {
       lastFrame: highEmphasisFrame,
       waitUntilReady: waitUntilReadyHigh,
       unmount: unmountHigh,
-    } = renderWithContext(
+    } = await renderWithContext(
       <ToolMessage {...baseProps} emphasis="high" />,
       StreamingState.Idle,
     );
@@ -343,7 +345,7 @@ describe('<ToolMessage />', () => {
       lastFrame: lowEmphasisFrame,
       waitUntilReady: waitUntilReadyLow,
       unmount: unmountLow,
-    } = renderWithContext(
+    } = await renderWithContext(
       <ToolMessage {...baseProps} emphasis="low" />,
       StreamingState.Idle,
     );
@@ -370,7 +372,7 @@ describe('<ToolMessage />', () => {
         },
       ],
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
       <ToolMessage {...baseProps} resultDisplay={ansiResult} />,
       StreamingState.Idle,
     );
@@ -380,7 +382,7 @@ describe('<ToolMessage />', () => {
   });
 
   it('renders McpProgressIndicator with percentage and message for executing tools', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
@@ -402,7 +404,7 @@ describe('<ToolMessage />', () => {
   });
 
   it('renders only percentage when progressMessage is missing', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
@@ -422,7 +424,7 @@ describe('<ToolMessage />', () => {
   });
 
   it('renders indeterminate progress when total is missing', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
@@ -447,7 +449,7 @@ describe('<ToolMessage />', () => {
         (_, i) => `Line ${i + 1}`,
       ).join('\n');
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolMessage
           {...baseProps}
           kind={Kind.Agent}
@@ -462,7 +464,8 @@ describe('<ToolMessage />', () => {
             constrainHeight: true,
           },
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
@@ -483,7 +486,7 @@ describe('<ToolMessage />', () => {
         (_, i) => `Line ${i + 1}`,
       ).join('\n');
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolMessage
           {...baseProps}
           kind={Kind.Agent}
@@ -495,7 +498,8 @@ describe('<ToolMessage />', () => {
           uiActions,
           uiState: { streamingState: StreamingState.Idle },
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
@@ -512,7 +516,7 @@ describe('<ToolMessage />', () => {
         (_, i) => `Line ${i + 1}`,
       ).join('\n');
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolMessage
           {...baseProps}
           kind={Kind.Read}
@@ -523,7 +527,8 @@ describe('<ToolMessage />', () => {
           uiActions,
           uiState: { streamingState: StreamingState.Idle },
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
