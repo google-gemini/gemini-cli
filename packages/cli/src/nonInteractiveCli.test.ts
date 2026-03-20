@@ -300,9 +300,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-stream',
     });
 
-    expect(streamSpy).toHaveBeenCalledWith({
-      streamId: expect.any(String),
-    });
+    expect(streamSpy).toHaveBeenCalledWith({ streamId: expect.any(String) });
   });
 
   it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
