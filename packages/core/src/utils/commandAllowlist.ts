@@ -77,7 +77,7 @@ export function canShowAutoApproveCheckbox(
   // EVERY root must be on an allowlist
   return roots.every((root) => {
     // Strip path prefixes (e.g., /usr/bin/ls → ls)
-    const base = root.includes('/') ? root.split('/').pop()! : root;
+    const base = root.split('/').pop() ?? root;
 
     if (safeCommandAllowlist.has(base)) return true;
     if (isAutoEdit && editCommandAllowlist.has(base)) return true;

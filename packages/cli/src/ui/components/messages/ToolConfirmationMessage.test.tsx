@@ -22,6 +22,7 @@ import {
   initializeShellParsers,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import '../../../test-utils/customMatchers.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { act } from 'react';
@@ -54,122 +55,101 @@ describe('ToolConfirmationMessage', () => {
       getApprovalMode: () => 'default',
     } as unknown as Config;
 
-    it('shows permanent approval option for safe commands', async () => {
-      const execSafe: SerializableConfirmationDetails = {
-        type: 'exec',
-        title: 'Confirm Execution',
+    it.each([
+      {
+        description: 'safe commands',
         command: 'ls -la',
         rootCommand: 'ls',
-        rootCommands: ['ls'],
-      };
+        approvalMode: 'default',
+      },
+      {
+        description: 'edit commands in AUTO_EDIT mode',
+        command: 'mkdir test',
+        rootCommand: 'mkdir',
+        approvalMode: 'autoEdit',
+      },
+    ])(
+      'shows permanent approval option for $description',
+      async ({ command, rootCommand, approvalMode }) => {
+        const mockConfigDynamic = {
+          ...mockConfigWithPermanent,
+          getApprovalMode: () => approvalMode,
+        } as unknown as Config;
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={execSafe}
-          config={mockConfigWithPermanent}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={30}
-          terminalWidth={80}
-        />,
-        { settings: mockSettingsWithPermanent },
-      );
+        const exec: SerializableConfirmationDetails = {
+          type: 'exec',
+          title: 'Confirm Execution',
+          command,
+          rootCommand,
+          rootCommands: [rootCommand],
+        };
 
-      await waitUntilReady();
-      const output = lastFrame();
-      expect(output).toContain('Allow this command for all future sessions');
-      unmount();
-    });
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ToolConfirmationMessage
+              callId="test-call-id"
+              confirmationDetails={exec}
+              config={mockConfigDynamic}
+              getPreferredEditor={vi.fn()}
+              availableTerminalHeight={30}
+              terminalWidth={80}
+            />,
+            { settings: mockSettingsWithPermanent },
+          );
 
-    it('hides permanent approval option for unsafe commands', async () => {
-      const execUnsafe: SerializableConfirmationDetails = {
-        type: 'exec',
-        title: 'Confirm Execution',
+        await waitUntilReady();
+        expect(lastFrame()).toMatchSnapshot();
+        unmount();
+      },
+    );
+
+    it.each([
+      {
+        description: 'unsafe commands',
         command: 'rm -rf /',
         rootCommand: 'rm',
-        rootCommands: ['rm'],
-      };
-
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={execUnsafe}
-          config={mockConfigWithPermanent}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={30}
-          terminalWidth={80}
-        />,
-        { settings: mockSettingsWithPermanent },
-      );
-
-      await waitUntilReady();
-      const output = lastFrame();
-      expect(output).not.toContain(
-        'Allow this command for all future sessions',
-      );
-      unmount();
-    });
-
-    it('shows permanent approval option for edit commands in AUTO_EDIT mode', async () => {
-      const mockConfigAutoEdit = {
-        ...mockConfigWithPermanent,
-        getApprovalMode: () => 'autoEdit',
-      } as unknown as Config;
-
-      const execEdit: SerializableConfirmationDetails = {
-        type: 'exec',
-        title: 'Confirm Execution',
+        approvalMode: 'default',
+      },
+      {
+        description: 'edit commands in DEFAULT mode',
         command: 'mkdir test',
         rootCommand: 'mkdir',
-        rootCommands: ['mkdir'],
-      };
+        approvalMode: 'default',
+      },
+    ])(
+      'hides permanent approval option for $description',
+      async ({ command, rootCommand, approvalMode }) => {
+        const mockConfigDynamic = {
+          ...mockConfigWithPermanent,
+          getApprovalMode: () => approvalMode,
+        } as unknown as Config;
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={execEdit}
-          config={mockConfigAutoEdit}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={30}
-          terminalWidth={80}
-        />,
-        { settings: mockSettingsWithPermanent },
-      );
+        const exec: SerializableConfirmationDetails = {
+          type: 'exec',
+          title: 'Confirm Execution',
+          command,
+          rootCommand,
+          rootCommands: [rootCommand],
+        };
 
-      await waitUntilReady();
-      const output = lastFrame();
-      expect(output).toContain('Allow this command for all future sessions');
-      unmount();
-    });
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ToolConfirmationMessage
+              callId="test-call-id"
+              confirmationDetails={exec}
+              config={mockConfigDynamic}
+              getPreferredEditor={vi.fn()}
+              availableTerminalHeight={30}
+              terminalWidth={80}
+            />,
+            { settings: mockSettingsWithPermanent },
+          );
 
-    it('hides permanent approval option for edit commands in DEFAULT mode', async () => {
-      const execEdit: SerializableConfirmationDetails = {
-        type: 'exec',
-        title: 'Confirm Execution',
-        command: 'mkdir test',
-        rootCommand: 'mkdir',
-        rootCommands: ['mkdir'],
-      };
-
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={execEdit}
-          config={mockConfigWithPermanent}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={30}
-          terminalWidth={80}
-        />,
-        { settings: mockSettingsWithPermanent },
-      );
-
-      await waitUntilReady();
-      const output = lastFrame();
-      expect(output).not.toContain(
-        'Allow this command for all future sessions',
-      );
-      unmount();
-    });
+        await waitUntilReady();
+        expect(lastFrame()).toMatchSnapshot();
+        unmount();
+      },
+    );
   });
 
   const mockConfirm = vi.fn();
