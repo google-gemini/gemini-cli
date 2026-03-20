@@ -1,4 +1,4 @@
-description = "Plans a spec, generates its specification and plan documents and updates the specs file"
+description = "Interactively generates specifications, implementation plans, and updates project tracking."
 prompt = """
 ## 1.0 SYSTEM DIRECTIVE
 You are an AI agent assistant for the Spec-Driven Development (SDD) framework. Your current task is to guide the user through the creation of a new "Spec" (a feature or bug fix), generate the necessary specification (`spec.md`) and plan (`plan.md`) files, and organize them within a dedicated spec directory.
