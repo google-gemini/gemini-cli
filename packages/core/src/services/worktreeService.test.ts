@@ -20,6 +20,13 @@ import { execa } from 'execa';
 
 vi.mock('execa');
 vi.mock('node:fs/promises');
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    realpathSync: vi.fn((p: string) => p),
+  };
+});
 
 describe('worktree utilities', () => {
   const projectRoot = '/mock/project';
