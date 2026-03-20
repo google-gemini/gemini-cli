@@ -13,6 +13,7 @@ import type {
   TokenStorageInitializationEvent,
   KeychainAvailabilityEvent,
 } from '../telemetry/types.js';
+import type { ChannelMessagePayload } from '../channels/types.js';
 import { debugLogger } from './debugLogger.js';
 
 /**
@@ -192,6 +193,7 @@ export enum CoreEvent {
   QuotaChanged = 'quota-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
+  ChannelMessage = 'channel-message',
 }
 
 /**
@@ -225,6 +227,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
+  [CoreEvent.ChannelMessage]: [ChannelMessagePayload];
 }
 
 type EventBacklogItem = {
@@ -398,6 +401,15 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: QuotaChangedPayload = { remaining, limit, resetTime };
     this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
+  /**
+   * Forwards a channel message from an MCP server that declared the
+   * `gemini/channel` experimental capability.
+   * Buffers automatically if the UI hasn't subscribed yet.
+   */
+  emitChannelMessage(payload: ChannelMessagePayload): void {
+    this._emitOrQueue(CoreEvent.ChannelMessage, payload);
   }
 
   /**

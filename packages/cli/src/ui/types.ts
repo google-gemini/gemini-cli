@@ -295,6 +295,17 @@ export type AgentDefinitionJson = Pick<
   'name' | 'displayName' | 'description' | 'kind'
 >;
 
+export interface ChannelInfo {
+  name: string;
+  displayName?: string;
+  supportsReply: boolean;
+}
+
+export type HistoryItemChannelsList = HistoryItemBase & {
+  type: 'channels_list';
+  channels: ChannelInfo[];
+};
+
 export type HistoryItemAgentsList = HistoryItemBase & {
   type: 'agents_list';
   agents: AgentDefinitionJson[];
@@ -377,6 +388,7 @@ export type HistoryItemWithoutId =
   | HistoryItemToolsList
   | HistoryItemSkillsList
   | HistoryItemAgentsList
+  | HistoryItemChannelsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
@@ -402,6 +414,7 @@ export enum MessageType {
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',
   AGENTS_LIST = 'agents_list',
+  CHANNELS_LIST = 'channels_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
   HINT = 'hint',

@@ -665,6 +665,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  channels?: string[];
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -868,6 +869,7 @@ export class Config implements McpContext, AgentLoopContext {
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
+  private readonly channels: string[];
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
   private readonly topicUpdateNarration: boolean;
@@ -1133,6 +1135,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.channels = params.channels ?? [];
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -2034,6 +2037,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getChannels(): string[] {
+    return this.channels;
   }
 
   getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {

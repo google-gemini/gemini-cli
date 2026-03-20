@@ -29,12 +29,14 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
+  NotificationSchema,
   type GetPromptResult,
   type Prompt,
   type ReadResourceResult,
   type Resource,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod/v4';
 import { parse } from 'shell-quote';
 import {
   AuthProviderType,
@@ -70,6 +72,7 @@ import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import { activeChannels } from '../channels/types.js';
 import {
   type ResourceRegistry,
   type MCPResource,
@@ -478,6 +481,56 @@ export class McpClient implements McpProgressReporter {
         }
       },
     );
+
+    // Channel capability: if the server declares experimental['gemini/channel'],
+    // listen for channel notifications and route them through coreEvents.
+    // Only register if this server is in the --channels list.
+    const channelCap = capabilities?.experimental?.['gemini/channel'];
+    const enabledChannels = this.cliConfig.getChannels?.() ?? [];
+    if (channelCap && enabledChannels.includes(this.serverName)) {
+      debugLogger.log(
+        `Server '${this.serverName}' declares gemini/channel capability. Listening for channel messages...`,
+      );
+
+      const channelCapRecord: Record<string, unknown> =
+        channelCap != null && typeof channelCap === 'object'
+          ? Object.fromEntries(Object.entries(channelCap))
+          : {};
+      activeChannels.set(this.serverName, {
+        supportsReply: capabilities?.tools != null,
+        displayName:
+          typeof channelCapRecord['displayName'] === 'string'
+            ? channelCapRecord['displayName']
+            : undefined,
+      });
+
+      const ChannelNotificationSchema = NotificationSchema.extend({
+        method: z.literal('notifications/gemini/channel'),
+      });
+      this.client.setNotificationHandler(
+        ChannelNotificationSchema,
+        (notification) => {
+          const params: Record<string, unknown> = Object.fromEntries(
+            Object.entries(notification.params ?? {}),
+          );
+          const rawMeta = params['meta'];
+          const meta =
+            rawMeta != null && typeof rawMeta === 'object'
+              ? Object.fromEntries(
+                  Object.entries(rawMeta).map(([k, v]) => [k, String(v)]),
+                )
+              : undefined;
+          coreEvents.emitChannelMessage({
+            channelName: this.serverName,
+            sender: String(params['sender'] ?? 'unknown'),
+            content: String(params['content'] ?? ''),
+            timestamp: Date.now(),
+            replyTo: params['replyTo'] ? String(params['replyTo']) : undefined,
+            metadata: meta,
+          });
+        },
+      );
+    }
   }
 
   /**
@@ -1757,6 +1810,7 @@ export interface McpContext {
   getPolicyEngine?(): {
     getRules(): ReadonlyArray<{ toolName?: string; source?: string }>;
   };
+  getChannels?(): string[];
 }
 
 /**

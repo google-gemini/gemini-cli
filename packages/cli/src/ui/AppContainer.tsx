@@ -67,6 +67,7 @@ import {
   refreshServerHierarchicalMemory,
   flattenMemory,
   type MemoryChangedPayload,
+  type ChannelMessagePayload,
   writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
@@ -1219,6 +1220,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     submitQuery,
     isMcpReady,
   });
+
+  // Listen for external channel messages from MCP servers declaring
+  // experimental['gemini/channel'] and inject them into the message queue.
+  const channelsEnabled = config.getChannels().length > 0;
+  useEffect(() => {
+    if (!channelsEnabled) return;
+    const handler = (payload: ChannelMessagePayload) => {
+      const meta = payload.metadata ?? {};
+      const user = meta['user'] ?? payload.sender;
+      const chatId = meta['chat_id'] ?? '';
+      const msgId = meta['message_id'] ?? '';
+      const imagePath = meta['image_path'] ?? '';
+      const formatted = `<channel source="${payload.channelName}" chat_id="${chatId}" message_id="${msgId}" user="${user}"${imagePath ? ` image_path="${imagePath}"` : ''}>\n${payload.content}\n</channel>`;
+      addMessage(formatted);
+    };
+    coreEvents.on(CoreEvent.ChannelMessage, handler);
+    return () => {
+      coreEvents.off(CoreEvent.ChannelMessage, handler);
+    };
+  }, [channelsEnabled, addMessage]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
