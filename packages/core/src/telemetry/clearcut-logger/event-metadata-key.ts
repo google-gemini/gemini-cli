@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 193
+  // Next ID: 194
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -718,8 +718,8 @@ export enum EventMetadataKey {
   // ==========================================================================
 
   // Logs the start of the onboarding process.
-  GEMINI_CLI_ONBOARDING_START = 191,
+  GEMINI_CLI_ONBOARDING_START = 192,
 
   // Logs the user tier for onboarding success events.
-  GEMINI_CLI_ONBOARDING_USER_TIER = 192,
+  GEMINI_CLI_ONBOARDING_USER_TIER = 193,
 }
