@@ -16,7 +16,9 @@ import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import type React from 'react';
 import { act, useState } from 'react';
-import type { LoadedSettings } from '../config/settings.js';
+import os from 'node:os';
+import path from 'node:path';
+import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -42,7 +44,7 @@ import {
   type OverflowState,
 } from '../ui/contexts/OverflowContext.js';
 
-import { type Config } from '@google/gemini-cli-core';
+import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
@@ -51,7 +53,6 @@ import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
-import { loadCliConfig, type CliArgs } from '../config/config.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -65,9 +66,7 @@ if (process.env['NODE_ENV'] === 'test') {
 }
 
 vi.mock('../utils/persistentState.js', () => ({
-  get persistentState() {
-    return persistentStateMock;
-  },
+  persistentState: persistentStateMock,
 }));
 
 vi.mock('../ui/utils/terminalUtils.js', () => ({
@@ -257,9 +256,13 @@ class XtermStdout extends EventEmitter {
           return currentFrame !== '';
         }
 
-        // If Ink expects nothing (no new static content and no dynamic output),
-        // we consider it a match because the terminal buffer will just hold the historical static content.
-        if (expectedFrame === '') {
+        // If both are empty, it's a match.
+        // We consider undefined lastRenderOutput as effectively empty for this check
+        // to support hook testing where Ink may skip rendering completely.
+        if (
+          (this.lastRenderOutput === undefined || expectedFrame === '') &&
+          currentFrame === ''
+        ) {
           return true;
         }
 
@@ -267,8 +270,8 @@ class XtermStdout extends EventEmitter {
           return false;
         }
 
-        // If the terminal is empty but Ink expects something, it's not a match.
-        if (currentFrame === '') {
+        // If Ink expects nothing but terminal has content, or vice-versa, it's NOT a match.
+        if (expectedFrame === '' || currentFrame === '') {
           return false;
         }
 
@@ -378,11 +381,13 @@ export type RenderInstance = {
 
 const instances: InkInstance[] = [];
 
-export const render = async (
+// Wrapper around ink's render that ensures act() is called and uses Xterm for output
+export const render = (
   tree: React.ReactElement,
   terminalWidth?: number,
-): Promise<
-  Omit<RenderInstance, 'capturedOverflowState' | 'capturedOverflowActions'>
+): Omit<
+  RenderInstance,
+  'capturedOverflowState' | 'capturedOverflowActions'
 > => {
   const cols = terminalWidth ?? 100;
   // We use 1000 rows to avoid windows with incorrect snapshots if a correct
@@ -430,8 +435,6 @@ export const render = async (
   });
 
   instances.push(instance);
-
-  await stdout.waitUntilReady();
 
   return {
     rerender: (newTree: React.ReactElement) => {
@@ -483,7 +486,58 @@ export const simulateClick = async (
   });
 };
 
-export const mockSettings = createMockSettings();
+let mockConfigInternal: Config | undefined;
+
+const getMockConfigInternal = (): Config => {
+  if (!mockConfigInternal) {
+    mockConfigInternal = makeFakeConfig({
+      targetDir: os.tmpdir(),
+      enableEventDrivenScheduler: true,
+    });
+  }
+  return mockConfigInternal;
+};
+
+const configProxy = new Proxy({} as Config, {
+  get(_target, prop) {
+    if (prop === 'getTargetDir') {
+      return () =>
+        path.join(
+          path.parse(process.cwd()).root,
+          'Users',
+          'test',
+          'project',
+          'foo',
+          'bar',
+          'and',
+          'some',
+          'more',
+          'directories',
+          'to',
+          'make',
+          'it',
+          'long',
+        );
+    }
+    if (prop === 'getUseBackgroundColor') {
+      return () => true;
+    }
+    const internal = getMockConfigInternal();
+    if (prop in internal) {
+      return internal[prop as keyof typeof internal];
+    }
+    throw new Error(`mockConfig does not have property ${String(prop)}`);
+  },
+});
+
+export const mockSettings = new LoadedSettings(
+  { path: '', settings: {}, originalSettings: {} },
+  { path: '', settings: {}, originalSettings: {} },
+  { path: '', settings: {}, originalSettings: {} },
+  { path: '', settings: {}, originalSettings: {} },
+  true,
+  [],
+);
 
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
@@ -592,7 +646,7 @@ const ContextCapture: React.FC<{ children: React.ReactNode }> = ({
   return <>{children}</>;
 };
 
-export const renderWithProviders = async (
+export const renderWithProviders = (
   component: React.ReactElement,
   {
     shellFocus = true,
@@ -600,7 +654,9 @@ export const renderWithProviders = async (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
-    config,
+
+    config = configProxy as unknown as Config,
+    useAlternateBuffer = true,
     uiActions,
     persistentState,
     appState = mockAppState,
@@ -611,6 +667,7 @@ export const renderWithProviders = async (
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
+    useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
@@ -618,15 +675,13 @@ export const renderWithProviders = async (
     };
     appState?: AppState;
   } = {},
-): Promise<
-  RenderInstance & {
-    simulateClick: (
-      col: number,
-      row: number,
-      button?: 0 | 1 | 2,
-    ) => Promise<void>;
-  }
-> => {
+): RenderInstance & {
+  simulateClick: (
+    col: number,
+    row: number,
+    button?: 0 | 1 | 2,
+  ) => Promise<void>;
+} => {
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
@@ -655,14 +710,30 @@ export const renderWithProviders = async (
   persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
+  let finalSettings = settings;
+  if (useAlternateBuffer !== undefined) {
+    finalSettings = createMockSettings({
+      ...settings.merged,
+      ui: {
+        ...settings.merged.ui,
+        useAlternateBuffer,
+      },
+    });
+  }
 
-  if (!config) {
-    config = await loadCliConfig(
-      settings.merged,
-      'random-session-id',
-      {} as unknown as CliArgs,
-      { cwd: '/' },
-    );
+  // Wrap config in a Proxy so useAlternateBuffer hook (which reads from Config) gets the correct value,
+  // without replacing the entire config object and its other values.
+  let finalConfig = config;
+  if (useAlternateBuffer !== undefined) {
+    finalConfig = new Proxy(config, {
+      get(target, prop, receiver) {
+        if (prop === 'getUseAlternateBuffer') {
+          return () => useAlternateBuffer;
+        }
+
+        return Reflect.get(target, prop, receiver);
+      },
+    });
   }
 
   const mainAreaWidth = terminalWidth;
@@ -691,10 +762,10 @@ export const renderWithProviders = async (
   capturedOverflowState = undefined;
   capturedOverflowActions = undefined;
 
-  const wrapWithProviders = (comp: React.ReactElement) => (
+  const renderResult = render(
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
-        <SettingsContext.Provider value={settings}>
+      <ConfigContext.Provider value={finalConfig}>
+        <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
@@ -705,7 +776,7 @@ export const renderWithProviders = async (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
-                          config={config}
+                          config={finalConfig}
                           toolCalls={allToolCalls}
                         >
                           <AskUserActionsProvider
@@ -726,7 +797,7 @@ export const renderWithProviders = async (
                                         flexGrow={0}
                                         flexDirection="column"
                                       >
-                                        {comp}
+                                        {component}
                                       </Box>
                                     </ContextCapture>
                                   </ScrollProvider>
@@ -744,19 +815,12 @@ export const renderWithProviders = async (
           </UIStateContext.Provider>
         </SettingsContext.Provider>
       </ConfigContext.Provider>
-    </AppContext.Provider>
-  );
-
-  const renderResult = await render(
-    wrapWithProviders(component),
+    </AppContext.Provider>,
     terminalWidth,
   );
 
   return {
     ...renderResult,
-    rerender: (newComponent: React.ReactElement) => {
-      renderResult.rerender(wrapWithProviders(newComponent));
-    },
     capturedOverflowState,
     capturedOverflowActions,
     simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
@@ -764,19 +828,19 @@ export const renderWithProviders = async (
   };
 };
 
-export async function renderHook<Result, Props>(
+export function renderHook<Result, Props>(
   renderCallback: (props: Props) => Result,
   options?: {
     initialProps?: Props;
     wrapper?: React.ComponentType<{ children: React.ReactNode }>;
   },
-): Promise<{
+): {
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
   generateSvg: () => string;
-}> {
+} {
   const result = { current: undefined as unknown as Result };
 
   let currentProps = options?.initialProps as Props;
@@ -799,15 +863,17 @@ export async function renderHook<Result, Props>(
   let waitUntilReady: () => Promise<void> = async () => {};
   let generateSvg: () => string = () => '';
 
-  const renderResult = await render(
-    <Wrapper>
-      <TestComponent renderCallback={renderCallback} props={currentProps} />
-    </Wrapper>,
-  );
-  inkRerender = renderResult.rerender;
-  unmount = renderResult.unmount;
-  waitUntilReady = renderResult.waitUntilReady;
-  generateSvg = renderResult.generateSvg;
+  act(() => {
+    const renderResult = render(
+      <Wrapper>
+        <TestComponent renderCallback={renderCallback} props={currentProps} />
+      </Wrapper>,
+    );
+    inkRerender = renderResult.rerender;
+    unmount = renderResult.unmount;
+    waitUntilReady = renderResult.waitUntilReady;
+    generateSvg = renderResult.generateSvg;
+  });
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {
@@ -825,7 +891,7 @@ export async function renderHook<Result, Props>(
   return { result, rerender, unmount, waitUntilReady, generateSvg };
 }
 
-export async function renderHookWithProviders<Result, Props>(
+export function renderHookWithProviders<Result, Props>(
   renderCallback: (props: Props) => Result,
   options: {
     initialProps?: Props;
@@ -837,14 +903,15 @@ export async function renderHookWithProviders<Result, Props>(
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
+    useAlternateBuffer?: boolean;
   } = {},
-): Promise<{
+): {
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
   generateSvg: () => string;
-}> {
+} {
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
@@ -861,16 +928,10 @@ export async function renderHookWithProviders<Result, Props>(
 
   const Wrapper = options.wrapper || (({ children }) => <>{children}</>);
 
-  let renderResult: RenderInstance & {
-    simulateClick: (
-      col: number,
-      row: number,
-      button?: 0 | 1 | 2,
-    ) => Promise<void>;
-  };
+  let renderResult: ReturnType<typeof render>;
 
-  await act(async () => {
-    renderResult = await renderWithProviders(
+  act(() => {
+    renderResult = renderWithProviders(
       <Wrapper>
         {}
         <TestComponent initialProps={options.initialProps as Props} />

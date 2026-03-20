@@ -6,22 +6,16 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { getToolGroupBorderAppearance } from './borderStyles.js';
-import { CoreToolCallStatus, makeFakeConfig } from '@google/gemini-cli-core';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import type { IndividualToolCallDisplay } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { createMockSettings } from '../../test-utils/settings.js';
 import { MainContent } from '../components/MainContent.js';
 import { Text } from 'ink';
 
 vi.mock('../components/CliSpinner.js', () => ({
   CliSpinner: () => <Text>⊶</Text>,
 }));
-
-const altBufferOptions = {
-  config: makeFakeConfig({ useAlternateBuffer: true }),
-  settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-};
 
 describe('getToolGroupBorderAppearance', () => {
   it('should use warning color for pending non-shell tools', () => {
@@ -110,8 +104,7 @@ describe('getToolGroupBorderAppearance', () => {
 
 describe('MainContent tool group border SVG snapshots', () => {
   it('should render SVG snapshot for a pending search dialog (google_web_search)', async () => {
-    const renderResult = await renderWithProviders(<MainContent />, {
-      ...altBufferOptions,
+    const renderResult = renderWithProviders(<MainContent />, {
       uiState: {
         history: [],
         pendingHistoryItems: [
@@ -135,8 +128,7 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for an empty slice following a search tool', async () => {
-    const renderResult = await renderWithProviders(<MainContent />, {
-      ...altBufferOptions,
+    const renderResult = renderWithProviders(<MainContent />, {
       uiState: {
         history: [],
         pendingHistoryItems: [
@@ -164,8 +156,7 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for a shell tool', async () => {
-    const renderResult = await renderWithProviders(<MainContent />, {
-      ...altBufferOptions,
+    const renderResult = renderWithProviders(<MainContent />, {
       uiState: {
         history: [],
         pendingHistoryItems: [

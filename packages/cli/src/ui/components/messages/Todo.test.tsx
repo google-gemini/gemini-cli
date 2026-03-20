@@ -32,11 +32,12 @@ describe.each([true, false])(
   '<TodoTray /> (showFullTodos: %s)',
   async (showFullTodos: boolean) => {
     const renderWithUiState = async (uiState: Partial<UIState>) => {
-      const result = await render(
+      const result = render(
         <UIStateContext.Provider value={uiState as UIState}>
           <TodoTray />
         </UIStateContext.Provider>,
       );
+      await result.waitUntilReady();
       return result;
     };
 
@@ -90,7 +91,7 @@ describe.each([true, false])(
     });
 
     it('renders a todo list with long descriptions that wrap when full view is on', async () => {
-      const { lastFrame, unmount } = await render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <Box width="50">
           <UIStateContext.Provider
             value={
@@ -117,6 +118,7 @@ describe.each([true, false])(
           </UIStateContext.Provider>
         </Box>,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });

@@ -13,9 +13,7 @@ import {
   type EmbedContentResponse,
   type EmbedContentParameters,
 } from '@google/genai';
-import * as os from 'node:os';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
-import { isCloudShell } from '../ide/detect-ide.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 
@@ -152,13 +150,6 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
-  if (authType === AuthType.GATEWAY) {
-    contentGeneratorConfig.apiKey = apiKey || 'gateway-placeholder-key';
-    contentGeneratorConfig.vertexai = false;
-
-    return contentGeneratorConfig;
-  }
-
   return contentGeneratorConfig;
 }
 
@@ -187,46 +178,19 @@ export async function createContentGenerator(
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const clientName = gcConfig.getClientName();
+    const userAgentPrefix = clientName
+      ? `GeminiCLI-${clientName}`
+      : 'GeminiCLI';
     const surface = determineSurface();
-
-    let userAgent: string;
-    // Use unified format for VS Code traffic.
-    // Note: We don't automatically assume a2a-server is VS Code,
-    // as it could be used by other clients unless the surface explicitly says 'vscode'.
-    if (clientName === 'acp-vscode' || surface === 'vscode') {
-      const osTypeMap: Record<string, string> = {
-        darwin: 'macOS',
-        win32: 'Windows',
-        linux: 'Linux',
-      };
-      const osType = osTypeMap[process.platform] || process.platform;
-      const osVersion = os.release();
-      const arch = process.arch;
-
-      const vscodeVersion = process.env['TERM_PROGRAM_VERSION'] || 'unknown';
-      let hostPath = `VSCode/${vscodeVersion}`;
-      if (isCloudShell()) {
-        const cloudShellVersion =
-          process.env['CLOUD_SHELL_VERSION'] || 'unknown';
-        hostPath += ` > CloudShell/${cloudShellVersion}`;
-      }
-
-      userAgent = `CloudCodeVSCode/${version} (aidev_client; os_type=${osType}; os_version=${osVersion}; arch=${arch}; host_path=${hostPath}; proxy_client=geminicli)`;
-    } else {
-      const userAgentPrefix = clientName
-        ? `GeminiCLI-${clientName}`
-        : 'GeminiCLI';
-      userAgent = `${userAgentPrefix}/${version}/${model} (${process.platform}; ${process.arch}; ${surface})`;
-    }
-
+    const userAgent = `${userAgentPrefix}/${version}/${model} (${process.platform}; ${process.arch}; ${surface})`;
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
     const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
 
     const baseHeaders: Record<string, string> = {
-      'User-Agent': userAgent,
       ...customHeadersMap,
+      'User-Agent': userAgent,
     };
 
     if (

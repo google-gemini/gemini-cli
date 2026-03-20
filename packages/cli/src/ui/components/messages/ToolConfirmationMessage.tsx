@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -79,7 +79,6 @@ export const ToolConfirmationMessage: React.FC<
     callId,
     expanded: false,
   });
-  const [isCancelling, setIsCancelling] = useState(false);
   const isMcpToolDetailsExpanded =
     mcpDetailsExpansionState.callId === callId
       ? mcpDetailsExpansionState.expanded
@@ -184,7 +183,7 @@ export const ToolConfirmationMessage: React.FC<
         return true;
       }
       if (keyMatchers[Command.ESCAPE](key)) {
-        setIsCancelling(true);
+        handleConfirm(ToolConfirmationOutcome.Cancel);
         return true;
       }
       if (keyMatchers[Command.QUIT](key)) {
@@ -196,20 +195,6 @@ export const ToolConfirmationMessage: React.FC<
     },
     { isActive: isFocused, priority: true },
   );
-
-  // TODO(#23009): Remove this hack once we migrate to the new renderer.
-  // Why useEffect is used here instead of calling handleConfirm directly:
-  // There is a race condition where calling handleConfirm immediately upon
-  // keypress removes the tool UI component while the UI is in an expanded state.
-  // This simultaneously triggers setConstrainHeight, causing render two footers.
-  // By bridging the cancel action through state (isCancelling) and this useEffect,
-  // we delay handleConfirm until the next render cycle, ensuring setConstrainHeight
-  // resolves properly first.
-  useEffect(() => {
-    if (isCancelling) {
-      handleConfirm(ToolConfirmationOutcome.Cancel);
-    }
-  }, [isCancelling, handleConfirm]);
 
   const handleSelect = useCallback(
     (item: ToolConfirmationOutcome) => handleConfirm(item),

@@ -5,15 +5,14 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { createMockSettings } from '../../../test-utils/settings.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect } from 'vitest';
-import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
+import { type AnsiOutput } from '@google/gemini-cli-core';
 
 describe('ToolResultDisplay Overflow', () => {
   it('shows the head of the content when overflowDirection is bottom (string)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={content}
         terminalWidth={80}
@@ -21,8 +20,7 @@ describe('ToolResultDisplay Overflow', () => {
         overflowDirection="bottom"
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        useAlternateBuffer: false,
         uiState: { constrainHeight: true },
       },
     );
@@ -40,7 +38,7 @@ describe('ToolResultDisplay Overflow', () => {
 
   it('shows the tail of the content when overflowDirection is top (string default)', async () => {
     const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={content}
         terminalWidth={80}
@@ -48,8 +46,7 @@ describe('ToolResultDisplay Overflow', () => {
         overflowDirection="top"
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        useAlternateBuffer: false,
         uiState: { constrainHeight: true },
       },
     );
@@ -78,7 +75,7 @@ describe('ToolResultDisplay Overflow', () => {
         inverse: false,
       },
     ]);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
@@ -86,8 +83,7 @@ describe('ToolResultDisplay Overflow', () => {
         overflowDirection="bottom"
       />,
       {
-        config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        useAlternateBuffer: false,
         uiState: { constrainHeight: true },
       },
     );

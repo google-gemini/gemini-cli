@@ -226,51 +226,6 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
-  describe('worktree', () => {
-    it('should parse --worktree flag when provided with a name', async () => {
-      process.argv = ['node', 'script.js', '--worktree', 'my-feature'];
-      const settings = createTestMergedSettings();
-      settings.experimental.worktrees = true;
-      const argv = await parseArguments(settings);
-      expect(argv.worktree).toBe('my-feature');
-    });
-
-    it('should generate a random name when --worktree is provided without a name', async () => {
-      process.argv = ['node', 'script.js', '--worktree'];
-      const settings = createTestMergedSettings();
-      settings.experimental.worktrees = true;
-      const argv = await parseArguments(settings);
-      expect(argv.worktree).toBeDefined();
-      expect(argv.worktree).not.toBe('');
-      expect(typeof argv.worktree).toBe('string');
-    });
-
-    it('should throw an error when --worktree is used but experimental.worktrees is not enabled', async () => {
-      process.argv = ['node', 'script.js', '--worktree', 'feature'];
-      const settings = createTestMergedSettings();
-      settings.experimental.worktrees = false;
-
-      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('process.exit called');
-      });
-      const mockConsoleError = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      await expect(parseArguments(settings)).rejects.toThrow(
-        'process.exit called',
-      );
-      expect(mockConsoleError).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'The --worktree flag is only available when experimental.worktrees is enabled in your settings.',
-        ),
-      );
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
-    });
-  });
-
   it.each([
     {
       description: 'long flags',
@@ -808,48 +763,6 @@ describe('loadCliConfig', () => {
     });
   });
 
-  it('should add IDE workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH to include directories', async () => {
-    vi.stubEnv(
-      'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      ['/project/folderA', '/project/folderB'].join(path.delimiter),
-    );
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments(createTestMergedSettings());
-    const settings = createTestMergedSettings();
-    const config = await loadCliConfig(settings, 'test-session', argv);
-    const dirs = config.getPendingIncludeDirectories();
-    expect(dirs).toContain('/project/folderA');
-    expect(dirs).toContain('/project/folderB');
-  });
-
-  it('should skip inaccessible workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH', async () => {
-    const resolveToRealPathSpy = vi
-      .spyOn(ServerConfig, 'resolveToRealPath')
-      .mockImplementation((p) => {
-        if (p.toString().includes('restricted')) {
-          const err = new Error('EACCES: permission denied');
-          (err as NodeJS.ErrnoException).code = 'EACCES';
-          throw err;
-        }
-        return p.toString();
-      });
-    vi.stubEnv(
-      'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      ['/project/folderA', '/nonexistent/restricted/folder'].join(
-        path.delimiter,
-      ),
-    );
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments(createTestMergedSettings());
-    const settings = createTestMergedSettings();
-    const config = await loadCliConfig(settings, 'test-session', argv);
-    const dirs = config.getPendingIncludeDirectories();
-    expect(dirs).toContain('/project/folderA');
-    expect(dirs).not.toContain('/nonexistent/restricted/folder');
-
-    resolveToRealPathSpy.mockRestore();
-  });
-
   it('should use default fileFilter options when unconfigured', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -885,7 +798,6 @@ describe('loadCliConfig', () => {
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
     // Restore ExtensionManager mocks that were reset
     ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
     ExtensionManager.prototype.loadExtensions = vi
@@ -897,7 +809,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -2267,30 +2178,6 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
-    expect(config.getExcludeTools()).toContain('ask_user');
-  });
-
-  it('should exclude ask_user in interactive mode when --acp is provided', async () => {
-    process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--acp'];
-    const argv = await parseArguments(createTestMergedSettings());
-    const config = await loadCliConfig(
-      createTestMergedSettings(),
-      'test-session',
-      argv,
-    );
-    expect(config.getExcludeTools()).toContain('ask_user');
-  });
-
-  it('should exclude ask_user in interactive mode when --experimental-acp is provided', async () => {
-    process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--experimental-acp'];
-    const argv = await parseArguments(createTestMergedSettings());
-    const config = await loadCliConfig(
-      createTestMergedSettings(),
-      'test-session',
-      argv,
-    );
     expect(config.getExcludeTools()).toContain('ask_user');
   });
 

@@ -49,6 +49,8 @@ const A2A_TIMEOUT = 1800000; // 30 minutes
  * Manages protocol negotiation, authentication, and transport selection.
  */
 export class A2AClientManager {
+  private static instance: A2AClientManager;
+
   // Each agent should manage their own context/taskIds/card/etc
   private clients = new Map<string, Client>();
   private agentCards = new Map<string, AgentCard>();
@@ -56,8 +58,8 @@ export class A2AClientManager {
   private a2aDispatcher: UndiciAgent | ProxyAgent;
   private a2aFetch: typeof fetch;
 
-  constructor(private readonly config: Config) {
-    const proxyUrl = this.config.getProxy();
+  private constructor(config?: Config) {
+    const proxyUrl = config?.getProxy();
     const agentOptions = {
       headersTimeout: A2A_TIMEOUT,
       bodyTimeout: A2A_TIMEOUT,
@@ -74,6 +76,25 @@ export class A2AClientManager {
 
     this.a2aFetch = (input, init) =>
       fetch(input, { ...init, dispatcher: this.a2aDispatcher } as RequestInit);
+  }
+
+  /**
+   * Gets the singleton instance of the A2AClientManager.
+   */
+  static getInstance(config?: Config): A2AClientManager {
+    if (!A2AClientManager.instance) {
+      A2AClientManager.instance = new A2AClientManager(config);
+    }
+    return A2AClientManager.instance;
+  }
+
+  /**
+   * Resets the singleton instance. Only for testing purposes.
+   * @internal
+   */
+  static resetInstanceForTesting() {
+    // @ts-expect-error - Resetting singleton for testing
+    A2AClientManager.instance = undefined;
   }
 
   /**

@@ -98,7 +98,12 @@ export class ContextManager {
     paths: { global: string[]; extension: string[]; project: string[] },
     contentsMap: Map<string, GeminiFileContent>,
   ) {
-    const hierarchicalMemory = categorizeAndConcatenate(paths, contentsMap);
+    const workingDir = this.config.getWorkingDir();
+    const hierarchicalMemory = categorizeAndConcatenate(
+      paths,
+      contentsMap,
+      workingDir,
+    );
 
     this.globalMemory = hierarchicalMemory.global || '';
     this.extensionMemory = hierarchicalMemory.extension || '';
@@ -150,6 +155,7 @@ export class ContextManager {
     }
     return concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
+      this.config.getWorkingDir(),
     );
   }
 

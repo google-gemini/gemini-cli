@@ -30,7 +30,7 @@ describe('Key Bubbling Regression', () => {
   ];
 
   it('does not navigate when pressing "j" or "k" in a focused text input', async () => {
-    const { stdin, lastFrame } = await renderWithProviders(
+    const { stdin, lastFrame } = renderWithProviders(
       <AskUserDialog
         questions={choiceQuestion}
         onSubmit={vi.fn()}

@@ -75,7 +75,6 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     if (definition.kind === 'remote') {
       return new RemoteAgentInvocation(
         definition,
-        this.context,
         params,
         effectiveMessageBus,
         _toolName,

@@ -143,9 +143,10 @@ describe('AuthDialog', () => {
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value as string);
         }
-        const { unmount } = await renderWithProviders(
+        const { waitUntilReady, unmount } = renderWithProviders(
           <AuthDialog {...props} />,
         );
+        await waitUntilReady();
         const items = mockedRadioButtonSelect.mock.calls[0][0].items;
         for (const item of shouldContain) {
           expect(items).toContainEqual(item);
@@ -160,7 +161,10 @@ describe('AuthDialog', () => {
 
   it('filters auth types when enforcedType is set', async () => {
     props.settings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
-    const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+    const { waitUntilReady, unmount } = renderWithProviders(
+      <AuthDialog {...props} />,
+    );
+    await waitUntilReady();
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).toHaveLength(1);
     expect(items[0].value).toBe(AuthType.USE_GEMINI);
@@ -169,7 +173,10 @@ describe('AuthDialog', () => {
 
   it('sets initial index to 0 when enforcedType is set', async () => {
     props.settings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
-    const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+    const { waitUntilReady, unmount } = renderWithProviders(
+      <AuthDialog {...props} />,
+    );
+    await waitUntilReady();
     const { initialIndex } = mockedRadioButtonSelect.mock.calls[0][0];
     expect(initialIndex).toBe(0);
     unmount();
@@ -206,7 +213,10 @@ describe('AuthDialog', () => {
       },
     ])('selects initial auth type $desc', async ({ setup, expected }) => {
       setup();
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { items, initialIndex } = mockedRadioButtonSelect.mock.calls[0][0];
       expect(items[initialIndex].value).toBe(expected);
       unmount();
@@ -216,7 +226,10 @@ describe('AuthDialog', () => {
   describe('handleAuthSelect', () => {
     it('calls onAuthError if validation fails', async () => {
       mockedValidateAuthMethod.mockReturnValue('Invalid method');
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       handleAuthSelect(AuthType.USE_GEMINI);
@@ -232,7 +245,10 @@ describe('AuthDialog', () => {
 
     it('sets auth context with requiresRestart: true for LOGIN_WITH_GOOGLE', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
@@ -245,7 +261,10 @@ describe('AuthDialog', () => {
 
     it('sets auth context with empty object for other auth types', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.USE_GEMINI);
@@ -259,7 +278,10 @@ describe('AuthDialog', () => {
       vi.stubEnv('GEMINI_API_KEY', 'test-key-from-env');
       // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
 
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.USE_GEMINI);
@@ -275,7 +297,10 @@ describe('AuthDialog', () => {
       vi.stubEnv('GEMINI_API_KEY', ''); // Empty string
       // props.settings.merged.security.auth.selectedType is undefined here
 
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.USE_GEMINI);
@@ -291,7 +316,10 @@ describe('AuthDialog', () => {
       // process.env['GEMINI_API_KEY'] is not set
       // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
 
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.USE_GEMINI);
@@ -309,7 +337,10 @@ describe('AuthDialog', () => {
       props.settings.merged.security.auth.selectedType =
         AuthType.LOGIN_WITH_GOOGLE;
 
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await handleAuthSelect(AuthType.USE_GEMINI);
@@ -329,7 +360,10 @@ describe('AuthDialog', () => {
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
       mockedValidateAuthMethod.mockReturnValue(null);
 
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const { onSelect: handleAuthSelect } =
         mockedRadioButtonSelect.mock.calls[0][0];
       await act(async () => {
@@ -349,9 +383,10 @@ describe('AuthDialog', () => {
 
   it('displays authError when provided', async () => {
     props.authError = 'Something went wrong';
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AuthDialog {...props} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Something went wrong');
     unmount();
   });
@@ -394,7 +429,10 @@ describe('AuthDialog', () => {
       },
     ])('$desc', async ({ setup, expectations }) => {
       setup();
-      const { unmount } = await renderWithProviders(<AuthDialog {...props} />);
+      const { waitUntilReady, unmount } = renderWithProviders(
+        <AuthDialog {...props} />,
+      );
+      await waitUntilReady();
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
       keypressHandler({ name: 'escape' });
       expectations(props);
@@ -404,27 +442,30 @@ describe('AuthDialog', () => {
 
   describe('Snapshots', () => {
     it('renders correctly with default props', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <AuthDialog {...props} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('renders correctly with auth error', async () => {
       props.authError = 'Something went wrong';
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <AuthDialog {...props} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('renders correctly with enforced auth type', async () => {
       props.settings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <AuthDialog {...props} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });

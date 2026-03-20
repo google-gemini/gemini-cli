@@ -209,7 +209,7 @@ export const useSlashCommandProcessor = (
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
-        agentContext: config,
+        config,
         settings,
         git: gitService,
         logger,

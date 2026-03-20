@@ -66,13 +66,11 @@ describe('A2AClientManager', () => {
   };
 
   const authFetchMock = vi.fn();
-  const mockConfig = {
-    getProxy: vi.fn(),
-  } as unknown as Config;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    manager = new A2AClientManager(mockConfig);
+    A2AClientManager.resetInstanceForTesting();
+    manager = A2AClientManager.getInstance();
 
     // Re-create the instances as plain objects that can be spied on
     const factoryInstance = {
@@ -126,6 +124,12 @@ describe('A2AClientManager', () => {
     vi.unstubAllGlobals();
   });
 
+  it('should enforce the singleton pattern', () => {
+    const instance1 = A2AClientManager.getInstance();
+    const instance2 = A2AClientManager.getInstance();
+    expect(instance1).toBe(instance2);
+  });
+
   describe('getInstance / dispatcher initialization', () => {
     it('should use UndiciAgent when no proxy is configured', async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent/card');
@@ -148,11 +152,12 @@ describe('A2AClientManager', () => {
     });
 
     it('should use ProxyAgent when a proxy is configured via Config', async () => {
-      const mockConfigWithProxy = {
+      A2AClientManager.resetInstanceForTesting();
+      const mockConfig = {
         getProxy: () => 'http://my-proxy:8080',
       } as Config;
 
-      manager = new A2AClientManager(mockConfigWithProxy);
+      manager = A2AClientManager.getInstance(mockConfig);
       await manager.loadAgent('TestProxyAgent', 'http://test.proxy.agent/card');
 
       const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock

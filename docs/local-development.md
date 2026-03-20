@@ -79,9 +79,7 @@ You can view traces in the Jaeger UI for local development.
 You can use an OpenTelemetry collector to forward telemetry data to Google Cloud
 Trace for custom processing or routing.
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> Ensure you complete the
+> **Warning:** Ensure you complete the
 > [Google Cloud telemetry prerequisites](./cli/telemetry.md#prerequisites)
 > (Project ID, authentication, IAM roles, and APIs) before using this method.
 

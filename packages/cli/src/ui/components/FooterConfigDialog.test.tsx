@@ -25,22 +25,24 @@ describe('<FooterConfigDialog />', () => {
 
   it('renders correctly with default settings', async () => {
     const settings = createMockSettings();
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await renderResult.waitUntilReady();
     expect(renderResult.lastFrame()).toMatchSnapshot();
     await expect(renderResult).toMatchSvgSnapshot();
   });
 
   it('toggles an item when enter is pressed', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = await renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     act(() => {
       stdin.write('\r'); // Enter to toggle
     });
@@ -60,11 +62,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('reorders items with arrow keys', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = await renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     // Initial order: workspace, git-branch, ...
     const output = lastFrame();
     const cwdIdx = output.indexOf('] workspace');
@@ -90,11 +93,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('closes on Esc', async () => {
     const settings = createMockSettings();
-    const { stdin } = await renderWithProviders(
+    const { stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    await waitUntilReady();
     act(() => {
       stdin.write('\x1b'); // Esc
     });
@@ -106,13 +110,14 @@ describe('<FooterConfigDialog />', () => {
 
   it('highlights the active item in the preview', async () => {
     const settings = createMockSettings();
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
-    const { lastFrame, stdin } = renderResult;
+    const { lastFrame, stdin, waitUntilReady } = renderResult;
 
+    await waitUntilReady();
     expect(lastFrame()).toContain('~/project/path');
 
     // Move focus down to 'code-changes' (which has colored elements)
@@ -143,10 +148,12 @@ describe('<FooterConfigDialog />', () => {
 
   it('shows an empty preview when all items are deselected', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = await renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
+
+    await waitUntilReady();
 
     // Default items are the first 5. We toggle them off.
     for (let i = 0; i < 5; i++) {
@@ -171,10 +178,11 @@ describe('<FooterConfigDialog />', () => {
 
   it('moves item correctly after trying to move up at the top', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin } = await renderWithProviders(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
+    await waitUntilReady();
 
     // Default initial items in mock settings are 'git-branch', 'workspace', ...
     await waitFor(() => {
@@ -209,12 +217,13 @@ describe('<FooterConfigDialog />', () => {
 
   it('updates the preview when Show footer labels is toggled off', async () => {
     const settings = createMockSettings();
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
-    const { lastFrame, stdin } = renderResult;
+    const { lastFrame, stdin, waitUntilReady } = renderResult;
+    await waitUntilReady();
 
     // By default labels are on
     expect(lastFrame()).toContain('workspace (/directory)');

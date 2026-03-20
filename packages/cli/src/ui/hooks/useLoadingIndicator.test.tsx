@@ -30,7 +30,7 @@ describe('useLoadingIndicator', () => {
     vi.restoreAllMocks();
   });
 
-  const renderLoadingIndicatorHook = async (
+  const renderLoadingIndicatorHook = (
     initialStreamingState: StreamingState,
     initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
@@ -60,7 +60,7 @@ describe('useLoadingIndicator', () => {
       });
       return null;
     }
-    const { rerender } = await render(
+    const { rerender } = render(
       <TestComponent
         streamingState={initialStreamingState}
         shouldShowFocusHint={initialShouldShowFocusHint}
@@ -92,16 +92,16 @@ describe('useLoadingIndicator', () => {
     };
   };
 
-  it('should initialize with default values when Idle', async () => {
+  it('should initialize with default values when Idle', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result } = await renderLoadingIndicatorHook(StreamingState.Idle);
+    const { result } = renderLoadingIndicatorHook(StreamingState.Idle);
     expect(result.current.elapsedTime).toBe(0);
     expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 
   it('should show interactive shell waiting phrase when shouldShowFocusHint is true', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result, rerender } = await renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
     );
@@ -125,9 +125,7 @@ describe('useLoadingIndicator', () => {
 
   it('should reflect values when Responding', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty for subsequent phrases
-    const { result } = await renderLoadingIndicatorHook(
-      StreamingState.Responding,
-    );
+    const { result } = renderLoadingIndicatorHook(StreamingState.Responding);
 
     // Initial phrase on first activation will be a tip, not necessarily from witty phrases
     expect(result.current.elapsedTime).toBe(0);
@@ -144,7 +142,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should show waiting phrase and retain elapsedTime when WaitingForConfirmation', async () => {
-    const { result, rerender } = await renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
     );
 
@@ -171,7 +169,7 @@ describe('useLoadingIndicator', () => {
 
   it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result, rerender } = await renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
     );
 
@@ -204,7 +202,7 @@ describe('useLoadingIndicator', () => {
 
   it('should reset timer and phrase when streamingState changes from Responding to Idle', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result, rerender } = await renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
     );
 
@@ -227,14 +225,14 @@ describe('useLoadingIndicator', () => {
     expect(result.current.elapsedTime).toBe(0);
   });
 
-  it('should reflect retry status in currentLoadingPhrase when provided', async () => {
+  it('should reflect retry status in currentLoadingPhrase when provided', () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 2,
       maxAttempts: 3,
       delayMs: 1000,
     };
-    const { result } = await renderLoadingIndicatorHook(
+    const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
       retryStatus,
@@ -244,14 +242,14 @@ describe('useLoadingIndicator', () => {
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
   });
 
-  it('should hide low-verbosity retry status for early retry attempts', async () => {
+  it('should hide low-verbosity retry status for early retry attempts', () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 1,
       maxAttempts: 5,
       delayMs: 1000,
     };
-    const { result } = await renderLoadingIndicatorHook(
+    const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
       retryStatus,
@@ -264,14 +262,14 @@ describe('useLoadingIndicator', () => {
     );
   });
 
-  it('should show a generic retry phrase in low error verbosity mode for later retries', async () => {
+  it('should show a generic retry phrase in low error verbosity mode for later retries', () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 2,
       maxAttempts: 5,
       delayMs: 1000,
     };
-    const { result } = await renderLoadingIndicatorHook(
+    const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
       retryStatus,
@@ -284,8 +282,8 @@ describe('useLoadingIndicator', () => {
     );
   });
 
-  it('should show no phrases when loadingPhrasesMode is "off"', async () => {
-    const { result } = await renderLoadingIndicatorHook(
+  it('should show no phrases when loadingPhrasesMode is "off"', () => {
+    const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
       null,

@@ -102,12 +102,10 @@ describe('memoryCommand', () => {
 
       mockContext = createMockCommandContext({
         services: {
-          agentContext: {
-            config: {
-              getUserMemory: mockGetUserMemory,
-              getGeminiMdFileCount: mockGetGeminiMdFileCount,
-              getExtensionLoader: () => new SimpleExtensionLoader([]),
-            },
+          config: {
+            getUserMemory: mockGetUserMemory,
+            getGeminiMdFileCount: mockGetGeminiMdFileCount,
+            getExtensionLoader: () => new SimpleExtensionLoader([]),
           },
         },
       });
@@ -252,7 +250,7 @@ describe('memoryCommand', () => {
 
       mockContext = createMockCommandContext({
         services: {
-          agentContext: { config: mockConfig },
+          config: mockConfig,
           settings: {
             merged: {
               memoryDiscoveryMaxDirs: 1000,
@@ -270,7 +268,7 @@ describe('memoryCommand', () => {
       if (!reloadCommand.action) throw new Error('Command has no action');
 
       // Enable JIT in mock config
-      const config = mockContext.services.agentContext?.config;
+      const config = mockContext.services.config;
       if (!config) throw new Error('Config is undefined');
 
       vi.mocked(config.isJitContextEnabled).mockReturnValue(true);
@@ -372,7 +370,7 @@ describe('memoryCommand', () => {
       if (!reloadCommand.action) throw new Error('Command has no action');
 
       const nullConfigContext = createMockCommandContext({
-        services: { agentContext: null },
+        services: { config: null },
       });
 
       await expect(
@@ -415,10 +413,8 @@ describe('memoryCommand', () => {
       });
       mockContext = createMockCommandContext({
         services: {
-          agentContext: {
-            config: {
-              getGeminiMdFilePaths: mockGetGeminiMdfilePaths,
-            },
+          config: {
+            getGeminiMdFilePaths: mockGetGeminiMdfilePaths,
           },
         },
       });

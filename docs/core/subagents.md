@@ -5,18 +5,16 @@ session. They are designed to handle specific, complex tasks—like deep codebas
 analysis, documentation lookup, or domain-specific reasoning—without cluttering
 the main agent's context or toolset.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> Subagents are currently an experimental feature.
-> 
-To use custom subagents, you must ensure they are enabled in your
-`settings.json` (enabled by default):
-
-```json
-{
-  "experimental": { "enableAgents": true }
-}
-```
+> **Note: Subagents are currently an experimental feature.**
+>
+> To use custom subagents, you must ensure they are enabled in your
+> `settings.json` (enabled by default):
+>
+> ```json
+> {
+>   "experimental": { "enableAgents": true }
+> }
+> ```
 
 ## What are subagents?
 
@@ -116,9 +114,7 @@ Gemini CLI comes with the following built-in subagents:
   the pricing table from this page," "Click the login button and enter my
   credentials."
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> This is a preview feature currently under active development.
+> **Note:** This is a preview feature currently under active development.
 
 #### Prerequisites
 
@@ -221,9 +217,7 @@ captures a screenshot and sends it to the vision model for analysis. The model
 returns coordinates and element descriptions that the browser agent uses with
 the `click_at` tool for precise, coordinate-based interactions.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> The visual agent requires API key or Vertex AI authentication. It is
+> **Note:** The visual agent requires API key or Vertex AI authentication. It is
 > not available when using "Sign in with Google".
 
 ## Creating custom subagents
@@ -411,9 +405,7 @@ that your subagent was called with a specific prompt and the given description.
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> Remote subagents are currently an experimental feature.
+> **Note: Remote subagents are currently an experimental feature.**
 
 See the [Remote Subagents documentation](remote-agents) for detailed
 configuration, authentication, and usage instructions.

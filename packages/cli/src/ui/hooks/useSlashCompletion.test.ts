@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { act, useState } from 'react';
-import type { FzfResultItem } from 'fzf';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
@@ -39,26 +38,8 @@ const getConstructorCallCount = () => asyncFzfConstructorCalls;
 // Note: This is a simplified reimplementation that may diverge from real fzf behavior.
 // Integration tests in useSlashCompletion.integration.test.ts use the real fzf library
 // to catch any behavioral differences and serve as our "canary in a coal mine."
-
-let deferredMatch: { resolve: (val?: unknown) => void } | null = null;
-
-export const resolveMatch = async () => {
-  // Wait up to 1s for deferredMatch to be set by the hook
-  const start = Date.now();
-  while (!deferredMatch && Date.now() - start < 1000) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-
-  if (deferredMatch) {
-    await act(async () => {
-      deferredMatch?.resolve(null);
-    });
-    deferredMatch = null;
-  }
-};
-
 function simulateFuzzyMatching(items: readonly string[], query: string) {
-  const results: Array<FzfResultItem<string>> = [];
+  const results = [];
   if (query) {
     const lowerQuery = query.toLowerCase();
     for (const item of items) {
@@ -117,13 +98,7 @@ function simulateFuzzyMatching(items: readonly string[], query: string) {
 
   // Sort by score descending (better matches first)
   results.sort((a, b) => b.score - a.score);
-  return new Promise((resolve) => {
-    deferredMatch = {
-      resolve: () => {
-        resolve(results);
-      },
-    };
-  });
+  return Promise.resolve(results);
 }
 
 // Mock the fzf module to provide a working fuzzy search implementation for tests
@@ -224,25 +199,38 @@ describe('useSlashCompletion', () => {
         }),
         createTestCommand({ name: 'chat', description: 'Manage chat history' }),
       ];
-
-      const { result, unmount } = await renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await resolveMatch();
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBe(slashCommands.length);
-        expect(result.current.suggestions.map((s) => s.label)).toEqual(
-          expect.arrayContaining(['help', 'clear', 'memory', 'chat', 'stats']),
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/',
+            slashCommands,
+            mockCommandContext,
+          ),
         );
+        result = hook.result;
+        unmount = hook.unmount;
       });
-      unmount();
+
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.suggestions.length).toBe(slashCommands.length);
+          expect(result.current.suggestions.map((s) => s.label)).toEqual(
+            expect.arrayContaining([
+              'help',
+              'clear',
+              'memory',
+              'chat',
+              'stats',
+            ]),
+          );
+        });
+      });
+      unmount!();
     });
 
     it('should filter commands based on partial input', async () => {
@@ -253,33 +241,44 @@ describe('useSlashCompletion', () => {
       const setIsLoadingSuggestions = vi.fn();
       const setIsPerfectMatch = vi.fn();
 
-      const { result, unmount } = await renderHook(() =>
-        useSlashCompletion({
-          enabled: true,
-          query: '/mem',
-          slashCommands,
-          commandContext: mockCommandContext,
-          setSuggestions,
-          setIsLoadingSuggestions,
-          setIsPerfectMatch,
-        }),
-      );
-
-      await resolveMatch();
-
-      await waitFor(() => {
-        expect(setSuggestions).toHaveBeenCalledWith([
-          {
-            label: 'memory',
-            value: 'memory',
-            description: 'Manage memory',
-            commandKind: CommandKind.BUILT_IN,
-          },
-        ]);
-        expect(result.current.completionStart).toBe(1);
-        expect(result.current.completionEnd).toBe(4);
+      let result: {
+        current: { completionStart: number; completionEnd: number };
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useSlashCompletion({
+            enabled: true,
+            query: '/mem',
+            slashCommands,
+            commandContext: mockCommandContext,
+            setSuggestions,
+            setIsLoadingSuggestions,
+            setIsPerfectMatch,
+          }),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
       });
-      unmount();
+
+      await act(async () => {
+        await waitFor(() => {
+          expect(setSuggestions).toHaveBeenCalledWith([
+            {
+              label: 'memory',
+              value: 'memory',
+              description: 'Manage memory',
+              commandKind: CommandKind.BUILT_IN,
+            },
+          ]);
+          expect(result.current.completionStart).toBe(1);
+          expect(result.current.completionEnd).toBe(4);
+        });
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      unmount!();
     });
 
     it('should suggest commands based on partial altNames', async () => {
@@ -291,17 +290,22 @@ describe('useSlashCompletion', () => {
             'check session stats. Usage: /stats [session|model|tools]',
         }),
       ];
-
-      const { result, unmount } = await renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/usage',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await resolveMatch();
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/usage',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
@@ -315,7 +319,7 @@ describe('useSlashCompletion', () => {
         ]);
         expect(result.current.completionStart).toBe(1);
       });
-      unmount();
+      unmount!();
     });
 
     it('should provide suggestions even for a perfectly typed command that is a leaf node', async () => {
@@ -326,24 +330,28 @@ describe('useSlashCompletion', () => {
           action: vi.fn(),
         }),
       ];
-
-      const { result, unmount } = await renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/clear',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await resolveMatch();
-
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/clear',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
       await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(1);
         expect(result.current.suggestions[0].label).toBe('clear');
         expect(result.current.completionStart).toBe(1);
       });
-      unmount();
+      unmount!();
     });
 
     it.each([['/?'], ['/usage']])(
@@ -365,22 +373,28 @@ describe('useSlashCompletion', () => {
           }),
         ];
 
-        const { result, unmount } = await renderHook(() =>
-          useTestHarnessForSlashCompletion(
-            true,
-            query,
-            mockSlashCommands,
-            mockCommandContext,
-          ),
-        );
-
-        await resolveMatch();
+        let result: {
+          current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+        };
+        let unmount: () => void;
+        await act(async () => {
+          const hook = renderHook(() =>
+            useTestHarnessForSlashCompletion(
+              true,
+              query,
+              mockSlashCommands,
+              mockCommandContext,
+            ),
+          );
+          result = hook.result;
+          unmount = hook.unmount;
+        });
 
         await waitFor(() => {
           expect(result.current.suggestions).toHaveLength(1);
           expect(result.current.completionStart).toBe(1);
         });
-        unmount();
+        unmount!();
       },
     );
 
@@ -403,7 +417,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/review',
@@ -411,8 +425,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         // All three should match 'review' in our fuzzy mock or as prefix/exact
@@ -460,17 +472,14 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result: chatResult, unmount: unmountChat } = await renderHook(
-        () =>
-          useTestHarnessForSlashCompletion(
-            true,
-            '/chat',
-            slashCommands,
-            mockCommandContext,
-          ),
+      const { result: chatResult, unmount: unmountChat } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(chatResult.current.suggestions[0]).toMatchObject({
@@ -480,17 +489,14 @@ describe('useSlashCompletion', () => {
         });
       });
 
-      const { result: resumeResult, unmount: unmountResume } = await renderHook(
-        () =>
-          useTestHarnessForSlashCompletion(
-            true,
-            '/resume',
-            slashCommands,
-            mockCommandContext,
-          ),
+      const { result: resumeResult, unmount: unmountResume } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/resume',
+          slashCommands,
+          mockCommandContext,
+        ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(resumeResult.current.suggestions[0]).toMatchObject({
@@ -534,7 +540,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/resum',
@@ -542,8 +548,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions[0]).toMatchObject({
@@ -575,7 +579,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/?',
@@ -583,8 +587,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         // 'help' should be first because '?' is an exact altName match
@@ -606,7 +608,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat',
@@ -614,8 +616,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         // Should show the auto-session entry plus subcommands of 'chat'
@@ -638,45 +638,55 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
       ];
-
-      const { result, unmount } = await renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/clear ',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await resolveMatch();
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/clear ',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
       await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(0);
       });
-      unmount();
+      unmount!();
     });
 
     it('should not provide suggestions for an unknown command', async () => {
       const slashCommands = [
         createTestCommand({ name: 'help', description: 'Show help' }),
       ];
-
-      const { result, unmount } = await renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/unknown-command',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await resolveMatch();
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/unknown-command',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
       await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(0);
         expect(result.current.completionStart).toBe(1);
       });
-      unmount();
+      unmount!();
     });
 
     it('should not suggest hidden commands', async () => {
@@ -691,23 +701,28 @@ describe('useSlashCompletion', () => {
           hidden: true,
         }),
       ];
-
-      const { result, unmount } = await renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/',
-          slashCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await resolveMatch();
+      let result: {
+        current: ReturnType<typeof useTestHarnessForSlashCompletion>;
+      };
+      let unmount: () => void;
+      await act(async () => {
+        const hook = renderHook(() =>
+          useTestHarnessForSlashCompletion(
+            true,
+            '/',
+            slashCommands,
+            mockCommandContext,
+          ),
+        );
+        result = hook.result;
+        unmount = hook.unmount;
+      });
 
       await waitFor(() => {
         expect(result.current.suggestions.length).toBe(1);
         expect(result.current.suggestions[0].label).toBe('visible');
       });
-      unmount();
+      unmount!();
     });
   });
 
@@ -724,7 +739,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -732,8 +747,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(2);
@@ -772,7 +785,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory',
@@ -780,8 +793,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       // Should verify that we see BOTH 'memory' and 'memory-leak'
       await waitFor(() => {
@@ -816,7 +827,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -824,8 +835,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toHaveLength(2);
@@ -860,7 +869,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory a',
@@ -868,8 +877,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
@@ -896,7 +903,7 @@ describe('useSlashCompletion', () => {
           ],
         }),
       ];
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory dothisnow',
@@ -904,12 +911,11 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
-
-      await waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(0);
-        expect(result.current.completionStart).toBe(8);
+      await act(async () => {
+        await waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(0);
+          expect(result.current.completionStart).toBe(8);
+        });
       });
       unmount();
     });
@@ -922,18 +928,12 @@ describe('useSlashCompletion', () => {
         'my-chat-tag-2',
         'another-channel',
       ];
-      let deferredCompletion: { resolve: (v: string[]) => void } | null = null;
-      const mockCompletionFn = vi.fn().mockImplementation(
-        (_context: CommandContext, partialArg: string) =>
-          new Promise((resolve) => {
-            deferredCompletion = {
-              resolve: () =>
-                resolve(
-                  availableTags.filter((tag) => tag.startsWith(partialArg)),
-                ),
-            };
-          }),
-      );
+      const mockCompletionFn = vi
+        .fn()
+        .mockImplementation(
+          async (_context: CommandContext, partialArg: string) =>
+            availableTags.filter((tag) => tag.startsWith(partialArg)),
+        );
 
       const slashCommands = [
         createTestCommand({
@@ -949,7 +949,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume my-ch',
@@ -958,45 +958,38 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            invocation: {
-              raw: '/chat resume my-ch',
-              name: 'resume',
-              args: 'my-ch',
-            },
-          }),
-          'my-ch',
-        );
+      await act(async () => {
+        await waitFor(() => {
+          expect(mockCompletionFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              invocation: {
+                raw: '/chat resume my-ch',
+                name: 'resume',
+                args: 'my-ch',
+              },
+            }),
+            'my-ch',
+          );
+        });
       });
 
       await act(async () => {
-        deferredCompletion?.resolve([]);
-      });
-
-      await waitFor(() => {
-        expect(result.current.suggestions).toEqual([
-          { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
-          { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
-        ]);
-        expect(result.current.completionStart).toBe(13);
-        expect(result.current.isLoadingSuggestions).toBe(false);
+        await waitFor(() => {
+          expect(result.current.suggestions).toEqual([
+            { label: 'my-chat-tag-1', value: 'my-chat-tag-1' },
+            { label: 'my-chat-tag-2', value: 'my-chat-tag-2' },
+          ]);
+          expect(result.current.completionStart).toBe(13);
+          expect(result.current.isLoadingSuggestions).toBe(false);
+        });
       });
       unmount();
     });
 
     it('should call command.completion with an empty string when args start with a space', async () => {
-      let deferredCompletion: { resolve: (v: string[]) => void } | null = null;
-      const mockCompletionFn = vi.fn().mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            deferredCompletion = {
-              resolve: () =>
-                resolve(['my-chat-tag-1', 'my-chat-tag-2', 'my-channel']),
-            };
-          }),
-      );
+      const mockCompletionFn = vi
+        .fn()
+        .mockResolvedValue(['my-chat-tag-1', 'my-chat-tag-2', 'my-channel']);
 
       const slashCommands = [
         createTestCommand({
@@ -1012,7 +1005,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/chat resume ',
@@ -1021,38 +1014,32 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      await waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            invocation: {
-              raw: '/chat resume ',
-              name: 'resume',
-              args: '',
-            },
-          }),
-          '',
-        );
+      await act(async () => {
+        await waitFor(() => {
+          expect(mockCompletionFn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              invocation: {
+                raw: '/chat resume ',
+                name: 'resume',
+                args: '',
+              },
+            }),
+            '',
+          );
+        });
       });
 
       await act(async () => {
-        deferredCompletion?.resolve([]);
-      });
-
-      await waitFor(() => {
-        expect(result.current.suggestions).toHaveLength(3);
-        expect(result.current.completionStart).toBe(13);
+        await waitFor(() => {
+          expect(result.current.suggestions).toHaveLength(3);
+          expect(result.current.completionStart).toBe(13);
+        });
       });
       unmount();
     });
 
     it('should handle completion function that returns null', async () => {
-      let deferredCompletion: { resolve: (v: null) => void } | null = null;
-      const mockCompletionFn = vi.fn().mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            deferredCompletion = { resolve: () => resolve(null) };
-          }),
-      );
+      const mockCompletionFn = vi.fn().mockResolvedValue(null);
 
       const slashCommands = [
         createTestCommand({
@@ -1062,7 +1049,7 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/test arg',
@@ -1070,10 +1057,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await act(async () => {
-        deferredCompletion?.resolve(null);
-      });
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([]);
@@ -1100,7 +1083,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/',
@@ -1108,8 +1091,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual(
@@ -1148,7 +1129,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/summ',
@@ -1156,8 +1137,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
@@ -1196,7 +1175,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/memory ',
@@ -1204,8 +1183,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual(
@@ -1238,7 +1215,7 @@ describe('useSlashCompletion', () => {
         },
       ] as SlashCommand[];
 
-      const { result, unmount } = await renderHook(() =>
+      const { result, unmount } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/custom',
@@ -1246,8 +1223,6 @@ describe('useSlashCompletion', () => {
           mockCommandContext,
         ),
       );
-
-      await resolveMatch();
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
@@ -1276,7 +1251,7 @@ describe('useSlashCompletion', () => {
       }),
     ];
 
-    const { rerender, unmount } = await renderHook(
+    const { rerender, unmount } = renderHook(
       ({ enabled, query }) =>
         useSlashCompletion({
           enabled,

@@ -95,8 +95,8 @@ describe('useTerminalTheme', () => {
     vi.restoreAllMocks();
   });
 
-  it('should subscribe to terminal background events on mount', async () => {
-    const { unmount } = await renderHook(() =>
+  it('should subscribe to terminal background events on mount', () => {
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
     );
     expect(mockSubscribe).toHaveBeenCalled();
@@ -104,15 +104,16 @@ describe('useTerminalTheme', () => {
   });
 
   it('should unsubscribe on unmount', async () => {
-    const { unmount } = await renderHook(() =>
+    const { unmount, waitUntilReady } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
     );
+    await waitUntilReady();
     unmount();
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
-  it('should poll for terminal background', async () => {
-    const { unmount } = await renderHook(() =>
+  it('should poll for terminal background', () => {
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
     );
 
@@ -123,7 +124,7 @@ describe('useTerminalTheme', () => {
 
   it('should not poll if terminal background is undefined at startup', async () => {
     config.getTerminalBackground = vi.fn().mockReturnValue(undefined);
-    const { unmount } = await renderHook(() =>
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
     );
 
@@ -132,9 +133,9 @@ describe('useTerminalTheme', () => {
     unmount();
   });
 
-  it('should switch to light theme when background is light and not call refreshStatic directly', async () => {
+  it('should switch to light theme when background is light and not call refreshStatic directly', () => {
     const refreshStatic = vi.fn();
-    const { unmount } = await renderHook(() =>
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
     );
 
@@ -152,13 +153,13 @@ describe('useTerminalTheme', () => {
     unmount();
   });
 
-  it('should switch to dark theme when background is dark', async () => {
+  it('should switch to dark theme when background is dark', () => {
     mockSettings.merged.ui.theme = 'default-light';
 
     config.setTerminalBackground('#ffffff');
 
     const refreshStatic = vi.fn();
-    const { unmount } = await renderHook(() =>
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
     );
 
@@ -178,9 +179,9 @@ describe('useTerminalTheme', () => {
     unmount();
   });
 
-  it('should not update config or call refreshStatic on repeated identical background reports', async () => {
+  it('should not update config or call refreshStatic on repeated identical background reports', () => {
     const refreshStatic = vi.fn();
-    await renderHook(() =>
+    renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
     );
 
@@ -195,7 +196,7 @@ describe('useTerminalTheme', () => {
     expect(mockHandleThemeSelect).not.toHaveBeenCalled();
   });
 
-  it('should switch theme even if terminal background report is identical to previousColor if current theme is mismatched', async () => {
+  it('should switch theme even if terminal background report is identical to previousColor if current theme is mismatched', () => {
     // Background is dark at startup
     config.setTerminalBackground('#000000');
     vi.mocked(config.setTerminalBackground).mockClear();
@@ -203,7 +204,7 @@ describe('useTerminalTheme', () => {
     mockSettings.merged.ui.theme = 'default-light';
 
     const refreshStatic = vi.fn();
-    const { unmount } = await renderHook(() =>
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
     );
 
@@ -225,9 +226,9 @@ describe('useTerminalTheme', () => {
     unmount();
   });
 
-  it('should not switch theme if autoThemeSwitching is disabled', async () => {
+  it('should not switch theme if autoThemeSwitching is disabled', () => {
     mockSettings.merged.ui.autoThemeSwitching = false;
-    const { unmount } = await renderHook(() =>
+    const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, vi.fn()),
     );
 

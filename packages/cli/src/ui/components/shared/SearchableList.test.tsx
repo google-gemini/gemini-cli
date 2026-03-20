@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { renderWithProviders } from '../../../test-utils/render.js';
+import { render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
@@ -14,6 +14,7 @@ import {
   type SearchListState,
   type GenericListItem,
 } from './SearchableList.js';
+import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { useTextBuffer } from './text-buffer.js';
 
 const useMockSearch = (props: {
@@ -51,6 +52,12 @@ const useMockSearch = (props: {
   };
 };
 
+vi.mock('../../contexts/UIStateContext.js', () => ({
+  useUIState: () => ({
+    mainAreaWidth: 100,
+  }),
+}));
+
 const mockItems: GenericListItem[] = [
   {
     key: 'item-1',
@@ -79,7 +86,7 @@ describe('SearchableList', () => {
     mockOnClose = vi.fn();
   });
 
-  const renderList = async (
+  const renderList = (
     props: Partial<SearchableListProps<GenericListItem>> = {},
   ) => {
     const defaultProps: SearchableListProps<GenericListItem> = {
@@ -91,11 +98,16 @@ describe('SearchableList', () => {
       ...props,
     };
 
-    return renderWithProviders(<SearchableList {...defaultProps} />);
+    return render(
+      <KeypressProvider>
+        <SearchableList {...defaultProps} />
+      </KeypressProvider>,
+    );
   };
 
   it('should render all items initially', async () => {
-    const { lastFrame } = await renderList();
+    const { lastFrame, waitUntilReady } = renderList();
+    await waitUntilReady();
     const frame = lastFrame();
 
     expect(frame).toContain('Test List');
@@ -108,9 +120,10 @@ describe('SearchableList', () => {
   });
 
   it('should reset selection to top when items change if resetSelectionOnItemsChange is true', async () => {
-    const { lastFrame, stdin } = await renderList({
+    const { lastFrame, stdin, waitUntilReady } = renderList({
       resetSelectionOnItemsChange: true,
     });
+    await waitUntilReady();
 
     await React.act(async () => {
       stdin.write('\u001B[B'); // Down arrow
@@ -148,7 +161,7 @@ describe('SearchableList', () => {
   });
 
   it('should filter items based on search query', async () => {
-    const { lastFrame, stdin } = await renderList();
+    const { lastFrame, stdin } = renderList();
 
     await React.act(async () => {
       stdin.write('Two');
@@ -163,7 +176,7 @@ describe('SearchableList', () => {
   });
 
   it('should show "No items found." when no items match', async () => {
-    const { lastFrame, stdin } = await renderList();
+    const { lastFrame, stdin } = renderList();
 
     await React.act(async () => {
       stdin.write('xyz123');
@@ -176,7 +189,7 @@ describe('SearchableList', () => {
   });
 
   it('should handle selection with Enter', async () => {
-    const { stdin } = await renderList();
+    const { stdin } = renderList();
 
     await React.act(async () => {
       stdin.write('\r'); // Enter
@@ -188,7 +201,7 @@ describe('SearchableList', () => {
   });
 
   it('should handle navigation and selection', async () => {
-    const { stdin } = await renderList();
+    const { stdin } = renderList();
 
     await React.act(async () => {
       stdin.write('\u001B[B'); // Down arrow
@@ -204,7 +217,7 @@ describe('SearchableList', () => {
   });
 
   it('should handle close with Esc', async () => {
-    const { stdin } = await renderList();
+    const { stdin } = renderList();
 
     await React.act(async () => {
       stdin.write('\u001B'); // Esc
@@ -216,7 +229,8 @@ describe('SearchableList', () => {
   });
 
   it('should match snapshot', async () => {
-    const { lastFrame } = await renderList();
+    const { lastFrame, waitUntilReady } = renderList();
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

@@ -37,10 +37,9 @@ export function determineSurface(): string {
     return ide.name;
   }
 
-  // If the detected IDE is 'vscode', we only accept it if TERM_PROGRAM or VSCODE_PID confirms it.
-  // This prevents generic terminals from being misidentified as VSCode, while still detecting
-  // background processes spawned by the VS Code extension host (like a2a-server).
-  if (process.env['TERM_PROGRAM'] === 'vscode' || process.env['VSCODE_PID']) {
+  // If the detected IDE is 'vscode', we only accept it if TERM_PROGRAM confirms it.
+  // This prevents generic terminals from being misidentified as VSCode.
+  if (process.env['TERM_PROGRAM'] === 'vscode') {
     return ide.name;
   }
 

@@ -16,7 +16,7 @@ import {
 } from 'vitest';
 import { render, cleanup, persistentStateMock } from '../test-utils/render.js';
 import { waitFor } from '../test-utils/async.js';
-import { act, useContext } from 'react';
+import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { type TrackedToolCall } from './hooks/useToolScheduler.js';
@@ -95,8 +95,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 import ansiEscapes from 'ansi-escapes';
-import { type LoadedSettings } from '../config/settings.js';
-import { createMockSettings } from '../test-utils/settings.js';
+import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { StreamingState } from './types.js';
@@ -212,7 +211,7 @@ import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
-import { useErrorCount } from './hooks/useConsoleMessages.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useVim } from './hooks/vim.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -250,15 +249,6 @@ describe('AppContainer State Management', () => {
   let mockInitResult: InitializationResult;
   let mockExtensionManager: MockedObject<ExtensionManager>;
 
-  type AppContainerProps = {
-    settings?: LoadedSettings;
-    config?: Config;
-    version?: string;
-    initResult?: InitializationResult;
-    startupWarnings?: StartupWarning[];
-    resumedSessionData?: ResumedSessionData;
-  };
-
   // Helper to generate the AppContainer JSX for render and rerender
   const getAppContainer = ({
     settings = mockSettings,
@@ -267,7 +257,14 @@ describe('AppContainer State Management', () => {
     initResult = mockInitResult,
     startupWarnings,
     resumedSessionData,
-  }: AppContainerProps = {}) => (
+  }: {
+    settings?: LoadedSettings;
+    config?: Config;
+    version?: string;
+    initResult?: InitializationResult;
+    startupWarnings?: StartupWarning[];
+    resumedSessionData?: ResumedSessionData;
+  } = {}) => (
     <SettingsContext.Provider value={settings}>
       <KeypressProvider config={config}>
         <OverflowProvider>
@@ -284,7 +281,7 @@ describe('AppContainer State Management', () => {
   );
 
   // Helper to render the AppContainer
-  const renderAppContainer = async (props?: AppContainerProps) =>
+  const renderAppContainer = (props?: Parameters<typeof getAppContainer>[0]) =>
     render(getAppContainer(props));
 
   // Create typed mocks for all hooks
@@ -296,7 +293,7 @@ describe('AppContainer State Management', () => {
   const mockedUseSettingsCommand = useSettingsCommand as Mock;
   const mockedUseModelCommand = useModelCommand as Mock;
   const mockedUseSlashCommandProcessor = useSlashCommandProcessor as Mock;
-  const mockedUseConsoleMessages = useErrorCount as Mock;
+  const mockedUseConsoleMessages = useConsoleMessages as Mock;
   const mockedUseGeminiStream = useGeminiStream as Mock;
   const mockedUseVim = useVim as Mock;
   const mockedUseFolderTrust = useFolderTrust as Mock;
@@ -398,9 +395,9 @@ describe('AppContainer State Management', () => {
       confirmationRequest: null,
     });
     mockedUseConsoleMessages.mockReturnValue({
-      errorCount: 0,
+      consoleMessages: [],
       handleNewMessage: vi.fn(),
-      clearErrorCount: vi.fn(),
+      clearConsoleMessages: vi.fn(),
     });
     mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
     mockedUseVim.mockReturnValue({ handleInput: vi.fn() });
@@ -487,18 +484,23 @@ describe('AppContainer State Management', () => {
     );
 
     // Mock LoadedSettings
-    mockSettings = createMockSettings({
-      hideBanner: false,
-      hideFooter: false,
-      hideTips: false,
-      showMemoryUsage: false,
-      theme: 'default',
-      ui: {
-        showStatusInTitle: false,
-        hideWindowTitle: false,
-        useAlternateBuffer: false,
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockSettings = {
+      merged: {
+        ...defaultMergedSettings,
+        hideBanner: false,
+        hideFooter: false,
+        hideTips: false,
+        showMemoryUsage: false,
+        theme: 'default',
+        ui: {
+          ...defaultMergedSettings.ui,
+          showStatusInTitle: false,
+          hideWindowTitle: false,
+          useAlternateBuffer: false,
+        },
       },
-    });
+    } as unknown as LoadedSettings;
 
     // Mock InitializationResult
     mockInitResult = {
@@ -516,9 +518,13 @@ describe('AppContainer State Management', () => {
 
   describe('Basic Rendering', () => {
     it('renders without crashing with minimal props', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
 
     it('renders with startup warnings', async () => {
@@ -535,32 +541,44 @@ describe('AppContainer State Management', () => {
         },
       ];
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({ startupWarnings }),
-      );
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ startupWarnings });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
 
     it('shows full UI details by default', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
-      expect(capturedUIState.cleanUiDetailsVisible).toBe(true);
-      unmount();
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(true);
+      });
+      unmount!();
     });
 
     it('starts in minimal UI mode when Focus UI preference is persisted', async () => {
       persistentStateMock.get.mockReturnValueOnce(true);
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
           settings: mockSettings,
-        }),
-      );
+        });
+        unmount = result.unmount;
+      });
 
-      expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
+      });
       expect(persistentStateMock.get).toHaveBeenCalledWith('focusUiEnabled');
-      unmount();
+      unmount!();
     });
   });
 
@@ -595,9 +613,15 @@ describe('AppContainer State Management', () => {
         ],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
 
-      expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled();
+      await waitFor(() =>
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled(),
+      );
       expect(
         terminalNotificationsMocks.buildRunEventNotificationContent,
       ).toHaveBeenCalledWith(
@@ -606,7 +630,9 @@ describe('AppContainer State Management', () => {
         }),
       );
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('does not send attention notification when terminal is focused', async () => {
@@ -639,13 +665,19 @@ describe('AppContainer State Management', () => {
         ],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
 
       expect(
         terminalNotificationsMocks.notifyViaTerminal,
       ).not.toHaveBeenCalled();
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('sends attention notification when focus reporting is unavailable', async () => {
@@ -678,11 +710,19 @@ describe('AppContainer State Management', () => {
         ],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+      });
 
-      expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled();
+      await waitFor(() =>
+        expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled(),
+      );
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('sends a macOS notification when a response completes while unfocused', async () => {
@@ -696,24 +736,35 @@ describe('AppContainer State Management', () => {
         streamingState: currentStreamingState,
       }));
 
-      const { unmount, rerender } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
 
       currentStreamingState = 'idle';
       await act(async () => {
-        rerender(getAppContainer());
+        rerender?.(getAppContainer());
       });
 
-      expect(
-        terminalNotificationsMocks.buildRunEventNotificationContent,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'session_complete',
-          detail: 'Gemini CLI finished responding.',
-        }),
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.buildRunEventNotificationContent,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'session_complete',
+            detail: 'Gemini CLI finished responding.',
+          }),
+        ),
       );
       expect(terminalNotificationsMocks.notifyViaTerminal).toHaveBeenCalled();
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('sends completion notification when focus reporting is unavailable', async () => {
@@ -727,23 +778,34 @@ describe('AppContainer State Management', () => {
         streamingState: currentStreamingState,
       }));
 
-      const { unmount, rerender } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
 
       currentStreamingState = 'idle';
       await act(async () => {
-        rerender(getAppContainer());
+        rerender?.(getAppContainer());
       });
 
-      expect(
-        terminalNotificationsMocks.buildRunEventNotificationContent,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'session_complete',
-          detail: 'Gemini CLI finished responding.',
-        }),
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.buildRunEventNotificationContent,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'session_complete',
+            detail: 'Gemini CLI finished responding.',
+          }),
+        ),
       );
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('does not send completion notification when another action-required dialog is pending', async () => {
@@ -761,18 +823,27 @@ describe('AppContainer State Management', () => {
         streamingState: currentStreamingState,
       }));
 
-      const { unmount, rerender } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
+
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
 
       currentStreamingState = 'idle';
       await act(async () => {
-        rerender(getAppContainer());
+        rerender?.(getAppContainer());
       });
 
       expect(
         terminalNotificationsMocks.notifyViaTerminal,
       ).not.toHaveBeenCalled();
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('can send repeated attention notifications for the same key after pending state clears', async () => {
@@ -808,15 +879,24 @@ describe('AppContainer State Management', () => {
         pendingHistoryItems,
       }));
 
-      const { unmount, rerender } = await act(async () => renderAppContainer());
+      let unmount: (() => void) | undefined;
+      let rerender: ((tree: ReactElement) => void) | undefined;
 
-      expect(
-        terminalNotificationsMocks.notifyViaTerminal,
-      ).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        const rendered = renderAppContainer();
+        unmount = rendered.unmount;
+        rerender = rendered.rerender;
+      });
+
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.notifyViaTerminal,
+        ).toHaveBeenCalledTimes(1),
+      );
 
       pendingHistoryItems = [];
       await act(async () => {
-        rerender(getAppContainer());
+        rerender?.(getAppContainer());
       });
 
       pendingHistoryItems = [
@@ -841,14 +921,18 @@ describe('AppContainer State Management', () => {
         },
       ];
       await act(async () => {
-        rerender(getAppContainer());
+        rerender?.(getAppContainer());
       });
 
-      expect(
-        terminalNotificationsMocks.notifyViaTerminal,
-      ).toHaveBeenCalledTimes(2);
+      await waitFor(() =>
+        expect(
+          terminalNotificationsMocks.notifyViaTerminal,
+        ).toHaveBeenCalledTimes(2),
+      );
 
-      unmount();
+      await act(async () => {
+        unmount?.();
+      });
     });
 
     it('initializes with theme error from initialization result', async () => {
@@ -857,82 +941,112 @@ describe('AppContainer State Management', () => {
         themeError: 'Failed to load theme',
       };
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
           initResult: initResultWithError,
-        }),
-      );
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+        });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
 
-    it('handles debug mode state', async () => {
+    it('handles debug mode state', () => {
       const debugConfig = makeFakeConfig();
       vi.spyOn(debugConfig, 'getDebugMode').mockReturnValue(true);
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({ config: debugConfig }),
-      );
-      unmount();
+      expect(() => {
+        renderAppContainer({ config: debugConfig });
+      }).not.toThrow();
     });
   });
 
   describe('Context Providers', () => {
     it('provides AppContext with correct values', async () => {
-      const { unmount } = await act(async () =>
-        renderAppContainer({ version: '2.0.0' }),
-      );
-      expect(capturedUIState).toBeTruthy();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ version: '2.0.0' });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Should render and unmount cleanly
-      unmount();
+      expect(() => unmount!()).not.toThrow();
     });
 
     it('provides UIStateContext with state management', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
 
     it('provides UIActionsContext with action handlers', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
 
     it('provides ConfigContext with config object', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
   });
 
   describe('Settings Integration', () => {
     it('handles settings with all display options disabled', async () => {
-      const settingsAllHidden = createMockSettings({
-        hideBanner: true,
-        hideFooter: true,
-        hideTips: true,
-        showMemoryUsage: false,
-      });
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const settingsAllHidden = {
+        merged: {
+          ...defaultMergedSettings,
+          hideBanner: true,
+          hideFooter: true,
+          hideTips: true,
+          showMemoryUsage: false,
+        },
+      } as unknown as LoadedSettings;
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({ settings: settingsAllHidden }),
-      );
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: settingsAllHidden });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
 
     it('handles settings with memory usage enabled', async () => {
-      const settingsWithMemory = createMockSettings({
-        showMemoryUsage: true,
-      });
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const settingsWithMemory = {
+        merged: {
+          ...defaultMergedSettings,
+          hideBanner: false,
+          hideFooter: false,
+          hideTips: false,
+          showMemoryUsage: true,
+        },
+      } as unknown as LoadedSettings;
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({ settings: settingsWithMemory }),
-      );
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: settingsWithMemory });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
   });
 
@@ -940,11 +1054,13 @@ describe('AppContainer State Management', () => {
     it.each(['1.0.0', '2.1.3-beta', '3.0.0-nightly'])(
       'handles version format: %s',
       async (version) => {
-        const { unmount } = await act(async () =>
-          renderAppContainer({ version }),
-        );
-        expect(capturedUIState).toBeTruthy();
-        unmount();
+        let unmount: () => void;
+        await act(async () => {
+          const result = renderAppContainer({ version });
+          unmount = result.unmount;
+        });
+        await waitFor(() => expect(capturedUIState).toBeTruthy());
+        unmount!();
       },
     );
   });
@@ -957,30 +1073,32 @@ describe('AppContainer State Management', () => {
       });
 
       // Should still render without crashing - errors should be handled internally
-      const { unmount } = await act(async () =>
-        renderAppContainer({ config: errorConfig }),
-      );
+      const { unmount } = renderAppContainer({ config: errorConfig });
       unmount();
     });
 
     it('handles undefined settings gracefully', async () => {
-      const undefinedSettings = createMockSettings();
+      const undefinedSettings = {
+        merged: mergeSettings({}, {}, {}, {}, true),
+      } as LoadedSettings;
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({ settings: undefinedSettings }),
-      );
-      expect(capturedUIState).toBeTruthy();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ settings: undefinedSettings });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      unmount!();
     });
   });
 
   describe('Provider Hierarchy', () => {
-    it('establishes correct provider nesting order', async () => {
+    it('establishes correct provider nesting order', () => {
       // This tests that all the context providers are properly nested
       // and that the component tree can be built without circular dependencies
-      const { unmount } = await act(async () => renderAppContainer());
+      const { unmount } = renderAppContainer();
 
-      unmount();
+      expect(() => unmount()).not.toThrow();
     });
   });
 
@@ -1012,32 +1130,40 @@ describe('AppContainer State Management', () => {
         filePath: '/tmp/test-session.json',
       };
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
           config: mockConfig,
           settings: mockSettings,
           version: '1.0.0',
           initResult: mockInitResult,
           resumedSessionData: mockResumedSessionData,
-        }),
-      );
-      unmount();
+        });
+        unmount = result.unmount;
+      });
+      await act(async () => {
+        unmount();
+      });
     });
 
     it('renders without resumed session data', async () => {
-      const { unmount } = await act(async () =>
-        renderAppContainer({
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
           config: mockConfig,
           settings: mockSettings,
           version: '1.0.0',
           initResult: mockInitResult,
           resumedSessionData: undefined,
-        }),
-      );
-      unmount();
+        });
+        unmount = result.unmount;
+      });
+      await act(async () => {
+        unmount();
+      });
     });
 
-    it('initializes chat recording service when config has it', async () => {
+    it('initializes chat recording service when config has it', () => {
       const mockChatRecordingService = {
         initialize: vi.fn(),
         recordMessage: vi.fn(),
@@ -1057,19 +1183,18 @@ describe('AppContainer State Management', () => {
         mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
       );
 
-      const { unmount } = await act(async () =>
+      expect(() => {
         renderAppContainer({
           config: configWithRecording,
           settings: mockSettings,
           version: '1.0.0',
           initResult: mockInitResult,
-        }),
-      );
-      unmount();
+        });
+      }).not.toThrow();
     });
   });
   describe('Session Recording Integration', () => {
-    it('provides chat recording service configuration', async () => {
+    it('provides chat recording service configuration', () => {
       const mockChatRecordingService = {
         initialize: vi.fn(),
         recordMessage: vi.fn(),
@@ -1095,24 +1220,23 @@ describe('AppContainer State Management', () => {
         'test-session-123',
       );
 
-      const { unmount } = await act(async () =>
+      expect(() => {
         renderAppContainer({
           config: configWithRecording,
           settings: mockSettings,
           version: '1.0.0',
           initResult: mockInitResult,
-        }),
-      );
+        });
+      }).not.toThrow();
 
       // Verify the recording service structure is correct
       expect(configWithRecording.getGeminiClient).toBeDefined();
       expect(mockGeminiClient.getChatRecordingService).toBeDefined();
       expect(mockChatRecordingService.initialize).toBeDefined();
       expect(mockChatRecordingService.recordMessage).toBeDefined();
-      unmount();
     });
 
-    it('handles session recording when messages are added', async () => {
+    it('handles session recording when messages are added', () => {
       const mockRecordMessage = vi.fn();
       const mockRecordMessageTokens = vi.fn();
 
@@ -1135,25 +1259,22 @@ describe('AppContainer State Management', () => {
         mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
       );
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          config: configWithRecording,
-          settings: mockSettings,
-          version: '1.0.0',
-          initResult: mockInitResult,
-        }),
-      );
+      renderAppContainer({
+        config: configWithRecording,
+        settings: mockSettings,
+        version: '1.0.0',
+        initResult: mockInitResult,
+      });
 
       // The actual recording happens through the useHistory hook
       // which would be triggered by user interactions
       expect(mockChatRecordingService.initialize).toBeDefined();
       expect(mockChatRecordingService.recordMessage).toBeDefined();
-      unmount();
     });
   });
 
   describe('Session Resume Flow', () => {
-    it('accepts resumed session data', async () => {
+    it('accepts resumed session data', () => {
       const mockResumeChat = vi.fn();
       const mockGeminiClient = {
         isInitialized: vi.fn(() => true),
@@ -1199,23 +1320,22 @@ describe('AppContainer State Management', () => {
         filePath: '/tmp/resumed-session.json',
       };
 
-      const { unmount } = await act(async () =>
+      expect(() => {
         renderAppContainer({
           config: configWithClient,
           settings: mockSettings,
           version: '1.0.0',
           initResult: mockInitResult,
           resumedSessionData: resumedData,
-        }),
-      );
+        });
+      }).not.toThrow();
 
       // Verify the resume functionality structure is in place
       expect(mockGeminiClient.resumeChat).toBeDefined();
       expect(resumedData.conversation.messages).toHaveLength(2);
-      unmount();
     });
 
-    it('does not attempt resume when client is not initialized', async () => {
+    it('does not attempt resume when client is not initialized', () => {
       const mockResumeChat = vi.fn();
       const mockGeminiClient = {
         isInitialized: vi.fn(() => false), // Not initialized
@@ -1240,24 +1360,21 @@ describe('AppContainer State Management', () => {
         filePath: '/tmp/session.json',
       };
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          config: configWithClient,
-          settings: mockSettings,
-          version: '1.0.0',
-          initResult: mockInitResult,
-          resumedSessionData: resumedData,
-        }),
-      );
+      renderAppContainer({
+        config: configWithClient,
+        settings: mockSettings,
+        version: '1.0.0',
+        initResult: mockInitResult,
+        resumedSessionData: resumedData,
+      });
 
       // Should not call resumeChat when client is not initialized
       expect(mockResumeChat).not.toHaveBeenCalled();
-      unmount();
     });
   });
 
   describe('Token Counting from Session Stats', () => {
-    it('tracks token counts from session messages', async () => {
+    it('tracks token counts from session messages', () => {
       // Session stats are provided through the SessionStatsProvider context
       // in the real app, not through the config directly
       const mockChatRecordingService = {
@@ -1285,30 +1402,33 @@ describe('AppContainer State Management', () => {
         mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
       );
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          config: configWithRecording,
-          settings: mockSettings,
-          version: '1.0.0',
-          initResult: mockInitResult,
-        }),
-      );
+      renderAppContainer({
+        config: configWithRecording,
+        settings: mockSettings,
+        version: '1.0.0',
+        initResult: mockInitResult,
+      });
 
       // In the actual app, these stats would be displayed in components
       // and updated as messages are processed through the recording service
       expect(mockChatRecordingService.recordMessageTokens).toBeDefined();
       expect(mockChatRecordingService.getCurrentConversation).toBeDefined();
-      unmount();
     });
   });
 
   describe('Quota and Fallback Integration', () => {
     it('passes a null proQuotaRequest to UIStateContext by default', async () => {
       // The default mock from beforeEach already sets proQuotaRequest to null
-      const { unmount } = await act(async () => renderAppContainer());
-      // Assert that the context value is as expected
-      expect(capturedUIState.quota.proQuotaRequest).toBeNull();
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => {
+        // Assert that the context value is as expected
+        expect(capturedUIState.quota.proQuotaRequest).toBeNull();
+      });
+      unmount!();
     });
 
     it('passes a valid proQuotaRequest to UIStateContext when provided by the hook', async () => {
@@ -1324,10 +1444,16 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () => renderAppContainer());
-      // Assert: The mock request is correctly passed through the context
-      expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
-      unmount();
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => {
+        // Assert: The mock request is correctly passed through the context
+        expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
+      });
+      unmount!();
     });
 
     it('passes the handleProQuotaChoice function to UIActionsContext', async () => {
@@ -1339,16 +1465,22 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () => renderAppContainer());
-      // Assert: The action in the context is the mock handler we provided
-      expect(capturedUIActions.handleProQuotaChoice).toBe(mockHandler);
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => {
+        // Assert: The action in the context is the mock handler we provided
+        expect(capturedUIActions.handleProQuotaChoice).toBe(mockHandler);
+      });
 
       // You can even verify that the plumbed function is callable
       act(() => {
         capturedUIActions.handleProQuotaChoice('retry_later');
       });
       expect(mockHandler).toHaveBeenCalledWith('retry_later');
-      unmount();
+      unmount!();
     });
   });
 
@@ -1364,14 +1496,20 @@ describe('AppContainer State Management', () => {
       expect(stdout).toBe(mocks.mockStdout);
     });
 
-    it('should update terminal title with Working… when showStatusInTitle is false', async () => {
+    it('should update terminal title with Working… when showStatusInTitle is false', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled
-      const mockSettingsWithShowStatusFalse = createMockSettings({
-        ui: {
-          showStatusInTitle: false,
-          hideWindowTitle: false,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithShowStatusFalse = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: false,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state as Active
       mockedUseGeminiStream.mockReturnValue({
@@ -1381,11 +1519,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithShowStatusFalse,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithShowStatusFalse,
+      });
 
       // Assert: Check that title was updated with "Working…"
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1399,14 +1535,19 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should use legacy terminal title when dynamicWindowTitle is false', async () => {
+    it('should use legacy terminal title when dynamicWindowTitle is false', () => {
       // Arrange: Set up mock settings with dynamicWindowTitle disabled
-      const mockSettingsWithDynamicTitleFalse = createMockSettings({
-        ui: {
-          dynamicWindowTitle: false,
-          hideWindowTitle: false,
+      const mockSettingsWithDynamicTitleFalse = {
+        ...mockSettings,
+        merged: {
+          ...mockSettings.merged,
+          ui: {
+            ...mockSettings.merged.ui,
+            dynamicWindowTitle: false,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
@@ -1416,11 +1557,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithDynamicTitleFalse,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithDynamicTitleFalse,
+      });
 
       // Assert: Check that legacy title was used
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1434,21 +1573,25 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should not update terminal title when hideWindowTitle is true', async () => {
+    it('should not update terminal title when hideWindowTitle is true', () => {
       // Arrange: Set up mock settings with hideWindowTitle enabled
-      const mockSettingsWithHideTitleTrue = createMockSettings({
-        ui: {
-          showStatusInTitle: true,
-          hideWindowTitle: true,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithHideTitleTrue = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: true,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithHideTitleTrue,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithHideTitleTrue,
+      });
 
       // Assert: Check that no title-related writes occurred
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1459,14 +1602,20 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should update terminal title with thought subject when in active state', async () => {
+    it('should update terminal title with thought subject when in active state', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = createMockSettings({
-        ui: {
-          showStatusInTitle: true,
-          hideWindowTitle: false,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithTitleEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state and thought
       const thoughtSubject = 'Processing request';
@@ -1477,11 +1626,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithTitleEnabled,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithTitleEnabled,
+      });
 
       // Assert: Check that title was updated with thought subject and suffix
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1495,24 +1642,28 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should update terminal title with default text when in Idle state and no thought subject', async () => {
+    it('should update terminal title with default text when in Idle state and no thought subject', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = createMockSettings({
-        ui: {
-          showStatusInTitle: true,
-          hideWindowTitle: false,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithTitleEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state as Idle with no thought
       mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithTitleEnabled,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithTitleEnabled,
+      });
 
       // Assert: Check that title was updated with default Idle text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1528,12 +1679,18 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title when in WaitingForConfirmation state with thought subject', async () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = createMockSettings({
-        ui: {
-          showStatusInTitle: true,
-          hideWindowTitle: false,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithTitleEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state and thought
       const thoughtSubject = 'Confirm tool execution';
@@ -1544,11 +1701,13 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
           settings: mockSettingsWithTitleEnabled,
-        }),
-      );
+        });
+        unmount = result.unmount;
+      });
 
       // Assert: Check that title was updated with confirmation text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1559,7 +1718,7 @@ describe('AppContainer State Management', () => {
       expect(titleWrites[0][0]).toBe(
         `\x1b]0;${'✋  Action Required (workspace)'.padEnd(80, ' ')}\x07`,
       );
-      unmount();
+      unmount!();
     });
 
     describe('Shell Focus Action Required', () => {
@@ -1583,12 +1742,17 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = createMockSettings({
-          ui: {
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
           },
-        });
+        } as unknown as LoadedSettings;
 
         // Mock an active shell pty but not focused
         mockedUseGeminiStream.mockReturnValue({
@@ -1605,11 +1769,9 @@ describe('AppContainer State Management', () => {
         vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
 
         // Act: Render the container (embeddedShellFocused is false by default in state)
-        const { unmount } = await act(async () =>
-          renderAppContainer({
-            settings: mockSettingsWithTitleEnabled,
-          }),
-        );
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
 
         // Initially it should show the working status
         const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1639,12 +1801,17 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = createMockSettings({
-          ui: {
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
           },
-        });
+        } as unknown as LoadedSettings;
 
         // Mock an active shell pty with redirection active
         mockedUseGeminiStream.mockReturnValue({
@@ -1668,11 +1835,9 @@ describe('AppContainer State Management', () => {
         vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
         vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
 
-        const { unmount } = await act(async () =>
-          renderAppContainer({
-            settings: mockSettingsWithTitleEnabled,
-          }),
-        );
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
 
         // Fast-forward time by 65 seconds - should still NOT be Action Required
         await act(async () => {
@@ -1706,12 +1871,17 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = createMockSettings({
-          ui: {
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
           },
-        });
+        } as unknown as LoadedSettings;
 
         // Mock an active shell pty with NO output since operation started (silent)
         mockedUseGeminiStream.mockReturnValue({
@@ -1727,11 +1897,9 @@ describe('AppContainer State Management', () => {
         vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
         vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
 
-        const { unmount } = await act(async () =>
-          renderAppContainer({
-            settings: mockSettingsWithTitleEnabled,
-          }),
-        );
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
 
         // Fast-forward time by 65 seconds
         await act(async () => {
@@ -1753,12 +1921,17 @@ describe('AppContainer State Management', () => {
         vi.setSystemTime(startTime);
 
         // Arrange: Set up mock settings with showStatusInTitle enabled
-        const mockSettingsWithTitleEnabled = createMockSettings({
-          ui: {
-            showStatusInTitle: true,
-            hideWindowTitle: false,
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
           },
-        });
+        } as unknown as LoadedSettings;
 
         // Mock an active shell pty but not focused
         let lastOutputTime = startTime + 1000;
@@ -1774,11 +1947,9 @@ describe('AppContainer State Management', () => {
         vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
 
         // Act: Render the container
-        const { unmount, rerender } = await act(async () =>
-          renderAppContainer({
-            settings: mockSettingsWithTitleEnabled,
-          }),
-        );
+        const { unmount, rerender } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
 
         // Fast-forward time by 20 seconds
         await act(async () => {
@@ -1832,14 +2003,20 @@ describe('AppContainer State Management', () => {
       });
     });
 
-    it('should pad title to exactly 80 characters', async () => {
+    it('should pad title to exactly 80 characters', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = createMockSettings({
-        ui: {
-          showStatusInTitle: true,
-          hideWindowTitle: false,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithTitleEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state and thought with a short subject
       const shortTitle = 'Short';
@@ -1850,11 +2027,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithTitleEnabled,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithTitleEnabled,
+      });
 
       // Assert: Check that title is padded to exactly 80 characters
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1869,14 +2044,20 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should use correct ANSI escape code format', async () => {
+    it('should use correct ANSI escape code format', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = createMockSettings({
-        ui: {
-          showStatusInTitle: true,
-          hideWindowTitle: false,
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithTitleEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock the streaming state and thought
       const title = 'Test Title';
@@ -1887,11 +2068,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithTitleEnabled,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithTitleEnabled,
+      });
 
       // Assert: Check that the correct ANSI escape sequence is used
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1904,14 +2083,19 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should use CLI_TITLE environment variable when set', async () => {
+    it('should use CLI_TITLE environment variable when set', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled (so it shows suffix)
-      const mockSettingsWithTitleDisabled = createMockSettings({
-        ui: {
-          showStatusInTitle: false,
-          hideWindowTitle: false,
+      const mockSettingsWithTitleDisabled = {
+        ...mockSettings,
+        merged: {
+          ...mockSettings.merged,
+          ui: {
+            ...mockSettings.merged.ui,
+            showStatusInTitle: false,
+            hideWindowTitle: false,
+          },
         },
-      });
+      } as unknown as LoadedSettings;
 
       // Mock CLI_TITLE environment variable
       vi.stubEnv('CLI_TITLE', 'Custom Gemini Title');
@@ -1923,11 +2107,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Act: Render the container
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: mockSettingsWithTitleDisabled,
-        }),
-      );
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithTitleDisabled,
+      });
 
       // Assert: Check that title was updated with CLI_TITLE value
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
@@ -1953,7 +2135,7 @@ describe('AppContainer State Management', () => {
     });
 
     it('should set and clear the queue error message after a timeout', async () => {
-      const { rerender, unmount } = await act(async () => renderAppContainer());
+      const { rerender, unmount } = renderAppContainer();
       await act(async () => {
         vi.advanceTimersByTime(0);
       });
@@ -1975,7 +2157,7 @@ describe('AppContainer State Management', () => {
     });
 
     it('should reset the timer if a new error message is set', async () => {
-      const { rerender, unmount } = await act(async () => renderAppContainer());
+      const { rerender, unmount } = renderAppContainer();
       await act(async () => {
         vi.advanceTimersByTime(0);
       });
@@ -2017,11 +2199,11 @@ describe('AppContainer State Management', () => {
     let mockCancelOngoingRequest: Mock;
     let rerender: () => void;
     let unmount: () => void;
-    let stdin: Awaited<ReturnType<typeof render>>['stdin'];
+    let stdin: ReturnType<typeof render>['stdin'];
 
     // Helper function to reduce boilerplate in tests
     const setupKeypressTest = async () => {
-      const renderResult = await act(async () => renderAppContainer());
+      const renderResult = renderAppContainer();
       stdin = renderResult.stdin;
       await act(async () => {
         vi.advanceTimersByTime(0);
@@ -2235,7 +2417,7 @@ describe('AppContainer State Management', () => {
           activePtyId: 1,
         });
 
-        const renderResult = await act(async () => render(getAppContainer()));
+        const renderResult = render(getAppContainer());
         await act(async () => {
           vi.advanceTimersByTime(0);
         });
@@ -2353,7 +2535,7 @@ describe('AppContainer State Management', () => {
     let unmount: () => void;
 
     const setupShortcutsVisibilityTest = async () => {
-      const renderResult = await act(async () => renderAppContainer());
+      const renderResult = renderAppContainer();
       await act(async () => {
         vi.advanceTimersByTime(0);
       });
@@ -2429,7 +2611,9 @@ describe('AppContainer State Management', () => {
       await act(async () => {
         rerender();
       });
-      expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
 
       unmount();
     });
@@ -2458,7 +2642,9 @@ describe('AppContainer State Management', () => {
       await act(async () => {
         rerender();
       });
-      expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
 
       unmount();
     });
@@ -2467,7 +2653,7 @@ describe('AppContainer State Management', () => {
   describe('Copy Mode (CTRL+S)', () => {
     let rerender: () => void;
     let unmount: () => void;
-    let stdin: Awaited<ReturnType<typeof render>>['stdin'];
+    let stdin: ReturnType<typeof render>['stdin'];
 
     const setupCopyModeTest = async (
       isAlternateMode = false,
@@ -2478,9 +2664,17 @@ describe('AppContainer State Management', () => {
       );
 
       // Update settings for this test run
-      const testSettings = createMockSettings({
-        ui: { useAlternateBuffer: isAlternateMode },
-      });
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const testSettings = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            useAlternateBuffer: isAlternateMode,
+          },
+        },
+      } as unknown as LoadedSettings;
 
       function TestChild() {
         useKeypress(childHandler || (() => {}), {
@@ -2505,7 +2699,7 @@ describe('AppContainer State Management', () => {
         </SettingsContext.Provider>
       );
 
-      const renderResult = await act(async () => render(getTree(testSettings)));
+      const renderResult = render(getTree(testSettings));
       stdin = renderResult.stdin;
       await act(async () => {
         vi.advanceTimersByTime(0);
@@ -2695,10 +2889,15 @@ describe('AppContainer State Management', () => {
         closeModelDialog: vi.fn(),
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       expect(capturedUIState.isModelDialogOpen).toBe(true);
-      unmount();
+      unmount!();
     });
 
     it('should provide model dialog actions in the UIActionsContext', async () => {
@@ -2710,29 +2909,45 @@ describe('AppContainer State Management', () => {
         closeModelDialog: mockCloseModelDialog,
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Verify that the actions are correctly passed through context
       act(() => {
         capturedUIActions.closeModelDialog();
       });
       expect(mockCloseModelDialog).toHaveBeenCalled();
-      unmount();
+      unmount!();
     });
   });
 
   describe('Agent Configuration Dialog Integration', () => {
     it('should initialize with dialog closed and no agent selected', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
       expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
       expect(capturedUIState.selectedAgentName).toBeUndefined();
       expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
       expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
-      unmount();
+      unmount!();
     });
 
     it('should update state when openAgentConfigDialog is called', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       const agentDefinition = { name: 'test-agent' };
       act(() => {
@@ -2747,11 +2962,16 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.selectedAgentName).toBe('test-agent');
       expect(capturedUIState.selectedAgentDisplayName).toBe('Test Agent');
       expect(capturedUIState.selectedAgentDefinition).toEqual(agentDefinition);
-      unmount();
+      unmount!();
     });
 
     it('should clear state when closeAgentConfigDialog is called', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       const agentDefinition = { name: 'test-agent' };
       act(() => {
@@ -2772,26 +2992,31 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.selectedAgentName).toBeUndefined();
       expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
       expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
-      unmount();
+      unmount!();
     });
   });
 
   describe('CoreEvents Integration', () => {
     it('subscribes to UserFeedback and drains backlog on mount', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       expect(mockCoreEvents.on).toHaveBeenCalledWith(
         CoreEvent.UserFeedback,
         expect.any(Function),
       );
       expect(mockCoreEvents.drainBacklogs).toHaveBeenCalledTimes(1);
-      unmount();
+      unmount!();
     });
 
     it('unsubscribes from UserFeedback on unmount', async () => {
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
@@ -2807,7 +3032,7 @@ describe('AppContainer State Management', () => {
     it('adds history item when UserFeedback event is received', async () => {
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
@@ -2843,7 +3068,7 @@ describe('AppContainer State Management', () => {
 
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => {
@@ -2876,7 +3101,7 @@ describe('AppContainer State Management', () => {
 
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
@@ -2888,7 +3113,7 @@ describe('AppContainer State Management', () => {
     it('handles consent request events', async () => {
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
@@ -2925,7 +3150,7 @@ describe('AppContainer State Management', () => {
     it('unsubscribes from ConsentRequest on unmount', async () => {
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => expect(capturedUIState).toBeTruthy());
@@ -2948,7 +3173,7 @@ describe('AppContainer State Management', () => {
       });
       let unmount: () => void;
       await act(async () => {
-        const result = await renderAppContainer();
+        const result = renderAppContainer();
         unmount = result.unmount;
       });
       await waitFor(() => {
@@ -2976,7 +3201,12 @@ describe('AppContainer State Management', () => {
     });
 
     it('preserves buffer when cancelling, even if empty (user is in control)', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
         mockedUseGeminiStream.mock.lastCall!,
@@ -2989,7 +3219,7 @@ describe('AppContainer State Management', () => {
       // Should NOT modify buffer when cancelling - user is in control
       expect(mockSetText).not.toHaveBeenCalled();
 
-      unmount();
+      unmount!();
     });
 
     it('preserves prompt text when cancelling streaming, even if same as last message (regression test for issue #13387)', async () => {
@@ -3007,7 +3237,12 @@ describe('AppContainer State Management', () => {
         initializeFromLogger: vi.fn(),
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
         mockedUseGeminiStream.mock.lastCall!,
@@ -3021,7 +3256,7 @@ describe('AppContainer State Management', () => {
       // Should NOT call setText - prompt should be preserved regardless of content
       expect(mockSetText).not.toHaveBeenCalled();
 
-      unmount();
+      unmount!();
     });
 
     it('restores the prompt when onCancelSubmit is called with shouldRestorePrompt=true (or undefined)', async () => {
@@ -3032,8 +3267,14 @@ describe('AppContainer State Management', () => {
         initializeFromLogger: vi.fn(),
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
-      expect(capturedUIState.userMessages).toContain('previous message');
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() =>
+        expect(capturedUIState.userMessages).toContain('previous message'),
+      );
 
       const { onCancelSubmit } = extractUseGeminiStreamArgs(
         mockedUseGeminiStream.mock.lastCall!,
@@ -3043,9 +3284,11 @@ describe('AppContainer State Management', () => {
         onCancelSubmit(true);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('previous message');
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith('previous message');
+      });
 
-      unmount();
+      unmount!();
     });
 
     it('input history is independent from conversation history (survives /clear)', async () => {
@@ -3058,10 +3301,18 @@ describe('AppContainer State Management', () => {
         initializeFromLogger: vi.fn(),
       });
 
-      const { rerender, unmount } = await act(async () => renderAppContainer());
+      let rerender: (tree: ReactElement) => void;
+      let unmount;
+      await act(async () => {
+        const result = renderAppContainer();
+        rerender = result.rerender;
+        unmount = result.unmount;
+      });
 
       // Verify userMessages is populated from inputHistory
-      expect(capturedUIState.userMessages).toContain('first prompt');
+      await waitFor(() =>
+        expect(capturedUIState.userMessages).toContain('first prompt'),
+      );
       expect(capturedUIState.userMessages).toContain('second prompt');
 
       // Clear the conversation history (simulating /clear command)
@@ -3084,7 +3335,7 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.userMessages).toContain('first prompt');
       expect(capturedUIState.userMessages).toContain('second prompt');
 
-      unmount();
+      unmount!();
     });
   });
 
@@ -3099,10 +3350,14 @@ describe('AppContainer State Management', () => {
       // Clear previous calls
       mocks.mockStdout.write.mockClear();
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let compUnmount: () => void = () => {};
+      await act(async () => {
+        const { unmount } = renderAppContainer();
+        compUnmount = unmount;
+      });
 
       // Allow async effects to run
-      expect(capturedUIState).toBeTruthy();
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Wait for fetchBannerTexts to complete
       await act(async () => {
@@ -3115,7 +3370,7 @@ describe('AppContainer State Management', () => {
       );
 
       expect(clearTerminalCalls).toHaveLength(0);
-      unmount();
+      compUnmount();
     });
   });
 
@@ -3126,13 +3381,20 @@ describe('AppContainer State Management', () => {
       );
       vi.mocked(checkPermissions).mockResolvedValue([]);
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-        }),
-      );
+      let unmount: () => void;
+      await act(async () => {
+        unmount = renderAppContainer({
+          settings: {
+            ...mockSettings,
+            merged: {
+              ...mockSettings.merged,
+              ui: { ...mockSettings.merged.ui, useAlternateBuffer: false },
+            },
+          } as LoadedSettings,
+        }).unmount;
+      });
 
-      expect(capturedUIActions).toBeTruthy();
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
 
       // Expand first
       act(() => capturedUIActions.setConstrainHeight(false));
@@ -3150,7 +3412,7 @@ describe('AppContainer State Management', () => {
       expect(mocks.mockStdout.write).toHaveBeenCalledWith(
         ansiEscapes.clearTerminal,
       );
-      unmount();
+      unmount!();
     });
 
     it('resets expansion state on submission when in alternate buffer without clearing terminal', async () => {
@@ -3161,13 +3423,20 @@ describe('AppContainer State Management', () => {
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
-          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        }),
-      );
+      let unmount: () => void;
+      await act(async () => {
+        unmount = renderAppContainer({
+          settings: {
+            ...mockSettings,
+            merged: {
+              ...mockSettings.merged,
+              ui: { ...mockSettings.merged.ui, useAlternateBuffer: true },
+            },
+          } as LoadedSettings,
+        }).unmount;
+      });
 
-      expect(capturedUIActions).toBeTruthy();
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
 
       // Expand first
       act(() => capturedUIActions.setConstrainHeight(false));
@@ -3185,7 +3454,7 @@ describe('AppContainer State Management', () => {
       expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
         ansiEscapes.clearTerminal,
       );
-      unmount();
+      unmount!();
     });
   });
 
@@ -3198,9 +3467,13 @@ describe('AppContainer State Management', () => {
       vi.useRealTimers();
     });
 
-    it('should set showIsExpandableHint when overflow occurs in Standard Mode and hides after 10s', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
-      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+    it('sets showIsExpandableHint when overflow occurs in Standard Mode and hides after 10s', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Trigger overflow
       act(() => {
@@ -3226,12 +3499,16 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.showIsExpandableHint).toBe(false);
       });
 
-      unmount();
+      unmount!();
     });
 
     it('resets the hint timer when a new component overflows (overflowingIdsSize increases)', async () => {
-      const { unmount } = await act(async () => renderAppContainer());
-      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // 1. Trigger first overflow
       act(() => {
@@ -3279,12 +3556,18 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.showIsExpandableHint).toBe(false);
       });
 
-      unmount();
+      unmount!();
     });
 
     it('toggles expansion state and resets the hint timer when Ctrl+O is pressed in Standard Mode', async () => {
-      const { stdin, unmount } = await act(async () => renderAppContainer());
-      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+      let unmount: () => void;
+      let stdin: ReturnType<typeof renderAppContainer>['stdin'];
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+        stdin = result.stdin;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Initial state is constrainHeight = true
       expect(capturedUIState.constrainHeight).toBe(true);
@@ -3309,8 +3592,10 @@ describe('AppContainer State Management', () => {
         stdin.write('\x0f'); // \x0f is Ctrl+O
       });
 
-      // constrainHeight should toggle
-      expect(capturedUIState.constrainHeight).toBe(false);
+      await waitFor(() => {
+        // constrainHeight should toggle
+        expect(capturedUIState.constrainHeight).toBe(false);
+      });
 
       // Advance enough that the original timer would have expired if it hadn't reset
       act(() => {
@@ -3329,12 +3614,18 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.showIsExpandableHint).toBe(false);
       });
 
-      unmount();
+      unmount!();
     });
 
     it('toggles Ctrl+O multiple times and verifies the hint disappears exactly after the last toggle', async () => {
-      const { stdin, unmount } = await act(async () => renderAppContainer());
-      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+      let unmount: () => void;
+      let stdin: ReturnType<typeof renderAppContainer>['stdin'];
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+        stdin = result.stdin;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Initial state is constrainHeight = true
       expect(capturedUIState.constrainHeight).toBe(true);
@@ -3358,7 +3649,9 @@ describe('AppContainer State Management', () => {
       act(() => {
         stdin.write('\x0f'); // Ctrl+O
       });
-      expect(capturedUIState.constrainHeight).toBe(false);
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(false);
+      });
 
       // Wait 1 second
       act(() => {
@@ -3370,7 +3663,9 @@ describe('AppContainer State Management', () => {
       act(() => {
         stdin.write('\x0f'); // Ctrl+O
       });
-      expect(capturedUIState.constrainHeight).toBe(true);
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(true);
+      });
 
       // Wait 1 second
       act(() => {
@@ -3382,7 +3677,9 @@ describe('AppContainer State Management', () => {
       act(() => {
         stdin.write('\x0f'); // Ctrl+O
       });
-      expect(capturedUIState.constrainHeight).toBe(false);
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(false);
+      });
 
       // Now we wait just before the timeout from the LAST toggle.
       // It should still be true.
@@ -3400,22 +3697,31 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.showIsExpandableHint).toBe(false);
       });
 
-      unmount();
+      unmount!();
     });
 
     it('DOES set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
-      const settingsWithAlternateBuffer = createMockSettings({
-        ui: { useAlternateBuffer: true },
-      });
+      const alternateSettings = mergeSettings({}, {}, {}, {}, true);
+      const settingsWithAlternateBuffer = {
+        merged: {
+          ...alternateSettings,
+          ui: {
+            ...alternateSettings.ui,
+            useAlternateBuffer: true,
+          },
+        },
+      } as unknown as LoadedSettings;
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
-      const { unmount } = await act(async () =>
-        renderAppContainer({
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
           settings: settingsWithAlternateBuffer,
-        }),
-      );
-      await waitFor(() => expect(capturedOverflowActions).toBeTruthy());
+        });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
 
       // Trigger overflow
       act(() => {
@@ -3427,7 +3733,7 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState.showIsExpandableHint).toBe(true);
       });
 
-      unmount();
+      unmount!();
     });
   });
 
@@ -3438,9 +3744,10 @@ describe('AppContainer State Management', () => {
       );
       vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => (unmount = renderAppContainer().unmount));
 
-      expect(capturedUIActions).toBeTruthy();
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
 
       await act(async () =>
         capturedUIActions.handleFinalSubmit('read @file.txt'),
@@ -3450,7 +3757,7 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.permissionConfirmationRequest?.files).toEqual([
         '/test/file.txt',
       ]);
-      unmount();
+      await act(async () => unmount!());
     });
 
     it.each([true, false])(
@@ -3466,9 +3773,10 @@ describe('AppContainer State Management', () => {
         );
         const { submitQuery } = mockedUseGeminiStream();
 
-        const { unmount } = await act(async () => renderAppContainer());
+        let unmount: () => void;
+        await act(async () => (unmount = renderAppContainer().unmount));
 
-        expect(capturedUIActions).toBeTruthy();
+        await waitFor(() => expect(capturedUIActions).toBeTruthy());
 
         await act(async () =>
           capturedUIActions.handleFinalSubmit('read @file.txt'),
@@ -3487,7 +3795,7 @@ describe('AppContainer State Management', () => {
         }
         expect(submitQuery).toHaveBeenCalledWith('read @file.txt');
         expect(capturedUIState.permissionConfirmationRequest).toBeNull();
-        unmount();
+        await act(async () => unmount!());
       },
     );
   });
@@ -3500,11 +3808,17 @@ describe('AppContainer State Management', () => {
         pendingHistoryItems: [],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
-      expect(capturedUIState).toBeTruthy();
-      expect(capturedUIState.allowPlanMode).toBe(true);
-      unmount();
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(true);
+      });
+      unmount!();
     });
 
     it('should NOT allow plan mode when disabled in config', async () => {
@@ -3514,11 +3828,17 @@ describe('AppContainer State Management', () => {
         pendingHistoryItems: [],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
-      expect(capturedUIState).toBeTruthy();
-      expect(capturedUIState.allowPlanMode).toBe(false);
-      unmount();
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
     });
 
     it('should NOT allow plan mode when streaming', async () => {
@@ -3529,11 +3849,17 @@ describe('AppContainer State Management', () => {
         pendingHistoryItems: [],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
-      expect(capturedUIState).toBeTruthy();
-      expect(capturedUIState.allowPlanMode).toBe(false);
-      unmount();
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
     });
 
     it('should NOT allow plan mode when a tool is awaiting confirmation', async () => {
@@ -3554,11 +3880,17 @@ describe('AppContainer State Management', () => {
         ],
       });
 
-      const { unmount } = await act(async () => renderAppContainer());
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
 
-      expect(capturedUIState).toBeTruthy();
-      expect(capturedUIState.allowPlanMode).toBe(false);
-      unmount();
+      await waitFor(() => {
+        expect(capturedUIState).toBeTruthy();
+        expect(capturedUIState.allowPlanMode).toBe(false);
+      });
+      unmount!();
     });
   });
 });

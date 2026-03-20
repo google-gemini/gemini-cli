@@ -29,7 +29,7 @@ describe('OverageMenuDialog', () => {
 
   describe('rendering', () => {
     it('should match snapshot with fallback available', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -38,30 +38,36 @@ describe('OverageMenuDialog', () => {
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('should match snapshot without fallback', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={500}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('should display the credit balance', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={200}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       const output = lastFrame() ?? '';
       expect(output).toContain('200');
       expect(output).toContain('AI Credits available');
@@ -69,13 +75,15 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display the model name', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       const output = lastFrame() ?? '';
       expect(output).toContain('gemini-2.5-pro');
       expect(output).toContain('Usage limit reached');
@@ -83,7 +91,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display reset time when provided', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           resetTime="3:45 PM"
@@ -91,6 +99,8 @@ describe('OverageMenuDialog', () => {
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       const output = lastFrame() ?? '';
       expect(output).toContain('3:45 PM');
       expect(output).toContain('Access resets at');
@@ -98,26 +108,30 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should not display reset time when not provided', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       const output = lastFrame() ?? '';
       expect(output).not.toContain('Access resets at');
       unmount();
     });
 
     it('should display slash command hints', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       const output = lastFrame() ?? '';
       expect(output).toContain('/stats');
       expect(output).toContain('/model');
@@ -129,13 +143,15 @@ describe('OverageMenuDialog', () => {
   describe('onChoice handling', () => {
     it('should call onChoice with use_credits when selected', async () => {
       // use_credits is the first item, so just press Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       writeKey(stdin, '\r');
 
       await waitFor(() => {
@@ -146,13 +162,15 @@ describe('OverageMenuDialog', () => {
 
     it('should call onChoice with manage when selected', async () => {
       // manage is the second item: Down + Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\r');
 
@@ -165,7 +183,7 @@ describe('OverageMenuDialog', () => {
     it('should call onChoice with use_fallback when selected', async () => {
       // With fallback: items are [use_credits, manage, use_fallback, stop]
       // use_fallback is the third item: Down x2 + Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -173,6 +191,8 @@ describe('OverageMenuDialog', () => {
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\r');
@@ -186,13 +206,15 @@ describe('OverageMenuDialog', () => {
     it('should call onChoice with stop when selected', async () => {
       // Without fallback: items are [use_credits, manage, stop]
       // stop is the third item: Down x2 + Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
+
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\r');

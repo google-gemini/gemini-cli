@@ -10,9 +10,10 @@ import { describe, it, expect } from 'vitest';
 
 describe('InfoMessage', () => {
   it('renders with the correct default prefix and text', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <InfoMessage text="Just so you know" />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -20,9 +21,10 @@ describe('InfoMessage', () => {
   });
 
   it('renders with a custom icon', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <InfoMessage text="Custom icon test" icon="★" />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -31,7 +33,10 @@ describe('InfoMessage', () => {
 
   it('renders multiline info messages', async () => {
     const message = 'Info line 1\nInfo line 2';
-    const { lastFrame, unmount } = await render(<InfoMessage text={message} />);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <InfoMessage text={message} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();

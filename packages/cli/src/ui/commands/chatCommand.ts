@@ -35,7 +35,7 @@ const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
-  const cfg = context.services.agentContext?.config;
+  const cfg = context.services.config;
   const geminiDir = cfg?.storage?.getProjectTempDir();
   if (!geminiDir) {
     return [];
@@ -103,8 +103,7 @@ const saveCommand: SlashCommand = {
       };
     }
 
-    const { logger } = context.services;
-    const config = context.services.agentContext?.config;
+    const { logger, config } = context.services;
     await logger.initialize();
 
     if (!context.overwriteConfirmed) {
@@ -126,7 +125,7 @@ const saveCommand: SlashCommand = {
       }
     }
 
-    const chat = context.services.agentContext?.geminiClient?.getChat();
+    const chat = config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -173,8 +172,7 @@ const resumeCheckpointCommand: SlashCommand = {
       };
     }
 
-    const { logger } = context.services;
-    const config = context.services.agentContext?.config;
+    const { logger, config } = context.services;
     await logger.initialize();
     const checkpoint = await logger.loadCheckpoint(tag);
     const conversation = checkpoint.history;
@@ -300,7 +298,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = context.services.agentContext?.geminiClient?.getChat();
+    const chat = context.services.config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -346,7 +344,7 @@ export const debugCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context): Promise<MessageActionReturn> => {
-    const req = context.services.agentContext?.config.getLatestApiRequest();
+    const req = context.services.config?.getLatestApiRequest();
     if (!req) {
       return {
         type: 'message',

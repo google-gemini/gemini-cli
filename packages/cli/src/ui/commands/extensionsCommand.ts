@@ -54,8 +54,8 @@ function showMessageIfNoExtensions(
 }
 
 async function listAction(context: CommandContext) {
-  const extensions = context.services.agentContext?.config
-    ? listExtensions(context.services.agentContext.config)
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
     : [];
 
   if (showMessageIfNoExtensions(context, extensions)) {
@@ -88,8 +88,8 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     (resolve) => (resolveUpdateComplete = resolve),
   );
 
-  const extensions = context.services.agentContext?.config
-    ? listExtensions(context.services.agentContext.config)
+  const extensions = context.services.config
+    ? listExtensions(context.services.config)
     : [];
 
   if (showMessageIfNoExtensions(context, extensions)) {
@@ -128,7 +128,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
       },
     });
     if (names?.length) {
-      const extensions = listExtensions(context.services.agentContext!.config);
+      const extensions = listExtensions(context.services.config!);
       for (const name of names) {
         const extension = extensions.find(
           (extension) => extension.name === name,
@@ -156,8 +156,7 @@ async function restartAction(
   context: CommandContext,
   args: string,
 ): Promise<void> {
-  const extensionLoader =
-    context.services.agentContext?.config.getExtensionLoader();
+  const extensionLoader = context.services.config?.getExtensionLoader();
   if (!extensionLoader) {
     context.ui.addItem({
       type: MessageType.ERROR,
@@ -236,8 +235,8 @@ async function restartAction(
 
   if (failures.length < extensionsToRestart.length) {
     try {
-      await context.services.agentContext?.config.reloadSkills();
-      await context.services.agentContext?.config.getAgentRegistry()?.reload();
+      await context.services.config?.reloadSkills();
+      await context.services.config?.getAgentRegistry()?.reload();
     } catch (error) {
       context.ui.addItem({
         type: MessageType.ERROR,
@@ -275,8 +274,7 @@ async function exploreAction(
   const useRegistryUI = settings.experimental?.extensionRegistry;
 
   if (useRegistryUI) {
-    const extensionManager =
-      context.services.agentContext?.config.getExtensionLoader();
+    const extensionManager = context.services.config?.getExtensionLoader();
     if (extensionManager instanceof ExtensionManager) {
       return {
         type: 'custom_dialog' as const,
@@ -284,11 +282,6 @@ async function exploreAction(
           onSelect: async (extension, requestConsentOverride) => {
             debugLogger.log(`Selected extension: ${extension.extensionName}`);
             await installAction(context, extension.url, requestConsentOverride);
-            context.ui.removeComponent();
-          },
-          onLink: async (extension, requestConsentOverride) => {
-            debugLogger.log(`Linking extension: ${extension.extensionName}`);
-            await linkAction(context, extension.url, requestConsentOverride);
             context.ui.removeComponent();
           },
           onClose: () => context.ui.removeComponent(),
@@ -338,8 +331,7 @@ function getEnableDisableContext(
   names: string[];
   scope: SettingScope;
 } | null {
-  const extensionLoader =
-    context.services.agentContext?.config.getExtensionLoader();
+  const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -439,8 +431,7 @@ async function enableAction(context: CommandContext, args: string) {
 
     if (extension?.mcpServers) {
       const mcpEnablementManager = McpServerEnablementManager.getInstance();
-      const mcpClientManager =
-        context.services.agentContext?.config.getMcpClientManager();
+      const mcpClientManager = context.services.config?.getMcpClientManager();
       const enabledServers = await mcpEnablementManager.autoEnableServers(
         Object.keys(extension.mcpServers ?? {}),
       );
@@ -472,8 +463,7 @@ async function installAction(
   args: string,
   requestConsentOverride?: (consent: string) => Promise<boolean>,
 ) {
-  const extensionLoader =
-    context.services.agentContext?.config.getExtensionLoader();
+  const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -538,13 +528,8 @@ async function installAction(
   }
 }
 
-async function linkAction(
-  context: CommandContext,
-  args: string,
-  requestConsentOverride?: (consent: string) => Promise<boolean>,
-) {
-  const extensionLoader =
-    context.services.agentContext?.config.getExtensionLoader();
+async function linkAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -591,11 +576,8 @@ async function linkAction(
       source: sourceFilepath,
       type: 'link',
     };
-    const extension = await extensionLoader.installOrUpdateExtension(
-      installMetadata,
-      undefined,
-      requestConsentOverride,
-    );
+    const extension =
+      await extensionLoader.installOrUpdateExtension(installMetadata);
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" linked successfully.`,
@@ -611,8 +593,7 @@ async function linkAction(
 }
 
 async function uninstallAction(context: CommandContext, args: string) {
-  const extensionLoader =
-    context.services.agentContext?.config.getExtensionLoader();
+  const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -711,8 +692,7 @@ async function configAction(context: CommandContext, args: string) {
     }
   }
 
-  const extensionManager =
-    context.services.agentContext?.config.getExtensionLoader();
+  const extensionManager = context.services.config?.getExtensionLoader();
   if (!(extensionManager instanceof ExtensionManager)) {
     debugLogger.error(
       `Cannot ${context.invocation?.name} extensions in this environment`,
@@ -749,7 +729,7 @@ export function completeExtensions(
   context: CommandContext,
   partialArg: string,
 ) {
-  let extensions = context.services.agentContext?.config.getExtensions() ?? [];
+  let extensions = context.services.config?.getExtensions() ?? [];
 
   if (context.invocation?.name === 'enable') {
     extensions = extensions.filter((ext) => !ext.isActive);

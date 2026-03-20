@@ -95,8 +95,8 @@ describe('useIncludeDirsTrust', () => {
     mockSetCustomDialog = vi.fn();
   });
 
-  const renderTestHook = async (isTrustedFolder: boolean | undefined) => {
-    await renderHook(() =>
+  const renderTestHook = (isTrustedFolder: boolean | undefined) => {
+    renderHook(() =>
       useIncludeDirsTrust(
         mockConfig,
         isTrustedFolder,
@@ -106,16 +106,16 @@ describe('useIncludeDirsTrust', () => {
     );
   };
 
-  it('should do nothing if isTrustedFolder is undefined', async () => {
+  it('should do nothing if isTrustedFolder is undefined', () => {
     vi.mocked(mockConfig.getPendingIncludeDirectories).mockReturnValue([
       '/foo',
     ]);
-    await renderTestHook(undefined);
+    renderTestHook(undefined);
     expect(mockConfig.clearPendingIncludeDirectories).not.toHaveBeenCalled();
   });
 
-  it('should do nothing if there are no pending directories', async () => {
-    await renderTestHook(true);
+  it('should do nothing if there are no pending directories', () => {
+    renderTestHook(true);
     expect(mockConfig.clearPendingIncludeDirectories).not.toHaveBeenCalled();
   });
 
@@ -140,7 +140,7 @@ describe('useIncludeDirsTrust', () => {
           failed: [{ path: '/dir2', error: new Error('Test error') }],
         });
 
-        await renderTestHook(isTrusted);
+        renderTestHook(isTrusted);
 
         await waitFor(() => {
           expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith([
@@ -195,7 +195,7 @@ describe('useIncludeDirsTrust', () => {
         failed: [],
       });
 
-      await renderTestHook(true);
+      renderTestHook(true);
 
       // Opens dialog for undefined trust dir
       expect(mockSetCustomDialog).toHaveBeenCalledTimes(1);
@@ -222,7 +222,7 @@ describe('useIncludeDirsTrust', () => {
         failed: [],
       });
 
-      await renderTestHook(true);
+      renderTestHook(true);
 
       await waitFor(() => {
         expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith(

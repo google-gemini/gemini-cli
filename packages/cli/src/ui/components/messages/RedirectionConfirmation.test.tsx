@@ -33,7 +33,7 @@ describe('ToolConfirmationMessage Redirection', () => {
       rootCommands: ['echo'],
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -43,6 +43,7 @@ describe('ToolConfirmationMessage Redirection', () => {
         terminalWidth={100}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();

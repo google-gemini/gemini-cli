@@ -31,14 +31,11 @@ describe('AtFileProcessor', () => {
 
     mockConfig = {
       // The processor only passes the config through, so we don't need a full mock.
-      get config() {
-        return this;
-      },
     } as unknown as Config;
 
     context = createMockCommandContext({
       services: {
-        agentContext: mockConfig,
+        config: mockConfig,
       },
     });
 
@@ -63,7 +60,7 @@ describe('AtFileProcessor', () => {
     const prompt: PartUnion[] = [{ text: 'Analyze @{file.txt}' }];
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        agentContext: null,
+        config: null,
       },
     });
     const result = await processor.process(prompt, contextWithoutConfig);

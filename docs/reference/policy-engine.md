@@ -90,17 +90,6 @@ If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
 the arguments don't match the pattern, the rule does not apply.
 
-#### Execution environment
-
-If `interactive` is specified, the rule will only apply if the CLI's execution
-environment matches the specified boolean value:
-
-- `true`: The rule applies only in interactive mode.
-- `false`: The rule applies only in non-interactive (headless) mode.
-
-If omitted, the rule applies to both interactive and non-interactive
-environments.
-
 ### Decisions
 
 There are three possible decisions a rule can enforce:
@@ -113,9 +102,7 @@ There are three possible decisions a rule can enforce:
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> The `deny` decision is the recommended way to exclude tools. The
+> **Note:** The `deny` decision is the recommended way to exclude tools. The
 > legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
 > policy rules with a `deny` decision.
 
@@ -241,17 +228,15 @@ directory are **ignored**.
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
   or others (e.g., `chmod 755`).
 - **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
-  must NOT have `Write`, `Modify`, or `Full Control` permissions. If you see a
-  security warning, use the folder properties to remove write permissions for
-  non-admin groups. You may need to "Disable inheritance" in Advanced Security
-  Settings.
+  must NOT have `Write`, `Modify`, or `Full Control` permissions. _Tip: If you
+  see a security warning, use the folder properties to remove write permissions
+  for non-admin groups. You may need to "Disable inheritance" in Advanced
+  Security Settings._
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> Supplemental admin policies (provided via `--admin-policy` or
-> `adminPolicyPaths` settings) are **NOT** subject to these strict ownership
-> checks, as they are explicitly provided by the user or administrator in their
-> current execution context.
+**Note:** Supplemental admin policies (provided via `--admin-policy` or
+`adminPolicyPaths` settings) are **NOT** subject to these strict ownership
+checks, as they are explicitly provided by the user or administrator in their
+current execution context.
 
 ### TOML rule schema
 
@@ -301,10 +286,6 @@ deny_message = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
-
-# (Optional) A boolean to restrict the rule to interactive (true) or non-interactive (false) environments.
-# If omitted, the rule applies to both.
-interactive = true
 ```
 
 ### Using arrays (lists)
@@ -352,9 +333,7 @@ using the `mcpName` field. **This is the recommended approach** for defining MCP
 policies, as it is much more robust than manually writing Fully Qualified Names
 (FQNs) or string wildcards.
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> Do not use underscores (`_`) in your MCP server names (e.g., use
+> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
 > `my-server` rather than `my_server`). The policy parser splits Fully Qualified
 > Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
 > prefix. If your server name contains an underscore, the parser will
@@ -380,8 +359,6 @@ priority = 200
 
 Specify only the `mcpName` to apply a rule to every tool provided by that
 server.
-
-**Note:** This applies to all decision types (`allow`, `deny`, `ask_user`).
 
 ```toml
 # Denies all tools from the `untrusted-server` MCP

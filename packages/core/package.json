@@ -16,7 +16,6 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
-    "posttest": "npm run build",
     "typecheck": "tsc --noEmit"
   },
   "files": [

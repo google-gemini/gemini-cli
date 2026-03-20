@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../../test-utils/render.js';
+import { render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
@@ -14,7 +14,14 @@ import {
   type BaseSettingsDialogProps,
   type SettingsDialogItem,
 } from './BaseSettingsDialog.js';
+import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { SettingScope } from '../../../config/settings.js';
+
+vi.mock('../../contexts/UIStateContext.js', () => ({
+  useUIState: () => ({
+    mainAreaWidth: 100,
+  }),
+}));
 
 enum TerminalKeys {
   ENTER = '\u000D',
@@ -108,8 +115,10 @@ describe('BaseSettingsDialog', () => {
       ...props,
     };
 
-    const result = await renderWithProviders(
-      <BaseSettingsDialog {...defaultProps} />,
+    const result = render(
+      <KeypressProvider>
+        <BaseSettingsDialog {...defaultProps} />
+      </KeypressProvider>,
     );
     await result.waitUntilReady();
     return result;
@@ -322,18 +331,22 @@ describe('BaseSettingsDialog', () => {
       const filteredItems = [items[0], items[2], items[4]];
       await act(async () => {
         rerender(
-          <BaseSettingsDialog
-            title="Test Settings"
-            items={filteredItems}
-            selectedScope={SettingScope.User}
-            maxItemsToShow={5}
-            onItemToggle={mockOnItemToggle}
-            onEditCommit={mockOnEditCommit}
-            onItemClear={mockOnItemClear}
-            onClose={mockOnClose}
-          />,
+          <KeypressProvider>
+            <BaseSettingsDialog
+              title="Test Settings"
+              items={filteredItems}
+              selectedScope={SettingScope.User}
+              maxItemsToShow={5}
+              onItemToggle={mockOnItemToggle}
+              onEditCommit={mockOnEditCommit}
+              onItemClear={mockOnItemClear}
+              onClose={mockOnClose}
+            />
+          </KeypressProvider>,
         );
       });
+      await waitUntilReady();
+
       // Verify the dialog hasn't crashed and the items are displayed
       await waitFor(() => {
         const frame = lastFrame();
@@ -378,18 +391,22 @@ describe('BaseSettingsDialog', () => {
       const filteredItems = [items[0], items[1]];
       await act(async () => {
         rerender(
-          <BaseSettingsDialog
-            title="Test Settings"
-            items={filteredItems}
-            selectedScope={SettingScope.User}
-            maxItemsToShow={5}
-            onItemToggle={mockOnItemToggle}
-            onEditCommit={mockOnEditCommit}
-            onItemClear={mockOnItemClear}
-            onClose={mockOnClose}
-          />,
+          <KeypressProvider>
+            <BaseSettingsDialog
+              title="Test Settings"
+              items={filteredItems}
+              selectedScope={SettingScope.User}
+              maxItemsToShow={5}
+              onItemToggle={mockOnItemToggle}
+              onEditCommit={mockOnEditCommit}
+              onItemClear={mockOnItemClear}
+              onClose={mockOnClose}
+            />
+          </KeypressProvider>,
         );
       });
+      await waitUntilReady();
+
       await waitFor(() => {
         const frame = lastFrame();
         expect(frame).toContain('Boolean Setting');

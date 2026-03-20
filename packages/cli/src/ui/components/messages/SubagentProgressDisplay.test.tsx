@@ -35,9 +35,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -58,9 +59,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -79,9 +81,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -100,9 +103,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -123,9 +127,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -143,9 +148,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -157,9 +163,10 @@ describe('<SubagentProgressDisplay />', () => {
       state: 'cancelled',
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -177,9 +184,10 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = await render(
-      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

@@ -102,24 +102,11 @@ export function resolveModel(
   config?: ModelCapabilityContext,
 ): string {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = config.modelConfigService.resolveModelId(requestedModel, {
+    return config.modelConfigService.resolveModelId(requestedModel, {
       useGemini3_1,
       useCustomTools: useCustomToolModel,
       hasAccessToPreview,
     });
-
-    if (!hasAccessToPreview && isPreviewModel(resolved, config)) {
-      // Fallback for unknown preview models.
-      if (resolved.includes('flash-lite')) {
-        return DEFAULT_GEMINI_FLASH_LITE_MODEL;
-      }
-      if (resolved.includes('flash')) {
-        return DEFAULT_GEMINI_FLASH_MODEL;
-      }
-      return DEFAULT_GEMINI_MODEL;
-    }
-
-    return resolved;
   }
 
   let resolved: string;

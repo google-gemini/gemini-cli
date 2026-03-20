@@ -49,7 +49,7 @@ export class ShowMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = showMemory(context.agentContext.config);
+    const result = showMemory(context.config);
     return { name: this.name, data: result.content };
   }
 }
@@ -63,7 +63,7 @@ export class RefreshMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = await refreshMemory(context.agentContext.config);
+    const result = await refreshMemory(context.config);
     return { name: this.name, data: result.content };
   }
 }
@@ -76,7 +76,7 @@ export class ListMemoryCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = listMemoryFiles(context.agentContext.config);
+    const result = listMemoryFiles(context.config);
     return { name: this.name, data: result.content };
   }
 }
@@ -95,7 +95,7 @@ export class AddMemoryCommand implements Command {
       return { name: this.name, data: result.content };
     }
 
-    const toolRegistry = context.agentContext.toolRegistry;
+    const toolRegistry = context.config.getToolRegistry();
     const tool = toolRegistry.getTool(result.toolName);
     if (tool) {
       const abortController = new AbortController();
@@ -106,10 +106,10 @@ export class AddMemoryCommand implements Command {
       await tool.buildAndExecute(result.toolArgs, signal, undefined, {
         shellExecutionConfig: {
           sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-          sandboxManager: context.agentContext.sandboxManager,
+          sandboxManager: context.config.sandboxManager,
         },
       });
-      await refreshMemory(context.agentContext.config);
+      await refreshMemory(context.config);
       return {
         name: this.name,
         data: `Added memory: "${textToAdd}"`,

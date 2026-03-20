@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import { render } from '../../test-utils/render.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
+import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { waitFor } from '../../test-utils/async.js';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -51,41 +52,44 @@ describe('EditorSettingsDialog', () => {
     vi.clearAllMocks();
   });
 
-  const renderWithProvider = async (ui: React.ReactElement) =>
-    renderWithProviders(ui);
+  const renderWithProvider = (ui: React.ReactNode) =>
+    render(<KeypressProvider>{ui}</KeypressProvider>);
 
   it('renders correctly', async () => {
-    const { lastFrame } = await renderWithProvider(
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('calls onSelect when an editor is selected', async () => {
     const onSelect = vi.fn();
-    const { lastFrame } = await renderWithProvider(
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={onSelect}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('VS Code');
   });
 
   it('switches focus between editor and scope sections on Tab', async () => {
-    const { lastFrame, stdin, waitUntilReady } = await renderWithProvider(
+    const { lastFrame, stdin, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     // Initial focus on editor
     expect(lastFrame()).toContain('> Select Editor');
@@ -124,13 +128,14 @@ describe('EditorSettingsDialog', () => {
 
   it('calls onExit when Escape is pressed', async () => {
     const onExit = vi.fn();
-    const { stdin, waitUntilReady } = await renderWithProvider(
+    const { stdin, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={onExit}
       />,
     );
+    await waitUntilReady();
 
     await act(async () => {
       stdin.write('\u001B'); // Escape
@@ -158,13 +163,14 @@ describe('EditorSettingsDialog', () => {
       },
     } as unknown as LoadedSettings;
 
-    const { lastFrame } = await renderWithProvider(
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={settingsWithOtherScope}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     const frame = lastFrame() || '';
     if (!frame.includes('(Also modified')) {

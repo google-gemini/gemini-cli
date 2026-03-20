@@ -29,8 +29,7 @@ export class RestoreCommand implements Command {
     context: CommandContext,
     args: string[],
   ): Promise<CommandExecutionResponse> {
-    const { agentContext: agentContext, git: gitService } = context;
-    const { config } = agentContext;
+    const { config, git: gitService } = context;
     const argsStr = args.join(' ');
 
     try {
@@ -117,7 +116,7 @@ export class ListCheckpointsCommand implements Command {
   readonly description = 'Lists all available checkpoints.';
 
   async execute(context: CommandContext): Promise<CommandExecutionResponse> {
-    const { config } = context.agentContext;
+    const { config } = context;
 
     try {
       if (!config.getCheckpointingEnabled()) {

@@ -217,13 +217,9 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         );
         // Poll for up to 5 seconds for the extension to activate.
         for (let i = 0; i < 10; i++) {
-          await setIdeModeAndSyncConnection(
-            context.services.agentContext!.config,
-            true,
-            {
-              logToConsole: false,
-            },
-          );
+          await setIdeModeAndSyncConnection(context.services.config!, true, {
+            logToConsole: false,
+          });
           if (
             ideClient.getConnectionStatus().status ===
             IDEConnectionStatus.Connected
@@ -266,10 +262,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         'ide.enabled',
         true,
       );
-      await setIdeModeAndSyncConnection(
-        context.services.agentContext!.config,
-        true,
-      );
+      await setIdeModeAndSyncConnection(context.services.config!, true);
       const { messageType, content } = getIdeStatusMessage(ideClient);
       context.ui.addItem(
         {
@@ -292,10 +285,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         'ide.enabled',
         false,
       );
-      await setIdeModeAndSyncConnection(
-        context.services.agentContext!.config,
-        false,
-      );
+      await setIdeModeAndSyncConnection(context.services.config!, false);
       const { messageType, content } = getIdeStatusMessage(ideClient);
       context.ui.addItem(
         {

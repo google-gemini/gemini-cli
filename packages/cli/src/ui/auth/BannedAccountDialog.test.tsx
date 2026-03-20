@@ -73,13 +73,14 @@ describe('BannedAccountDialog', () => {
   });
 
   it('renders the suspension message from accountSuspensionInfo', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const frame = lastFrame();
     expect(frame).toContain('Account Suspended');
     expect(frame).toContain('violation of Terms of Service');
@@ -88,13 +89,14 @@ describe('BannedAccountDialog', () => {
   });
 
   it('renders menu options with appeal link text from response', async () => {
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).toHaveLength(3);
     expect(items[0].label).toBe('Appeal Here');
@@ -107,13 +109,14 @@ describe('BannedAccountDialog', () => {
     const infoWithoutUrl: AccountSuspensionInfo = {
       message: 'Account suspended.',
     };
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={infoWithoutUrl}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items).toHaveLength(2);
     expect(items[0].label).toBe('Change authentication');
@@ -126,26 +129,28 @@ describe('BannedAccountDialog', () => {
       message: 'Account suspended.',
       appealUrl: 'https://example.com/appeal',
     };
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={infoWithoutLinkText}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const items = mockedRadioButtonSelect.mock.calls[0][0].items;
     expect(items[0].label).toBe('Open the Google Form');
     unmount();
   });
 
   it('opens browser when appeal option is selected', async () => {
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await onSelect('open_form');
     expect(mockedOpenBrowser).toHaveBeenCalledWith(
@@ -157,13 +162,14 @@ describe('BannedAccountDialog', () => {
 
   it('shows URL when browser cannot be launched', async () => {
     mockedShouldLaunchBrowser.mockReturnValue(false);
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     onSelect('open_form');
     await waitFor(() => {
@@ -174,13 +180,14 @@ describe('BannedAccountDialog', () => {
   });
 
   it('calls onExit when "Exit" is selected', async () => {
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await onSelect('exit');
     expect(mockedRunExitCleanup).toHaveBeenCalled();
@@ -189,13 +196,14 @@ describe('BannedAccountDialog', () => {
   });
 
   it('calls onChangeAuth when "Change authentication" is selected', async () => {
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     onSelect('change_auth');
     expect(onChangeAuth).toHaveBeenCalled();
@@ -204,13 +212,14 @@ describe('BannedAccountDialog', () => {
   });
 
   it('exits on escape key', async () => {
-    const { unmount } = await renderWithProviders(
+    const { waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
     const result = keypressHandler({ name: 'escape' });
     expect(result).toBe(true);
@@ -218,13 +227,14 @@ describe('BannedAccountDialog', () => {
   });
 
   it('renders snapshot correctly', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <BannedAccountDialog
         accountSuspensionInfo={DEFAULT_SUSPENSION_INFO}
         onExit={onExit}
         onChangeAuth={onChangeAuth}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

@@ -30,10 +30,10 @@ describe('useReverseSearchCompletion', () => {
 
   describe('Core Hook Behavior', () => {
     describe('State Management', () => {
-      it('should initialize with default state', async () => {
+      it('should initialize with default state', () => {
         const mockShellHistory = ['echo hello'];
 
-        const { result } = await renderHookWithProviders(() =>
+        const { result } = renderHookWithProviders(() =>
           useReverseSearchCompletion(
             useTextBufferForTest(''),
             mockShellHistory,
@@ -48,9 +48,9 @@ describe('useReverseSearchCompletion', () => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
 
-      it('should reset state when reverseSearchActive becomes false', async () => {
+      it('should reset state when reverseSearchActive becomes false', () => {
         const mockShellHistory = ['echo hello'];
-        const { result, rerender } = await renderHookWithProviders(
+        const { result, rerender } = renderHookWithProviders(
           ({ text, active }) => {
             const textBuffer = useTextBufferForTest(text);
             return useReverseSearchCompletion(
@@ -72,10 +72,10 @@ describe('useReverseSearchCompletion', () => {
       });
 
       describe('Navigation', () => {
-        it('should handle navigateUp with no suggestions', async () => {
+        it('should handle navigateUp with no suggestions', () => {
           const mockShellHistory = ['echo hello'];
 
-          const { result } = await renderHookWithProviders(() =>
+          const { result } = renderHookWithProviders(() =>
             useReverseSearchCompletion(
               useTextBufferForTest('grep'),
               mockShellHistory,
@@ -90,9 +90,9 @@ describe('useReverseSearchCompletion', () => {
           expect(result.current.activeSuggestionIndex).toBe(-1);
         });
 
-        it('should handle navigateDown with no suggestions', async () => {
+        it('should handle navigateDown with no suggestions', () => {
           const mockShellHistory = ['echo hello'];
-          const { result } = await renderHookWithProviders(() =>
+          const { result } = renderHookWithProviders(() =>
             useReverseSearchCompletion(
               useTextBufferForTest('grep'),
               mockShellHistory,
@@ -107,7 +107,7 @@ describe('useReverseSearchCompletion', () => {
           expect(result.current.activeSuggestionIndex).toBe(-1);
         });
 
-        it('should navigate up through suggestions with wrap-around', async () => {
+        it('should navigate up through suggestions with wrap-around', () => {
           const mockShellHistory = [
             'ls -l',
             'ls -la',
@@ -117,7 +117,7 @@ describe('useReverseSearchCompletion', () => {
             'echo Hi',
           ];
 
-          const { result } = await renderHookWithProviders(() =>
+          const { result } = renderHookWithProviders(() =>
             useReverseSearchCompletion(
               useTextBufferForTest('echo'),
               mockShellHistory,
@@ -135,7 +135,7 @@ describe('useReverseSearchCompletion', () => {
           expect(result.current.activeSuggestionIndex).toBe(1);
         });
 
-        it('should navigate down through suggestions with wrap-around', async () => {
+        it('should navigate down through suggestions with wrap-around', () => {
           const mockShellHistory = [
             'ls -l',
             'ls -la',
@@ -144,7 +144,7 @@ describe('useReverseSearchCompletion', () => {
             'echo "Hello, World!"',
             'echo Hi',
           ];
-          const { result } = await renderHookWithProviders(() =>
+          const { result } = renderHookWithProviders(() =>
             useReverseSearchCompletion(
               useTextBufferForTest('ls'),
               mockShellHistory,
@@ -162,7 +162,7 @@ describe('useReverseSearchCompletion', () => {
           expect(result.current.activeSuggestionIndex).toBe(1);
         });
 
-        it('should handle navigation with multiple suggestions', async () => {
+        it('should handle navigation with multiple suggestions', () => {
           const mockShellHistory = [
             'ls -l',
             'ls -la',
@@ -172,7 +172,7 @@ describe('useReverseSearchCompletion', () => {
             'echo "Hi all"',
           ];
 
-          const { result } = await renderHookWithProviders(() =>
+          const { result } = renderHookWithProviders(() =>
             useReverseSearchCompletion(
               useTextBufferForTest('l'),
               mockShellHistory,
@@ -209,13 +209,13 @@ describe('useReverseSearchCompletion', () => {
           expect(result.current.activeSuggestionIndex).toBe(4);
         });
 
-        it('should handle navigation with large suggestion lists and scrolling', async () => {
+        it('should handle navigation with large suggestion lists and scrolling', () => {
           const largeMockCommands = Array.from(
             { length: 15 },
             (_, i) => `echo ${i}`,
           );
 
-          const { result } = await renderHookWithProviders(() =>
+          const { result } = renderHookWithProviders(() =>
             useReverseSearchCompletion(
               useTextBufferForTest('echo'),
               largeMockCommands,
@@ -239,9 +239,9 @@ describe('useReverseSearchCompletion', () => {
   });
 
   describe('Filtering', () => {
-    it('filters history by buffer.text and sets showSuggestions', async () => {
+    it('filters history by buffer.text and sets showSuggestions', () => {
       const history = ['foo', 'barfoo', 'baz'];
-      const { result } = await renderHookWithProviders(() =>
+      const { result } = renderHookWithProviders(() =>
         useReverseSearchCompletion(useTextBufferForTest('foo'), history, true),
       );
 
@@ -253,9 +253,9 @@ describe('useReverseSearchCompletion', () => {
       expect(result.current.showSuggestions).toBe(true);
     });
 
-    it('hides suggestions when there are no matches', async () => {
+    it('hides suggestions when there are no matches', () => {
       const history = ['alpha', 'beta'];
-      const { result } = await renderHookWithProviders(() =>
+      const { result } = renderHookWithProviders(() =>
         useReverseSearchCompletion(useTextBufferForTest('γ'), history, true),
       );
 

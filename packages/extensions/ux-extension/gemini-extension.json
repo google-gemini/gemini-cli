@@ -1,0 +1,13 @@
+{
+  "name": "ux-extension",
+  "version": "1.0.0",
+  "description": "Specialized suite of UX development tools for the Gemini CLI team, including worktree management, PR finishing, and design auditing.",
+  "author": "AI DevTools UX Team",
+  "skills": [
+    "skills/_ux_git-worktree",
+    "skills/_ux_finish-pr",
+    "skills/_ux_designer",
+    "skills/_ux_string-reviewer"
+  ],
+  "commands": ["commands/ux-help.toml"]
+}

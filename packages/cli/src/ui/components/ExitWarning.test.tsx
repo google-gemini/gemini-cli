@@ -24,7 +24,8 @@ describe('ExitWarning', () => {
       ctrlCPressedOnce: false,
       ctrlDPressedOnce: false,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<ExitWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -35,7 +36,8 @@ describe('ExitWarning', () => {
       ctrlCPressedOnce: true,
       ctrlDPressedOnce: false,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<ExitWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('Press Ctrl+C again to exit');
     unmount();
   });
@@ -46,7 +48,8 @@ describe('ExitWarning', () => {
       ctrlCPressedOnce: false,
       ctrlDPressedOnce: true,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<ExitWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('Press Ctrl+D again to exit');
     unmount();
   });
@@ -57,7 +60,8 @@ describe('ExitWarning', () => {
       ctrlCPressedOnce: true,
       ctrlDPressedOnce: true,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<ExitWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });

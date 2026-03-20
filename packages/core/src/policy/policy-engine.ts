@@ -74,7 +74,6 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
-  nonInteractive: boolean,
   toolAnnotations?: Record<string, unknown>,
   subagent?: string,
 ): boolean {
@@ -143,16 +142,6 @@ function ruleMatches(
       stringifiedArgs === undefined ||
       !rule.argsPattern.test(stringifiedArgs)
     ) {
-      return false;
-    }
-  }
-
-  // Check interactive if specified
-  if ('interactive' in rule && rule.interactive !== undefined) {
-    if (rule.interactive && nonInteractive) {
-      return false;
-    }
-    if (!rule.interactive && !nonInteractive) {
       return false;
     }
   }
@@ -454,7 +443,6 @@ export class PolicyEngine {
           stringifiedArgs,
           serverName,
           this.approvalMode,
-          this.nonInteractive,
           toolAnnotations,
           subagent,
         ),
@@ -533,7 +521,6 @@ export class PolicyEngine {
             stringifiedArgs,
             serverName,
             this.approvalMode,
-            this.nonInteractive,
             toolAnnotations,
             subagent,
           )
@@ -726,7 +713,6 @@ export class PolicyEngine {
           undefined, // stringifiedArgs
           serverName,
           this.approvalMode,
-          this.nonInteractive,
           annotations,
         );
 

@@ -18,8 +18,8 @@ describe('useInputHistory', () => {
 
   const userMessages = ['message 1', 'message 2', 'message 3'];
 
-  it('should initialize with historyIndex -1 and empty originalQueryBeforeNav', async () => {
-    const { result } = await renderHook(() =>
+  it('should initialize with historyIndex -1 and empty originalQueryBeforeNav', () => {
+    const { result } = renderHook(() =>
       useInputHistory({
         userMessages: [],
         onSubmit: mockOnSubmit,
@@ -39,8 +39,8 @@ describe('useInputHistory', () => {
   });
 
   describe('handleSubmit', () => {
-    it('should call onSubmit with trimmed value and reset history', async () => {
-      const { result } = await renderHook(() =>
+    it('should call onSubmit with trimmed value and reset history', () => {
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -63,8 +63,8 @@ describe('useInputHistory', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should not call onSubmit if value is empty after trimming', async () => {
-      const { result } = await renderHook(() =>
+    it('should not call onSubmit if value is empty after trimming', () => {
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -84,8 +84,8 @@ describe('useInputHistory', () => {
   });
 
   describe('navigateUp', () => {
-    it('should not navigate if isActive is false', async () => {
-      const { result } = await renderHook(() =>
+    it('should not navigate if isActive is false', () => {
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -102,8 +102,8 @@ describe('useInputHistory', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should not navigate if userMessages is empty', async () => {
-      const { result } = await renderHook(() =>
+    it('should not navigate if userMessages is empty', () => {
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages: [],
           onSubmit: mockOnSubmit,
@@ -120,9 +120,9 @@ describe('useInputHistory', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should call onChange with the last message when navigating up from initial state', async () => {
+    it('should call onChange with the last message when navigating up from initial state', () => {
       const currentQuery = 'current query';
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -140,10 +140,10 @@ describe('useInputHistory', () => {
       expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start'); // Last message
     });
 
-    it('should store currentQuery and currentCursorOffset as original state on first navigateUp', async () => {
+    it('should store currentQuery and currentCursorOffset as original state on first navigateUp', () => {
       const currentQuery = 'original user input';
       const currentCursorOffset = 5;
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -169,8 +169,8 @@ describe('useInputHistory', () => {
       );
     });
 
-    it('should navigate through history messages on subsequent navigateUp calls', async () => {
-      const { result } = await renderHook(() =>
+    it('should navigate through history messages on subsequent navigateUp calls', () => {
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -199,7 +199,7 @@ describe('useInputHistory', () => {
   });
 
   describe('navigateDown', () => {
-    it('should not navigate if isActive is false', async () => {
+    it('should not navigate if isActive is false', () => {
       const initialProps = {
         userMessages,
         onSubmit: mockOnSubmit,
@@ -208,7 +208,7 @@ describe('useInputHistory', () => {
         currentCursorOffset: 0,
         onChange: mockOnChange,
       };
-      const { result, rerender } = await renderHook(
+      const { result, rerender } = renderHook(
         (props) => useInputHistory(props),
         {
           initialProps,
@@ -231,8 +231,8 @@ describe('useInputHistory', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should not navigate if historyIndex is -1 (not in history navigation)', async () => {
-      const { result } = await renderHook(() =>
+    it('should not navigate if historyIndex is -1 (not in history navigation)', () => {
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -249,10 +249,10 @@ describe('useInputHistory', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should restore cursor offset only when in middle of compose prompt', async () => {
+    it('should restore cursor offset only when in middle of compose prompt', () => {
       const originalQuery = 'my original input';
       const originalCursorOffset = 5; // Middle
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
@@ -278,9 +278,9 @@ describe('useInputHistory', () => {
       );
     });
 
-    it('should NOT restore cursor offset if it was at start or end of compose prompt', async () => {
+    it('should NOT restore cursor offset if it was at start or end of compose prompt', () => {
       const originalQuery = 'my original input';
-      const { result, rerender } = await renderHook(
+      const { result, rerender } = renderHook(
         (props) => useInputHistory(props),
         {
           initialProps: {
@@ -325,10 +325,10 @@ describe('useInputHistory', () => {
       expect(mockOnChange).toHaveBeenCalledWith(originalQuery, 'end');
     });
 
-    it('should remember text edits but use default cursor when navigating between history items', async () => {
+    it('should remember text edits but use default cursor when navigating between history items', () => {
       const originalQuery = 'my original input';
       const originalCursorOffset = 5;
-      const { result, rerender } = await renderHook(
+      const { result, rerender } = renderHook(
         (props) => useInputHistory(props),
         {
           initialProps: {
@@ -400,7 +400,7 @@ describe('useInputHistory', () => {
       );
     });
 
-    it('should restore offset for history items ONLY if returning from them immediately', async () => {
+    it('should restore offset for history items ONLY if returning from them immediately', () => {
       const originalQuery = 'my original input';
       const initialProps = {
         userMessages,
@@ -411,7 +411,7 @@ describe('useInputHistory', () => {
         onChange: mockOnChange,
       };
 
-      const { result, rerender } = await renderHook(
+      const { result, rerender } = renderHook(
         (props) => useInputHistory(props),
         {
           initialProps,

@@ -43,7 +43,8 @@ describe('QuittingDisplay', () => {
     mockUseUIState.mockReturnValue({
       quittingMessages: null,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<QuittingDisplay />);
+    const { lastFrame, waitUntilReady, unmount } = render(<QuittingDisplay />);
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -57,7 +58,8 @@ describe('QuittingDisplay', () => {
       quittingMessages: mockMessages,
       constrainHeight: false,
     } as unknown as UIState);
-    const { lastFrame, unmount } = await render(<QuittingDisplay />);
+    const { lastFrame, waitUntilReady, unmount } = render(<QuittingDisplay />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('Goodbye');
     expect(lastFrame()).toContain('See you later');
     unmount();

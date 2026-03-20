@@ -8,6 +8,7 @@ import { createContext, useContext } from 'react';
 import type {
   HistoryItem,
   ThoughtSummary,
+  ConsoleMessageItem,
   ConfirmationRequest,
   QuotaStats,
   LoopDetectionConfirmationRequest,
@@ -157,6 +158,7 @@ export interface UIState {
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
+  filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;

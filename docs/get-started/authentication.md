@@ -4,9 +4,7 @@ To use Gemini CLI, you'll need to authenticate with Google. This guide helps you
 quickly find the best way to sign in based on your account type and how you're
 using the CLI.
 
-<!-- prettier-ignore -->
-> [!TIP]
-> Looking for a high-level comparison of all available subscriptions?
+> **Note:** Looking for a high-level comparison of all available subscriptions?
 > To compare features and find the right quota for your needs, see our
 > [Plans page](https://geminicli.com/plans/).
 
@@ -42,11 +40,11 @@ Select the authentication method that matches your situation in the table below:
 
 If you run Gemini CLI on your local machine, the simplest authentication method
 is logging in with your Google account. This method requires a web browser on a
-machine that can communicate with the terminal running Gemini CLI (for example,
-your local machine).
+machine that can communicate with the terminal running Gemini CLI (e.g., your
+local machine).
 
-If you are a **Google AI Pro** or **Google AI Ultra** subscriber, use the Google
-account associated with your subscription.
+> **Important:** If you are a **Google AI Pro** or **Google AI Ultra**
+> subscriber, use the Google account associated with your subscription.
 
 To authenticate and use Gemini CLI:
 
@@ -109,9 +107,7 @@ To authenticate and use Gemini CLI with a Gemini API key:
 
 4. Select **Use Gemini API key**.
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> Treat API keys, especially for services like Gemini, as sensitive
+> **Warning:** Treat API keys, especially for services like Gemini, as sensitive
 > credentials. Protect them to prevent unauthorized access and potential misuse
 > of the service under your account.
 
@@ -134,7 +130,7 @@ For example:
 **macOS/Linux**
 
 ```bash
-# Replace with your project ID and desired location (for example, us-central1)
+# Replace with your project ID and desired location (e.g., us-central1)
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -142,7 +138,7 @@ export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 **Windows (PowerShell)**
 
 ```powershell
-# Replace with your project ID and desired location (for example, us-central1)
+# Replace with your project ID and desired location (e.g., us-central1)
 $env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 $env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -154,20 +150,20 @@ To make any Vertex AI environment variable settings persistent, see
 
 Consider this authentication method if you have Google Cloud CLI installed.
 
-If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you must unset
-them to use ADC.
-
-**macOS/Linux**
-
-```bash
-unset GOOGLE_API_KEY GEMINI_API_KEY
-```
-
-**Windows (PowerShell)**
-
-```powershell
-Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
-```
+> **Note:** If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you
+> must unset them to use ADC:
+>
+> **macOS/Linux**
+>
+> ```bash
+> unset GOOGLE_API_KEY GEMINI_API_KEY
+> ```
+>
+> **Windows (PowerShell)**
+>
+> ```powershell
+> Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
+> ```
 
 1. Verify you have a Google Cloud project and Vertex AI API is enabled.
 
@@ -192,20 +188,20 @@ Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
 Consider this method of authentication in non-interactive environments, CI/CD
 pipelines, or if your organization restricts user-based ADC or API key creation.
 
-If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you must unset
-them:
-
-**macOS/Linux**
-
-```bash
-unset GOOGLE_API_KEY GEMINI_API_KEY
-```
-
-**Windows (PowerShell)**
-
-```powershell
-Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
-```
+> **Note:** If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you
+> must unset them:
+>
+> **macOS/Linux**
+>
+> ```bash
+> unset GOOGLE_API_KEY GEMINI_API_KEY
+> ```
+>
+> **Windows (PowerShell)**
+>
+> ```powershell
+> Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
+> ```
 
 1.  [Create a service account and key](https://cloud.google.com/iam/docs/keys-create-delete)
     and download the provided JSON file. Assign the "Vertex AI User" role to the
@@ -237,11 +233,8 @@ Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
     ```
 
 5.  Select **Vertex AI**.
-
-<!-- prettier-ignore -->
-> [!WARNING]
-> Protect your service account key file as it gives access to
-> your resources.
+    > **Warning:** Protect your service account key file as it gives access to
+    > your resources.
 
 #### C. Vertex AI - Google Cloud API key
 
@@ -264,9 +257,10 @@ Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
     $env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
     ```
 
-    If you see errors like `"API keys are not supported by this API..."`, your
-    organization might restrict API key usage for this service. Try the other
-    Vertex AI authentication methods instead.
+    > **Note:** If you see errors like
+    > `"API keys are not supported by this API..."`, your organization might
+    > restrict API key usage for this service. Try the other Vertex AI
+    > authentication methods instead.
 
 3.  [Configure your Google Cloud Project](#set-gcp).
 
@@ -280,9 +274,7 @@ Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
 
 ## Set your Google Cloud project <a id="set-gcp"></a>
 
-<!-- prettier-ignore -->
-> [!IMPORTANT]
-> Most individual Google accounts (free and paid) don't require a
+> **Important:** Most individual Google accounts (free and paid) don't require a
 > Google Cloud project for authentication.
 
 When you sign in using your Google account, you may need to configure a Google
@@ -333,31 +325,29 @@ persist them with the following methods:
 1.  **Add your environment variables to your shell configuration file:** Append
     the environment variable commands to your shell's startup file.
 
-    **macOS/Linux** (for example, `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
+    **macOS/Linux** (e.g., `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
 
     ```bash
     echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
     source ~/.bashrc
     ```
 
-    **Windows (PowerShell)** (for example, `$PROFILE`):
+    **Windows (PowerShell)** (e.g., `$PROFILE`):
 
     ```powershell
     Add-Content -Path $PROFILE -Value '$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"'
     . $PROFILE
     ```
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> Be aware that when you export API keys or service account
-> paths in your shell configuration file, any process launched from that
-> shell can read them.
+    > **Warning:** Be aware that when you export API keys or service account
+    > paths in your shell configuration file, any process launched from that
+    > shell can read them.
 
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
     directory or home directory. Gemini CLI automatically loads variables from
     the first `.env` file it finds, searching up from the current directory,
-    then in your home directory's `.gemini/.env` (for example, `~/.gemini/.env`
-    or `%USERPROFILE%\.gemini\.env`).
+    then in your home directory's `.gemini/.env` (e.g., `~/.gemini/.env` or
+    `%USERPROFILE%\.gemini\.env`).
 
     Example for user-wide settings:
 

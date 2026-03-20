@@ -183,6 +183,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,
+    filteredConsoleMessages: [],
     history: [],
     sessionStats: {
       sessionId: 'test-session',
@@ -251,7 +252,7 @@ const renderComposer = async (
   config = createMockConfig(),
   uiActions = createMockUIActions(),
 ) => {
-  const result = await render(
+  const result = render(
     <ConfigContext.Provider value={config as unknown as Config}>
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
@@ -262,6 +263,7 @@ const renderComposer = async (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
+  await result.waitUntilReady();
 
   // Wait for shortcuts hint debounce if using fake timers
   if (vi.isFakeTimers()) {
@@ -406,7 +408,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        ui: { loadingPhrases: 'off' },
+        merged: { ui: { loadingPhrases: 'off' } },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -755,6 +757,13 @@ describe('Composer', () => {
     it('shows DetailedMessagesDisplay when showErrorDetails is true', async () => {
       const uiState = createMockUIState({
         showErrorDetails: true,
+        filteredConsoleMessages: [
+          {
+            type: 'error',
+            content: 'Test error',
+            count: 1,
+          },
+        ],
       });
 
       const { lastFrame } = await renderComposer(uiState);

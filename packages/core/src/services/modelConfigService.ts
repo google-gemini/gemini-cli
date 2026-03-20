@@ -5,7 +5,6 @@
  */
 
 import type { GenerateContentConfig } from '@google/genai';
-import type { ModelPolicy } from '../availability/modelPolicy.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -112,7 +111,6 @@ export interface ModelConfigServiceConfig {
   modelDefinitions?: Record<string, ModelDefinition>;
   modelIdResolutions?: Record<string, ModelResolution>;
   classifierIdResolutions?: Record<string, ModelResolution>;
-  modelChains?: Record<string, ModelPolicy[]>;
 }
 
 const MAX_ALIAS_CHAIN_DEPTH = 100;
@@ -221,29 +219,6 @@ export class ModelConfigService {
     }
 
     return resolution.default;
-  }
-
-  getModelChain(chainName: string): ModelPolicy[] | undefined {
-    return this.config.modelChains?.[chainName];
-  }
-
-  /**
-   * Fetches a chain template and resolves all model IDs within it
-   * based on the provided context.
-   */
-  resolveChain(
-    chainName: string,
-    context: ResolutionContext = {},
-  ): ModelPolicy[] | undefined {
-    const template = this.config.modelChains?.[chainName];
-    if (!template) {
-      return undefined;
-    }
-    // Map through the template and resolve each model ID
-    return template.map((policy) => ({
-      ...policy,
-      model: this.resolveModelId(policy.model, context),
-    }));
   }
 
   registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {

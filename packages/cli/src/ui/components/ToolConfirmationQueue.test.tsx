@@ -5,12 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from 'react';
 import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
@@ -80,7 +78,7 @@ describe('ToolConfirmationQueue', () => {
       total: 3,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -91,6 +89,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Action Required');
@@ -117,7 +116,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -128,6 +127,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
@@ -155,18 +155,15 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Box flexDirection="column" height={30}>
         <ToolConfirmationQueue
           confirmingTool={confirmingTool as unknown as ConfirmingToolState}
         />
       </Box>,
       {
-        config: {
-          ...mockConfig,
-          getUseAlternateBuffer: () => true,
-        } as unknown as Config,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        config: mockConfig,
+        useAlternateBuffer: true,
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -175,6 +172,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     await waitFor(() =>
       expect(lastFrame()?.toLowerCase()).toContain(
@@ -208,13 +206,13 @@ describe('ToolConfirmationQueue', () => {
     };
 
     // Use a small availableTerminalHeight to force truncation
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
       {
         config: mockConfig,
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        useAlternateBuffer: false,
         uiState: {
           terminalWidth: 80,
           terminalHeight: 40,
@@ -224,6 +222,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     // With availableTerminalHeight = 10:
     // maxHeight = Math.max(10 - 1, 4) = 9
@@ -258,7 +257,11 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const {
+      lastFrame,
+      waitUntilReady,
+      unmount = vi.fn(),
+    } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -273,6 +276,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     // Calculation:
     // availableTerminalHeight: 20 -> maxHeight: 19 (20-1)
@@ -313,7 +317,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -327,6 +331,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).not.toContain('Press CTRL-O to show more lines');
@@ -351,7 +356,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -362,6 +367,7 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -388,18 +394,16 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await act(async () =>
-      renderWithProviders(
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />,
-        {
-          config: mockConfig,
-          uiState: {
-            terminalWidth: 80,
-          },
+    const { lastFrame, unmount } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
         },
-      ),
+      },
     );
 
     await waitFor(() => {

@@ -51,11 +51,12 @@ const TestComponent = ({ onColor }: { onColor: (c: string) => void }) => {
 describe('TerminalContext', () => {
   it('should parse OSC 11 response', async () => {
     const handleColor = vi.fn();
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <TerminalProvider>
         <TestComponent onColor={handleColor} />
       </TerminalProvider>,
     );
+    await waitUntilReady();
 
     await act(async () => {
       mockStdin.emit('data', '\x1b]11;rgb:ffff/ffff/ffff\x1b\\');
@@ -70,11 +71,12 @@ describe('TerminalContext', () => {
 
   it('should handle partial chunks', async () => {
     const handleColor = vi.fn();
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <TerminalProvider>
         <TestComponent onColor={handleColor} />
       </TerminalProvider>,
     );
+    await waitUntilReady();
 
     await act(async () => {
       mockStdin.emit('data', '\x1b]11;rgb:0000/');

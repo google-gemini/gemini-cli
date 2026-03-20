@@ -55,18 +55,20 @@ describe('AuthInProgress', () => {
   });
 
   it('renders initial state with spinner', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <AuthInProgress onTimeout={onTimeout} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('[Spinner] Waiting for authentication...');
     expect(lastFrame()).toContain('Press Esc or Ctrl+C to cancel');
     unmount();
   });
 
   it('calls onTimeout when ESC is pressed', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <AuthInProgress onTimeout={onTimeout} />,
     );
+    await waitUntilReady();
     const keypressHandler = vi.mocked(useKeypress).mock.calls[0][0];
 
     await act(async () => {
@@ -82,9 +84,10 @@ describe('AuthInProgress', () => {
   });
 
   it('calls onTimeout when Ctrl+C is pressed', async () => {
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <AuthInProgress onTimeout={onTimeout} />,
     );
+    await waitUntilReady();
     const keypressHandler = vi.mocked(useKeypress).mock.calls[0][0];
 
     await act(async () => {
@@ -97,9 +100,10 @@ describe('AuthInProgress', () => {
   });
 
   it('calls onTimeout and shows timeout message after 3 minutes', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <AuthInProgress onTimeout={onTimeout} />,
     );
+    await waitUntilReady();
 
     await act(async () => {
       vi.advanceTimersByTime(180000);
@@ -112,7 +116,10 @@ describe('AuthInProgress', () => {
   });
 
   it('clears timer on unmount', async () => {
-    const { unmount } = await render(<AuthInProgress onTimeout={onTimeout} />);
+    const { waitUntilReady, unmount } = render(
+      <AuthInProgress onTimeout={onTimeout} />,
+    );
+    await waitUntilReady();
 
     await act(async () => {
       unmount();

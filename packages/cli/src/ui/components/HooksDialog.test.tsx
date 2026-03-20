@@ -35,18 +35,20 @@ describe('HooksDialog', () => {
 
   describe('snapshots', () => {
     it('renders empty hooks dialog', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={[]} onClose={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('renders single hook with security warning, source, and tips', async () => {
       const hooks = [createMockHook('test-hook', 'before-tool', true)];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={hooks} onClose={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -57,9 +59,10 @@ describe('HooksDialog', () => {
         createMockHook('hook2', 'before-tool', false),
         createMockHook('hook3', 'after-agent', true),
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={hooks} onClose={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -77,9 +80,10 @@ describe('HooksDialog', () => {
           },
         }),
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={hooks} onClose={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -96,9 +100,10 @@ describe('HooksDialog', () => {
           enabled: true,
         },
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={hooks} onClose={vi.fn()} />,
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -107,9 +112,10 @@ describe('HooksDialog', () => {
   describe('keyboard interaction', () => {
     it('should call onClose when escape key is pressed', async () => {
       const onClose = vi.fn();
-      const { stdin, unmount } = await renderWithProviders(
+      const { waitUntilReady, stdin, unmount } = renderWithProviders(
         <HooksDialog hooks={[]} onClose={onClose} />,
       );
+      await waitUntilReady();
 
       act(() => {
         stdin.write('\u001b[27u');
@@ -131,9 +137,10 @@ describe('HooksDialog', () => {
         createMockHook('hook1', 'before-tool', true),
         createMockHook('hook2', 'after-tool', false),
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={10} />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).not.toContain('▲');
       expect(lastFrame()).not.toContain('▼');
@@ -142,9 +149,10 @@ describe('HooksDialog', () => {
 
     it('should show scroll down indicator when there are more hooks than maxVisibleHooks', async () => {
       const hooks = createManyHooks(15);
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain('▼');
       unmount();
@@ -152,10 +160,10 @@ describe('HooksDialog', () => {
 
     it('should scroll down when down arrow is pressed', async () => {
       const hooks = createManyHooks(15);
-      const { lastFrame, waitUntilReady, stdin, unmount } =
-        await renderWithProviders(
-          <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
-        );
+      const { lastFrame, waitUntilReady, stdin, unmount } = renderWithProviders(
+        <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
+      );
+      await waitUntilReady();
 
       // Initially should not show up indicator
       expect(lastFrame()).not.toContain('▲');
@@ -172,10 +180,10 @@ describe('HooksDialog', () => {
 
     it('should scroll up when up arrow is pressed after scrolling down', async () => {
       const hooks = createManyHooks(15);
-      const { lastFrame, waitUntilReady, stdin, unmount } =
-        await renderWithProviders(
-          <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
-        );
+      const { lastFrame, waitUntilReady, stdin, unmount } = renderWithProviders(
+        <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
+      );
+      await waitUntilReady();
 
       // Scroll down twice
       act(() => {
@@ -199,10 +207,10 @@ describe('HooksDialog', () => {
 
     it('should not scroll beyond the end', async () => {
       const hooks = createManyHooks(10);
-      const { lastFrame, waitUntilReady, stdin, unmount } =
-        await renderWithProviders(
-          <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
-        );
+      const { lastFrame, waitUntilReady, stdin, unmount } = renderWithProviders(
+        <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
+      );
+      await waitUntilReady();
 
       // Scroll down many times past the end
       act(() => {
@@ -221,10 +229,10 @@ describe('HooksDialog', () => {
 
     it('should not scroll above the beginning', async () => {
       const hooks = createManyHooks(10);
-      const { lastFrame, waitUntilReady, stdin, unmount } =
-        await renderWithProviders(
-          <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
-        );
+      const { lastFrame, waitUntilReady, stdin, unmount } = renderWithProviders(
+        <HooksDialog hooks={hooks} onClose={vi.fn()} maxVisibleHooks={5} />,
+      );
+      await waitUntilReady();
 
       // Try to scroll up when already at top
       act(() => {

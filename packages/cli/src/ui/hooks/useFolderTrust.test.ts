@@ -119,18 +119,18 @@ describe('useFolderTrust', () => {
     });
   });
 
-  it('should not open dialog when folder is already trusted', async () => {
+  it('should not open dialog when folder is already trusted', () => {
     isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: true, source: 'file' });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
     expect(onTrustChange).toHaveBeenCalledWith(true);
   });
 
-  it('should not open dialog when folder is already untrusted', async () => {
+  it('should not open dialog when folder is already untrusted', () => {
     isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: false, source: 'file' });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
@@ -142,7 +142,7 @@ describe('useFolderTrust', () => {
       isTrusted: undefined,
       source: undefined,
     });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
     await waitFor(() => {
@@ -151,11 +151,9 @@ describe('useFolderTrust', () => {
     expect(onTrustChange).toHaveBeenCalledWith(undefined);
   });
 
-  it('should send a message if the folder is untrusted', async () => {
+  it('should send a message if the folder is untrusted', () => {
     isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: false, source: 'file' });
-    await renderHook(() =>
-      useFolderTrust(mockSettings, onTrustChange, addItem),
-    );
+    renderHook(() => useFolderTrust(mockSettings, onTrustChange, addItem));
     expect(addItem).toHaveBeenCalledWith(
       {
         text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
@@ -165,11 +163,9 @@ describe('useFolderTrust', () => {
     );
   });
 
-  it('should not send a message if the folder is trusted', async () => {
+  it('should not send a message if the folder is trusted', () => {
     isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: true, source: 'file' });
-    await renderHook(() =>
-      useFolderTrust(mockSettings, onTrustChange, addItem),
-    );
+    renderHook(() => useFolderTrust(mockSettings, onTrustChange, addItem));
     expect(addItem).not.toHaveBeenCalled();
   });
 
@@ -186,7 +182,7 @@ describe('useFolderTrust', () => {
       });
     });
 
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -216,7 +212,7 @@ describe('useFolderTrust', () => {
       isTrusted: undefined,
       source: undefined,
     });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -242,7 +238,7 @@ describe('useFolderTrust', () => {
       isTrusted: undefined,
       source: undefined,
     });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -268,7 +264,7 @@ describe('useFolderTrust', () => {
       isTrusted: undefined,
       source: undefined,
     });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -296,7 +292,7 @@ describe('useFolderTrust', () => {
       });
     });
 
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -321,7 +317,7 @@ describe('useFolderTrust', () => {
       isTrusted: true,
       source: 'file',
     });
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -346,7 +342,7 @@ describe('useFolderTrust', () => {
       throw new Error('test error');
     });
     const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
@@ -366,14 +362,14 @@ describe('useFolderTrust', () => {
   });
 
   describe('headless mode', () => {
-    it('should force trust and hide dialog in headless mode', async () => {
+    it('should force trust and hide dialog in headless mode', () => {
       vi.mocked(isHeadlessMode).mockReturnValue(true);
       isWorkspaceTrustedSpy.mockReturnValue({
         isTrusted: false,
         source: 'file',
       });
 
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useFolderTrust(mockSettings, onTrustChange, addItem),
       );
 

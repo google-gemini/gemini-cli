@@ -18,9 +18,10 @@ describe('<Checklist />', () => {
   ];
 
   it('renders nothing when list is empty', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist title="Test List" items={[]} isExpanded={true} />,
     );
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
@@ -29,14 +30,15 @@ describe('<Checklist />', () => {
       { status: 'completed', label: 'Task 1' },
       { status: 'cancelled', label: 'Task 2' },
     ];
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist title="Test List" items={inactiveItems} isExpanded={false} />,
     );
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders summary view correctly (collapsed)', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist
         title="Test List"
         items={items}
@@ -44,11 +46,12 @@ describe('<Checklist />', () => {
         toggleHint="toggle me"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders expanded view correctly', async () => {
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist
         title="Test List"
         items={items}
@@ -56,6 +59,7 @@ describe('<Checklist />', () => {
         toggleHint="toggle me"
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -64,9 +68,10 @@ describe('<Checklist />', () => {
       { status: 'completed', label: 'Task 1' },
       { status: 'pending', label: 'Task 2' },
     ];
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = render(
       <Checklist title="Test List" items={pendingItems} isExpanded={false} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });

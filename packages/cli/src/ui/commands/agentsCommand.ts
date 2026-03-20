@@ -21,7 +21,7 @@ const agentsListCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext) => {
-    const config = context.services.agentContext?.config;
+    const { config } = context.services;
     if (!config) {
       return {
         type: 'message',
@@ -61,8 +61,7 @@ async function enableAction(
   context: CommandContext,
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
-  const config = context.services.agentContext?.config;
-  const { settings } = context.services;
+  const { config, settings } = context.services;
   if (!config) {
     return {
       type: 'message',
@@ -138,8 +137,7 @@ async function disableAction(
   context: CommandContext,
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
-  const config = context.services.agentContext?.config;
-  const { settings } = context.services;
+  const { config, settings } = context.services;
   if (!config) {
     return {
       type: 'message',
@@ -218,7 +216,7 @@ async function configAction(
   context: CommandContext,
   args: string,
 ): Promise<SlashCommandActionReturn | void> {
-  const config = context.services.agentContext?.config;
+  const { config } = context.services;
   if (!config) {
     return {
       type: 'message',
@@ -268,8 +266,7 @@ async function configAction(
 }
 
 function completeAgentsToEnable(context: CommandContext, partialArg: string) {
-  const config = context.services.agentContext?.config;
-  const { settings } = context.services;
+  const { config, settings } = context.services;
   if (!config) return [];
 
   const overrides = settings.merged.agents.overrides;
@@ -281,7 +278,7 @@ function completeAgentsToEnable(context: CommandContext, partialArg: string) {
 }
 
 function completeAgentsToDisable(context: CommandContext, partialArg: string) {
-  const config = context.services.agentContext?.config;
+  const { config } = context.services;
   if (!config) return [];
 
   const agentRegistry = config.getAgentRegistry();
@@ -290,7 +287,7 @@ function completeAgentsToDisable(context: CommandContext, partialArg: string) {
 }
 
 function completeAllAgents(context: CommandContext, partialArg: string) {
-  const config = context.services.agentContext?.config;
+  const { config } = context.services;
   if (!config) return [];
 
   const agentRegistry = config.getAgentRegistry();
@@ -331,7 +328,7 @@ const agentsReloadCommand: SlashCommand = {
   description: 'Reload the agent registry',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext) => {
-    const config = context.services.agentContext?.config;
+    const { config } = context.services;
     const agentRegistry = config?.getAgentRegistry();
     if (!agentRegistry) {
       return {

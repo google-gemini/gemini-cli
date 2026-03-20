@@ -125,11 +125,9 @@ You must complete several setup steps before enabling Google Cloud telemetry.
       }
       ```
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> This setting requires **Direct export** (in-process exporters)
-> and cannot be used when `useCollector` is `true`. If both are enabled,
-> telemetry will be disabled.
+      > **Note:** This setting requires **Direct export** (in-process exporters)
+      > and cannot be used when `useCollector` is `true`. If both are enabled,
+      > telemetry will be disabled.
 
 3.  Ensure your account or service account has these IAM roles:
     - Cloud Trace Agent
@@ -306,7 +304,6 @@ Emitted at startup with the CLI configuration.
 - `extension_ids` (string)
 - `extensions_count` (int)
 - `auth_type` (string)
-- `worktree_active` (boolean)
 - `github_workflow_name` (string, optional)
 - `github_repository_hash` (string, optional)
 - `github_event_name` (string, optional)

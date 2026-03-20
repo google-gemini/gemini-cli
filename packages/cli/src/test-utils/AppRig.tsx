@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppContainer } from '../ui/AppContainer.js';
-import { renderWithProviders, type RenderInstance } from './render.js';
+import { renderWithProviders } from './render.js';
 import {
   makeFakeConfig,
   type Config,
@@ -155,7 +155,7 @@ export interface PendingConfirmation {
 }
 
 export class AppRig {
-  private renderResult: RenderInstance | undefined;
+  private renderResult: ReturnType<typeof renderWithProviders> | undefined;
   private config: Config | undefined;
   private settings: LoadedSettings | undefined;
   private testDir: string;
@@ -204,7 +204,6 @@ export class AppRig {
       enableEventDrivenScheduler: true,
       extensionLoader: new MockExtensionManager(),
       excludeTools: this.options.configOverrides?.excludeTools,
-      useAlternateBuffer: false,
       ...this.options.configOverrides,
     };
     this.config = makeFakeConfig(configParams);
@@ -275,9 +274,6 @@ export class AppRig {
         ide: {
           enabled: false,
           hasSeenNudge: true,
-        },
-        ui: {
-          useAlternateBuffer: false,
         },
       },
     });
@@ -393,12 +389,12 @@ export class AppRig {
     return isAnyToolActive || isAwaitingConfirmation;
   }
 
-  async render() {
+  render() {
     if (!this.config || !this.settings)
       throw new Error('AppRig not initialized');
 
-    await act(async () => {
-      this.renderResult = await renderWithProviders(
+    act(() => {
+      this.renderResult = renderWithProviders(
         <AppContainer
           config={this.config!}
           version="test-version"
@@ -414,6 +410,7 @@ export class AppRig {
           config: this.config!,
           settings: this.settings!,
           width: this.options.terminalWidth ?? 120,
+          useAlternateBuffer: false,
           uiState: {
             terminalHeight: this.options.terminalHeight ?? 40,
           },

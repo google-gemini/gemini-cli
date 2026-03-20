@@ -6,27 +6,25 @@
 
 export type WithMeta = { _meta?: Record<string, unknown> };
 
-export type Unsubscribe = () => void;
-
-export interface AgentProtocol extends Trajectory {
+export interface AgentSession extends Trajectory {
   /**
    * Send data to the agent. Promise resolves when action is acknowledged.
-   * Returns the `streamId` of the stream the message was correlated to --
-   * this may be a new stream if idle, an existing stream, or null if no
-   * stream was triggered.
-   *
-   * When a new stream is created by a send, the streamId MUST be returned
-   * before the `agent_start` event is emitted for the stream.
+   * Returns the `streamId` of the stream the message was correlated to -- this may
+   * be a new stream if idle or an existing stream.
    */
-  send(payload: AgentSend): Promise<{ streamId: string | null }>;
-
+  send(payload: AgentSend): Promise<{ streamId: string }>;
   /**
-   * Subscribes the provided callback to all future events emitted by this
-   * session. Returns an unsubscribe function.
+   * Begin listening to actively streaming data. Stream must have the following
+   * properties:
    *
-   * @param callback The callback function to listen to events.
+   * - If no arguments are provided, streams events from an active stream.
+   * - If a {streamId} is provided, streams ALL events from that stream.
+   * - If an {eventId} is provided, streams all events AFTER that event.
    */
-  subscribe(callback: (event: AgentEvent) => void): Unsubscribe;
+  stream(options?: {
+    streamId?: string;
+    eventId?: string;
+  }): AsyncIterableIterator<AgentEvent>;
 
   /**
    * Aborts an active stream of agent activity.
@@ -34,7 +32,7 @@ export interface AgentProtocol extends Trajectory {
   abort(): Promise<void>;
 
   /**
-   * AgentProtocol implements the Trajectory interface and can retrieve existing events.
+   * AgentSession implements the Trajectory interface and can retrieve existing events.
    */
   readonly events: AgentEvent[];
 }
@@ -63,7 +61,7 @@ export interface AgentEventCommon {
   /** Identifies the subagent thread, omitted for "main thread" events. */
   threadId?: string;
   /** Identifies a particular stream of a particular thread. */
-  streamId?: string | null;
+  streamId?: string;
   /** ISO Timestamp for the time at which the event occurred. */
   timestamp: string;
   /** The concrete type of the event. */
@@ -92,10 +90,10 @@ export interface AgentEvents {
   session_update: SessionUpdate;
   /** Message content provided by user, agent, or developer. */
   message: Message;
-  /** Event indicating the start of agent activity on a stream. */
-  agent_start: AgentStart;
-  /** Event indicating the end of agent activity on a stream. */
-  agent_end: AgentEnd;
+  /** Event indicating the start of a new stream. */
+  stream_start: StreamStart;
+  /** Event indicating the end of a running stream. */
+  stream_end: StreamEnd;
   /** Tool request issued by the agent. */
   tool_request: ToolRequest;
   /** Tool update issued by the agent. */
@@ -259,7 +257,7 @@ export interface Usage {
   cost?: { amount: number; currency?: string };
 }
 
-export interface AgentStart {
+export interface StreamStart {
   streamId: string;
 }
 
@@ -274,7 +272,7 @@ type StreamEndReason =
   | 'elicitation'
   | (string & {});
 
-export interface AgentEnd {
+export interface StreamEnd {
   streamId: string;
   reason: StreamEndReason;
   elicitationIds?: string[];

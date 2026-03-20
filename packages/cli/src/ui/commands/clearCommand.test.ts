@@ -36,25 +36,24 @@ describe('clearCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        agentContext: {
-          config: {
-            getEnableHooks: vi.fn().mockReturnValue(false),
-            setSessionId: vi.fn(),
-            getMessageBus: vi.fn().mockReturnValue(undefined),
-            getHookSystem: vi.fn().mockReturnValue({
-              fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
-              fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
-            }),
-            injectionService: {
-              clear: mockHintClear,
-            },
+        config: {
+          getGeminiClient: () =>
+            ({
+              resetChat: mockResetChat,
+              getChat: () => ({
+                getChatRecordingService: mockGetChatRecordingService,
+              }),
+            }) as unknown as GeminiClient,
+          setSessionId: vi.fn(),
+          getEnableHooks: vi.fn().mockReturnValue(false),
+          getMessageBus: vi.fn().mockReturnValue(undefined),
+          getHookSystem: vi.fn().mockReturnValue({
+            fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+            fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
+          }),
+          injectionService: {
+            clear: mockHintClear,
           },
-          geminiClient: {
-            resetChat: mockResetChat,
-            getChat: () => ({
-              getChatRecordingService: mockGetChatRecordingService,
-            }),
-          } as unknown as GeminiClient,
         },
       },
     });
@@ -99,7 +98,7 @@ describe('clearCommand', () => {
 
     const nullConfigContext = createMockCommandContext({
       services: {
-        agentContext: null,
+        config: null,
       },
     });
 

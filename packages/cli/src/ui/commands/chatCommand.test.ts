@@ -70,19 +70,18 @@ describe('chatCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        agentContext: {
-          config: {
-            getProjectRoot: () => '/project/root',
-            getContentGeneratorConfig: () => ({
-              authType: AuthType.LOGIN_WITH_GOOGLE,
-            }),
-            storage: {
-              getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
-            },
+        config: {
+          getProjectRoot: () => '/project/root',
+          getGeminiClient: () =>
+            ({
+              getChat: mockGetChat,
+            }) as unknown as GeminiClient,
+          storage: {
+            getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
           },
-          geminiClient: {
-            getChat: mockGetChat,
-          } as unknown as GeminiClient,
+          getContentGeneratorConfig: () => ({
+            authType: AuthType.LOGIN_WITH_GOOGLE,
+          }),
         },
         logger: {
           saveCheckpoint: mockSaveCheckpoint,
@@ -699,11 +698,7 @@ Hi there!`;
 
       beforeEach(() => {
         mockGetLatestApiRequest = vi.fn();
-        if (!mockContext.services.agentContext!.config) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mockContext.services.agentContext!.config as any) = {};
-        }
-        mockContext.services.agentContext!.config.getLatestApiRequest =
+        mockContext.services.config!.getLatestApiRequest =
           mockGetLatestApiRequest;
         vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
         vi.spyOn(Date, 'now').mockReturnValue(1234567890);

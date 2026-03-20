@@ -9,7 +9,6 @@ import { authCommand } from './authCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { SettingScope } from '../../config/settings.js';
-import type { GeminiClient } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -25,10 +24,8 @@ describe('authCommand', () => {
   beforeEach(() => {
     mockContext = createMockCommandContext({
       services: {
-        agentContext: {
-          geminiClient: {
-            stripThoughtsFromHistory: vi.fn(),
-          },
+        config: {
+          getGeminiClient: vi.fn(),
         },
       },
     });
@@ -104,19 +101,17 @@ describe('authCommand', () => {
       const mockStripThoughts = vi.fn();
       const mockClient = {
         stripThoughtsFromHistory: mockStripThoughts,
-      } as unknown as GeminiClient;
-      if (mockContext.services.agentContext?.config) {
-        mockContext.services.agentContext.config.getGeminiClient = vi.fn(
-          () => mockClient,
-        );
+      } as unknown as ReturnType<
+        NonNullable<typeof mockContext.services.config>['getGeminiClient']
+      >;
+
+      if (mockContext.services.config) {
+        mockContext.services.config.getGeminiClient = vi.fn(() => mockClient);
       }
 
       await logoutCommand!.action!(mockContext, '');
 
-      expect(
-        mockContext.services.agentContext?.geminiClient
-          .stripThoughtsFromHistory,
-      ).toHaveBeenCalled();
+      expect(mockStripThoughts).toHaveBeenCalled();
     });
 
     it('should return logout action to signal explicit state change', async () => {
@@ -128,7 +123,7 @@ describe('authCommand', () => {
 
     it('should handle missing config gracefully', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
-      mockContext.services.agentContext = null;
+      mockContext.services.config = null;
 
       const result = await logoutCommand!.action!(mockContext, '');
 

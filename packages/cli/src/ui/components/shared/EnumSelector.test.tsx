@@ -25,7 +25,7 @@ const NUMERIC_OPTIONS: readonly SettingEnumOption[] = [
 
 describe('<EnumSelector />', () => {
   it('renders with string options and matches snapshot', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={LANGUAGE_OPTIONS}
         currentValue="en"
@@ -33,12 +33,13 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('renders with numeric options and matches snapshot', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={NUMERIC_OPTIONS}
         currentValue={2}
@@ -46,12 +47,13 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('renders inactive state and matches snapshot', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={LANGUAGE_OPTIONS}
         currentValue="zh"
@@ -59,6 +61,7 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -67,7 +70,7 @@ describe('<EnumSelector />', () => {
     const singleOption: readonly SettingEnumOption[] = [
       { label: 'Only Option', value: 'only' },
     ];
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={singleOption}
         currentValue="only"
@@ -75,12 +78,13 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('renders nothing when no options are provided', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={[]}
         currentValue=""
@@ -88,12 +92,13 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
   it('handles currentValue not found in options', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={LANGUAGE_OPTIONS}
         currentValue="invalid"
@@ -101,6 +106,7 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     // Should default to first option
     expect(lastFrame()).toContain('English');
     unmount();
@@ -108,7 +114,7 @@ describe('<EnumSelector />', () => {
 
   it('updates when currentValue changes externally', async () => {
     const { rerender, lastFrame, waitUntilReady, unmount } =
-      await renderWithProviders(
+      renderWithProviders(
         <EnumSelector
           options={LANGUAGE_OPTIONS}
           currentValue="en"
@@ -116,6 +122,7 @@ describe('<EnumSelector />', () => {
           onValueChange={async () => {}}
         />,
       );
+    await waitUntilReady();
     expect(lastFrame()).toContain('English');
 
     await act(async () => {
@@ -134,7 +141,7 @@ describe('<EnumSelector />', () => {
   });
 
   it('shows navigation arrows when multiple options available', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={LANGUAGE_OPTIONS}
         currentValue="en"
@@ -142,6 +149,7 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('←');
     expect(lastFrame()).toContain('→');
     unmount();
@@ -151,7 +159,7 @@ describe('<EnumSelector />', () => {
     const singleOption: readonly SettingEnumOption[] = [
       { label: 'Only Option', value: 'only' },
     ];
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <EnumSelector
         options={singleOption}
         currentValue="only"
@@ -159,6 +167,7 @@ describe('<EnumSelector />', () => {
         onValueChange={async () => {}}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).not.toContain('←');
     expect(lastFrame()).not.toContain('→');
     unmount();

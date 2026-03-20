@@ -22,7 +22,6 @@ const TODO_STATUSES = [
   'in_progress',
   'completed',
   'cancelled',
-  'blocked',
 ] as const;
 
 export interface WriteTodosToolParams {

@@ -45,23 +45,25 @@ describe('LoginWithGoogleRestartDialog', () => {
   });
 
   it('renders correctly', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <LoginWithGoogleRestartDialog
         onDismiss={onDismiss}
         config={mockConfig}
       />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('calls onDismiss when escape is pressed', async () => {
-    const { unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <LoginWithGoogleRestartDialog
         onDismiss={onDismiss}
         config={mockConfig}
       />,
     );
+    await waitUntilReady();
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     keypressHandler({
@@ -81,12 +83,13 @@ describe('LoginWithGoogleRestartDialog', () => {
     async (keyName) => {
       vi.useFakeTimers();
 
-      const { unmount } = await render(
+      const { waitUntilReady, unmount } = render(
         <LoginWithGoogleRestartDialog
           onDismiss={onDismiss}
           config={mockConfig}
         />,
       );
+      await waitUntilReady();
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
       keypressHandler({

@@ -73,9 +73,10 @@ describe('MultiFolderTrustDialog', () => {
 
   it('renders the dialog with the list of folders', async () => {
     const folders = ['/path/to/folder1', '/path/to/folder2'];
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog {...defaultProps} folders={folders} />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain(
       'Do you trust the following folders being added to this workspace?',
@@ -87,9 +88,10 @@ describe('MultiFolderTrustDialog', () => {
 
   it('calls onComplete and finishAddingDirectories with an error on escape', async () => {
     const folders = ['/path/to/folder1'];
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog {...defaultProps} folders={folders} />,
     );
+    await waitUntilReady();
 
     const keypressCallback = mockedUseKeypress.mock.calls[0][0];
     await act(async () => {
@@ -119,9 +121,10 @@ describe('MultiFolderTrustDialog', () => {
 
   it('calls finishAddingDirectories with an error and does not add directories when "No" is chosen', async () => {
     const folders = ['/path/to/folder1'];
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog {...defaultProps} folders={folders} />,
     );
+    await waitUntilReady();
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
@@ -145,13 +148,14 @@ describe('MultiFolderTrustDialog', () => {
 
   it('adds directories to workspace context when "Yes" is chosen', async () => {
     const folders = ['/path/to/folder1', '/path/to/folder2'];
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog
         {...defaultProps}
         folders={folders}
         trustedDirs={['/already/trusted']}
       />,
     );
+    await waitUntilReady();
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
@@ -178,9 +182,10 @@ describe('MultiFolderTrustDialog', () => {
 
   it('adds directories to workspace context and remembers them as trusted when "Yes, and remember" is chosen', async () => {
     const folders = ['/path/to/folder1'];
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog {...defaultProps} folders={folders} />,
     );
+    await waitUntilReady();
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
@@ -207,9 +212,10 @@ describe('MultiFolderTrustDialog', () => {
 
   it('shows submitting message after a choice is made', async () => {
     const folders = ['/path/to/folder1'];
-    const { lastFrame, waitUntilReady, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog {...defaultProps} folders={folders} />,
     );
+    await waitUntilReady();
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
 
@@ -224,13 +230,14 @@ describe('MultiFolderTrustDialog', () => {
 
   it('shows an error message and completes when config is missing', async () => {
     const folders = ['/path/to/folder1'];
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog
         {...defaultProps}
         folders={folders}
         config={null as unknown as Config}
       />,
     );
+    await waitUntilReady();
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
@@ -256,13 +263,14 @@ describe('MultiFolderTrustDialog', () => {
     });
 
     const folders = ['/path/to/good', '/path/to/error'];
-    const { waitUntilReady, unmount } = await render(
+    const { waitUntilReady, unmount } = render(
       <MultiFolderTrustDialog
         {...defaultProps}
         folders={folders}
         errors={['initial error']}
       />,
     );
+    await waitUntilReady();
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {

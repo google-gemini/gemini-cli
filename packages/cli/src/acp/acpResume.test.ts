@@ -97,9 +97,6 @@ describe('GeminiAgent Session Resume', () => {
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
-      get config() {
-        return this;
-      },
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {
@@ -161,10 +158,9 @@ describe('GeminiAgent Session Resume', () => {
       ],
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockConfig as any).toolRegistry = {
+    mockConfig.getToolRegistry = vi.fn().mockReturnValue({
       getTool: vi.fn().mockReturnValue({ kind: 'read' }),
-    };
+    });
 
     (SessionSelector as unknown as Mock).mockImplementation(() => ({
       resolveSession: vi.fn().mockResolvedValue({

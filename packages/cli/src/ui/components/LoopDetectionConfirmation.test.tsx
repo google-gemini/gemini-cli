@@ -12,19 +12,21 @@ describe('LoopDetectionConfirmation', () => {
   const onComplete = vi.fn();
 
   it('renders correctly', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
       { width: 101 },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('contains the expected options', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <LoopDetectionConfirmation onComplete={onComplete} />,
       { width: 100 },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('A potential loop was detected');

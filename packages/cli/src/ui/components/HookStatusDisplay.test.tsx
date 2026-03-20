@@ -18,9 +18,10 @@ describe('<HookStatusDisplay />', () => {
     const props = {
       activeHooks: [{ name: 'test-hook', eventName: 'BeforeAgent' }],
     };
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <HookStatusDisplay {...props} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -32,9 +33,10 @@ describe('<HookStatusDisplay />', () => {
         { name: 'h2', eventName: 'BeforeAgent' },
       ],
     };
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <HookStatusDisplay {...props} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -45,18 +47,20 @@ describe('<HookStatusDisplay />', () => {
         { name: 'step', eventName: 'BeforeAgent', index: 1, total: 3 },
       ],
     };
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <HookStatusDisplay {...props} />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
   it('should return empty string if no active hooks', async () => {
     const props = { activeHooks: [] };
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <HookStatusDisplay {...props} />,
     );
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });

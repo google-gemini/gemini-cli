@@ -22,10 +22,11 @@ describe('compressCommand', () => {
     mockTryCompressChat = vi.fn();
     context = createMockCommandContext({
       services: {
-        agentContext: {
-          geminiClient: {
-            tryCompressChat: mockTryCompressChat,
-          } as unknown as GeminiClient,
+        config: {
+          getGeminiClient: () =>
+            ({
+              tryCompressChat: mockTryCompressChat,
+            }) as unknown as GeminiClient,
         },
       },
     });

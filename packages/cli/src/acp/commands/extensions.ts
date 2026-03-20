@@ -53,7 +53,7 @@ export class ListExtensionsCommand implements Command {
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const extensions = listExtensions(context.agentContext.config);
+    const extensions = listExtensions(context.config);
     const data = extensions.length ? extensions : 'No extensions installed.';
 
     return { name: this.name, data };
@@ -134,7 +134,7 @@ export class EnableExtensionCommand implements Command {
     args: string[],
   ): Promise<CommandExecutionResponse> {
     const enableContext = getEnableDisableContext(
-      context.agentContext.config,
+      context.config,
       args,
       'enable',
     );
@@ -156,8 +156,7 @@ export class EnableExtensionCommand implements Command {
 
         if (extension?.mcpServers) {
           const mcpEnablementManager = McpServerEnablementManager.getInstance();
-          const mcpClientManager =
-            context.agentContext.config.getMcpClientManager();
+          const mcpClientManager = context.config.getMcpClientManager();
           const enabledServers = await mcpEnablementManager.autoEnableServers(
             Object.keys(extension.mcpServers),
           );
@@ -192,7 +191,7 @@ export class DisableExtensionCommand implements Command {
     args: string[],
   ): Promise<CommandExecutionResponse> {
     const enableContext = getEnableDisableContext(
-      context.agentContext.config,
+      context.config,
       args,
       'disable',
     );
@@ -224,7 +223,7 @@ export class InstallExtensionCommand implements Command {
     context: CommandContext,
     args: string[],
   ): Promise<CommandExecutionResponse> {
-    const extensionLoader = context.agentContext.config.getExtensionLoader();
+    const extensionLoader = context.config.getExtensionLoader();
     if (!(extensionLoader instanceof ExtensionManager)) {
       return {
         name: this.name,
@@ -269,7 +268,7 @@ export class LinkExtensionCommand implements Command {
     context: CommandContext,
     args: string[],
   ): Promise<CommandExecutionResponse> {
-    const extensionLoader = context.agentContext.config.getExtensionLoader();
+    const extensionLoader = context.config.getExtensionLoader();
     if (!(extensionLoader instanceof ExtensionManager)) {
       return {
         name: this.name,
@@ -314,7 +313,7 @@ export class UninstallExtensionCommand implements Command {
     context: CommandContext,
     args: string[],
   ): Promise<CommandExecutionResponse> {
-    const extensionLoader = context.agentContext.config.getExtensionLoader();
+    const extensionLoader = context.config.getExtensionLoader();
     if (!(extensionLoader instanceof ExtensionManager)) {
       return {
         name: this.name,
@@ -370,7 +369,7 @@ export class RestartExtensionCommand implements Command {
     context: CommandContext,
     args: string[],
   ): Promise<CommandExecutionResponse> {
-    const extensionLoader = context.agentContext.config.getExtensionLoader();
+    const extensionLoader = context.config.getExtensionLoader();
     if (!(extensionLoader instanceof ExtensionManager)) {
       return { name: this.name, data: 'Cannot restart extensions.' };
     }
@@ -425,7 +424,7 @@ export class UpdateExtensionCommand implements Command {
     context: CommandContext,
     args: string[],
   ): Promise<CommandExecutionResponse> {
-    const extensionLoader = context.agentContext.config.getExtensionLoader();
+    const extensionLoader = context.config.getExtensionLoader();
     if (!(extensionLoader instanceof ExtensionManager)) {
       return { name: this.name, data: 'Cannot update extensions.' };
     }

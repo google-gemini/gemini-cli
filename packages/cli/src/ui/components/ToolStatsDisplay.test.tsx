@@ -36,7 +36,8 @@ const renderWithMockedStats = async (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  const result = await render(<ToolStatsDisplay />);
+  const result = render(<ToolStatsDisplay />);
+  await result.waitUntilReady();
   return result;
 };
 

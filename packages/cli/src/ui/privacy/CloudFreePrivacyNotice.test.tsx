@@ -82,9 +82,10 @@ describe('CloudFreePrivacyNotice', () => {
       updateDataCollectionOptIn,
     });
 
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <CloudFreePrivacyNotice config={mockConfig} onExit={onExit} />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain(expectedText);
     unmount();
@@ -114,9 +115,10 @@ describe('CloudFreePrivacyNotice', () => {
         updateDataCollectionOptIn,
       });
 
-      const { waitUntilReady, unmount } = await render(
+      const { waitUntilReady, unmount } = render(
         <CloudFreePrivacyNotice config={mockConfig} onExit={onExit} />,
       );
+      await waitUntilReady();
 
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
       await act(async () => {
@@ -143,9 +145,10 @@ describe('CloudFreePrivacyNotice', () => {
     ])(
       'calls correct functions on selecting "$label"',
       async ({ selection }) => {
-        const { waitUntilReady, unmount } = await render(
+        const { waitUntilReady, unmount } = render(
           <CloudFreePrivacyNotice config={mockConfig} onExit={onExit} />,
         );
+        await waitUntilReady();
 
         const onSelectHandler =
           mockedRadioButtonSelect.mock.calls[0][0].onSelect;

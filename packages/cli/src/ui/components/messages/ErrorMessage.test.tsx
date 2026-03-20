@@ -10,9 +10,10 @@ import { describe, it, expect } from 'vitest';
 
 describe('ErrorMessage', () => {
   it('renders with the correct prefix and text', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ErrorMessage text="Something went wrong" />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -21,9 +22,10 @@ describe('ErrorMessage', () => {
 
   it('renders multiline error messages', async () => {
     const message = 'Error line 1\nError line 2';
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ErrorMessage text={message} />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();

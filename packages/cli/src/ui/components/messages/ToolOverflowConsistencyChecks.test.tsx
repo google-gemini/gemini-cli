@@ -7,10 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { createMockSettings } from '../../../test-utils/settings.js';
 import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
 import { waitFor } from '../../../test-utils/async.js';
-import { CoreToolCallStatus, makeFakeConfig } from '@google/gemini-cli-core';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { useOverflowState } from '../../contexts/OverflowContext.js';
 
 describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay synchronization', () => {
@@ -41,7 +40,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       return null;
     };
 
-    const { unmount, waitUntilReady } = await renderWithProviders(
+    const { unmount, waitUntilReady } = renderWithProviders(
       <>
         <StateCapture />
         <ToolGroupMessage
@@ -57,8 +56,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
           streamingState: StreamingState.Idle,
           constrainHeight: true,
         },
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        useAlternateBuffer: true,
       },
     );
 
@@ -95,7 +93,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       },
     ];
 
-    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
       <ToolGroupMessage
         item={{ id: 1, type: 'tool_group', tools: toolCalls }}
         toolCalls={toolCalls}
@@ -108,8 +106,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
           streamingState: StreamingState.Idle,
           constrainHeight: true,
         },
-        config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        useAlternateBuffer: false,
       },
     );
 

@@ -25,7 +25,7 @@ export class AtFileProcessor implements IPromptProcessor {
     input: PromptPipelineContent,
     context: CommandContext,
   ): Promise<PromptPipelineContent> {
-    const config = context.services.agentContext?.config;
+    const config = context.services.config;
     if (!config) {
       return input;
     }

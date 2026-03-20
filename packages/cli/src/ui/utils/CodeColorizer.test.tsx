@@ -35,7 +35,10 @@ describe('colorizeCode', () => {
       hideLineNumbers: true,
     });
 
-    const { lastFrame, unmount } = await renderWithProviders(<>{result}</>);
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <>{result}</>,
+    );
+    await waitUntilReady();
     // We expect the output to preserve the empty line.
     // If the bug exists, it might look like "line 1\nline 3"
     // If fixed, it should look like "line 1\n \nline 3" (if we use space) or just have the newline.
@@ -73,7 +76,7 @@ describe('colorizeCode', () => {
       hideLineNumbers: true,
     });
 
-    const renderResult = await renderWithProviders(<>{result}</>);
+    const renderResult = renderWithProviders(<>{result}</>);
     await renderResult.waitUntilReady();
 
     await expect(renderResult).toMatchSvgSnapshot();

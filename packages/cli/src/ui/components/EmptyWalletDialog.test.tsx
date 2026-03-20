@@ -30,7 +30,7 @@ describe('EmptyWalletDialog', () => {
 
   describe('rendering', () => {
     it('should match snapshot with fallback available', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -38,30 +38,33 @@ describe('EmptyWalletDialog', () => {
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('should match snapshot without fallback', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('should display the model name and usage limit message', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const output = lastFrame() ?? '';
       expect(output).toContain('gemini-2.5-pro');
@@ -70,12 +73,13 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should display purchase prompt and credits update notice', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const output = lastFrame() ?? '';
       expect(output).toContain('purchase more AI Credits');
@@ -86,13 +90,14 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should display reset time when provided', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           resetTime="3:45 PM"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const output = lastFrame() ?? '';
       expect(output).toContain('3:45 PM');
@@ -101,12 +106,13 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should not display reset time when not provided', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const output = lastFrame() ?? '';
       expect(output).not.toContain('Access resets at');
@@ -114,12 +120,13 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should display slash command hints', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       const output = lastFrame() ?? '';
       expect(output).toContain('/stats');
@@ -132,13 +139,14 @@ describe('EmptyWalletDialog', () => {
   describe('onChoice handling', () => {
     it('should call onGetCredits and onChoice when get_credits is selected', async () => {
       // get_credits is the first item, so just press Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
           onGetCredits={mockOnGetCredits}
         />,
       );
+      await waitUntilReady();
 
       writeKey(stdin, '\r');
 
@@ -150,12 +158,13 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should call onChoice without onGetCredits when onGetCredits is not provided', async () => {
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       writeKey(stdin, '\r');
 
@@ -168,13 +177,14 @@ describe('EmptyWalletDialog', () => {
     it('should call onChoice with use_fallback when selected', async () => {
       // With fallback: items are [get_credits, use_fallback, stop]
       // use_fallback is the second item: Down + Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\r');
@@ -188,12 +198,13 @@ describe('EmptyWalletDialog', () => {
     it('should call onChoice with stop when selected', async () => {
       // Without fallback: items are [get_credits, stop]
       // stop is the second item: Down + Enter
-      const { unmount, stdin } = await renderWithProviders(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
         />,
       );
+      await waitUntilReady();
 
       writeKey(stdin, '\x1b[B'); // Down arrow
       writeKey(stdin, '\r');

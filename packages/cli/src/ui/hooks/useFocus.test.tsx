@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderWithProviders } from '../../test-utils/render.js';
+import { render } from '../../test-utils/render.js';
 import { EventEmitter } from 'node:events';
 import { useFocus } from './useFocus.js';
 import { vi, type Mock } from 'vitest';
 import { useStdin, useStdout } from 'ink';
+import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 
 // Mock the ink hooks
@@ -47,13 +48,17 @@ describe('useFocus', () => {
     stdin.removeAllListeners();
   });
 
-  const renderFocusHook = async () => {
+  const renderFocusHook = () => {
     let hookResult: ReturnType<typeof useFocus>;
     function TestComponent() {
       hookResult = useFocus();
       return null;
     }
-    const { unmount } = await renderWithProviders(<TestComponent />);
+    const { unmount } = render(
+      <KeypressProvider>
+        <TestComponent />
+      </KeypressProvider>,
+    );
     return {
       result: {
         get current() {
@@ -64,15 +69,15 @@ describe('useFocus', () => {
     };
   };
 
-  it('should initialize with focus and enable focus reporting', async () => {
-    const { result } = await renderFocusHook();
+  it('should initialize with focus and enable focus reporting', () => {
+    const { result } = renderFocusHook();
 
     expect(result.current.isFocused).toBe(true);
     expect(stdout.write).toHaveBeenCalledWith('\x1b[?1004h');
   });
 
-  it('should set isFocused to false when a focus-out event is received', async () => {
-    const { result } = await renderFocusHook();
+  it('should set isFocused to false when a focus-out event is received', () => {
+    const { result } = renderFocusHook();
 
     // Initial state is focused
     expect(result.current.isFocused).toBe(true);
@@ -86,8 +91,8 @@ describe('useFocus', () => {
     expect(result.current.isFocused).toBe(false);
   });
 
-  it('should set isFocused to true when a focus-in event is received', async () => {
-    const { result } = await renderFocusHook();
+  it('should set isFocused to true when a focus-in event is received', () => {
+    const { result } = renderFocusHook();
 
     // Simulate focus-out to set initial state to false
     act(() => {
@@ -104,8 +109,8 @@ describe('useFocus', () => {
     expect(result.current.isFocused).toBe(true);
   });
 
-  it('should clean up and disable focus reporting on unmount', async () => {
-    const { unmount } = await renderFocusHook();
+  it('should clean up and disable focus reporting on unmount', () => {
+    const { unmount } = renderFocusHook();
 
     // At this point we should have listeners from both KeypressProvider and useFocus
     const listenerCountAfterMount = stdin.listenerCount('data');
@@ -119,8 +124,8 @@ describe('useFocus', () => {
     expect(stdin.listenerCount('data')).toBeLessThan(listenerCountAfterMount);
   });
 
-  it('should handle multiple focus events correctly', async () => {
-    const { result } = await renderFocusHook();
+  it('should handle multiple focus events correctly', () => {
+    const { result } = renderFocusHook();
 
     act(() => {
       stdin.emit('data', '\x1b[O');
@@ -143,8 +148,8 @@ describe('useFocus', () => {
     expect(result.current.isFocused).toBe(true);
   });
 
-  it('restores focus on keypress after focus is lost', async () => {
-    const { result } = await renderFocusHook();
+  it('restores focus on keypress after focus is lost', () => {
+    const { result } = renderFocusHook();
 
     // Simulate focus-out event
     act(() => {
@@ -159,8 +164,8 @@ describe('useFocus', () => {
     expect(result.current.isFocused).toBe(true);
   });
 
-  it('tracks whether any focus event has been received', async () => {
-    const { result } = await renderFocusHook();
+  it('tracks whether any focus event has been received', () => {
+    const { result } = renderFocusHook();
 
     expect(result.current.hasReceivedFocusEvent).toBe(false);
 

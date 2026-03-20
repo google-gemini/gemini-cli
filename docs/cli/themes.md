@@ -36,11 +36,9 @@ using the `/theme` command within Gemini CLI:
     preview or highlight as you select.
 4.  Confirm your selection to apply the theme.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> If a theme is defined in your `settings.json` file (either by name or
-> by a file path), you must remove the `"theme"` setting from the file before
-> you can change the theme using the `/theme` command.
+**Note:** If a theme is defined in your `settings.json` file (either by name or
+by a file path), you must remove the `"theme"` setting from the file before you
+can change the theme using the `/theme` command.
 
 ### Theme persistence
 
@@ -181,13 +179,11 @@ custom theme defined in `settings.json`.
 }
 ```
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> For your safety, Gemini CLI will only load theme files that
-> are located within your home directory. If you attempt to load a theme from
-> outside your home directory, a warning will be displayed and the theme will
-> not be loaded. This is to prevent loading potentially malicious theme files
-> from untrusted sources.
+**Security note:** For your safety, Gemini CLI will only load theme files that
+are located within your home directory. If you attempt to load a theme from
+outside your home directory, a warning will be displayed and the theme will not
+be loaded. This is to prevent loading potentially malicious theme files from
+untrusted sources.
 
 ### Example custom theme
 

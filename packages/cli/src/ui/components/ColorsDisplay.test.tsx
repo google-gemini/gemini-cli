@@ -96,9 +96,10 @@ describe('ColorsDisplay', () => {
 
   it('renders correctly', async () => {
     const mockTheme = themeManager.getActiveTheme();
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ColorsDisplay activeTheme={mockTheme} />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     // Check for title and description

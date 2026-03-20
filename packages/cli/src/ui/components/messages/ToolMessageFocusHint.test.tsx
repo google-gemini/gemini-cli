@@ -66,10 +66,11 @@ describe('Focus Hint', () => {
 
   describe.each(testCases)('$componentName', ({ Component }) => {
     it('shows focus hint after delay even with NO output', async () => {
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Component {...baseProps} resultDisplay={undefined} />,
         { uiState: { streamingState: StreamingState.Idle } },
       );
+      await waitUntilReady();
 
       // Initially, no focus hint
       expect(lastFrame()).toMatchSnapshot('initial-no-output');
@@ -87,10 +88,11 @@ describe('Focus Hint', () => {
     });
 
     it('shows focus hint after delay with output', async () => {
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Component {...baseProps} resultDisplay="Some output" />,
         { uiState: { streamingState: StreamingState.Idle } },
       );
+      await waitUntilReady();
 
       // Initially, no focus hint
       expect(lastFrame()).toMatchSnapshot('initial-with-output');
@@ -109,7 +111,7 @@ describe('Focus Hint', () => {
 
   it('handles long descriptions by shrinking them to show the focus hint', async () => {
     const longDescription = 'A'.repeat(100);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolMessage
         {...baseProps}
         description={longDescription}
@@ -117,6 +119,7 @@ describe('Focus Hint', () => {
       />,
       { uiState: { streamingState: StreamingState.Idle } },
     );
+    await waitUntilReady();
 
     await act(async () => {
       vi.advanceTimersByTime(SHELL_FOCUS_HINT_DELAY_MS + 100);

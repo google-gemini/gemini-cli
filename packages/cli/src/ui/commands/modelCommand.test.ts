@@ -37,11 +37,8 @@ describe('modelCommand', () => {
     }
 
     const mockRefreshUserQuota = vi.fn();
-    mockContext.services.agentContext = {
+    mockContext.services.config = {
       refreshUserQuota: mockRefreshUserQuota,
-      get config() {
-        return this;
-      },
     } as unknown as Config;
 
     await modelCommand.action(mockContext, '');
@@ -69,11 +66,8 @@ describe('modelCommand', () => {
         (c) => c.name === 'manage',
       );
       const mockRefreshUserQuota = vi.fn();
-      mockContext.services.agentContext = {
+      mockContext.services.config = {
         refreshUserQuota: mockRefreshUserQuota,
-        get config() {
-          return this;
-        },
       } as unknown as Config;
 
       await manageCommand!.action!(mockContext, '');
@@ -90,7 +84,7 @@ describe('modelCommand', () => {
       expect(setCommand).toBeDefined();
 
       const mockSetModel = vi.fn();
-      mockContext.services.agentContext = {
+      mockContext.services.config = {
         setModel: mockSetModel,
         getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
         getUserId: vi.fn().mockReturnValue('test-user'),
@@ -104,9 +98,6 @@ describe('modelCommand', () => {
         getPolicyEngine: vi.fn().mockReturnValue({
           getApprovalMode: vi.fn().mockReturnValue('auto'),
         }),
-        get config() {
-          return this;
-        },
       } as unknown as Config;
 
       await setCommand!.action!(mockContext, 'gemini-pro');
@@ -125,7 +116,7 @@ describe('modelCommand', () => {
         (c) => c.name === 'set',
       );
       const mockSetModel = vi.fn();
-      mockContext.services.agentContext = {
+      mockContext.services.config = {
         setModel: mockSetModel,
         getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
         getUserId: vi.fn().mockReturnValue('test-user'),
@@ -139,9 +130,6 @@ describe('modelCommand', () => {
         getPolicyEngine: vi.fn().mockReturnValue({
           getApprovalMode: vi.fn().mockReturnValue('auto'),
         }),
-        get config() {
-          return this;
-        },
       } as unknown as Config;
 
       await setCommand!.action!(mockContext, 'gemini-pro --persist');

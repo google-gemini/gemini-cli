@@ -56,18 +56,14 @@ describe('useSessionResume', () => {
   });
 
   describe('loadHistoryForResume', () => {
-    it('should return a loadHistoryForResume callback', async () => {
-      const { result } = await renderHook(() =>
-        useSessionResume(getDefaultProps()),
-      );
+    it('should return a loadHistoryForResume callback', () => {
+      const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       expect(result.current.loadHistoryForResume).toBeInstanceOf(Function);
     });
 
     it('should clear history and add items when loading history', async () => {
-      const { result } = await renderHook(() =>
-        useSessionResume(getDefaultProps()),
-      );
+      const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       const uiHistory: HistoryItemWithoutId[] = [
         { type: 'user', text: 'Hello' },
@@ -121,7 +117,7 @@ describe('useSessionResume', () => {
     });
 
     it('should not load history if Gemini client is not initialized', async () => {
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
           isGeminiClientInitialized: false,
@@ -159,9 +155,7 @@ describe('useSessionResume', () => {
     });
 
     it('should handle empty history arrays', async () => {
-      const { result } = await renderHook(() =>
-        useSessionResume(getDefaultProps()),
-      );
+      const { result } = renderHook(() => useSessionResume(getDefaultProps()));
 
       const resumedData: ResumedSessionData = {
         conversation: {
@@ -196,7 +190,7 @@ describe('useSessionResume', () => {
         getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
       };
 
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
           config: configWithWorkspace as unknown as Config,
@@ -236,7 +230,7 @@ describe('useSessionResume', () => {
         getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
       };
 
-      const { result } = await renderHook(() =>
+      const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
           config: configWithWorkspace as unknown as Config,
@@ -264,8 +258,8 @@ describe('useSessionResume', () => {
   });
 
   describe('callback stability', () => {
-    it('should maintain stable loadHistoryForResume reference across renders', async () => {
-      const { result, rerender } = await renderHook(() =>
+    it('should maintain stable loadHistoryForResume reference across renders', () => {
+      const { result, rerender } = renderHook(() =>
         useSessionResume(getDefaultProps()),
       );
 
@@ -276,8 +270,8 @@ describe('useSessionResume', () => {
       expect(result.current.loadHistoryForResume).toBe(initialCallback);
     });
 
-    it('should update callback when config changes', async () => {
-      const { result, rerender } = await renderHook(
+    it('should update callback when config changes', () => {
+      const { result, rerender } = renderHook(
         ({ config }: { config: Config }) =>
           useSessionResume({
             ...getDefaultProps(),
@@ -301,15 +295,15 @@ describe('useSessionResume', () => {
   });
 
   describe('automatic resume on mount', () => {
-    it('should not resume when resumedSessionData is not provided', async () => {
-      await renderHook(() => useSessionResume(getDefaultProps()));
+    it('should not resume when resumedSessionData is not provided', () => {
+      renderHook(() => useSessionResume(getDefaultProps()));
 
       expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
     });
 
-    it('should not resume when user is authenticating', async () => {
+    it('should not resume when user is authenticating', () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
         projectHash: 'project-123',
@@ -325,7 +319,7 @@ describe('useSessionResume', () => {
         ] as MessageRecord[],
       };
 
-      await renderHook(() =>
+      renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
           resumedSessionData: {
@@ -341,7 +335,7 @@ describe('useSessionResume', () => {
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
     });
 
-    it('should not resume when Gemini client is not initialized', async () => {
+    it('should not resume when Gemini client is not initialized', () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
         projectHash: 'project-123',
@@ -357,7 +351,7 @@ describe('useSessionResume', () => {
         ] as MessageRecord[],
       };
 
-      await renderHook(() =>
+      renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
           resumedSessionData: {
@@ -396,7 +390,7 @@ describe('useSessionResume', () => {
       };
 
       await act(async () => {
-        await renderHook(() =>
+        renderHook(() =>
           useSessionResume({
             ...getDefaultProps(),
             resumedSessionData: {
@@ -446,7 +440,7 @@ describe('useSessionResume', () => {
 
       let rerenderFunc: (props: { refreshStatic: () => void }) => void;
       await act(async () => {
-        const { rerender } = await renderHook(
+        const { rerender } = renderHook(
           ({ refreshStatic }: { refreshStatic: () => void }) =>
             useSessionResume({
               ...getDefaultProps(),
@@ -506,7 +500,7 @@ describe('useSessionResume', () => {
       };
 
       await act(async () => {
-        await renderHook(() =>
+        renderHook(() =>
           useSessionResume({
             ...getDefaultProps(),
             resumedSessionData: {

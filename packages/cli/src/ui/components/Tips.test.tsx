@@ -18,7 +18,10 @@ describe('Tips', () => {
       getGeminiMdFileCount: vi.fn().mockReturnValue(fileCount),
     } as unknown as Config;
 
-    const { lastFrame, unmount } = await render(<Tips config={config} />);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Tips config={config} />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

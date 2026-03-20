@@ -15,7 +15,7 @@ async function listTools(
   context: CommandContext,
   showDescriptions: boolean,
 ): Promise<void> {
-  const toolRegistry = context.services.agentContext?.toolRegistry;
+  const toolRegistry = context.services.config?.getToolRegistry();
   if (!toolRegistry) {
     context.ui.addItem({
       type: MessageType.ERROR,

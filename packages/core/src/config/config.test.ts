@@ -1523,7 +1523,7 @@ describe('Server Config (config.ts)', () => {
 
       const paramsWithProxy: ConfigParameters = {
         ...baseParams,
-        proxy: 'http://invalid-proxy:8080',
+        proxy: 'invalid-proxy',
       };
       new Config(paramsWithProxy);
 
@@ -3102,35 +3102,6 @@ describe('Config JIT Initialization', () => {
 
     expect(ContextManager).not.toHaveBeenCalled();
     expect(config.getUserMemory()).toBe('Initial Memory');
-  });
-
-  describe('isMemoryManagerEnabled', () => {
-    it('should default to false', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(false);
-    });
-
-    it('should return true when experimentalMemoryManager is true', () => {
-      const params: ConfigParameters = {
-        sessionId: 'test-session',
-        targetDir: '/tmp/test',
-        debugMode: false,
-        model: 'test-model',
-        cwd: '/tmp/test',
-        experimentalMemoryManager: true,
-      };
-
-      config = new Config(params);
-      expect(config.isMemoryManagerEnabled()).toBe(true);
-    });
   });
 
   describe('reloadSkills', () => {

@@ -34,10 +34,10 @@ const setModelCommand: SlashCommand = {
     const modelName = parts[0];
     const persist = parts.includes('--persist');
 
-    if (context.services.agentContext?.config) {
-      context.services.agentContext.config.setModel(modelName, !persist);
+    if (context.services.config) {
+      context.services.config.setModel(modelName, !persist);
       const event = new ModelSlashCommandEvent(modelName);
-      logModelSlashCommand(context.services.agentContext.config, event);
+      logModelSlashCommand(context.services.config, event);
 
       context.ui.addItem({
         type: MessageType.INFO,
@@ -53,8 +53,8 @@ const manageModelCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext) => {
-    if (context.services.agentContext?.config) {
-      await context.services.agentContext.config.refreshUserQuota();
+    if (context.services.config) {
+      await context.services.config.refreshUserQuota();
     }
     return {
       type: 'dialog',

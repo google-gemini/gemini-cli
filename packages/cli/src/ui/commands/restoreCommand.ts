@@ -37,11 +37,10 @@ async function restoreAction(
   args: string,
 ): Promise<void | SlashCommandActionReturn> {
   const { services, ui } = context;
-  const { agentContext, git: gitService } = services;
+  const { config, git: gitService } = services;
   const { addItem, loadHistory } = ui;
 
-  const checkpointDir =
-    agentContext?.config.storage.getProjectTempCheckpointsDir();
+  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
 
   if (!checkpointDir) {
     return {
@@ -117,7 +116,7 @@ async function restoreAction(
       } else if (action.type === 'load_history' && loadHistory) {
         loadHistory(action.history);
         if (action.clientHistory) {
-          agentContext!.geminiClient?.setHistory(action.clientHistory);
+          config?.getGeminiClient()?.setHistory(action.clientHistory);
         }
       }
     }
@@ -141,9 +140,8 @@ async function completion(
   _partialArg: string,
 ): Promise<string[]> {
   const { services } = context;
-  const { agentContext } = services;
-  const checkpointDir =
-    agentContext?.config.storage.getProjectTempCheckpointsDir();
+  const { config } = services;
+  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
   if (!checkpointDir) {
     return [];
   }

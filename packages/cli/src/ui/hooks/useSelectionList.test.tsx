@@ -89,9 +89,10 @@ describe('useSelectionList', () => {
       hookResult = useSelectionList(props);
       return null;
     }
-    const { rerender, unmount, waitUntilReady } = await render(
+    const { rerender, unmount, waitUntilReady } = render(
       <TestComponent {...initialProps} />,
     );
+    await waitUntilReady();
 
     return {
       result: {
@@ -1101,9 +1102,10 @@ describe('useSelectionList', () => {
           });
           return null;
         }
-        const { rerender, waitUntilReady } = await render(
+        const { rerender, waitUntilReady } = render(
           <TestComponent {...initialProps} />,
         );
+        await waitUntilReady();
 
         return {
           rerender: async (newProps: Partial<typeof initialProps>) => {

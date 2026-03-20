@@ -13,27 +13,21 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import type { Client } from '@a2a-js/sdk/client';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import {
+  A2AClientManager,
   type SendMessageResult,
-  type A2AClientManager,
 } from './a2a-client-manager.js';
-
 import type { RemoteAgentDefinition } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
-import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import type { Config } from '../config/config.js';
 
 // Mock A2AClientManager
 vi.mock('./a2a-client-manager.js', () => ({
-  A2AClientManager: vi.fn().mockImplementation(() => ({
-    getClient: vi.fn(),
-    loadAgent: vi.fn(),
-    sendMessageStream: vi.fn(),
-  })),
+  A2AClientManager: {
+    getInstance: vi.fn(),
+  },
 }));
 
 // Mock A2AAuthProviderFactory
@@ -55,40 +49,16 @@ describe('RemoteAgentInvocation', () => {
     },
   };
 
-  let mockClientManager: {
-    getClient: Mock<A2AClientManager['getClient']>;
-    loadAgent: Mock<A2AClientManager['loadAgent']>;
-    sendMessageStream: Mock<A2AClientManager['sendMessageStream']>;
-  };
-  let mockContext: AgentLoopContext;
-  const mockMessageBus = createMockMessageBus();
-
-  const mockClient = {
+  const mockClientManager = {
+    getClient: vi.fn(),
+    loadAgent: vi.fn(),
     sendMessageStream: vi.fn(),
-    getTask: vi.fn(),
-    cancelTask: vi.fn(),
-  } as unknown as Client;
+  };
+  const mockMessageBus = createMockMessageBus();
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mockClientManager = {
-      getClient: vi.fn(),
-      loadAgent: vi.fn(),
-      sendMessageStream: vi.fn(),
-    };
-
-    const mockConfig = {
-      getA2AClientManager: vi.fn().mockReturnValue(mockClientManager),
-      injectionService: {
-        getLatestInjectionIndex: vi.fn().mockReturnValue(0),
-      },
-    } as unknown as Config;
-
-    mockContext = {
-      config: mockConfig,
-    } as unknown as AgentLoopContext;
-
+    (A2AClientManager.getInstance as Mock).mockReturnValue(mockClientManager);
     (
       RemoteAgentInvocation as unknown as {
         sessionState?: Map<string, { contextId?: string; taskId?: string }>;
@@ -105,7 +75,6 @@ describe('RemoteAgentInvocation', () => {
       expect(() => {
         new RemoteAgentInvocation(
           mockDefinition,
-          mockContext,
           { query: 'valid' },
           mockMessageBus,
         );
@@ -114,17 +83,12 @@ describe('RemoteAgentInvocation', () => {
 
     it('accepts missing query (defaults to "Get Started!")', () => {
       expect(() => {
-        new RemoteAgentInvocation(
-          mockDefinition,
-          mockContext,
-          {},
-          mockMessageBus,
-        );
+        new RemoteAgentInvocation(mockDefinition, {}, mockMessageBus);
       }).not.toThrow();
     });
 
     it('uses "Get Started!" default when query is missing during execution', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -138,7 +102,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {},
         mockMessageBus,
       );
@@ -155,7 +118,6 @@ describe('RemoteAgentInvocation', () => {
       expect(() => {
         new RemoteAgentInvocation(
           mockDefinition,
-          mockContext,
           { query: 123 },
           mockMessageBus,
         );
@@ -179,7 +141,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'hi',
         },
@@ -226,7 +187,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         authDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -260,7 +220,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         authDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -272,7 +231,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should not load the agent if already present', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -286,7 +245,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'hi',
         },
@@ -298,7 +256,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should persist contextId and taskId across invocations', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
 
       // First call return values
       mockClientManager.sendMessageStream.mockImplementationOnce(
@@ -316,7 +274,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation1 = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'first',
         },
@@ -348,7 +305,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation2 = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'second',
         },
@@ -379,7 +335,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation3 = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'third',
         },
@@ -401,7 +356,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation4 = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'fourth',
         },
@@ -417,7 +371,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should handle streaming updates and reassemble output', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -438,7 +392,6 @@ describe('RemoteAgentInvocation', () => {
       const updateOutput = vi.fn();
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -449,7 +402,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should abort when signal is aborted during streaming', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       const controller = new AbortController();
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -472,7 +425,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -483,7 +435,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           if (Math.random() < 0) yield {} as unknown as SendMessageResult;
@@ -493,7 +445,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'hi',
         },
@@ -507,7 +458,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should use a2a helpers for extracting text', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       // Mock a complex message part that needs extraction
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -525,7 +476,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'hi',
         },
@@ -538,7 +488,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should handle mixed response types during streaming (TaskStatusUpdateEvent + Message)', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -568,7 +518,6 @@ describe('RemoteAgentInvocation', () => {
       const updateOutput = vi.fn();
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -583,20 +532,17 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should handle artifact reassembly with append: true', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
             kind: 'status-update',
             taskId: 'task-1',
-            contextId: 'ctx-1',
-            final: false,
             status: {
               state: 'working',
               message: {
                 kind: 'message',
                 role: 'agent',
-                messageId: 'm1',
                 parts: [{ kind: 'text', text: 'Generating...' }],
               },
             },
@@ -604,7 +550,6 @@ describe('RemoteAgentInvocation', () => {
           yield {
             kind: 'artifact-update',
             taskId: 'task-1',
-            contextId: 'ctx-1',
             append: false,
             artifact: {
               artifactId: 'art-1',
@@ -615,21 +560,18 @@ describe('RemoteAgentInvocation', () => {
           yield {
             kind: 'artifact-update',
             taskId: 'task-1',
-            contextId: 'ctx-1',
             append: true,
             artifact: {
               artifactId: 'art-1',
               parts: [{ kind: 'text', text: ' Part 2' }],
             },
           };
-          return;
         },
       );
 
       const updateOutput = vi.fn();
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -649,7 +591,6 @@ describe('RemoteAgentInvocation', () => {
     it('should return info confirmation details', async () => {
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         {
           query: 'hi',
         },
@@ -688,7 +629,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -706,7 +646,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );
@@ -719,7 +658,7 @@ describe('RemoteAgentInvocation', () => {
     });
 
     it('should include partial output when error occurs mid-stream', async () => {
-      mockClientManager.getClient.mockReturnValue(mockClient);
+      mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
@@ -735,7 +674,6 @@ describe('RemoteAgentInvocation', () => {
 
       const invocation = new RemoteAgentInvocation(
         mockDefinition,
-        mockContext,
         { query: 'hi' },
         mockMessageBus,
       );

@@ -69,9 +69,10 @@ describe('PrivacyNotice', () => {
         authType,
       } as unknown as ContentGeneratorConfig);
 
-      const { lastFrame, unmount } = await render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <PrivacyNotice config={mockConfig} onExit={onExit} />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain(expectedComponent);
       unmount();

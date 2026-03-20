@@ -17,20 +17,22 @@ const MOCK_TABS: Tab[] = [
 describe('TabHeader', () => {
   describe('rendering', () => {
     it('renders null for single tab', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader
           tabs={[{ key: '0', header: 'Only Tab' }]}
           currentIndex={0}
         />,
       );
+      await waitUntilReady();
       expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
 
     it('renders all tab headers', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       expect(frame).toContain('Tab 1');
       expect(frame).toContain('Tab 2');
@@ -40,9 +42,10 @@ describe('TabHeader', () => {
     });
 
     it('renders separators between tabs', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       // Should have 2 separators for 3 tabs
       const separatorCount = (frame?.match(/│/g) || []).length;
@@ -54,9 +57,10 @@ describe('TabHeader', () => {
 
   describe('arrows', () => {
     it('shows arrows by default', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       expect(frame).toContain('←');
       expect(frame).toContain('→');
@@ -65,9 +69,10 @@ describe('TabHeader', () => {
     });
 
     it('hides arrows when showArrows is false', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={MOCK_TABS} currentIndex={0} showArrows={false} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       expect(frame).not.toContain('←');
       expect(frame).not.toContain('→');
@@ -78,9 +83,10 @@ describe('TabHeader', () => {
 
   describe('status icons', () => {
     it('shows status icons by default', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       // Default uncompleted icon is □
       expect(frame).toContain('□');
@@ -89,9 +95,10 @@ describe('TabHeader', () => {
     });
 
     it('hides status icons when showStatusIcons is false', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={MOCK_TABS} currentIndex={0} showStatusIcons={false} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       expect(frame).not.toContain('□');
       expect(frame).not.toContain('✓');
@@ -100,13 +107,14 @@ describe('TabHeader', () => {
     });
 
     it('shows checkmark for completed tabs', async () => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader
           tabs={MOCK_TABS}
           currentIndex={0}
           completedIndices={new Set([0, 2])}
         />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       // Should have 2 checkmarks and 1 box
       const checkmarkCount = (frame?.match(/✓/g) || []).length;
@@ -122,9 +130,10 @@ describe('TabHeader', () => {
         { key: '0', header: 'Tab 1' },
         { key: '1', header: 'Review', isSpecial: true },
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={tabsWithSpecial} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       // Special tab shows ≡ icon
       expect(frame).toContain('≡');
@@ -137,9 +146,10 @@ describe('TabHeader', () => {
         { key: '0', header: 'Tab 1', statusIcon: '★' },
         { key: '1', header: 'Tab 2' },
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={tabsWithCustomIcon} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       expect(frame).toContain('★');
       expect(frame).toMatchSnapshot();
@@ -148,13 +158,14 @@ describe('TabHeader', () => {
 
     it('uses custom renderStatusIcon when provided', async () => {
       const renderStatusIcon = () => '•';
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader
           tabs={MOCK_TABS}
           currentIndex={0}
           renderStatusIcon={renderStatusIcon}
         />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       const bulletCount = (frame?.match(/•/g) || []).length;
       expect(bulletCount).toBe(3);
@@ -167,9 +178,10 @@ describe('TabHeader', () => {
         { key: '0', header: 'ThisIsAVeryLongHeaderThatShouldBeTruncated' },
         { key: '1', header: 'AnotherVeryLongHeader' },
       ];
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader tabs={longTabs} currentIndex={0} />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
 
       // Current tab (index 0) should NOT be truncated
@@ -185,13 +197,14 @@ describe('TabHeader', () => {
 
     it('falls back to default when renderStatusIcon returns undefined', async () => {
       const renderStatusIcon = () => undefined;
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <TabHeader
           tabs={MOCK_TABS}
           currentIndex={0}
           renderStatusIcon={renderStatusIcon}
         />,
       );
+      await waitUntilReady();
       const frame = lastFrame();
       expect(frame).toContain('□');
       expect(frame).toMatchSnapshot();

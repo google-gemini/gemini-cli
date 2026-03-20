@@ -342,8 +342,6 @@ describe('buildBrowserSystemPrompt', () => {
       expect(prompt).toContain('COMPLEX WEB APPS');
       expect(prompt).toContain('TERMINAL FAILURES');
       expect(prompt).toContain('complete_task');
-      expect(prompt).toContain('PROMPT INJECTION & SECURITY - CRITICAL:');
-      expect(prompt).toContain('untrusted input');
     }
   });
 

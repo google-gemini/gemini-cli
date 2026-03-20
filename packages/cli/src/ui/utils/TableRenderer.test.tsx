@@ -17,14 +17,16 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Header 1');
     expect(output).toContain('Row 1, Col 1');
@@ -47,14 +49,16 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     // Since terminalWidth is 80 and headers are long, they might be truncated.
     // We just check for some of the content.
@@ -75,14 +79,16 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('This is a very');
     expect(output).toContain('long cell');
@@ -101,14 +107,16 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('wrapping in');
     await expect(renderResult).toMatchSvgSnapshot();
@@ -126,14 +134,16 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Tiny');
     expect(output).toContain('definitely needs');
@@ -153,14 +163,16 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Start. Stop.');
     await expect(renderResult).toMatchSvgSnapshot();
@@ -172,14 +184,16 @@ describe('TableRenderer', () => {
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 50;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     // The output should NOT contain the literal '**'
     expect(output).not.toContain('**Bold Header**');
@@ -197,14 +211,16 @@ describe('TableRenderer', () => {
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 40;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     // Markers should be gone
     expect(output).not.toContain('**');
@@ -239,7 +255,7 @@ describe('TableRenderer', () => {
 
     const terminalWidth = 160;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -247,7 +263,9 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expect(output).toContain('Comprehensive Architectural');
     expect(output).toContain('protocol buffers');
@@ -307,7 +325,7 @@ describe('TableRenderer', () => {
       expected: ['Mixed 😃 中文', '你好 😃', 'こんにちは 🚀'],
     },
   ])('$name', async ({ headers, rows, terminalWidth, expected }) => {
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -315,7 +333,9 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
@@ -340,14 +360,16 @@ describe('TableRenderer', () => {
   ])('$name', async ({ headers, rows, expected }) => {
     const terminalWidth = 50;
 
-    const renderResult = await renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, unmount } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
+
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
@@ -466,7 +488,7 @@ describe('TableRenderer', () => {
   ])(
     '$name',
     async ({ headers, rows, terminalWidth, waitForText, assertions }) => {
-      const renderResult = await renderWithProviders(
+      const renderResult = renderWithProviders(
         <TableRenderer
           headers={headers}
           rows={rows}
@@ -474,7 +496,8 @@ describe('TableRenderer', () => {
         />,
         { width: terminalWidth },
       );
-      const { lastFrame, unmount } = renderResult;
+      const { lastFrame, waitUntilReady, unmount } = renderResult;
+      await waitUntilReady();
 
       const output = lastFrame();
       expect(output).toBeDefined();

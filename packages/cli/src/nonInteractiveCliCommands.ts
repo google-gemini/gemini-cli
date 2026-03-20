@@ -65,9 +65,9 @@ export const handleSlashCommand = async (
 
       const logger = new Logger(config?.getSessionId() || '', config?.storage);
 
-      const commandContext: CommandContext = {
+      const context: CommandContext = {
         services: {
-          agentContext: config,
+          config,
           settings,
           git: undefined,
           logger,
@@ -84,7 +84,7 @@ export const handleSlashCommand = async (
         },
       };
 
-      const result = await commandToExecute.action(commandContext, args);
+      const result = await commandToExecute.action(context, args);
 
       if (result) {
         switch (result.type) {

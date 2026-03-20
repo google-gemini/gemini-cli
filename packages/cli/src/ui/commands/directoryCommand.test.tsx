@@ -85,14 +85,11 @@ describe('directoryCommand', () => {
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
-      get config() {
-        return this;
-      },
     } as unknown as Config;
 
     mockContext = {
       services: {
-        agentContext: mockConfig,
+        config: mockConfig,
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,

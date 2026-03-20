@@ -31,10 +31,8 @@ describe('initCommand', () => {
     // Create a fresh mock context for each test
     mockContext = createMockCommandContext({
       services: {
-        agentContext: {
-          config: {
-            getTargetDir: () => targetDir,
-          },
+        config: {
+          getTargetDir: () => targetDir,
         },
       },
     });
@@ -96,7 +94,7 @@ describe('initCommand', () => {
     // Arrange: Create a context without config
     const noConfigContext = createMockCommandContext();
     if (noConfigContext.services) {
-      noConfigContext.services.agentContext = null;
+      noConfigContext.services.config = null;
     }
 
     // Act: Run the command's action

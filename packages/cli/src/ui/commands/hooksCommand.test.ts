@@ -93,7 +93,7 @@ describe('hooksCommand', () => {
     // Create mock context with config and settings
     mockContext = createMockCommandContext({
       services: {
-        agentContext: { config: mockConfig },
+        config: mockConfig,
         settings: mockSettings,
       },
     });
@@ -141,7 +141,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 
@@ -225,7 +225,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 
@@ -338,7 +338,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 
@@ -470,7 +470,7 @@ describe('hooksCommand', () => {
     it('should return empty array when config is not available', () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 
@@ -567,7 +567,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 
@@ -691,7 +691,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 

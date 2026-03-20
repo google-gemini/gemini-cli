@@ -13,7 +13,7 @@ describe('StickyHeader', () => {
   it.each([true, false])(
     'renders children with isFirst=%s',
     async (isFirst) => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <StickyHeader
           isFirst={isFirst}
           width={80}
@@ -23,6 +23,7 @@ describe('StickyHeader', () => {
           <Text>Hello Sticky</Text>
         </StickyHeader>,
       );
+      await waitUntilReady();
       expect(lastFrame()).toContain('Hello Sticky');
       unmount();
     },

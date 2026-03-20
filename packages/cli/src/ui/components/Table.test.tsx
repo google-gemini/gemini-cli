@@ -19,11 +19,9 @@ describe('Table', () => {
       { id: 2, name: 'Bob' },
     ];
 
-    const renderResult = await render(
-      <Table columns={columns} data={data} />,
-      100,
-    );
-    const { lastFrame } = renderResult;
+    const renderResult = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = renderResult;
+    await waitUntilReady?.();
     const output = lastFrame();
 
     expect(output).toContain('ID');
@@ -48,11 +46,9 @@ describe('Table', () => {
     ];
     const data = [{ value: 10 }];
 
-    const renderResult = await render(
-      <Table columns={columns} data={data} />,
-      100,
-    );
-    const { lastFrame } = renderResult;
+    const renderResult = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = renderResult;
+    await waitUntilReady?.();
     const output = lastFrame();
 
     expect(output).toContain('20');
@@ -62,10 +58,11 @@ describe('Table', () => {
   it('should handle undefined values gracefully', async () => {
     const columns = [{ key: 'name', header: 'Name', flexGrow: 1 }];
     const data: Array<{ name: string | undefined }> = [{ name: undefined }];
-    const { lastFrame } = await render(
+    const { lastFrame, waitUntilReady } = render(
       <Table columns={columns} data={data} />,
       100,
     );
+    await waitUntilReady?.();
     const output = lastFrame();
     expect(output).toContain('undefined');
   });
@@ -83,11 +80,9 @@ describe('Table', () => {
     ];
     const data = [{ status: 'Active' }];
 
-    const renderResult = await render(
-      <Table columns={columns} data={data} />,
-      100,
-    );
-    const { lastFrame } = renderResult;
+    const renderResult = render(<Table columns={columns} data={data} />, 100);
+    const { lastFrame, waitUntilReady } = renderResult;
+    await waitUntilReady?.();
     const output = lastFrame();
 
     expect(output).toContain('Active');

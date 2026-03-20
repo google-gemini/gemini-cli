@@ -61,15 +61,15 @@ describe('useBanner', () => {
     mockedPersistentStateGet.mockReturnValue({});
   });
 
-  it('should return warning text and warning color if warningText is present', async () => {
+  it('should return warning text and warning color if warningText is present', () => {
     const data = { defaultText: 'Standard', warningText: 'Critical Error' };
 
-    const { result } = await renderHook(() => useBanner(data));
+    const { result } = renderHook(() => useBanner(data));
 
     expect(result.current.bannerText).toBe('Critical Error');
   });
 
-  it('should hide banner if show count exceeds max limit (Legacy format)', async () => {
+  it('should hide banner if show count exceeds max limit (Legacy format)', () => {
     mockedPersistentStateGet.mockReturnValue({
       [crypto
         .createHash('sha256')
@@ -77,12 +77,12 @@ describe('useBanner', () => {
         .digest('hex')]: 5,
     });
 
-    const { result } = await renderHook(() => useBanner(defaultBannerData));
+    const { result } = renderHook(() => useBanner(defaultBannerData));
 
     expect(result.current.bannerText).toBe('');
   });
 
-  it('should increment the persistent count when banner is shown', async () => {
+  it('should increment the persistent count when banner is shown', () => {
     const data = { defaultText: 'Tracker', warningText: '' };
 
     // Current count is 1
@@ -90,7 +90,7 @@ describe('useBanner', () => {
       [crypto.createHash('sha256').update(data.defaultText).digest('hex')]: 1,
     });
 
-    await renderHook(() => useBanner(data));
+    renderHook(() => useBanner(data));
 
     // Expect set to be called with incremented count
     expect(mockedPersistentStateSet).toHaveBeenCalledWith(
@@ -101,19 +101,19 @@ describe('useBanner', () => {
     );
   });
 
-  it('should NOT increment count if warning text is shown instead', async () => {
+  it('should NOT increment count if warning text is shown instead', () => {
     const data = { defaultText: 'Standard', warningText: 'Warning' };
 
-    await renderHook(() => useBanner(data));
+    renderHook(() => useBanner(data));
 
     // Since warning text takes precedence, default banner logic (and increment) is skipped
     expect(mockedPersistentStateSet).not.toHaveBeenCalled();
   });
 
-  it('should handle newline replacements', async () => {
+  it('should handle newline replacements', () => {
     const data = { defaultText: 'Line1\\nLine2', warningText: '' };
 
-    const { result } = await renderHook(() => useBanner(data));
+    const { result } = renderHook(() => useBanner(data));
 
     expect(result.current.bannerText).toBe('Line1\nLine2');
   });

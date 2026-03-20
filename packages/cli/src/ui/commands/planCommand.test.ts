@@ -52,16 +52,14 @@ describe('planCommand', () => {
   beforeEach(() => {
     mockContext = createMockCommandContext({
       services: {
-        agentContext: {
-          config: {
-            isPlanEnabled: vi.fn(),
-            setApprovalMode: vi.fn(),
-            getApprovedPlanPath: vi.fn(),
-            getApprovalMode: vi.fn(),
-            getFileSystemService: vi.fn(),
-            storage: {
-              getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
-            },
+        config: {
+          isPlanEnabled: vi.fn(),
+          setApprovalMode: vi.fn(),
+          getApprovedPlanPath: vi.fn(),
+          getApprovalMode: vi.fn(),
+          getFileSystemService: vi.fn(),
+          storage: {
+            getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
         },
       },
@@ -85,19 +83,17 @@ describe('planCommand', () => {
   });
 
   it('should switch to plan mode if enabled', async () => {
-    vi.mocked(
-      mockContext.services.agentContext!.config.isPlanEnabled,
-    ).mockReturnValue(true);
-    vi.mocked(
-      mockContext.services.agentContext!.config.getApprovedPlanPath,
-    ).mockReturnValue(undefined);
+    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
+    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
+      undefined,
+    );
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
 
-    expect(
-      mockContext.services.agentContext!.config.setApprovalMode,
-    ).toHaveBeenCalledWith(ApprovalMode.PLAN);
+    expect(mockContext.services.config!.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.PLAN,
+    );
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'info',
       'Switched to Plan Mode.',
@@ -106,12 +102,10 @@ describe('planCommand', () => {
 
   it('should display the approved plan from config', async () => {
     const mockPlanPath = '/mock/plans/dir/approved-plan.md';
-    vi.mocked(
-      mockContext.services.agentContext!.config.isPlanEnabled,
-    ).mockReturnValue(true);
-    vi.mocked(
-      mockContext.services.agentContext!.config.getApprovedPlanPath,
-    ).mockReturnValue(mockPlanPath);
+    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
+    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
+      mockPlanPath,
+    );
     vi.mocked(processSingleFileContent).mockResolvedValue({
       llmContent: '# Approved Plan Content',
       returnDisplay: '# Approved Plan Content',
@@ -134,7 +128,7 @@ describe('planCommand', () => {
     it('should copy the approved plan to clipboard', async () => {
       const mockPlanPath = '/mock/plans/dir/approved-plan.md';
       vi.mocked(
-        mockContext.services.agentContext!.config.getApprovedPlanPath,
+        mockContext.services.config!.getApprovedPlanPath,
       ).mockReturnValue(mockPlanPath);
       vi.mocked(readFileWithEncoding).mockResolvedValue('# Plan Content');
 
@@ -155,7 +149,7 @@ describe('planCommand', () => {
 
     it('should warn if no approved plan is found', async () => {
       vi.mocked(
-        mockContext.services.agentContext!.config.getApprovedPlanPath,
+        mockContext.services.config!.getApprovedPlanPath,
       ).mockReturnValue(undefined);
 
       const copySubCommand = planCommand.subCommands?.find(

@@ -36,7 +36,7 @@ export const createMockCommandContext = (
       args: '',
     },
     services: {
-      agentContext: null,
+      config: null,
 
       settings: {
         merged: defaultMergedSettings,

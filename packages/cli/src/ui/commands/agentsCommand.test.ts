@@ -26,7 +26,6 @@ describe('agentsCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
   let mockConfig: {
     getAgentRegistry: ReturnType<typeof vi.fn>;
-    config: Config;
   };
 
   beforeEach(() => {
@@ -38,14 +37,11 @@ describe('agentsCommand', () => {
         getAllAgentNames: vi.fn().mockReturnValue([]),
         reload: vi.fn(),
       }),
-      get config() {
-        return this as unknown as Config;
-      },
     };
 
     mockContext = createMockCommandContext({
       services: {
-        agentContext: mockConfig as unknown as Config,
+        config: mockConfig as unknown as Config,
         settings: {
           workspace: { path: '/mock/path' },
           merged: { agents: { overrides: {} } },
@@ -57,7 +53,7 @@ describe('agentsCommand', () => {
   it('should show an error if config is not available', async () => {
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        agentContext: null,
+        config: null,
       },
     });
 
@@ -230,7 +226,7 @@ describe('agentsCommand', () => {
 
   it('should show an error if config is not available for enable', async () => {
     const contextWithoutConfig = createMockCommandContext({
-      services: { agentContext: null },
+      services: { config: null },
     });
     const enableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'enable',
@@ -336,7 +332,7 @@ describe('agentsCommand', () => {
 
   it('should show an error if config is not available for disable', async () => {
     const contextWithoutConfig = createMockCommandContext({
-      services: { agentContext: null },
+      services: { config: null },
     });
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',
@@ -437,7 +433,7 @@ describe('agentsCommand', () => {
 
     it('should show an error if config is not available', async () => {
       const contextWithoutConfig = createMockCommandContext({
-        services: { agentContext: null },
+        services: { config: null },
       });
       const configCommand = agentsCommand.subCommands?.find(
         (cmd) => cmd.name === 'config',

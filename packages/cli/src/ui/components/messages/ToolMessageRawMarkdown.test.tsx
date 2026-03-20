@@ -5,12 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { type ToolMessageProps, ToolMessage } from './ToolMessage.js';
+import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
 import { StreamingState } from '../../types.js';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { createMockSettings } from '../../../test-utils/settings.js';
-import { CoreToolCallStatus, makeFakeConfig } from '@google/gemini-cli-core';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
   const baseProps: ToolMessageProps = {
@@ -64,7 +63,7 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
   ])(
     'renders with renderMarkdown=$renderMarkdown, useAlternateBuffer=$useAlternateBuffer $description',
     async ({ renderMarkdown, useAlternateBuffer, availableTerminalHeight }) => {
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <StreamingContext.Provider value={StreamingState.Idle}>
           <ToolMessage
             {...baseProps}
@@ -73,10 +72,10 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
         </StreamingContext.Provider>,
         {
           uiState: { renderMarkdown, streamingState: StreamingState.Idle },
-          config: makeFakeConfig({ useAlternateBuffer }),
-          settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          useAlternateBuffer,
         },
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     },

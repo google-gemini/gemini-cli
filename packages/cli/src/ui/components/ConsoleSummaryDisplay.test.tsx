@@ -10,9 +10,10 @@ import { describe, it, expect } from 'vitest';
 
 describe('ConsoleSummaryDisplay', () => {
   it('renders nothing when errorCount is 0', async () => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ConsoleSummaryDisplay errorCount={0} />,
     );
+    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -21,9 +22,10 @@ describe('ConsoleSummaryDisplay', () => {
     [1, '1 error'],
     [5, '5 errors'],
   ])('renders correct message for %i errors', async (count, expectedText) => {
-    const { lastFrame, unmount } = await render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ConsoleSummaryDisplay errorCount={count} />,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain(expectedText);
     expect(output).toContain('✖');

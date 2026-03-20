@@ -19,9 +19,6 @@ export interface ExtensionDetailsProps {
   onInstall: (
     requestConsentOverride: (consent: string) => Promise<boolean>,
   ) => void | Promise<void>;
-  onLink: (
-    requestConsentOverride: (consent: string) => Promise<boolean>,
-  ) => void | Promise<void>;
   isInstalled: boolean;
 }
 
@@ -29,7 +26,6 @@ export function ExtensionDetails({
   extension,
   onBack,
   onInstall,
-  onLink,
   isInstalled,
 }: ExtensionDetailsProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
@@ -38,11 +34,6 @@ export function ExtensionDetails({
     resolve: (value: boolean) => void;
   } | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
-
-  const isLinkable =
-    !extension.url.startsWith('http') &&
-    !extension.url.startsWith('git@') &&
-    !extension.url.startsWith('sso://');
 
   useKeypress(
     (key) => {
@@ -65,20 +56,9 @@ export function ExtensionDetails({
         onBack();
         return true;
       }
-
       if (keyMatchers[Command.RETURN](key) && !isInstalled && !isInstalling) {
         setIsInstalling(true);
         void onInstall(
-          (prompt: string) =>
-            new Promise((resolve) => {
-              setConsentRequest({ prompt, resolve });
-            }),
-        );
-        return true;
-      }
-      if (key.name === 'l' && isLinkable && !isInstalled && !isInstalling) {
-        setIsInstalling(true);
-        void onLink(
           (prompt: string) =>
             new Promise((resolve) => {
               setConsentRequest({ prompt, resolve });
@@ -250,11 +230,8 @@ export function ExtensionDetails({
             understand the permissions it requires and the actions it may
             perform.
           </Text>
-          <Box marginTop={1} flexDirection="row">
-            <Box marginRight={2}>
-              <Text color={theme.text.primary}>[{'Enter'}] Install</Text>
-            </Box>
-            {isLinkable && <Text color={theme.text.primary}>[L] Link</Text>}
+          <Box marginTop={1}>
+            <Text color={theme.text.primary}>[{'Enter'}] Install</Text>
           </Box>
         </Box>
       )}

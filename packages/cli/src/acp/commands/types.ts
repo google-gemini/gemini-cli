@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentLoopContext, GitService } from '@google/gemini-cli-core';
+import type { Config, GitService } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 
 export interface CommandContext {
-  agentContext: AgentLoopContext;
+  config: Config;
   settings: LoadedSettings;
   git?: GitService;
   sendMessage: (text: string) => Promise<void>;

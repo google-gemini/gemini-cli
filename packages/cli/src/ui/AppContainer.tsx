@@ -103,7 +103,7 @@ import {
   useOverflowActions,
   useOverflowState,
 } from './contexts/OverflowContext.js';
-import { useErrorCount } from './hooks/useConsoleMessages.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
@@ -552,7 +552,8 @@ export const AppContainer = (props: AppContainerProps) => {
     };
   }, [settings]);
 
-  const { errorCount, clearErrorCount } = useErrorCount();
+  const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
+    useConsoleMessages();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
@@ -1007,18 +1008,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      let flattenedMemory: string;
-      let fileCount: number;
+      const { memoryContent, fileCount } =
+        await refreshServerHierarchicalMemory(config);
 
-      if (config.isJitContextEnabled()) {
-        await config.getContextManager()?.refresh();
-        flattenedMemory = flattenMemory(config.getUserMemory());
-        fileCount = config.getGeminiMdFileCount();
-      } else {
-        const result = await refreshServerHierarchicalMemory(config);
-        flattenedMemory = flattenMemory(result.memoryContent);
-        fileCount = result.fileCount;
-      }
+      const flattenedMemory = flattenMemory(memoryContent);
 
       historyManager.addItem(
         {
@@ -1379,11 +1372,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
     triggerExpandHint(null);
     historyManager.clearItems();
-    clearErrorCount();
+    clearConsoleMessagesState();
     refreshStatic();
   }, [
     historyManager,
-    clearErrorCount,
+    clearConsoleMessagesState,
     refreshStatic,
     reset,
     triggerExpandHint,
@@ -1684,6 +1677,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
+      // Debug log keystrokes if enabled
+      if (settings.merged.general.debugKeystrokeLogging) {
+        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
@@ -1862,6 +1860,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activePtyId,
       handleSuspend,
       embeddedShellFocused,
+      settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
       tabFocusTimeoutRef,
@@ -1989,6 +1988,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     };
   }, [historyManager]);
+
+  const filteredConsoleMessages = useMemo(() => {
+    if (config.getDebugMode()) {
+      return consoleMessages;
+    }
+    return consoleMessages.filter((msg) => msg.type !== 'debug');
+  }, [consoleMessages, config]);
+
+  // Computed values
+  const errorCount = useMemo(
+    () =>
+      filteredConsoleMessages
+        .filter((msg) => msg.type === 'error')
+        .reduce((total, msg) => total + msg.count, 0),
+    [filteredConsoleMessages],
+  );
 
   const nightly = props.version.includes('nightly');
 
@@ -2224,6 +2239,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
+      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
@@ -2351,6 +2367,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
+      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressCount,

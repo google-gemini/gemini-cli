@@ -80,8 +80,8 @@ describe('useToolScheduler', () => {
     vi.clearAllMocks();
   });
 
-  it('initializes with empty tool calls', async () => {
-    const { result } = await renderHook(() =>
+  it('initializes with empty tool calls', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -92,8 +92,8 @@ describe('useToolScheduler', () => {
     expect(toolCalls).toEqual([]);
   });
 
-  it('updates tool calls when MessageBus emits TOOL_CALLS_UPDATE', async () => {
-    const { result } = await renderHook(() =>
+  it('updates tool calls when MessageBus emits TOOL_CALLS_UPDATE', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -134,8 +134,8 @@ describe('useToolScheduler', () => {
     });
   });
 
-  it('preserves responseSubmittedToGemini flag across updates', async () => {
-    const { result } = await renderHook(() =>
+  it('preserves responseSubmittedToGemini flag across updates', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -192,9 +192,9 @@ describe('useToolScheduler', () => {
     expect(result.current[0][0].responseSubmittedToGemini).toBe(true);
   });
 
-  it('updates lastToolOutputTime when tools are executing', async () => {
+  it('updates lastToolOutputTime when tools are executing', () => {
     vi.useFakeTimers();
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -231,8 +231,8 @@ describe('useToolScheduler', () => {
     vi.useRealTimers();
   });
 
-  it('delegates cancelAll to the Core Scheduler', async () => {
-    const { result } = await renderHook(() =>
+  it('delegates cancelAll to the Core Scheduler', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -285,7 +285,7 @@ describe('useToolScheduler', () => {
         }) as unknown as Scheduler,
     );
 
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useToolScheduler(onComplete, mockConfig, () => undefined),
     );
 
@@ -310,8 +310,8 @@ describe('useToolScheduler', () => {
     expect(onComplete).toHaveBeenCalledWith([completedToolCall]);
   });
 
-  it('setToolCallsForDisplay re-groups tools by schedulerId (Multi-Scheduler support)', async () => {
-    const { result } = await renderHook(() =>
+  it('setToolCallsForDisplay re-groups tools by schedulerId (Multi-Scheduler support)', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -386,8 +386,8 @@ describe('useToolScheduler', () => {
     expect(toolCalls2.every((t) => t.responseSubmittedToGemini)).toBe(true);
   });
 
-  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', async () => {
-    const { result } = await renderHook(() =>
+  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -420,8 +420,8 @@ describe('useToolScheduler', () => {
     expect(result.current[0]).toHaveLength(0);
   });
 
-  it('allows TOOL_CALLS_UPDATE from non-root schedulers when tools are awaiting approval', async () => {
-    const { result } = await renderHook(() =>
+  it('allows TOOL_CALLS_UPDATE from non-root schedulers when tools are awaiting approval', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -458,8 +458,8 @@ describe('useToolScheduler', () => {
     expect(toolCalls[0].status).toBe(CoreToolCallStatus.AwaitingApproval);
   });
 
-  it('preserves subagent tools in the UI after they have been approved', async () => {
-    const { result } = await renderHook(() =>
+  it('preserves subagent tools in the UI after they have been approved', () => {
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,
@@ -538,9 +538,9 @@ describe('useToolScheduler', () => {
     expect(result.current[0]).toHaveLength(0);
   });
 
-  it('adapts success/error status to executing when a tail call is present', async () => {
+  it('adapts success/error status to executing when a tail call is present', () => {
     vi.useFakeTimers();
-    const { result } = await renderHook(() =>
+    const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
         mockConfig,

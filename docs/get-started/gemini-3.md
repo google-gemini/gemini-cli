@@ -2,9 +2,7 @@
 
 Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> Gemini 3.1 Pro Preview is rolling out. To determine whether you have
+> **Note:** Gemini 3.1 Pro Preview is rolling out. To determine whether you have
 > access to Gemini 3.1, use the `/model` command and select **Manual**. If you
 > have access, you will see `gemini-3.1-pro-preview`.
 >
@@ -27,7 +25,7 @@ Get started by upgrading Gemini CLI to the latest version:
 npm install -g @google/gemini-cli@latest
 ```
 
-If your version is 0.21.1 or later:
+After you’ve confirmed your version is 0.21.1 or later:
 
 1. Run `/model`.
 2. Select **Auto (Gemini 3)**.
@@ -41,9 +39,7 @@ When you encounter that limit, you’ll be given the option to switch to Gemini
 2.5 Pro, upgrade for higher limits, or stop. You’ll also be told when your usage
 limit resets and Gemini 3 Pro can be used again.
 
-<!-- prettier-ignore -->
-> [!TIP]
-> Looking to upgrade for higher limits? To compare subscription
+> **Note:** Looking to upgrade for higher limits? To compare subscription
 > options and find the right quota for your needs, see our
 > [Plans page](https://geminicli.com/plans/).
 
@@ -56,9 +52,7 @@ There may be times when the Gemini 3 Pro model is overloaded. When that happens,
 Gemini CLI will ask you to decide whether you want to keep trying Gemini 3 Pro
 or fallback to Gemini 2.5 Pro.
 
-<!-- prettier-ignore -->
-> [!NOTE]
-> The **Keep trying** option uses exponential backoff, in which Gemini
+> **Note:** The **Keep trying** option uses exponential backoff, in which Gemini
 > CLI waits longer between each retry, when the system is busy. If the retry
 > doesn't happen immediately, please wait a few minutes for the request to
 > process.
@@ -115,7 +109,7 @@ then:
 
 Restart Gemini CLI and you should have access to Gemini 3.
 
-## Next steps
+## Need help?
 
 If you need help, we recommend searching for an existing
 [GitHub issue](https://github.com/google-gemini/gemini-cli/issues). If you

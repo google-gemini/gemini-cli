@@ -32,20 +32,20 @@ describe('useMemoryMonitor', () => {
     return null;
   }
 
-  it('should not warn when memory usage is below threshold', async () => {
+  it('should not warn when memory usage is below threshold', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD / 2,
     } as NodeJS.MemoryUsage);
-    await render(<TestComponent />);
+    render(<TestComponent />);
     vi.advanceTimersByTime(10000);
     expect(addItem).not.toHaveBeenCalled();
   });
 
-  it('should warn when memory usage is above threshold', async () => {
+  it('should warn when memory usage is above threshold', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    await render(<TestComponent />);
+    render(<TestComponent />);
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
     expect(addItem).toHaveBeenCalledWith(
@@ -57,11 +57,11 @@ describe('useMemoryMonitor', () => {
     );
   });
 
-  it('should only warn once', async () => {
+  it('should only warn once', () => {
     memoryUsageSpy.mockReturnValue({
       rss: MEMORY_WARNING_THRESHOLD * 1.5,
     } as NodeJS.MemoryUsage);
-    const { rerender } = await render(<TestComponent />);
+    const { rerender } = render(<TestComponent />);
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
     expect(addItem).toHaveBeenCalledTimes(1);
 

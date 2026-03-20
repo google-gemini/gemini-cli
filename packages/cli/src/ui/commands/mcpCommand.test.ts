@@ -119,10 +119,7 @@ describe('mcpCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        agentContext: {
-          config: mockConfig,
-          toolRegistry: mockConfig.getToolRegistry(),
-        },
+        config: mockConfig,
       },
     });
   });
@@ -135,7 +132,7 @@ describe('mcpCommand', () => {
     it('should show an error if config is not available', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          agentContext: null,
+          config: null,
         },
       });
 
@@ -149,8 +146,7 @@ describe('mcpCommand', () => {
     });
 
     it('should show an error if tool registry is not available', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockContext.services.agentContext as any).toolRegistry = undefined;
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue(undefined);
 
       const result = await mcpCommand.action!(mockContext, '');
 
@@ -200,13 +196,9 @@ describe('mcpCommand', () => {
         ...mockServer3Tools,
       ];
 
-      const mockToolRegistry = {
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(allTools),
-      };
-      mockConfig.getToolRegistry = vi.fn().mockReturnValue(mockToolRegistry);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (mockContext.services.agentContext as any).toolRegistry =
-        mockToolRegistry;
+      });
 
       const resourcesByServer: Record<
         string,

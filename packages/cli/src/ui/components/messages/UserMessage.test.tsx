@@ -15,10 +15,11 @@ vi.mock('../../utils/commandUtils.js', () => ({
 
 describe('UserMessage', () => {
   it('renders normal user message with correct prefix', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <UserMessage text="Hello Gemini" width={80} />,
       { width: 80 },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -26,10 +27,11 @@ describe('UserMessage', () => {
   });
 
   it('renders slash command message', async () => {
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <UserMessage text="/help" width={80} />,
       { width: 80 },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -38,10 +40,11 @@ describe('UserMessage', () => {
 
   it('renders multiline user message', async () => {
     const message = 'Line 1\nLine 2';
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <UserMessage text={message} width={80} />,
       { width: 80 },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -50,10 +53,11 @@ describe('UserMessage', () => {
 
   it('transforms image paths in user message', async () => {
     const message = 'Check out this image: @/path/to/my-image.png';
-    const { lastFrame, unmount } = await renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <UserMessage text={message} width={80} />,
       { width: 80 },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('[Image my-image.png]');

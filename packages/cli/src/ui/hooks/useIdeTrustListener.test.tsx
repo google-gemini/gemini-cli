@@ -52,27 +52,9 @@ describe('useIdeTrustListener', () => {
   let trustChangeCallback: (isTrusted: boolean) => void;
   let statusChangeCallback: (state: IDEConnectionState) => void;
 
-  let deferredIdeClient: { resolve: (c: IdeClient) => void };
-
   beforeEach(async () => {
     vi.clearAllMocks();
-
-    vi.mocked(IdeClient.getInstance).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          deferredIdeClient = { resolve };
-        }),
-    );
-
-    mockIdeClient = {
-      addTrustChangeListener: vi.fn(),
-      removeTrustChangeListener: vi.fn(),
-      addStatusChangeListener: vi.fn(),
-      removeStatusChangeListener: vi.fn(),
-      getConnectionStatus: vi.fn(() => ({
-        status: IDEConnectionStatus.Disconnected,
-      })),
-    } as unknown as IdeClient;
+    mockIdeClient = await IdeClient.getInstance();
 
     mockSettings = {
       merged: {
@@ -102,10 +84,11 @@ describe('useIdeTrustListener', () => {
       hookResult = useIdeTrustListener();
       return null;
     }
-    const result = await render(<TestComponent />);
+    const { rerender, unmount } = render(<TestComponent />);
 
+    // Flush any pending async state updates from the hook's initialization
     await act(async () => {
-      deferredIdeClient.resolve(mockIdeClient);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     return {
@@ -115,10 +98,10 @@ describe('useIdeTrustListener', () => {
         },
       },
       rerender: async () => {
-        result.rerender(<TestComponent />);
+        rerender(<TestComponent />);
       },
       unmount: async () => {
-        result.unmount();
+        unmount();
       },
     };
   };
