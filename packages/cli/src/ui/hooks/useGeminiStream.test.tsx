@@ -3249,6 +3249,11 @@ describe('useGeminiStream', () => {
         ),
       );
 
+      // Reset fake timers to startTime because the asynchronous render lifecycle
+      // (via waitUntilReady) advances the mock clock while waiting for initial
+      // components to settle.
+      vi.setSystemTime(startTime);
+
       // Submit query
       await act(async () => {
         await result.current.submitQuery('Test query');

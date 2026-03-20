@@ -1094,7 +1094,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         additionalProperties: {
           type: 'array',
-          ref: 'ModelPolicy',
+          ref: 'ModelPolicyChain',
         },
       },
     },
@@ -1905,6 +1905,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable local and remote subagents.',
         showInDialog: false,
+      },
+      worktrees: {
+        type: 'boolean',
+        label: 'Enable Git Worktrees',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable automated Git worktree management for parallel work.',
+        showInDialog: true,
       },
       extensionManagement: {
         type: 'boolean',
@@ -2986,6 +2996,14 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+    },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A chain of model policies for fallback behavior.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
     },
   },
   ModelPolicy: {
