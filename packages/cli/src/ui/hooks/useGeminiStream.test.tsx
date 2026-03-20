@@ -2681,7 +2681,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithDefaults();
+      const { result } = await renderHookWithDefaults();
 
       // Submit a query
       await act(async () => {
@@ -2735,7 +2735,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithDefaults();
+      const { result } = await renderHookWithDefaults();
 
       // Submit a query
       await act(async () => {
