@@ -113,7 +113,7 @@ export class BrowserManager {
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
     this.maxActionsPerTask =
-      browserConfig?.customConfig?.maxActionsPerTask ?? 100;
+      browserConfig?.customConfig.maxActionsPerTask ?? 100;
   }
 
   /**
