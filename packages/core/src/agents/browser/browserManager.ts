@@ -29,6 +29,16 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { recordBrowserAgentConnectionMetrics } from '../../telemetry/metrics.js';
+
+function categorizeConnectionError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('already running')) return 'profile_locked';
+  if (lower.includes('timed out')) return 'timeout';
+  if (lower.includes('connection refused') || lower.includes('econnrefused'))
+    return 'connection_refused';
+  return 'unknown';
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -262,16 +272,31 @@ export class BrowserManager {
       return;
     }
 
-    // Request browser consent if needed (first-run privacy notice)
-    const consentGranted = await getBrowserConsentIfNeeded();
-    if (!consentGranted) {
-      throw new Error(
-        'Browser agent requires user consent to proceed. ' +
-          'Please re-run and accept the privacy notice.',
-      );
-    }
+    const connectStart = Date.now();
+    const browserConfig = this.config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'isolated';
+    const headless = browserConfig.customConfig.headless ?? false;
 
-    await this.connectMcp();
+    try {
+      await this.connectMcp();
+      recordBrowserAgentConnectionMetrics(this.config, {
+        durationMs: Date.now() - connectStart,
+        sessionMode,
+        headless,
+        success: true,
+      });
+    } catch (error) {
+      recordBrowserAgentConnectionMetrics(this.config, {
+        durationMs: Date.now() - connectStart,
+        sessionMode,
+        headless,
+        success: false,
+        errorType: categorizeConnectionError(
+          error instanceof Error ? error.message : String(error),
+        ),
+      });
+      throw error;
+    }
   }
 
   /**

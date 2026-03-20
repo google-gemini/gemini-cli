@@ -709,4 +709,14 @@ export enum EventMetadataKey {
 
   // Logs the source of a credit purchase click (e.g. overage_menu, empty_wallet_menu, manage).
   GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
+
+  // ==========================================================================
+  // Stale Output Elision Event Keys
+  // ==========================================================================
+
+  // Logs the number of tool outputs elided in this operation.
+  GEMINI_CLI_STALE_OUTPUT_ELISION_COUNT = 172,
+
+  // Logs the tokens saved by stale output elision.
+  GEMINI_CLI_STALE_OUTPUT_ELISION_TOKENS_SAVED = 173,
 }

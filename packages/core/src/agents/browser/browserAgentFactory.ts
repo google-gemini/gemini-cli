@@ -30,6 +30,19 @@ import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import {
+  recordBrowserAgentToolDiscoveryMetrics,
+  recordBrowserAgentVisionStatus,
+  recordBrowserAgentCleanupMetrics,
+} from '../../telemetry/metrics.js';
+
+function toDisabledReasonCode(reason: string | undefined): string | undefined {
+  if (!reason) return undefined;
+  if (reason.includes('visualModel')) return 'no_visual_model';
+  if (reason.includes('Visual tools missing')) return 'missing_visual_tools';
+  if (reason.includes('auth type')) return 'blocked_auth_type';
+  return 'unknown';
+}
 
 /**
  * Creates a browser agent definition with MCP tools configured.
@@ -106,6 +119,15 @@ export async function createBrowserAgentDefinition(
     );
   }
 
+  const sessionMode = browserConfig?.customConfig?.sessionMode ?? 'isolated';
+
+  // Record tool discovery metrics
+  recordBrowserAgentToolDiscoveryMetrics(config, {
+    toolCount: mcpTools.length,
+    sessionMode,
+    missingSemanticTools,
+  });
+
   // Only click_at is strictly required — text input can use press_key or fill.
   const requiredVisualTools = ['click_at'];
   const missingVisualTools = requiredVisualTools.filter(
@@ -138,6 +160,11 @@ export async function createBrowserAgentDefinition(
 
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
   const visionDisabledReason = getVisionDisabledReason();
+
+  recordBrowserAgentVisionStatus(config, {
+    enabled: !visionDisabledReason,
+    disabledReason: toDisabledReasonCode(visionDisabledReason),
+  });
 
   if (visionDisabledReason) {
     debugLogger.log(`Vision disabled: ${visionDisabledReason}`);
@@ -172,11 +199,26 @@ export async function createBrowserAgentDefinition(
  */
 export async function cleanupBrowserAgent(
   browserManager: BrowserManager,
+  config: Config,
+  sessionMode: string,
 ): Promise<void> {
+  const cleanupStart = Date.now();
   try {
     await browserManager.close();
+    const durationMs = Date.now() - cleanupStart;
+    recordBrowserAgentCleanupMetrics(config, {
+      durationMs,
+      sessionMode,
+      success: true,
+    });
     debugLogger.log('Browser agent cleanup complete');
   } catch (error) {
+    const durationMs = Date.now() - cleanupStart;
+    recordBrowserAgentCleanupMetrics(config, {
+      durationMs,
+      sessionMode,
+      success: false,
+    });
     debugLogger.error(
       `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
     );

@@ -48,6 +48,7 @@ import type {
   ApprovalModeDurationEvent,
   PlanExecutionEvent,
   ToolOutputMaskingEvent,
+  StaleOutputElisionEvent,
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
   StartupStatsEvent,
@@ -131,6 +132,7 @@ export enum EventNames {
   OVERAGE_OPTION_SELECTED = 'overage_option_selected',
   EMPTY_WALLET_MENU_SHOWN = 'empty_wallet_menu_shown',
   CREDIT_PURCHASE_CLICK = 'credit_purchase_click',
+  STALE_OUTPUT_ELISION = 'stale_output_elision',
 }
 
 export interface LogResponse {
@@ -1419,6 +1421,25 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOOL_OUTPUT_MASKING, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logStaleOutputElisionEvent(event: StaleOutputElisionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STALE_OUTPUT_ELISION_COUNT,
+        value: event.elision_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_STALE_OUTPUT_ELISION_TOKENS_SAVED,
+        value: event.tokens_saved.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.STALE_OUTPUT_ELISION, data),
     );
     this.flushIfNeeded();
   }
