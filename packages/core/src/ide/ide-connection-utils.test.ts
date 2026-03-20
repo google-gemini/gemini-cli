@@ -698,11 +698,10 @@ describe('ide-connection-utils', () => {
   });
 
   describe('createProxyAwareFetch', () => {
-    it('should return a fetch function without throwing fetch resolution errors', async () => {
+    it('should return a proxy-aware fetcher function', async () => {
       const { createProxyAwareFetch } = await import(
         './ide-connection-utils.js'
       );
-      // Tests that the IIFE resolves the undici exports correctly and returns a function
       const fetcher = await createProxyAwareFetch('127.0.0.1');
       expect(typeof fetcher).toBe('function');
     });
