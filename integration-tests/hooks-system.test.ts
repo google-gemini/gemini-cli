@@ -2015,8 +2015,14 @@ console.log(JSON.stringify({
       const disabledCmd = `node ${disabledFilename}`;
 
       // 3. Final setup with full settings
+      // Add fakeResponsesPath and disable routing to run without API key locally
       rig.setup('Hook Disabling Multiple Ops', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.disabled-via-command.responses',
+        ),
         settings: {
+          routing: { strategy: 'default' },
           hooksConfig: {
             enabled: true,
             disabled: ['multi-hook-disabled'],
