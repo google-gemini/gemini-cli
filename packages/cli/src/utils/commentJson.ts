@@ -163,7 +163,45 @@ function applyUpdates(
   current: Record<string, unknown>,
   updates: Record<string, unknown>,
 ): Record<string, unknown> {
-  // Apply sync-by-omission semantics consistently at all levels
-  applyKeyDiff(current, updates);
+  // At the top level, use additive semantics: do NOT delete keys that exist
+  // in the on-disk file but are absent from `updates`. This preserves
+  // top-level keys added externally while the CLI is running (e.g. a `hooks`
+  // block written to settings.json via a text editor). Sync-by-omission still
+  // applies recursively within any top-level block that IS managed by the CLI.
+  for (const key of Object.getOwnPropertyNames(updates)) {
+    const updateVal = updates[key];
+    const currentVal = current[key];
+
+    const isObj =
+      typeof updateVal === 'object' &&
+      updateVal !== null &&
+      !Array.isArray(updateVal);
+    const isCurrentObj =
+      typeof currentVal === 'object' &&
+      currentVal !== null &&
+      !Array.isArray(currentVal);
+    const isArr = Array.isArray(updateVal);
+    const isCurrentArr = Array.isArray(currentVal);
+
+    if (isObj && isCurrentObj) {
+      // Recurse with full sync-by-omission for nested managed blocks.
+      applyKeyDiff(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        currentVal as Record<string, unknown>,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        updateVal as Record<string, unknown>,
+      );
+    } else if (isArr && isCurrentArr) {
+      // In-place mutate arrays to preserve array-level comments on CommentArray.
+      const baseArr = currentVal as unknown[];
+      const desiredArr = updateVal as unknown[];
+      baseArr.length = 0;
+      for (const el of desiredArr) {
+        baseArr.push(el);
+      }
+    } else {
+      current[key] = updateVal;
+    }
+  }
   return current;
 }

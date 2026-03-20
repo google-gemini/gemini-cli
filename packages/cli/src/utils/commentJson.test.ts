@@ -322,7 +322,11 @@ describe('commentJson', () => {
       expect(updatedContent).toContain('"item2"');
     });
 
-    it('should remove both nested and non-nested objects when omitted', () => {
+    it('should remove nested objects within managed blocks when omitted, but preserve unknown top-level keys', () => {
+      // The file has three top-level keys: topLevelObject, parent, preservedObject.
+      // The updates only mention parent and preservedObject.
+      // Expected: topLevelObject is PRESERVED (externally-added top-level key),
+      // nestedObject inside parent is REMOVED (sync-by-omission within managed block).
       const originalContent = `{
         // Top-level config
         "topLevelObject": {
@@ -356,8 +360,11 @@ describe('commentJson', () => {
 
       const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
 
-      expect(updatedContent).not.toContain('"topLevelObject"');
+      // topLevelObject is NOT in updates but IS on disk — it must be preserved.
+      expect(updatedContent).toContain('"topLevelObject"');
 
+      // nestedObject is inside the managed `parent` block and absent from updates
+      // — sync-by-omission still removes it from within the managed block.
       expect(updatedContent).not.toContain('"nestedObject"');
 
       expect(updatedContent).toContain('"keepThis": "value"');
@@ -365,6 +372,42 @@ describe('commentJson', () => {
       expect(updatedContent).toContain('"data": "keep"');
 
       expect(updatedContent).toContain('// This should be preserved');
+    });
+
+    it('should preserve top-level keys added externally while the CLI is running', () => {
+      // Simulates the bug: user starts CLI (file has no hooks), adds hooks to
+      // the file externally, then a theme save fires. The hooks must survive.
+      const originalContent = `{
+        "ui": {
+          "theme": "dark"
+        },
+        "hooks": {
+          "PostToolUse": [
+            {
+              "command": "echo done"
+            }
+          ]
+        }
+      }`;
+
+      fs.writeFileSync(testFilePath, originalContent, 'utf-8');
+
+      // The CLI only knows about ui.theme — it doesn't know about hooks.
+      updateSettingsFilePreservingFormat(testFilePath, {
+        ui: {
+          theme: 'light',
+        },
+      });
+
+      const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
+
+      // Theme was updated.
+      expect(updatedContent).toContain('"theme": "light"');
+
+      // Hooks block must be preserved even though it wasn't in the updates.
+      expect(updatedContent).toContain('"hooks"');
+      expect(updatedContent).toContain('"PostToolUse"');
+      expect(updatedContent).toContain('"echo done"');
     });
   });
 });
