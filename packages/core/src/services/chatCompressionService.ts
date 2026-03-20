@@ -162,7 +162,6 @@ async function truncateHistoryToBudget(
               contentStr = responseObj['output'];
             } else if (
               'content' in responseObj &&
-               
               typeof responseObj['content'] === 'string'
             ) {
               contentStr = responseObj['content'];

@@ -11,7 +11,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
-     
     ...actual,
     Storage: {
       // eslint-disable-next-line @typescript-eslint/no-misused-spread
