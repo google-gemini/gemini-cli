@@ -121,6 +121,7 @@ describe('E2E Tests', () => {
   beforeEach(() => {
     getApprovalModeSpy.mockReturnValue(ApprovalMode.DEFAULT);
     getAllowedToolsSpy.mockReturnValue([]);
+    getAllowedToolsSpy.mockReturnValue([]);
   });
 
   afterAll(
