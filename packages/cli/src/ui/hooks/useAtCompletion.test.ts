@@ -612,6 +612,7 @@ describe('useAtCompletion', () => {
       multiDirTmpDirs.push(addedDir);
 
       const multiDirConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getWorkspaceContext: vi.fn().mockReturnValue({
           getDirectories: () => [cwdDir, addedDir],
@@ -644,6 +645,7 @@ describe('useAtCompletion', () => {
       const directories = [cwdDir];
 
       const dynamicConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getWorkspaceContext: vi.fn().mockReturnValue({
           getDirectories: () => [...directories],
@@ -688,6 +690,7 @@ describe('useAtCompletion', () => {
       multiDirTmpDirs.push(dir2);
 
       const multiDirConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getWorkspaceContext: vi.fn().mockReturnValue({
           getDirectories: () => [dir1, dir2],

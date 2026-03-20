@@ -71,10 +71,12 @@ describe('Dynamic Configuration Parity', () => {
       for (const flags of flagCombos) {
         for (const hasAccess of [true, false]) {
           const mockLegacyConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-misused-spread
             ...legacyConfig,
             getHasAccessToPreviewModel: () => hasAccess,
           } as unknown as Config;
           const mockDynamicConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-misused-spread
             ...dynamicConfig,
             getHasAccessToPreviewModel: () => hasAccess,
           } as unknown as Config;
@@ -110,10 +112,12 @@ describe('Dynamic Configuration Parity', () => {
 
     for (const hasAccess of [true, false]) {
       const mockLegacyConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...legacyConfig,
         getHasAccessToPreviewModel: () => hasAccess,
       } as unknown as Config;
       const mockDynamicConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...dynamicConfig,
         getHasAccessToPreviewModel: () => hasAccess,
       } as unknown as Config;

@@ -524,6 +524,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_API_RESPONSE,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -683,6 +684,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_API_ERROR,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1253,6 +1255,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1390,6 +1393,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1470,6 +1474,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1549,6 +1554,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1629,6 +1635,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1923,6 +1930,7 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'installation.id': 'test-installation-id',
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
           interactive: false,
@@ -1960,6 +1968,7 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'installation.id': 'test-installation-id',
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
           interactive: false,
