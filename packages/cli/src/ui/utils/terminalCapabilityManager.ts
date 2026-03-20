@@ -13,17 +13,20 @@ import {
   disableModifyOtherKeys,
   enableBracketedPasteMode,
   disableBracketedPasteMode,
+  writeToStdout,
+  exitAlternateScreen,
+  disableMouseEvents,
+  enableLineWrapping,
 } from '@google/gemini-cli-core';
-import ansiEscapes from 'ansi-escapes';
 import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
 const TERMINAL_CLEANUP_SEQUENCE =
-  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1049l\x1b[?1006l\x1b[?7h';
+  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1049l\x1b[?1006l\x1b[?1002l\x1b[?7h';
 
 export function clearTerminalScreen(): void {
-  process.stdout.write(ansiEscapes.clearTerminal);
+  writeToStdout('\x1b[2J\x1b[H');
 }
 
 export function cleanupTerminalOnExit() {
@@ -39,6 +42,9 @@ export function cleanupTerminalOnExit() {
   disableKittyKeyboardProtocol();
   disableModifyOtherKeys();
   disableBracketedPasteMode();
+  exitAlternateScreen();
+  disableMouseEvents();
+  enableLineWrapping();
 }
 
 export class TerminalCapabilityManager {

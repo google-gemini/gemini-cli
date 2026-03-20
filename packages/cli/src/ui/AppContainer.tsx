@@ -1712,6 +1712,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
 
         const next = !isAlternateBufferRef.current;
+        isAlternateBufferRef.current = next;
+
         if (next) {
           enterAlternateScreen();
           disableLineWrapping();
