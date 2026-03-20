@@ -257,6 +257,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
 
+- **`ui.compactToolOutput`** (boolean):
+  - **Description:** Display tool outputs (like directory listings and file
+    reads) in a compact, structured format.
+  - **Default:** `false`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`
@@ -2389,7 +2394,7 @@ conventions and context.
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
   - See the [Commands documentation](./commands.md#memory) for full details on
-    the `/memory` command and its sub-commands (`show` and `reload`).
+    the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor

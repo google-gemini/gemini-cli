@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, Fragment } from 'react';
 import { Box, Text } from 'ink';
 import type {
   HistoryItem,
@@ -16,6 +16,7 @@ import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
+import { DenseToolMessage } from './DenseToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool } from './ToolShared.js';
@@ -23,10 +24,79 @@ import {
   shouldHideToolCall,
   CoreToolCallStatus,
   Kind,
+  EDIT_DISPLAY_NAME,
+  GLOB_DISPLAY_NAME,
+  WEB_SEARCH_DISPLAY_NAME,
+  READ_FILE_DISPLAY_NAME,
+  LS_DISPLAY_NAME,
+  GREP_DISPLAY_NAME,
+  WEB_FETCH_DISPLAY_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  READ_MANY_FILES_DISPLAY_NAME,
+  isFileDiff,
+  isGrepResult,
+  isListResult,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+
+const COMPACT_OUTPUT_ALLOWLIST = new Set([
+  EDIT_DISPLAY_NAME,
+  GLOB_DISPLAY_NAME,
+  WEB_SEARCH_DISPLAY_NAME,
+  READ_FILE_DISPLAY_NAME,
+  LS_DISPLAY_NAME,
+  GREP_DISPLAY_NAME,
+  WEB_FETCH_DISPLAY_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  READ_MANY_FILES_DISPLAY_NAME,
+]);
+
+// Helper to identify if a tool should use the compact view
+export const isCompactTool = (
+  tool: IndividualToolCallDisplay,
+  isCompactModeEnabled: boolean,
+): boolean => {
+  const hasCompactOutputSupport = COMPACT_OUTPUT_ALLOWLIST.has(tool.name);
+  const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
+  return (
+    isCompactModeEnabled &&
+    hasCompactOutputSupport &&
+    displayStatus !== ToolCallStatus.Confirming
+  );
+};
+
+// Helper to identify if a compact tool has a payload (diff, list, etc.)
+export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
+  if (tool.outputFile) return true;
+  const res = tool.resultDisplay;
+  if (!res) return false;
+
+  if (isFileDiff(res)) return true;
+  if (tool.confirmationDetails?.type === 'edit') return true;
+  if (isGrepResult(res) && res.matches.length > 0) return true;
+
+  // ReadManyFilesResult check (has 'include' and 'files')
+  if (isListResult(res) && 'include' in res) {
+    const includeProp = (res as { include?: unknown }).include;
+    if (Array.isArray(includeProp) && res.files.length > 0) {
+      return true;
+    }
+  }
+
+  // Generic summary/payload pattern
+  if (
+    typeof res === 'object' &&
+    res !== null &&
+    'summary' in res &&
+    'payload' in res
+  ) {
+    return true;
+  }
+
+  return false;
+};
 
 interface ToolGroupMessageProps {
   item: HistoryItem | HistoryItemWithoutId;
@@ -53,11 +123,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 }) => {
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
+  const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
 
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
-  const toolCalls = useMemo(
+  const visibleToolCalls = useMemo(
     () =>
       allToolCalls.filter((t) => {
+        // Hide internal errors unless full verbosity
         if (
           isLowErrorVerbosity &&
           t.status === CoreToolCallStatus.Error &&
@@ -65,25 +137,42 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         ) {
           return false;
         }
+        // Standard hiding logic (e.g. Plan Mode internal edits)
+        if (
+          shouldHideToolCall({
+            displayName: t.name,
+            status: t.status,
+            approvalMode: t.approvalMode,
+            hasResultDisplay: !!t.resultDisplay,
+            parentCallId: t.parentCallId,
+          })
+        ) {
+          return false;
+        }
 
-        return !shouldHideToolCall({
-          displayName: t.name,
-          status: t.status,
-          approvalMode: t.approvalMode,
-          hasResultDisplay: !!t.resultDisplay,
-          parentCallId: t.parentCallId,
-        });
+        // We HIDE tools that are still in pre-execution states (Confirming, Pending)
+        // from the History log. They live in the Global Queue or wait for their turn.
+        // Only show tools that are actually running or finished.
+        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
+
+        // We hide Confirming tools from the history log because they are
+        // currently being rendered in the interactive ToolConfirmationQueue.
+        // We show everything else, including Pending (waiting to run) and
+        // Canceled (rejected by user), to ensure the history is complete
+        // and to avoid tools "vanishing" after approval.
+        return displayStatus !== ToolCallStatus.Confirming;
       }),
     [allToolCalls, isLowErrorVerbosity],
   );
 
-  const config = useConfig();
   const {
     activePtyId,
     embeddedShellFocused,
     backgroundShells,
     pendingHistoryItems,
   } = useUIState();
+
+  const config = useConfig();
 
   const { borderColor, borderDimColor } = useMemo(
     () =>
@@ -103,41 +192,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     ],
   );
 
-  // We HIDE tools that are still in pre-execution states (Confirming, Pending)
-  // from the History log. They live in the Global Queue or wait for their turn.
-  // Only show tools that are actually running or finished.
-  // We explicitly exclude Pending and Confirming to ensure they only
-  // appear in the Global Queue until they are approved and start executing.
-  const visibleToolCalls = useMemo(
-    () =>
-      toolCalls.filter((t) => {
-        const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-        // We hide Confirming tools from the history log because they are
-        // currently being rendered in the interactive ToolConfirmationQueue.
-        // We show everything else, including Pending (waiting to run) and
-        // Canceled (rejected by user), to ensure the history is complete
-        // and to avoid tools "vanishing" after approval.
-        return displayStatus !== ToolCallStatus.Confirming;
-      }),
-
-    [toolCalls],
-  );
-
-  const staticHeight = /* border */ 2;
-
-  let countToolCallsWithResults = 0;
-  for (const tool of visibleToolCalls) {
-    if (
-      tool.kind !== Kind.Agent &&
-      tool.resultDisplay !== undefined &&
-      tool.resultDisplay !== ''
-    ) {
-      countToolCallsWithResults++;
-    }
-  }
-  const countOneLineToolCalls =
-    visibleToolCalls.filter((t) => t.kind !== Kind.Agent).length -
-    countToolCallsWithResults;
   const groupedTools = useMemo(() => {
     const groups: Array<
       IndividualToolCallDisplay | IndividualToolCallDisplay[]
@@ -157,10 +211,75 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     return groups;
   }, [visibleToolCalls]);
 
+  const staticHeight = useMemo(() => {
+    let height = 0;
+    for (let i = 0; i < groupedTools.length; i++) {
+      const group = groupedTools[i];
+      const isFirst = i === 0;
+      const prevGroup = i > 0 ? groupedTools[i - 1] : null;
+      const prevIsCompact =
+        prevGroup &&
+        !Array.isArray(prevGroup) &&
+        isCompactTool(prevGroup, isCompactModeEnabled);
+
+      if (Array.isArray(group)) {
+        // Agent group
+        height += 1; // Header
+        height += group.length; // 1 line per agent
+        const isFirstProp = isFirst
+          ? (borderTopOverride ?? true)
+          : prevIsCompact;
+        if (isFirstProp) height += 1; // Top border
+
+        // Spacing logic
+        if (isFirst) {
+          height += (borderTopOverride ?? true) ? 1 : 0;
+        } else {
+          height += 1; // marginTop
+        }
+      } else {
+        const isCompact = isCompactTool(group, isCompactModeEnabled);
+        if (isCompact) {
+          height += 1; // Base height for compact tool
+          // Spacing logic (matching marginTop)
+          if (isFirst) {
+            height += (borderTopOverride ?? true) ? 1 : 0;
+          } else if (!prevIsCompact) {
+            height += 1;
+          }
+        } else {
+          height += 3; // Static overhead for standard tool
+          if (isFirst) {
+            height += (borderTopOverride ?? true) ? 1 : 0;
+          } else {
+            height += 1; // marginTop is always 1 for non-compact tools (not first)
+          }
+        }
+      }
+    }
+    return height;
+  }, [groupedTools, isCompactModeEnabled, borderTopOverride]);
+
+  let countToolCallsWithResults = 0;
+  for (const tool of visibleToolCalls) {
+    if (tool.kind !== Kind.Agent) {
+      if (isCompactTool(tool, isCompactModeEnabled)) {
+        if (hasDensePayload(tool)) {
+          countToolCallsWithResults++;
+        }
+      } else if (
+        tool.resultDisplay !== undefined &&
+        tool.resultDisplay !== ''
+      ) {
+        countToolCallsWithResults++;
+      }
+    }
+  }
+
   const availableTerminalHeightPerToolMessage = availableTerminalHeight
     ? Math.max(
         Math.floor(
-          (availableTerminalHeight - staticHeight - countOneLineToolCalls) /
+          (availableTerminalHeight - staticHeight) /
             Math.max(1, countToolCallsWithResults),
         ),
         1,
@@ -175,7 +294,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // explicit "closing slice" (tools: []) used to bridge static/pending sections,
   // and only if it's actually continuing an open box from above.
   const isExplicitClosingSlice = allToolCalls.length === 0;
-  if (visibleToolCalls.length === 0 && !isExplicitClosingSlice) {
+  const shouldShowGroup =
+    visibleToolCalls.length > 0 ||
+    (isExplicitClosingSlice && borderBottomOverride === true);
+
+  if (!shouldShowGroup) {
     return null;
   }
 
@@ -190,98 +313,158 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      marginBottom={(borderBottomOverride ?? true) ? 1 : 0}
     >
+      {visibleToolCalls.length === 0 &&
+        isExplicitClosingSlice &&
+        borderBottomOverride === true && (
+          <Box
+            height={0}
+            width={contentWidth}
+            borderLeft={true}
+            borderRight={true}
+            borderTop={false}
+            borderBottom={true}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+            borderStyle="round"
+          />
+        )}
       {groupedTools.map((group, index) => {
         const isFirst = index === 0;
-        const resolvedIsFirst =
-          borderTopOverride !== undefined
-            ? borderTopOverride && isFirst
-            : isFirst;
+        const isLast = index === groupedTools.length - 1;
 
-        if (Array.isArray(group)) {
+        const prevGroup = index > 0 ? groupedTools[index - 1] : null;
+        const prevIsCompact =
+          prevGroup &&
+          !Array.isArray(prevGroup) &&
+          isCompactTool(prevGroup, isCompactModeEnabled);
+
+        const nextGroup = !isLast ? groupedTools[index + 1] : null;
+        const nextIsCompact =
+          nextGroup &&
+          !Array.isArray(nextGroup) &&
+          isCompactTool(nextGroup, isCompactModeEnabled);
+
+        const isAgentGroup = Array.isArray(group);
+        const isCompact =
+          !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
+
+        let marginTop = 0;
+        if (isFirst) {
+          // marginTop = (borderTopOverride ?? true) ? 1 : 0;
+          marginTop = (borderTopOverride ?? false) ? 1 : 0;
+        } else if (isCompact && prevIsCompact) {
+          marginTop = 0;
+        } else {
+          marginTop = 1;
+        }
+
+        const isFirstProp = !!(isFirst
+          ? (borderTopOverride ?? true)
+          : prevIsCompact);
+
+        const showClosingBorder = !isCompact && (nextIsCompact || isLast);
+
+        if (isAgentGroup) {
           return (
-            <SubagentGroupDisplay
+            <Box
               key={group[0].callId}
-              toolCalls={group}
-              availableTerminalHeight={availableTerminalHeight}
-              terminalWidth={contentWidth}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              isFirst={resolvedIsFirst}
-              isExpandable={isExpandable}
-            />
+              marginTop={marginTop}
+              flexDirection="column"
+              width={contentWidth}
+            >
+              <SubagentGroupDisplay
+                toolCalls={group}
+                availableTerminalHeight={availableTerminalHeight}
+                terminalWidth={contentWidth}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                isFirst={isFirstProp}
+                isExpandable={isExpandable}
+              />
+              {showClosingBorder && (
+                <Box
+                  height={0}
+                  width={contentWidth}
+                  borderLeft={true}
+                  borderRight={true}
+                  borderTop={false}
+                  borderBottom={isLast ? (borderBottomOverride ?? true) : true}
+                  borderColor={borderColor}
+                  borderDimColor={borderDimColor}
+                  borderStyle="round"
+                />
+              )}
+            </Box>
           );
         }
 
         const tool = group;
         const isShellToolCall = isShellTool(tool.name);
-
         const commonProps = {
           ...tool,
           availableTerminalHeight: availableTerminalHeightPerToolMessage,
           terminalWidth: contentWidth,
           emphasis: 'medium' as const,
-          isFirst: resolvedIsFirst,
+          isFirst: isCompact ? false : isFirstProp,
           borderColor,
           borderDimColor,
           isExpandable,
         };
 
         return (
-          <Box
-            key={tool.callId}
-            flexDirection="column"
-            minHeight={1}
-            width={contentWidth}
-          >
-            {isShellToolCall ? (
-              <ShellToolMessage {...commonProps} config={config} />
-            ) : (
-              <ToolMessage {...commonProps} />
-            )}
-            {tool.outputFile && (
+          <Fragment key={tool.callId}>
+            <Box
+              flexDirection="column"
+              minHeight={1}
+              width={contentWidth}
+              marginTop={marginTop}
+            >
+              {isCompact ? (
+                <DenseToolMessage {...commonProps} />
+              ) : isShellToolCall ? (
+                <ShellToolMessage {...commonProps} config={config} />
+              ) : (
+                <ToolMessage {...commonProps} />
+              )}
+              {!isCompact && tool.outputFile && (
+                <Box
+                  borderLeft={true}
+                  borderRight={true}
+                  borderTop={false}
+                  borderBottom={false}
+                  borderColor={borderColor}
+                  borderDimColor={borderDimColor}
+                  flexDirection="column"
+                  borderStyle="round"
+                  paddingLeft={1}
+                  paddingRight={1}
+                >
+                  <Box>
+                    <Text color={theme.text.primary}>
+                      Output too long and was saved to: {tool.outputFile}
+                    </Text>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+            {showClosingBorder && (
               <Box
+                height={0}
+                width={contentWidth}
                 borderLeft={true}
                 borderRight={true}
                 borderTop={false}
-                borderBottom={false}
+                borderBottom={isLast ? (borderBottomOverride ?? true) : true}
                 borderColor={borderColor}
                 borderDimColor={borderDimColor}
-                flexDirection="column"
                 borderStyle="round"
-                paddingLeft={1}
-                paddingRight={1}
-              >
-                <Box>
-                  <Text color={theme.text.primary}>
-                    Output too long and was saved to: {tool.outputFile}
-                  </Text>
-                </Box>
-              </Box>
+              />
             )}
-          </Box>
+          </Fragment>
         );
       })}
-      {
-        /*
-            We have to keep the bottom border separate so it doesn't get
-            drawn over by the sticky header directly inside it.
-           */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
-          borderBottomOverride !== false && (
-            <Box
-              height={0}
-              width={contentWidth}
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={borderBottomOverride ?? true}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              borderStyle="round"
-            />
-          )
-      }
     </Box>
   );
 
