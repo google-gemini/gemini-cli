@@ -12,7 +12,9 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  AuthProviderType,
   type MCPServerConfig,
+  type RequiredMcpServerConfig,
   type BugCommandSettings,
   type TelemetrySettings,
   type AuthType,
@@ -1081,6 +1083,20 @@ const SETTINGS_SCHEMA = {
           ref: 'ModelResolution',
         },
       },
+      modelChains: {
+        type: 'object',
+        label: 'Model Chains',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelChains,
+        description:
+          'Availability policy chains defining fallback behavior for models.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'array',
+          ref: 'ModelPolicy',
+        },
+      },
     },
   },
 
@@ -1344,9 +1360,29 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           Legacy full-process sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
-          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc", "windows-native").
         `,
         showInDialog: false,
+      },
+      sandboxAllowedPaths: {
+        type: 'array',
+        label: 'Sandbox Allowed Paths',
+        category: 'Tools',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of additional paths that the sandbox is allowed to access.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
+      sandboxNetworkAccess: {
+        type: 'boolean',
+        label: 'Sandbox Network Access',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: 'Whether the sandbox is allowed to access the network.',
+        showInDialog: true,
       },
       shell: {
         type: 'object',
@@ -2045,6 +2081,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      memoryManager: {
+        type: 'boolean',
+        label: 'Memory Manager Agent',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
       topicUpdateNarration: {
         type: 'boolean',
         label: 'Topic & Update Narration',
@@ -2391,12 +2437,26 @@ const SETTINGS_SCHEMA = {
             category: 'Admin',
             requiresRestart: false,
             default: {} as Record<string, MCPServerConfig>,
-            description: 'Admin-configured MCP servers.',
+            description: 'Admin-configured MCP servers (allowlist).',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
             additionalProperties: {
               type: 'object',
               ref: 'MCPServerConfig',
+            },
+          },
+          requiredConfig: {
+            type: 'object',
+            label: 'Required MCP Config',
+            category: 'Admin',
+            requiresRestart: false,
+            default: {} as Record<string, RequiredMcpServerConfig>,
+            description: 'Admin-required MCP servers that are always injected.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+            additionalProperties: {
+              type: 'object',
+              ref: 'RequiredMcpServerConfig',
             },
           },
         },
@@ -2523,11 +2583,72 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Authentication provider used for acquiring credentials (for example `dynamic_discovery`).',
-        enum: [
-          'dynamic_discovery',
-          'google_credentials',
-          'service_account_impersonation',
-        ],
+        enum: Object.values(AuthProviderType),
+      },
+      targetAudience: {
+        type: 'string',
+        description:
+          'OAuth target audience (CLIENT_ID.apps.googleusercontent.com).',
+      },
+      targetServiceAccount: {
+        type: 'string',
+        description:
+          'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  RequiredMcpServerConfig: {
+    type: 'object',
+    description:
+      'Admin-required MCP server configuration (remote transports only).',
+    additionalProperties: false,
+    properties: {
+      url: {
+        type: 'string',
+        description: 'URL for the required MCP server.',
+      },
+      type: {
+        type: 'string',
+        description: 'Transport type for the required server.',
+        enum: ['sse', 'http'],
+      },
+      headers: {
+        type: 'object',
+        description: 'Additional HTTP headers sent to the server.',
+        additionalProperties: { type: 'string' },
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds for MCP requests.',
+      },
+      trust: {
+        type: 'boolean',
+        description:
+          'Marks the server as trusted. Defaults to true for admin-required servers.',
+      },
+      description: {
+        type: 'string',
+        description: 'Human-readable description of the server.',
+      },
+      includeTools: {
+        type: 'array',
+        description: 'Subset of tools enabled for this server.',
+        items: { type: 'string' },
+      },
+      excludeTools: {
+        type: 'array',
+        description: 'Tools disabled for this server.',
+        items: { type: 'string' },
+      },
+      oauth: {
+        type: 'object',
+        description: 'OAuth configuration for authenticating with the server.',
+        additionalProperties: true,
+      },
+      authProviderType: {
+        type: 'string',
+        description: 'Authentication provider used for acquiring credentials.',
+        enum: Object.values(AuthProviderType),
       },
       targetAudience: {
         type: 'string',
@@ -2866,6 +2987,34 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         },
       },
     },
+  },
+  ModelPolicy: {
+    type: 'object',
+    description:
+      'Defines the policy for a single model in the availability chain.',
+    properties: {
+      model: { type: 'string' },
+      isLastResort: { type: 'boolean' },
+      actions: {
+        type: 'object',
+        properties: {
+          terminal: { type: 'string', enum: ['silent', 'prompt'] },
+          transient: { type: 'string', enum: ['silent', 'prompt'] },
+          not_found: { type: 'string', enum: ['silent', 'prompt'] },
+          unknown: { type: 'string', enum: ['silent', 'prompt'] },
+        },
+      },
+      stateTransitions: {
+        type: 'object',
+        properties: {
+          terminal: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          transient: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          not_found: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          unknown: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+        },
+      },
+    },
+    required: ['model'],
   },
 };
 

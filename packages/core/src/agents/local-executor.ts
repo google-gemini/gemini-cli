@@ -18,7 +18,10 @@ import {
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
-import { type AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  type AnyDeclarativeTool,
+  ToolConfirmationOutcome,
+} from '../tools/tools.js';
 import {
   DiscoveredMCPTool,
   isMcpToolName,
@@ -29,6 +32,7 @@ import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
+import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -46,6 +50,9 @@ import {
   DEFAULT_QUERY_STRING,
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
+  SUBAGENT_CANCELLED_ERROR_MESSAGE,
   type LocalAgentDefinition,
   type AgentInputs,
   type OutputObject,
@@ -113,7 +120,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
   private get executionContext(): AgentLoopContext {
     return {
-      ...this.context,
+      config: this.context.config,
+      promptId: this.context.promptId,
+      geminiClient: this.context.geminiClient,
+      sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
       promptRegistry: this.promptRegistry,
       resourceRegistry: this.resourceRegistry,
@@ -335,6 +345,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', {
         error: `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`,
         context: 'protocol_violation',
+        errorType: SubagentActivityErrorType.GENERIC,
       });
       return {
         status: 'stop',
@@ -468,6 +479,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', {
         error: `Graceful recovery attempt failed. Reason: ${turnResult.status}`,
         context: 'recovery_turn',
+        errorType: SubagentActivityErrorType.GENERIC,
       });
       return null;
     } catch (error) {
@@ -475,6 +487,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', {
         error: `Graceful recovery attempt failed: ${String(error)}`,
         context: 'recovery_turn',
+        errorType: SubagentActivityErrorType.GENERIC,
       });
       return null;
     } finally {
@@ -573,12 +586,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        let currentMessage: Content = formattedInitialHints
-          ? {
-              role: 'user',
-              parts: [{ text: formattedInitialHints }, { text: query }],
-            }
-          : { role: 'user', parts: [{ text: query }] };
+        // Inject loaded memory files (JIT + extension/project memory)
+        const environmentMemory = this.context.config.isJitContextEnabled?.()
+          ? this.context.config.getSessionMemory()
+          : this.context.config.getEnvironmentMemory();
+
+        const initialParts: Part[] = [];
+        if (environmentMemory) {
+          initialParts.push({ text: environmentMemory });
+        }
+        if (formattedInitialHints) {
+          initialParts.push({ text: formattedInitialHints });
+        }
+        initialParts.push({ text: query });
+
+        let currentMessage: Content = {
+          role: 'user',
+          parts: initialParts,
+        };
 
         while (true) {
           // Check for termination conditions like max turns.
@@ -680,12 +705,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
             finalResult = `Agent reached max turns limit (${maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           } else if (
             terminateReason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
@@ -697,6 +724,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'protocol_violation',
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           }
         }
@@ -751,6 +779,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
+          errorType: SubagentActivityErrorType.GENERIC,
         });
         return {
           result: finalResult,
@@ -758,7 +787,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         };
       }
 
-      this.emitActivity('ERROR', { error: String(error) });
+      this.emitActivity('ERROR', {
+        error: String(error),
+        errorType: SubagentActivityErrorType.GENERIC,
+      });
       throw error; // Re-throw other errors or external aborts.
     } finally {
       deadlineTimer.abort();
@@ -1027,6 +1059,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             context: 'tool_call',
             name: toolName,
             error,
+            errorType: SubagentActivityErrorType.GENERIC,
           });
           continue;
         }
@@ -1054,6 +1087,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
                 context: 'tool_call',
                 name: toolName,
                 error,
+                errorType: SubagentActivityErrorType.GENERIC,
               });
               continue;
             }
@@ -1096,6 +1130,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               name: toolName,
               callId,
               error,
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           }
         } else {
@@ -1139,6 +1174,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               name: toolName,
               callId,
               error,
+              errorType: SubagentActivityErrorType.GENERIC,
             });
           }
         }
@@ -1163,6 +1199,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           name: toolName,
           callId,
           error,
+          errorType: SubagentActivityErrorType.GENERIC,
         });
 
         continue;
@@ -1210,18 +1247,46 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             callId: call.request.callId,
             error: call.response.error?.message || 'Unknown error',
+            errorType: SubagentActivityErrorType.GENERIC,
           });
         } else if (call.status === 'cancelled') {
-          this.emitActivity('ERROR', {
-            context: 'tool_call',
-            name: toolName,
-            callId: call.request.callId,
-            error: 'Request cancelled.',
-          });
-          aborted = true;
+          const isSoftRejection =
+            call.outcome === ToolConfirmationOutcome.Cancel;
+
+          if (isSoftRejection) {
+            const error = `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`${TASK_COMPLETE_TOOL_NAME}\` to report your findings and the blocker.`;
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: toolName,
+              callId: call.request.callId,
+              error,
+              errorType: SubagentActivityErrorType.REJECTED,
+            });
+            // Soft rejection: we do NOT set aborted=true, allowing the agent to rethink.
+
+            // Provide the direct instruction to the model as the tool error response.
+            syncResults.set(call.request.callId, {
+              functionResponse: {
+                name: toolName,
+                id: call.request.callId,
+                response: { error },
+              },
+            });
+            continue; // Skip the generic syncResults.set below
+          } else {
+            // Hard abort (Ctrl+C)
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: toolName,
+              callId: call.request.callId,
+              error: SUBAGENT_CANCELLED_ERROR_MESSAGE,
+              errorType: SubagentActivityErrorType.CANCELLED,
+            });
+            aborted = true;
+          }
         }
 
-        // Add result to syncResults to preserve order later
+        // Add result to syncResults for other statuses (success, error, hard abort)
         syncResults.set(call.request.callId, call.response.responseParts[0]);
       }
     }
@@ -1323,6 +1388,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
+    // Append memory context if available.
+    const systemMemory = this.context.config.getSystemInstructionMemory();
+    if (systemMemory) {
+      finalPrompt += `\n\n${renderUserMemory(systemMemory)}`;
+    }
+
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
@@ -1332,7 +1403,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 Important Rules:
 * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
 * Work systematically using available tools to complete your task.
-* Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
+* Always use absolute paths for file operations. Construct them using the provided "Environment Context".
+* If a tool call is rejected by the user, acknowledge the rejection, rethink your strategy, and try a different approach. Do not repeatedly attempt the same rejected operation.`;
 
     if (this.definition.outputConfig) {
       finalPrompt += `

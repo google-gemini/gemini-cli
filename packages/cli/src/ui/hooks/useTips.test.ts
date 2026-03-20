@@ -16,8 +16,8 @@ describe('useTips()', () => {
     vi.clearAllMocks();
   });
 
-  it('should return false and call set(1) if state is undefined', () => {
-    const { result } = renderHookWithProviders(() => useTips());
+  it('should return false and call set(1) if state is undefined', async () => {
+    const { result } = await renderHookWithProviders(() => useTips());
 
     expect(result.current.showTips).toBe(true);
 
@@ -25,20 +25,20 @@ describe('useTips()', () => {
     expect(persistentStateMock.get('tipsShown')).toBe(1);
   });
 
-  it('should return false and call set(6) if state is 5', () => {
+  it('should return false and call set(6) if state is 5', async () => {
     persistentStateMock.setData({ tipsShown: 5 });
 
-    const { result } = renderHookWithProviders(() => useTips());
+    const { result } = await renderHookWithProviders(() => useTips());
 
     expect(result.current.showTips).toBe(true);
 
     expect(persistentStateMock.get('tipsShown')).toBe(6);
   });
 
-  it('should return true if state is 10', () => {
+  it('should return true if state is 10', async () => {
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { result } = renderHookWithProviders(() => useTips());
+    const { result } = await renderHookWithProviders(() => useTips());
 
     expect(result.current.showTips).toBe(false);
     expect(persistentStateMock.set).not.toHaveBeenCalled();
