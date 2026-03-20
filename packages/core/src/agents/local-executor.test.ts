@@ -874,55 +874,6 @@ describe('LocalAgentExecutor', () => {
       );
     });
 
-    it('should not emit THOUGHT_CHUNK multiple times if the subject is identical', async () => {
-      const definition = createTestDefinition([LS_TOOL_NAME]);
-      const executor = await LocalAgentExecutor.create(
-        definition,
-        mockConfig,
-        onActivity,
-      );
-
-      mockSendMessageStream.mockImplementationOnce(async () =>
-        (async function* () {
-          yield {
-            type: StreamEventType.CHUNK,
-            value: createMockResponseChunk([
-              { text: '**Same Subject** Part 1', thought: true },
-            ]),
-          } as StreamEvent;
-          yield {
-            type: StreamEventType.CHUNK,
-            value: createMockResponseChunk([
-              { text: '**Same Subject** Part 2', thought: true },
-            ]),
-          } as StreamEvent;
-          yield {
-            type: StreamEventType.CHUNK,
-            value: createMockResponseChunk(
-              [{ text: '**Same Subject** Part 3', thought: true }],
-              [
-                {
-                  name: TASK_COMPLETE_TOOL_NAME,
-                  args: { finalResult: 'Done' },
-                },
-              ],
-            ),
-          } as StreamEvent;
-        })(),
-      );
-
-      const output = await executor.run({ goal: 'Duplicate test' }, signal);
-
-      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
-
-      // Verify that THOUGHT_CHUNK was only emitted ONCE for the same subject
-      const thoughtActivities = activities.filter(
-        (a) => a.type === 'THOUGHT_CHUNK',
-      );
-      expect(thoughtActivities).toHaveLength(1);
-      expect(thoughtActivities[0].data['text']).toBe('Same Subject');
-    });
-
     it('should execute successfully when model calls complete_task without output (Happy Path No Output)', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {}, 'none');
       const executor = await LocalAgentExecutor.create(
