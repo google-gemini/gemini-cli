@@ -5,13 +5,7 @@
  */
 
 import type React from 'react';
-import {
-  createContext,
-  useContext,
-  useCallback,
-  useState,
-  useEffect,
-} from 'react';
+import { createContext, useContext, useCallback, useState, useEffect } from 'react';
 import {
   IdeClient,
   ToolConfirmationOutcome,
@@ -52,7 +46,7 @@ interface ToolActionsContextValue {
 
 const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
 
-export const useToolActions = () => {
+export const useToolActions = (): ToolActionsContextValue => {
   const context = useContext(ToolActionsContext);
   if (!context) {
     throw new Error('useToolActions must be used within a ToolActionsProvider');
@@ -77,24 +71,23 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
 
   useEffect(() => {
     let isMounted = true;
+    let activeClient: IdeClient | null = null;
+
+    const handleStatusChange = () => {
+      if (isMounted && activeClient) {
+        setIsDiffingEnabled(activeClient.isDiffingEnabled());
+      }
+    };
+
     if (config.getIdeMode()) {
       IdeClient.getInstance()
         .then((client) => {
           if (!isMounted) return;
+          activeClient = client;
           setIdeClient(client);
           setIsDiffingEnabled(client.isDiffingEnabled());
 
-          const handleStatusChange = () => {
-            if (isMounted) {
-              setIsDiffingEnabled(client.isDiffingEnabled());
-            }
-          };
-
           client.addStatusChangeListener(handleStatusChange);
-          // Return a cleanup function for the listener
-          return () => {
-            client.removeStatusChangeListener(handleStatusChange);
-          };
         })
         .catch((error) => {
           debugLogger.error('Failed to get IdeClient instance:', error);
@@ -102,6 +95,9 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
     }
     return () => {
       isMounted = false;
+      if (activeClient) {
+        activeClient.removeStatusChangeListener(handleStatusChange);
+      }
     };
   }, [config]);
 
@@ -164,7 +160,13 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   );
 
   return (
-    <ToolActionsContext.Provider value={{ confirm, cancel, isDiffingEnabled }}>
+    <ToolActionsContext.Provider
+      value={{
+        confirm,
+        cancel,
+        isDiffingEnabled,
+      }}
+    >
       {children}
     </ToolActionsContext.Provider>
   );
