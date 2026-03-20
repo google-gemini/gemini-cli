@@ -649,12 +649,16 @@ export async function loadCliConfig(
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
 
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive) {
+  if (!interactive || isAcpMode) {
     // The Policy Engine natively handles headless safety by translating ASK_USER
     // decisions to DENY. However, we explicitly block ask_user here to guarantee
     // it can never be allowed via a high-priority policy rule when no human is present.
+    // We also exclude it in ACP mode as IDEs intercept tool calls and ask for permission,
+    // breaking conversational flows.
     extraExcludes.push(ASK_USER_TOOL_NAME);
   }
 
@@ -770,7 +774,6 @@ export async function loadCliConfig(
     }
   }
 
-  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
   let clientName: string | undefined = undefined;
   if (isAcpMode) {
     const ide = detectIdeFromEnv();
