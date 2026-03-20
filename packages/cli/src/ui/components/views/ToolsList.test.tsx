@@ -32,7 +32,7 @@ const mockTools: ToolDefinition[] = [
 
 describe('<ToolsList />', () => {
   it('renders correctly with descriptions', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <ToolsList
         tools={mockTools}
         showDescriptions={true}
@@ -44,7 +44,7 @@ describe('<ToolsList />', () => {
   });
 
   it('renders correctly without descriptions', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <ToolsList
         tools={mockTools}
         showDescriptions={false}
@@ -56,7 +56,7 @@ describe('<ToolsList />', () => {
   });
 
   it('renders correctly with no tools', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <ToolsList tools={[]} showDescriptions={true} terminalWidth={40} />,
     );
     await waitUntilReady();
