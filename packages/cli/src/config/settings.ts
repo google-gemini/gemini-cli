@@ -633,7 +633,7 @@ export function resetSettingsCacheForTesting() {
 }
 
 export function isWorktreeEnabled(settings: LoadedSettings): boolean {
-  return !!settings.merged.experimental?.worktrees;
+  return settings.merged.experimental.worktrees;
 }
 
 /**
