@@ -291,7 +291,9 @@ export async function createProxyAwareFetch(ideServerHost: string) {
   // If the import fails, the error will be thrown when awaiting undiciPromise below.
   undiciPromise.catch(() => {});
   return async (url: string | URL, init?: RequestInit): Promise<Response> => {
-    const { fetch: fetchFn } = await undiciPromise;
+    const undiciExports = await undiciPromise;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    const fetchFn = undiciExports.fetch ?? (undiciExports as any).default?.fetch;
     const fetchOptions: RequestInit & { dispatcher?: unknown } = {
       ...init,
       dispatcher: agent,
