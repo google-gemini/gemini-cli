@@ -233,7 +233,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         });
 
       // Deduplicate: only show one entry per unique resolved model value.
-      // This is needed because 3 pro and 3.1 pro models can resolve to the same value.
+      // This is needed because 3 pro and 3.1 pro models can resolve to the same
+      // value, depending on the useGemini31 flag.
       const seen = new Set<string>();
       return list.filter((option) => {
         if (seen.has(option.value)) return false;
