@@ -195,48 +195,51 @@ describe('loggers', () => {
   });
 
   describe('logCliConfiguration', () => {
+    const baseMockConfig = {
+      getSessionId: () => 'test-session-id',
+      getModel: () => 'test-model',
+      getEmbeddingModel: () => 'test-embedding-model',
+      getSandbox: () => true,
+      getCoreTools: () => ['ls', 'read-file'],
+      getApprovalMode: () => 'default',
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_VERTEX_AI,
+      }),
+      getTelemetryEnabled: () => true,
+      getUsageStatisticsEnabled: () => true,
+      getTelemetryLogPromptsEnabled: () => true,
+      getFileFilteringRespectGitIgnore: () => true,
+      getFileFilteringAllowBuildArtifacts: () => false,
+      getDebugMode: () => true,
+      getMcpServers: () => {
+        throw new Error('Should not call');
+      },
+      getQuestion: () => 'test-question',
+      getTargetDir: () => 'target-dir',
+      getProxy: () => 'http://test.proxy.com:8080',
+      getOutputFormat: () => OutputFormat.JSON,
+      getExtensions: () =>
+        [
+          { name: 'ext-one', id: 'id-one' },
+          { name: 'ext-two', id: 'id-two' },
+        ] as GeminiCLIExtension[],
+      getMcpClientManager: () => ({
+        getMcpServers: () => ({
+          'test-server': {
+            command: 'test-command',
+          },
+        }),
+      }),
+      isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
+      getWorktreeSettings: () => undefined,
+    } as unknown as Config;
+
     it('should log the cli configuration', async () => {
-      const mockConfig = {
-        getSessionId: () => 'test-session-id',
-        getModel: () => 'test-model',
-        getEmbeddingModel: () => 'test-embedding-model',
-        getSandbox: () => true,
-        getCoreTools: () => ['ls', 'read-file'],
-        getApprovalMode: () => 'default',
-        getContentGeneratorConfig: () => ({
-          model: 'test-model',
-          apiKey: 'test-api-key',
-          authType: AuthType.USE_VERTEX_AI,
-        }),
-        getTelemetryEnabled: () => true,
-        getUsageStatisticsEnabled: () => true,
-        getTelemetryLogPromptsEnabled: () => true,
-        getFileFilteringRespectGitIgnore: () => true,
-        getFileFilteringAllowBuildArtifacts: () => false,
-        getDebugMode: () => true,
-        getMcpServers: () => {
-          throw new Error('Should not call');
-        },
-        getQuestion: () => 'test-question',
-        getTargetDir: () => 'target-dir',
-        getProxy: () => 'http://test.proxy.com:8080',
-        getOutputFormat: () => OutputFormat.JSON,
-        getExtensions: () =>
-          [
-            { name: 'ext-one', id: 'id-one' },
-            { name: 'ext-two', id: 'id-two' },
-          ] as GeminiCLIExtension[],
-        getMcpClientManager: () => ({
-          getMcpServers: () => ({
-            'test-server': {
-              command: 'test-command',
-            },
-          }),
-        }),
-        isInteractive: () => false,
-        getExperiments: () => undefined,
-        getExperimentsAsync: async () => undefined,
-      } as unknown as Config;
+      const mockConfig = baseMockConfig;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
       logCliConfiguration(mockConfig, startSessionEvent);
@@ -270,7 +273,30 @@ describe('loggers', () => {
           extensions_count: 2,
           extensions: 'ext-one,ext-two',
           auth_type: 'vertex-ai',
+          worktree_active: false,
         },
+      });
+    });
+
+    it('should set worktree_active to true when worktree settings are present', async () => {
+      const mockConfig = {
+        ...baseMockConfig,
+        getWorktreeSettings: () => ({
+          name: 'test-worktree',
+          path: '/path/to/worktree',
+          baseSha: 'test-sha',
+        }),
+      } as unknown as Config;
+
+      const startSessionEvent = new StartSessionEvent(mockConfig);
+      logCliConfiguration(mockConfig, startSessionEvent);
+
+      await new Promise(process.nextTick);
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'CLI configuration loaded.',
+        attributes: expect.objectContaining({
+          worktree_active: true,
+        }),
       });
     });
   });

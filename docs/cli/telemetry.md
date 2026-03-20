@@ -306,6 +306,7 @@ Emitted at startup with the CLI configuration.
 - `extension_ids` (string)
 - `extensions_count` (int)
 - `auth_type` (string)
+- `worktree_active` (boolean)
 - `github_workflow_name` (string, optional)
 - `github_repository_hash` (string, optional)
 - `github_event_name` (string, optional)
