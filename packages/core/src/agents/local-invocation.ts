@@ -24,6 +24,7 @@ import {
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { isCancellationError } from '../utils/errors.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -294,10 +295,7 @@ ${output.result}`;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-
-      const isAbort =
-        (error instanceof Error && error.name === 'AbortError') ||
-        errorMessage.includes('Aborted');
+      const isAbort = isCancellationError(error);
 
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {
