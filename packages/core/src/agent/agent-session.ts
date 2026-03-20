@@ -45,6 +45,28 @@ export class AgentSession implements AgentProtocol {
    * @param payload The payload to send to the agent.
    */
   async *sendStream(payload: AgentSend): AsyncIterable<AgentEvent> {
+    const result = await this._protocol.send(payload);
+    const streamId = result.streamId;
+
+    if (streamId === null) {
+      return;
+    }
+
+    yield* this.stream({ streamId });
+  }
+
+  /**
+   * Returns an AsyncIterable that yields events from the agent session,
+   * optionally replaying events from history or reattaching to an existing stream.
+   *
+   * @param options Options for replaying or reattaching to the event stream.
+   */
+  async *stream(
+    options: {
+      eventId?: string;
+      streamId?: string;
+    } = {},
+  ): AsyncIterable<AgentEvent> {
     let resolve: (() => void) | undefined;
     let next = new Promise<void>((res) => {
       resolve = res;
@@ -52,20 +74,34 @@ export class AgentSession implements AgentProtocol {
 
     let eventQueue: AgentEvent[] = [];
     const earlyEvents: AgentEvent[] = [];
-    let streamId: string | null | undefined;
     let done = false;
+    let trackedStreamId = options.streamId;
     let started = false;
 
-    const handleEvent = (event: AgentEvent) => {
-      if (event.type === 'agent_start') {
-        started = true;
+    // 1. Subscribe early to avoid missing any events that occur during replay setup
+    const unsubscribe = this._protocol.subscribe((event) => {
+      if (done) return;
+
+      if (!started) {
+        earlyEvents.push(event);
+        return;
       }
 
-      if (started) {
-        eventQueue.push(event);
+      if (trackedStreamId && event.streamId !== trackedStreamId) return;
+
+      // If we don't have a tracked stream yet, the first agent_start we see becomes it.
+      if (!trackedStreamId && event.type === 'agent_start') {
+        trackedStreamId = event.streamId ?? undefined;
       }
 
-      if (event.type === 'agent_end') {
+      // If we still don't have a tracked stream and we aren't replaying everything (eventId), ignore.
+      if (!trackedStreamId && !options.eventId) return;
+
+      eventQueue.push(event);
+      if (
+        event.type === 'agent_end' &&
+        event.streamId === (trackedStreamId ?? null)
+      ) {
         done = true;
       }
 
@@ -74,42 +110,91 @@ export class AgentSession implements AgentProtocol {
         resolve = r;
       });
       currentResolve?.();
-    };
-
-    const unsubscribe = this._protocol.subscribe((event) => {
-      if (done) return;
-
-      if (streamId === undefined) {
-        earlyEvents.push(event);
-        return;
-      }
-
-      if (streamId === null || event.streamId !== streamId) return;
-
-      handleEvent(event);
     });
 
     try {
-      const result = await this._protocol.send(payload);
-      streamId = result.streamId;
+      const currentEvents = this._protocol.events;
+      let replayStartIndex = -1;
 
-      if (streamId === null) {
-        done = true;
-        const currentResolve = resolve;
-        currentResolve?.();
-        return;
+      if (options.eventId) {
+        const index = currentEvents.findIndex((e) => e.id === options.eventId);
+        if (index !== -1) {
+          replayStartIndex = index + 1;
+        }
+      } else if (options.streamId) {
+        const index = currentEvents.findIndex(
+          (e) => e.type === 'agent_start' && e.streamId === options.streamId,
+        );
+        if (index !== -1) {
+          replayStartIndex = index;
+        }
       }
 
-      // Process events that arrived while we were waiting for the streamId
+      if (replayStartIndex !== -1) {
+        for (let i = replayStartIndex; i < currentEvents.length; i++) {
+          const event = currentEvents[i];
+          if (options.streamId && event.streamId !== options.streamId) continue;
+
+          eventQueue.push(event);
+          if (event.type === 'agent_start' && !trackedStreamId) {
+            trackedStreamId = event.streamId ?? undefined;
+          }
+          if (
+            event.type === 'agent_end' &&
+            event.streamId === (trackedStreamId ?? null)
+          ) {
+            done = true;
+            break;
+          }
+        }
+      }
+
+      if (!done && !trackedStreamId) {
+        // Find active stream in history
+        const activeStarts = currentEvents.filter(
+          (e) => e.type === 'agent_start',
+        );
+        for (let i = activeStarts.length - 1; i >= 0; i--) {
+          const start = activeStarts[i];
+          if (
+            !currentEvents.some(
+              (e) => e.type === 'agent_end' && e.streamId === start.streamId,
+            )
+          ) {
+            trackedStreamId = start.streamId ?? undefined;
+            break;
+          }
+        }
+      }
+
+      // If we replayed to the end and no stream is active, and we were specifically
+      // replaying from an eventId (or we've already finished the stream we were looking for), we are done.
+      if (!done && !trackedStreamId && options.eventId) {
+        done = true;
+      }
+
+      started = true;
+
+      // Process events that arrived while we were replaying
       for (const event of earlyEvents) {
-        if (event.streamId === streamId) {
-          handleEvent(event);
+        if (done) break;
+        if (trackedStreamId && event.streamId !== trackedStreamId) continue;
+        if (!trackedStreamId && event.type === 'agent_start') {
+          trackedStreamId = event.streamId ?? undefined;
+        }
+        if (!trackedStreamId && !options.eventId) continue;
+
+        eventQueue.push(event);
+        if (
+          event.type === 'agent_end' &&
+          event.streamId === (trackedStreamId ?? null)
+        ) {
+          done = true;
         }
       }
 
       while (true) {
-        // Yield what we have.
-        if (started && eventQueue.length > 0) {
+        if (eventQueue.length > 0) {
           const eventsToYield = eventQueue;
           eventQueue = [];
           for (const event of eventsToYield) {
@@ -118,8 +203,6 @@ export class AgentSession implements AgentProtocol {
         }
 
         if (done) break;
-
-        // Wait for next event.
         await next;
       }
     } finally {
