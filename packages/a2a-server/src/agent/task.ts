@@ -10,6 +10,7 @@ import {
   type GeminiClient,
   GeminiEventType,
   ToolConfirmationOutcome,
+  ApprovalMode,
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
@@ -88,8 +89,7 @@ export class Task {
   autoExecute: boolean;
   private get isYoloMatch(): boolean {
     return (
-      this.autoExecute ||
-      (this.config.getAllowedTools()?.includes('*') ?? false)
+      this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO
     );
   }
 
@@ -880,7 +880,9 @@ export class Task {
     if (
       part.kind !== 'data' ||
       !part.data ||
+      // eslint-disable-next-line no-restricted-syntax
       typeof part.data['callId'] !== 'string' ||
+      // eslint-disable-next-line no-restricted-syntax
       typeof part.data['outcome'] !== 'string'
     ) {
       return false;
