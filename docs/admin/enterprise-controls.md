@@ -22,7 +22,7 @@ preferred method for enforcing policy.
 **Enabled/Disabled** | Default: enabled
 
 If enabled, users will not be able to use the `--yolo` flag or wildcard tool
-policies.
+policies (e.g. `--allowed-tools=*`).
 
 ### Extensions
 
