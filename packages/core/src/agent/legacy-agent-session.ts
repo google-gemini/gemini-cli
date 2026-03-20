@@ -40,6 +40,10 @@ import type {
   Unsubscribe,
 } from './types.js';
 
+function isAbortLikeError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
 export interface LegacySessionDeps {
   client: GeminiClient;
   scheduler: Scheduler;
@@ -71,7 +75,7 @@ class LegacyAgentProtocol implements AgentProtocol {
     this._promptId = deps.promptId;
   }
 
-  get events(): AgentEvent[] {
+  get events(): readonly AgentEvent[] {
     return this._events;
   }
 
@@ -102,29 +106,37 @@ class LegacyAgentProtocol implements AgentProtocol {
     this._beginNewStream();
     const streamId = this._translationState.streamId;
     const parts = contentPartsToGeminiParts(message);
-    const userMessage = this._makeInternalEvent('message', {
-      role: 'user',
-      content: message,
-      ...(payload._meta ? { _meta: payload._meta } : {}),
-    });
+    const userMessage = this._makeUserMessageEvent(message, payload._meta);
 
     this._emit([userMessage]);
 
-    void Promise.resolve().then(async () => {
-      this._ensureAgentStart();
-      try {
-        await this._runLoop(parts);
-      } catch (err: unknown) {
-        this._emitErrorAndAgentEnd(err);
-        this._markStreamDone();
-      }
-    });
+    this._scheduleRunLoop(parts);
 
     return { streamId };
   }
 
   async abort(): Promise<void> {
     this._abortController.abort();
+  }
+
+  private _scheduleRunLoop(initialParts: Part[]): void {
+    setTimeout(() => {
+      void this._runLoopInBackground(initialParts);
+    }, 0);
+  }
+
+  private async _runLoopInBackground(initialParts: Part[]): Promise<void> {
+    this._ensureAgentStart();
+    try {
+      await this._runLoop(initialParts);
+    } catch (err: unknown) {
+      if (this._abortController.signal.aborted || isAbortLikeError(err)) {
+        this._ensureAgentEnd('aborted');
+      } else {
+        this._emitErrorAndAgentEnd(err);
+      }
+      this._markStreamDone();
+    }
   }
 
   private async _runLoop(initialParts: Part[]): Promise<void> {
@@ -135,17 +147,11 @@ class LegacyAgentProtocol implements AgentProtocol {
     while (true) {
       turnCount++;
       if (maxTurns >= 0 && turnCount > maxTurns) {
-        this._emit([
-          this._makeInternalEvent('agent_end', {
-            reason: 'max_turns',
-            data: {
-              code: 'MAX_TURNS_EXCEEDED',
-              maxTurns,
-              turnCount: turnCount - 1,
-            },
-          }),
-        ]);
-        this._markStreamDone();
+        this._finishStream('max_turns', {
+          code: 'MAX_TURNS_EXCEEDED',
+          maxTurns,
+          turnCount: turnCount - 1,
+        });
         return;
       }
 
@@ -158,8 +164,7 @@ class LegacyAgentProtocol implements AgentProtocol {
 
       for await (const event of responseStream) {
         if (this._abortController.signal.aborted) {
-          this._ensureAgentEnd('aborted');
-          this._markStreamDone();
+          this._finishStream('aborted');
           return;
         }
 
@@ -170,8 +175,7 @@ class LegacyAgentProtocol implements AgentProtocol {
         this._emit(translateEvent(event, this._translationState));
 
         if (event.type === GeminiEventType.Error) {
-          this._ensureAgentEnd('failed');
-          this._markStreamDone();
+          this._finishStream('failed');
           return;
         }
 
@@ -179,15 +183,13 @@ class LegacyAgentProtocol implements AgentProtocol {
           event.type === GeminiEventType.InvalidStream ||
           event.type === GeminiEventType.ContextWindowWillOverflow
         ) {
-          this._ensureAgentEnd('failed');
-          this._markStreamDone();
+          this._finishStream('failed');
           return;
         }
 
         if (event.type === GeminiEventType.Finished) {
           if (toolCallRequests.length === 0) {
-            this._ensureAgentEnd(mapFinishReason(event.value.reason));
-            this._markStreamDone();
+            this._finishStream(mapFinishReason(event.value.reason));
             return;
           }
           continue;
@@ -203,9 +205,13 @@ class LegacyAgentProtocol implements AgentProtocol {
         }
       }
 
+      if (this._abortController.signal.aborted) {
+        this._finishStream('aborted');
+        return;
+      }
+
       if (toolCallRequests.length === 0) {
-        this._ensureAgentEnd('completed');
-        this._markStreamDone();
+        this._finishStream('completed');
         return;
       }
 
@@ -213,6 +219,11 @@ class LegacyAgentProtocol implements AgentProtocol {
         toolCallRequests,
         this._abortController.signal,
       );
+
+      if (this._abortController.signal.aborted) {
+        this._finishStream('aborted');
+        return;
+      }
 
       const toolResponseParts: Part[] = [];
       for (const tc of completedToolCalls) {
@@ -227,7 +238,7 @@ class LegacyAgentProtocol implements AgentProtocol {
         const data = buildToolResponseData(response);
 
         this._emit([
-          this._makeInternalEvent('tool_response', {
+          this._makeToolResponseEvent({
             requestId: request.callId,
             name: request.name,
             content,
@@ -261,8 +272,7 @@ class LegacyAgentProtocol implements AgentProtocol {
           tc.response.error !== undefined,
       );
       if (stopTool) {
-        this._ensureAgentEnd('completed');
-        this._markStreamDone();
+        this._finishStream('completed');
         return;
       }
 
@@ -270,8 +280,7 @@ class LegacyAgentProtocol implements AgentProtocol {
         isFatalToolError(tc.response.errorType),
       );
       if (fatalTool) {
-        this._ensureAgentEnd('failed');
-        this._markStreamDone();
+        this._finishStream('failed');
         return;
       }
 
@@ -313,19 +322,27 @@ class LegacyAgentProtocol implements AgentProtocol {
   private _ensureAgentStart(): void {
     if (!this._translationState.streamStartEmitted) {
       this._translationState.streamStartEmitted = true;
-      this._emit([this._makeInternalEvent('agent_start', {})]);
+      this._emit([this._makeAgentStartEvent()]);
     }
   }
 
   private _ensureAgentEnd(reason: StreamEndReason = 'completed'): void {
     if (!this._agentEndEmitted && this._translationState.streamStartEmitted) {
       this._agentEndEmitted = true;
-      this._emit([
-        this._makeInternalEvent('agent_end', {
-          reason,
-        }),
-      ]);
+      this._emit([this._makeAgentEndEvent(reason)]);
     }
+  }
+
+  private _finishStream(
+    reason: StreamEndReason,
+    data?: Record<string, unknown>,
+  ): void {
+    if (data && !this._agentEndEmitted) {
+      this._emit([this._makeAgentEndEvent(reason, data)]);
+    } else {
+      this._ensureAgentEnd(reason);
+    }
+    this._markStreamDone();
   }
 
   /**
@@ -346,10 +363,13 @@ class LegacyAgentProtocol implements AgentProtocol {
       if ('code' in err) {
         meta['code'] = err.code;
       }
+      if ('status' in err) {
+        meta['status'] = err.status;
+      }
     }
 
     this._emit([
-      this._makeInternalEvent('error', {
+      this._makeErrorEvent({
         status: 'INTERNAL',
         message,
         fatal: true,
@@ -360,21 +380,75 @@ class LegacyAgentProtocol implements AgentProtocol {
     this._ensureAgentEnd('failed');
   }
 
-  private _makeInternalEvent<T extends AgentEvent['type']>(
-    type: T,
-    payload: Omit<
-      Partial<AgentEvent<T>>,
-      'id' | 'timestamp' | 'streamId' | 'type'
-    >,
-  ): AgentEvent<T> {
-    const id = `${this._translationState.streamId}-${this._translationState.eventCounter++}`;
+  private _nextEventFields() {
     return {
-      ...payload,
-      id,
+      id: `${this._translationState.streamId}-${this._translationState.eventCounter++}`,
       timestamp: new Date().toISOString(),
       streamId: this._translationState.streamId,
-      type,
     };
+  }
+
+  private _makeUserMessageEvent(
+    content: ContentPart[],
+    meta?: Record<string, unknown>,
+  ): AgentEvent<'message'> {
+    const event = {
+      ...this._nextEventFields(),
+      type: 'message',
+      role: 'user',
+      content,
+      ...(meta ? { _meta: meta } : {}),
+    } satisfies AgentEvent<'message'>;
+    return event;
+  }
+
+  private _makeToolResponseEvent(
+    payload: Omit<
+      AgentEvent<'tool_response'>,
+      'id' | 'timestamp' | 'streamId' | 'type'
+    >,
+  ): AgentEvent<'tool_response'> {
+    const event = {
+      ...this._nextEventFields(),
+      type: 'tool_response',
+      ...payload,
+    } satisfies AgentEvent<'tool_response'>;
+    return event;
+  }
+
+  private _makeAgentStartEvent(): AgentEvent<'agent_start'> {
+    const event = {
+      ...this._nextEventFields(),
+      type: 'agent_start',
+    } satisfies AgentEvent<'agent_start'>;
+    return event;
+  }
+
+  private _makeAgentEndEvent(
+    reason: StreamEndReason,
+    data?: Record<string, unknown>,
+  ): AgentEvent<'agent_end'> {
+    const event = {
+      ...this._nextEventFields(),
+      type: 'agent_end',
+      reason,
+      ...(data ? { data } : {}),
+    } satisfies AgentEvent<'agent_end'>;
+    return event;
+  }
+
+  private _makeErrorEvent(
+    payload: Omit<
+      AgentEvent<'error'>,
+      'id' | 'timestamp' | 'streamId' | 'type'
+    >,
+  ): AgentEvent<'error'> {
+    const event = {
+      ...this._nextEventFields(),
+      type: 'error',
+      ...payload,
+    } satisfies AgentEvent<'error'>;
+    return event;
   }
 }
 
