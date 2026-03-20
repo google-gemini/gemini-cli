@@ -10,15 +10,15 @@ context.
 npm install -g @google/gemini-cli
 ```
 
+For more installation options and authentication setup, see the full
+[Installation](./resources/installation.md) and
+[Authentication](./resources/authentication.md) guides.
+
 ## Get started
 
 Jump in to Gemini CLI.
 
 - **[Quickstart](./get-started/index.md):** Your first session with Gemini CLI.
-- **[Installation](./get-started/installation.md):** How to install Gemini CLI
-  on your system.
-- **[Authentication](./get-started/authentication.md):** Setup instructions for
-  personal and enterprise accounts.
 - **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
   action.
 - **[CLI cheatsheet](./cli/cli-reference.md):** A quick reference for common
@@ -116,6 +116,9 @@ Deep technical documentation and API specifications.
 Support, release history, and legal information.
 
 - **[FAQ](./resources/faq.md):** Answers to frequently asked questions.
+- **[Installation](./resources/installation.md):** How to install Gemini CLI.
+- **[Authentication](./resources/authentication.md):** Setup instructions for
+  personal and enterprise accounts.
 - **[Quota and pricing](./resources/quota-and-pricing.md):** Limits and billing
   details.
 - **[Terms and privacy](./resources/tos-privacy.md):** Official notices and

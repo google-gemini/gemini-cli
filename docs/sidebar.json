@@ -7,11 +7,6 @@
         "items": [
           { "label": "Overview", "slug": "docs" },
           { "label": "Quickstart", "slug": "docs/get-started" },
-          { "label": "Installation", "slug": "docs/get-started/installation" },
-          {
-            "label": "Authentication",
-            "slug": "docs/get-started/authentication"
-          },
           { "label": "Examples", "slug": "docs/get-started/examples" },
           { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
           {
@@ -220,6 +215,11 @@
         "label": "Resources",
         "items": [
           { "label": "FAQ", "slug": "docs/resources/faq" },
+          { "label": "Installation", "slug": "docs/resources/installation" },
+          {
+            "label": "Authentication",
+            "slug": "docs/resources/authentication"
+          },
           {
             "label": "Quota and pricing",
             "slug": "docs/resources/quota-and-pricing"

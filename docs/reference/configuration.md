@@ -1903,8 +1903,8 @@ within your user's home folder.
 Environment variables are a common way to configure applications, especially for
 sensitive information like API keys or for settings that might change between
 environments. For authentication setup, see the
-[Authentication documentation](../get-started/authentication.md) which covers
-all available authentication methods.
+[Authentication documentation](../resources/authentication.md) which covers all
+available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The
 loading order is:
@@ -1924,7 +1924,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
   - One of several available
-    [authentication methods](../get-started/authentication.md).
+    [authentication methods](../resources/authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env`
     file.
 - **`GEMINI_MODEL`**:
