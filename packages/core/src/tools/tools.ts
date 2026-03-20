@@ -925,7 +925,10 @@ export type ToolResultDisplay =
   | FileDiff
   | AnsiOutput
   | TodoList
-  | SubagentProgress;
+  | SubagentProgress
+  | GrepResult
+  | ListDirectoryResult
+  | ReadManyFilesResult;
 
 export type TodoStatus =
   | 'pending'

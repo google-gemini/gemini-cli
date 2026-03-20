@@ -5,7 +5,13 @@
  */
 
 import type React from 'react';
-import { createContext, useContext, useCallback, useState, useEffect } from 'react';
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useState,
+  useEffect,
+} from 'react';
 import {
   IdeClient,
   ToolConfirmationOutcome,
@@ -42,6 +48,9 @@ interface ToolActionsContextValue {
   ) => Promise<void>;
   cancel: (callId: string) => Promise<void>;
   isDiffingEnabled: boolean;
+  isExpanded: (callId: string) => boolean;
+  toggleExpansion: (callId: string) => void;
+  toggleAllExpansion: (callIds: string[]) => void;
 }
 
 const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
@@ -58,12 +67,22 @@ interface ToolActionsProviderProps {
   children: React.ReactNode;
   config: Config;
   toolCalls: IndividualToolCallDisplay[];
+  isExpanded: (callId: string) => boolean;
+  toggleExpansion: (callId: string) => void;
+  toggleAllExpansion: (callIds: string[]) => void;
 }
 
 export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   props: ToolActionsProviderProps,
 ) => {
-  const { children, config, toolCalls } = props;
+  const {
+    children,
+    config,
+    toolCalls,
+    isExpanded,
+    toggleExpansion,
+    toggleAllExpansion,
+  } = props;
 
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
@@ -165,6 +184,9 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
         confirm,
         cancel,
         isDiffingEnabled,
+        isExpanded,
+        toggleExpansion,
+        toggleAllExpansion,
       }}
     >
       {children}
