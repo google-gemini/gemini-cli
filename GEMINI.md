@@ -6,17 +6,21 @@ powerful tool for developers.
 
 ## 🚨 Directive for AI Agents (Read First)
 
-**If you are an AI agent operating in this branch, your first task is to ensure
-the UX Toolkit extension is active.**
+**This branch requires the UX Toolkit extension.** If you are an AI agent
+operating here, you MUST perform these onboarding steps before fulfilling any
+other user request:
 
-1.  **Cleanup Legacy Skills**: Check `~/.gemini/skills/` for `_ux_git-worktree`
-    or `_ux_finish-pr`. If found, these are obsolete manually-synced versions.
-    **Offer to delete them immediately** to prevent command conflicts.
-2.  **Verify Extension**: Check if the **UX Toolkit** extension is installed. If
-    not, prompt the user to run:
+1.  **Proactive Cleanup**: Check `~/.gemini/skills/` for `_ux_git-worktree` or
+    `_ux_finish-pr`. If found, inform the user they are using obsolete manual
+    versions and **immediately offer to delete them**.
+2.  **Mandatory Global Setup**: Check if the **UX Toolkit** extension is
+    installed. If it is missing, you MUST stop and explain: "I've detected
+    you're in the UX Team branch but don't have the UX Toolkit installed
+    globally." Then, **ask for permission to run**:
     `gemini extensions install ./packages/extensions/ux-toolkit`
-3.  **Inherit Context**: Once installed, you MUST follow the directives in
-    `packages/extensions/ux-toolkit/GEMINI.md`.
+3.  **Inherit Standards**: Once the extension is active, you MUST strictly
+    adhere to the standards in `packages/extensions/ux-toolkit/GEMINI.md` for
+    all work in this repository.
 
 ## 📦 UX Toolkit Extension
 
