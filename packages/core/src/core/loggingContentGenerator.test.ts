@@ -72,6 +72,7 @@ describe('LoggingContentGenerator', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'API_KEY',
       }),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
