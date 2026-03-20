@@ -11,7 +11,9 @@ locations:
 - **User settings**: `~/.gemini/settings.json`
 - **Workspace settings**: `your-project/.gemini/settings.json`
 
-Note: Workspace settings override user settings.
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> Workspace settings override user settings.
 
 ## Settings reference
 
@@ -116,6 +118,8 @@ they appear in the UI.
 
 | UI Label                         | Setting                              | Description                                                                                                                                                                | Default |
 | -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Sandbox Allowed Paths            | `tools.sandboxAllowedPaths`          | List of additional paths that the sandbox is allowed to access.                                                                                                            | `[]`    |
+| Sandbox Network Access           | `tools.sandboxNetworkAccess`         | Whether the sandbox is allowed to access the network.                                                                                                                      | `false` |
 | Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`  |
 | Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `false` |
 | Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`  |
@@ -148,6 +152,7 @@ they appear in the UI.
 | UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
 | -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
+| Enable Git Worktrees       | `experimental.worktrees`                 | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
 | Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Plan                       | `experimental.plan`                      | Enable Plan Mode.                                                                                                                                         | `true`  |
