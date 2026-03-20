@@ -12,6 +12,7 @@ import {
   type SpanOptions,
 } from '@opentelemetry/api';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { truncateString } from '../utils/textUtils.js';
 import {
   type GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,
@@ -89,13 +90,13 @@ export async function runInDevTraceSpan<R>(
         if (meta.input !== undefined) {
           span.setAttribute(
             GEN_AI_INPUT_MESSAGES,
-            safeJsonStringify(meta.input),
+            truncateString(safeJsonStringify(meta.input), 160 * 1024),
           );
         }
         if (meta.output !== undefined) {
           span.setAttribute(
             GEN_AI_OUTPUT_MESSAGES,
-            safeJsonStringify(meta.output),
+            truncateString(safeJsonStringify(meta.output), 160 * 1024),
           );
         }
         for (const [key, value] of Object.entries(meta.attributes)) {
