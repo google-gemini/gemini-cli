@@ -17,16 +17,12 @@ import type { SessionBrowserState } from '../SessionBrowser.js';
 describe('SessionBrowser Search and Navigation Components', () => {
   it('SearchModeDisplay renders correctly with query', async () => {
     const mockState = { searchQuery: 'test query' } as SessionBrowserState;
-    const { lastFrame, waitUntilReady } = render(
-      <SearchModeDisplay state={mockState} />,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await render(<SearchModeDisplay state={mockState} />);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('NavigationHelp renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = render(<NavigationHelpDisplay />);
-    await waitUntilReady();
+    const { lastFrame } = await render(<NavigationHelpDisplay />);
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -37,10 +33,7 @@ describe('SessionBrowser Search and Navigation Components', () => {
       sortOrder: 'date',
       sortReverse: false,
     } as SessionBrowserState;
-    const { lastFrame, waitUntilReady } = render(
-      <SessionListHeader state={mockState} />,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await render(<SessionListHeader state={mockState} />);
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -51,19 +44,13 @@ describe('SessionBrowser Search and Navigation Components', () => {
       sortOrder: 'name',
       sortReverse: true,
     } as SessionBrowserState;
-    const { lastFrame, waitUntilReady } = render(
-      <SessionListHeader state={mockState} />,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await render(<SessionListHeader state={mockState} />);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('NoResultsDisplay renders correctly', async () => {
     const mockState = { searchQuery: 'no match' } as SessionBrowserState;
-    const { lastFrame, waitUntilReady } = render(
-      <NoResultsDisplay state={mockState} />,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await render(<NoResultsDisplay state={mockState} />);
     expect(lastFrame()).toMatchSnapshot();
   });
 });
