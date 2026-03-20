@@ -31,16 +31,6 @@ tools:
 You are the test agent. Add or update tests.
 `;
 
-const GENERALIST_AGENT_DEFINITION = `---
-name: generalist-agent
-description: A broad generalist agent that can help with many software tasks.
-tools:
-  - read_file
-  - write_file
----
-You are the generalist agent. Help with general software development tasks.
-`;
-
 const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
 
 function readProjectFile(
@@ -95,6 +85,11 @@ describe('subagent eval test cases', () => {
       settings: {
         experimental: {
           enableAgents: true,
+          agents: {
+            overrides: {
+              generalist: { enabled: true },
+            },
+          },
         },
       },
     },
@@ -102,7 +97,6 @@ describe('subagent eval test cases', () => {
       'Rename the exported function in index.ts from add to sum and update the file directly.',
     files: {
       '.gemini/agents/docs-agent.md': DOCS_AGENT_DEFINITION,
-      '.gemini/agents/generalist-agent.md': GENERALIST_AGENT_DEFINITION,
       'index.ts': INDEX_TS,
     },
     assert: async (rig, _result) => {
@@ -111,7 +105,7 @@ describe('subagent eval test cases', () => {
 
       expect(updatedIndex).toContain('export const sum =');
       expect(toolLogs).not.toContain('docs-agent');
-      expect(toolLogs).not.toContain('generalist-agent');
+      expect(toolLogs).not.toContain('generalist');
     },
   });
 
@@ -127,13 +121,17 @@ describe('subagent eval test cases', () => {
       settings: {
         experimental: {
           enableAgents: true,
+          agents: {
+            overrides: {
+              generalist: { enabled: true },
+            },
+          },
         },
       },
     },
     prompt: 'Please add a small test file that verifies add(1, 2) returns 3.',
     files: {
       '.gemini/agents/test-agent.md': TEST_AGENT_DEFINITION,
-      '.gemini/agents/generalist-agent.md': GENERALIST_AGENT_DEFINITION,
       'index.ts': INDEX_TS,
       'package.json': JSON.stringify(
         {
@@ -149,7 +147,7 @@ describe('subagent eval test cases', () => {
       const toolLogs = serializedToolLogs(rig);
 
       await rig.expectToolCallSuccess(['test-agent']);
-      expect(toolLogs).not.toContain('generalist-agent');
+      expect(toolLogs).not.toContain('generalist');
     },
   });
 
@@ -163,6 +161,11 @@ describe('subagent eval test cases', () => {
       settings: {
         experimental: {
           enableAgents: true,
+          agents: {
+            overrides: {
+              generalist: { enabled: true },
+            },
+          },
         },
       },
     },
@@ -171,7 +174,6 @@ describe('subagent eval test cases', () => {
     files: {
       '.gemini/agents/docs-agent.md': DOCS_AGENT_DEFINITION,
       '.gemini/agents/test-agent.md': TEST_AGENT_DEFINITION,
-      '.gemini/agents/generalist-agent.md': GENERALIST_AGENT_DEFINITION,
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
       'package.json': JSON.stringify(
@@ -190,7 +192,7 @@ describe('subagent eval test cases', () => {
 
       await rig.expectToolCallSuccess(['docs-agent', 'test-agent']);
       expect(readme).not.toContain('TODO: update the README.');
-      expect(toolLogs).not.toContain('generalist-agent');
+      expect(toolLogs).not.toContain('generalist');
     },
   });
 });
