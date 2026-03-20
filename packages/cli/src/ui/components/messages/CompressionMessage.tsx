@@ -22,8 +22,13 @@ export interface CompressionDisplayProps {
 export function CompressionMessage({
   compression,
 }: CompressionDisplayProps): React.JSX.Element {
-  const { isPending, beforePercentage, afterPercentage, compressionStatus } =
-    compression;
+  const {
+    isPending,
+    beforePercentage,
+    afterPercentage,
+    compressionStatus,
+    thresholdPercentage,
+  } = compression;
 
   const getCompressionText = () => {
     if (isPending) {
@@ -31,8 +36,13 @@ export function CompressionMessage({
     }
 
     switch (compressionStatus) {
-      case CompressionStatus.COMPRESSED:
-        return `Context compressed (${beforePercentage}% ➔ ${afterPercentage}%).`;
+      case CompressionStatus.COMPRESSED: {
+        let text = `Context compressed (${beforePercentage}% → ${afterPercentage}%).`;
+        if (thresholdPercentage != null) {
+          text += ` Adjust threshold (${thresholdPercentage}%) in /settings.`;
+        }
+        return text;
+      }
       case CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT:
         return 'Compression was not beneficial for this history size.';
       case CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR:

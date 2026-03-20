@@ -248,6 +248,9 @@ describe('Gemini Client (client.ts)', () => {
       getEnableHooks: vi.fn().mockReturnValue(false),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getCompressionThreshold: vi.fn().mockReturnValue(undefined),
+      getShowContextWindowWarning: vi.fn().mockReturnValue(false),
+      getShowContextCompression: vi.fn().mockReturnValue(false),
+      getContextWindowCompressionThreshold: vi.fn().mockReturnValue(0.2),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
@@ -1617,6 +1620,7 @@ ${JSON.stringify(
             originalTokenCount: initialTokenCount,
             newTokenCount: 400,
             compressionStatus: CompressionStatus.COMPRESSED,
+            requestTokenCount: 50, // Added to match updated interface
           };
         });
 
@@ -1643,10 +1647,13 @@ ${JSON.stringify(
         }),
       );
 
-      // 2. Should contain compression event
+      // 2. Should contain compression event with requestTokenCount
       expect(events).toContainEqual(
         expect.objectContaining({
           type: GeminiEventType.ChatCompressed,
+          value: expect.objectContaining({
+            requestTokenCount: expect.any(Number),
+          }),
         }),
       );
 

@@ -2637,6 +2637,7 @@ describe('useGeminiStream', () => {
               afterPercentage: 5,
               compressionStatus: 'compressed',
               isManual: false,
+              thresholdPercentage: 20,
             },
           }),
           expect.any(Number),
@@ -2692,6 +2693,68 @@ describe('useGeminiStream', () => {
           expect.objectContaining({
             type: 'compression',
           }),
+        );
+      });
+    });
+
+    it('should add informational messages when ChatCompressed event is received with a large prompt even if showContextCompression is false', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(10000);
+      vi.mocked(
+        mockConfig.getContextWindowCompressionThreshold,
+      ).mockReturnValue(0.2); // 20%
+      vi.mocked(mockConfig.getShowContextCompression).mockReturnValue(false);
+
+      // Setup mock to return a stream with ChatCompressed event and a large requestTokenCount (25%)
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 1000,
+              newTokenCount: 500,
+              compressionStatus: 'compressed',
+              requestTokenCount: 2500, // 25% > 20%
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response after compression',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: {
+              finishReason: 'STOP',
+              usageMetadata: {
+                promptTokenCount: 10,
+                candidatesTokenCount: 20,
+                totalTokenCount: 30,
+              },
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithDefaults();
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test large prompt compression');
+      });
+
+      // Check that compression message WAS added despite the setting
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'compression',
+            compression: expect.objectContaining({
+              beforePercentage: 10,
+              afterPercentage: 5,
+              compressionStatus: 'compressed',
+              isManual: false,
+              thresholdPercentage: 20,
+            }),
+          }),
+          expect.any(Number),
         );
       });
     });

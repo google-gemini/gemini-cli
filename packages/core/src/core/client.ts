@@ -608,7 +608,19 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false);
+    // Estimate tokens. For text-only requests, we estimate based on character length.
+    // For requests with non-text parts (like images, tools), we use the countTokens API.
+    const estimatedRequestTokenCount = await calculateRequestTokenCount(
+      request,
+      this.getContentGeneratorOrFail(),
+      modelForLimitCheck,
+    );
+
+    const compressed = await this.tryCompressChat(
+      prompt_id,
+      false,
+      estimatedRequestTokenCount,
+    );
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -619,17 +631,13 @@ export class GeminiClient {
 
     await this.tryMaskToolOutputs(this.getHistory());
 
-    // Estimate tokens. For text-only requests, we estimate based on character length.
-    // For requests with non-text parts (like images, tools), we use the countTokens API.
-    const estimatedRequestTokenCount = await calculateRequestTokenCount(
-      request,
-      this.getContentGeneratorOrFail(),
-      modelForLimitCheck,
-    );
-
     if (estimatedRequestTokenCount > remainingTokenCount) {
       if (!this.config.getShowContextWindowWarning()) {
-        const forcedCompressed = await this.tryCompressChat(prompt_id, true);
+        const forcedCompressed = await this.tryCompressChat(
+          prompt_id,
+          true,
+          estimatedRequestTokenCount,
+        );
         if (
           forcedCompressed.compressionStatus === CompressionStatus.COMPRESSED
         ) {
@@ -1175,6 +1183,7 @@ export class GeminiClient {
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    requestTokenCount?: number,
   ): Promise<ChatCompressionInfo> {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
@@ -1189,6 +1198,11 @@ export class GeminiClient {
       this.config,
       this.hasFailedCompressionAttempt,
     );
+
+    const resultInfo = {
+      ...info,
+      requestTokenCount,
+    };
 
     if (
       info.compressionStatus ===
@@ -1225,7 +1239,7 @@ export class GeminiClient {
       }
     }
 
-    return info;
+    return resultInfo;
   }
 
   /**

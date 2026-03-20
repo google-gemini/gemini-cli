@@ -141,7 +141,8 @@ export interface CompressionProps {
   beforePercentage: number | null;
   afterPercentage: number | null;
   compressionStatus: CompressionStatus | null;
-  isManual?: boolean;
+  isManual: boolean;
+  thresholdPercentage?: number | null;
 }
 
 /**

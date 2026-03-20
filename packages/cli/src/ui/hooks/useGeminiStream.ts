@@ -38,8 +38,12 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
+<<<<<<< HEAD
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
+=======
+  CompressionStatus,
+>>>>>>> 97ff2bea4 (feat(ui): restore threshold hint and thin arrow to compression message)
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -1153,7 +1157,12 @@ export const useGeminiStream = (
           ? Math.round((eventValue.newTokenCount / limit) * 100)
           : null;
 
-      if (!config.getShowContextCompression()) {
+      const threshold = config.getContextWindowCompressionThreshold();
+      const isLargePrompt =
+        eventValue?.requestTokenCount != null &&
+        eventValue.requestTokenCount / limit > threshold;
+
+      if (!config.getShowContextCompression() && !isLargePrompt) {
         return;
       }
 
@@ -1164,8 +1173,9 @@ export const useGeminiStream = (
             isPending: false,
             beforePercentage,
             afterPercentage,
-            compressionStatus: eventValue?.compressionStatus ?? null,
+            compressionStatus: eventValue ? ((Number(eventValue.compressionStatus) as unknown) as CompressionStatus) : null,
             isManual: false,
+            thresholdPercentage: Math.round(threshold * 100),
           },
           timestamp: new Date(userMessageTimestamp),
         } as HistoryItemWithoutId,
