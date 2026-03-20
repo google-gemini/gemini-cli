@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- TODO: Refactor to remove any usage */
 import {
   describe,
   it,
@@ -256,8 +256,11 @@ describe('useGeminiStream', () => {
   const mockOnAuthError = vi.fn();
   const mockPerformMemoryRefresh = vi.fn(() => Promise.resolve());
   const mockSetModelSwitchedFromQuotaError = vi.fn();
-  const mockOnCancelSubmit = vi.fn();
   const mockSetShellInputFocused = vi.fn();
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   const mockGetGeminiClient = vi.fn().mockImplementation(() => {
     const clientInstance = new MockedGeminiClientClass(mockConfig);
@@ -335,6 +338,10 @@ describe('useGeminiStream', () => {
     getShowContextCompression: vi.fn(() => false),
     getContextWindowCompressionThreshold: vi.fn(() => 0.2),
   } as unknown as Config;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test

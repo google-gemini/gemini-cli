@@ -587,7 +587,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Show a warning message when the context window limit is nearly reached.',
+          'Show a warning message when the context window limit is nearly reached. If disabled, the CLI will attempt to automatically compress the history when the limit is reached.',
         showInDialog: true,
       },
       showContextCompression: {

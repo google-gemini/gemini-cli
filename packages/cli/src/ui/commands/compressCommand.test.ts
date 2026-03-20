@@ -22,6 +22,10 @@ describe('compressCommand', () => {
   let context: ReturnType<typeof createMockCommandContext>;
   let mockTryCompressChat: ReturnType<typeof vi.fn>;
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     mockTryCompressChat = vi.fn();
     vi.mocked(Core.tokenLimit).mockReturnValue(1000);
