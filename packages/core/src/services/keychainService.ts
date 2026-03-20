@@ -51,7 +51,12 @@ export class KeychainService {
    */
   async getPassword(account: string): Promise<string | null> {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.getPassword(this.serviceName, account);
+    try {
+      return await keychain.getPassword(this.serviceName, account);
+    } catch {
+      debugLogger.log('Keychain operation failed: getPassword');
+      throw new Error('Keychain operation failed');
+    }
   }
 
   /**
@@ -60,7 +65,12 @@ export class KeychainService {
    */
   async setPassword(account: string, value: string): Promise<void> {
     const keychain = await this.getKeychainOrThrow();
-    await keychain.setPassword(this.serviceName, account, value);
+    try {
+      await keychain.setPassword(this.serviceName, account, value);
+    } catch {
+      debugLogger.log('Keychain operation failed: setPassword');
+      throw new Error('Keychain operation failed');
+    }
   }
 
   /**
@@ -70,7 +80,12 @@ export class KeychainService {
    */
   async deletePassword(account: string): Promise<boolean> {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.deletePassword(this.serviceName, account);
+    try {
+      return await keychain.deletePassword(this.serviceName, account);
+    } catch {
+      debugLogger.log('Keychain operation failed: deletePassword');
+      throw new Error('Keychain operation failed');
+    }
   }
 
   /**
@@ -81,7 +96,12 @@ export class KeychainService {
     Array<{ account: string; password: string }>
   > {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.findCredentials(this.serviceName);
+    try {
+      return await keychain.findCredentials(this.serviceName);
+    } catch {
+      debugLogger.log('Keychain operation failed: findCredentials');
+      throw new Error('Keychain operation failed');
+    }
   }
 
   private async getKeychainOrThrow(): Promise<Keychain> {

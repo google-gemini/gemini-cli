@@ -8,7 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn, exec, execFile, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
-import { start_sandbox } from './sandbox.js';
+import { start_sandbox, maskSandboxEnvForLogging } from './sandbox.js';
 import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
@@ -745,5 +745,60 @@ describe('sandbox', () => {
         expect.objectContaining({ stdio: 'inherit' }),
       );
     });
+  });
+});
+
+describe('maskSandboxEnvForLogging', () => {
+  it('should mask values when key matches NEVER_ALLOWED_NAME_PATTERNS', () => {
+    expect(maskSandboxEnvForLogging('MY_API_KEY=sk-abc123')).toBe(
+      'MY_API_KEY=***',
+    );
+    expect(maskSandboxEnvForLogging('AUTH_TOKEN=abc')).toBe('AUTH_TOKEN=***');
+    expect(maskSandboxEnvForLogging('DB_PASSWORD=hunter2')).toBe(
+      'DB_PASSWORD=***',
+    );
+    expect(maskSandboxEnvForLogging('CLIENT_SECRET=xyz')).toBe(
+      'CLIENT_SECRET=***',
+    );
+    expect(maskSandboxEnvForLogging('PRIVATE_DATA=foo')).toBe(
+      'PRIVATE_DATA=***',
+    );
+    expect(maskSandboxEnvForLogging('TLS_CERT=bar')).toBe('TLS_CERT=***');
+    expect(maskSandboxEnvForLogging('MY_CREDENTIAL=baz')).toBe(
+      'MY_CREDENTIAL=***',
+    );
+  });
+
+  it('should mask values when value matches NEVER_ALLOWED_VALUE_PATTERNS', () => {
+    expect(
+      maskSandboxEnvForLogging('GITHUB=ghp_' + 'a'.repeat(36)),
+    ).toBe('GITHUB=***');
+    expect(
+      maskSandboxEnvForLogging('SOME_VAR=AIzaSy' + 'a'.repeat(33)),
+    ).toBe('SOME_VAR=***');
+    expect(
+      maskSandboxEnvForLogging(
+        'MY_VAR=-----BEGIN RSA PRIVATE KEY-----',
+      ),
+    ).toBe('MY_VAR=***');
+  });
+
+  it('should pass through non-sensitive key=value pairs', () => {
+    expect(maskSandboxEnvForLogging('MY_VAR=hello')).toBe('MY_VAR=hello');
+    expect(maskSandboxEnvForLogging('DEBUG=1')).toBe('DEBUG=1');
+    expect(maskSandboxEnvForLogging('NODE_ENV=production')).toBe(
+      'NODE_ENV=production',
+    );
+  });
+
+  it('should return string as-is if no = found', () => {
+    expect(maskSandboxEnvForLogging('NOEQUALS')).toBe('NOEQUALS');
+  });
+
+  it('should handle values containing = signs', () => {
+    expect(maskSandboxEnvForLogging('MY_VAR=a=b=c')).toBe('MY_VAR=a=b=c');
+    expect(maskSandboxEnvForLogging('MY_API_KEY=a=b=c')).toBe(
+      'MY_API_KEY=***',
+    );
   });
 });
