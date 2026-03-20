@@ -28,13 +28,13 @@ describe('useHookDisplayState', () => {
     coreEvents.removeAllListeners(CoreEvent.HookEnd);
   });
 
-  it('should initialize with empty hooks', () => {
-    const { result } = renderHook(() => useHookDisplayState());
+  it('should initialize with empty hooks', async () => {
+    const { result } = await renderHook(() => useHookDisplayState());
     expect(result.current).toEqual([]);
   });
 
-  it('should add a hook when HookStart event is emitted', () => {
-    const { result } = renderHook(() => useHookDisplayState());
+  it('should add a hook when HookStart event is emitted', async () => {
+    const { result } = await renderHook(() => useHookDisplayState());
 
     const payload: HookStartPayload = {
       hookName: 'test-hook',
@@ -54,8 +54,8 @@ describe('useHookDisplayState', () => {
     });
   });
 
-  it('should remove a hook immediately if duration > minimum duration', () => {
-    const { result } = renderHook(() => useHookDisplayState());
+  it('should remove a hook immediately if duration > minimum duration', async () => {
+    const { result } = await renderHook(() => useHookDisplayState());
 
     const startPayload: HookStartPayload = {
       hookName: 'test-hook',
@@ -84,8 +84,8 @@ describe('useHookDisplayState', () => {
     expect(result.current).toHaveLength(0);
   });
 
-  it('should delay removal if duration < minimum duration', () => {
-    const { result } = renderHook(() => useHookDisplayState());
+  it('should delay removal if duration < minimum duration', async () => {
+    const { result } = await renderHook(() => useHookDisplayState());
 
     const startPayload: HookStartPayload = {
       hookName: 'test-hook',
@@ -122,8 +122,8 @@ describe('useHookDisplayState', () => {
     expect(result.current).toHaveLength(0);
   });
 
-  it('should handle multiple hooks correctly', () => {
-    const { result } = renderHook(() => useHookDisplayState());
+  it('should handle multiple hooks correctly', async () => {
+    const { result } = await renderHook(() => useHookDisplayState());
 
     act(() => {
       coreEvents.emitHookStart({ hookName: 'h1', eventName: 'e1' });
@@ -188,8 +188,8 @@ describe('useHookDisplayState', () => {
     expect(result.current).toHaveLength(0);
   });
 
-  it('should handle interleaved hooks with same name and event', () => {
-    const { result } = renderHook(() => useHookDisplayState());
+  it('should handle interleaved hooks with same name and event', async () => {
+    const { result } = await renderHook(() => useHookDisplayState());
     const hook = { hookName: 'same-hook', eventName: 'same-event' };
 
     // Start Hook 1 at t=0

@@ -13,23 +13,20 @@ import type { SessionBrowserState } from '../SessionBrowser.js';
 
 describe('SessionBrowser UI States', () => {
   it('SessionBrowserLoading renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = render(<SessionBrowserLoading />);
-    await waitUntilReady();
+    const { lastFrame } = await render(<SessionBrowserLoading />);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('SessionBrowserError renders correctly', async () => {
     const mockState = { error: 'Test error message' } as SessionBrowserState;
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <SessionBrowserError state={mockState} />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('SessionBrowserEmpty renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = render(<SessionBrowserEmpty />);
-    await waitUntilReady();
+    const { lastFrame } = await render(<SessionBrowserEmpty />);
     expect(lastFrame()).toMatchSnapshot();
   });
 });

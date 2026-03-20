@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
-import { waitFor } from '../../test-utils/async.js';
 import { useLogger } from './useLogger.js';
 import {
   sessionId as globalSessionId,
@@ -17,6 +17,8 @@ import {
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import type React from 'react';
 
+let deferredInit: { resolve: (val?: unknown) => void };
+
 // Mock Logger
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -24,7 +26,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     Logger: vi.fn().mockImplementation((id: string) => ({
-      initialize: vi.fn().mockResolvedValue(undefined),
+      initialize: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            deferredInit = { resolve };
+          }),
+      ),
       sessionId: id,
     })),
   };
@@ -41,9 +48,15 @@ describe('useLogger', () => {
   });
 
   it('should initialize with the global sessionId by default', async () => {
-    const { result } = renderHook(() => useLogger(mockStorage));
+    const { result } = await renderHook(() => useLogger(mockStorage));
 
-    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current).toBeNull();
+
+    await act(async () => {
+      deferredInit.resolve();
+    });
+
+    expect(result.current).not.toBeNull();
     expect(Logger).toHaveBeenCalledWith(globalSessionId, mockStorage);
   });
 
@@ -54,9 +67,17 @@ describe('useLogger', () => {
       </ConfigContext.Provider>
     );
 
-    const { result } = renderHook(() => useLogger(mockStorage), { wrapper });
+    const { result } = await renderHook(() => useLogger(mockStorage), {
+      wrapper,
+    });
 
-    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current).toBeNull();
+
+    await act(async () => {
+      deferredInit.resolve();
+    });
+
+    expect(result.current).not.toBeNull();
     expect(Logger).toHaveBeenCalledWith('active-session-id', mockStorage);
   });
 });

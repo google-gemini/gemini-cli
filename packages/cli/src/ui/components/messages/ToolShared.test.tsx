@@ -15,30 +15,27 @@ vi.mock('../GeminiRespondingSpinner.js', () => ({
 
 describe('McpProgressIndicator', () => {
   it('renders determinate progress at 50%', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <McpProgressIndicator progress={50} total={100} barWidth={20} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
     expect(output).toContain('50%');
   });
 
   it('renders complete progress at 100%', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <McpProgressIndicator progress={100} total={100} barWidth={20} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
     expect(output).toContain('100%');
   });
 
   it('renders indeterminate progress with raw count', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <McpProgressIndicator progress={7} barWidth={20} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
     expect(output).toContain('7');
@@ -46,7 +43,7 @@ describe('McpProgressIndicator', () => {
   });
 
   it('renders progress with a message', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <McpProgressIndicator
         progress={30}
         total={100}
@@ -54,17 +51,15 @@ describe('McpProgressIndicator', () => {
         barWidth={20}
       />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
     expect(output).toContain('Downloading...');
   });
 
   it('clamps progress exceeding total to 100%', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <McpProgressIndicator progress={150} total={100} barWidth={20} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('100%');
     expect(output).not.toContain('150%');

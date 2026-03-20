@@ -10,10 +10,9 @@ import { describe, it, expect } from 'vitest';
 
 describe('WarningMessage', () => {
   it('renders with the correct prefix and text', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <WarningMessage text="Watch out!" />,
     );
-    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -22,10 +21,9 @@ describe('WarningMessage', () => {
 
   it('renders multiline warning messages', async () => {
     const message = 'Warning line 1\nWarning line 2';
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <WarningMessage text={message} />,
     );
-    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();

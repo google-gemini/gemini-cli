@@ -14,9 +14,9 @@ describe('text-buffer performance', () => {
     vi.restoreAllMocks();
   });
 
-  it('should handle pasting large amounts of text efficiently', () => {
+  it('should handle pasting large amounts of text efficiently', async () => {
     const viewport = { width: 80, height: 24 };
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useTextBuffer({
         viewport,
       }),
@@ -39,7 +39,7 @@ describe('text-buffer performance', () => {
     expect(duration).toBeLessThan(5000);
   });
 
-  it('should handle character-by-character insertion in a large buffer efficiently', () => {
+  it('should handle character-by-character insertion in a large buffer efficiently', async () => {
     const lines = 5000;
     const initialText = Array.from(
       { length: lines },
@@ -47,7 +47,7 @@ describe('text-buffer performance', () => {
     ).join('\n');
     const viewport = { width: 80, height: 24 };
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useTextBuffer({
         initialText,
         viewport,

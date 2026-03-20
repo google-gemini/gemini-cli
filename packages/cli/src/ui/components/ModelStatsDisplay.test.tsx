@@ -59,11 +59,10 @@ const renderWithMockedStats = async (
     },
   } as unknown as LoadedSettings);
 
-  const result = render(
+  const result = await render(
     <ModelStatsDisplay currentModel={currentModel} />,
     width,
   );
-  await result.waitUntilReady();
   return result;
 };
 
@@ -529,14 +528,13 @@ describe('<ModelStatsDisplay />', () => {
       startNewPrompt: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ModelStatsDisplay
         selectedAuthType="oauth"
         userEmail="test@example.com"
         tier="Pro"
       />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Auth Method:');

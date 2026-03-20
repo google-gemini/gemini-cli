@@ -70,9 +70,9 @@ describe('useVim passthrough', () => {
       name: 'Ctrl-X',
       key: createKey({ name: 'x', ctrl: true, sequence: '\x18' }),
     },
-  ])('should pass through $name in $mode mode', ({ mode, key }) => {
+  ])('should pass through $name in $mode mode', async ({ mode, key }) => {
     mockVimContext.vimMode = mode;
-    const { result } = renderHook(() => useVim(mockBuffer as TextBuffer));
+    const { result } = await renderHook(() => useVim(mockBuffer as TextBuffer));
 
     let handled = true;
     act(() => {

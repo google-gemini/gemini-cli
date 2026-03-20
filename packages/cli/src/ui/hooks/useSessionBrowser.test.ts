@@ -100,7 +100,7 @@ describe('useSessionBrowser', () => {
     mockedGetSessionFiles.mockResolvedValue([mockSession]);
     mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
@@ -127,7 +127,7 @@ describe('useSessionBrowser', () => {
     } as SessionInfo;
     mockedFs.readFile.mockRejectedValue(new Error('File not found'));
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 
@@ -151,7 +151,7 @@ describe('useSessionBrowser', () => {
     } as SessionInfo;
     mockedFs.readFile.mockResolvedValue('invalid json');
 
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useSessionBrowser(mockConfig, mockOnLoadHistory),
     );
 

@@ -62,51 +62,53 @@ describe('useFlickerDetector', () => {
     vi.clearAllMocks();
   });
 
-  it('should not record a flicker when height is less than terminal height', () => {
+  it('should not record a flicker when height is less than terminal height', async () => {
     mockMeasureElement.mockReturnValue({ width: 80, height: 20 });
-    renderHook(() => useFlickerDetector(mockRef, 25));
+    await renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
     expect(mockAppEventsEmit).not.toHaveBeenCalled();
   });
 
-  it('should not record a flicker when height is equal to terminal height', () => {
+  it('should not record a flicker when height is equal to terminal height', async () => {
     mockMeasureElement.mockReturnValue({ width: 80, height: 25 });
-    renderHook(() => useFlickerDetector(mockRef, 25));
+    await renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
     expect(mockAppEventsEmit).not.toHaveBeenCalled();
   });
 
-  it('should record a flicker when height is greater than terminal height and height is constrained', () => {
+  it('should record a flicker when height is greater than terminal height and height is constrained', async () => {
     mockMeasureElement.mockReturnValue({ width: 80, height: 30 });
-    renderHook(() => useFlickerDetector(mockRef, 25));
+    await renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).toHaveBeenCalledTimes(1);
     expect(mockRecordFlickerFrame).toHaveBeenCalledWith(mockConfig);
     expect(mockAppEventsEmit).toHaveBeenCalledTimes(1);
     expect(mockAppEventsEmit).toHaveBeenCalledWith(AppEvent.Flicker);
   });
 
-  it('should NOT record a flicker when height is greater than terminal height but height is NOT constrained', () => {
+  it('should NOT record a flicker when height is greater than terminal height but height is NOT constrained', async () => {
     // Override default UI state for this test
     mockUseUIState.mockReturnValue({ constrainHeight: false });
     mockMeasureElement.mockReturnValue({ width: 80, height: 30 });
-    renderHook(() => useFlickerDetector(mockRef, 25));
+    await renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
     expect(mockAppEventsEmit).not.toHaveBeenCalled();
   });
 
-  it('should not check for flicker if the ref is not set', () => {
+  it('should not check for flicker if the ref is not set', async () => {
     mockRef.current = null;
     mockMeasureElement.mockReturnValue({ width: 80, height: 30 });
-    renderHook(() => useFlickerDetector(mockRef, 25));
+    await renderHook(() => useFlickerDetector(mockRef, 25));
     expect(mockMeasureElement).not.toHaveBeenCalled();
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
     expect(mockAppEventsEmit).not.toHaveBeenCalled();
   });
 
-  it('should re-evaluate on re-render', () => {
+  it('should re-evaluate on re-render', async () => {
     // Start with a valid height
     mockMeasureElement.mockReturnValue({ width: 80, height: 20 });
-    const { rerender } = renderHook(() => useFlickerDetector(mockRef, 25));
+    const { rerender } = await renderHook(() =>
+      useFlickerDetector(mockRef, 25),
+    );
     expect(mockRecordFlickerFrame).not.toHaveBeenCalled();
 
     // Now, simulate a re-render where the height is too great

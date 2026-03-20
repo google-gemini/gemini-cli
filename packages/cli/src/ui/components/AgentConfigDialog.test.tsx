@@ -126,7 +126,6 @@ describe('AgentConfigDialog', () => {
       />,
       { settings, uiState: { mainAreaWidth: 100 } },
     );
-    await result.waitUntilReady();
     return result;
   };
 

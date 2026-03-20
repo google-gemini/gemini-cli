@@ -22,8 +22,7 @@ describe('CopyModeWarning', () => {
     mockUseUIState.mockReturnValue({
       copyModeEnabled: false,
     } as unknown as UIState);
-    const { lastFrame, waitUntilReady, unmount } = render(<CopyModeWarning />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<CopyModeWarning />);
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -32,8 +31,7 @@ describe('CopyModeWarning', () => {
     mockUseUIState.mockReturnValue({
       copyModeEnabled: true,
     } as unknown as UIState);
-    const { lastFrame, waitUntilReady, unmount } = render(<CopyModeWarning />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<CopyModeWarning />);
     expect(lastFrame()).toContain('In Copy Mode');
     expect(lastFrame()).toContain('Use Page Up/Down to scroll');
     expect(lastFrame()).toContain('Press Ctrl+S or any other key to exit');

@@ -66,13 +66,13 @@ describe('useConsoleMessages', () => {
     };
   };
 
-  const renderConsoleMessagesHook = () => {
+  const renderConsoleMessagesHook = async () => {
     let hookResult: ReturnType<typeof useTestableConsoleMessages>;
     function TestComponent() {
       hookResult = useTestableConsoleMessages();
       return null;
     }
-    const { unmount } = render(<TestComponent />);
+    const { unmount } = await render(<TestComponent />);
     return {
       result: {
         get current() {
@@ -83,13 +83,13 @@ describe('useConsoleMessages', () => {
     };
   };
 
-  it('should initialize with an empty array of console messages', () => {
-    const { result } = renderConsoleMessagesHook();
+  it('should initialize with an empty array of console messages', async () => {
+    const { result } = await renderConsoleMessagesHook();
     expect(result.current.consoleMessages).toEqual([]);
   });
 
   it('should add a new message when log is called', async () => {
-    const { result } = renderConsoleMessagesHook();
+    const { result } = await renderConsoleMessagesHook();
 
     act(() => {
       result.current.log('Test message');
@@ -105,7 +105,7 @@ describe('useConsoleMessages', () => {
   });
 
   it('should batch and count identical consecutive messages', async () => {
-    const { result } = renderConsoleMessagesHook();
+    const { result } = await renderConsoleMessagesHook();
 
     act(() => {
       result.current.log('Test message');
@@ -123,7 +123,7 @@ describe('useConsoleMessages', () => {
   });
 
   it('should not batch different messages', async () => {
-    const { result } = renderConsoleMessagesHook();
+    const { result } = await renderConsoleMessagesHook();
 
     act(() => {
       result.current.log('First message');
@@ -141,7 +141,7 @@ describe('useConsoleMessages', () => {
   });
 
   it('should clear all messages when clearConsoleMessages is called', async () => {
-    const { result } = renderConsoleMessagesHook();
+    const { result } = await renderConsoleMessagesHook();
 
     act(() => {
       result.current.log('A message');
@@ -160,8 +160,8 @@ describe('useConsoleMessages', () => {
     expect(result.current.consoleMessages).toHaveLength(0);
   });
 
-  it('should clear the pending timeout when clearConsoleMessages is called', () => {
-    const { result } = renderConsoleMessagesHook();
+  it('should clear the pending timeout when clearConsoleMessages is called', async () => {
+    const { result } = await renderConsoleMessagesHook();
     const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
     act(() => {
@@ -176,8 +176,8 @@ describe('useConsoleMessages', () => {
     // clearTimeoutSpy.mockRestore() is handled by afterEach restoreAllMocks
   });
 
-  it('should clean up the timeout on unmount', () => {
-    const { result, unmount } = renderConsoleMessagesHook();
+  it('should clean up the timeout on unmount', async () => {
+    const { result, unmount } = await renderConsoleMessagesHook();
     const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
     act(() => {
