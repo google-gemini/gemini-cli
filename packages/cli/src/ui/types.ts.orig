@@ -48,7 +48,6 @@ export enum StreamingState {
 export enum GeminiEventType {
   Content = 'content',
   ToolCallRequest = 'tool_call_request',
-  SystemMessage = 'system_message',
   // Add other event types if the UI hook needs to handle them
 }
 

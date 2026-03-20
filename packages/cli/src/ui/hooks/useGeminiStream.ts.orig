@@ -1298,19 +1298,6 @@ export const useGeminiStream = (
     ],
   );
 
-  const handleSystemMessageEvent = useCallback(
-    (systemMessage: string, userMessageTimestamp: number) => {
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: systemMessage,
-        },
-        userMessageTimestamp,
-      );
-    },
-    [addItem],
-  );
-
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -1348,9 +1335,6 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
-            break;
-          case ServerGeminiEventType.SystemMessage:
-            handleSystemMessageEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
             handleAgentExecutionStoppedEvent(
@@ -1431,7 +1415,6 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
-      handleSystemMessageEvent,
       handleAgentExecutionStoppedEvent,
       handleAgentExecutionBlockedEvent,
       addItem,
