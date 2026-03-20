@@ -111,6 +111,7 @@ vi.mock(
         }),
       })),
       logToolCall: vi.fn(),
+      updatePolicy: vi.fn(),
       isWithinRoot: vi.fn().mockReturnValue(true),
       LlmRole: {
         MAIN: 'main',
@@ -656,6 +657,9 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      get messageBus() {
+        return mockMessageBus;
+      },
       getPolicyEngine: vi.fn().mockReturnValue({}),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -966,6 +970,15 @@ describe('Session', () => {
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+    );
+    const { updatePolicy } = await import('@google/gemini-cli-core');
+    expect(updatePolicy).toHaveBeenCalledWith(
+      mockTool,
+      ToolConfirmationOutcome.ProceedOnce,
+      expect.objectContaining({ type: 'info' }),
+      expect.anything(),
+      mockMessageBus,
+      expect.anything(),
     );
   });
 
