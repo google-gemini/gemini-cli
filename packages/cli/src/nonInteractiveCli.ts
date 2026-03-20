@@ -298,9 +298,11 @@ export async function runNonInteractive({
         message: geminiPartsToContentParts(query),
       });
 
-      const getFirstText = (parts?: ContentPart[]): string | undefined => {
-        const part = parts?.[0];
-        return part?.type === 'text' ? part.text : undefined;
+      const getTextContent = (parts?: ContentPart[]): string | undefined => {
+        const text = parts
+          ?.map((part) => (part.type === 'text' ? part.text : ''))
+          .join('');
+        return text ? text : undefined;
       };
 
       const emitFinalSuccessResult = (): void => {
@@ -396,8 +398,8 @@ export async function runNonInteractive({
           case 'tool_response': {
             textOutput.ensureTrailingNewline();
             if (streamFormatter) {
-              const displayText = getFirstText(event.displayContent);
-              const errorMsg = getFirstText(event.content) ?? 'Tool error';
+              const displayText = getTextContent(event.displayContent);
+              const errorMsg = getTextContent(event.content) ?? 'Tool error';
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_RESULT,
                 timestamp: new Date().toISOString(),
@@ -416,8 +418,8 @@ export async function runNonInteractive({
               });
             }
             if (event.isError) {
-              const displayText = getFirstText(event.displayContent);
-              const errorMsg = getFirstText(event.content) ?? 'Tool error';
+              const displayText = getTextContent(event.displayContent);
+              const errorMsg = getTextContent(event.content) ?? 'Tool error';
 
               if (event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION) {
                 const stopMessage = `Agent execution stopped: ${errorMsg}`;
