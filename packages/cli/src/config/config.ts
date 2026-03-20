@@ -420,6 +420,8 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  /** Skip extension loading (used for early config loads that only need auth). */
+  skipExtensions?: boolean;
 }
 
 export async function loadCliConfig(
@@ -428,7 +430,7 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const { cwd = process.cwd(), projectHooks, skipExtensions } = options;
   const debugMode = isDebugMode(argv);
 
   if (argv.sandbox) {
@@ -510,7 +512,9 @@ export async function loadCliConfig(
     eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
     clientVersion: await getVersion(),
   });
-  await extensionManager.loadExtensions();
+  if (!skipExtensions) {
+    await extensionManager.loadExtensions();
+  }
 
   const extensionPlanSettings = extensionManager
     .getExtensions()
