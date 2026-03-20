@@ -880,9 +880,7 @@ export class Task {
     if (
       part.kind !== 'data' ||
       !part.data ||
-      // eslint-disable-next-line no-restricted-syntax
       typeof part.data['callId'] !== 'string' ||
-      // eslint-disable-next-line no-restricted-syntax
       typeof part.data['outcome'] !== 'string'
     ) {
       return false;
