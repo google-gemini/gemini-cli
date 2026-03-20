@@ -92,11 +92,6 @@ export class UserSimulator {
           : '';
 
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
-Here is the current terminal screen output:
-
-<screen>
-${strippedScreen}
-</screen>
 Look carefully at the screen and determine the CLI's current state:
 
 STATE 1: The agent is busy (e.g., streaming a response, showing a spinner, running a tool, or displaying a timer like "7s"). It is actively working and NOT waiting for text input.
@@ -119,7 +114,13 @@ CRITICAL RULES:
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
 - RULE 3: Output ONLY the raw characters to send, <WAIT>, or <DONE>.
 - RULE 4: Do NOT output markdown, explanations of your thought process, or quotes.
-${goalInstruction}${historyInstruction}`;
+${goalInstruction}${historyInstruction}
+
+Here is the current terminal screen output:
+
+<screen>
+${strippedScreen}
+</screen>`;
 
       if (this.interactionsFile) {
         fs.appendFileSync(
