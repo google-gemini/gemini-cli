@@ -210,8 +210,14 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const callId = activity.data['id']
               ? String(activity.data['id'])
               : undefined;
-            // Find the tool call by ID
-            // Find the tool call by ID
+            const data = activity.data['data'];
+            const isError =
+              data &&
+              typeof data === 'object' &&
+              'exitCode' in data &&
+              data.exitCode !== undefined &&
+              data.exitCode !== 0;
+
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
@@ -219,7 +225,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
                 recentActivity[i].id === callId &&
                 recentActivity[i].status === 'running'
               ) {
-                recentActivity[i].status = 'completed';
+                recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
                 break;
               }

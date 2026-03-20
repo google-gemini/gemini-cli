@@ -166,14 +166,21 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           }
           case 'TOOL_CALL_END': {
             const name = String(activity.data['name']);
-            // Find the last running tool call with this name
+            const data = activity.data['data'];
+            const isError =
+              data &&
+              typeof data === 'object' &&
+              'exitCode' in data &&
+              data.exitCode !== undefined &&
+              data.exitCode !== 0;
+
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
                 recentActivity[i].content === name &&
                 recentActivity[i].status === 'running'
               ) {
-                recentActivity[i].status = 'completed';
+                recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
                 break;
               }
