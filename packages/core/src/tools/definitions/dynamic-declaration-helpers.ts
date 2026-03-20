@@ -26,6 +26,8 @@ import {
   PARAM_ADDITIONAL_PERMISSIONS,
   CREATE_NEW_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_PREVIOUS_SUMMARY,
+  TOPIC_PARAM_CURRENT_SUMMARY,
 } from './base-declarations.js';
 
 /**
@@ -214,7 +216,7 @@ export function getCreateNewTopicDeclaration(): FunctionDeclaration {
   return {
     name: CREATE_NEW_TOPIC_TOOL_NAME,
     description:
-      'Organizes work into a new "Chapter" or "Topic". Call this when transitioning between major phases (e.g., from Research to Implementation).',
+      'Organizes work into a granular, single-focus "Chapter" or "Topic". You MUST NOT combine distinct phases (e.g., do NOT use "Researching and Implementing"). Use specific, singular titles like "Researching", "Planning", or "Implementing [Specific Idea]". If your work deviates from the current topic\'s stated goal, you MUST create a new topic to reflect the shift (e.g., "Implementing [New Idea]"). When shifting topics, you MUST provide a detailed summary (5-10 sentences) of the work completed in the previous topic and a clear statement of what the new topic aims to achieve.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -222,8 +224,18 @@ export function getCreateNewTopicDeclaration(): FunctionDeclaration {
           type: 'string',
           description: 'The title of the new topic or chapter.',
         },
+        [TOPIC_PARAM_PREVIOUS_SUMMARY]: {
+          type: 'string',
+          description:
+            '(OPTIONAL) A detailed summary (5-10 sentences) of the work completed in the previous topic. This is required when transitioning between topics to maintain continuity.',
+        },
+        [TOPIC_PARAM_CURRENT_SUMMARY]: {
+          type: 'string',
+          description:
+            'A detailed explanation (5-10 sentences) of what the new topic intends to achieve. This is mandatory for all new topics to provide clear strategic intent.',
+        },
       },
-      required: [TOPIC_PARAM_TITLE],
+      required: [TOPIC_PARAM_TITLE, TOPIC_PARAM_CURRENT_SUMMARY],
     },
   };
 }

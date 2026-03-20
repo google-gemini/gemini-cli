@@ -11,6 +11,8 @@ import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
   CREATE_NEW_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_PREVIOUS_SUMMARY,
+  TOPIC_PARAM_CURRENT_SUMMARY,
 } from './definitions/base-declarations.js';
 import type { Config } from '../config/config.js';
 
@@ -79,16 +81,37 @@ describe('CreateNewTopicTool', () => {
     expect(tool.displayName).toBe('Create New Topic');
   });
 
-  it('should update TopicState on execute', async () => {
-    const invocation = tool.build({ [TOPIC_PARAM_TITLE]: 'New Chapter' });
+  it('should update TopicState and include current goal on execute', async () => {
+    const invocation = tool.build({
+      [TOPIC_PARAM_TITLE]: 'New Chapter',
+      [TOPIC_PARAM_CURRENT_SUMMARY]: 'The goal is to implement X',
+    });
     const result = await invocation.execute(new AbortController().signal);
 
-    expect(result.llmContent).toBe('Current topic: "New Chapter"');
+    expect(result.llmContent).toContain('Current topic: "New Chapter"');
+    expect(result.llmContent).toContain(
+      'Topic goal: The goal is to implement X',
+    );
     expect(mockConfig.topicState.getTopic()).toBe('New Chapter');
   });
 
+  it('should include previous summary if provided', async () => {
+    const invocation = tool.build({
+      [TOPIC_PARAM_TITLE]: 'New Chapter',
+      [TOPIC_PARAM_CURRENT_SUMMARY]: 'The goal is to implement X',
+      [TOPIC_PARAM_PREVIOUS_SUMMARY]: 'Finished Y',
+    });
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('Previous topic summary: Finished Y');
+    expect(result.llmContent).toContain('Current topic: "New Chapter"');
+  });
+
   it('should return error if title is invalid after sanitization', async () => {
-    const invocation = tool.build({ [TOPIC_PARAM_TITLE]: '  \n  ' });
+    const invocation = tool.build({
+      [TOPIC_PARAM_TITLE]: '  \n  ',
+      [TOPIC_PARAM_CURRENT_SUMMARY]: 'Goal',
+    });
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.error).toBeDefined();
