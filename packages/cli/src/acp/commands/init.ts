@@ -22,7 +22,7 @@ export class InitCommand implements Command {
     context: CommandContext,
     _args: string[] = [],
   ): Promise<CommandExecutionResponse> {
-    const targetDir = context.config.getTargetDir();
+    const targetDir = context.agentContext.config.getTargetDir();
     if (!targetDir) {
       throw new Error('Command requires a workspace.');
     }
