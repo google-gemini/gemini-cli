@@ -637,6 +637,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  autoDistillation?: boolean;
   experimentalMemoryManager?: boolean;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
@@ -863,6 +864,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly autoDistillation: boolean;
   private readonly experimentalMemoryManager: boolean;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1028,6 +1030,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
+    this.autoDistillation = params.autoDistillation ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
@@ -2184,6 +2187,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  isAutoDistillationEnabled(): boolean {
+    return this.autoDistillation;
   }
 
   isMemoryManagerEnabled(): boolean {
