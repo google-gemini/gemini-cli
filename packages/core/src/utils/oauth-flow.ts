@@ -361,20 +361,24 @@ async function parseTokenEndpointResponse(
       data &&
       typeof data === 'object' &&
       'access_token' in data &&
+       
       typeof (data as Record<string, unknown>)['access_token'] === 'string'
     ) {
       const obj = data as Record<string, unknown>;
       const result: OAuthTokenResponse = {
         access_token: String(obj['access_token']),
         token_type:
+           
           typeof obj['token_type'] === 'string' ? obj['token_type'] : 'Bearer',
         expires_in:
+           
           typeof obj['expires_in'] === 'number' ? obj['expires_in'] : undefined,
         refresh_token:
+           
           typeof obj['refresh_token'] === 'string'
             ? obj['refresh_token']
             : undefined,
-
+         
         scope: typeof obj['scope'] === 'string' ? obj['scope'] : undefined,
       };
       return result;
