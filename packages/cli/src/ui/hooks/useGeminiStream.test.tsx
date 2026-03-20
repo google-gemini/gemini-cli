@@ -52,6 +52,7 @@ import {
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  CompressionStatus,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -2598,7 +2599,7 @@ describe('useGeminiStream', () => {
             value: {
               originalTokenCount: 1000,
               newTokenCount: 500,
-              compressionStatus: 'compressed',
+              compressionStatus: CompressionStatus.COMPRESSED,
             },
           };
           yield {
@@ -2635,7 +2636,7 @@ describe('useGeminiStream', () => {
               isPending: false,
               beforePercentage: 10,
               afterPercentage: 5,
-              compressionStatus: 'compressed',
+              compressionStatus: CompressionStatus.COMPRESSED,
               isManual: false,
               thresholdPercentage: 20,
             },
@@ -2659,7 +2660,7 @@ describe('useGeminiStream', () => {
             value: {
               originalTokenCount: 1000,
               newTokenCount: 500,
-              compressionStatus: 'compressed',
+              compressionStatus: CompressionStatus.COMPRESSED,
             },
           };
           yield {
@@ -2712,7 +2713,7 @@ describe('useGeminiStream', () => {
             value: {
               originalTokenCount: 1000,
               newTokenCount: 500,
-              compressionStatus: 'compressed',
+              compressionStatus: CompressionStatus.COMPRESSED,
               requestTokenCount: 2500, // 25% > 20%
             },
           };
@@ -2749,7 +2750,7 @@ describe('useGeminiStream', () => {
             compression: expect.objectContaining({
               beforePercentage: 10,
               afterPercentage: 5,
-              compressionStatus: 'compressed',
+              compressionStatus: CompressionStatus.COMPRESSED,
               isManual: false,
               thresholdPercentage: 20,
             }),
