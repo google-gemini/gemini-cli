@@ -15,11 +15,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 
-/**
- * A simple asynchronous wrapper for execFile that returns the exit status,
- * stdout, and stderr. Unlike spawnSync, this does not block the Node.js
- * event loop, allowing the local HTTP test server to function.
- */
 async function runCommand(command: SandboxedCommand) {
   try {
     const { stdout, stderr } = await promisify(execFile)(
@@ -33,11 +28,7 @@ async function runCommand(command: SandboxedCommand) {
     );
     return { status: 0, stdout, stderr };
   } catch (error: unknown) {
-    const err = error as {
-      code?: number;
-      stdout?: string;
-      stderr?: string;
-    };
+    const err = error as { code?: number; stdout?: string; stderr?: string };
     return {
       status: err.code ?? 1,
       stdout: err.stdout ?? '',
@@ -50,7 +41,7 @@ describe.skipIf(os.platform() !== 'darwin')(
   'MacOsSandboxManager Integration',
   () => {
     describe('Basic Execution', () => {
-      it('should execute commands within the workspace', async () => {
+      it('executes commands within the workspace', async () => {
         const manager = new MacOsSandboxManager({ workspace: process.cwd() });
         const command = await manager.prepareCommand({
           command: 'echo',
@@ -59,23 +50,18 @@ describe.skipIf(os.platform() !== 'darwin')(
           env: process.env,
         });
 
-        const execResult = await runCommand(command);
-
-        expect(execResult.status).toBe(0);
-        expect(execResult.stdout.trim()).toBe('sandbox test');
+        const result = await runCommand(command);
+        expect(result.status).toBe(0);
+        expect(result.stdout.trim()).toBe('sandbox test');
       });
 
-      it('should support interactive pseudo-terminals (node-pty)', async () => {
+      it('supports interactive pseudo-terminals (node-pty)', async () => {
         const manager = new MacOsSandboxManager({ workspace: process.cwd() });
-        const abortController = new AbortController();
-
-        // Verify that node-pty file descriptors are successfully allocated inside the sandbox
-        // by using the bash [ -t 1 ] idiom to check if stdout is a TTY.
         const handle = await ShellExecutionService.execute(
           'bash -c "if [ -t 1 ]; then echo True; else echo False; fi"',
           process.cwd(),
           () => {},
-          abortController.signal,
+          new AbortController().signal,
           true,
           {
             sanitizationConfig: getSecureSanitizationConfig(),
@@ -84,122 +70,139 @@ describe.skipIf(os.platform() !== 'darwin')(
         );
 
         const result = await handle.result;
-        expect(result.error).toBeNull();
         expect(result.exitCode).toBe(0);
         expect(result.output).toContain('True');
       });
     });
 
     describe('File System Access', () => {
-      it('should block file system access outside the workspace', async () => {
+      it('blocks access outside the workspace', async () => {
         const manager = new MacOsSandboxManager({ workspace: process.cwd() });
-        const blockedPath = '/Users/Shared/.gemini_test_sandbox_blocked';
-
         const command = await manager.prepareCommand({
           command: 'touch',
-          args: [blockedPath],
+          args: ['/Users/Shared/.gemini_test_blocked'],
           cwd: process.cwd(),
           env: process.env,
         });
-        const execResult = await runCommand(command);
-
-        expect(execResult.status).not.toBe(0);
-        expect(execResult.stderr).toContain('Operation not permitted');
+        const result = await runCommand(command);
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Operation not permitted');
       });
 
-      it('should grant file system access to explicitly allowed paths', async () => {
-        // Create a unique temporary directory to prevent artifacts and test flakiness
-        const allowedDir = fs.mkdtempSync(
-          path.join(os.tmpdir(), 'gemini-sandbox-test-'),
-        );
-
+      it('grants access to explicitly allowed paths', async () => {
+        const allowedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'allowed-'));
         try {
-          const manager = new MacOsSandboxManager({
-            workspace: process.cwd(),
-          });
-          const testFile = path.join(allowedDir, 'test.txt');
-
+          const manager = new MacOsSandboxManager({ workspace: process.cwd() });
           const command = await manager.prepareCommand({
             command: 'touch',
-            args: [testFile],
+            args: [path.join(allowedDir, 'test.txt')],
             cwd: process.cwd(),
             env: process.env,
-            policy: {
-              allowedPaths: [allowedDir],
-            },
+            policy: { allowedPaths: [allowedDir] },
           });
-
-          const execResult = await runCommand(command);
-
-          expect(execResult.status).toBe(0);
+          const result = await runCommand(command);
+          expect(result.status).toBe(0);
         } finally {
           fs.rmSync(allowedDir, { recursive: true, force: true });
+        }
+      });
+
+      it('blocks access to forbidden paths within the workspace', async () => {
+        const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-'));
+        const forbiddenDir = path.join(workspace, 'forbidden');
+        fs.mkdirSync(forbiddenDir);
+
+        try {
+          const manager = new MacOsSandboxManager({ workspace });
+          const command = await manager.prepareCommand({
+            command: 'touch',
+            args: [path.join(forbiddenDir, 'test.txt')],
+            cwd: workspace,
+            env: process.env,
+            policy: { forbiddenPaths: [forbiddenDir] },
+          });
+          const result = await runCommand(command);
+          expect(result.status).not.toBe(0);
+          expect(result.stderr).toContain('Operation not permitted');
+        } finally {
+          fs.rmSync(workspace, { recursive: true, force: true });
+        }
+      });
+
+      it('prioritizes forbiddenPaths over allowedPaths', async () => {
+        const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-'));
+        const conflictDir = path.join(workspace, 'conflict');
+        fs.mkdirSync(conflictDir);
+
+        try {
+          const manager = new MacOsSandboxManager({ workspace });
+          const command = await manager.prepareCommand({
+            command: 'touch',
+            args: [path.join(conflictDir, 'test.txt')],
+            cwd: workspace,
+            env: process.env,
+            policy: {
+              allowedPaths: [conflictDir],
+              forbiddenPaths: [conflictDir],
+            },
+          });
+          const result = await runCommand(command);
+          expect(result.status).not.toBe(0);
+          expect(result.stderr).toContain('Operation not permitted');
+        } finally {
+          fs.rmSync(workspace, { recursive: true, force: true });
         }
       });
     });
 
     describe('Network Access', () => {
-      let testServer: http.Server;
-      let testServerUrl: string;
+      let server: http.Server;
+      let url: string;
 
       beforeAll(async () => {
-        testServer = http.createServer((_, res) => {
-          // Ensure connections are closed immediately to prevent hanging
+        server = http.createServer((_, res) => {
           res.setHeader('Connection', 'close');
           res.writeHead(200);
           res.end('ok');
         });
-
         await new Promise<void>((resolve, reject) => {
-          testServer.on('error', reject);
-          testServer.listen(0, '127.0.0.1', () => {
-            const address = testServer.address() as import('net').AddressInfo;
-            testServerUrl = `http://127.0.0.1:${address.port}`;
+          server.on('error', reject);
+          server.listen(0, '127.0.0.1', () => {
+            const addr = server.address() as import('net').AddressInfo;
+            url = `http://127.0.0.1:${addr.port}`;
             resolve();
           });
         });
       });
 
       afterAll(async () => {
-        if (testServer) {
-          await new Promise<void>((resolve) => {
-            testServer.close(() => resolve());
-          });
-        }
+        if (server) await new Promise<void>((res) => server.close(() => res()));
       });
 
-      it('should block network access by default', async () => {
+      it('blocks network access by default', async () => {
         const manager = new MacOsSandboxManager({ workspace: process.cwd() });
         const command = await manager.prepareCommand({
           command: 'curl',
-          args: ['-s', '--connect-timeout', '1', testServerUrl],
+          args: ['-s', '--connect-timeout', '1', url],
           cwd: process.cwd(),
           env: process.env,
         });
-
-        const execResult = await runCommand(command);
-
-        expect(execResult.status).not.toBe(0);
+        const result = await runCommand(command);
+        expect(result.status).not.toBe(0);
       });
 
-      it('should grant network access when explicitly allowed', async () => {
-        const manager = new MacOsSandboxManager({
-          workspace: process.cwd(),
-        });
+      it('grants network access when explicitly allowed', async () => {
+        const manager = new MacOsSandboxManager({ workspace: process.cwd() });
         const command = await manager.prepareCommand({
           command: 'curl',
-          args: ['-s', '--connect-timeout', '1', testServerUrl],
+          args: ['-s', '--connect-timeout', '1', url],
           cwd: process.cwd(),
           env: process.env,
-          policy: {
-            networkAccess: true,
-          },
+          policy: { networkAccess: true },
         });
-
-        const execResult = await runCommand(command);
-
-        expect(execResult.status).toBe(0);
-        expect(execResult.stdout.trim()).toBe('ok');
+        const result = await runCommand(command);
+        expect(result.status).toBe(0);
+        expect(result.stdout.trim()).toBe('ok');
       });
     });
   },
