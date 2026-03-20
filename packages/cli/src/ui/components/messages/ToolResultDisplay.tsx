@@ -80,7 +80,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   // 1. Early return for background tools (Todos)
   if (typeof resultDisplay === 'object' && 'todos' in resultDisplay) {
-    // display nothing, as the TodoTray will handle rendering todos
+    // display nothing, as the TasksTray will handle rendering todos
     return null;
   }
 
