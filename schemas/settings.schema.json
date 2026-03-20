@@ -2663,6 +2663,13 @@
           "default": true,
           "type": "boolean"
         },
+        "worktrees": {
+          "title": "Enable Git Worktrees",
+          "description": "Enable automated Git worktree management for parallel work.",
+          "markdownDescription": "Enable automated Git worktree management for parallel work.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionManagement": {
           "title": "Extension Management",
           "description": "Enable extension management features.",
