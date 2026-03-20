@@ -436,7 +436,9 @@ describe('SettingsSchema', () => {
       expect(setting.default).toBe(false);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe('Enable git worktrees.');
+      expect(setting.description).toBe(
+        'Enable automated Git worktree management for parallel work.',
+      );
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {
