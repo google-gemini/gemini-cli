@@ -47,8 +47,8 @@ describe('compressCommand', () => {
         isPending: true,
         beforePercentage: null,
         afterPercentage: null,
-        threshold: null,
         compressionStatus: null,
+        isManual: true,
       },
     };
     await compressCommand.action!(context, '');
@@ -80,7 +80,7 @@ describe('compressCommand', () => {
         compressionStatus: null,
         beforePercentage: null,
         afterPercentage: null,
-        threshold: null,
+        isManual: true,
       },
     });
 
@@ -97,7 +97,7 @@ describe('compressCommand', () => {
           compressionStatus: Core.CompressionStatus.COMPRESSED,
           beforePercentage: 20,
           afterPercentage: 10,
-          threshold: 20,
+          isManual: true,
         },
       },
       expect.any(Number),

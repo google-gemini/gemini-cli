@@ -1152,9 +1152,10 @@ export const useGeminiStream = (
         eventValue?.newTokenCount != null
           ? Math.round((eventValue.newTokenCount / limit) * 100)
           : null;
-      const threshold = Math.round(
-        config.getContextWindowCompressionThreshold() * 100,
-      );
+
+      if (!config.getShowContextCompression()) {
+        return;
+      }
 
       addItem(
         {
@@ -1163,8 +1164,8 @@ export const useGeminiStream = (
             isPending: false,
             beforePercentage,
             afterPercentage,
-            threshold,
             compressionStatus: eventValue?.compressionStatus ?? null,
+            isManual: false,
           },
           timestamp: new Date(userMessageTimestamp),
         } as HistoryItemWithoutId,

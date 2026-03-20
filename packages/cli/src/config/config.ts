@@ -956,6 +956,7 @@ export async function loadCliConfig(
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
     showContextWindowWarning: settings.ui?.showContextWindowWarning,
+    showContextCompression: settings.ui?.showContextCompression,
 
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,

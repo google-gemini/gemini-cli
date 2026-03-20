@@ -590,6 +590,15 @@ const SETTINGS_SCHEMA = {
           'Show a warning message when the context window limit is nearly reached.',
         showInDialog: true,
       },
+      showContextCompression: {
+        type: 'boolean',
+        label: 'Show Context Compression Events',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show a message when the chat history is compressed.',
+        showInDialog: true,
+      },
       footer: {
         type: 'object',
         label: 'Footer',

@@ -140,8 +140,8 @@ export interface CompressionProps {
   isPending: boolean;
   beforePercentage: number | null;
   afterPercentage: number | null;
-  threshold: number | null;
   compressionStatus: CompressionStatus | null;
+  isManual?: boolean;
 }
 
 /**

@@ -674,6 +674,7 @@ export interface ConfigParameters {
   }>;
   enableConseca?: boolean;
   showContextWindowWarning?: boolean;
+  showContextCompression?: boolean;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -710,6 +711,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
   private readonly showContextWindowWarning: boolean;
+  private readonly showContextCompression: boolean;
 
   private readonly coreTools: string[] | undefined;
   private readonly mainAgentTools: string[] | undefined;
@@ -1149,6 +1151,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
     this.showContextWindowWarning = params.showContextWindowWarning ?? false;
+    this.showContextCompression = params.showContextCompression ?? false;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -2058,6 +2061,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getShowContextWindowWarning(): boolean {
     return this.showContextWindowWarning;
+  }
+
+  getShowContextCompression(): boolean {
+    return this.showContextCompression;
   }
 
   getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {

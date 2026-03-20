@@ -47,8 +47,8 @@ export const compressCommand: SlashCommand = {
         isPending: true,
         beforePercentage: null,
         afterPercentage: null,
-        threshold: null,
         compressionStatus: null,
+        isManual: true,
       },
     };
 
@@ -76,8 +76,8 @@ export const compressCommand: SlashCommand = {
               isPending: false,
               beforePercentage,
               afterPercentage,
-              threshold,
               compressionStatus: compressed.compressionStatus,
+              isManual: true,
             },
           } as HistoryItemCompression,
           Date.now(),
