@@ -20,7 +20,7 @@ import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
  * forbidden. Evals must test against the full, default tool set to ensure
  * realistic behavior.
  */
-type EvalConfigOverrides = Record<string, unknown> & {
+interface EvalConfigOverrides {
   /** Restricting tools via excludeTools in evals is forbidden. */
   excludeTools?: never;
   /** Restricting tools via coreTools in evals is forbidden. */
@@ -29,7 +29,8 @@ type EvalConfigOverrides = Record<string, unknown> & {
   allowedTools?: never;
   /** Restricting tools via mainAgentTools in evals is forbidden. */
   mainAgentTools?: never;
-};
+  [key: string]: unknown;
+}
 
 export interface AppEvalCase {
   name: string;
