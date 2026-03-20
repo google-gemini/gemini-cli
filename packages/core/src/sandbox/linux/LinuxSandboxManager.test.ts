@@ -10,11 +10,11 @@ import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 
 vi.mock('node:fs', async () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual = (await vi.importActual('node:fs')) as any;
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
     ...actual,
     default: {
+      // @ts-expect-error - Property 'default' does not exist on type 'typeof import("node:fs")'
       ...actual.default,
       existsSync: vi.fn(() => true),
       realpathSync: vi.fn((p: string | Buffer) => p.toString()),
