@@ -1008,11 +1008,13 @@ export class Session {
 
         await confirmationDetails.onConfirm(outcome);
 
+        const { onConfirm: _onConfirm, ...serializableDetails } =
+          confirmationDetails;
+
         await updatePolicy(
           tool,
           outcome,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-          confirmationDetails as any, // SerializableConfirmationDetails structure matches what updatePolicy needs
+          serializableDetails,
           this.context,
           this.context.messageBus,
           invocation,
