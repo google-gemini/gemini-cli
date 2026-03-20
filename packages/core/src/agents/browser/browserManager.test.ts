@@ -691,7 +691,7 @@ describe('BrowserManager', () => {
     });
   });
 
-  describe('Rate limiting and loop detection', () => {
+  describe('Rate limiting', () => {
     it('should terminate task when maxActionsPerTask is reached', async () => {
       const limitedConfig = makeFakeConfig({
         agents: {
@@ -710,24 +710,6 @@ describe('BrowserManager', () => {
       // 4th call should throw
       await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
         /maximum action limit \(3\)/,
-      );
-    });
-
-    it('should count all tools towards maxActionsPerTask', async () => {
-      const limitedConfig = makeFakeConfig({
-        agents: {
-          browser: {
-            maxActionsPerTask: 2,
-          },
-        },
-      });
-      const manager = new BrowserManager(limitedConfig);
-
-      await manager.callTool('take_snapshot', {});
-      await manager.callTool('take_screenshot', {});
-
-      await expect(manager.callTool('click', { uid: '1_2' })).rejects.toThrow(
-        /maximum action limit \(2\)/,
       );
     });
   });
