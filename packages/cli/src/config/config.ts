@@ -774,7 +774,6 @@ export async function loadCliConfig(
     }
   }
 
-  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
   let clientName: string | undefined = undefined;
   if (isAcpMode) {
     const ide = detectIdeFromEnv();
