@@ -834,7 +834,8 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: false,
-        description: 'Enable voice input support.',
+        description:
+          'Enable voice input support. Note: Voice input is not natively supported in WSL2 (Windows Subsystem for Linux).',
         showInDialog: true,
       },
       provider: {
