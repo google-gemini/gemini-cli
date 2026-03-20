@@ -7,6 +7,8 @@
 import {
   CREATE_NEW_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_PREVIOUS_SUMMARY,
+  TOPIC_PARAM_CURRENT_SUMMARY,
 } from './definitions/coreTools.js';
 import {
   BaseDeclarativeTool,
@@ -60,6 +62,8 @@ export class TopicState {
 
 interface CreateNewTopicParams {
   [TOPIC_PARAM_TITLE]: string;
+  [TOPIC_PARAM_PREVIOUS_SUMMARY]?: string;
+  [TOPIC_PARAM_CURRENT_SUMMARY]: string;
 }
 
 class CreateNewTopicInvocation extends BaseToolInvocation<
@@ -76,11 +80,14 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Create new topic: "${this.params[TOPIC_PARAM_TITLE]}"`;
+    const title = this.params[TOPIC_PARAM_TITLE];
+    return `Create new topic: "${title}"`;
   }
 
   async execute(): Promise<ToolResult> {
     const title = this.params[TOPIC_PARAM_TITLE];
+    const previousSummary = this.params[TOPIC_PARAM_PREVIOUS_SUMMARY];
+    const currentSummary = this.params[TOPIC_PARAM_CURRENT_SUMMARY];
 
     const success = this.config.topicState.setTopic(title);
 
@@ -98,9 +105,20 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
     const setTopic = this.config.topicState.getTopic()!;
     debugLogger.log(`[TopicTool] Changing topic to: "${setTopic}"`);
 
+    let llmContent = `Current topic: "${setTopic}"\nTopic goal: ${currentSummary}`;
+    let returnDisplay = `Current topic: **${setTopic}**\n\n**Topic Goal:**\n${currentSummary}`;
+
+    if (previousSummary) {
+      llmContent =
+        `Previous topic summary: ${previousSummary}\n\n` + llmContent;
+      returnDisplay =
+        `**Previous Topic Summary:**\n${previousSummary}\n\n---\n\n` +
+        returnDisplay;
+    }
+
     return {
-      llmContent: `Current topic: "${setTopic}"`,
-      returnDisplay: `Current topic: **${setTopic}**`,
+      llmContent,
+      returnDisplay,
     };
   }
 }

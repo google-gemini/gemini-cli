@@ -77,6 +77,8 @@ import {
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_PREVIOUS_SUMMARY,
+  TOPIC_PARAM_CURRENT_SUMMARY,
 } from './definitions/coreTools.js';
 
 export {
@@ -152,6 +154,8 @@ export {
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
   TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_PREVIOUS_SUMMARY,
+  TOPIC_PARAM_CURRENT_SUMMARY,
 };
 
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
