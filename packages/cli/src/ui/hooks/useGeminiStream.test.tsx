@@ -375,7 +375,7 @@ describe('useGeminiStream', () => {
     setValue: vi.fn(),
   } as unknown as LoadedSettings;
 
-  const renderTestHook = (
+  const renderTestHook = async (
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
     loadedSettings: LoadedSettings = mockLoadedSettings,
@@ -436,7 +436,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    const { result, rerender } = renderHookWithProviders(
+    const { result, rerender } = await renderHookWithProviders(
       (props: typeof initialProps) =>
         useGeminiStream(
           props.client,
@@ -518,7 +518,7 @@ describe('useGeminiStream', () => {
   });
 
   // Helper to render hook with default parameters - reduces boilerplate
-  const renderHookWithDefaults = (
+  const renderHookWithDefaults = async (
     options: {
       shellModeActive?: boolean;
       onCancelSubmit?: () => void;
@@ -562,7 +562,7 @@ describe('useGeminiStream', () => {
     );
   };
 
-  it('should not submit tool responses if not all tool calls are completed', () => {
+  it('should not submit tool responses if not all tool calls are completed', async () => {
     const toolCalls: TrackedToolCall[] = [
       {
         request: {
@@ -617,7 +617,7 @@ describe('useGeminiStream', () => {
     ];
 
     const { mockMarkToolsAsSubmitted, mockSendMessageStream } =
-      renderTestHook(toolCalls);
+      await renderTestHook(toolCalls);
 
     // Effect for submitting tool responses depends on toolCalls and isResponding
     // isResponding is initially false, so the effect should run.
@@ -626,7 +626,7 @@ describe('useGeminiStream', () => {
     expect(mockSendMessageStream).not.toHaveBeenCalled(); // submitQuery uses this
   });
 
-  it('should expose activePtyId for non-shell executing tools that report an execution ID', () => {
+  it('should expose activePtyId for non-shell executing tools that report an execution ID', async () => {
     const remoteExecutingTool: TrackedExecutingToolCall = {
       request: {
         callId: 'remote-call-1',
@@ -651,7 +651,7 @@ describe('useGeminiStream', () => {
       pid: 4242,
     };
 
-    const { result } = renderTestHook([remoteExecutingTool]);
+    const { result } = await renderTestHook([remoteExecutingTool]);
     expect(result.current.activePtyId).toBe(4242);
   });
 
@@ -716,7 +716,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    renderHookWithProviders(() =>
+    await renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -817,7 +817,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    renderHookWithProviders(() =>
+    await renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -927,7 +927,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    renderHookWithProviders(() =>
+    await renderHookWithProviders(() =>
       useGeminiStream(
         client,
         [],
@@ -998,7 +998,7 @@ describe('useGeminiStream', () => {
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
-    const { result } = renderTestHook([], client);
+    const { result } = await renderTestHook([], client);
 
     // Trigger the onComplete callback with STOP_EXECUTION tool
     await act(async () => {
@@ -1078,7 +1078,7 @@ describe('useGeminiStream', () => {
     } as LoadedSettings;
     const client = new MockedGeminiClientClass(mockConfig);
 
-    const { result } = renderTestHook([], client, lowVerbositySettings);
+    const { result } = await renderTestHook([], client, lowVerbositySettings);
 
     await act(async () => {
       if (capturedOnComplete) {
@@ -1191,7 +1191,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    renderHookWithProviders(() =>
+    await renderHookWithProviders(() =>
       useGeminiStream(
         client,
         [],
@@ -1308,7 +1308,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    const { result, rerender } = renderHookWithProviders(() =>
+    const { result, rerender } = await renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -1409,7 +1409,7 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       // Start a query
       await act(async () => {
@@ -1446,7 +1446,7 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           mockConfig.getGeminiClient(),
           [],
@@ -1487,7 +1487,7 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           mockConfig.getGeminiClient(),
           [],
@@ -1520,8 +1520,8 @@ describe('useGeminiStream', () => {
       expect(setShellInputFocusedSpy).toHaveBeenCalledWith(false);
     });
 
-    it('should not do anything if escape is pressed when not responding', () => {
-      const { result } = renderTestHook();
+    it('should not do anything if escape is pressed when not responding', async () => {
+      const { result } = await renderTestHook();
 
       expect(result.current.streamingState).toBe(StreamingState.Idle);
 
@@ -1549,7 +1549,7 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1601,7 +1601,7 @@ describe('useGeminiStream', () => {
         } as TrackedExecutingToolCall,
       ];
 
-      const { result } = renderTestHook(toolCalls);
+      const { result } = await renderTestHook(toolCalls);
 
       // State is `Responding` because a tool is running
       expect(result.current.streamingState).toBe(StreamingState.Responding);
@@ -1649,7 +1649,7 @@ describe('useGeminiStream', () => {
         } as TrackedWaitingToolCall,
       ];
 
-      const { result } = renderTestHook(toolCalls);
+      const { result } = await renderTestHook(toolCalls);
 
       // State is `WaitingForConfirmation` because a tool is awaiting approval
       expect(result.current.streamingState).toBe(
@@ -1678,7 +1678,7 @@ describe('useGeminiStream', () => {
 
   describe('Retry Handling', () => {
     it('should update retryStatus when CoreEvent.RetryAttempt is emitted', async () => {
-      const { result } = renderHookWithDefaults();
+      const { result } = await renderHookWithDefaults();
 
       const retryPayload = {
         model: 'gemini-2.5-pro',
@@ -1695,7 +1695,7 @@ describe('useGeminiStream', () => {
     });
 
     it('should reset retryStatus when isResponding becomes false', async () => {
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       const retryPayload = {
         model: 'gemini-2.5-pro',
@@ -1745,7 +1745,7 @@ describe('useGeminiStream', () => {
       };
       mockHandleSlashCommand.mockResolvedValue(clientToolRequest);
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('/memory add "test fact"');
@@ -1772,7 +1772,7 @@ describe('useGeminiStream', () => {
       };
       mockHandleSlashCommand.mockResolvedValue(uiOnlyCommandResult);
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('/help');
@@ -1793,7 +1793,7 @@ describe('useGeminiStream', () => {
       mockHandleSlashCommand.mockResolvedValue(customCommandResult);
 
       const { result, mockSendMessageStream: localMockSendMessageStream } =
-        renderTestHook();
+        await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('/my-custom-command');
@@ -1831,7 +1831,7 @@ describe('useGeminiStream', () => {
       mockHandleSlashCommand.mockResolvedValue(emptyPromptResult);
 
       const { result, mockSendMessageStream: localMockSendMessageStream } =
-        renderTestHook();
+        await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('/emptycmd');
@@ -1852,7 +1852,7 @@ describe('useGeminiStream', () => {
 
     it('should not call handleSlashCommand for line comments', async () => {
       const { result, mockSendMessageStream: localMockSendMessageStream } =
-        renderTestHook();
+        await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('// This is a line comment');
@@ -1873,7 +1873,7 @@ describe('useGeminiStream', () => {
 
     it('should not call handleSlashCommand for block comments', async () => {
       const { result, mockSendMessageStream: localMockSendMessageStream } =
-        renderTestHook();
+        await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('/* This is a block comment */');
@@ -1893,7 +1893,7 @@ describe('useGeminiStream', () => {
     });
 
     it('should not call handleSlashCommand is shell mode is active', async () => {
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -1973,7 +1973,7 @@ describe('useGeminiStream', () => {
         ];
       });
 
-      renderHookWithProviders(() =>
+      await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2033,7 +2033,7 @@ describe('useGeminiStream', () => {
         getModel: vi.fn(() => 'gemini-2.5-pro'),
       } as unknown as Config;
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(testConfig),
           [],
@@ -2080,7 +2080,7 @@ describe('useGeminiStream', () => {
         createMockToolCall('read_file', 'call2', 'info'),
       ];
 
-      const { result } = renderTestHook(awaitingApprovalToolCalls);
+      const { result } = await renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
         await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
@@ -2110,7 +2110,7 @@ describe('useGeminiStream', () => {
         createMockToolCall('read_file', 'call3', 'info'),
       ];
 
-      const { result } = renderTestHook(awaitingApprovalToolCalls);
+      const { result } = await renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
         await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
@@ -2134,7 +2134,7 @@ describe('useGeminiStream', () => {
         createMockToolCall('replace', 'call1', 'edit'),
       ];
 
-      const { result } = renderTestHook(awaitingApprovalToolCalls);
+      const { result } = await renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
         await result.current.handleApprovalModeChange(ApprovalMode.DEFAULT);
@@ -2156,7 +2156,7 @@ describe('useGeminiStream', () => {
         createMockToolCall('write_file', 'call2', 'edit'),
       ];
 
-      const { result } = renderTestHook(awaitingApprovalToolCalls);
+      const { result } = await renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
         await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
@@ -2198,7 +2198,7 @@ describe('useGeminiStream', () => {
         } as unknown as TrackedWaitingToolCall,
       ];
 
-      const { result } = renderTestHook(awaitingApprovalToolCalls);
+      const { result } = await renderTestHook(awaitingApprovalToolCalls);
 
       // Should not throw an error
       await act(async () => {
@@ -2241,7 +2241,7 @@ describe('useGeminiStream', () => {
         } as TrackedExecutingToolCall,
       ];
 
-      const { result } = renderTestHook(mixedStatusToolCalls);
+      const { result } = await renderTestHook(mixedStatusToolCalls);
 
       await act(async () => {
         await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
@@ -2262,7 +2262,7 @@ describe('useGeminiStream', () => {
       (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.PLAN);
 
       // Render the hook, which will initialize the previousApprovalModeRef with PLAN
-      const { result, client } = renderTestHook([]);
+      const { result, client } = await renderTestHook([]);
 
       // Update mockConfig to return DEFAULT mode (new mode)
       (mockConfig.getApprovalMode as Mock).mockReturnValue(
@@ -2302,7 +2302,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2376,7 +2376,7 @@ describe('useGeminiStream', () => {
             })(),
           );
 
-          const { result } = renderHookWithDefaults();
+          const { result } = await renderHookWithDefaults();
 
           await act(async () => {
             await result.current.submitQuery('Test overflow');
@@ -2407,7 +2407,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2456,7 +2456,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithDefaults();
+      const { result } = await renderHookWithDefaults();
 
       // Submit a query
       await act(async () => {
@@ -2543,7 +2543,7 @@ describe('useGeminiStream', () => {
           })(),
         );
 
-        const { result } = renderHookWithDefaults();
+        const { result } = await renderHookWithDefaults();
 
         await act(async () => {
           await result.current.submitQuery(`Test ${reason}`);
@@ -2615,7 +2615,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    const { result } = renderHookWithProviders(() =>
+    const { result } = await renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -2686,7 +2686,7 @@ describe('useGeminiStream', () => {
       shouldProceed: true,
     });
 
-    const { result } = renderHookWithProviders(() =>
+    const { result } = await renderHookWithProviders(() =>
       useGeminiStream(
         mockConfig.getGeminiClient(),
         [],
@@ -2779,7 +2779,7 @@ describe('useGeminiStream', () => {
       })(),
     );
 
-    const { result } = renderTestHook();
+    const { result } = await renderTestHook();
 
     await act(async () => {
       await result.current.submitQuery(userQuery);
@@ -2852,7 +2852,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2907,7 +2907,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('Test query');
@@ -2952,7 +2952,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -3024,7 +3024,7 @@ describe('useGeminiStream', () => {
       });
     });
 
-    it('should memoize pendingHistoryItems', () => {
+    it('should memoize pendingHistoryItems', async () => {
       mockUseToolScheduler.mockReturnValue([
         [],
         mockScheduleToolCalls,
@@ -3034,7 +3034,7 @@ describe('useGeminiStream', () => {
         0,
       ]);
 
-      const { result, rerender } = renderHookWithProviders(() =>
+      const { result, rerender } = await renderHookWithProviders(() =>
         useGeminiStream(
           mockConfig.getGeminiClient(),
           [],
@@ -3105,7 +3105,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -3162,7 +3162,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -3230,7 +3230,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(() =>
+      const { result } = await renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -3290,7 +3290,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test query');
@@ -3337,7 +3337,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test query');
@@ -3402,7 +3402,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test query');
@@ -3437,7 +3437,7 @@ describe('useGeminiStream', () => {
     });
 
     it('should handle multiple loop detection events properly', async () => {
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       // First loop detection - set up fresh mock for first call
       mockSendMessageStream.mockReturnValueOnce(
@@ -3547,7 +3547,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test query');
@@ -3584,7 +3584,7 @@ describe('useGeminiStream', () => {
           })(),
         );
 
-        const { result } = renderTestHook();
+        const { result } = await renderTestHook();
 
         // Start first query without awaiting (fire-and-forget, like existing tests)
         await act(async () => {
@@ -3640,7 +3640,7 @@ describe('useGeminiStream', () => {
           })(),
         );
 
-        const { result } = renderTestHook();
+        const { result } = await renderTestHook();
 
         await act(async () => {
           await result.current.submitQuery('test query');
@@ -3695,7 +3695,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test stop');
@@ -3723,7 +3723,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test stop');
@@ -3754,7 +3754,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test block');
@@ -3781,7 +3781,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('test block');
@@ -3810,7 +3810,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('user query');
@@ -3858,7 +3858,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
 
       await act(async () => {
         await result.current.submitQuery('user query');
@@ -3884,7 +3884,7 @@ describe('useGeminiStream', () => {
   });
 
   it('should trace UserPrompt telemetry on submitQuery', async () => {
-    const { result } = renderTestHook();
+    const { result } = await renderTestHook();
 
     mockSendMessageStream.mockReturnValue(
       (async function* () {

@@ -37,7 +37,7 @@ describe('<SectionHeader />', () => {
       width: 40,
     },
   ])('$description', async ({ title, subtitle, width }) => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <SectionHeader title={title} subtitle={subtitle} />,
       { width },
     );

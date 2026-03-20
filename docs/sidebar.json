@@ -100,6 +100,11 @@
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
           {
+            "label": "Git worktrees",
+            "badge": "🔬",
+            "slug": "docs/cli/git-worktrees"
+          },
+          {
             "label": "Hooks",
             "collapsed": true,
             "items": [

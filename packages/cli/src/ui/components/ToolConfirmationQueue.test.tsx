@@ -79,7 +79,7 @@ describe('ToolConfirmationQueue', () => {
       total: 3,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -117,7 +117,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -156,7 +156,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Box flexDirection="column" height={30}>
         <ToolConfirmationQueue
           confirmingTool={confirmingTool as unknown as ConfirmingToolState}
@@ -211,7 +211,7 @@ describe('ToolConfirmationQueue', () => {
     };
 
     // Use a small availableTerminalHeight to force truncation
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -266,7 +266,7 @@ describe('ToolConfirmationQueue', () => {
       lastFrame,
       waitUntilReady,
       unmount = vi.fn(),
-    } = renderWithProviders(
+    } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -322,7 +322,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -361,7 +361,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -399,7 +399,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
