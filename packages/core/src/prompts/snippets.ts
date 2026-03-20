@@ -18,6 +18,8 @@ import {
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  WRITE_TO_SHELL_TOOL_NAME,
+  READ_SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
   GREP_PARAM_TOTAL_MAX_MATCHES,
@@ -81,6 +83,7 @@ export interface PrimaryWorkflowsOptions {
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
+  interactiveShellMode?: 'human' | 'ai' | 'off';
   topicUpdateNarration: boolean;
   memoryManagerEnabled: boolean;
 }
@@ -391,7 +394,7 @@ export function renderOperationalGuidelines(
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
-  )}${toolUsageRememberingFacts(options)}
+  )}${toolUsageRememberingFacts(options)}${toolUsageAiShell(options)}
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
@@ -798,6 +801,17 @@ function toolUsageInteractive(
   return `
 - **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
+}
+
+function toolUsageAiShell(options: OperationalGuidelinesOptions): string {
+  if (options.interactiveShellMode !== 'ai') return '';
+  return `
+- **AI-Driven Interactive Shell:** Commands using \`wait_for_output_seconds\` auto-promote to background when they stall. Once promoted, use ${formatToolName(READ_SHELL_TOOL_NAME)} to see the terminal screen, then ${formatToolName(WRITE_TO_SHELL_TOOL_NAME)} to send text input and/or special keys (arrows, Enter, Ctrl-C, etc.).
+  - Set \`wait_for_output_seconds\` **low (2-5)** for commands that prompt for input (npx, installers, REPLs). Set **high (60+)** for long builds. Omit for instant commands.
+  - **Always read the screen before writing input.** The screen state tells you what the process is waiting for.
+  - When waiting for a command to finish (e.g. npm install), use ${formatToolName(READ_SHELL_TOOL_NAME)} with \`wait_seconds\` to delay before reading. Do NOT poll in a tight loop.
+  - **Clean up when done:** when your task is complete, kill background processes with ${formatToolName(WRITE_TO_SHELL_TOOL_NAME)} sending Ctrl-C, or note the PID for the user to clean up.
+  - You are the sole operator of promoted shells — the user cannot type into them.`;
 }
 
 function toolUsageRememberingFacts(

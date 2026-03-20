@@ -149,6 +149,8 @@ describe('ShellTool', () => {
       getShellBackgroundCompletionBehavior: vi.fn().mockReturnValue('silent'),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
+      getInteractiveShellMode: vi.fn().mockReturnValue('off'),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
       sanitizationConfig: {},
       get sandboxManager() {
         return mockSandboxManager;
@@ -422,7 +424,7 @@ describe('ShellTool', () => {
 
       expect(mockShellBackground).toHaveBeenCalledWith(
         12345,
-        'default',
+        'test-session-id',
         'sleep 10',
       );
 
@@ -666,7 +668,7 @@ describe('ShellTool', () => {
 
         expect(mockShellBackground).toHaveBeenCalledWith(
           12345,
-          'default',
+          'test-session-id',
           'sleep 10',
         );
 

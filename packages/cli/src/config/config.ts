@@ -1009,6 +1009,7 @@ export async function loadCliConfig(
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellBackgroundCompletionBehavior: settings.tools?.shell
       ?.backgroundCompletionBehavior as string | undefined,
+    interactiveShellMode: settings.tools?.shell?.interactiveShellMode,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,

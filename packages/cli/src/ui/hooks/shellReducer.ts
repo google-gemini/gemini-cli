@@ -92,7 +92,23 @@ export function shellReducer(
         nextTasks.delete(action.pid);
       }
       nextTasks.set(action.pid, updatedTask);
-      return { ...state, backgroundTasks: nextTasks };
+
+      // Auto-hide panel when all tasks have exited
+      let nextVisible = state.isBackgroundTaskVisible;
+      if (action.update.status === 'exited') {
+        const hasRunning = Array.from(nextTasks.values()).some(
+          (s) => s.status === 'running',
+        );
+        if (!hasRunning) {
+          nextVisible = false;
+        }
+      }
+
+      return {
+        ...state,
+        backgroundTasks: nextTasks,
+        isBackgroundTaskVisible: nextVisible,
+      };
     }
     case 'APPEND_TASK_OUTPUT': {
       const task = state.backgroundTasks.get(action.pid);
