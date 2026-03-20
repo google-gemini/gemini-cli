@@ -315,7 +315,7 @@ export function renderPrimaryWorkflows(
   if (!options) return '';
 
   const transitionOverride = options.approvedPlan
-    ? `\n\n**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Do not hesitate; begin executing the steps of the plan immediately.`
+    ? `\n\n**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Begin executing the steps of the plan immediately.`
     : '';
 
   return `
