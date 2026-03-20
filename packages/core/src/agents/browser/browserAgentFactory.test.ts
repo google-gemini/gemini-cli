@@ -11,10 +11,7 @@ import {
 } from './browserAgentFactory.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
-import {
-  PolicyDecision,
-  PRIORITY_SUBAGENT_TOOL,
-} from '../../policy/types.js';
+import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../../policy/policy-engine.js';
