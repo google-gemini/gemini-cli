@@ -107,4 +107,54 @@ describe('WindowsSandboxManager', () => {
       'Low',
     ]);
   });
+
+  it('applies icacls deny to forbiddenPaths', async () => {
+    const req: SandboxRequest = {
+      command: 'echo',
+      args: ['hello'],
+      cwd: '/test/cwd',
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/forbidden1'],
+      },
+    };
+
+    await manager.prepareCommand(req);
+
+    expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+      path.resolve('/test/forbidden1'),
+      '/deny',
+      '*S-1-16-4096:(OI)(CI)(F)',
+    ]);
+  });
+
+  it('prioritizes forbiddenPaths over allowedPaths by applying an explicit deny', async () => {
+    const conflictPath = '/test/conflict_path';
+    const req: SandboxRequest = {
+      command: 'echo',
+      args: ['hello'],
+      cwd: '/test/cwd',
+      env: {},
+      policy: {
+        allowedPaths: [conflictPath],
+        forbiddenPaths: [conflictPath],
+      },
+    };
+
+    await manager.prepareCommand(req);
+
+    // Should grant allow
+    expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+      path.resolve(conflictPath),
+      '/setintegritylevel',
+      'Low',
+    ]);
+
+    // Should also apply deny, which always overrides allow in Windows ACLs
+    expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+      path.resolve(conflictPath),
+      '/deny',
+      '*S-1-16-4096:(OI)(CI)(F)',
+    ]);
+  });
 });

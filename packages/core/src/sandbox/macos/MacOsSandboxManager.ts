@@ -77,7 +77,14 @@ export class MacOsSandboxManager implements SandboxManager {
       );
     }
 
-    // TODO: handle forbidden paths
+    const forbiddenPaths = sanitizePaths(policy?.forbiddenPaths) || [];
+    for (let i = 0; i < forbiddenPaths.length; i++) {
+      const forbiddenPath = this.tryRealpath(forbiddenPaths[i]);
+      args.push('-D', `FORBIDDEN_PATH_${i}=${forbiddenPath}`);
+      profileLines.push(
+        `(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_${i}")))`,
+      );
+    }
 
     if (policy?.networkAccess) {
       profileLines.push(NETWORK_SEATBELT_PROFILE);

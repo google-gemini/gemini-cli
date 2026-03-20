@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import fs from 'node:fs';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 
@@ -104,5 +105,110 @@ describe('LinuxSandboxManager', () => {
 
     // Should only contain the primary workspace bind, not the second one with a trailing slash
     expect(binds).toEqual(['--bind', workspace, workspace]);
+  });
+
+  it('maps forbidden directory paths to bwrap tmpfs', async () => {
+    vi.spyOn(fs, 'statSync').mockImplementation((p) => {
+      if (p === '/test/forbidden_dir')
+        return { isDirectory: () => true } as fs.Stats;
+      throw new Error('ENOENT');
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'node',
+      args: ['script.js'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/forbidden_dir'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).toEqual(
+      expect.arrayContaining(['--tmpfs', '/test/forbidden_dir']),
+    );
+  });
+
+  it('maps forbidden file paths to bwrap ro-bind-try with /dev/null', async () => {
+    vi.spyOn(fs, 'statSync').mockImplementation((p) => {
+      if (p === '/test/forbidden_file')
+        return { isDirectory: () => false } as fs.Stats;
+      throw new Error('ENOENT');
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'node',
+      args: ['script.js'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/forbidden_file'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).toEqual(
+      expect.arrayContaining([
+        '--ro-bind-try',
+        '/dev/null',
+        '/test/forbidden_file',
+      ]),
+    );
+  });
+
+  it('ignores forbiddenPaths when statSync throws an error', async () => {
+    vi.spyOn(fs, 'statSync').mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'node',
+      args: ['script.js'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/missing'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).not.toContain('/test/missing');
+  });
+
+  it('prioritizes forbiddenPaths over allowedPaths by mounting them later in the bwrap arguments', async () => {
+    vi.spyOn(fs, 'statSync').mockImplementation(
+      () => ({ isDirectory: () => true }) as fs.Stats,
+    );
+
+    const conflictPath = '/test/conflict_path';
+    const bwrapArgs = await getBwrapArgs({
+      command: 'node',
+      args: ['script.js'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        allowedPaths: [conflictPath],
+        forbiddenPaths: [conflictPath],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    // Verify both are present
+    expect(binds).toContain('--bind-try');
+    expect(binds).toContain('--tmpfs');
+
+    // The tmpfs mount MUST appear after the bind-try mount to override it
+    const bindIndex = binds.indexOf('--bind-try');
+    const tmpfsIndex = binds.indexOf('--tmpfs');
+    expect(tmpfsIndex).toBeGreaterThan(bindIndex);
   });
 });

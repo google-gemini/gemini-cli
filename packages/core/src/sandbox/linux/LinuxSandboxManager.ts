@@ -5,7 +5,7 @@
  */
 
 import { join, normalize } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import fs, { writeFileSync } from 'node:fs';
 import os from 'node:os';
 import {
   type SandboxManager,
@@ -121,7 +121,19 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    // TODO: handle forbidden paths
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const forbiddenPath of forbiddenPaths) {
+      try {
+        const stats = fs.statSync(forbiddenPath);
+        if (stats.isDirectory()) {
+          bwrapArgs.push('--tmpfs', forbiddenPath);
+        } else {
+          bwrapArgs.push('--ro-bind-try', '/dev/null', forbiddenPath);
+        }
+      } catch (_) {
+        // Path might not exist or be inaccessible, ignore it.
+      }
+    }
 
     const bpfPath = getSeccompBpfPath();
 

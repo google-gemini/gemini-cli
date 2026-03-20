@@ -92,6 +92,60 @@ describe('MacOsSandboxManager', () => {
       expect(result.args).toContain('ALLOWED_PATH_1=/test/real_path');
     });
 
+    it('should generate deny rules for forbiddenPaths', async () => {
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+        if (p === '/test/symlink') return '/test/real_path';
+        return p as string;
+      });
+
+      const result = await manager.prepareCommand({
+        command: 'echo',
+        args: ['hello'],
+        cwd: mockWorkspace,
+        env: {},
+        policy: {
+          forbiddenPaths: ['/custom/path1', '/test/symlink'],
+        },
+      });
+
+      const profile = result.args[1];
+      expect(profile).toContain(
+        '(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_0")))',
+      );
+      expect(profile).toContain(
+        '(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_1")))',
+      );
+
+      expect(result.args).toContain('-D');
+      expect(result.args).toContain('FORBIDDEN_PATH_0=/custom/path1');
+      expect(result.args).toContain('FORBIDDEN_PATH_1=/test/real_path');
+    });
+
+    it('should prioritize forbiddenPaths over allowedPaths by placing deny rules after allow rules', async () => {
+      const result = await manager.prepareCommand({
+        command: 'echo',
+        args: ['hello'],
+        cwd: mockWorkspace,
+        env: {},
+        policy: {
+          allowedPaths: ['/test/conflict_path'],
+          forbiddenPaths: ['/test/conflict_path'],
+        },
+      });
+
+      const profile = result.args[1];
+      const allowIndex = profile.indexOf(
+        '(allow file-read* file-write* (subpath (param "ALLOWED_PATH_0")))',
+      );
+      const denyIndex = profile.indexOf(
+        '(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_0")))',
+      );
+
+      expect(allowIndex).toBeGreaterThan(-1);
+      expect(denyIndex).toBeGreaterThan(-1);
+      expect(denyIndex).toBeGreaterThan(allowIndex); // Deny must come after allow to override it
+    });
+
     it('should format the executable and arguments correctly for sandbox-exec', async () => {
       const result = await manager.prepareCommand({
         command: 'echo',
