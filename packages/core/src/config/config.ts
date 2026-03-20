@@ -3135,7 +3135,6 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
-        maxActionsPerTask: customConfig.maxActionsPerTask ?? 100,
       },
     };
   }
