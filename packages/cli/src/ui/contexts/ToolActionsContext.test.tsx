@@ -71,6 +71,9 @@ describe('ToolActionsContext', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to a pending promise to avoid unwanted async state updates in tests
+    // that don't specifically test the IdeClient initialization.
+    vi.mocked(IdeClient.getInstance).mockReturnValue(new Promise(() => {}));
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (

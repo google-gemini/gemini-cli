@@ -16,7 +16,7 @@ import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import type React from 'react';
 import { act, useState } from 'react';
-import type { LoadedSettings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -611,16 +611,18 @@ export const renderWithProviders = async (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
+    useAlternateBuffer: explicitUseAlternateBuffer,
     config,
     uiActions,
     persistentState,
     appState = mockAppState,
   }: {
     shellFocus?: boolean;
-    settings?: LoadedSettings;
+    settings?: LoadedSettings | Partial<LoadedSettings['merged']>;
     uiState?: Partial<UIState>;
     width?: number;
     mouseEventsEnabled?: boolean;
+    useAlternateBuffer?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
     persistentState?: {
@@ -659,14 +661,33 @@ export const renderWithProviders = async (
 
   const terminalWidth = width ?? baseState.terminalWidth;
 
+  const finalSettings =
+    settings instanceof LoadedSettings
+      ? settings
+      : createMockSettings(settings || {});
+
   if (!config) {
     config = await loadCliConfig(
-      settings.merged,
+      finalSettings.merged,
       'random-session-id',
-      {} as unknown as CliArgs,
+      {} as CliArgs,
       { cwd: '/' },
     );
   }
+
+  const useAlternateBuffer =
+    explicitUseAlternateBuffer ??
+    finalSettings.merged.ui?.useAlternateBuffer ??
+    false;
+
+  const finalConfig = new Proxy(config, {
+    get(target, prop) {
+      if (prop === 'getUseAlternateBuffer') {
+        return () => useAlternateBuffer;
+      }
+      return Reflect.get(target, prop);
+    },
+  });
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
@@ -696,8 +717,8 @@ export const renderWithProviders = async (
 
   const wrapWithProviders = (comp: React.ReactElement) => (
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
-        <SettingsContext.Provider value={settings}>
+      <ConfigContext.Provider value={finalConfig}>
+        <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
@@ -708,7 +729,7 @@ export const renderWithProviders = async (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
-                          config={config}
+                          config={finalConfig}
                           toolCalls={allToolCalls}
                         >
                           <AskUserActionsProvider
@@ -834,7 +855,7 @@ export async function renderHookWithProviders<Result, Props>(
     wrapper?: React.ComponentType<{ children: React.ReactNode }>;
     // Options for renderWithProviders
     shellFocus?: boolean;
-    settings?: LoadedSettings;
+    settings?: LoadedSettings | Partial<LoadedSettings['merged']>;
     uiState?: Partial<UIState>;
     width?: number;
     mouseEventsEnabled?: boolean;
