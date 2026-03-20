@@ -10,20 +10,21 @@ import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 
 vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = (await vi.importActual('node:fs')) as any;
   return {
     ...actual,
     default: {
       ...actual.default,
       existsSync: vi.fn(() => true),
-      realpathSync: vi.fn((p) => p.toString()),
+      realpathSync: vi.fn((p: string | Buffer) => p.toString()),
       mkdirSync: vi.fn(),
       openSync: vi.fn(),
       closeSync: vi.fn(),
       writeFileSync: vi.fn(),
     },
     existsSync: vi.fn(() => true),
-    realpathSync: vi.fn((p) => p.toString()),
+    realpathSync: vi.fn((p: string | Buffer) => p.toString()),
     mkdirSync: vi.fn(),
     openSync: vi.fn(),
     closeSync: vi.fn(),

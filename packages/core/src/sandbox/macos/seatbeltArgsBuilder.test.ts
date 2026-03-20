@@ -17,7 +17,8 @@ describe('seatbeltArgsBuilder', () => {
       (p) =>
         ({
           isDirectory: () => (p as string).endsWith('.git'),
-        }) as fs.Stats,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
     );
 
     const args = buildSeatbeltArgs({ workspace: '/Users/test/workspace' });
@@ -129,7 +130,8 @@ describe('seatbeltArgsBuilder', () => {
       (p) =>
         ({
           isDirectory: () => (p as string).endsWith('.git'),
-        }) as fs.Stats,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
     );
 
     const args = buildSeatbeltArgs({ workspace: '/Users/test/workspace' });
