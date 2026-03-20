@@ -444,18 +444,6 @@ export async function runNonInteractive({
 
             const errorCode = event._meta?.['code'];
 
-            if (errorCode === 'MAX_TURNS_EXCEEDED') {
-              if (streamFormatter) {
-                streamFormatter.emitEvent({
-                  type: JsonStreamEventType.ERROR,
-                  timestamp: new Date().toISOString(),
-                  severity: 'error',
-                  message: event.message,
-                });
-              }
-              break;
-            }
-
             if (errorCode === 'AGENT_EXECUTION_BLOCKED') {
               if (config.getOutputFormat() === OutputFormat.TEXT) {
                 process.stderr.write(`[WARNING] ${event.message}\n`);
@@ -482,7 +470,20 @@ export async function runNonInteractive({
             if (event.reason === 'aborted') {
               handleCancellationError(config);
             } else if (event.reason === 'max_turns') {
-              handleMaxTurnsExceededError(config);
+              const isSessionLimit =
+                typeof event.data?.['maxTurns'] === 'number' &&
+                typeof event.data?.['turnCount'] === 'number';
+              if (isSessionLimit) {
+                handleMaxTurnsExceededError(config);
+              }
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: 'Maximum session turns exceeded',
+                });
+              }
             }
 
             const stopMessage =
