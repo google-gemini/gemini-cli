@@ -4003,6 +4003,16 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('should render correctly with wildcard policy enabled', async () => {
+      props.isWildcardPolicyEnabled = true;
+      const { stdout, unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await waitFor(() => expect(stdout.lastFrame()).toContain('*'));
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;

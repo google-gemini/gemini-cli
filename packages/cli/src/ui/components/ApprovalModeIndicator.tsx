@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, checkExhaustive } from '@google/gemini-cli-core';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { Command } from '../key/keyBindings.js';
 
@@ -47,7 +47,12 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
         subText = `${cycleHint} to manual`;
         break;
       case ApprovalMode.DEFAULT:
+        textColor = theme.text.accent;
+        textContent = '';
+        subText = `${cycleHint} to accept edits`;
+        break;
       default:
+        checkExhaustive(approvalMode);
         textColor = theme.text.accent;
         textContent = '';
         subText = `${cycleHint} to accept edits`;

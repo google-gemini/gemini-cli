@@ -259,7 +259,7 @@ Ask the user for specific feedback on how to improve the plan.`,
       // For non-interactive environment requires minimal user action, exit as AUTO_EDIT mode for plan implementation.
       return ApprovalMode.AUTO_EDIT;
     }
-    // By default, YOLO mode in interactive environment cannot enter/exit plan mode.
+    // By default, wildcard policies in interactive environment cannot enter/exit plan mode.
     // Always exit plan mode and move to default approval mode if exit_plan_mode tool is configured with allow decision.
     return ApprovalMode.DEFAULT;
   }
