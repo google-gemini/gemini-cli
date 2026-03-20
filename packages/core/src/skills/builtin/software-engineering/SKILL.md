@@ -1,25 +1,35 @@
 ---
 name: software-engineering
-description: Expert guidance for software engineering tasks, including the Research-Strategy-Execution lifecycle, engineering standards, and testing protocols.
+description: Expert guidance for brownfield software engineering tasks. Prioritizes surgical precision, codebase consistency, and pragmatic problem-solving to ensure changes are easy to review and stable.
 ---
 
 # Software Engineering Workflow
 
+This workflow provides structured approach for working within existing codebases. It scales based on task complexity, ensuring that simple fixes remain fast while complex changes are handled with professional rigor. Prioritize codebase stability and reviewability, making targeted changes while strictly adhering to established patterns.
+
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+Operate using a **Research -> Strategy -> Execution** lifecycle. Adjust the depth of each phase to be proportional to the task's scope.
 
-1. **Research:** Systematically map the codebase and validate assumptions. Use search tools like `grep_search` and `glob` extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use `read_file` to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
-3. **Execution:** For each sub-task:
-   - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
-   - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (`replace`, `write_file`, `run_shell_command`). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
-   - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.
+1. **Research:** Understand the context. For simple tasks, a quick file read is sufficient. For others, systematically map the codebase and validate assumptions. Use search tools (in parallel if independent) and read tools to understand file structures, existing code patterns, and conventions. Map data flows and side effect. Do NOT make assumptions. 
+   - **Established Usage:** Before employing a library or framework, verify its **established usage** within the project (e.g., check existing imports). Do not introduce new dependencies or patterns if a functional equivalent already exists in the codebase.
+   - **Bug Reproduction:**For bugs, make a judgment call: if the cause is non-obvious or risky, prioritize creating a reproduction script or test case to confirm the failure before applying a fix.
+2. **Strategy:** Formulate and share a grounded plan based on your research. Focus on how the change integrates with existing logic and patterns. **The strategy is iterative;** if research or execution reveals a blocker, stop and redefine the strategy before proceeding.
+3. **Execution:** Resolve tasks through an iterative **Plan -> Act -> Validate** cycle:
+   - **Plan:** Define the specific code change and testing approach.
+   - **Act (Surgical Precision):**
+     - **Targeted Edits:** Favor precise, localized edits over full-file rewrites. Keep the diff clean and "PR-ready." 
+     - **Focus:** Stick to the task at hand. Avoid unrelated "cleanup," reformatting, or refactoring unless it is necessary for the change or specifically requested.
+     - **Consistency:** Mimic the surrounding code's style, naming, and abstractions.
+   - **Validate:** 
+     - **Iterative Testing:** Run specific, relevant tests during development for fast feedback.
+     - **Final Verification:** Before concluding, run comprehensive checks (e.g., full relevant test suites, linters, or type-checkers) to ensure the change is correct and introduces no regressions.
 
-**Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
-
-## Engineering Standards
-
-- **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
-- **Libraries/Frameworks:** NEVER assume a library/framework is available. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', etc.) before employing it.
-- **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
-- **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.
+## Engineering Principles
+- **Reviewability:** Your output should be easy to review. Avoid high-noise diffs. Every line changed should have a clear purpose. A clean, surgical diff is the hallmark of a high-quality contribution.
+- **Surgical vs. Structural:** Always prefer a surgical fix that respects the existing architecture. If a larger refactor is truly necessary, justify it in your strategy first. If you encounter unrelated bugs or technical debt, resist the urge to fix them immediately. Note them for the user but remain focused on the current objective.
+- **Dependency & Install Rabbit Holes:** If a dependency is missing or an installation/configuration fails multiple times, **do not spend multiple turns troubleshooting the environment.** Take a step back, acknowledge the blocker, and **redefine your strategy.** It is better to use a slightly more manual approach with existing tools than to get stuck in an "install loop." 
+- **Logical Loops & Stuckness:** If you find yourself repeatedly failing the same validation step or hitting the same error after 2-3 attempts, **stop.** Do not persist with the same logic. This is a signal that your underlying strategy or understanding of the codebase is flawed. Zoom out, re-read the relevant files, and **redefine your strategy** based on the new error data.
+- **Convention Over Invention:** Respect the established "style" of the workspace. During research, identify the patterns used for error handling, logging, and naming, and follow them strictly.
+- **Proportional Effort:** Scale the documentation and investigation to match the risk. Do not over-engineer the process for trivial tasks.
+- **Testing:** Ensure the change is verified by adding or updating idiomatic test cases.
+- **Ownership of the Lifecycle:** You are responsible for the change from start to finish. A task is not "done" until the code is written, the tests pass, and the project-wide standards (linting/types) are met.

@@ -1,18 +1,18 @@
 ---
 name: new-application
-description: Specialized workflow for designing and building new applications and prototypes with a focus on visual aesthetics and modern UX.
+description: Specialized workflow for greenfield development focused on designing and building new applications and prototypes with modern UX.
 ---
 
 # New Applications
 
-**Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, interactive feedback, and platform-appropriate design.
+This skill provides guidance to implement and deliver a visually appealing, substantially complete, and functional prototype with rich aesthetics. 
 
 ## Workflow
 
 1. **Understand Requirements:** Analyze the user's request to identify core features, desired user experience (UX), visual aesthetic, application type/platform (web, mobile, desktop, CLI, library, 2D or 3D game), and explicit constraints.
-2. **Design & Plan:** Formulate a development plan. Present a clear, concise summary to the user. For applications requiring visual assets, describe the strategy for sourcing or generating placeholders.
+2. **Design & Plan:** Formulate a development plan. Present a clear, concise summary to the user. This plan should respect user's constraints, and requirements. For applications requiring visual assets, describe the strategy for sourcing or generating placeholders.
    - **Styling:** **Prefer Vanilla CSS** for maximum flexibility. **Avoid TailwindCSS** unless explicitly requested.
-   - **Default Tech Stack:**
+   - **Default Tech Stack:** To be used only when alternatives aren't explicitly requested
      - **Web:** React (TypeScript) or Angular with Vanilla CSS.
      - **APIs:** Node.js (Express) or Python (FastAPI).
      - **Mobile:** Compose Multiplatform or Flutter.
