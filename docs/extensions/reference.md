@@ -23,7 +23,7 @@ Gemini CLI creates a copy of the extension during installation. You must run
 GitHub, you must have `git` installed on your machine.
 
 ```bash
-gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
+gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent] [--skip-settings]
 ```
 
 - `<source>`: The GitHub URL or local path of the extension.
@@ -31,6 +31,7 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 - `--auto-update`: Enable automatic updates for this extension.
 - `--pre-release`: Enable installation of pre-release versions.
 - `--consent`: Acknowledge security risks and skip the confirmation prompt.
+- `--skip-settings`: Skip the configuration on install process.
 
 ### Uninstall an extension
 
