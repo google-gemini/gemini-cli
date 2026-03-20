@@ -171,6 +171,67 @@ describe('AgentSession', () => {
       expect(streamedEvents).toEqual(allEvents.slice(2));
     });
 
+    it('should resume from an in-stream event within the same stream only', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'first answer 1' }],
+        },
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'first answer 2' }],
+        },
+      ]);
+      const { streamId: streamId1 } = await session.send({
+        message: [{ type: 'text', text: 'first request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      protocol.pushResponse([
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'second answer' }],
+        },
+      ]);
+      await session.send({
+        message: [{ type: 'text', text: 'second request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const resumeEvent = session.events.find(
+        (event): event is AgentEvent<'message'> =>
+          event.type === 'message' &&
+          event.streamId === streamId1 &&
+          event.role === 'agent' &&
+          event.content[0]?.type === 'text' &&
+          event.content[0].text === 'first answer 1',
+      );
+      expect(resumeEvent).toBeDefined();
+
+      const streamedEvents: AgentEvent[] = [];
+      for await (const event of session.stream({ eventId: resumeEvent!.id })) {
+        streamedEvents.push(event);
+      }
+
+      expect(
+        streamedEvents.every((event) => event.streamId === streamId1),
+      ).toBe(true);
+      expect(streamedEvents.map((event) => event.type)).toEqual([
+        'message',
+        'agent_end',
+      ]);
+      const resumedMessage = streamedEvents[0] as AgentEvent<'message'>;
+      expect(resumedMessage.content).toEqual([
+        { type: 'text', text: 'first answer 2' },
+      ]);
+    });
+
     it('should replay events for streamId starting with agent_start', async () => {
       const protocol = new MockAgentProtocol();
       const session = new AgentSession(protocol);
@@ -221,6 +282,33 @@ describe('AgentSession', () => {
       );
       expect(streamedEvents).toEqual(allEvents.slice(startEventIndex));
       expect(streamedEvents.at(-1)?.type).toBe('agent_end');
+    });
+
+    it('should not drop agent_end that arrives while replay events are being yielded', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([{ type: 'message' }], { keepOpen: true });
+      const { streamId } = await session.send({ update: { title: 't1' } });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const iterator = session
+        .stream({ streamId: streamId! })
+        [Symbol.asyncIterator]();
+
+      const first = await iterator.next();
+      expect(first.value?.type).toBe('agent_start');
+
+      protocol.pushToStream(streamId!, [], { close: true });
+
+      const second = await iterator.next();
+      expect(second.value?.type).toBe('message');
+
+      const third = await iterator.next();
+      expect(third.value?.type).toBe('agent_end');
+
+      const fourth = await iterator.next();
+      expect(fourth.done).toBe(true);
     });
 
     it('should follow an active stream if no options provided', async () => {

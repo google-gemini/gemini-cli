@@ -77,6 +77,33 @@ export class AgentSession implements AgentProtocol {
     let done = false;
     let trackedStreamId = options.streamId;
     let started = false;
+    let agentActivityStarted = false;
+
+    const queueVisibleEvent = (event: AgentEvent): void => {
+      if (trackedStreamId && event.streamId !== trackedStreamId) {
+        return;
+      }
+
+      if (!agentActivityStarted) {
+        if (event.type !== 'agent_start') {
+          return;
+        }
+        trackedStreamId = event.streamId ?? trackedStreamId ?? undefined;
+        agentActivityStarted = true;
+      }
+
+      if (!trackedStreamId && !options.eventId) {
+        return;
+      }
+
+      eventQueue.push(event);
+      if (
+        event.type === 'agent_end' &&
+        event.streamId === (trackedStreamId ?? null)
+      ) {
+        done = true;
+      }
+    };
 
     // 1. Subscribe early to avoid missing any events that occur during replay setup
     const unsubscribe = this._protocol.subscribe((event) => {
@@ -87,23 +114,7 @@ export class AgentSession implements AgentProtocol {
         return;
       }
 
-      if (trackedStreamId && event.streamId !== trackedStreamId) return;
-
-      // If we don't have a tracked stream yet, the first agent_start we see becomes it.
-      if (!trackedStreamId && event.type === 'agent_start') {
-        trackedStreamId = event.streamId ?? undefined;
-      }
-
-      // If we still don't have a tracked stream and we aren't replaying everything (eventId), ignore.
-      if (!trackedStreamId && !options.eventId) return;
-
-      eventQueue.push(event);
-      if (
-        event.type === 'agent_end' &&
-        event.streamId === (trackedStreamId ?? null)
-      ) {
-        done = true;
-      }
+      queueVisibleEvent(event);
 
       const currentResolve = resolve;
       next = new Promise<void>((r) => {
@@ -119,7 +130,23 @@ export class AgentSession implements AgentProtocol {
       if (options.eventId) {
         const index = currentEvents.findIndex((e) => e.id === options.eventId);
         if (index !== -1) {
+          const resumeEvent = currentEvents[index];
           replayStartIndex = index + 1;
+          trackedStreamId = resumeEvent?.streamId ?? undefined;
+          if (trackedStreamId) {
+            agentActivityStarted =
+              resumeEvent?.type === 'agent_start' ||
+              currentEvents
+                .slice(0, index)
+                .some(
+                  (event) =>
+                    event.type === 'agent_start' &&
+                    event.streamId === trackedStreamId,
+                );
+          } else {
+            // No correlated stream means "resume globally after this event".
+            agentActivityStarted = true;
+          }
         }
       } else if (options.streamId) {
         const index = currentEvents.findIndex(
@@ -128,29 +155,7 @@ export class AgentSession implements AgentProtocol {
         if (index !== -1) {
           replayStartIndex = index;
         }
-      }
-
-      if (replayStartIndex !== -1) {
-        for (let i = replayStartIndex; i < currentEvents.length; i++) {
-          const event = currentEvents[i];
-          if (options.streamId && event.streamId !== options.streamId) continue;
-
-          eventQueue.push(event);
-          if (event.type === 'agent_start' && !trackedStreamId) {
-            trackedStreamId = event.streamId ?? undefined;
-          }
-          if (
-            event.type === 'agent_end' &&
-            event.streamId === (trackedStreamId ?? null)
-          ) {
-            done = true;
-            break;
-          }
-        }
-      }
-
-      if (!done && !trackedStreamId) {
-        // Find active stream in history
+      } else {
         const activeStarts = currentEvents.filter(
           (e) => e.type === 'agent_start',
         );
@@ -162,8 +167,19 @@ export class AgentSession implements AgentProtocol {
             )
           ) {
             trackedStreamId = start.streamId ?? undefined;
+            replayStartIndex = currentEvents.findIndex(
+              (e) => e.id === start.id,
+            );
             break;
           }
+        }
+      }
+
+      if (replayStartIndex !== -1) {
+        for (let i = replayStartIndex; i < currentEvents.length; i++) {
+          const event = currentEvents[i];
+          queueVisibleEvent(event);
+          if (done) break;
         }
       }
 
@@ -178,19 +194,7 @@ export class AgentSession implements AgentProtocol {
       // Process events that arrived while we were replaying
       for (const event of earlyEvents) {
         if (done) break;
-        if (trackedStreamId && event.streamId !== trackedStreamId) continue;
-        if (!trackedStreamId && event.type === 'agent_start') {
-          trackedStreamId = event.streamId ?? undefined;
-        }
-        if (!trackedStreamId && !options.eventId) continue;
-
-        eventQueue.push(event);
-        if (
-          event.type === 'agent_end' &&
-          event.streamId === (trackedStreamId ?? null)
-        ) {
-          done = true;
-        }
+        queueVisibleEvent(event);
       }
 
       while (true) {
@@ -200,6 +204,7 @@ export class AgentSession implements AgentProtocol {
           for (const event of eventsToYield) {
             yield event;
           }
+          continue;
         }
 
         if (done) break;
