@@ -26,8 +26,7 @@ const renderWithWidth = async (
   props: React.ComponentProps<typeof ContextSummaryDisplay>,
 ) => {
   useTerminalSizeMock.mockReturnValue({ columns: width, rows: 24 });
-  const result = render(<ContextSummaryDisplay {...props} />);
-  await result.waitUntilReady();
+  const result = await render(<ContextSummaryDisplay {...props} />);
   return result;
 };
 

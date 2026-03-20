@@ -48,7 +48,7 @@ describe('AskUserDialog', () => {
   ];
 
   it('renders question and options', async () => {
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -58,7 +58,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -397,7 +396,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -407,12 +406,11 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('hides progress header for single question', async () => {
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -422,12 +420,11 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('shows keyboard hints', async () => {
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -437,7 +434,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -471,7 +467,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toContain('Which testing framework?');
 
     writeKey(stdin, '\x1b[C'); // Right arrow
@@ -582,7 +577,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -592,7 +587,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -736,7 +730,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = await renderWithProviders(
+      const { lastFrame } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -746,7 +740,6 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -759,7 +752,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = await renderWithProviders(
+      const { lastFrame } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -769,7 +762,6 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -820,7 +812,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = await renderWithProviders(
+      const { lastFrame } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -830,7 +822,6 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 

@@ -94,14 +94,10 @@ describe('App', () => {
   };
 
   it('should render main content and composer when not quitting', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: mockUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: mockUIState,
+      settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+    });
 
     expect(lastFrame()).toContain('Tips for getting started');
     expect(lastFrame()).toContain('Notifications');
@@ -115,14 +111,10 @@ describe('App', () => {
       quittingMessages: [{ id: 1, type: 'user', text: 'test' }],
     } as UIState;
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: quittingUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: quittingUIState,
+      settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+    });
 
     expect(lastFrame()).toContain('Quitting...');
     unmount();
@@ -136,14 +128,10 @@ describe('App', () => {
       pendingHistoryItems: [{ type: 'user', text: 'pending item' }],
     } as UIState;
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: quittingUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: quittingUIState,
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     expect(lastFrame()).toContain('HistoryItemDisplay');
     expect(lastFrame()).toContain('Quitting...');
@@ -156,14 +144,10 @@ describe('App', () => {
       dialogsVisible: true,
     } as UIState;
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: dialogUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: dialogUIState,
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     expect(lastFrame()).toContain('Tips for getting started');
     expect(lastFrame()).toContain('Notifications');
@@ -183,14 +167,10 @@ describe('App', () => {
         [stateKey]: true,
       } as UIState;
 
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-        <App />,
-        {
-          uiState,
-          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        },
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderWithProviders(<App />, {
+        uiState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
 
       expect(lastFrame()).toContain(`Press Ctrl+${key} again to exit.`);
       unmount();
@@ -200,14 +180,10 @@ describe('App', () => {
   it('should render ScreenReaderAppLayout when screen reader is enabled', async () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: mockUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: mockUIState,
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('Footer');
@@ -219,14 +195,10 @@ describe('App', () => {
   it('should render DefaultAppLayout when screen reader is not enabled', async () => {
     (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: mockUIState,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: mockUIState,
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     expect(lastFrame()).toContain('Tips for getting started');
     expect(lastFrame()).toContain('Notifications');
@@ -274,15 +246,11 @@ describe('App', () => {
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <App />,
-      {
-        uiState: stateWithConfirmingTool,
-        config: configWithExperiment,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<App />, {
+      uiState: stateWithConfirmingTool,
+      config: configWithExperiment,
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     expect(lastFrame()).toContain('Tips for getting started');
     expect(lastFrame()).toContain('Notifications');
@@ -295,28 +263,20 @@ describe('App', () => {
   describe('Snapshots', () => {
     it('renders default layout correctly', async () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-        <App />,
-        {
-          uiState: mockUIState,
-          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        },
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderWithProviders(<App />, {
+        uiState: mockUIState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('renders screen reader layout correctly', async () => {
       (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-        <App />,
-        {
-          uiState: mockUIState,
-          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        },
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderWithProviders(<App />, {
+        uiState: mockUIState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -326,14 +286,10 @@ describe('App', () => {
         ...mockUIState,
         dialogsVisible: true,
       } as UIState;
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-        <App />,
-        {
-          uiState: dialogUIState,
-          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        },
-      );
-      await waitUntilReady();
+      const { lastFrame, unmount } = await renderWithProviders(<App />, {
+        uiState: dialogUIState,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      });
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
