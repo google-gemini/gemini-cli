@@ -1916,6 +1916,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable local and remote subagents.',
         showInDialog: false,
       },
+      worktrees: {
+        type: 'boolean',
+        label: 'Enable Git Worktrees',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable automated Git worktree management for parallel work.',
+        showInDialog: true,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
