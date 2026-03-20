@@ -467,7 +467,7 @@ export async function runNonInteractive({
             }
             break;
           }
-          case 'stream_end': {
+          case 'agent_end': {
             if (event.reason === 'aborted') {
               handleCancellationError(config);
             } else if (event.reason === 'max_turns') {
