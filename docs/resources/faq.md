@@ -56,6 +56,94 @@ like Google Gmail or Google Workspace, respectively). This is because the Gemini
 Code Assist API does not support cached content creation. You can still view
 your total token usage using the `/stats` command in Gemini CLI.
 
+### Why am I getting 'You must be a named user on your organization's Gemini Code Assist Standard edition subscription' error?
+
+This error might occur if Gemini CLI detects the `GOOGLE_CLOUD_PROJECT` or
+`GOOGLE_CLOUD_PROJECT_ID` environment variable is defined. Setting these
+variables forces an organization subscription check. This might be an issue if
+you are using an individual Google account not linked to an organizational
+subscription.
+
+- **Individual users:** Unset the `GOOGLE_CLOUD_PROJECT` and
+  `GOOGLE_CLOUD_PROJECT_ID` environment variables. Check and remove these
+  variables from your shell configuration files (for example, `.bashrc`,
+  `.zshrc`) and any `.env` files. If this doesn't resolve the issue, try using a
+  different Google account.
+- **Organizational users:** Ask your Google Cloud administrator to add you to
+  your organization's Gemini Code Assist subscription.
+
+### Why am I getting a 'Failed to sign in. Message: Your current account is not eligible... because it is not currently available in your location' error?
+
+Gemini CLI does not currently support your location. For a full list of
+supported locations, see the
+[Available locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
+page for Gemini Code Assist for individuals.
+
+### Why am I getting a 'Failed to sign in. Message: Request contains an invalid argument' error?
+
+Users with Google Workspace accounts or Google Cloud accounts associated with
+their Gmail accounts may not be able to activate the free tier of the Google
+Code Assist plan. For Google Cloud accounts, you can work around this by setting
+`GOOGLE_CLOUD_PROJECT` to your project ID. Alternatively, you can obtain the
+Gemini API key from [Google AI Studio](http://aistudio.google.com/app/apikey),
+which also includes a separate free tier.
+
+### Why am I getting an `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` or `unable to get local issuer certificate` error?
+
+You may be on a corporate network with a firewall that intercepts and inspects
+SSL/TLS traffic. This often requires a custom root CA certificate to be trusted
+by Node.js.
+
+First try setting `NODE_USE_SYSTEM_CA`; if that does not resolve the issue, set
+`NODE_EXTRA_CA_CERTS`:
+
+- Set the `NODE_USE_SYSTEM_CA=1` environment variable to tell Node.js to use the
+  operating system's native certificate store (where corporate certificates are
+  typically already installed). Example: `export NODE_USE_SYSTEM_CA=1` (Windows
+  PowerShell: `$env:NODE_USE_SYSTEM_CA=1`)
+- Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of
+  your corporate root CA certificate file. Example:
+  `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt` (Windows
+  PowerShell: `$env:NODE_EXTRA_CA_CERTS="C:\path\to\your\corporate-ca.crt"`)
+
+### Why am I getting an `EADDRINUSE` (Address already in use) error when starting an MCP server?
+
+Another process is already using the port that the MCP server is trying to bind
+to. Either stop the other process that is using the port or configure the MCP
+server to use a different port.
+
+### Why am I getting `MODULE_NOT_FOUND` or import errors?
+
+Dependencies are not installed correctly, or the project hasn't been built.
+
+1. Run `npm install` to ensure all dependencies are present.
+2. Run `npm run build` to compile the project.
+3. Verify that the build completed successfully with `npm run start`.
+
+### Why am I getting 'Operation not permitted' or 'Permission denied' errors?
+
+When sandboxing is enabled, Gemini CLI may attempt operations that are
+restricted by your sandbox configuration, such as writing outside the project
+directory or system temp directory. Refer to the
+[Configuration: Sandboxing](../cli/sandbox.md) documentation for more
+information, including how to customize your sandbox configuration.
+
+### Why isn't Gemini CLI running in interactive mode in my CI environment?
+
+The Gemini CLI does not enter interactive mode (no prompt appears) if an
+environment variable starting with `CI_` (e.g., `CI_TOKEN`) is set. The
+underlying UI framework detects these variables and assumes a non-interactive CI
+environment. If the `CI_` prefixed variable is not needed for the CLI to
+function, you can temporarily unset it for the command. e.g.,
+`env -u CI_TOKEN gemini`.
+
+### Why doesn't DEBUG mode work when I set it in my project's `.env` file?
+
+The `DEBUG` and `DEBUG_MODE` variables are automatically excluded from project
+`.env` files to prevent interference with gemini-cli behavior. Use a
+`.gemini/.env` file instead, or configure the `advanced.excludedEnvVars` setting
+in your `settings.json` to exclude fewer variables.
+
 ## Installation and updates
 
 ### How do I check which version of Gemini CLI I'm currently running?
@@ -77,6 +165,28 @@ If you installed it globally via `npm`, update it using the command
 `npm install -g @google/gemini-cli@latest`. If you compiled it from source, pull
 the latest changes from the repository, and then rebuild using the command
 `npm run build`.
+
+### Why am I getting a 'Command not found' error when attempting to run `gemini`?
+
+Gemini CLI is not correctly installed or it is not in your system's `PATH`.
+
+- If you installed `gemini` globally, check that your `npm` global binary
+  directory is in your `PATH`. You can update Gemini CLI using the command
+  `npm install -g @google/gemini-cli@latest`.
+- If you are running `gemini` from source, ensure you are using the correct
+  command to invoke it (e.g., `node packages/cli/dist/index.js ...`). To update
+  Gemini CLI, pull the latest changes from the repository, and then rebuild
+  using the command `npm run build`.
+
+### Why am I seeing `npm WARN deprecated node-domexception@1.0.0` or `npm WARN deprecated glob` during install or update?
+
+When installing or updating the Gemini CLI globally, you might see deprecation
+warnings regarding `node-domexception` or old versions of `glob`. These warnings
+occur because some dependencies rely on older package versions. Since Gemini CLI
+requires Node.js 20 or higher, the platform's native features are used, making
+these warnings purely informational. They are harmless and can be safely
+ignored. Your installation or update will complete successfully and function
+properly.
 
 ## Platform-specific issues
 
@@ -179,6 +289,35 @@ Gemini Code Assist, Gemini Code Assist for individuals, you can also opt out of
 using your data to improve Google's machine learning models. See the
 [Gemini Code Assist for individuals privacy notice](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals)
 for more information.
+
+## Debugging tips
+
+### How do I debug issues with Gemini CLI?
+
+- **CLI debugging:**
+  - Use the `--debug` flag for more detailed output. In interactive mode, press
+    F12 to view the debug console.
+  - Check the CLI logs, often found in a user-specific configuration or cache
+    directory.
+
+- **Core debugging:**
+  - Check the server console output for error messages or stack traces.
+  - Increase log verbosity if configurable. For example, set the `DEBUG_MODE`
+    environment variable to `true` or `1`.
+  - Use Node.js debugging tools (e.g., `node --inspect`) if you need to step
+    through server-side code.
+
+- **Tool issues:**
+  - If a specific tool is failing, try to isolate the issue by running the
+    simplest possible version of the command or operation the tool performs.
+  - For `run_shell_command`, check that the command works directly in your shell
+    first.
+  - For _file system tools_, verify that paths are correct and check the
+    permissions.
+
+- **Pre-flight checks:**
+  - Always run `npm run preflight` before committing code. This can catch many
+    common issues related to formatting, linting, and type errors.
 
 ## Not seeing your question?
 
