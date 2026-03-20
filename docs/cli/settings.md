@@ -101,6 +101,13 @@ they appear in the UI.
 | Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
 | Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
 
+### Agents
+
+| UI Label                  | Setting                                  | Description                                                                                   | Default |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- | ------- |
+| Confirm Sensitive Actions | `agents.browser.confirmSensitiveActions` | Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script). | `false` |
+| Block File Uploads        | `agents.browser.blockFileUploads`        | Hard-block file upload requests from the browser agent.                                       | `false` |
+
 ### Context
 
 | UI Label                             | Setting                                           | Description                                                                                                                                                                                                                                 | Default |
