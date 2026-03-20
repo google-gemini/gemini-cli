@@ -11,7 +11,7 @@ import React from 'react';
 
 describe('ThinkingMessage', () => {
   it('renders subject line with vertical rule and "Thinking..." header', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
         terminalWidth={80}
@@ -30,7 +30,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('uses description when subject is empty', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: 'Processing details' }}
         terminalWidth={80}
@@ -48,7 +48,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders full mode with left border and full text', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Planning',
@@ -70,7 +70,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders "Thinking..." header when isFirstThinking is true', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Summary line',
@@ -92,7 +92,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('normalizes escaped newline tokens', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Matching the Blocks',
@@ -110,7 +110,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders empty state gracefully', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: '' }}
         terminalWidth={80}
@@ -124,7 +124,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders multiple thinking messages sequentially correctly', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <React.Fragment>
         <ThinkingMessage
           thought={{
@@ -161,7 +161,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('filters out progress dots and empty lines', async () => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '...', description: 'Thinking\n.\n..\n...\nDone' }}
         terminalWidth={80}
