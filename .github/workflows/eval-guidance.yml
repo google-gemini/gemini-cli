@@ -1,0 +1,92 @@
+name: 'Evals: PR Guidance'
+
+on:
+  pull_request:
+    paths:
+      - 'packages/core/src/**/*.ts'
+      - '.gemini/commands/*.toml'
+      - '.gemini/skills/**/SKILL.md'
+      - '!**/*.test.ts'
+      - '!**/*.test.tsx'
+
+permissions:
+  pull-requests: 'write'
+  contents: 'read'
+
+jobs:
+  provide-guidance:
+    name: 'Model Steering Guidance'
+    runs-on: 'ubuntu-latest'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+        with:
+          fetch-depth: 0
+
+      - name: 'Detect Steering Changes'
+        id: 'detect'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          # 1. Path-based detection (The "Knowns")
+          KNOWN_PATHS=("packages/core/src/prompts/snippets" "packages/core/src/tools/definitions" ".gemini/commands" ".gemini/skills")
+          PR_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          IS_STEERING_CHANGE=false
+          for path in "${KNOWN_PATHS[@]}"; do
+            if echo "$PR_FILES" | grep -q "$path"; then
+              IS_STEERING_CHANGE=true
+              break
+            fi
+          done
+
+          # 2. Signature-based detection (The "Unknowns")
+          # We look for patterns that define tools or agents in any file
+          SIGNATURES=("LocalAgentDefinition" "LocalInvocation" "ToolDefinition" "inputSchema" "kind: 'local'")
+          if [ "$IS_STEERING_CHANGE" = false ]; then
+            PR_DIFF=$(git diff -U0 origin/${{ github.base_ref }}...HEAD)
+            for sig in "${SIGNATURES[@]}"; do
+              if echo "$PR_DIFF" | grep -q "$sig"; then
+                IS_STEERING_CHANGE=true
+                echo "DEBUG: Detected steering via signature: $sig"
+                break
+              fi
+            done
+          fi
+
+          echo "STEERING_DETECTED=$IS_STEERING_CHANGE" >> "$GITHUB_OUTPUT"
+
+      - name: 'Analyze PR Content'
+        if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
+        id: 'analysis'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          # Check for behavioral eval changes
+          EVAL_CHANGES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "^evals/" || true)
+          if [ -z "$EVAL_CHANGES" ]; then
+            echo "MISSING_EVALS=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Check if user is a maintainer (has write/admin access)
+          USER_PERMISSION=$(gh api repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission --jq '.permission')
+          if [[ "$USER_PERMISSION" == "admin" || "$USER_PERMISSION" == "write" ]]; then
+            echo "IS_MAINTAINER=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 'Post Guidance Comment'
+        if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
+        uses: 'thollander/actions-comment-pull-request@v2'
+        with:
+          comment_tag: 'eval-guidance-bot'
+          message: |
+            ### 🧠 Model Steering Guidance
+
+            This PR modifies files that affect the model's behavior (prompts, tools, or instructions).
+
+            ${{ steps.analysis.outputs.MISSING_EVALS == 'true' && '- ⚠️ **Consider adding Evals:** No behavioral evaluations (`evals/*.eval.ts`) were added or updated in this PR. Consider adding a test case to verify the new behavior and prevent regressions.' || '' }}
+            ${{ steps.analysis.outputs.IS_MAINTAINER == 'true' && '- 🚀 **Maintainer Reminder:** Please ensure that these changes do not regress results on benchmark evals before merging.' || '' }}
+
+            ---
+            *This is an automated guidance message triggered by steering logic signatures.*
