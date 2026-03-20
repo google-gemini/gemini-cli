@@ -2225,6 +2225,30 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).toContain('ask_user');
   });
 
+  it('should exclude ask_user in interactive mode when --acp is provided', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getExcludeTools()).toContain('ask_user');
+  });
+
+  it('should exclude ask_user in interactive mode when --experimental-acp is provided', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getExcludeTools()).toContain('ask_user');
+  });
+
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="ShellTool" is set', async () => {
     process.stdin.isTTY = false;
     process.argv = [
