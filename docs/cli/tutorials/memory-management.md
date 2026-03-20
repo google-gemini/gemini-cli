@@ -12,7 +12,7 @@ persistent facts, and inspect the active context.
 ## Why manage context?
 
 Gemini CLI is powerful but general. It doesn't know your preferred testing
-framework, your indentation style, or or your preference against `any` in
+framework, your indentation style, or your preference against `any` in
 TypeScript. Context management solves this by giving the agent persistent
 memory.
 

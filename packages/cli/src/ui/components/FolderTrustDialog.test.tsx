@@ -5,11 +5,12 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig, ExitCodes } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -47,7 +48,7 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should render the dialog with title and description', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} />,
     );
     await waitUntilReady();
@@ -71,14 +72,15 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 24 },
       },
     );
@@ -101,14 +103,15 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 14 },
       },
     );
@@ -132,14 +135,15 @@ describe('FolderTrustDialog', () => {
       discoveryErrors: [],
       securityWarnings: [],
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true, terminalHeight: 10 },
       },
     );
@@ -161,14 +165,15 @@ describe('FolderTrustDialog', () => {
       securityWarnings: [],
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <FolderTrustDialog
         onSelect={vi.fn()}
         discoveryResults={discoveryResults}
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         // Initially constrained
         uiState: { constrainHeight: true, terminalHeight: 24 },
       },
@@ -187,14 +192,15 @@ describe('FolderTrustDialog', () => {
     // because it's handled in AppContainer.
     // But we can re-render with constrainHeight: false.
     const { lastFrame: lastFrameExpanded, unmount: unmountExpanded } =
-      renderWithProviders(
+      await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
         {
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
           uiState: { constrainHeight: false, terminalHeight: 24 },
         },
       );
@@ -211,9 +217,10 @@ describe('FolderTrustDialog', () => {
 
   it('should display exit message and call process.exit and not call onSelect when escape is pressed', async () => {
     const onSelect = vi.fn();
-    const { lastFrame, stdin, waitUntilReady, unmount } = renderWithProviders(
-      <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
-    );
+    const { lastFrame, stdin, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
+      );
     await waitUntilReady();
 
     await act(async () => {
@@ -239,7 +246,7 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should display restart message when isRestarting is true', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
     await waitUntilReady();
@@ -253,7 +260,7 @@ describe('FolderTrustDialog', () => {
     const relaunchApp = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
     await waitUntilReady();
@@ -268,7 +275,7 @@ describe('FolderTrustDialog', () => {
     const relaunchApp = vi
       .spyOn(processUtils, 'relaunchApp')
       .mockResolvedValue(undefined);
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
     await waitUntilReady();
@@ -282,7 +289,7 @@ describe('FolderTrustDialog', () => {
   });
 
   it('should not call process.exit when "r" is pressed and isRestarting is false', async () => {
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={false} />,
     );
     await waitUntilReady();
@@ -301,7 +308,7 @@ describe('FolderTrustDialog', () => {
   describe('directory display', () => {
     it('should correctly display the folder name for a nested directory', async () => {
       mockedCwd.mockReturnValue('/home/user/project');
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
       await waitUntilReady();
@@ -311,7 +318,7 @@ describe('FolderTrustDialog', () => {
 
     it('should correctly display the parent folder name for a nested directory', async () => {
       mockedCwd.mockReturnValue('/home/user/project');
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
       await waitUntilReady();
@@ -321,7 +328,7 @@ describe('FolderTrustDialog', () => {
 
     it('should correctly display an empty parent folder name for a directory directly under root', async () => {
       mockedCwd.mockReturnValue('/project');
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
       await waitUntilReady();
@@ -341,7 +348,7 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: [],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -379,7 +386,7 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: ['Dangerous setting detected!'],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -403,7 +410,7 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: ['Failed to load custom commands'],
         securityWarnings: [],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
@@ -427,14 +434,15 @@ describe('FolderTrustDialog', () => {
         discoveryErrors: [],
         securityWarnings: [],
       };
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
         />,
         {
           width: 80,
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: { constrainHeight: false, terminalHeight: 15 },
         },
       );
@@ -462,7 +470,7 @@ describe('FolderTrustDialog', () => {
         securityWarnings: [`${ansiRed}warning-with-ansi${ansiReset}`],
       };
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <FolderTrustDialog
           onSelect={vi.fn()}
           discoveryResults={discoveryResults}
