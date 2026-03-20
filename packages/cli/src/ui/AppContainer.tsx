@@ -1700,6 +1700,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
     errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
+  const applyAlternateBufferMode = useCallback(
+    (next: boolean) => {
+      if (next) {
+        enterAlternateScreen();
+        disableLineWrapping();
+        enableMouseEvents();
+        // Clear the alternate buffer after entering to avoid artifacts;
+        clearTerminalScreen();
+      } else {
+        // Clear the alternate buffer before exiting to avoid artifacts;
+        // do not clear normal buffer to preserve scrollback.
+        clearTerminalScreen();
+        exitAlternateScreen();
+        enableLineWrapping();
+        disableMouseEvents();
+        setCopyModeEnabled(false);
+      }
+    },
+    [setCopyModeEnabled],
+  );
+
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
@@ -1714,17 +1735,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         const next = !isAlternateBufferRef.current;
         isAlternateBufferRef.current = next;
 
-        if (next) {
-          enterAlternateScreen();
-          disableLineWrapping();
-          enableMouseEvents();
-          clearTerminalScreen();
-        } else {
-          clearTerminalScreen();
-          exitAlternateScreen();
-          enableLineWrapping();
-          disableMouseEvents();
-        }
+        applyAlternateBufferMode(next);
         setIsAlternateBuffer(next);
 
         setHistoryRemountKey((prev) => prev + 1);
@@ -1912,6 +1923,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCopyModeEnabled,
       tabFocusTimeoutRef,
       shortcutsHelpVisible,
+      applyAlternateBufferMode,
       backgroundCurrentShell,
       toggleBackgroundShell,
       backgroundShells,

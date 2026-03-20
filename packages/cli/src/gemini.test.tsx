@@ -28,7 +28,10 @@ import {
 } from './config/config.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
-import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
+import {
+  terminalCapabilityManager,
+  cleanupTerminalOnExit,
+} from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
@@ -169,7 +172,6 @@ class MockProcessExitError extends Error {
   }
 }
 
-// Mock dependencies
 vi.mock('./config/settings.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./config/settings.js')>();
   return {
@@ -1446,12 +1448,17 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    // 5 cleanups: mouseEvents, consolePatcher, lineWrapping, instance.unmount, and TTY check
+    // 4 cleanups: consolePatcher, instance.unmount, TTY check, and terminal mode cleanup
     expect(registerCleanup).toHaveBeenCalledTimes(4);
 
     // Verify cleanup handler is registered with unmount function
-    const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
-    expect(typeof cleanupFn).toBe('function');
+    const cleanupCalls = vi.mocked(registerCleanup).mock.calls;
+    expect(cleanupCalls.some((call) => typeof call[0] === 'function')).toBe(
+      true,
+    );
+    expect(cleanupCalls.some((call) => call[0] === cleanupTerminalOnExit)).toBe(
+      true,
+    );
 
     // checkForUpdates should be called asynchronously (not waited for)
     // We need a small delay to let it execute

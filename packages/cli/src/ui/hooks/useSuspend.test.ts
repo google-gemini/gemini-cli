@@ -65,7 +65,10 @@ describe('useSuspend', () => {
     });
   };
 
+  let originalSigcontListeners: NodeJS.SignalsListener[];
+
   beforeEach(() => {
+    originalSigcontListeners = process.listeners('SIGCONT');
     process.removeAllListeners('SIGCONT');
     vi.useFakeTimers();
     vi.clearAllMocks();
@@ -77,6 +80,10 @@ describe('useSuspend', () => {
   });
 
   afterEach(() => {
+    process.removeAllListeners('SIGCONT');
+    for (const listener of originalSigcontListeners) {
+      process.on('SIGCONT', listener);
+    }
     vi.useRealTimers();
     killSpy.mockRestore();
     setPlatform(originalPlatform);

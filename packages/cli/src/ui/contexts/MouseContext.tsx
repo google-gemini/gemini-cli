@@ -136,6 +136,10 @@ export function MouseProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleData = (data: Buffer | string) => {
+      // It is safe and desirable to leave this listener always-on because it allows us
+      // to robustly detect and process valid mouse sequences if they occur, while
+      // efficiently discarding normal typing and unrelated escape sequences below.
+      // This guarantees the buffer does not grow unbounded outside of mouse modes.
       mouseBuffer += typeof data === 'string' ? data : data.toString('utf-8');
 
       // Safety cap to prevent infinite buffer growth on garbage
