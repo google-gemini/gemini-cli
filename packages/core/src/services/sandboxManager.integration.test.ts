@@ -7,8 +7,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { ShellExecutionService } from './shellExecutionService.js';
 import { getSecureSanitizationConfig } from './environmentSanitization.js';
-import { type SandboxedCommand } from './sandboxManager.js';
-import { execFile } from 'node:child_process';
+import {
+  type SandboxedCommand,
+  NoopSandboxManager,
+  LocalSandboxManager,
+} from './sandboxManager.js';
+import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -89,14 +93,43 @@ async function runCommand(command: SandboxedCommand) {
   }
 }
 
+/**
+ * Determines if the system has the necessary binaries to run the sandbox.
+ */
+function isSandboxAvailable(): boolean {
+  if (os.platform() === 'win32') {
+    // Windows sandboxing relies on icacls, which is a core system utility and
+    // always available.
+    return true;
+  }
+
+  if (os.platform() === 'darwin') {
+    return fs.existsSync('/usr/bin/sandbox-exec');
+  }
+
+  if (os.platform() === 'linux') {
+    // TODO: Install bubblewrap (bwrap) in Linux CI environments to enable full
+    // integration testing.
+    try {
+      execSync('which bwrap', { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
 describe('SandboxManager Integration', () => {
   const workspace = process.cwd();
   const manager = createSandboxManager({ enabled: true }, workspace);
 
   // Skip if we are on an unsupported platform or if it's a NoopSandboxManager
   const shouldSkip =
-    manager.constructor.name === 'NoopSandboxManager' ||
-    manager.constructor.name === 'LocalSandboxManager';
+    manager instanceof NoopSandboxManager ||
+    manager instanceof LocalSandboxManager ||
+    !isSandboxAvailable();
 
   describe.skipIf(shouldSkip)('Cross-platform Sandbox Behavior', () => {
     describe('Basic Execution', () => {
