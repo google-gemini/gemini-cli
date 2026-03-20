@@ -138,6 +138,25 @@ export async function updatePolicy(
     }
   }
 
+  // Determine implicit mode restriction for persistent policies
+  let modes: ApprovalMode[] | undefined;
+  if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+    const currentMode = context.config.getApprovalMode();
+    // Implementation Modes -> Restrict to [default, autoEdit, yolo]
+    // Plan Mode -> undefined (Global trust)
+    if (
+      currentMode === ApprovalMode.DEFAULT ||
+      currentMode === ApprovalMode.AUTO_EDIT ||
+      currentMode === ApprovalMode.YOLO
+    ) {
+      modes = [
+        ApprovalMode.DEFAULT,
+        ApprovalMode.AUTO_EDIT,
+        ApprovalMode.YOLO,
+      ];
+    }
+  }
+
   // Specialized Tools (MCP)
   if (confirmationDetails?.type === 'mcp') {
     await handleMcpPolicyUpdate(
@@ -146,6 +165,7 @@ export async function updatePolicy(
       confirmationDetails,
       messageBus,
       persistScope,
+      modes,
     );
     return;
   }
@@ -157,6 +177,7 @@ export async function updatePolicy(
     confirmationDetails,
     messageBus,
     persistScope,
+    modes,
     toolInvocation,
     context.config,
   );
@@ -189,6 +210,7 @@ async function handleStandardPolicyUpdate(
   confirmationDetails: SerializableConfirmationDetails | undefined,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  modes?: ApprovalMode[],
   toolInvocation?: AnyToolInvocation,
   config?: Config,
 ): Promise<void> {
@@ -213,6 +235,7 @@ async function handleStandardPolicyUpdate(
       toolName: tool.name,
       persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
       persistScope,
+      modes,
       ...options,
     });
   }
@@ -231,6 +254,7 @@ async function handleMcpPolicyUpdate(
   >,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  modes?: ApprovalMode[],
 ): Promise<void> {
   const isMcpAlways =
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -256,5 +280,6 @@ async function handleMcpPolicyUpdate(
     mcpName: confirmationDetails.serverName,
     persist,
     persistScope,
+    modes,
   });
 }

@@ -10,6 +10,7 @@ import type {
   ToolConfirmationPayload,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
+import type { ApprovalMode } from '../policy/types.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -126,6 +127,7 @@ export interface UpdatePolicy {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  modes?: ApprovalMode[];
 }
 
 export interface ToolPolicyRejection {

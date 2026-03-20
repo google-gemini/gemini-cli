@@ -534,6 +534,7 @@ interface TomlRule {
   priority?: number;
   commandPrefix?: string | string[];
   argsPattern?: string;
+  modes?: string[];
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
 }
@@ -657,6 +658,10 @@ export function createPolicyUpdater(
               decision: 'allow',
               priority: getAlwaysAllowPriorityFraction(),
             };
+
+            if (message.modes) {
+              newRule.modes = message.modes;
+            }
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
