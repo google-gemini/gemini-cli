@@ -95,12 +95,9 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
-  /** State for action rate limiting and loop detection */
+  /** State for action rate limiting */
   private actionCounter = 0;
   private readonly maxActionsPerTask: number;
-  private lastAction: { toolName: string; args: string } | undefined;
-  private repeatedActionCount = 0;
-  private readonly MAX_REPEATED_ACTIONS = 5;
 
   /**
    * Whether to inject the automation overlay.
@@ -159,33 +156,13 @@ export class BrowserManager {
     }
 
     // Hard enforcement of per-action rate limit
-    this.actionCounter++;
-    if (this.actionCounter > this.maxActionsPerTask) {
+    if (this.actionCounter >= this.maxActionsPerTask) {
       throw new Error(
         `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
-          `Task terminated to prevent runaway execution.`,
+          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
       );
     }
-
-    // Detect rapid repeated identical actions (loop detection)
-    const currentArgsJson = JSON.stringify(args);
-    if (
-      this.lastAction &&
-      this.lastAction.toolName === toolName &&
-      this.lastAction.args === currentArgsJson
-    ) {
-      this.repeatedActionCount++;
-      if (this.repeatedActionCount >= this.MAX_REPEATED_ACTIONS) {
-        throw new Error(
-          `Browser agent detected a potential runaway loop: tool '${toolName}' ` +
-            `was called ${this.MAX_REPEATED_ACTIONS} times with identical arguments. ` +
-            `Task terminated.`,
-        );
-      }
-    } else {
-      this.lastAction = { toolName, args: currentArgsJson };
-      this.repeatedActionCount = 1;
-    }
+    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
