@@ -41,7 +41,7 @@ export default tseslint.config(
   {
     // Global ignores
     ignores: [
-      'node_modules/*',
+      '**/node_modules/**',
       'eslint.config.js',
       'packages/**/dist/**',
       'bundle/**',
@@ -50,7 +50,7 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
-      '.gemini/skills/**',
+      '.gemini/**',
       '**/*.d.ts',
     ],
   },
@@ -319,7 +319,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['./scripts/**/*.js', 'esbuild.config.js', 'packages/core/scripts/**/*.{js,mjs}'],
+    files: [
+      './scripts/**/*.js',
+      'packages/*/scripts/**/*.js',
+      'esbuild.config.js',
+      'packages/core/scripts/**/*.{js,mjs}',
+    ],
     languageOptions: {
       globals: {
         ...globals.node,
