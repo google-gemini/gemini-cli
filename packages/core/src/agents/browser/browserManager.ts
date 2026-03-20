@@ -156,6 +156,7 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
+    this.actionCounter++;
     // Hard enforcement of per-action rate limit
     if (this.actionCounter >= this.maxActionsPerTask) {
       throw new Error(
@@ -163,7 +164,6 @@ export class BrowserManager {
           `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
       );
     }
-    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
