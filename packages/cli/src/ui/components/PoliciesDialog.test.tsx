@@ -91,7 +91,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('renders with Allow tab active by default', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -111,7 +111,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('shows formatted shell command constraints', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -128,7 +128,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('displays policy source on each item', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -144,7 +144,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('displays correct count for Allow tab', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -158,7 +158,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('switches to Ask tab with right arrow', async () => {
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -181,7 +181,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('switches to Deny tab and shows deny rules', async () => {
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -209,7 +209,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('wraps tabs with left arrow from first tab', async () => {
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -232,7 +232,7 @@ describe('PoliciesDialog', () => {
 
   it('shows empty state when a tab has no rules', async () => {
     // Only allow rules — Ask and Deny tabs will be empty
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALLOW_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -254,7 +254,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('navigates list items with up/down arrows', async () => {
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -279,7 +279,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('closes on Escape when search is empty', async () => {
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -304,7 +304,7 @@ describe('PoliciesDialog', () => {
       source: 'Workspace: .gemini/policies/global.toml',
     });
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={[wildcardRule]}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -325,7 +325,7 @@ describe('PoliciesDialog', () => {
       source: 'User: mcp-policies.toml',
     });
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={[mcpRule]}
         toolDisplayNames={TOOL_DISPLAY_NAMES}
@@ -340,7 +340,7 @@ describe('PoliciesDialog', () => {
   });
 
   it('renders with no rules at all (empty allow tab)', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={[]}
         toolDisplayNames={new Map()}
@@ -356,7 +356,7 @@ describe('PoliciesDialog', () => {
   it('sorts rules by priority descending within a tab', async () => {
     // All three allow rules have priorities 4.1, 4.1, 4.0
     // The 4.1 rules (git show, git diff) should appear before 4.0 (npm test)
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <PoliciesDialog
         rules={ALL_RULES}
         toolDisplayNames={TOOL_DISPLAY_NAMES}

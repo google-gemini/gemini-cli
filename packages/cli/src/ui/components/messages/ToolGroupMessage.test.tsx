@@ -65,21 +65,17 @@ describe('<ToolGroupMessage />', () => {
     enableInteractiveShell: true,
   });
   const fullVerbositySettings = createMockSettings({
-    merged: {
-      ui: { errorVerbosity: 'full' },
-    },
+    ui: { errorVerbosity: 'full' },
   });
   const lowVerbositySettings = createMockSettings({
-    merged: {
-      ui: { errorVerbosity: 'low' },
-    },
+    ui: { errorVerbosity: 'low' },
   });
 
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', async () => {
       const toolCalls = [createToolCall()];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -113,15 +109,35 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
-      // Should now render confirming tools
+      // Should now hide confirming tools (to avoid duplication with Global Queue)
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
+    });
+
+    it('renders canceled tool calls', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'canceled-tool',
+          name: 'canceled-tool',
+          status: CoreToolCallStatus.Cancelled,
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        { config: baseMockConfig, settings: fullVerbositySettings },
+      );
+
       await waitUntilReady();
       const output = lastFrame();
-      expect(output).toContain('test-tool');
+      expect(output).toMatchSnapshot('canceled_tool');
       unmount();
     });
 
@@ -148,7 +164,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -189,7 +205,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -222,7 +238,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -266,7 +282,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -308,7 +324,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -342,7 +358,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -370,7 +386,7 @@ describe('<ToolGroupMessage />', () => {
     it('renders empty tool calls array', async () => {
       const toolCalls: IndividualToolCallDisplay[] = [];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -407,7 +423,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
@@ -440,7 +456,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -480,7 +496,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item2 = createItem(toolCalls2);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <Scrollable height={6} hasFocus={true} scrollToBottom={true}>
           <ToolGroupMessage
             {...baseProps}
@@ -525,7 +541,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -555,7 +571,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
@@ -593,7 +609,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const item = createItem(toolCalls);
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -660,10 +676,15 @@ describe('<ToolGroupMessage />', () => {
         ];
         const item = createItem(toolCalls);
 
-        const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
-          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-          { config: baseMockConfig, settings: fullVerbositySettings },
-        );
+        const { lastFrame, unmount, waitUntilReady } =
+          await renderWithProviders(
+            <ToolGroupMessage
+              {...baseProps}
+              item={item}
+              toolCalls={toolCalls}
+            />,
+            { config: baseMockConfig, settings: fullVerbositySettings },
+          );
         await waitUntilReady();
 
         if (shouldHide) {
@@ -690,7 +711,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         { config: baseMockConfig, settings: fullVerbositySettings },
       );
@@ -713,7 +734,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -740,7 +761,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -763,7 +784,7 @@ describe('<ToolGroupMessage />', () => {
       const toolCalls: IndividualToolCallDisplay[] = [];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -794,7 +815,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -827,7 +848,7 @@ describe('<ToolGroupMessage />', () => {
       ];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -842,7 +863,7 @@ describe('<ToolGroupMessage />', () => {
       );
 
       await waitUntilReady();
-      expect(lastFrame({ allowEmpty: true })).not.toBe('');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
 
@@ -868,7 +889,7 @@ describe('<ToolGroupMessage />', () => {
       const initialItem = createItem(visibleTools);
       const hiddenItem = createItem(hiddenTools);
 
-      const firstRender = renderWithProviders(
+      const firstRender = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={initialItem}
@@ -885,7 +906,7 @@ describe('<ToolGroupMessage />', () => {
       expect(firstRender.lastFrame()).toContain('visible-tool');
       firstRender.unmount();
 
-      const secondRender = renderWithProviders(
+      const secondRender = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={hiddenItem}
@@ -922,7 +943,7 @@ describe('<ToolGroupMessage />', () => {
       const toolCalls = [visibleTool, ...hiddenTools];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           item={item}
@@ -948,7 +969,7 @@ describe('<ToolGroupMessage />', () => {
       const toolCalls: IndividualToolCallDisplay[] = [];
       const item = createItem(toolCalls);
 
-      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
         <ToolGroupMessage
           item={item}
           toolCalls={toolCalls}
@@ -995,10 +1016,15 @@ describe('<ToolGroupMessage />', () => {
         ];
         const item = createItem(toolCalls);
 
-        const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
-          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-          { config: baseMockConfig, settings: fullVerbositySettings },
-        );
+        const { lastFrame, unmount, waitUntilReady } =
+          await renderWithProviders(
+            <ToolGroupMessage
+              {...baseProps}
+              item={item}
+              toolCalls={toolCalls}
+            />,
+            { config: baseMockConfig, settings: fullVerbositySettings },
+          );
 
         await waitUntilReady();
 

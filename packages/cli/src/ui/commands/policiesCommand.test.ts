@@ -9,7 +9,7 @@ import { policiesCommand } from './policiesCommand.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { type Config, PolicyDecision } from '@google/gemini-cli-core';
+import { PolicyDecision, type AgentLoopContext } from '@google/gemini-cli-core';
 
 describe('policiesCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -28,7 +28,7 @@ describe('policiesCommand', () => {
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
-      mockContext.services.config = null;
+      mockContext.services.agentContext = null;
       const listCommand = policiesCommand.subCommands?.[0];
       if (!listCommand?.action)
         throw new Error('list subcommand action missing');
@@ -48,9 +48,15 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue([]),
       };
-      mockContext.services.config = {
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      } as unknown as Config;
+        getToolRegistry: vi.fn().mockReturnValue({
+          getTool: vi.fn().mockReturnValue(undefined),
+        }),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
       const listCommand = policiesCommand.subCommands?.[0];
       if (!listCommand?.action)
@@ -85,9 +91,15 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.config = {
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      } as unknown as Config;
+        getToolRegistry: vi.fn().mockReturnValue({
+          getTool: vi.fn().mockReturnValue(undefined),
+        }),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
       const listCommand = policiesCommand.subCommands?.[0];
       if (!listCommand?.action)
@@ -126,10 +138,13 @@ describe('policiesCommand', () => {
       const mockToolRegistry = {
         getTool: vi.fn().mockReturnValue(undefined),
       };
-      mockContext.services.config = {
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
-      } as unknown as Config;
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
       const listCommand = policiesCommand.subCommands?.[0];
       if (!listCommand?.action)
@@ -171,10 +186,13 @@ describe('policiesCommand', () => {
           return undefined;
         }),
       };
-      mockContext.services.config = {
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
-      } as unknown as Config;
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
       const listCommand = policiesCommand.subCommands?.[0];
       if (!listCommand?.action)
@@ -206,10 +224,13 @@ describe('policiesCommand', () => {
       const mockToolRegistry = {
         getTool: vi.fn().mockReturnValue(undefined),
       };
-      mockContext.services.config = {
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
-      } as unknown as Config;
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
       if (!policiesCommand.action)
         throw new Error('policiesCommand action missing');
@@ -220,7 +241,7 @@ describe('policiesCommand', () => {
     });
 
     it('should show error if config is missing', async () => {
-      mockContext.services.config = null;
+      mockContext.services.agentContext = null;
 
       if (!policiesCommand.action)
         throw new Error('policiesCommand action missing');

@@ -159,6 +159,13 @@ export interface PolicyRule {
   modes?: ApprovalMode[];
 
   /**
+   * If true, this rule only applies to interactive environments.
+   * If false, this rule only applies to non-interactive environments.
+   * If undefined, it applies to both interactive and non-interactive environments.
+   */
+  interactive?: boolean;
+
+  /**
    * If true, allows command redirection even if the policy engine would normally
    * downgrade ALLOW to ASK_USER for redirected commands.
    * Only applies when decision is ALLOW.
@@ -356,3 +363,9 @@ export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
  */
 export const ALWAYS_ALLOW_PRIORITY_OFFSET =
   ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
+
+/**
+ * Priority for the YOLO "allow all" rule.
+ * Matches the raw priority used in yolo.toml.
+ */
+export const PRIORITY_YOLO_ALLOW_ALL = 998;
