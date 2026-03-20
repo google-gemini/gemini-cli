@@ -132,6 +132,7 @@ describe('createContentGenerator', () => {
     // Set a fixed version for testing
     vi.stubEnv('CLI_VERSION', '1.2.3');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
 
     const mockGenerator = {
       models: {},
@@ -171,6 +172,7 @@ describe('createContentGenerator', () => {
     // Set a fixed version for testing
     vi.stubEnv('CLI_VERSION', '1.2.3');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
 
     const mockGenerator = {
       models: {},
@@ -207,6 +209,7 @@ describe('createContentGenerator', () => {
     vi.stubEnv('CLI_VERSION', '1.2.3');
     // Mock the environment variable that the VS Code extension host would provide to the a2a-server process
     vi.stubEnv('VSCODE_PID', '12345');
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('TERM_PROGRAM_VERSION', '1.85.0');
 
     const mockGenerator = {
@@ -243,6 +246,7 @@ describe('createContentGenerator', () => {
     // Set a fixed version for testing
     vi.stubEnv('CLI_VERSION', '1.2.3');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+    vi.stubEnv('VSCODE_PID', '');
 
     const mockGenerator = {
       models: {},
