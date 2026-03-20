@@ -251,6 +251,11 @@ export class PolicyEngine {
     // this filter, redirect entries are recursively checked via this.check()
     // where they fail to match the user's commandPrefix rule and fall
     // through to a catch-all ASK_USER, defeating allow_redirection.
+    //
+    // The filter uses tree-sitter AST node types (file_redirect,
+    // heredoc_redirect, herestring_redirect) via REDIRECTION_NAMES, not
+    // string matching on command text, so it cannot be bypassed by naming
+    // an executable after a redirection marker.
     const parsed = parseCommandDetails(command);
     const subCommands =
       parsed && !parsed.hasError
