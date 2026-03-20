@@ -127,7 +127,7 @@ describe('ExtensionDetails', () => {
   });
 
   it('should call onLink when "l" is pressed and is linkable', async () => {
-    const { stdin, waitUntilReady } = await renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <ExtensionDetails
         extension={linkableExtension}
         onBack={mockOnBack}
@@ -136,7 +136,6 @@ describe('ExtensionDetails', () => {
         isInstalled={false}
       />,
     );
-    await waitUntilReady();
     await React.act(async () => {
       stdin.write('l');
     });
@@ -146,15 +145,14 @@ describe('ExtensionDetails', () => {
   });
 
   it('should NOT show "Link" button for GitHub extensions', async () => {
-    const { lastFrame, waitUntilReady } = await renderDetails(false);
-    await waitUntilReady();
+    const { lastFrame } = await renderDetails(true);
     await waitFor(() => {
       expect(lastFrame()).not.toContain('[L] Link');
     });
   });
 
   it('should show "Link" button for local extensions', async () => {
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <ExtensionDetails
         extension={linkableExtension}
         onBack={mockOnBack}
@@ -163,7 +161,6 @@ describe('ExtensionDetails', () => {
         isInstalled={false}
       />,
     );
-    await waitUntilReady();
     await waitFor(() => {
       expect(lastFrame()).toContain('[L] Link');
     });

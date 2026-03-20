@@ -43,10 +43,7 @@ describe('ConfigInitDisplay', () => {
   });
 
   it('renders initial state', async () => {
-    const { lastFrame, waitUntilReady } = await renderWithProviders(
-      <ConfigInitDisplay />,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await renderWithProviders(<ConfigInitDisplay />);
     expect(lastFrame()).toMatchSnapshot();
   });
 

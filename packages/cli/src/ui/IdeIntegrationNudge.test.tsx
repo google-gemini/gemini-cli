@@ -54,10 +54,9 @@ describe('IdeIntegrationNudge', () => {
   });
 
   it('renders correctly with default options', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} />,
     );
-    await waitUntilReady();
     const frame = lastFrame();
 
     expect(frame).toContain('Do you want to connect VS Code to Gemini CLI?');
@@ -72,8 +71,6 @@ describe('IdeIntegrationNudge', () => {
     const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // "Yes" is the first option and selected by default usually.
     await act(async () => {
@@ -93,8 +90,6 @@ describe('IdeIntegrationNudge', () => {
     const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // Navigate down to "No (esc)"
     await act(async () => {
@@ -119,8 +114,6 @@ describe('IdeIntegrationNudge', () => {
     const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
-
-    await waitUntilReady();
 
     // Navigate down to "No, don't ask again"
     await act(async () => {
@@ -151,8 +144,6 @@ describe('IdeIntegrationNudge', () => {
       <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
     );
 
-    await waitUntilReady();
-
     // Press Escape
     await act(async () => {
       stdin.write('\u001B');
@@ -178,8 +169,6 @@ describe('IdeIntegrationNudge', () => {
       await renderWithProviders(
         <IdeIntegrationNudge {...defaultProps} onComplete={onComplete} />,
       );
-
-    await waitUntilReady();
 
     const frame = lastFrame();
 

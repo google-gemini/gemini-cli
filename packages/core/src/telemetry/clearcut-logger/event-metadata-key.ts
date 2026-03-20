@@ -452,6 +452,9 @@ export enum EventMetadataKey {
   // Logs the name of extensions as a comma-separated string
   GEMINI_CLI_START_SESSION_EXTENSION_IDS = 120,
 
+  // Logs whether the session is running in a Git worktree.
+  GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE = 191,
+
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 
