@@ -11,6 +11,7 @@ import {
   resolveModel,
 } from '@google/gemini-cli-core';
 import type { Writable } from 'node:stream';
+import * as fs from 'node:fs';
 
 export class UserSimulator {
   private isRunning = false;
@@ -20,6 +21,8 @@ export class UserSimulator {
   private lastResponse = '';
   private repeatCount = 0;
   private readonly MAX_REPEATS = 3;
+  private interactionsFile: string | null = null;
+  private actionHistory: string[] = [];
 
   constructor(
     private readonly config: Config,
@@ -31,6 +34,7 @@ export class UserSimulator {
     if (!this.config.getSimulateUser()) {
       return;
     }
+    this.interactionsFile = `interactions_${Date.now()}.txt`;
     this.isRunning = true;
     this.timer = setInterval(() => this.tick(), 1000);
   }
@@ -50,7 +54,7 @@ export class UserSimulator {
     try {
       this.isProcessing = true;
       const screen = this.getScreen();
-      if (!screen || screen === this.lastScreenContent) return;
+      if (!screen) return;
 
       const strippedScreen = screen.replace(
         // eslint-disable-next-line no-control-regex
@@ -58,12 +62,34 @@ export class UserSimulator {
         '',
       );
 
+      const normalizedScreen = strippedScreen
+        .replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g, '')
+        .replace(/\[?\s*\b\d+(\.\d+)?s\b\s*\]?/g, '')
+        .trim();
+
+      if (normalizedScreen === this.lastScreenContent) return;
+
       debugLogger.log(
         `[SIMULATOR] Screen Content Seen:\n---\n${strippedScreen}\n---`,
       );
+      if (this.interactionsFile) {
+        fs.appendFileSync(
+          this.interactionsFile,
+          `[LOG] [SIMULATOR] Screen Content Seen:\n---\n${strippedScreen}\n---\n\n`,
+        );
+      }
 
       const contentGenerator = this.config.getContentGenerator();
       if (!contentGenerator) return;
+
+      const originalGoal = this.config.getQuestion();
+      const goalInstruction = originalGoal
+        ? `\nThe original goal was: "${originalGoal}"\n`
+        : '';
+
+      const historyInstruction = this.actionHistory.length > 0
+        ? `\nYou have previously taken the following actions (in order):\n${this.actionHistory.map((a, i) => `${i + 1}. ${JSON.stringify(a)}`).join('\n')}\nPay close attention to whether you have already asked for the original goal. Do not unnecessarily repeat your previous requests.\n`
+        : '';
 
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Here is the current terminal screen output:
@@ -71,22 +97,36 @@ Here is the current terminal screen output:
 <screen>
 ${strippedScreen}
 </screen>
+${goalInstruction}${historyInstruction}
+Look carefully at the screen and determine the CLI's current state:
 
-Look at the screen. Is the CLI waiting for your input (e.g., asking for tool confirmation, presenting a multi-choice question, or waiting for a text prompt with an indicator like "❯")?
-If it is NOT waiting for input (e.g., it is streaming a response or showing a spinner), you MUST output exactly: <WAIT>
+STATE 1: The agent is busy (e.g., streaming a response, showing a spinner, running a tool, or displaying a timer like "7s"). It is actively working and NOT waiting for text input.
+- In this case, you MUST output exactly: <WAIT>
 
-If the agent has explicitly stated that the task or implementation is complete, or is asking if there is anything else you need because it has finished its work (e.g. asking "is there anything else?"), you MUST output exactly: <DONE>
+STATE 2: The agent is waiting for you to authorize a tool, confirm an action, or answer a specific multi-choice question (e.g., "Action Required", "Allow execution", numbered options).
+- In this case, you MUST output the exact raw characters to select the option (e.g., 1, 2, y, n). Do NOT output <DONE> or "Thank you". You must unblock the agent and allow it to run the tool.
 
-If you have already achieved your original goal (which is whatever you initially prompted the agent with) and the agent is idle, you MUST output exactly: <DONE>
+STATE 3: The agent has finished its current thought process AND is idle, waiting for a NEW general text prompt (usually indicated by a "> Type your message" prompt).
+- First, verify that the ACTUAL task is fully complete based on your original goal. Do not stop at intermediate steps like planning or syntax checking.
+- If the task is indeed fully complete, output "Thank you\\r" to graciously finish the simulation.
+- If you have already said thank you, output exactly: <DONE>
+- If the agent is waiting at a general text prompt but the original task is NOT complete, provide text instructions to continue what is missing.
 
-If it IS waiting for your input, output ONLY the exact raw characters you would type. 
-Read the screen context carefully. Sometimes you may need to choose a numbered option, answer yes/no, or provide a text explanation.
-For example:
-- To choose an option from a multi-choice list, output the number: 1
-- To answer a simple yes/no confirmation, output: y
-- To provide an explanation or answer an open-ended question, output the text followed by \\n: Because it is required for the project\\n
-- To enter a new prompt, output the text followed by \\n.
-Do NOT output markdown, explanations of your thought process, or quotes. Output ONLY the raw characters to send, <WAIT>, or <DONE>.`;
+STATE 4: Any other situation where the agent is waiting for text input or needs to press Enter.
+- Output the raw characters you would type, followed by \\r. For just an Enter key press, output \\r.
+
+CRITICAL RULES:
+- RULE 1: If there is ANY active spinner (e.g., ⠋, ⠙, ⠹, ⠸, ⠼, ⠴, ⠧) or an elapsed time indicator (e.g., "0s", "7s") anywhere on the screen, the agent is STILL WORKING. You MUST output <WAIT>. Do NOT issue commands, even if a text prompt is visible below it.
+- RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
+- RULE 3: Output ONLY the raw characters to send, <WAIT>, or <DONE>.
+- RULE 4: Do NOT output markdown, explanations of your thought process, or quotes.`;
+
+      if (this.interactionsFile) {
+        fs.appendFileSync(
+          this.interactionsFile,
+          `[LOG] [SIMULATOR] Prompt Used:\n---\n${prompt}\n---\n\n`,
+        );
+      }
 
       const model = resolveModel(
         PREVIEW_GEMINI_FLASH_MODEL,
@@ -119,6 +159,12 @@ Do NOT output markdown, explanations of your thought process, or quotes. Output 
       debugLogger.log(
         `[SIMULATOR] Raw model response: ${JSON.stringify(response.text)}`,
       );
+      if (this.interactionsFile) {
+        fs.appendFileSync(
+          this.interactionsFile,
+          `[LOG] [SIMULATOR] Raw model response: ${JSON.stringify(response.text)}\n\n`,
+        );
+      }
       debugLogger.log(
         `[SIMULATOR] Processed response: ${JSON.stringify(responseText)}`,
       );
@@ -135,7 +181,7 @@ Do NOT output markdown, explanations of your thought process, or quotes. Output 
         debugLogger.log(
           '[SIMULATOR] Skipping action (model decided to <WAIT>)',
         );
-        this.lastScreenContent = screen;
+        this.lastScreenContent = normalizedScreen;
         return;
       }
 
@@ -162,15 +208,18 @@ Do NOT output markdown, explanations of your thought process, or quotes. Output 
           process.exit(0);
         }
 
-        const keys = responseText.replace(/\\n/g, '\n');
+        const keys = responseText.replace(/\\n/g, '\r').replace(/\\r/g, '\r');
+        const readableAction = trimmedResponse.replace(/\\r/g, '[ENTER]');
+        this.actionHistory.push(readableAction);
+        
         debugLogger.log(
           `[SIMULATOR] Sending to stdin: ${JSON.stringify(keys)}`,
         );
         this.stdinBuffer.write(keys);
-        this.lastScreenContent = screen;
+        this.lastScreenContent = normalizedScreen;
       } else {
         debugLogger.log('[SIMULATOR] Skipping (empty response)');
-        this.lastScreenContent = screen;
+        this.lastScreenContent = normalizedScreen;
       }
     } catch (e: unknown) {
       debugLogger.error('UserSimulator tick failed', e);
