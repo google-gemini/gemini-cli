@@ -175,6 +175,7 @@ export class PromptProvider {
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
+            interactive: interactiveMode,
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
@@ -191,6 +192,7 @@ export class PromptProvider {
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration:
               context.config.isTopicUpdateNarrationEnabled(),
+            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),

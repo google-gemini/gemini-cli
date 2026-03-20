@@ -42,7 +42,7 @@ describe('ShortcutsHelp', () => {
         value: platform.value,
       });
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ShortcutsHelp />,
         {
           width,
@@ -56,7 +56,7 @@ describe('ShortcutsHelp', () => {
   );
 
   it('always shows Tab focus UI shortcut', async () => {
-    const rendered = renderWithProviders(<ShortcutsHelp />);
+    const rendered = await renderWithProviders(<ShortcutsHelp />);
     await rendered.waitUntilReady();
     expect(rendered.lastFrame()).toContain('Tab focus UI');
     rendered.unmount();
