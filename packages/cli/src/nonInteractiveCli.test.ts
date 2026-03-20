@@ -277,6 +277,34 @@ describe('runNonInteractive', () => {
     // so we no longer expect shutdownTelemetry to be called directly here
   });
 
+  it('should stream the specific stream started by send', async () => {
+    const { LegacyAgentSession } = await import(
+      '../../core/src/agent/legacy-agent-session.js'
+    );
+    const streamSpy = vi.spyOn(LegacyAgentSession.prototype, 'stream');
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Hello again' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test input',
+      prompt_id: 'prompt-id-stream',
+    });
+
+    expect(streamSpy).toHaveBeenCalledWith({
+      streamId: expect.any(String),
+    });
+  });
+
   it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
     vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
     const events: ServerGeminiStreamEvent[] = [
