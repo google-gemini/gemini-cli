@@ -1472,7 +1472,7 @@ describe('Approval mode tool exclusion logic', () => {
     await expect(
       loadCliConfig(settings, 'test-session', invalidArgv as CliArgs),
     ).rejects.toThrow(
-      'Invalid approval mode: invalid_mode. Valid values are: auto_edit, plan, default ',
+      'Invalid approval mode: invalid_mode. Valid values are: auto_edit, plan, default',
     );
   });
 
