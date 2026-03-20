@@ -251,7 +251,7 @@ const renderComposer = async (
   config = createMockConfig(),
   uiActions = createMockUIActions(),
 ) => {
-  const result = render(
+  const result = await render(
     <ConfigContext.Provider value={config as unknown as Config}>
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
@@ -262,7 +262,6 @@ const renderComposer = async (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-  await result.waitUntilReady();
 
   // Wait for shortcuts hint debounce if using fake timers
   if (vi.isFakeTimers()) {
