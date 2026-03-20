@@ -129,24 +129,29 @@ export class AgentSession implements AgentProtocol {
 
       if (options.eventId) {
         const index = currentEvents.findIndex((e) => e.id === options.eventId);
-        if (index !== -1) {
-          const resumeEvent = currentEvents[index];
-          replayStartIndex = index + 1;
-          trackedStreamId = resumeEvent?.streamId ?? undefined;
-          if (trackedStreamId) {
-            agentActivityStarted =
-              resumeEvent?.type === 'agent_start' ||
-              currentEvents
-                .slice(0, index)
-                .some(
-                  (event) =>
-                    event.type === 'agent_start' &&
-                    event.streamId === trackedStreamId,
-                );
-          } else {
-            // No correlated stream means "resume globally after this event".
-            agentActivityStarted = true;
-          }
+        if (index === -1) {
+          throw new Error(`Unknown eventId: ${options.eventId}`);
+        }
+
+        const resumeEvent = currentEvents[index];
+        replayStartIndex = index + 1;
+        trackedStreamId = resumeEvent?.streamId ?? undefined;
+        if (resumeEvent?.type === 'agent_end') {
+          agentActivityStarted = true;
+          done = true;
+        } else if (trackedStreamId) {
+          agentActivityStarted =
+            resumeEvent?.type === 'agent_start' ||
+            currentEvents
+              .slice(0, index)
+              .some(
+                (event) =>
+                  event.type === 'agent_start' &&
+                  event.streamId === trackedStreamId,
+              );
+        } else {
+          // No correlated stream means "resume globally after this event".
+          agentActivityStarted = true;
         }
       } else if (options.streamId) {
         const index = currentEvents.findIndex(

@@ -171,6 +171,43 @@ describe('AgentSession', () => {
       expect(streamedEvents).toEqual(allEvents.slice(2));
     });
 
+    it('should complete immediately when resuming from agent_end', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([{ type: 'message' }]);
+      const { streamId } = await session.send({
+        message: [{ type: 'text', text: 'request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const endEvent = session.events.findLast(
+        (event): event is AgentEvent<'agent_end'> =>
+          event.type === 'agent_end' && event.streamId === streamId,
+      );
+      expect(endEvent).toBeDefined();
+
+      const iterator = session.stream({ eventId: endEvent!.id })[
+        Symbol.asyncIterator
+      ]();
+      await expect(iterator.next()).resolves.toEqual({
+        value: undefined,
+        done: true,
+      });
+    });
+
+    it('should throw for an unknown eventId', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      const iterator = session.stream({ eventId: 'missing-event' })[
+        Symbol.asyncIterator
+      ]();
+      await expect(iterator.next()).rejects.toThrow(
+        'Unknown eventId: missing-event',
+      );
+    });
+
     it('should resume from an in-stream event within the same stream only', async () => {
       const protocol = new MockAgentProtocol();
       const session = new AgentSession(protocol);
