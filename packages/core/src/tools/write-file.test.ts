@@ -642,6 +642,51 @@ describe('WriteFileTool', () => {
         expect(diffPromiseResolved).toBe(true);
       });
     });
+
+    it('should return confirmation details in AUTO_EDIT mode when policy decision is ASK_USER', async () => {
+      mockConfigInternal.getApprovalMode.mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+
+      const askUserBus = createMockMessageBus();
+      getMockMessageBusInstance(askUserBus).defaultToolDecision = 'ask_user';
+      const askUserTool = new WriteFileTool(mockConfig, askUserBus);
+
+      const filePath = path.join(rootDir, 'auto_edit_ask_user_file.txt');
+      const proposedContent =
+        'Content that requires confirmation even in AUTO_EDIT mode.';
+      mockEnsureCorrectFileContent.mockResolvedValue(proposedContent);
+
+      const params = { file_path: filePath, content: proposedContent };
+      const invocation = askUserTool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(abortSignal);
+
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toEqual(
+        expect.objectContaining({
+          type: 'edit',
+          title: expect.stringContaining('Confirm Write'),
+          fileName: 'auto_edit_ask_user_file.txt',
+        }),
+      );
+    });
+
+    it('should return false in AUTO_EDIT mode when policy decision is ALLOW', async () => {
+      mockConfigInternal.getApprovalMode.mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+
+      const allowBus = createMockMessageBus();
+      getMockMessageBusInstance(allowBus).defaultToolDecision = 'allow';
+      const allowTool = new WriteFileTool(mockConfig, allowBus);
+
+      const filePath = path.join(rootDir, 'auto_edit_allow_file.txt');
+      const params = { file_path: filePath, content: 'Allowed content.' };
+      const invocation = allowTool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(abortSignal);
+
+      expect(confirmation).toBe(false);
+    });
   });
 
   describe('execute', () => {

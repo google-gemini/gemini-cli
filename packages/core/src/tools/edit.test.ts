@@ -1108,6 +1108,65 @@ function doIt() {
 
       calculateSpy.mockRestore();
     });
+
+    it('should return confirmation details in AUTO_EDIT mode when policy decision is ASK_USER', async () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+
+      const askUserBus = createMockMessageBus();
+      getMockMessageBusInstance(askUserBus).defaultToolDecision = 'ask_user';
+      const askUserTool = new EditTool(mockConfig, askUserBus);
+
+      const filePath = path.join(rootDir, 'auto_edit_ask_user_edit.txt');
+      fs.writeFileSync(filePath, 'original content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'original content',
+        new_string: 'new content',
+      };
+
+      const invocation = askUserTool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toEqual(
+        expect.objectContaining({
+          type: 'edit',
+          title: expect.stringContaining('Confirm Edit'),
+          fileName: 'auto_edit_ask_user_edit.txt',
+        }),
+      );
+    });
+
+    it('should return false in AUTO_EDIT mode when policy decision is ALLOW', async () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+
+      const allowBus = createMockMessageBus();
+      getMockMessageBusInstance(allowBus).defaultToolDecision = 'allow';
+      const allowTool = new EditTool(mockConfig, allowBus);
+
+      const filePath = path.join(rootDir, 'auto_edit_allow_edit.txt');
+      fs.writeFileSync(filePath, 'original content', 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'original content',
+        new_string: 'new content',
+      };
+
+      const invocation = allowTool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmation).toBe(false);
+    });
   });
 
   describe('multiple file edits', () => {
