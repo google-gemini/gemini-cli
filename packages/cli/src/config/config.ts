@@ -1014,11 +1014,8 @@ async function resolveWorktreeSettings(
     if (isGeminiWorktree(toplevel, projectRoot)) {
       worktreePath = toplevel;
     }
-  } catch (e) {
-    if (e instanceof Error && e.message.includes('not a git repository')) {
-      return undefined;
-    }
-    throw e;
+  } catch (_e) {
+    return undefined;
   }
 
   if (!worktreePath) {
