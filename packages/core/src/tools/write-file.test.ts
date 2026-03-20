@@ -648,13 +648,17 @@ describe('WriteFileTool', () => {
         ApprovalMode.AUTO_EDIT,
       );
 
+      const askUserBus = createMockMessageBus();
+      getMockMessageBusInstance(askUserBus).defaultToolDecision = 'ask_user';
+      const askUserTool = new WriteFileTool(mockConfig, askUserBus);
+
       const filePath = path.join(rootDir, 'auto_edit_ask_user_file.txt');
       const proposedContent =
         'Content that requires confirmation even in AUTO_EDIT mode.';
       mockEnsureCorrectFileContent.mockResolvedValue(proposedContent);
 
       const params = { file_path: filePath, content: proposedContent };
-      const invocation = tool.build(params);
+      const invocation = askUserTool.build(params);
       const confirmation = await invocation.shouldConfirmExecute(abortSignal);
 
       expect(confirmation).not.toBe(false);

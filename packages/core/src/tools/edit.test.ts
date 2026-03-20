@@ -1114,6 +1114,10 @@ function doIt() {
         ApprovalMode.AUTO_EDIT,
       );
 
+      const askUserBus = createMockMessageBus();
+      getMockMessageBusInstance(askUserBus).defaultToolDecision = 'ask_user';
+      const askUserTool = new EditTool(mockConfig, askUserBus);
+
       const filePath = path.join(rootDir, 'auto_edit_ask_user_edit.txt');
       fs.writeFileSync(filePath, 'original content', 'utf8');
       const params: EditToolParams = {
@@ -1123,7 +1127,7 @@ function doIt() {
         new_string: 'new content',
       };
 
-      const invocation = tool.build(params);
+      const invocation = askUserTool.build(params);
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
