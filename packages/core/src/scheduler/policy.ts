@@ -125,6 +125,9 @@ export async function updatePolicy(
 
   // Determine persist scope if we are persisting.
   let persistScope: 'workspace' | 'user' | undefined;
+  let modes: ApprovalMode[] | undefined;
+  const currentMode = context.config.getApprovalMode();
+
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
     // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
     if (
@@ -136,6 +139,10 @@ export async function updatePolicy(
     } else {
       persistScope = 'user';
     }
+
+    if (currentMode !== ApprovalMode.PLAN) {
+      modes = [ApprovalMode.DEFAULT, ApprovalMode.AUTO_EDIT, ApprovalMode.YOLO];
+    }
   }
 
   // Specialized Tools (MCP)
@@ -146,6 +153,7 @@ export async function updatePolicy(
       confirmationDetails,
       messageBus,
       persistScope,
+      modes,
     );
     return;
   }
@@ -159,6 +167,7 @@ export async function updatePolicy(
     persistScope,
     toolInvocation,
     context.config,
+    modes,
   );
 }
 
@@ -191,6 +200,7 @@ async function handleStandardPolicyUpdate(
   persistScope?: 'workspace' | 'user',
   toolInvocation?: AnyToolInvocation,
   config?: Config,
+  modes?: ApprovalMode[],
 ): Promise<void> {
   if (
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -213,6 +223,7 @@ async function handleStandardPolicyUpdate(
       toolName: tool.name,
       persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
       persistScope,
+      modes,
       ...options,
     });
   }
@@ -231,6 +242,7 @@ async function handleMcpPolicyUpdate(
   >,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  modes?: ApprovalMode[],
 ): Promise<void> {
   const isMcpAlways =
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -256,5 +268,6 @@ async function handleMcpPolicyUpdate(
     mcpName: confirmationDetails.serverName,
     persist,
     persistScope,
+    modes,
   });
 }
