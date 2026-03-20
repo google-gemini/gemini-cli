@@ -538,7 +538,31 @@ describe('SettingsSchema', () => {
       }
     };
 
+    const visitJsonSchema = (jsonSchema: Record<string, unknown>) => {
+      const ref = jsonSchema['ref'];
+      if (typeof ref === 'string') {
+        referenced.add(ref);
+      }
+      const properties = jsonSchema['properties'];
+      if (
+        properties &&
+        typeof properties === 'object' &&
+        !Array.isArray(properties)
+      ) {
+        Object.values(properties as Record<string, unknown>).forEach((prop) =>
+          visitJsonSchema(prop as Record<string, unknown>),
+        );
+      }
+      const items = jsonSchema['items'];
+      if (items && typeof items === 'object' && !Array.isArray(items)) {
+        visitJsonSchema(items as Record<string, unknown>);
+      }
+    };
+
     Object.values(schema).forEach(visitDefinition);
+
+    // Also visit all definitions to find nested references
+    Object.values(SETTINGS_SCHEMA_DEFINITIONS).forEach(visitJsonSchema);
 
     // Ensure definitions map doesn't accumulate stale entries.
     Object.keys(SETTINGS_SCHEMA_DEFINITIONS).forEach((key) => {

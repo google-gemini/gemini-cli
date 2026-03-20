@@ -2061,7 +2061,7 @@
           },
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ModelPolicy"
+            "$ref": "#/$defs/ModelPolicyChain"
           }
         }
       },
@@ -3684,6 +3684,14 @@
             }
           }
         }
+      }
+    },
+    "ModelPolicyChain": {
+      "type": "array",
+      "description": "A chain of model policies for fallback behavior.",
+      "items": {
+        "type": "object",
+        "ref": "ModelPolicy"
       }
     },
     "ModelPolicy": {
