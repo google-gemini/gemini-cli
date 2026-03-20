@@ -291,7 +291,6 @@ export class AppRig {
 
       const newContentGeneratorConfig = {
         authType: authMethod,
-
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
       };
