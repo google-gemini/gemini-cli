@@ -1143,15 +1143,28 @@ export const useGeminiStream = (
         setPendingHistoryItem(null);
       }
 
+      const limit = tokenLimit(config.getModel());
+      const beforePercentage =
+        eventValue?.originalTokenCount != null
+          ? Math.round((eventValue.originalTokenCount / limit) * 100)
+          : null;
+      const afterPercentage =
+        eventValue?.newTokenCount != null
+          ? Math.round((eventValue.newTokenCount / limit) * 100)
+          : null;
+      const threshold = Math.round(
+        config.getContextWindowCompressionThreshold() * 100,
+      );
+
       addItem(
         {
           type: 'compression',
           compression: {
             isPending: false,
-            originalTokenCount: eventValue?.originalTokenCount ?? null,
-            newTokenCount: eventValue?.newTokenCount ?? null,
+            beforePercentage,
+            afterPercentage,
+            threshold,
             compressionStatus: eventValue?.compressionStatus ?? null,
-            model: config.getModel(),
           },
           timestamp: new Date(userMessageTimestamp),
         } as HistoryItemWithoutId,
@@ -1185,7 +1198,7 @@ export const useGeminiStream = (
         ((limit - remainingTokenCount) / limit) * 100,
       );
 
-      const text = `Context window is ${usedPercentage}% full. Message size (${estimatedRequestTokenCount.toLocaleString()} tokens) might exceed the limit.\nPlease try reducing the size of your message or use the /compress command to compress the chat history.`;
+      const text = `Context ${usedPercentage}% full. Message may exceed limit. Reduce size or /compress.`;
 
       addItem({
         type: 'info',

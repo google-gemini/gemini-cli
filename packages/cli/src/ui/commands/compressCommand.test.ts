@@ -4,15 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  CompressionStatus,
-  type ChatCompressionInfo,
-  type GeminiClient,
-} from '@google/gemini-cli-core';
+import * as Core from '@google/gemini-cli-core';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { compressCommand } from './compressCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    tokenLimit: vi.fn(),
+  };
+});
 
 describe('compressCommand', () => {
   let context: ReturnType<typeof createMockCommandContext>;
@@ -20,12 +24,17 @@ describe('compressCommand', () => {
 
   beforeEach(() => {
     mockTryCompressChat = vi.fn();
+    vi.mocked(Core.tokenLimit).mockReturnValue(1000);
     context = createMockCommandContext({
       services: {
         agentContext: {
+          config: {
+            getModel: () => 'test-model',
+            getContextWindowCompressionThreshold: () => 0.2,
+          },
           geminiClient: {
             tryCompressChat: mockTryCompressChat,
-          } as unknown as GeminiClient,
+          } as unknown as Core.GeminiClient,
         },
       },
     });
@@ -36,10 +45,10 @@ describe('compressCommand', () => {
       type: MessageType.COMPRESSION,
       compression: {
         isPending: true,
-        originalTokenCount: null,
-        newTokenCount: null,
+        beforePercentage: null,
+        afterPercentage: null,
+        threshold: null,
         compressionStatus: null,
-        model: 'test-model',
       },
     };
     await compressCommand.action!(context, '');
@@ -55,9 +64,9 @@ describe('compressCommand', () => {
   });
 
   it('should set pending item, call tryCompressChat, and add result on success', async () => {
-    const compressedResult: ChatCompressionInfo = {
+    const compressedResult: Core.ChatCompressionInfo = {
       originalTokenCount: 200,
-      compressionStatus: CompressionStatus.COMPRESSED,
+      compressionStatus: Core.CompressionStatus.COMPRESSED,
       newTokenCount: 100,
     };
     mockTryCompressChat.mockResolvedValue(compressedResult);
@@ -69,9 +78,9 @@ describe('compressCommand', () => {
       compression: {
         isPending: true,
         compressionStatus: null,
-        originalTokenCount: null,
-        newTokenCount: null,
-        model: 'test-model',
+        beforePercentage: null,
+        afterPercentage: null,
+        threshold: null,
       },
     });
 
@@ -85,10 +94,10 @@ describe('compressCommand', () => {
         type: MessageType.COMPRESSION,
         compression: {
           isPending: false,
-          compressionStatus: CompressionStatus.COMPRESSED,
-          originalTokenCount: 200,
-          newTokenCount: 100,
-          model: 'test-model',
+          compressionStatus: Core.CompressionStatus.COMPRESSED,
+          beforePercentage: 20,
+          afterPercentage: 10,
+          threshold: 20,
         },
       },
       expect.any(Number),

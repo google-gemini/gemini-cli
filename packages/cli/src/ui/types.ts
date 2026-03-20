@@ -138,10 +138,10 @@ export interface IndividualToolCallDisplay {
 
 export interface CompressionProps {
   isPending: boolean;
-  originalTokenCount: number | null;
-  newTokenCount: number | null;
+  beforePercentage: number | null;
+  afterPercentage: number | null;
+  threshold: number | null;
   compressionStatus: CompressionStatus | null;
-  model?: string;
 }
 
 /**

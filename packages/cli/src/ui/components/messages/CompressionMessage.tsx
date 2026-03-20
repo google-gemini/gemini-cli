@@ -9,7 +9,7 @@ import type { CompressionProps } from '../../types.js';
 import { CliSpinner } from '../CliSpinner.js';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
-import { CompressionStatus, tokenLimit } from '@google/gemini-cli-core';
+import { CompressionStatus } from '@google/gemini-cli-core';
 
 export interface CompressionDisplayProps {
   compression: CompressionProps;
@@ -24,37 +24,22 @@ export function CompressionMessage({
 }: CompressionDisplayProps): React.JSX.Element {
   const {
     isPending,
-    originalTokenCount,
-    newTokenCount,
+    beforePercentage,
+    afterPercentage,
+    threshold,
     compressionStatus,
-    model,
   } = compression;
-
-  const originalTokens = originalTokenCount ?? 0;
-  const newTokens = newTokenCount ?? 0;
 
   const getCompressionText = () => {
     if (isPending) {
       return 'Compressing chat history';
     }
 
-    const limit = model ? tokenLimit(model) : 0;
-    const formatPercent = (tokens: number) =>
-      limit > 0
-        ? `${Math.round((tokens / limit) * 100)}% (${tokens.toLocaleString()} tokens)`
-        : `${tokens.toLocaleString()} tokens`;
-
     switch (compressionStatus) {
       case CompressionStatus.COMPRESSED:
-        return `Context compressed from ${formatPercent(originalTokens)} to ${formatPercent(newTokens)}. Change threshold in /settings.`;
+        return `Context compressed (${beforePercentage}% ➔ ${afterPercentage}%). Adjust threshold (${threshold}%) in /settings.`;
       case CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT:
-        // For smaller histories (< 50k tokens), compression overhead likely exceeds benefits
-        if (originalTokens < 50000) {
-          return 'Compression was not beneficial for this history size.';
-        }
-        // For larger histories where compression should work but didn't,
-        // this suggests an issue with the compression process itself
-        return 'Chat history compression did not reduce size.';
+        return 'Compression was not beneficial for this history size.';
       case CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR:
         return 'Could not compress chat history due to a token counting error.';
       case CompressionStatus.COMPRESSION_FAILED_EMPTY_SUMMARY:
