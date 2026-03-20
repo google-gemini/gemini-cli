@@ -57,6 +57,44 @@ describe('LspService', () => {
     });
   });
 
+  it('should parse modern TSC error format', async () => {
+    const tscOutput = `file.ts:10:5 - error TS1234: Property 'x' does not exist on type 'Y'.`;
+    (spawnAsync as Mock).mockImplementation((cmd: string) => {
+      if (cmd.includes('tsc'))
+        return Promise.resolve({ stdout: tscOutput, stderr: '' });
+      return Promise.resolve({ stdout: '', stderr: '' });
+    });
+
+    const diagnostics = await lspService.getDiagnostics('file.ts');
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({
+      line: 10,
+      column: 5,
+      severity: 'error',
+      code: 'TS1234',
+      message: "Property 'x' does not exist on type 'Y'.",
+    });
+  });
+
+  it('should strip --project flag for single file type checks', async () => {
+    mockConfig.getLspSettings.mockReturnValue({
+      lintEnabled: false,
+      typeCheckEnabled: true,
+      typeCheckCommand: 'tsc --project tsconfig.json --noEmit',
+    });
+
+    (spawnAsync as Mock).mockResolvedValue({ stdout: '', stderr: '' });
+
+    await lspService.getDiagnostics('file.ts');
+
+    const lastCall = (spawnAsync as Mock).mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    expect(lastCall![0]).not.toContain('--project');
+    expect(lastCall![0]).not.toContain('tsconfig.json');
+    expect(lastCall![1]).toContain('file.ts');
+  });
+
   it('should parse ESLint error format', async () => {
     const eslintOutput = `file.ts:5:10: error 'foo' is defined but never used.`;
     (spawnAsync as Mock).mockImplementation((cmd: string) => {

@@ -5,6 +5,7 @@
  */
 
 import { setTimeout as sleep } from 'node:timers/promises';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   HookType,
   HookEventName,
@@ -41,6 +42,12 @@ export function createLspDiagnosticsHook(
       return;
     }
 
+    // Skip if the folder is not trusted (fail-fast)
+    const config = lspService.getConfig();
+    if (config.isTrustedFolder && !config.isTrustedFolder()) {
+      return;
+    }
+
     // Skip if the tool failed
     if (afterToolInput.tool_response['error']) {
       return;
@@ -53,7 +60,9 @@ export function createLspDiagnosticsHook(
     }
 
     // Delay slightly to let the IDE debounce (e.g. VS Code usually debounces by 50-200ms + language server processing time)
-    await sleep(1000);
+    const debounceDelay =
+      lspService.getConfig().getLspSettings().debounceDelay ?? 1000;
+    await sleep(debounceDelay);
 
     // Invalidate cache before fetching to ensure we get fresh diagnostics after a write
     await lspService.invalidateCache(filePath);
@@ -62,12 +71,12 @@ export function createLspDiagnosticsHook(
     let diagnostics;
     try {
       diagnostics = await lspService.getDiagnostics(filePath);
-    } catch (_e) {
-      // Don't crash if LSP fails
+    } catch (e) {
+      debugLogger.error('LSP diagnostics failed:', e);
       return;
     }
 
-    if (diagnostics.length > 0) {
+    if (diagnostics && diagnostics.length > 0) {
       const formattedDiagnostics = diagnostics
         .map((d) => {
           // Improve readability of common linter regexes (e.g. /^_/u -> ^_)

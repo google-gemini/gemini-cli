@@ -34,6 +34,10 @@ export class LspService {
     this.projectRoot = config.getProjectRoot ? config.getProjectRoot() : '.';
   }
 
+  getConfig(): Config {
+    return this.config;
+  }
+
   private async computeFileHash(filePath: string): Promise<string> {
     try {
       const absolutePath = path.resolve(this.projectRoot, filePath);
@@ -433,6 +437,12 @@ export class LspService {
           debugLogger.debug('Using tsgo for faster type checking');
         }
 
+        // Special handling for tsc: remove --project if targeting a single file
+        if (typeCmd.includes('tsc') && filePath !== '.') {
+          typeCmd = typeCmd.replace(/--project\s+\S+/, '');
+          typeCmd = typeCmd.replace(/-p\s+\S+/, '');
+        }
+
         const typeCheckResults = await this.runCommand(typeCmd, filePath);
         diagnostics.push(...this.parseDiagnostics(typeCheckResults, filePath));
       } catch (error) {
@@ -486,6 +496,7 @@ export class LspService {
     try {
       const { stdout, stderr } = await spawnAsync(resolvedCmd, filteredArgs, {
         cwd: this.projectRoot,
+        sandboxManager: this.config.sandboxManager,
       });
       return stdout + stderr;
     } catch (error: unknown) {
@@ -528,6 +539,17 @@ export class LspService {
         colIdx: 3,
         severityIdx: 4,
         messageIdx: 5,
+      },
+      // Modern TSC format: file.ts:10:5 - error TS1234: message
+      {
+        regex:
+          /^(.*?):(\d+):(\d+)\s+-\s+(err|error|warn|warning|info)\s+(.*?):\s+(.*)$/,
+        fileIdx: 1,
+        lineIdx: 2,
+        colIdx: 3,
+        severityIdx: 4,
+        codeIdx: 5,
+        messageIdx: 6,
       },
       // Generic format: file.ts: line 10, col 5, Error - message
       {

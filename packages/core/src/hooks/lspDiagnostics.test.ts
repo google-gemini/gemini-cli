@@ -24,15 +24,24 @@ import type { LspService } from '../services/lspService.js';
 import type { Diagnostic } from '../services/lspTypes.js';
 
 describe('lspDiagnosticsHook', () => {
+  const mockConfig = {
+    getLspSettings: vi.fn().mockReturnValue({
+      debounceDelay: 0,
+    }),
+    isTrustedFolder: vi.fn().mockReturnValue(true),
+  };
+
   const mockLspService = {
     getDiagnostics: vi.fn(),
     invalidateCache: vi.fn(),
+    getConfig: vi.fn().mockReturnValue(mockConfig),
   } as unknown as LspService;
 
   const hook = createLspDiagnosticsHook(mockLspService);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(true);
   });
 
   const baseInput: HookInput = {
@@ -42,6 +51,22 @@ describe('lspDiagnosticsHook', () => {
     timestamp: new Date().toISOString(),
     hook_event_name: HookEventName.AfterTool,
   };
+
+  it('should skip if the folder is not trusted', async () => {
+    vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+    const input: AfterToolInput = {
+      ...baseInput,
+      tool_name: EDIT_TOOL_NAME,
+      tool_input: { file_path: 'test.ts' },
+      tool_response: { success: true },
+    };
+
+    const result = (await hook.action(input)) as HookOutput;
+
+    expect(mockLspService.getDiagnostics).not.toHaveBeenCalled();
+    expect(result).toBeUndefined();
+  });
 
   it('should trigger for file modification tools', async () => {
     const diagnostics: Diagnostic[] = [

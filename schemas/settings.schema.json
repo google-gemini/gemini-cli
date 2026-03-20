@@ -202,14 +202,6 @@
           "default": {},
           "type": "object",
           "properties": {
-            "mode": {
-              "title": "Diagnostic Mode",
-              "description": "Diagnostic mode: auto, lsp (IDE/LSP only), cli (command only), or off.",
-              "markdownDescription": "Diagnostic mode: auto, lsp (IDE/LSP only), cli (command only), or off.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `auto`",
-              "default": "auto",
-              "type": "string",
-              "enum": ["auto", "lsp", "cli", "off"]
-            },
             "lintEnabled": {
               "title": "Enable Linting",
               "description": "Enable automatic linting after file edits.",
