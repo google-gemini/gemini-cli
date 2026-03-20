@@ -36,6 +36,7 @@ import {
   // Tool-specific parameter names
   READ_FILE_PARAM_START_LINE,
   READ_FILE_PARAM_END_LINE,
+  READ_FILE_PARAM_FULL,
   WRITE_FILE_PARAM_CONTENT,
   GREP_PARAM_INCLUDE_PATTERN,
   GREP_PARAM_EXCLUDE_PATTERN,
@@ -91,7 +92,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding ${DEFAULT_MAX_LINES_TEXT_FILE} lines, ${MAX_LINE_LENGTH_TEXT_FILE} characters per line, or ${MAX_FILE_SIZE_MB}MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
+    description: `Reads and returns the content of a specified file. For large files, the tool will return a summary/outline to help you understand the file's structure. You can then use 'start_line' and 'end_line' for targeted reads of specific sections, or 'full: true' to retrieve the complete content. For your safety, the tool will automatically truncate output exceeding ${DEFAULT_MAX_LINES_TEXT_FILE} lines, ${MAX_LINE_LENGTH_TEXT_FILE} characters per line, or ${MAX_FILE_SIZE_MB}MB in size; however, triggering these limits is considered token-inefficient. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -108,6 +109,11 @@ export const GEMINI_3_SET: CoreToolSet = {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
           type: 'number',
+        },
+        [READ_FILE_PARAM_FULL]: {
+          description:
+            'Optional: If true, returns the full file contents. If false (default), large files may be summarized for efficiency.',
+          type: 'boolean',
         },
       },
       required: [PARAM_FILE_PATH],

@@ -402,6 +402,7 @@ export interface ProcessedFileReadResult {
  * @param _fileSystemService Currently unused in this function; kept for signature stability.
  * @param startLine Optional 1-based line number to start reading from.
  * @param endLine Optional 1-based line number to end reading at (inclusive).
+ * @param full Optional boolean to indicate if full file content should be returned without line truncation.
  * @returns ProcessedFileReadResult object.
  */
 export async function processSingleFileContent(
@@ -410,6 +411,7 @@ export async function processSingleFileContent(
   _fileSystemService: FileSystemService,
   startLine?: number,
   endLine?: number,
+  full?: boolean,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -482,11 +484,13 @@ export async function processSingleFileContent(
           sliceStart = startLine ? startLine - 1 : 0;
           sliceEnd = endLine
             ? Math.min(endLine, originalLineCount)
-            : Math.min(
-                sliceStart + DEFAULT_MAX_LINES_TEXT_FILE,
-                originalLineCount,
-              );
-        } else {
+            : full
+              ? originalLineCount
+              : Math.min(
+                  sliceStart + DEFAULT_MAX_LINES_TEXT_FILE,
+                  originalLineCount,
+                );
+        } else if (!full) {
           sliceEnd = Math.min(DEFAULT_MAX_LINES_TEXT_FILE, originalLineCount);
         }
 
@@ -496,7 +500,7 @@ export async function processSingleFileContent(
 
         let linesWereTruncatedInLength = false;
         const formattedLines = selectedLines.map((line) => {
-          if (line.length > MAX_LINE_LENGTH_TEXT_FILE) {
+          if (!full && line.length > MAX_LINE_LENGTH_TEXT_FILE) {
             linesWereTruncatedInLength = true;
             return (
               line.substring(0, MAX_LINE_LENGTH_TEXT_FILE) + '... [truncated]'

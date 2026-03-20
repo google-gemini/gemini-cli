@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -40,6 +41,14 @@ vi.mock('./jit-context.js', () => ({
   JIT_CONTEXT_PREFIX: '\n\n--- Newly Discovered Project Context ---\n',
   JIT_CONTEXT_SUFFIX: '\n--- End Project Context ---',
 }));
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
 
 describe('ReadFileTool', () => {
   let tempRootDir: string;
@@ -610,7 +619,7 @@ describe('ReadFileTool', () => {
       const schema = tool.getSchema(modelId);
       expect(schema.name).toBe(ReadFileTool.Name);
       expect(schema.description).toMatchSnapshot();
-      expect(schema.description).toContain('surgical reads');
+      expect(schema.description).toContain('targeted reads');
     });
   });
 
@@ -683,6 +692,126 @@ describe('ReadFileTool', () => {
       expect(jitTextPart!['text']).toContain(
         'Auth rules: use httpOnly cookies.',
       );
+    });
+  });
+
+  describe('tilth and full parameter', () => {
+    it('should use tilth for large files when full is false', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const content = 'A'.repeat(5000); // Exceeds default 4096 threshold
+      fs.writeFileSync(filePath, content);
+
+      vi.mocked(execSync).mockReturnValue('tilth summary');
+
+      const params: ReadFileToolParams = {
+        file_path: 'large.txt',
+        full: false,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(execSync).toHaveBeenCalledWith(
+        expect.stringContaining(`npx -y tilth --budget 1000 "${filePath}"`),
+        expect.any(Object),
+      );
+      expect(result.llmContent).toContain('tilth summary');
+      expect(result.returnDisplay).toContain('Summarized large file');
+    });
+
+    it('should NOT use tilth when full is true', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const content = 'A'.repeat(5000);
+      fs.writeFileSync(filePath, content);
+
+      vi.mocked(execSync).mockClear();
+
+      const params: ReadFileToolParams = {
+        file_path: 'large.txt',
+        full: true,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(execSync).not.toHaveBeenCalled();
+      // Should return full content (clamped by MAX_LINE_LENGTH_TEXT_FILE per line, but not summarized by tilth)
+      expect(result.llmContent).not.toContain('--- FILE SUMMARY ---');
+    });
+
+    it('should use tilth when start_line is 1 and no end_line is provided', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const content = 'A\n'.repeat(3000); // 6000 bytes
+      fs.writeFileSync(filePath, content);
+
+      vi.mocked(execSync).mockClear();
+      vi.mocked(execSync).mockReturnValue('tilth summary for line 1');
+
+      const params: ReadFileToolParams = {
+        file_path: 'large.txt',
+        start_line: 1,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(execSync).toHaveBeenCalled();
+      expect(result.llmContent).toContain('tilth summary for line 1');
+    });
+
+    it('should NOT use tilth when custom start_line (not 1) is provided', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const content = 'A\n'.repeat(3000);
+      fs.writeFileSync(filePath, content);
+
+      vi.mocked(execSync).mockClear();
+
+      const params: ReadFileToolParams = {
+        file_path: 'large.txt',
+        start_line: 10,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(execSync).not.toHaveBeenCalled();
+      expect(result.llmContent).not.toContain('--- FILE SUMMARY ---');
+    });
+
+    it('should read to end when start_line > 1 is provided without end_line', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const lines = Array.from({ length: 3000 }, (_, i) => `Line ${i + 1}`);
+      fs.writeFileSync(filePath, lines.join('\n'));
+
+      vi.mocked(execSync).mockClear();
+
+      const params: ReadFileToolParams = {
+        file_path: 'large.txt',
+        start_line: 10,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(execSync).not.toHaveBeenCalled();
+      expect(result.llmContent).toContain('Line 10');
+      expect(result.llmContent).not.toContain('Line 1\n');
+      expect(result.returnDisplay).toContain('Read lines 10-'); // Clamped by default max lines, but direct read
+    });
+
+    it('should respect custom GEMINI_CLI_FULL_READ_THRESHOLD', async () => {
+      const filePath = path.join(tempRootDir, 'medium.txt');
+      const content = 'A'.repeat(1000);
+      fs.writeFileSync(filePath, content);
+
+      vi.stubEnv('GEMINI_CLI_FULL_READ_THRESHOLD', '500');
+      vi.mocked(execSync).mockReturnValue('tilth summary');
+
+      const params: ReadFileToolParams = {
+        file_path: 'medium.txt',
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(execSync).toHaveBeenCalled();
+      expect(result.llmContent).toContain('tilth summary');
+
+      vi.unstubAllEnvs();
     });
   });
 });

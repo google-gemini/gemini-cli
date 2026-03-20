@@ -6,6 +6,8 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
@@ -24,6 +26,8 @@ import type { PartListUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
+  detectFileType,
+  type ProcessedFileReadResult,
 } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -34,6 +38,7 @@ import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { MAX_FILE_SIZE_MB } from '../utils/constants.js';
 import {
   discoverJitContext,
   appendJitContext,
@@ -58,6 +63,12 @@ export interface ReadFileToolParams {
    * The line number to end reading at (optional, 1-based, inclusive)
    */
   end_line?: number;
+
+  /**
+   * If true, returns the full file contents.
+   * If false (default), large files may be summarized for efficiency.
+   */
+  full?: boolean;
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -120,13 +131,81 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const result = await processSingleFileContent(
-      this.resolvedPath,
-      this.config.getTargetDir(),
-      this.config.getFileSystemService(),
-      this.params.start_line,
-      this.params.end_line,
-    );
+    let result: ProcessedFileReadResult;
+    if (!fs.existsSync(this.resolvedPath)) {
+      result = await processSingleFileContent(
+        this.resolvedPath,
+        this.config.getTargetDir(),
+        this.config.getFileSystemService(),
+        this.params.start_line,
+        this.params.end_line,
+        this.params.full,
+      );
+    } else {
+      const stats = await fs.promises.stat(this.resolvedPath);
+      const fileSizeInMB = stats.size / (1024 * 1024);
+      if (fileSizeInMB > MAX_FILE_SIZE_MB) {
+        result = await processSingleFileContent(
+          this.resolvedPath,
+          this.config.getTargetDir(),
+          this.config.getFileSystemService(),
+          this.params.start_line,
+          this.params.end_line,
+          this.params.full,
+        );
+      } else {
+        const fileType = await detectFileType(this.resolvedPath);
+        const fullReadThreshold = parseInt(
+          process.env['GEMINI_CLI_FULL_READ_THRESHOLD'] ?? '4096',
+          10,
+        );
+
+        const isExplicitLineRange =
+          (this.params.start_line !== undefined &&
+            this.params.start_line !== 1) ||
+          this.params.end_line !== undefined;
+
+        const isDirectReadRequired =
+          this.params.full === true ||
+          isExplicitLineRange ||
+          stats.size < fullReadThreshold ||
+          fileType !== 'text';
+        if (isDirectReadRequired) {
+          result = await processSingleFileContent(
+            this.resolvedPath,
+            this.config.getTargetDir(),
+            this.config.getFileSystemService(),
+            this.params.start_line,
+            this.params.end_line,
+            this.params.full,
+          );
+        } else {
+          try {
+            const summary = execSync(
+              `npx -y tilth --budget 1000 "${this.resolvedPath}"`,
+              {
+                encoding: 'utf-8',
+                stdio: ['ignore', 'pipe', 'pipe'],
+              },
+            ).toString();
+            result = {
+              llmContent: summary,
+              returnDisplay: `Summarized large file: ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`,
+            };
+          } catch (_error) {
+            // Fallback to normal read if tilth fails
+            result = await processSingleFileContent(
+              this.resolvedPath,
+              this.config.getTargetDir(),
+              this.config.getFileSystemService(),
+              this.params.start_line,
+              this.params.end_line,
+              this.params.full,
+            );
+          }
+        }
+      }
+    }
 
     if (result.error) {
       return {
@@ -254,6 +333,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
       params.start_line > params.end_line
     ) {
       return 'start_line cannot be greater than end_line';
+    }
+
+    if (params.full !== undefined && typeof params.full !== 'boolean') {
+      return 'full must be a boolean';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();

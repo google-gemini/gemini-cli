@@ -25,6 +25,7 @@ import {
   GREP_PARAM_AFTER,
   READ_FILE_PARAM_START_LINE,
   READ_FILE_PARAM_END_LINE,
+  READ_FILE_PARAM_FULL,
   SHELL_PARAM_IS_BACKGROUND,
   EDIT_PARAM_OLD_STRING,
   TRACKER_CREATE_TASK_TOOL_NAME,
@@ -215,7 +216,7 @@ Use the following guidelines to optimize your search and read patterns.
 - **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
 - **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize ${READ_FILE_TOOL_NAME} to get a summary/outline of the file, then use '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' for targeted reads of relevant sections, or use '${READ_FILE_PARAM_FULL}: true' for small to medium files when the complete context is required.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 

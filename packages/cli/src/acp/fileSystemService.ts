@@ -14,7 +14,7 @@ export class AcpFileSystemService implements FileSystemService {
   constructor(
     private readonly connection: acp.AgentSideConnection,
     private readonly sessionId: string,
-    private readonly capabilities: acp.FileSystemCapabilities,
+    private readonly capabilities: acp.FileSystemCapability,
     private readonly fallback: FileSystemService,
   ) {}
 

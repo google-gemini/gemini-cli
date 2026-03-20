@@ -36,6 +36,7 @@ import {
   // Tool-specific parameter names
   READ_FILE_PARAM_START_LINE,
   READ_FILE_PARAM_END_LINE,
+  READ_FILE_PARAM_FULL,
   WRITE_FILE_PARAM_CONTENT,
   GREP_PARAM_INCLUDE_PATTERN,
   GREP_PARAM_EXCLUDE_PATTERN,
@@ -83,7 +84,7 @@ import {
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. For large files, the tool will return a summary/outline to help you understand the file's structure. You can then use 'start_line' and 'end_line' for targeted reads of specific sections, or 'full: true' to retrieve the complete content. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -100,6 +101,11 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
           type: 'number',
+        },
+        [READ_FILE_PARAM_FULL]: {
+          description:
+            'Optional: If true, returns the full file contents. If false (default), large files may be summarized for efficiency.',
+          type: 'boolean',
         },
       },
       required: [PARAM_FILE_PATH],
