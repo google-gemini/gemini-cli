@@ -46,6 +46,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -794,6 +795,10 @@ export async function loadCliConfig(
     workspacePoliciesDir,
   );
   policyEngineConfig.nonInteractive = !interactive;
+  if (!interactive) {
+    // Default decision for non-interactive env should DENY instead of ASK_USER
+    policyEngineConfig.defaultDecision = PolicyDecision.DENY;
+  }
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
