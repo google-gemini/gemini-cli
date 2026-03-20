@@ -1198,6 +1198,26 @@ const SETTINGS_SCHEMA = {
               'Disable user input on browser window during automation.',
             showInDialog: false,
           },
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
+          },
         },
       },
     },

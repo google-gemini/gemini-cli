@@ -330,6 +330,10 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Whether to confirm sensitive actions (e.g., fill_form, evaluate_script). */
+  confirmSensitiveActions?: boolean;
+  /** Whether to block file uploads. */
+  blockFileUploads?: boolean;
 }
 
 /**
@@ -3135,6 +3139,8 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        confirmSensitiveActions: customConfig.confirmSensitiveActions,
+        blockFileUploads: customConfig.blockFileUploads,
       },
     };
   }
