@@ -47,6 +47,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   getDisplayString,
+  updatePolicy,
   type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
@@ -69,6 +70,7 @@ import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
+import { createPolicyUpdater } from '../config/policy.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
@@ -299,6 +301,11 @@ export class GeminiAgent {
     }
 
     await config.initialize();
+    createPolicyUpdater(
+      config.getPolicyEngine(),
+      config.getMessageBus(),
+      config.storage,
+    );
     startupProfiler.flush(config);
 
     const geminiClient = config.getGeminiClient();
@@ -437,6 +444,11 @@ export class GeminiAgent {
     // 3. Now that we are authenticated, it is safe to initialize the config
     // which starts the MCP servers and other heavy resources.
     await config.initialize();
+    createPolicyUpdater(
+      config.getPolicyEngine(),
+      config.getMessageBus(),
+      config.storage,
+    );
     startupProfiler.flush(config);
 
     return config;
@@ -995,6 +1007,16 @@ export class Session {
                 .parse(output.outcome.optionId);
 
         await confirmationDetails.onConfirm(outcome);
+
+        await updatePolicy(
+          tool,
+          outcome,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+          confirmationDetails as any, // SerializableConfirmationDetails structure matches what updatePolicy needs
+          this.context,
+          this.context.messageBus,
+          invocation,
+        );
 
         switch (outcome) {
           case ToolConfirmationOutcome.Cancel:
