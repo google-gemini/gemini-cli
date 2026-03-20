@@ -21,6 +21,7 @@ import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,
+  isAbortError,
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
@@ -359,9 +360,9 @@ export class Turn {
         }
       }
     } catch (e) {
-      if (signal.aborted) {
+      if (signal.aborted || isAbortError(e)) {
         yield { type: GeminiEventType.UserCancelled };
-        // Regular cancellation error, fail gracefully.
+        // Regular cancellation or loop-detection abort error, fail gracefully.
         return;
       }
 
