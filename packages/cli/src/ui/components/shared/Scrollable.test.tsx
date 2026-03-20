@@ -29,7 +29,7 @@ describe('<Scrollable />', () => {
   });
 
   it('renders children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Hello World</Text>
       </Scrollable>,
@@ -40,7 +40,7 @@ describe('<Scrollable />', () => {
   });
 
   it('renders multiple children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
@@ -55,7 +55,7 @@ describe('<Scrollable />', () => {
   });
 
   it('matches snapshot', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
@@ -77,7 +77,7 @@ describe('<Scrollable />', () => {
       },
     );
 
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <Scrollable hasFocus={true} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
@@ -105,7 +105,7 @@ describe('<Scrollable />', () => {
     // Initial state with scrollToBottom={true}
     unmount();
     const { waitUntilReady: waitUntilReady2, unmount: unmount2 } =
-      renderWithProviders(
+      await renderWithProviders(
         <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
           <Text>Line 1</Text>
           <Text>Line 2</Text>
@@ -197,7 +197,7 @@ describe('<Scrollable />', () => {
           },
         );
 
-        const { stdin, waitUntilReady, unmount } = renderWithProviders(
+        const { stdin, waitUntilReady, unmount } = await renderWithProviders(
           <Scrollable hasFocus={true} height={5}>
             <Box height={scrollHeight}>
               <Text>Content</Text>
