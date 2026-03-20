@@ -181,9 +181,20 @@ As described in the
 rule that does not explicitly specify `modes` is considered "always active" and
 will apply to Plan Mode as well.
 
-If you want a rule to apply to other modes but _not_ to Plan Mode, you must
-explicitly specify the target modes. For example, to allow `npm test` in default
-and Auto-Edit modes but not in Plan Mode:
+To maintain the integrity of Plan Mode as a safe research environment,
+persistent tool approvals are context-aware by default:
+
+- **Implementation-time approvals**: If you select **"Allow for all future
+  sessions"** while in an implementation mode (like Default or Auto-Edit),
+  Gemini CLI automatically restricts the rule to those modes. This ensures that
+  tools trusted for coding don't automatically execute while you're researching.
+- **Planning-time approvals**: If you grant persistent approval while already in
+  Plan Mode, the rule is saved without mode restrictions (applying to all
+  modes), as it represents an intentional choice to trust the tool for planning.
+
+If you want to manually restrict a rule to other modes but _not_ to Plan Mode,
+you must explicitly specify the target modes. For example, to allow `npm test`
+in default and Auto-Edit modes but not in Plan Mode:
 
 ```toml
 [[rule]]

@@ -242,4 +242,23 @@ decision = "deny"
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
     expect(content).toContain('toolName = "test_tool"');
   });
+
+  it('should include modes if provided', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+      modes: [ApprovalMode.DEFAULT, ApprovalMode.YOLO],
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const content = memfs.readFileSync(policyFile, 'utf-8') as string;
+    expect(content).toContain('modes = [ "default", "yolo" ]');
+  });
 });

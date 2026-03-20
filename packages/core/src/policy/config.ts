@@ -533,7 +533,6 @@ export async function createPolicyEngineConfig(
     disableAlwaysAllow: settings.disableAlwaysAllow,
   };
 }
-
 interface TomlRule {
   toolName?: string;
   mcpName?: string;
@@ -542,6 +541,7 @@ interface TomlRule {
   commandPrefix?: string | string[];
   argsPattern?: string;
   allowRedirection?: boolean;
+  modes?: ApprovalMode[];
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
 }
@@ -585,6 +585,7 @@ export function createPolicyUpdater(
               priority,
               argsPattern: new RegExp(pattern),
               mcpName: message.mcpName,
+              modes: message.modes,
               source: 'Dynamic (Confirmed)',
               allowRedirection: message.allowRedirection,
             });
@@ -622,6 +623,7 @@ export function createPolicyUpdater(
           priority,
           argsPattern,
           mcpName: message.mcpName,
+          modes: message.modes,
           source: 'Dynamic (Confirmed)',
           allowRedirection: message.allowRedirection,
         });
@@ -690,6 +692,10 @@ export function createPolicyUpdater(
 
             if (message.allowRedirection !== undefined) {
               newRule.allowRedirection = message.allowRedirection;
+            }
+
+            if (message.modes) {
+              newRule.modes = message.modes;
             }
 
             // Add to rules
