@@ -253,9 +253,16 @@ export class InstallExtensionCommand implements Command {
         data: `Extension "${extension.name}" installed successfully.`,
       };
     } catch (error) {
+      const message = getErrorMessage(error);
+      if (message.includes('already installed')) {
+        return {
+          name: this.name,
+          data: `Extension from "${source}" is already installed.`,
+        };
+      }
       return {
         name: this.name,
-        data: `Failed to install extension from "${source}": ${getErrorMessage(error)}`,
+        data: `Failed to install extension from "${source}": ${message}`,
       };
     }
   }
@@ -298,9 +305,16 @@ export class LinkExtensionCommand implements Command {
         data: `Extension "${extension.name}" linked successfully.`,
       };
     } catch (error) {
+      const message = getErrorMessage(error);
+      if (message.includes('already installed')) {
+        return {
+          name: this.name,
+          data: `Extension from "${sourceFilepath}" is already installed.`,
+        };
+      }
       return {
         name: this.name,
-        data: `Failed to link extension: ${getErrorMessage(error)}`,
+        data: `Failed to link extension: ${message}`,
       };
     }
   }

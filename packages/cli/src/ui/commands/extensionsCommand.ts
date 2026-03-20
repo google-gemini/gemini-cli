@@ -524,12 +524,18 @@ async function installAction(
       text: `Extension "${extension.name}" installed successfully.`,
     });
   } catch (error) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Failed to install extension from "${source}": ${getErrorMessage(
-        error,
-      )}`,
-    });
+    const message = getErrorMessage(error);
+    if (message.includes('already installed')) {
+      context.ui.addItem({
+        type: MessageType.WARNING,
+        text: `Extension from "${source}" is already installed.`,
+      });
+    } else {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to install extension from "${source}": ${message}`,
+      });
+    }
   }
 }
 
@@ -589,12 +595,18 @@ async function linkAction(context: CommandContext, args: string) {
       text: `Extension "${extension.name}" linked successfully.`,
     });
   } catch (error) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Failed to link extension from "${sourceFilepath}": ${getErrorMessage(
-        error,
-      )}`,
-    });
+    const message = getErrorMessage(error);
+    if (message.includes('already installed')) {
+      context.ui.addItem({
+        type: MessageType.WARNING,
+        text: `Extension from "${sourceFilepath}" is already installed.`,
+      });
+    } else {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to link extension from "${sourceFilepath}": ${message}`,
+      });
+    }
   }
 }
 
