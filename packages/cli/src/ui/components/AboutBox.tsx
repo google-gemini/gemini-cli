@@ -11,6 +11,25 @@ import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { getDisplayString } from '@google/gemini-cli-core';
 
+/**
+ * Masks an email address to prevent PII exposure.
+ * Example: "john.doe@company.com" → "j***@company.com"
+ */
+export function maskEmail(email: string): string {
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 0) return '***';
+  return email[0] + '***' + email.substring(atIndex);
+}
+
+/**
+ * Masks a GCP project ID to prevent PII exposure.
+ * Example: "my-prod-project-123456" → "***3456"
+ */
+export function maskGcpProject(project: string): string {
+  if (project.length <= 4) return '***';
+  return '***' + project.substring(project.length - 4);
+}
+
 interface AboutBoxProps {
   cliVersion: string;
   osVersion: string;
@@ -116,7 +135,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
             <Text color={theme.text.primary}>
               {selectedAuthType.startsWith('oauth')
                 ? userEmail
-                  ? `Signed in with Google (${userEmail})`
+                  ? `Signed in with Google (${maskEmail(userEmail)})`
                   : 'Signed in with Google'
                 : selectedAuthType}
             </Text>
@@ -143,7 +162,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
             </Text>
           </Box>
           <Box>
-            <Text color={theme.text.primary}>{gcpProject}</Text>
+            <Text color={theme.text.primary}>{maskGcpProject(gcpProject)}</Text>
           </Box>
         </Box>
       )}
