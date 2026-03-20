@@ -11,7 +11,7 @@ import {
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
-  type ToolConfirmationOutcome,
+  ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
 import { buildParamArgsPattern } from '../policy/utils.js';
@@ -499,8 +499,15 @@ ${aggregatedContent}
   }
 
   override getPolicyUpdateOptions(
-    _outcome: ToolConfirmationOutcome,
+    outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlways ||
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
+    ) {
+      return {};
+    }
+
     if (this.params.url) {
       return {
         argsPattern: buildParamArgsPattern('url', this.params.url),
