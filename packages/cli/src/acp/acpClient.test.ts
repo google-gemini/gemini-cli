@@ -171,6 +171,10 @@ describe('GeminiAgent', () => {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
       }),
+      getPolicyEngine: vi.fn().mockReturnValue({}),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
@@ -652,6 +656,10 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      getPolicyEngine: vi.fn().mockReturnValue({}),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
       setApprovalMode: vi.fn(),
       setModel: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(true),

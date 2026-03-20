@@ -88,6 +88,12 @@ describe('GeminiAgent Session Resume', () => {
         resumeChat: vi.fn().mockResolvedValue(undefined),
         getChat: vi.fn().mockReturnValue({}),
       }),
+      getPolicyEngine: vi.fn().mockReturnValue({}),
+      getMessageBus: vi.fn().mockReturnValue({
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      }),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
