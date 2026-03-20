@@ -68,7 +68,7 @@ export async function runExitCleanup() {
   cleanupFunctions.length = 0; // Clear the array
 
   // drain stdin to prevent printing garbage on exit
-  // https://github.com/google-gemini/gemini-cli/issues/1680
+  // https://github.com/google-gemini/gemini-cli/issues/1681
   await drainStdin();
 
   runSyncCleanup();
