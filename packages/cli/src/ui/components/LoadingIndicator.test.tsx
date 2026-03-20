@@ -36,7 +36,7 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
 
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
-const renderWithContext = (
+const renderWithContext = async (
   ui: React.ReactElement,
   streamingStateValue: StreamingState,
   width = 120,
@@ -55,7 +55,7 @@ describe('<LoadingIndicator />', () => {
   };
 
   it('should render blank when streamingState is Idle and no loading phrase or thought', async () => {
-    const { lastFrame, waitUntilReady } = renderWithContext(
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
@@ -64,7 +64,7 @@ describe('<LoadingIndicator />', () => {
   });
 
   it('should render spinner, phrase, and time when streamingState is Responding', async () => {
-    const { lastFrame, waitUntilReady } = renderWithContext(
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...defaultProps} />,
       StreamingState.Responding,
     );
@@ -80,7 +80,7 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'Confirm action',
       elapsedTime: 10,
     };
-    const { lastFrame, waitUntilReady } = renderWithContext(
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.WaitingForConfirmation,
     );
@@ -97,7 +97,7 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'Processing data...',
       elapsedTime: 3,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -111,7 +111,7 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'Working...',
       elapsedTime: 60,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -125,7 +125,7 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'Working...',
       elapsedTime: 125,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -136,7 +136,7 @@ describe('<LoadingIndicator />', () => {
 
   it('should render rightContent when provided', async () => {
     const rightContent = <Text>Extra Info</Text>;
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...defaultProps} rightContent={rightContent} />,
       StreamingState.Responding,
     );
@@ -178,7 +178,7 @@ describe('<LoadingIndicator />', () => {
       );
     };
 
-    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithProviders(
       <TestWrapper />,
     );
     await waitUntilReady();
@@ -232,7 +232,7 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'Loading...',
       elapsedTime: 5,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -250,7 +250,7 @@ describe('<LoadingIndicator />', () => {
       },
       elapsedTime: 5,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -274,7 +274,7 @@ describe('<LoadingIndicator />', () => {
       },
       elapsedTime: 5,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -293,7 +293,7 @@ describe('<LoadingIndicator />', () => {
       currentLoadingPhrase: 'This should not be displayed',
       elapsedTime: 5,
     };
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
@@ -306,7 +306,7 @@ describe('<LoadingIndicator />', () => {
   });
 
   it('should not display thought indicator for non-thought loading phrases', async () => {
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator
         currentLoadingPhrase="some random tip..."
         elapsedTime={3}
@@ -319,7 +319,7 @@ describe('<LoadingIndicator />', () => {
   });
 
   it('should truncate long primary text instead of wrapping', async () => {
-    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
       <LoadingIndicator
         {...defaultProps}
         currentLoadingPhrase={
@@ -337,7 +337,7 @@ describe('<LoadingIndicator />', () => {
 
   describe('responsive layout', () => {
     it('should render on a single line on a wide terminal', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator
           {...defaultProps}
           rightContent={<Text>Right</Text>}
@@ -356,7 +356,7 @@ describe('<LoadingIndicator />', () => {
     });
 
     it('should render on multiple lines on a narrow terminal', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator
           {...defaultProps}
           rightContent={<Text>Right</Text>}
@@ -382,7 +382,7 @@ describe('<LoadingIndicator />', () => {
     });
 
     it('should use wide layout at 80 columns', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
         80,
@@ -393,7 +393,7 @@ describe('<LoadingIndicator />', () => {
     });
 
     it('should use narrow layout at 79 columns', async () => {
-      const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+      const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
         79,
