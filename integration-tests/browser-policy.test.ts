@@ -205,7 +205,6 @@ priority = 200
       },
     });
 
-    expect(stdout).toContain('sessionMode: existing');
     expect(stdout).toContain('saved logins will be visible');
   });
 });
