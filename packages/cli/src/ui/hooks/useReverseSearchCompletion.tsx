@@ -48,7 +48,10 @@ export function useReverseSearchCompletion(
     setVisibleStartIndex,
   } = useCompletion();
 
-  const debouncedQuery = useDebouncedValue(buffer.text, 100);
+  const debouncedQuery = useDebouncedValue(
+    reverseSearchActive ? buffer.text : '',
+    100,
+  );
 
   // incremental search
   const prevQueryRef = useRef<string>('');

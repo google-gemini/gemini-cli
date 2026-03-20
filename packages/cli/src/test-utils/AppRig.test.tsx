@@ -8,7 +8,7 @@ import { describe, it, afterEach, expect } from 'vitest';
 import { AppRig } from './AppRig.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { debugLogger } from '@google/gemini-cli-core';
+import { FakeContentGenerator, debugLogger } from '@google/gemini-cli-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,8 +25,10 @@ describe('AppRig', () => {
       'fixtures',
       'steering.responses',
     );
+    const contentGenerator =
+      await FakeContentGenerator.fromFile(fakeResponsesPath);
     rig = new AppRig({
-      fakeResponsesPath,
+      contentGenerator,
       configOverrides: { modelSteering: true },
     });
     await rig.initialize();
@@ -66,7 +68,9 @@ describe('AppRig', () => {
       'fixtures',
       'simple.responses',
     );
-    rig = new AppRig({ fakeResponsesPath });
+    const contentGenerator =
+      await FakeContentGenerator.fromFile(fakeResponsesPath);
+    rig = new AppRig({ contentGenerator });
     await rig.initialize();
     await rig.render();
     // Wait for initial render

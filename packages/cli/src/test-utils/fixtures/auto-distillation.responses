@@ -1,0 +1,3 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"role":"model","parts":[{"text":"I will now fetch the data."},{"functionCall":{"name":"run_shell_command","args":{"command":"cat large.txt"}}}]},"finishReason":"STOP"}]}]}
+{"method":"generateContent","response":{"candidates":[{"content":{"role":"model","parts":[{"text":"- Line 1: Header\n- Lines 2-5000: User data\n- Line 5001: Footer"}]},"finishReason":"STOP"}]}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"role":"model","parts":[{"text":"I got the summarized output. Task complete."}]},"finishReason":"STOP"}]}]}
