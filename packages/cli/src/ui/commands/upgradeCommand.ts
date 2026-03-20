@@ -23,8 +23,8 @@ export const upgradeCommand: SlashCommand = {
   description: 'Upgrade your Gemini Code Assist tier for higher limits',
   autoExecute: true,
   action: async (context) => {
-    const authType =
-      context.services.config?.getContentGeneratorConfig()?.authType;
+    const config = context.services.agentContext?.config;
+    const authType = config?.getContentGeneratorConfig()?.authType;
     if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       // This command should ideally be hidden if not logged in with Google,
       // but we add a safety check here just in case.
@@ -36,7 +36,7 @@ export const upgradeCommand: SlashCommand = {
       };
     }
 
-    const tierName = context.services.config?.getUserTierName();
+    const tierName = config?.getUserTierName();
     if (isUltraTier(tierName)) {
       return {
         type: 'message',

@@ -17,7 +17,7 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -49,7 +49,7 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -79,7 +79,7 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -107,7 +107,7 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -134,7 +134,7 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -163,7 +163,7 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -184,7 +184,7 @@ describe('TableRenderer', () => {
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 50;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -211,7 +211,7 @@ describe('TableRenderer', () => {
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 40;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -255,7 +255,7 @@ describe('TableRenderer', () => {
 
     const terminalWidth = 160;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -325,7 +325,7 @@ describe('TableRenderer', () => {
       expected: ['Mixed 😃 中文', '你好 😃', 'こんにちは 🚀'],
     },
   ])('$name', async ({ headers, rows, terminalWidth, expected }) => {
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -360,7 +360,7 @@ describe('TableRenderer', () => {
   ])('$name', async ({ headers, rows, expected }) => {
     const terminalWidth = 50;
 
-    const renderResult = renderWithProviders(
+    const renderResult = await renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -488,7 +488,7 @@ describe('TableRenderer', () => {
   ])(
     '$name',
     async ({ headers, rows, terminalWidth, waitForText, assertions }) => {
-      const renderResult = renderWithProviders(
+      const renderResult = await renderWithProviders(
         <TableRenderer
           headers={headers}
           rows={rows}

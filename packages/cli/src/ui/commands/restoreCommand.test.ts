@@ -47,14 +47,17 @@ describe('restoreCommand', () => {
         getProjectTempCheckpointsDir: vi.fn().mockReturnValue(checkpointsDir),
         getProjectTempDir: vi.fn().mockReturnValue(geminiTempDir),
       },
-      getGeminiClient: vi.fn().mockReturnValue({
+      geminiClient: {
         setHistory: mockSetHistory,
-      }),
+      },
+      get config() {
+        return this;
+      },
     } as unknown as Config;
 
     mockContext = createMockCommandContext({
       services: {
-        config: mockConfig,
+        agentContext: mockConfig,
         git: mockGitService,
       },
     });

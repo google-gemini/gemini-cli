@@ -6,6 +6,7 @@
 
 import {
   sanitizeEnvironment,
+  getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 
@@ -24,6 +25,8 @@ export interface SandboxRequest {
   /** Optional sandbox-specific configuration. */
   config?: {
     sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+    allowedPaths?: string[];
+    networkAccess?: boolean;
   };
 }
 
@@ -61,15 +64,9 @@ export class NoopSandboxManager implements SandboxManager {
    * the original program and arguments.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction:
-        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
-        true,
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.config?.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
@@ -90,14 +87,4 @@ export class LocalSandboxManager implements SandboxManager {
   }
 }
 
-/**
- * Creates a sandbox manager based on the provided settings.
- */
-export function createSandboxManager(
-  sandboxingEnabled: boolean,
-): SandboxManager {
-  if (sandboxingEnabled) {
-    return new LocalSandboxManager();
-  }
-  return new NoopSandboxManager();
-}
+export { createSandboxManager } from './sandboxManagerFactory.js';
