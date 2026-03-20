@@ -1627,7 +1627,7 @@ describe('Settings Loading and Merging', () => {
         saveSettings(settings1.user);
 
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
+        expect(mockedRead).toHaveBeenCalledTimes(11); // Should have re-read from disk (+ 1 for preserving external settings)
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1651,8 +1651,8 @@ describe('Settings Loading and Merging', () => {
         const settings2W1 = loadSettings(workspace1);
         const settings2W2 = loadSettings(workspace2);
 
-        // Both workspace caches should have been cleared and re-read from disk (+10 reads)
-        expect(mockedRead).toHaveBeenCalledTimes(20);
+        // Both workspace caches should have been cleared and re-read from disk (+10 reads + 1 for preserving external settings)
+        expect(mockedRead).toHaveBeenCalledTimes(21);
         expect(settings1W1).not.toBe(settings2W1);
         expect(settings1W2).not.toBe(settings2W2);
       });
@@ -2600,6 +2600,33 @@ describe('Settings Loading and Merging', () => {
         'error',
         'Failed to save settings: Write failed',
         error,
+      );
+    });
+
+    it('should preserve externally-added settings from disk when saving', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const settingsFile = createMockSettings({ ui: { theme: 'light' } }).user;
+      settingsFile.path = path.resolve('/mock/settings.json');
+
+      // Simulate: file on disk has hooks that were added externally
+      (vi.mocked(fs.existsSync) as Mock).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockReturnValue(
+        JSON.stringify({
+          ui: { theme: 'dark' },
+          hooks: { afterTurn: [{ command: 'echo done' }] },
+        }),
+      );
+
+      saveSettings(settingsFile);
+
+      // The saved settings should include both our tracked change (ui.theme)
+      // AND the externally-added hooks
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        path.resolve('/mock/settings.json'),
+        expect.objectContaining({
+          ui: { theme: 'light' },
+          hooks: { afterTurn: [{ command: 'echo done' }] },
+        }),
       );
     });
   });

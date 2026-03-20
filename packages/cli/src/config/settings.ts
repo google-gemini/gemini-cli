@@ -1066,6 +1066,30 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
+    // Re-read the current file to preserve any settings that were added
+    // externally (e.g., manually editing settings.json while the CLI is
+    // running).  Only adopt top-level keys that originalSettings doesn't
+    // already track — keys we DO track take precedence because the CLI may
+    // have intentionally modified or removed them.
+    if (fs.existsSync(settingsFile.path)) {
+      try {
+        const diskContent = fs.readFileSync(settingsFile.path, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const diskSettings = JSON.parse(diskContent) as Record<string, unknown>;
+        const original = settingsFile.originalSettings as Record<
+          string,
+          unknown
+        >;
+        for (const key of Object.keys(diskSettings)) {
+          if (!Object.prototype.hasOwnProperty.call(original, key)) {
+            original[key] = diskSettings[key];
+          }
+        }
+      } catch {
+        // Ignore parse errors; proceed with what we have
+      }
+    }
+
     const settingsToSave = settingsFile.originalSettings;
 
     // Use the format-preserving update function
