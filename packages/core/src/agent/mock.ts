@@ -118,21 +118,24 @@ export class MockAgentProtocol implements AgentProtocol {
 
     // If there were queued responses (even if empty array), we trigger a stream.
     const hasResponseEvents = responseData !== undefined;
-    const streamId = hasResponseEvents
-      ? (response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`)
-      : null;
+    let correlationStreamId: string | undefined;
+    const getCorrelationStreamId = (): string =>
+      (correlationStreamId ??=
+        response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`);
+    const streamId = hasResponseEvents ? getCorrelationStreamId() : null;
 
     const now = new Date().toISOString();
     const eventsToEmit: AgentEvent[] = [];
 
-    // Helper to normalize and prepare for emission
+    // All emitted events stay correlated to a stream even if this send does not
+    // start agent activity and therefore returns `streamId: null`.
     const normalize = (eventData: MockAgentEvent): AgentEvent =>
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ({
         ...eventData,
         id: eventData.id ?? `e-${this._nextEventId++}`,
         timestamp: eventData.timestamp ?? now,
-        streamId: eventData.streamId ?? streamId,
+        streamId: eventData.streamId ?? getCorrelationStreamId(),
       }) as AgentEvent;
 
     // 1. User/Update event (BEFORE agent_start)

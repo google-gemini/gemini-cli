@@ -117,6 +117,7 @@ describe('AgentSession', () => {
     expect(events).toHaveLength(0);
     expect(protocol.events).toHaveLength(1);
     expect(protocol.events[0].type).toBe('session_update');
+    expect(protocol.events[0].streamId).toEqual(expect.any(String));
   });
 
   it('should skip events that occur before agent_start', async () => {
@@ -206,6 +207,28 @@ describe('AgentSession', () => {
       await expect(iterator.next()).rejects.toThrow(
         'Unknown eventId: missing-event',
       );
+    });
+
+    it('should complete immediately when resuming from an event on a stream with no agent activity', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      const { streamId } = await session.send({ update: { title: 'draft' } });
+      expect(streamId).toBeNull();
+
+      const updateEvent = session.events.find(
+        (event): event is AgentEvent<'session_update'> =>
+          event.type === 'session_update',
+      );
+      expect(updateEvent).toBeDefined();
+
+      const iterator = session.stream({ eventId: updateEvent!.id })[
+        Symbol.asyncIterator
+      ]();
+      await expect(iterator.next()).resolves.toEqual({
+        value: undefined,
+        done: true,
+      });
     });
 
     it('should resume from an in-stream event within the same stream only', async () => {
@@ -398,5 +421,6 @@ describe('AgentSession', () => {
       expect(streamedEvents.some((e) => e.type === 'agent_end')).toBe(true);
       expect(streamedEvents.some((e) => e.streamId === streamId2)).toBe(false);
     });
+
   });
 });

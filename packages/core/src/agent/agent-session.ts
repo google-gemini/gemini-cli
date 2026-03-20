@@ -34,7 +34,7 @@ export class AgentSession implements AgentProtocol {
     return this._protocol.abort();
   }
 
-  get events(): AgentEvent[] {
+  get events(): readonly AgentEvent[] {
     return this._protocol.events;
   }
 
@@ -88,19 +88,16 @@ export class AgentSession implements AgentProtocol {
         if (event.type !== 'agent_start') {
           return;
         }
-        trackedStreamId = event.streamId ?? trackedStreamId ?? undefined;
+        trackedStreamId = event.streamId;
         agentActivityStarted = true;
       }
 
-      if (!trackedStreamId && !options.eventId) {
+      if (!trackedStreamId) {
         return;
       }
 
       eventQueue.push(event);
-      if (
-        event.type === 'agent_end' &&
-        event.streamId === (trackedStreamId ?? null)
-      ) {
+      if (event.type === 'agent_end' && event.streamId === trackedStreamId) {
         done = true;
       }
     };
@@ -135,23 +132,32 @@ export class AgentSession implements AgentProtocol {
 
         const resumeEvent = currentEvents[index];
         replayStartIndex = index + 1;
-        trackedStreamId = resumeEvent?.streamId ?? undefined;
-        if (resumeEvent?.type === 'agent_end') {
+        trackedStreamId = resumeEvent.streamId;
+        const streamHasStarted =
+          resumeEvent.type === 'agent_start' ||
+          currentEvents
+            .slice(0, index)
+            .some(
+              (event) =>
+                event.type === 'agent_start' &&
+                event.streamId === trackedStreamId,
+            );
+
+        if (resumeEvent.type === 'agent_end') {
           agentActivityStarted = true;
           done = true;
-        } else if (trackedStreamId) {
-          agentActivityStarted =
-            resumeEvent?.type === 'agent_start' ||
-            currentEvents
-              .slice(0, index)
-              .some(
-                (event) =>
-                  event.type === 'agent_start' &&
-                  event.streamId === trackedStreamId,
-              );
-        } else {
-          // No correlated stream means "resume globally after this event".
+        } else if (streamHasStarted) {
           agentActivityStarted = true;
+        } else if (
+          !currentEvents
+            .slice(index + 1)
+            .some(
+              (event) =>
+                event.type === 'agent_start' &&
+                event.streamId === trackedStreamId,
+            )
+        ) {
+          done = true;
         }
       } else if (options.streamId) {
         const index = currentEvents.findIndex(
@@ -171,7 +177,7 @@ export class AgentSession implements AgentProtocol {
               (e) => e.type === 'agent_end' && e.streamId === start.streamId,
             )
           ) {
-            trackedStreamId = start.streamId ?? undefined;
+            trackedStreamId = start.streamId;
             replayStartIndex = currentEvents.findIndex(
               (e) => e.id === start.id,
             );
@@ -187,13 +193,6 @@ export class AgentSession implements AgentProtocol {
           if (done) break;
         }
       }
-
-      // If we replayed to the end and no stream is active, and we were specifically
-      // replaying from an eventId (or we've already finished the stream we were looking for), we are done.
-      if (!done && !trackedStreamId && options.eventId) {
-        done = true;
-      }
-
       started = true;
 
       // Process events that arrived while we were replaying
