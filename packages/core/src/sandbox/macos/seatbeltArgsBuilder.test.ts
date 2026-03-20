@@ -12,6 +12,13 @@ describe('seatbeltArgsBuilder', () => {
   it('should build a strict allowlist profile allowing the workspace via param and protecting governance files', () => {
     // Mock realpathSync to just return the path for testing
     vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'lstatSync').mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => (p as string).endsWith('.git'),
+        }) as fs.Stats,
+    );
 
     const args = buildSeatbeltArgs({ workspace: '/Users/test/workspace' });
 
@@ -27,6 +34,9 @@ describe('seatbeltArgsBuilder', () => {
     expect(profile).toContain(
       '(deny file-write* (literal (param "GOVERNANCE_FILE_1")))',
     );
+    expect(profile).toContain(
+      '(deny file-write* (subpath (param "GOVERNANCE_FILE_2")))',
+    );
     expect(profile).not.toContain('(allow network*)');
 
     expect(args).toContain('-D');
@@ -37,6 +47,7 @@ describe('seatbeltArgsBuilder', () => {
     expect(args).toContain(
       'GOVERNANCE_FILE_1=/Users/test/workspace/.geminiignore',
     );
+    expect(args).toContain('GOVERNANCE_FILE_2=/Users/test/workspace/.git');
     expect(args).toContain(`TMPDIR=${os.tmpdir()}`);
 
     vi.restoreAllMocks();
@@ -103,6 +114,38 @@ describe('seatbeltArgsBuilder', () => {
         workspace: '/test/workspace',
       }),
     ).toThrow('Permission denied');
+
+    vi.restoreAllMocks();
+  });
+
+  it('should protect real paths of governance files if they are symlinks', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+      if (p === '/Users/test/workspace/.gitignore')
+        return '/shared/global.gitignore';
+      return p as string;
+    });
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'lstatSync').mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => (p as string).endsWith('.git'),
+        }) as fs.Stats,
+    );
+
+    const args = buildSeatbeltArgs({ workspace: '/Users/test/workspace' });
+    const profile = args[1];
+
+    expect(profile).toContain(
+      '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+    );
+    expect(profile).toContain(
+      '(deny file-write* (literal (param "REAL_GOVERNANCE_FILE_0")))',
+    );
+
+    expect(args).toContain(
+      'GOVERNANCE_FILE_0=/Users/test/workspace/.gitignore',
+    );
+    expect(args).toContain('REAL_GOVERNANCE_FILE_0=/shared/global.gitignore');
 
     vi.restoreAllMocks();
   });

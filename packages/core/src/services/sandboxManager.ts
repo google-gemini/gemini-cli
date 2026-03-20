@@ -57,8 +57,13 @@ export interface SandboxManager {
 /**
  * Files that represent the governance or "constitution" of the repository
  * and should be write-protected in any sandbox.
+ * TODO: Implement equivalent protection for Windows (e.g., via Restricted Tokens or ACLs).
  */
-export const GOVERNANCE_FILES = ['.gitignore', '.geminiignore'];
+export const GOVERNANCE_FILES = [
+  '.gitignore',
+  '.geminiignore',
+  '.git',
+] as const;
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import fs from 'node:fs';
+import { join, dirname } from 'node:path';
 import os from 'node:os';
 import {
   type SandboxManager,
@@ -72,9 +72,22 @@ function getSeccompBpfPath(): string {
   }
 
   const bpfPath = join(os.tmpdir(), `gemini-cli-seccomp-${process.pid}.bpf`);
-  writeFileSync(bpfPath, buf);
+  fs.writeFileSync(bpfPath, buf);
   cachedBpfPath = bpfPath;
   return bpfPath;
+}
+
+/**
+ * Ensures a file or directory exists.
+ */
+function touch(filePath: string, isDirectory: boolean) {
+  if (fs.existsSync(filePath)) return;
+  if (isDirectory) {
+    fs.mkdirSync(filePath, { recursive: true });
+  } else {
+    fs.mkdirSync(dirname(filePath), { recursive: true });
+    fs.closeSync(fs.openSync(filePath, 'a'));
+  }
 }
 
 /**
@@ -123,11 +136,19 @@ export class LinuxSandboxManager implements SandboxManager {
     ];
 
     // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
-    // We use --ro-bind-try so that it doesn't fail if the file doesn't exist.
+    // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
     // In bwrap, later binds override earlier ones for the same path.
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file);
-      bwrapArgs.push('--ro-bind-try', filePath, filePath);
+      const isDirectory = file === '.git';
+      touch(filePath, isDirectory);
+
+      const realPath = fs.realpathSync(filePath);
+
+      bwrapArgs.push('--ro-bind', filePath, filePath);
+      if (realPath !== filePath) {
+        bwrapArgs.push('--ro-bind', realPath, realPath);
+      }
     }
 
     const allowedPaths = this.options.allowedPaths ?? [];

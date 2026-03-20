@@ -61,11 +61,32 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   args.push('-D', `WORKSPACE=${workspacePath}`);
 
   // Add explicit deny rules for governance files in the workspace.
-  // These are added before the workspace allow rule to ensure they take precedence.
+  // These are added after the workspace allow rule (which is in BASE_SEATBELT_PROFILE)
+  // to ensure they take precedence (Seatbelt evaluates rules in order, later rules win for same path).
   for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
     const governanceFile = path.join(workspacePath, GOVERNANCE_FILES[i]);
+    const realGovernanceFile = tryRealpath(governanceFile);
+
+    // Determine if it should be treated as a directory (subpath) or a file (literal).
+    // .git is generally a directory, while ignore files are literals.
+    let isDirectory = GOVERNANCE_FILES[i] === '.git';
+    try {
+      if (fs.existsSync(realGovernanceFile)) {
+        isDirectory = fs.lstatSync(realGovernanceFile).isDirectory();
+      }
+    } catch {
+      // Ignore errors, use default guess
+    }
+
+    const ruleType = isDirectory ? 'subpath' : 'literal';
+
     args.push('-D', `GOVERNANCE_FILE_${i}=${governanceFile}`);
-    profile += `(deny file-write* (literal (param "GOVERNANCE_FILE_${i}")))\n`;
+    profile += `(deny file-write* (${ruleType} (param "GOVERNANCE_FILE_${i}")))\n`;
+
+    if (realGovernanceFile !== governanceFile) {
+      args.push('-D', `REAL_GOVERNANCE_FILE_${i}=${realGovernanceFile}`);
+      profile += `(deny file-write* (${ruleType} (param "REAL_GOVERNANCE_FILE_${i}")))\n`;
+    }
   }
 
   const tmpPath = tryRealpath(os.tmpdir());
