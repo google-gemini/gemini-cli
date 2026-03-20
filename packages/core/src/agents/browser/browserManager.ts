@@ -591,27 +591,58 @@ export class BrowserManager {
       const parsedUrl = new URL(url);
       const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
 
-      for (const domainPattern of allowedDomains) {
-        if (domainPattern.startsWith('*.')) {
-          const baseDomain = domainPattern.substring(2);
+      if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
+        // If none matched, then deny
+        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+      }
+
+      // Check query parameters for embedded URLs that could bypass domain
+      // restrictions via proxy services (e.g. translate.google.com/translate?u=BLOCKED).
+      for (const paramValue of parsedUrl.searchParams.values()) {
+        try {
+          const embeddedUrl = new URL(paramValue);
           if (
-            urlHostname === baseDomain ||
-            urlHostname.endsWith(`.${baseDomain}`)
+            embeddedUrl.protocol === 'http:' ||
+            embeddedUrl.protocol === 'https:'
           ) {
-            return undefined;
+            const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
+            if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
+              return `Tool '${toolName}' is not permitted: embedded URL targets disallowed domain '${embeddedHostname}'.`;
+            }
           }
-        } else {
-          if (urlHostname === domainPattern) {
-            return undefined;
-          }
+        } catch {
+          // Not a valid URL, skip.
         }
       }
+
+      return undefined;
     } catch {
       return `Invalid URL: Malformed URL string.`;
     }
+  }
 
+  /**
+   * Checks whether a hostname matches any pattern in the allowed domains list.
+   */
+  private isDomainAllowed(hostname: string, allowedDomains: string[]): boolean {
+    const normalized = hostname.replace(/\.$/, '');
+    for (const domainPattern of allowedDomains) {
+      if (domainPattern.startsWith('*.')) {
+        const baseDomain = domainPattern.substring(2);
+        if (
+          normalized === baseDomain ||
+          normalized.endsWith(`.${baseDomain}`)
+        ) {
+          return true;
+        }
+      } else {
+        if (normalized === domainPattern) {
+          return true;
+        }
+      }
+    }
     // If none matched, then deny
-    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+    return false;
   }
 
   /**
