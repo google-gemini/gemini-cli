@@ -8,8 +8,8 @@ import {
   getProjectRootForWorktree,
   createWorktreeService,
   writeToStderr,
+  type WorktreeInfo,
 } from '@google/gemini-cli-core';
-import { registerCleanup } from './cleanup.js';
 
 /**
  * Sets up a git worktree for parallel sessions.
@@ -20,9 +20,9 @@ import { registerCleanup } from './cleanup.js';
  */
 export async function setupWorktree(
   worktreeName: string | undefined,
-): Promise<void> {
+): Promise<WorktreeInfo | undefined> {
   if (process.env['GEMINI_CLI_WORKTREE_HANDLED'] === '1') {
-    return;
+    return undefined;
   }
 
   try {
@@ -33,14 +33,8 @@ export async function setupWorktree(
 
     process.chdir(worktreeInfo.path);
     process.env['GEMINI_CLI_WORKTREE_HANDLED'] = '1';
-    process.env['GEMINI_CLI_WORKTREE_BASE_SHA'] = worktreeInfo.baseSha;
 
-    registerCleanup(async () => {
-      const cleanedUp = await service.maybeCleanup(worktreeInfo);
-      if (cleanedUp) {
-        process.chdir(projectRoot);
-      }
-    });
+    return worktreeInfo;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     writeToStderr(`Failed to create or switch to worktree: ${errorMessage}\n`);

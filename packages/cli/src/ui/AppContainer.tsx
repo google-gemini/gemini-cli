@@ -912,7 +912,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setTimeout(async () => {
           await runExitCleanup();
           process.exit(0);
-        }, 1000);
+        }, 100);
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),

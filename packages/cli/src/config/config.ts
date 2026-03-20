@@ -474,6 +474,7 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  worktreeSettings?: WorktreeSettings;
 }
 
 export async function loadCliConfig(
@@ -485,7 +486,8 @@ export async function loadCliConfig(
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
 
-  const worktreeSettings = await resolveWorktreeSettings(cwd);
+  const worktreeSettings =
+    options.worktreeSettings ?? (await resolveWorktreeSettings(cwd));
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -1001,25 +1003,38 @@ function mergeExcludeTools(
 async function resolveWorktreeSettings(
   cwd: string,
 ): Promise<WorktreeSettings | undefined> {
-  const projectRoot = await getProjectRootForWorktree(cwd);
-  const worktreePath = isGeminiWorktree(cwd, projectRoot) ? cwd : undefined;
+  let worktreePath: string | undefined;
+  try {
+    const { stdout } = await execa('git', ['rev-parse', '--show-toplevel'], {
+      cwd,
+    });
+    const toplevel = stdout.trim();
+    const projectRoot = await getProjectRootForWorktree(toplevel);
+
+    if (isGeminiWorktree(toplevel, projectRoot)) {
+      worktreePath = toplevel;
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('not a git repository')) {
+      return undefined;
+    }
+    throw e;
+  }
 
   if (!worktreePath) {
     return undefined;
   }
 
-  let worktreeBaseSha = process.env['GEMINI_CLI_WORKTREE_BASE_SHA'];
-  if (!worktreeBaseSha) {
-    try {
-      const { stdout } = await execa('git', ['rev-parse', 'HEAD'], {
-        cwd: worktreePath,
-      });
-      worktreeBaseSha = stdout.trim();
-    } catch (e: unknown) {
-      debugLogger.debug(
-        `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
+  let worktreeBaseSha: string | undefined;
+  try {
+    const { stdout } = await execa('git', ['rev-parse', 'HEAD'], {
+      cwd: worktreePath,
+    });
+    worktreeBaseSha = stdout.trim();
+  } catch (e: unknown) {
+    debugLogger.debug(
+      `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 
   if (!worktreeBaseSha) {

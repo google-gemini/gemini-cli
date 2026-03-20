@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupWorktree } from './worktreeSetup.js';
 import * as coreFunctions from '@google/gemini-cli-core';
-import { registerCleanup } from './cleanup.js';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -26,10 +25,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     writeToStderr: vi.fn(),
   };
 });
-
-vi.mock('./cleanup.js', () => ({
-  registerCleanup: vi.fn(),
-}));
 
 describe('setupWorktree', () => {
   const originalEnv = { ...process.env };
@@ -84,7 +79,6 @@ describe('setupWorktree', () => {
     expect(process.chdir).toHaveBeenCalledWith(
       '/mock/project/.gemini/worktrees/my-feature',
     );
-    expect(registerCleanup).toHaveBeenCalled();
     expect(process.env['GEMINI_CLI_WORKTREE_HANDLED']).toBe('1');
   });
 

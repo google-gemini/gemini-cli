@@ -6,6 +6,7 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { execa } from 'execa';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -132,8 +133,15 @@ export function isGeminiWorktree(
   dirPath: string,
   projectRoot: string,
 ): boolean {
-  const worktreesBaseDir = path.join(projectRoot, '.gemini', 'worktrees');
-  return dirPath.startsWith(worktreesBaseDir);
+  try {
+    const realDirPath = realpathSync(dirPath);
+    const realProjectRoot = realpathSync(projectRoot);
+    const worktreesBaseDir = path.join(realProjectRoot, '.gemini', 'worktrees');
+    const relative = path.relative(worktreesBaseDir, realDirPath);
+    return !relative.startsWith('..') && !path.isAbsolute(relative);
+  } catch {
+    return false;
+  }
 }
 
 export async function hasWorktreeChanges(

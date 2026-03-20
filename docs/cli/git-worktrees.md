@@ -66,31 +66,22 @@ CLI in it.
 
 ## How to exit a Git worktree session
 
-When you exit a worktree session (using `/quit` or `Ctrl+C`), Gemini
-automatically determines whether to clean up or preserve the worktree based on
-the presence of changes.
+When you exit a worktree session (using `/quit` or `Ctrl+C`), Gemini leaves the
+worktree intact so your work is not lost. This includes your uncommitted changes
+(modified files, staged changes, or untracked files) and any new commits you
+have made.
 
-- **Automatic removal:** If the worktree is completely clean—meaning it has no
-  uncommitted changes and no new commits have been made—Gemini automatically
-  removes the worktree directory and deletes the temporary branch.
-- **Safe preservation:** If Gemini detects any changes, it leaves the worktree
-  intact so your work is not lost. Preservation occurs if:
-  - You have **uncommitted changes** (modified files, staged changes, or new
-    untracked files).
-  - You have made **new commits** on the worktree branch since the session
-    started.
+Gemini prioritizes a fast and safe exit: it **does not automatically delete**
+your worktree or branch. You are responsible for cleaning up your worktrees
+manually once you are finished with them.
 
-Gemini prioritizes a fast and safe exit: it **does not display an interactive
-prompt** to ask whether to keep the worktree. Instead, it ensures your work is
-safely preserved by default if any modifications are detected.
+When you exit, Gemini displays instructions on how to resume your work or how to
+manually remove the worktree if you no longer need it.
 
 ## Resuming work in a Git worktree
 
-If a worktree was preserved because it contained changes, Gemini displays
-instructions on how to resume your work when you exit.
-
-To resume a session in a preserved worktree, navigate to the worktree directory
-and start Gemini CLI with the `--resume` flag and the session ID:
+To resume a session in a worktree, navigate to the worktree directory and start
+Gemini CLI with the `--resume` flag and the session ID:
 
 ```bash
 cd .gemini/worktrees/feature-search

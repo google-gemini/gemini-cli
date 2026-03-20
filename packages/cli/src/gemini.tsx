@@ -9,6 +9,7 @@ import {
   WarningPriority,
   type Config,
   type ResumedSessionData,
+  type WorktreeInfo,
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
@@ -213,8 +214,9 @@ export async function main() {
 
   // If a worktree is requested and enabled, set it up early.
   const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
+  let worktreeInfo: WorktreeInfo | undefined;
   if (requestedWorktree !== undefined) {
-    await setupWorktree(requestedWorktree || undefined);
+    worktreeInfo = await setupWorktree(requestedWorktree || undefined);
   }
 
   // Report settings errors once during startup
@@ -433,6 +435,7 @@ export async function main() {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
+      worktreeSettings: worktreeInfo,
     });
     loadConfigHandle?.end();
 
