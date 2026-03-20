@@ -99,6 +99,7 @@ export class BrowserManager {
   /** State for action rate limiting */
   private actionCounter = 0;
   private readonly maxActionsPerTask: number;
+  private abortController: AbortController | undefined;
 
   /**
    * Whether to inject the automation overlay.
@@ -113,6 +114,14 @@ export class BrowserManager {
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
     this.maxActionsPerTask =
       browserConfig?.customConfig?.maxActionsPerTask ?? 100;
+  }
+
+  /**
+   * Sets the AbortController used to signal task termination
+   * when action per task limits are reached.
+   */
+  setAbortController(controller: AbortController): void {
+    this.abortController = controller;
   }
 
   /**
@@ -156,14 +165,16 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
-    this.actionCounter++;
     // Hard enforcement of per-action rate limit
     if (this.actionCounter >= this.maxActionsPerTask) {
-      throw new Error(
+      const error = new Error(
         `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
           `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
       );
+      this.abortController?.abort(error);
+      throw error;
     }
+    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {

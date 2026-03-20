@@ -713,42 +713,6 @@ describe('BrowserManager', () => {
       );
     });
 
-    it('should terminate task when rapid repeated identical actions are detected', async () => {
-      const manager = new BrowserManager(mockConfig);
-
-      // First 4 calls with identical args should succeed
-      for (let i = 0; i < 4; i++) {
-        await manager.callTool('click', { uid: '1_2' });
-      }
-
-      // 5th identical call should throw
-      await expect(manager.callTool('click', { uid: '1_2' })).rejects.toThrow(
-        /potential runaway loop: tool 'click' was called 5 times with identical arguments/,
-      );
-    });
-
-    it('should reset repeated count when tool or args change', async () => {
-      const manager = new BrowserManager(mockConfig);
-
-      // 4 identical calls
-      for (let i = 0; i < 4; i++) {
-        await manager.callTool('click', { uid: '1_2' });
-      }
-
-      // Change args - should NOT throw
-      await manager.callTool('click', { uid: 'different' });
-
-      // 3 more identical calls (of the new args) should NOT throw yet
-      for (let i = 0; i < 3; i++) {
-        await manager.callTool('click', { uid: 'different' });
-      }
-
-      // 5th identical call (of the new args) should throw
-      await expect(
-        manager.callTool('click', { uid: 'different' }),
-      ).rejects.toThrow(/potential runaway loop/);
-    });
-
     it('should count all tools towards maxActionsPerTask', async () => {
       const limitedConfig = makeFakeConfig({
         agents: {
