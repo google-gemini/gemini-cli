@@ -789,7 +789,6 @@ const listExtensionsCommand: SlashCommand = {
   description: 'List active extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
   action: listAction,
 };
 
@@ -850,7 +849,6 @@ const exploreExtensionsCommand: SlashCommand = {
   description: 'Open extensions page in your browser',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
   action: exploreAction,
 };
 

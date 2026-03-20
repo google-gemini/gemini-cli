@@ -177,6 +177,7 @@ const listAction = async (
   context: CommandContext,
   showDescriptions = false,
   showSchema = false,
+  serverNameFilter?: string,
 ): Promise<void | MessageActionReturn> => {
   const agentContext = context.services.agentContext;
   const config = agentContext?.config;
@@ -199,10 +200,24 @@ const listAction = async (
     };
   }
 
-  const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
-  const serverNames = Object.keys(mcpServers);
+  let mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
   const blockedMcpServers =
     config.getMcpClientManager()?.getBlockedMcpServers() || [];
+
+  if (serverNameFilter) {
+    const filter = serverNameFilter.trim().toLowerCase();
+    if (filter) {
+      mcpServers = Object.fromEntries(
+        Object.entries(mcpServers).filter(
+          ([name]) =>
+            name.toLowerCase().includes(filter) ||
+            normalizeServerId(name).includes(filter),
+        ),
+      );
+    }
+  }
+
+  const serverNames = Object.keys(mcpServers);
 
   const connectingServers = serverNames.filter(
     (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
@@ -306,8 +321,7 @@ const listCommand: SlashCommand = {
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
-  action: (context) => listAction(context),
+  action: (context, args) => listAction(context, false, false, args),
 };
 
 const descCommand: SlashCommand = {
@@ -316,8 +330,7 @@ const descCommand: SlashCommand = {
   description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
-  action: (context) => listAction(context, true),
+  action: (context, args) => listAction(context, true, false, args),
 };
 
 const schemaCommand: SlashCommand = {
@@ -326,8 +339,7 @@ const schemaCommand: SlashCommand = {
     'List configured MCP servers and tools with descriptions and schemas',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
-  action: (context) => listAction(context, true, true),
+  action: (context, args) => listAction(context, true, true, args),
 };
 
 const reloadCommand: SlashCommand = {
@@ -336,9 +348,9 @@ const reloadCommand: SlashCommand = {
   description: 'Reloads MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  takesArgs: false,
   action: async (
     context: CommandContext,
+    args: string,
   ): Promise<void | SlashCommandActionReturn> => {
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
@@ -375,7 +387,7 @@ const reloadCommand: SlashCommand = {
     // Reload the slash commands to reflect the changes.
     context.ui.reloadCommands();
 
-    return listCommand.action!(context, '');
+    return listCommand.action!(context, args);
   },
 };
 

@@ -280,5 +280,47 @@ describe('mcpCommand', () => {
         }),
       );
     });
+
+    it('should filter servers by name when an argument is provided to list', async () => {
+      const listSubCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'list',
+      );
+      await listSubCommand!.action!(mockContext, 'server1');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.MCP_STATUS,
+          servers: expect.objectContaining({
+            server1: expect.any(Object),
+          }),
+        }),
+      );
+
+      // Should NOT contain server2 or server3
+      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0][0];
+       
+      expect(Object.keys(call.servers)).toEqual(['server1']);
+    });
+
+    it('should filter servers by name and show descriptions when an argument is provided to desc', async () => {
+      const descSubCommand = mcpCommand.subCommands!.find(
+        (c) => c.name === 'desc',
+      );
+      await descSubCommand!.action!(mockContext, 'server2');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.MCP_STATUS,
+          showDescriptions: true,
+          servers: expect.objectContaining({
+            server2: expect.any(Object),
+          }),
+        }),
+      );
+
+      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0][0];
+       
+      expect(Object.keys(call.servers)).toEqual(['server2']);
+    });
   });
 });

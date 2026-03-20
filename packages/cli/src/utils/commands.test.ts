@@ -217,5 +217,15 @@ describe('parseSlashCommand', () => {
       expect(result.args).toBe('some args');
       expect(result.canonicalPath).toEqual(['parent', 'notakes']);
     });
+
+    it('should NOT backtrack if subcommand is NOT marked with takesArgs: false', () => {
+      const result = parseSlashCommand(
+        '/parent takes some args',
+        backtrackingCommands,
+      );
+      expect(result.commandToExecute?.name).toBe('takes');
+      expect(result.args).toBe('some args');
+      expect(result.canonicalPath).toEqual(['parent', 'takes']);
+    });
   });
 });
