@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, LlmRole, resolveModel } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  LlmRole,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  resolveModel,
+} from '@google/gemini-cli-core';
 import type { Writable } from 'node:stream';
 
 export class UserSimulator {
@@ -84,7 +89,7 @@ For example:
 Do NOT output markdown, explanations of your thought process, or quotes. Output ONLY the raw characters to send, <WAIT>, or <DONE>.`;
 
       const model = resolveModel(
-        this.config.getModel(),
+        PREVIEW_GEMINI_FLASH_MODEL,
         false, // useGemini3_1
         false, // useCustomToolModel
         this.config.getHasAccessToPreviewModel?.() ?? true,
