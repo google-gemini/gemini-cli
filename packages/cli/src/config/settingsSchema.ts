@@ -592,11 +592,12 @@ const SETTINGS_SCHEMA = {
       },
       showContextCompression: {
         type: 'boolean',
-        label: 'Show Context Compression Events',
+        label: 'Show Context Compression Messages',
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Show a message when the chat history is compressed.',
+        description:
+          'Show a message in the chat history when it is compressed.',
         showInDialog: true,
       },
       footer: {
