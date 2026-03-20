@@ -39,6 +39,6 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  Shift+Tab to accept edits                                                 undefined undefined file
  workspace (/directory)                sandbox                   /model                     context
- /                                     no sandbox                gemini-pro                17% used
+ /directory                            no sandbox                gemini-pro                17% used
 "
 `;

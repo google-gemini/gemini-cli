@@ -140,6 +140,7 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
     mockConfig.isTrustedFolder = () => true;
     mockConfig.getDisableAlwaysAllow = () => false;
     mockConfig.getIdeMode = () => false;
+    mockConfig.getTargetDir = () => '/directory';
 
     const { waitUntilReady, lastFrame, generateSvg, unmount } =
       await renderWithProviders(<App />, {

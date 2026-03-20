@@ -216,7 +216,7 @@
     <text x="351" y="631" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">sandbox</text>
     <text x="585" y="631" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/model</text>
     <text x="828" y="631" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">context</text>
-    <text x="9" y="648" fill="#ffffff" textLength="9" lengthAdjust="spacingAndGlyphs">/</text>
+    <text x="9" y="648" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs">/directory</text>
     <text x="351" y="648" fill="#ff87af" textLength="90" lengthAdjust="spacingAndGlyphs">no sandbox</text>
     <text x="585" y="648" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs">gemini-pro</text>
     <text x="819" y="648" fill="#afafaf" textLength="72" lengthAdjust="spacingAndGlyphs">17% used</text>
