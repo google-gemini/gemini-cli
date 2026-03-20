@@ -89,6 +89,8 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'REPOSITORY',
     'TITLE',
     'TRIGGERING_ACTOR',
+    // Path to UNIX domain socket for SSH agent, GPG agent
+    'SSH_AUTH_SOCK'
   ]);
 
 export const NEVER_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> = new Set(
