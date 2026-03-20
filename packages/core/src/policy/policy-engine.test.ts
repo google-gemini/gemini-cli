@@ -167,6 +167,57 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should match unqualified rule names with qualified tool calls when serverName is provided', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'tool',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Match with unqualified rule name and qualified tool call + serverName
+      expect(
+        (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      expect(
+        (await engine.check({ name: 'my-server__tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+
+      expect(
+        (await engine.check({ name: 'my-server__tool' }, 'wrong-server'))
+          .decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should ALLOW unqualified rule for MCP tool in non-interactive mode', async () => {
+      const config: PolicyEngineConfig = {
+        nonInteractive: true,
+        rules: [
+          {
+            toolName: 'notify_user',
+            decision: PolicyDecision.ALLOW,
+          },
+        ],
+      };
+
+      engine = new PolicyEngine(config);
+
+      // In non-interactive mode, an unqualified ALLOW rule should still
+      // match a qualified MCP tool call — not fall through to DENY
+      expect(
+        (await engine.check({ name: 'craftMCP__notify_user' }, 'craftMCP'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      expect(
+        (await engine.check({ name: 'craftMCP__other_tool' }, 'craftMCP'))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should match by args pattern', async () => {
       const rules: PolicyRule[] = [
         {
