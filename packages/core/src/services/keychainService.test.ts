@@ -327,5 +327,61 @@ describe('KeychainService', () => {
     it('getPassword should return null if key is missing', async () => {
       expect(await service.getPassword('missing')).toBeNull();
     });
+
+    it('should sanitize native errors from getPassword', async () => {
+      mockKeytar.getPassword?.mockRejectedValue(
+        new Error('sensitive account info: user@corp.internal'),
+      );
+
+      const err = await service.getPassword('acc1').catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toBe('Keychain operation failed');
+      expect((err as Error).message).not.toContain('sensitive');
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        'Keychain operation failed: getPassword',
+      );
+    });
+
+    it('should sanitize native errors from setPassword', async () => {
+      mockKeytar.setPassword?.mockRejectedValue(
+        new Error('credential store locked for service=my-app'),
+      );
+
+      const err = await service.setPassword('acc1', 'val').catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toBe('Keychain operation failed');
+      expect((err as Error).message).not.toContain('credential store');
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        'Keychain operation failed: setPassword',
+      );
+    });
+
+    it('should sanitize native errors from deletePassword', async () => {
+      mockKeytar.deletePassword?.mockRejectedValue(
+        new Error('access denied for account admin@secret-org'),
+      );
+
+      const err = await service.deletePassword('acc1').catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toBe('Keychain operation failed');
+      expect((err as Error).message).not.toContain('admin@secret-org');
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        'Keychain operation failed: deletePassword',
+      );
+    });
+
+    it('should sanitize native errors from findCredentials', async () => {
+      mockKeytar.findCredentials?.mockRejectedValue(
+        new Error('D-Bus error: org.freedesktop.Secret.Error.NoSuchObject'),
+      );
+
+      const err = await service.findCredentials().catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toBe('Keychain operation failed');
+      expect((err as Error).message).not.toContain('D-Bus');
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        'Keychain operation failed: findCredentials',
+      );
+    });
   });
 });
