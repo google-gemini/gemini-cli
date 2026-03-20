@@ -294,7 +294,7 @@ export async function runNonInteractive({
       });
 
       // Start the agentic loop (runs in background)
-      await session.send({
+      const { streamId } = await session.send({
         message: geminiPartsToContentParts(query),
       });
 
@@ -351,7 +351,7 @@ export async function runNonInteractive({
       // Consume AgentEvents for output formatting
       let responseText = '';
       let streamEnded = false;
-      for await (const event of session.stream()) {
+      for await (const event of session.stream({ streamId })) {
         if (streamEnded) break;
         switch (event.type) {
           case 'message': {
