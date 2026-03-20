@@ -246,7 +246,9 @@ export const AppContainer = (props: AppContainerProps) => {
     ),
   );
   const isAlternateBufferRef = useRef(isAlternateBuffer);
-  isAlternateBufferRef.current = isAlternateBuffer;
+  useEffect(() => {
+    isAlternateBufferRef.current = isAlternateBuffer;
+  }, [isAlternateBuffer]);
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -1709,21 +1711,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
           return true;
         }
 
-        setIsAlternateBuffer((prev) => {
-          const next = !prev;
-          if (next) {
-            enterAlternateScreen();
-            disableLineWrapping();
-            enableMouseEvents();
-            stdout.write('\x1b[2J\x1b[H');
-          } else {
-            clearTerminalScreen();
-            exitAlternateScreen();
-            enableLineWrapping();
-            disableMouseEvents();
-          }
-          return next;
-        });
+        const next = !isAlternateBufferRef.current;
+        if (next) {
+          enterAlternateScreen();
+          disableLineWrapping();
+          enableMouseEvents();
+          clearTerminalScreen();
+        } else {
+          clearTerminalScreen();
+          exitAlternateScreen();
+          enableLineWrapping();
+          disableMouseEvents();
+        }
+        setIsAlternateBuffer(next);
 
         setHistoryRemountKey((prev) => prev + 1);
         return true;
@@ -1922,7 +1922,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       triggerExpandHint,
       keyMatchers,
       isHelpDismissKey,
-      stdout,
     ],
   );
 
