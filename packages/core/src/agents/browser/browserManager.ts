@@ -21,6 +21,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
@@ -346,6 +347,10 @@ export class BrowserManager {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
       mcpArgs.push('--autoConnect');
+      const warningMessage =
+        "Warning: 'sessionMode: existing' is enabled. The agent will have access to your logged-in browser sessions, cookies, and saved credentials.";
+      coreEvents.emitFeedback('warning', warningMessage);
+      coreEvents.emitConsoleLog('warn', warningMessage);
     }
 
     // Add optional settings from config
