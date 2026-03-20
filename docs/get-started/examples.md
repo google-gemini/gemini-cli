@@ -4,7 +4,9 @@ Gemini CLI helps you automate common engineering tasks by combining AI reasoning
 with local system tools. This document provides examples of how to use the CLI
 for file management, code analysis, and data transformation.
 
-> **Note:** These examples demonstrate potential capabilities. Your actual
+<!-- prettier-ignore -->
+> [!NOTE]
+> These examples demonstrate potential capabilities. Your actual
 > results can vary based on the model used and your project environment.
 
 ## Rename your photographs based on content
