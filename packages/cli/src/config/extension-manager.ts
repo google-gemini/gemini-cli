@@ -85,6 +85,8 @@ import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { getFormattedSettingValue } from '../commands/extensions/utils.js';
 
+const emittedWarnings = new Set<string>();
+
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
   settings: MergedSettings;
@@ -421,8 +423,11 @@ Would you like to attempt to install via "git clone" instead?`,
             .join(
               ', ',
             )}. Please run "gemini extensions config ${newExtensionConfig.name} [setting-name]" to configure them.`;
-          debugLogger.warn(message);
-          coreEvents.emitFeedback('warning', message);
+          if (!emittedWarnings.has(message)) {
+            debugLogger.warn(message);
+            coreEvents.emitFeedback('warning', message);
+            emittedWarnings.add(message);
+          }
         }
 
         if (
@@ -682,8 +687,11 @@ Would you like to attempt to install via "git clone" instead?`,
               if (existingIdx !== -1) {
                 // If the user has a manually installed version of the builtin extension, we warn them.
                 const message = `Extension "${builtinExt.name}" is now built-in. Your manual installation at "${builtExtensions[existingIdx].path}" is being ignored. Please run "gemini extensions uninstall ${builtinExt.name}" to clean up.`;
-                debugLogger.warn(message);
-                coreEvents.emitFeedback('warning', message);
+                if (!emittedWarnings.has(message)) {
+                  debugLogger.warn(message);
+                  coreEvents.emitFeedback('warning', message);
+                  emittedWarnings.add(message);
+                }
                 builtExtensions[existingIdx] = builtinExt;
               } else {
                 // Check if this is the new 'sdd' extension and if 'conductor' is installed.
@@ -693,8 +701,11 @@ Would you like to attempt to install via "git clone" instead?`,
                   );
                   if (conductorIdx !== -1) {
                     const message = `The "conductor" extension has been replaced by built-in Spec-Driven Development. Your project files in "/conductor" are preserved. Run "/spec:setup" to get started.`;
-                    debugLogger.warn(message);
-                    coreEvents.emitFeedback('warning', message);
+                    if (!emittedWarnings.has(message)) {
+                      debugLogger.warn(message);
+                      coreEvents.emitFeedback('warning', message);
+                      emittedWarnings.add(message);
+                    }
                   }
                 }
                 builtExtensions.push(builtinExt);
