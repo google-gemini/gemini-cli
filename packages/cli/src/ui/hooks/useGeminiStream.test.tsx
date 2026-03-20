@@ -105,7 +105,12 @@ const MockedGeminiClientClass = vi.hoisted(() =>
 );
 
 const MockedUserPromptEvent = vi.hoisted(() =>
-  vi.fn().mockImplementation(() => {}),
+  vi
+    .fn()
+    .mockImplementation(() => ({
+      toLogBody: vi.fn(),
+      toOpenTelemetryAttributes: vi.fn(),
+    })),
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 const mockIsBackgroundExecutionData = vi.hoisted(
@@ -2198,7 +2203,6 @@ describe('useGeminiStream', () => {
   });
 
   describe('handleApprovalModeChange', () => {
-
     it('should only auto-approve edit tools when switching to AUTO_EDIT mode', async () => {
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
         createMockToolCall('replace', 'call1', 'edit'),
