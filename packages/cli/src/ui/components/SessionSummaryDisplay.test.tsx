@@ -8,10 +8,12 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
   getShellConfiguration,
+  type WorktreeSettings,
 } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -24,10 +26,20 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof SessionContext>();
+  const actual =
+    await importOriginal<typeof import('../contexts/SessionContext.js')>();
   return {
     ...actual,
     useSessionStats: vi.fn(),
+  };
+});
+
+vi.mock('../contexts/ConfigContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../contexts/ConfigContext.js')>();
+  return {
+    ...actual,
+    useConfig: vi.fn(),
   };
 });
 
@@ -38,6 +50,7 @@ const renderWithMockedStats = async (
   metrics: SessionMetrics,
   sessionId = 'test-session',
   alias?: string,
+  worktreeSettings?: WorktreeSettings,
 ) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
@@ -51,7 +64,11 @@ const renderWithMockedStats = async (
 
     getPromptCount: () => 5,
     startNewPrompt: vi.fn(),
-  });
+  } as unknown as ReturnType<typeof SessionContext.useSessionStats>);
+
+  vi.mocked(useConfig).mockReturnValue({
+    getWorktreeSettings: () => worktreeSettings,
+  } as never);
 
   const result = await renderWithProviders(
     <SessionSummaryDisplay duration="1h 23m 45s" />,
@@ -203,6 +220,60 @@ describe('<SessionSummaryDisplay />', () => {
 
       // PowerShell wraps in single quotes and escapes internal single quotes by doubling them
       expect(output).toContain("gemini --resume '''; rm -rf / #'");
+      unmount();
+    });
+  });
+
+  describe('Worktree status', () => {
+    it('renders worktree instructions when worktreeSettings are present', async () => {
+      const worktreeSettings: WorktreeSettings = {
+        name: 'foo-bar',
+        path: '/path/to/foo-bar',
+        baseSha: 'base-sha',
+      };
+
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        'test-session',
+        undefined,
+        worktreeSettings,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('To resume work in this worktree:');
+      expect(output).toContain(
+        'cd /path/to/foo-bar && gemini --resume test-session',
+      );
+      expect(output).toContain(
+        'To remove manually: git worktree remove /path/to/foo-bar',
+      );
+      unmount();
+    });
+
+    it('renders both alias and worktree instructions when both are present', async () => {
+      const worktreeSettings: WorktreeSettings = {
+        name: 'foo-bar',
+        path: '/path/to/foo-bar',
+        baseSha: 'base-sha',
+      };
+      const alias = 'my-feat';
+      const uuid = 'test-uuid';
+
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        uuid,
+        alias,
+        worktreeSettings,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('To resume work in this worktree:');
+      expect(output).toContain(
+        'cd /path/to/foo-bar && gemini --resume my-feat (test-uuid)',
+      );
+      expect(output).toContain(
+        'To remove manually: git worktree remove /path/to/foo-bar',
+      );
       unmount();
     });
   });
