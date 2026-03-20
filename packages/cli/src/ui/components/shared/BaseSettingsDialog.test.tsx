@@ -108,7 +108,7 @@ describe('BaseSettingsDialog', () => {
       ...props,
     };
 
-    const result = renderWithProviders(
+    const result = await renderWithProviders(
       <BaseSettingsDialog {...defaultProps} />,
     );
     await result.waitUntilReady();
