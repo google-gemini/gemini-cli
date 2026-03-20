@@ -23,7 +23,7 @@ import {
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
 } from './tool-names.js';
-import type { ToolResult, TodoList } from './tools.js';
+import type { ToolResult, TodoList, TodoStatus } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
@@ -48,6 +48,22 @@ export async function buildTodosReturnDisplay(
     }
   }
 
+  const statusOrder: Record<TaskStatus, number> = {
+    [TaskStatus.IN_PROGRESS]: 0,
+    [TaskStatus.OPEN]: 1,
+    [TaskStatus.BLOCKED]: 2,
+    [TaskStatus.CLOSED]: 3,
+  };
+
+  const sortTasks = (a: TrackerTask, b: TrackerTask) => {
+    if (statusOrder[a.status] !== statusOrder[b.status]) {
+      return statusOrder[a.status] - statusOrder[b.status];
+    }
+    return a.id.localeCompare(b.id);
+  };
+
+  roots.sort(sortTasks);
+
   const todos: TodoList['todos'] = [];
 
   const addTask = (task: TrackerTask, depth: number, visited: Set<string>) => {
@@ -60,20 +76,22 @@ export async function buildTodosReturnDisplay(
     }
     visited.add(task.id);
 
-    let status: 'pending' | 'in_progress' | 'completed' | 'cancelled' =
-      'pending';
+    let status: TodoStatus = 'pending';
     if (task.status === TaskStatus.IN_PROGRESS) {
       status = 'in_progress';
     } else if (task.status === TaskStatus.CLOSED) {
       status = 'completed';
+    } else if (task.status === TaskStatus.BLOCKED) {
+      status = 'blocked';
     }
 
     const indent = '  '.repeat(depth);
-    const description = `${indent}[${task.id}] ${TASK_TYPE_LABELS[task.type]} ${task.title}`;
+    const description = `${indent}${task.type}: ${task.title} (${task.id})`;
 
     todos.push({ description, status });
 
     const children = childrenMap.get(task.id) ?? [];
+    children.sort(sortTasks);
     for (const child of children) {
       addTask(child, depth + 1, visited);
     }
@@ -570,7 +588,7 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
     const statusEmojis: Record<TaskStatus, string> = {
       open: '⭕',
       in_progress: '🚧',
-      blocked: '🚫',
+      blocked: '⛔',
       closed: '✅',
     };
 

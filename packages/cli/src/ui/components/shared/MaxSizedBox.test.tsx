@@ -288,7 +288,7 @@ describe('<MaxSizedBox />', () => {
       { length: 20 },
       (_, i) => `- Step ${i + 1}: Do something important`,
     ).join('\n');
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <MaxSizedBox maxWidth={80} maxHeight={5} overflowDirection="bottom">
         <MarkdownDisplay
           text={`## Plan\n\n${markdownContent}`}
