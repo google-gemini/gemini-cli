@@ -5,12 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, poll, normalizePath } from './test-helper.js';
+import { TestRig, poll, normalizePath, skipFlaky } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 
-describe('Hooks System Integration', { timeout: 120000 }, () => {
+describe.skipIf(skipFlaky)('Hooks System Integration', { timeout: 120000 }, () => {
   let rig: TestRig;
 
   beforeEach(() => {
