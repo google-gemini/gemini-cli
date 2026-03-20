@@ -133,6 +133,8 @@ describe('createContentGenerator', () => {
     vi.stubEnv('CLI_VERSION', '1.2.3');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
     vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
 
     const mockGenerator = {
       models: {},
@@ -173,6 +175,8 @@ describe('createContentGenerator', () => {
     vi.stubEnv('CLI_VERSION', '1.2.3');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
     vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
 
     const mockGenerator = {
       models: {},
@@ -247,6 +251,8 @@ describe('createContentGenerator', () => {
     vi.stubEnv('CLI_VERSION', '1.2.3');
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
     vi.stubEnv('VSCODE_PID', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
 
     const mockGenerator = {
       models: {},
