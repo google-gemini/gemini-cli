@@ -36,18 +36,22 @@ Returns a stream of newline-delimited JSON (JSONL) events.
 
 ## Exit codes
 
-The Gemini CLI uses specific exit codes to indicate the reason for termination.
-This is especially useful for headless scripting and automation:
+Gemini CLI uses the following exit codes to indicate why the tool terminated
+unexpectedly. You can use these codes to handle errors in scripts and automation
+workflows.
 
-| Exit Code | Error Type                 | Description                                                                                         |
+| Exit code | Error type                 | Description                                                                                         |
 | --------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
-| 0         | `Success`                  | Success.                                                                                            |
-| 1         | `GeneralError`             | General error or API failure.                                                                       |
 | 41        | `FatalAuthenticationError` | An error occurred during the authentication process.                                                |
 | 42        | `FatalInputError`          | Invalid or missing input was provided to the CLI. (non-interactive mode only)                       |
 | 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (e.g., Docker, Podman, or Seatbelt).              |
 | 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
 | 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
+| 54        | `FatalToolExecutionError`  | An error occurred during tool execution.                                                            |
+| 130       | `FatalCancellationError`   | The operation was canceled by the user (e.g., SIGINT).                                              |
+
+Exit code 0 indicates that Gemini CLI finished successfully. Exit code 1
+indicates a general error or API failure occurred.
 
 ## Next steps
 
