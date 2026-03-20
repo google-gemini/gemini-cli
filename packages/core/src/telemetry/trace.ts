@@ -98,10 +98,10 @@ export interface SpanMetadata {
  * @returns The result of the function.
  */
 export async function runInDevTraceSpan<R>(
-  opts: SpanOptions & { operation: GeminiCliOperation },
+  opts: SpanOptions & { operation: GeminiCliOperation; logPrompts?: boolean },
   fn: ({ metadata }: { metadata: SpanMetadata }) => Promise<R>,
 ): Promise<R> {
-  const { operation, ...restOfSpanOpts } = opts;
+  const { operation, logPrompts, ...restOfSpanOpts } = opts;
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
   return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
@@ -116,16 +116,18 @@ export async function runInDevTraceSpan<R>(
     };
     const endSpan = () => {
       try {
-        if (meta.input !== undefined) {
-          const truncated = truncateForTelemetry(meta.input);
-          if (truncated !== undefined) {
-            span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+        if (logPrompts !== false) {
+          if (meta.input !== undefined) {
+            const truncated = truncateForTelemetry(meta.input);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+            }
           }
-        }
-        if (meta.output !== undefined) {
-          const truncated = truncateForTelemetry(meta.output);
-          if (truncated !== undefined) {
-            span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+          if (meta.output !== undefined) {
+            const truncated = truncateForTelemetry(meta.output);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+            }
           }
         }
         for (const [key, value] of Object.entries(meta.attributes)) {

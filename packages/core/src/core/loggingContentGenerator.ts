@@ -349,6 +349,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -438,6 +439,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -591,6 +593,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
         },
