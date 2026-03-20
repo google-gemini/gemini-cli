@@ -264,6 +264,7 @@ describe('mcp list command', () => {
         config: {
           'allowed-server': { url: 'http://allowed' },
         },
+        requiredConfig: {},
       },
     };
 
