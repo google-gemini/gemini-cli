@@ -181,7 +181,13 @@ describe('translateEvent', () => {
     it('stringifies object resultDisplay correctly', () => {
       state.streamStartEmitted = true;
       state.pendingToolNames.set('call-3', 'diff_tool');
-      const objectDisplay = { type: 'FileDiff', before: 'a', after: 'b' };
+      const objectDisplay = {
+        fileDiff: '@@ -1 +1 @@\n-a\n+b',
+        fileName: 'test.txt',
+        filePath: '/tmp/test.txt',
+        originalContent: 'a',
+        newContent: 'b',
+      };
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.ToolCallResponse,
         value: {
@@ -402,19 +408,17 @@ describe('translateEvent', () => {
   });
 
   describe('MaxSessionTurns events', () => {
-    it('emits a non-fatal max-turns error event', () => {
+    it('emits stream_end with max_turns', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.MaxSessionTurns,
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
-      const err = result[0] as AgentEvent<'error'>;
-      expect(err.type).toBe('error');
-      expect(err.fatal).toBe(false);
-      expect(err.status).toBe('RESOURCE_EXHAUSTED');
-      expect(err._meta?.['code']).toBe('MAX_TURNS_EXCEEDED');
-      expect(err.message).toBe('Maximum session turns exceeded');
+      const streamEnd = result[0] as AgentEvent<'stream_end'>;
+      expect(streamEnd.type).toBe('stream_end');
+      expect(streamEnd.reason).toBe('max_turns');
+      expect(streamEnd.data).toEqual({ code: 'MAX_TURNS_EXCEEDED' });
     });
   });
 
@@ -627,6 +631,24 @@ describe('mapFinishReason', () => {
 
   it('maps PROHIBITED_CONTENT to refusal', () => {
     expect(mapFinishReason(FinishReason.PROHIBITED_CONTENT)).toBe('refusal');
+  });
+
+  it('maps IMAGE_SAFETY to refusal', () => {
+    expect(mapFinishReason(FinishReason.IMAGE_SAFETY)).toBe('refusal');
+  });
+
+  it('maps IMAGE_PROHIBITED_CONTENT to refusal', () => {
+    expect(mapFinishReason(FinishReason.IMAGE_PROHIBITED_CONTENT)).toBe(
+      'refusal',
+    );
+  });
+
+  it('maps UNEXPECTED_TOOL_CALL to failed', () => {
+    expect(mapFinishReason(FinishReason.UNEXPECTED_TOOL_CALL)).toBe('failed');
+  });
+
+  it('maps NO_IMAGE to failed', () => {
+    expect(mapFinishReason(FinishReason.NO_IMAGE)).toBe('failed');
   });
 });
 

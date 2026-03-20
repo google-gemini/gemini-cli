@@ -157,11 +157,11 @@ export function translateEvent(
     case GeminiEventType.MaxSessionTurns:
       ensureStreamStart(state, out);
       out.push(
-        makeEvent('error', state, {
-          status: 'RESOURCE_EXHAUSTED',
-          message: 'Maximum session turns exceeded',
-          fatal: false,
-          _meta: { code: 'MAX_TURNS_EXCEEDED' },
+        makeEvent('stream_end', state, {
+          reason: 'max_turns',
+          data: {
+            code: 'MAX_TURNS_EXCEEDED',
+          },
         }),
       );
       break;
@@ -338,12 +338,15 @@ export function mapFinishReason(
     case 'BLOCKLIST':
     case 'PROHIBITED_CONTENT':
     case 'SPII':
+    case 'IMAGE_SAFETY':
+    case 'IMAGE_PROHIBITED_CONTENT':
       return 'refusal';
     case 'MALFORMED_FUNCTION_CALL':
     case 'OTHER':
+    case 'UNEXPECTED_TOOL_CALL':
+    case 'NO_IMAGE':
       return 'failed';
     default:
-      ((_x: never) => {})(reason);
       return 'failed';
   }
 }
