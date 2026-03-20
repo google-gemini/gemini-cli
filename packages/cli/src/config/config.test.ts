@@ -32,7 +32,7 @@ import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
-import { RESUME_LATEST, RESUME_INTERACTIVE } from '../utils/sessionUtils.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi.fn(() => ({ isTrusted: true, source: 'file' })), // Default to trusted
@@ -565,20 +565,6 @@ describe('parseArguments', () => {
       const argv = await parseArguments(createTestMergedSettings());
       expect(argv.resume).toBe(RESUME_LATEST);
       expect(argv.resume).toBe('latest');
-    } finally {
-      process.stdin.isTTY = originalIsTTY;
-    }
-  });
-
-  it('should return RESUME_INTERACTIVE constant when --resume list is passed', async () => {
-    const originalIsTTY = process.stdin.isTTY;
-    process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', '--resume', 'list'];
-
-    try {
-      const argv = await parseArguments(createTestMergedSettings());
-      expect(argv.resume).toBe(RESUME_INTERACTIVE);
-      expect(argv.resume).toBe('interactive');
     } finally {
       process.stdin.isTTY = originalIsTTY;
     }

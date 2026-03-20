@@ -200,7 +200,6 @@ interface AppContainerProps {
   version: string;
   initializationResult: InitializationResult;
   resumedSessionData?: ResumedSessionData;
-  initialSessionBrowserOpen?: boolean;
 }
 
 import { useRepeatedKeyPress } from './hooks/useRepeatedKeyPress.js';
@@ -742,11 +741,7 @@ export const AppContainer = (props: AppContainerProps) => {
     closeSessionBrowser,
     handleResumeSession,
     handleDeleteSession: handleDeleteSessionSync,
-  } = useSessionBrowser(
-    config,
-    loadHistoryForResume,
-    props.initialSessionBrowserOpen,
-  );
+  } = useSessionBrowser(config, loadHistoryForResume);
   // Wrap handleDeleteSession to return a Promise for UIActions interface
   const handleDeleteSession = useCallback(
     async (session: SessionInfo): Promise<void> => {

@@ -31,7 +31,6 @@ import {
   ValidationRequiredError,
   type AdminControlsSettings,
   debugLogger,
-  generateSummary,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -76,11 +75,7 @@ import { validateAuthMethod } from './config/auth.js';
 import { runAcpClient } from './acp/acpClient.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import {
-  SessionError,
-  SessionSelector,
-  RESUME_INTERACTIVE,
-} from './utils/sessionUtils.js';
+import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 
 import {
   relaunchAppInChildProcess,
@@ -173,7 +168,6 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
-  initialSessionBrowserOpen: boolean = false,
 ) {
   // Dynamically import the heavy UI module so React/Ink are only parsed when needed
   const { startInteractiveUI: doStartUI } = await import('./interactiveCli.js');
@@ -184,7 +178,6 @@ export async function startInteractiveUI(
     workspaceRoot,
     resumedSessionData,
     initializationResult,
-    initialSessionBrowserOpen,
   );
 }
 
@@ -559,39 +552,34 @@ export async function main() {
 
     // Handle --resume flag
     let resumedSessionData: ResumedSessionData | undefined = undefined;
-    let initialSessionBrowserOpen = false;
     if (argv.resume) {
-      if (argv.resume === RESUME_INTERACTIVE) {
-        initialSessionBrowserOpen = true;
-      } else {
-        const sessionSelector = new SessionSelector(config);
-        try {
-          const result = await sessionSelector.resolveSession(argv.resume);
-          resumedSessionData = {
-            conversation: result.sessionData,
-            filePath: result.sessionPath,
-          };
-          // Use the existing session ID to continue recording to the same session
-          config.setSessionId(resumedSessionData.conversation.sessionId);
-        } catch (error) {
-          if (
-            error instanceof SessionError &&
-            error.code === 'NO_SESSIONS_FOUND'
-          ) {
-            // No sessions to resume — start a fresh session with a warning
-            startupWarnings.push({
-              id: 'resume-no-sessions',
-              message: error.message,
-              priority: WarningPriority.High,
-            });
-          } else {
-            coreEvents.emitFeedback(
-              'error',
-              `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-            await runExitCleanup();
-            process.exit(ExitCodes.FATAL_INPUT_ERROR);
-          }
+      const sessionSelector = new SessionSelector(config);
+      try {
+        const result = await sessionSelector.resolveSession(argv.resume);
+        resumedSessionData = {
+          conversation: result.sessionData,
+          filePath: result.sessionPath,
+        };
+        // Use the existing session ID to continue recording to the same session
+        config.setSessionId(resumedSessionData.conversation.sessionId);
+      } catch (error) {
+        if (
+          error instanceof SessionError &&
+          error.code === 'NO_SESSIONS_FOUND'
+        ) {
+          // No sessions to resume — start a fresh session with a warning
+          startupWarnings.push({
+            id: 'resume-no-sessions',
+            message: error.message,
+            priority: WarningPriority.High,
+          });
+        } else {
+          coreEvents.emitFeedback(
+            'error',
+            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_INPUT_ERROR);
         }
       }
     }
@@ -599,14 +587,6 @@ export async function main() {
     cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
-      if (initialSessionBrowserOpen) {
-        // Generate summary for the previous session BEFORE opening the browser
-        // so that the user sees a helpful title/alias for their last session.
-        await generateSummary(config).catch((e) => {
-          debugLogger.warn('Pre-resume summary generation failed:', e);
-        });
-      }
-
       await startInteractiveUI(
         config,
         settings,
@@ -614,7 +594,6 @@ export async function main() {
         process.cwd(),
         resumedSessionData,
         initializationResult,
-        initialSessionBrowserOpen,
       );
       return;
     }

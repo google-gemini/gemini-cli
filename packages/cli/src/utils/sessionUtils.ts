@@ -25,12 +25,6 @@ import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 export const RESUME_LATEST = 'latest';
 
 /**
- * Constant for the resume "interactive" identifier.
- * Used when --resume is passed without a value to trigger interactive selection.
- */
-export const RESUME_INTERACTIVE = 'interactive';
-
-/**
  * Error codes for session-related errors.
  */
 export type SessionErrorCode =

@@ -31,11 +31,8 @@ export const useSessionBrowser = (
     clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
     resumedSessionData: ResumedSessionData,
   ) => Promise<void>,
-  initialSessionBrowserOpen: boolean = false,
 ) => {
-  const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(
-    initialSessionBrowserOpen,
-  );
+  const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(false);
 
   return {
     isSessionBrowserOpen,

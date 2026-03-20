@@ -52,7 +52,7 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import { RESUME_LATEST, RESUME_INTERACTIVE } from '../utils/sessionUtils.js';
+import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
@@ -85,7 +85,7 @@ export interface CliArgs {
   experimentalAcp?: boolean;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  resume: string | typeof RESUME_LATEST | typeof RESUME_INTERACTIVE | undefined;
+  resume: string | typeof RESUME_LATEST | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -239,7 +239,7 @@ export async function parseArguments(
           // one, and not being passed at all.
           skipValidation: true,
           description:
-            'Resume a previous session. Use "latest" for most recent, "list" for interactive UI, alias, or index number (e.g. --resume 5)',
+            'Resume a previous session. Use "latest" for most recent, alias, or index number (e.g. --resume 5)',
           coerce: (value: string | boolean): string => {
             // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
             // When --resume passed without a value (`gemini --resume`): value = "" (string) or true (boolean)
@@ -251,9 +251,6 @@ export async function parseArguments(
             const trimmed = String(value).trim();
             if (trimmed === '') {
               return RESUME_LATEST;
-            }
-            if (trimmed === 'list') {
-              return RESUME_INTERACTIVE;
             }
             return trimmed;
           },
