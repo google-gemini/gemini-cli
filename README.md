@@ -30,7 +30,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 ## 📦 Installation
 
 See
-[Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
+[Gemini CLI installation, execution, and releases](./docs/resources/installation.md)
 for recommended system specifications and a detailed installation guide.
 
 ### Quick Install
@@ -209,7 +209,7 @@ gemini
 ```
 
 For Google Workspace accounts and other authentication methods, see the
-[authentication guide](./docs/get-started/authentication.md).
+[authentication guide](./docs/resources/authentication.md).
 
 ## 🚀 Getting Started
 
@@ -280,8 +280,8 @@ gemini
 
 - [**Quickstart Guide**](./docs/get-started/index.md) - Get up and running
   quickly.
-- [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
-  auth configuration.
+- [**Authentication Setup**](./docs/resources/authentication.md) - Detailed auth
+  configuration.
 - [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
   customization.
 - [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
