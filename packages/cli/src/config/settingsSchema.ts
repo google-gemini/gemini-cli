@@ -252,7 +252,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description: 'Enable update notification prompts.',
-        showInDialog: false,
+        showInDialog: true,
       },
       enableNotifications: {
         type: 'boolean',
