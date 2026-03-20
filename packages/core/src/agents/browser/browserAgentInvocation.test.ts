@@ -29,6 +29,13 @@ vi.mock('./browserAgentFactory.js', () => ({
   cleanupBrowserAgent: vi.fn(),
 }));
 
+vi.mock('./inputBlocker.js', () => ({
+  injectInputBlocker: vi.fn(),
+  removeInputBlocker: vi.fn(),
+  suspendInputBlocker: vi.fn(),
+  resumeInputBlocker: vi.fn(),
+}));
+
 vi.mock('../local-executor.js', () => ({
   LocalAgentExecutor: {
     create: vi.fn(),
@@ -177,7 +184,10 @@ describe('BrowserAgentInvocation', () => {
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
-        browserManager: {} as never,
+        browserManager: {
+          setAbortController: vi.fn(),
+          callTool: vi.fn().mockResolvedValue({}),
+        } as never,
       });
 
       mockExecutor = {
