@@ -59,7 +59,7 @@ describe('<VirtualizedList />', () => {
     ])(
       'renders only visible items ($name)',
       async ({ initialScrollIndex, visible, notVisible }) => {
-        const { lastFrame, waitUntilReady, unmount } = render(
+        const { lastFrame, unmount } = await render(
           <Box height={10} width={100} borderStyle="round">
             <VirtualizedList
               data={longData}
@@ -70,22 +70,21 @@ describe('<VirtualizedList />', () => {
             />
           </Box>,
         );
-        await waitUntilReady();
 
-        const frame = lastFrame();
+        const output = lastFrame();
         visible.forEach((item) => {
-          expect(frame).toContain(item);
+          expect(output).toContain(item);
         });
         notVisible.forEach((item) => {
-          expect(frame).not.toContain(item);
+          expect(output).not.toContain(item);
         });
-        expect(frame).toMatchSnapshot();
+        expect(output).toMatchSnapshot();
         unmount();
       },
     );
 
     it('sticks to bottom when new items added', async () => {
-      const { lastFrame, rerender, waitUntilReady, unmount } = render(
+      const { lastFrame, rerender, waitUntilReady, unmount } = await render(
         <Box height={10} width={100} borderStyle="round">
           <VirtualizedList
             data={longData}
@@ -96,7 +95,6 @@ describe('<VirtualizedList />', () => {
           />
         </Box>,
       );
-      await waitUntilReady();
 
       expect(lastFrame()).toContain('Item 99');
 
@@ -126,7 +124,7 @@ describe('<VirtualizedList />', () => {
 
     it('scrolls down to show new items when requested via ref', async () => {
       const ref = createRef<VirtualizedListRef<string>>();
-      const { lastFrame, waitUntilReady, unmount } = render(
+      const { lastFrame, waitUntilReady, unmount } = await render(
         <Box height={10} width={100} borderStyle="round">
           <VirtualizedList
             ref={ref}
@@ -137,7 +135,6 @@ describe('<VirtualizedList />', () => {
           />
         </Box>,
       );
-      await waitUntilReady();
 
       expect(lastFrame()).toContain('Item 0');
 
@@ -180,7 +177,7 @@ describe('<VirtualizedList />', () => {
           (_, i) => `Item ${i}`,
         );
 
-        const { lastFrame, waitUntilReady, unmount } = render(
+        const { lastFrame, unmount } = await render(
           <Box height={20} width={100} borderStyle="round">
             <VirtualizedList
               data={veryLongData}
@@ -193,7 +190,6 @@ describe('<VirtualizedList />', () => {
             />
           </Box>,
         );
-        await waitUntilReady();
 
         const frame = lastFrame();
         expect(mountedCount).toBe(expectedMountedCount);
@@ -262,8 +258,9 @@ describe('<VirtualizedList />', () => {
       return null;
     };
 
-    const { lastFrame, waitUntilReady, unmount } = render(<TestComponent />);
-    await waitUntilReady();
+    const { lastFrame, unmount, waitUntilReady } = await render(
+      <TestComponent />,
+    );
 
     // Initially, only Item 0 (height 10) fills the 10px viewport
     expect(lastFrame()).toContain('Item 0');
@@ -295,7 +292,7 @@ describe('<VirtualizedList />', () => {
     );
     const keyExtractor = (item: string) => item;
 
-    const { waitUntilReady, unmount } = render(
+    const { unmount, waitUntilReady } = await render(
       <Box height={10} width={100} borderStyle="round">
         <VirtualizedList
           ref={ref}
@@ -306,7 +303,6 @@ describe('<VirtualizedList />', () => {
         />
       </Box>,
     );
-    await waitUntilReady();
 
     expect(ref.current?.getScrollState().scrollTop).toBe(0);
 
@@ -335,7 +331,7 @@ describe('<VirtualizedList />', () => {
 
     const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
     // Use copy mode
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <Box height={10} width={100}>
         <VirtualizedList
           data={longData}
@@ -350,7 +346,6 @@ describe('<VirtualizedList />', () => {
         />
       </Box>,
     );
-    await waitUntilReady();
 
     // Item 50 should be visible
     expect(lastFrame()).toContain('Item 50');
