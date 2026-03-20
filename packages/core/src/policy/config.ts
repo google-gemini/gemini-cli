@@ -285,6 +285,7 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
+  interactive: boolean = true,
 ): Promise<PolicyEngineConfig> {
   const systemPoliciesDir = path.resolve(Storage.getSystemPoliciesDir());
   const userPoliciesDir = path.resolve(Storage.getUserPoliciesDir());
@@ -524,7 +525,10 @@ export async function createPolicyEngineConfig(
   return {
     rules,
     checkers,
-    defaultDecision: PolicyDecision.ASK_USER,
+    defaultDecision: interactive
+      ? PolicyDecision.ASK_USER
+      : PolicyDecision.DENY,
+    nonInteractive: !interactive,
     approvalMode,
     disableAlwaysAllow: settings.disableAlwaysAllow,
   };

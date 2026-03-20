@@ -605,12 +605,12 @@ describe('Policy Engine Integration Tests', () => {
     it('should verify non-interactive mode transformation', async () => {
       const settings: Settings = {};
 
-      const config = await createPolicyEngineConfig(
+      const engineConfig = await createPolicyEngineConfig(
         settings,
         ApprovalMode.DEFAULT,
+        undefined,
+        false,
       );
-      // Enable non-interactive mode
-      const engineConfig = { ...config, nonInteractive: true };
       const engine = new PolicyEngine(engineConfig);
 
       // ASK_USER should become DENY in non-interactive mode

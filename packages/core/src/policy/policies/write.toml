@@ -31,6 +31,7 @@
 toolName = "replace"
 decision = "ask_user"
 priority = 10
+interactive = true
 
 [[rule]]
 toolName = "replace"
@@ -47,21 +48,25 @@ required_context = ["environment"]
 toolName = "save_memory"
 decision = "ask_user"
 priority = 10
+interactive = true
 
 [[rule]]
 toolName = "run_shell_command"
 decision = "ask_user"
 priority = 10
+interactive = true
 
 [[rule]]
 toolName = "write_file"
 decision = "ask_user"
 priority = 10
+interactive = true
 
 [[rule]]
 toolName = "activate_skill"
 decision = "ask_user"
 priority = 10
+interactive = true
 
 [[rule]]
 toolName = "write_file"
@@ -84,3 +89,19 @@ modes = ["autoEdit"]
 toolName = "web_fetch"
 decision = "ask_user"
 priority = 10
+interactive = true
+
+# Headless Denial Rule (Priority 10)
+# Ensures that tools that normally default to ASK_USER are denied in non-interactive mode.
+[[rule]]
+toolName = [
+  "replace",
+  "save_memory",
+  "run_shell_command",
+  "write_file",
+  "activate_skill",
+  "web_fetch"
+]
+decision = "deny"
+priority = 10
+interactive = false

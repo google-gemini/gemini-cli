@@ -143,12 +143,17 @@ vi.mock('@google/gemini-cli-core', async () => {
       respectGeminiIgnore: true,
       customIgnoreFilePaths: [],
     },
-    createPolicyEngineConfig: vi.fn(async () => ({
-      rules: [],
-      checkers: [],
-      defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
-      approvalMode: ServerConfig.ApprovalMode.DEFAULT,
-    })),
+    createPolicyEngineConfig: vi.fn(
+      async (_settings, approvalMode, _workspacePoliciesDir, interactive) => ({
+        rules: [],
+        checkers: [],
+        defaultDecision: interactive
+          ? ServerConfig.PolicyDecision.ASK_USER
+          : ServerConfig.PolicyDecision.DENY,
+        approvalMode: approvalMode ?? ServerConfig.ApprovalMode.DEFAULT,
+        nonInteractive: !interactive,
+      }),
+    ),
     getAdminErrorMessage: vi.fn(
       (_feature) =>
         `YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli`,
@@ -3460,6 +3465,8 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         }),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -3480,6 +3487,8 @@ describe('Policy Engine Integration in loadCliConfig', () => {
           exclude: expect.arrayContaining([ASK_USER_TOOL_NAME]),
         }),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -3503,6 +3512,8 @@ describe('Policy Engine Integration in loadCliConfig', () => {
           path.normalize('/path/to/policy2.toml'),
         ],
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
