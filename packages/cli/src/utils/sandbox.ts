@@ -25,6 +25,8 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  NEVER_ALLOWED_NAME_PATTERNS,
+  NEVER_ALLOWED_VALUE_PATTERNS,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -42,6 +44,32 @@ import {
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+/**
+ * Masks sensitive values in a SANDBOX_ENV key=value pair for safe debug logging.
+ * Checks the key against NEVER_ALLOWED_NAME_PATTERNS and the value against
+ * NEVER_ALLOWED_VALUE_PATTERNS. Returns 'KEY=***' if either matches.
+ */
+export function maskSandboxEnvForLogging(envPair: string): string {
+  const eqIndex = envPair.indexOf('=');
+  if (eqIndex === -1) {
+    return envPair;
+  }
+  const key = envPair.substring(0, eqIndex);
+  const value = envPair.substring(eqIndex + 1);
+
+  for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
+    if (pattern.test(key)) {
+      return `${key}=***`;
+    }
+  }
+  for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
+    if (pattern.test(value)) {
+      return `${key}=***`;
+    }
+  }
+  return envPair;
+}
 
 export async function start_sandbox(
   config: SandboxConfig,
@@ -619,7 +647,7 @@ export async function start_sandbox(
       for (let env of process.env['SANDBOX_ENV'].split(',')) {
         if ((env = env.trim())) {
           if (env.includes('=')) {
-            debugLogger.log(`SANDBOX_ENV: ${env}`);
+            debugLogger.log(`SANDBOX_ENV: ${maskSandboxEnvForLogging(env)}`);
             args.push('--env', env);
           } else {
             throw new FatalSandboxError(
@@ -982,6 +1010,7 @@ async function start_lxc_sandbox(
       for (let env of process.env['SANDBOX_ENV'].split(',')) {
         if ((env = env.trim())) {
           if (env.includes('=')) {
+            debugLogger.log(`SANDBOX_ENV: ${maskSandboxEnvForLogging(env)}`);
             envArgs.push('--env', env);
           } else {
             throw new FatalSandboxError(
