@@ -3249,8 +3249,9 @@ describe('useGeminiStream', () => {
         ),
       );
 
-      // Reset start time after hook render, because renderHook (async)
-      // advances fake timers by 50ms during its internal waitUntilReady() check.
+      // Reset fake timers to startTime because the asynchronous render lifecycle
+      // (via waitUntilReady) advances the mock clock while waiting for initial
+      // components to settle.
       vi.setSystemTime(startTime);
 
       // Submit query
