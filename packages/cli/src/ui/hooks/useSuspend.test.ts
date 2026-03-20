@@ -89,7 +89,7 @@ describe('useSuspend', () => {
     setPlatform(originalPlatform);
   });
 
-  it('cleans terminal state on suspend and restores/repaints on resume in alternate screen mode', () => {
+  it('cleans terminal state on suspend and restores/repaints on resume in alternate screen mode', async () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
@@ -97,7 +97,7 @@ describe('useSuspend', () => {
     const enableSupportedModes =
       terminalCapabilityManager.enableSupportedModes as unknown as Mock;
 
-    const { result, unmount } = renderHook(() =>
+    const { result, unmount } = await renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
@@ -148,13 +148,13 @@ describe('useSuspend', () => {
     unmount();
   });
 
-  it('does not toggle alternate screen or mouse restore when alternate screen mode is disabled', () => {
+  it('does not toggle alternate screen or mouse restore when alternate screen mode is disabled', async () => {
     const handleWarning = vi.fn();
     const setRawMode = vi.fn();
     const refreshStatic = vi.fn();
     const setForceRerenderKey = vi.fn();
 
-    const { result, unmount } = renderHook(() =>
+    const { result, unmount } = await renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,
@@ -181,7 +181,7 @@ describe('useSuspend', () => {
     unmount();
   });
 
-  it('warns and skips suspension on windows', () => {
+  it('warns and skips suspension on windows', async () => {
     setPlatform('win32');
 
     const handleWarning = vi.fn();
@@ -189,7 +189,7 @@ describe('useSuspend', () => {
     const refreshStatic = vi.fn();
     const setForceRerenderKey = vi.fn();
 
-    const { result, unmount } = renderHook(() =>
+    const { result, unmount } = await renderHook(() =>
       useSuspend({
         handleWarning,
         setRawMode,

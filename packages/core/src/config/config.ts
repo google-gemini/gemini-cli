@@ -42,9 +42,11 @@ import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
-  createSandboxManager,
   type SandboxManager,
+  NoopSandboxManager,
 } from '../services/sandboxManager.js';
+import { createSandboxManager } from '../services/sandboxManagerFactory.js';
+import { SandboxedFileSystemService } from '../services/sandboxedFileSystemService.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -328,6 +330,10 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Whether to confirm sensitive actions (e.g., fill_form, evaluate_script). */
+  confirmSensitiveActions?: boolean;
+  /** Whether to block file uploads. */
+  blockFileUploads?: boolean;
 }
 
 /**
@@ -467,7 +473,13 @@ export interface SandboxConfig {
   enabled: boolean;
   allowedPaths?: string[];
   networkAccess?: boolean;
-  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  command?:
+    | 'docker'
+    | 'podman'
+    | 'sandbox-exec'
+    | 'runsc'
+    | 'lxc'
+    | 'windows-native';
   image?: string;
 }
 
@@ -478,7 +490,14 @@ export const ConfigSchema = z.object({
       allowedPaths: z.array(z.string()).default([]),
       networkAccess: z.boolean().default(false),
       command: z
-        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'])
+        .enum([
+          'docker',
+          'podman',
+          'sandbox-exec',
+          'runsc',
+          'lxc',
+          'windows-native',
+        ])
         .optional(),
       image: z.string().optional(),
     })
@@ -511,6 +530,12 @@ export interface PolicyUpdateConfirmationRequest {
   identifier: string;
   policyDir: string;
   newHash: string;
+}
+
+export interface WorktreeSettings {
+  name: string;
+  path: string;
+  baseSha: string;
 }
 
 export interface ConfigParameters {
@@ -636,6 +661,7 @@ export interface ConfigParameters {
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
+  worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
@@ -680,6 +706,7 @@ export class Config implements McpContext, AgentLoopContext {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
@@ -876,7 +903,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
-    this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox
       ? {
           enabled: params.sandbox.enabled ?? false,
@@ -890,12 +916,28 @@ export class Config implements McpContext, AgentLoopContext {
           allowedPaths: [],
           networkAccess: false,
         };
+
+    this._sandboxManager = createSandboxManager(this.sandbox, params.targetDir);
+
+    if (
+      !(this._sandboxManager instanceof NoopSandboxManager) &&
+      this.sandbox.enabled
+    ) {
+      this.fileSystemService = new SandboxedFileSystemService(
+        this._sandboxManager,
+        params.targetDir,
+      );
+    } else {
+      this.fileSystemService = new StandardFileSystemService();
+    }
+
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.worktreeSettings = params.worktreeSettings;
 
     this.coreTools = params.coreTools;
     this.mainAgentTools = params.mainAgentTools;
@@ -994,6 +1036,10 @@ export class Config implements McpContext, AgentLoopContext {
         ...DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
         ...modelConfigServiceConfig.classifierIdResolutions,
       };
+      const mergedModelChains = {
+        ...DEFAULT_MODEL_CONFIGS.modelChains,
+        ...modelConfigServiceConfig.modelChains,
+      };
 
       modelConfigServiceConfig = {
         // Preserve other user settings like customAliases
@@ -1007,6 +1053,7 @@ export class Config implements McpContext, AgentLoopContext {
         modelDefinitions: mergedModelDefinitions,
         modelIdResolutions: mergedModelIdResolutions,
         classifierIdResolutions: mergedClassifierIdResolutions,
+        modelChains: mergedModelChains,
       };
     }
 
@@ -1067,7 +1114,8 @@ export class Config implements McpContext, AgentLoopContext {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
-      sandboxManager: this.sandboxManager,
+      sandboxManager: this._sandboxManager,
+      sandboxConfig: this.sandbox,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -1189,12 +1237,7 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = createSandboxManager(
-      params.toolSandboxing ?? false,
-      this.targetDir,
-    );
     this.a2aClientManager = new A2AClientManager(this);
-    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
   }
 
@@ -1523,6 +1566,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSessionId(): string {
     return this.promptId;
+  }
+
+  getWorktreeSettings(): WorktreeSettings | undefined {
+    return this.worktreeSettings;
   }
 
   getClientName(): string | undefined {
@@ -3092,6 +3139,8 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        confirmSensitiveActions: customConfig.confirmSensitiveActions,
+        blockFileUploads: customConfig.blockFileUploads,
       },
     };
   }
