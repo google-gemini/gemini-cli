@@ -125,6 +125,7 @@ describe('WindowsSandboxManager', () => {
       path.resolve('/test/forbidden1'),
       '/deny',
       '*S-1-16-4096:(OI)(CI)(F)',
+      '/T',
     ]);
   });
 
@@ -155,6 +156,30 @@ describe('WindowsSandboxManager', () => {
       path.resolve(conflictPath),
       '/deny',
       '*S-1-16-4096:(OI)(CI)(F)',
+      '/T',
     ]);
+  });
+
+  it('throws an error if icacls deny fails', async () => {
+    vi.mocked(spawnAsync).mockImplementation((command, args) => {
+      if (command === 'icacls' && args.includes('/deny')) {
+        return Promise.reject(new Error('icacls failed'));
+      }
+      return Promise.resolve({ stdout: '', stderr: '' });
+    });
+
+    const req: SandboxRequest = {
+      command: 'echo',
+      args: ['hello'],
+      cwd: '/test/cwd',
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/forbidden1'],
+      },
+    };
+
+    await expect(manager.prepareCommand(req)).rejects.toThrow(
+      'Failed to deny access to forbidden path',
+    );
   });
 });

@@ -248,18 +248,22 @@ export class WindowsSandboxManager implements SandboxManager {
     // (F)  - Full Access: Deny all permissions (read, write, execute).
     const DENY_ALL_INHERIT = '(OI)(CI)(F)';
 
+    // /T - Traverse: Apply the operation to all existing files and subdirectories.
+    const RECURSIVE = '/T';
+
     try {
       await spawnAsync('icacls', [
         resolvedPath,
         '/deny',
         `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
+        RECURSIVE,
       ]);
       this.deniedCache.add(resolvedPath);
     } catch (e) {
-      debugLogger.log(
-        'WindowsSandboxManager: icacls deny failed for',
-        resolvedPath,
-        e,
+      throw new Error(
+        `Failed to deny access to forbidden path: ${resolvedPath}. ${
+          e instanceof Error ? e.message : String(e)
+        }`,
       );
     }
   }

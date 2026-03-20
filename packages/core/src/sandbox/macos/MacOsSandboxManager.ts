@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -37,7 +37,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    const sandboxArgs = this.buildSeatbeltArgs(this.options, req.policy);
+    const sandboxArgs = await this.buildSeatbeltArgs(this.options, req.policy);
 
     return {
       program: '/usr/bin/sandbox-exec',
@@ -55,22 +55,22 @@ export class MacOsSandboxManager implements SandboxManager {
    * Returns arguments up to the end of sandbox-exec configuration (e.g. ['-p', '<profile>', '-D', ...])
    * Does not include the final '--' separator or the command to run.
    */
-  private buildSeatbeltArgs(
+  private async buildSeatbeltArgs(
     options: GlobalSandboxOptions,
     policy?: ExecutionPolicy,
-  ): string[] {
+  ): Promise<string[]> {
     const profileLines = [BASE_SEATBELT_PROFILE];
     const args: string[] = [];
 
-    const workspacePath = this.tryRealpath(options.workspace);
+    const workspacePath = await this.tryRealpath(options.workspace);
     args.push('-D', `WORKSPACE=${workspacePath}`);
 
-    const tmpPath = this.tryRealpath(os.tmpdir());
+    const tmpPath = await this.tryRealpath(os.tmpdir());
     args.push('-D', `TMPDIR=${tmpPath}`);
 
     const allowedPaths = sanitizePaths(policy?.allowedPaths) || [];
     for (let i = 0; i < allowedPaths.length; i++) {
-      const allowedPath = this.tryRealpath(allowedPaths[i]);
+      const allowedPath = await this.tryRealpath(allowedPaths[i]);
       args.push('-D', `ALLOWED_PATH_${i}=${allowedPath}`);
       profileLines.push(
         `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))`,
@@ -79,7 +79,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const forbiddenPaths = sanitizePaths(policy?.forbiddenPaths) || [];
     for (let i = 0; i < forbiddenPaths.length; i++) {
-      const forbiddenPath = this.tryRealpath(forbiddenPaths[i]);
+      const forbiddenPath = await this.tryRealpath(forbiddenPaths[i]);
       args.push('-D', `FORBIDDEN_PATH_${i}=${forbiddenPath}`);
       profileLines.push(
         `(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_${i}")))`,
@@ -100,16 +100,16 @@ export class MacOsSandboxManager implements SandboxManager {
    * If a file does not exist (ENOENT), it recursively resolves the parent directory.
    * Other errors (e.g. EACCES) are re-thrown.
    */
-  private tryRealpath(p: string): string {
+  private async tryRealpath(p: string): Promise<string> {
     try {
-      return fs.realpathSync(p);
+      return await fs.realpath(p);
     } catch (e) {
       if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
         const parentDir = path.dirname(p);
         if (parentDir === p) {
           return p;
         }
-        return path.join(this.tryRealpath(parentDir), path.basename(p));
+        return path.join(await this.tryRealpath(parentDir), path.basename(p));
       }
       throw e;
     }

@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
+import { type Stats } from 'node:fs';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 
@@ -108,10 +109,12 @@ describe('LinuxSandboxManager', () => {
   });
 
   it('maps forbidden directory paths to bwrap tmpfs', async () => {
-    vi.spyOn(fs, 'statSync').mockImplementation((p) => {
+    vi.spyOn(fs, 'stat').mockImplementation((p) => {
       if (p === '/test/forbidden_dir')
-        return { isDirectory: () => true } as fs.Stats;
-      throw new Error('ENOENT');
+        return Promise.resolve({ isDirectory: () => true } as Stats);
+      const error = new Error('ENOENT');
+      Object.assign(error, { code: 'ENOENT' });
+      return Promise.reject(error);
     });
 
     const bwrapArgs = await getBwrapArgs({
@@ -133,10 +136,12 @@ describe('LinuxSandboxManager', () => {
   });
 
   it('maps forbidden file paths to bwrap ro-bind-try with /dev/null', async () => {
-    vi.spyOn(fs, 'statSync').mockImplementation((p) => {
+    vi.spyOn(fs, 'stat').mockImplementation((p) => {
       if (p === '/test/forbidden_file')
-        return { isDirectory: () => false } as fs.Stats;
-      throw new Error('ENOENT');
+        return Promise.resolve({ isDirectory: () => false } as Stats);
+      const error = new Error('ENOENT');
+      Object.assign(error, { code: 'ENOENT' });
+      return Promise.reject(error);
     });
 
     const bwrapArgs = await getBwrapArgs({
@@ -161,9 +166,11 @@ describe('LinuxSandboxManager', () => {
     );
   });
 
-  it('ignores forbiddenPaths when statSync throws an error', async () => {
-    vi.spyOn(fs, 'statSync').mockImplementation(() => {
-      throw new Error('ENOENT');
+  it('ignores forbiddenPaths when stat throws an error', async () => {
+    vi.spyOn(fs, 'stat').mockImplementation(() => {
+      const error = new Error('ENOENT');
+      Object.assign(error, { code: 'ENOENT' });
+      return Promise.reject(error);
     });
 
     const bwrapArgs = await getBwrapArgs({
@@ -182,9 +189,31 @@ describe('LinuxSandboxManager', () => {
     expect(binds).not.toContain('/test/missing');
   });
 
+  it('throws an error if stat fails with a non-ENOENT error', async () => {
+    vi.spyOn(fs, 'stat').mockImplementation(() => {
+      const error = new Error('Permission denied');
+      Object.assign(error, { code: 'EACCES' });
+      return Promise.reject(error);
+    });
+
+    const req: SandboxRequest = {
+      command: 'node',
+      args: ['script.js'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/forbidden1'],
+      },
+    };
+
+    await expect(manager.prepareCommand(req)).rejects.toThrow(
+      'Failed to deny access to forbidden path',
+    );
+  });
+
   it('prioritizes forbiddenPaths over allowedPaths by mounting them later in the bwrap arguments', async () => {
-    vi.spyOn(fs, 'statSync').mockImplementation(
-      () => ({ isDirectory: () => true }) as fs.Stats,
+    vi.spyOn(fs, 'stat').mockImplementation(() =>
+      Promise.resolve({ isDirectory: () => true } as Stats),
     );
 
     const conflictPath = '/test/conflict_path';

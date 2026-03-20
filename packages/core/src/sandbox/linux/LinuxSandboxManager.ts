@@ -5,7 +5,8 @@
  */
 
 import { join, normalize } from 'node:path';
-import fs, { writeFileSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import os from 'node:os';
 import {
   type SandboxManager,
@@ -18,6 +19,7 @@ import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import { isNodeError } from '../../utils/errors.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -124,14 +126,21 @@ export class LinuxSandboxManager implements SandboxManager {
     const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
       try {
-        const stats = fs.statSync(forbiddenPath);
+        const stats = await fs.stat(forbiddenPath);
         if (stats.isDirectory()) {
           bwrapArgs.push('--tmpfs', forbiddenPath);
         } else {
           bwrapArgs.push('--ro-bind-try', '/dev/null', forbiddenPath);
         }
-      } catch (_) {
-        // Path might not exist or be inaccessible, ignore it.
+      } catch (e) {
+        if (isNodeError(e) && e.code === 'ENOENT') {
+          continue;
+        }
+        throw new Error(
+          `Failed to deny access to forbidden path: ${forbiddenPath}. ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
       }
     }
 

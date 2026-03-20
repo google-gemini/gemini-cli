@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
 import type { ExecutionPolicy } from '../../services/sandboxManager.js';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 
 describe('MacOsSandboxManager', () => {
@@ -23,8 +23,10 @@ describe('MacOsSandboxManager', () => {
 
   beforeEach(() => {
     manager = new MacOsSandboxManager({ workspace: mockWorkspace });
-    // Mock realpathSync to just return the path for testing
-    vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
+    // Mock realpath to just return the path for testing
+    vi.spyOn(fs, 'realpath').mockImplementation((p) =>
+      Promise.resolve(p as string),
+    );
   });
 
   afterEach(() => {
@@ -68,9 +70,9 @@ describe('MacOsSandboxManager', () => {
     });
 
     it('should parameterize allowed paths and normalize them', async () => {
-      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
-        if (p === '/test/symlink') return '/test/real_path';
-        return p as string;
+      vi.spyOn(fs, 'realpath').mockImplementation((p) => {
+        if (p === '/test/symlink') return Promise.resolve('/test/real_path');
+        return Promise.resolve(p as string);
       });
 
       const result = await manager.prepareCommand({
@@ -93,9 +95,9 @@ describe('MacOsSandboxManager', () => {
     });
 
     it('should generate deny rules for forbiddenPaths', async () => {
-      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
-        if (p === '/test/symlink') return '/test/real_path';
-        return p as string;
+      vi.spyOn(fs, 'realpath').mockImplementation((p) => {
+        if (p === '/test/symlink') return Promise.resolve('/test/real_path');
+        return Promise.resolve(p as string);
       });
 
       const result = await manager.prepareCommand({
@@ -188,16 +190,16 @@ describe('MacOsSandboxManager', () => {
     });
 
     it('should resolve parent directories if a file does not exist', async () => {
-      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+      vi.spyOn(fs, 'realpath').mockImplementation((p) => {
         if (p === '/test/symlink/nonexistent.txt') {
           const error = new Error('ENOENT');
           Object.assign(error, { code: 'ENOENT' });
-          throw error;
+          return Promise.reject(error);
         }
         if (p === '/test/symlink') {
-          return '/test/real_path';
+          return Promise.resolve('/test/real_path');
         }
-        return p as string;
+        return Promise.resolve(p as string);
       });
 
       const dynamicManager = new MacOsSandboxManager({
@@ -215,11 +217,11 @@ describe('MacOsSandboxManager', () => {
       );
     });
 
-    it('should throw if realpathSync throws a non-ENOENT error', async () => {
-      vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+    it('should throw if realpath throws a non-ENOENT error', async () => {
+      vi.spyOn(fs, 'realpath').mockImplementation(() => {
         const error = new Error('Permission denied');
         Object.assign(error, { code: 'EACCES' });
-        throw error;
+        return Promise.reject(error);
       });
 
       const errorManager = new MacOsSandboxManager({
@@ -231,6 +233,9 @@ describe('MacOsSandboxManager', () => {
           args: ['hello'],
           cwd: mockWorkspace,
           env: {},
+          policy: {
+            forbiddenPaths: ['/some/path'],
+          },
         }),
       ).rejects.toThrow('Permission denied');
     });
