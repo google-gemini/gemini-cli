@@ -71,13 +71,18 @@ describe('ToolActionsContext', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to a pending promise to avoid unwanted async state updates in tests
+    // that don't specifically test the IdeClient initialization.
+    vi.mocked(IdeClient.getInstance).mockReturnValue(new Promise(() => {}));
   });
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <ToolActionsProvider config={mockConfig} toolCalls={mockToolCalls}>
-      {children}
-    </ToolActionsProvider>
-  );
+  const wrapper = ({ children }: { children: React.ReactNode }) => {
+    return (
+      <ToolActionsProvider config={mockConfig} toolCalls={mockToolCalls}>
+        {children}
+      </ToolActionsProvider>
+    );
+  };
 
   it('publishes to MessageBus for tools with correlationId', async () => {
     const { result } = await renderHook(() => useToolActions(), { wrapper });

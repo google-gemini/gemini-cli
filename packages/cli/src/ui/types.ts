@@ -93,15 +93,18 @@ export function mapCoreStatusToDisplayStatus(
   }
 }
 
+
 /**
  * --- TYPE GUARDS ---
  */
+
 
 export const isTodoList = (res: unknown): res is { todos: unknown[] } =>
   typeof res === 'object' && res !== null && 'todos' in res;
 
 export const isAnsiOutput = (res: unknown): res is AnsiOutput =>
   Array.isArray(res) && (res.length === 0 || Array.isArray(res[0]));
+
 
 export interface ToolCallEvent {
   type: 'tool_call';

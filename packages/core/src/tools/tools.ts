@@ -920,7 +920,6 @@ export const isListResult = (
   res: unknown,
 ): res is ListDirectoryResult | ReadManyFilesResult =>
   isStructuredToolResult(res) && 'files' in res && Array.isArray(res.files);
-
 export type ToolResultDisplay =
   | string
   | FileDiff
