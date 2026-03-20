@@ -262,8 +262,8 @@ Here is a breakdown of the fields available in a TOML policy rule:
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
 
-# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
-# made by this specific subagent.
+# (Optional) The name of a subagent. If provided, the rule only applies to tool
+# calls made by this specific subagent.
 subagent = "generalist"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
@@ -278,14 +278,17 @@ toolAnnotations = { readOnlyHint = true }
 argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
-# This is syntactic sugar for `toolName = "run_shell_command"` and an `argsPattern`.
+# This is syntactic sugar for `toolName = "run_shell_command"` and an
+# `argsPattern`.
 commandPrefix = "git"
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
-# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`).
-# Because it prepends `"command":"`, it effectively matches from the start of the command.
-# Anchors like `^` or `$` apply to the full JSON string, so `^` should usually be avoided here.
+# Note: This pattern is tested against the JSON representation of the arguments
+# (e.g., `{"command":"<your_command>"}`). Because it prepends `"command":"`,
+# it effectively matches from the start of the command.
+# Anchors like `^` or `$` apply to the full JSON string,
+# so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
 commandRegex = "git (commit|push)"
 
@@ -295,14 +298,16 @@ decision = "ask_user"
 # The priority of the rule, from 0 to 999.
 priority = 10
 
-# (Optional) A custom message to display when a tool call is denied by this rule.
-# This message is returned to the model and user, useful for explaining *why* it was denied.
+# (Optional) A custom message to display when a tool call is denied by this
+# rule. This message is returned to the model and user,
+# useful for explaining *why* it was denied.
 deny_message = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
 
-# (Optional) A boolean to restrict the rule to interactive (true) or non-interactive (false) environments.
+# (Optional) A boolean to restrict the rule to interactive (true) or
+# non-interactive (false) environments.
 # If omitted, the rule applies to both.
 interactive = true
 ```
