@@ -929,7 +929,7 @@ describe('Plan Mode Denial Consistency', () => {
           ApprovalMode.AUTO_EDIT,
           ApprovalMode.YOLO,
         ],
-        description: 'restrict modes when granted in DEFAULT mode',
+        description: 'exclude Plan Mode when granted in DEFAULT mode',
       },
       {
         currentMode: ApprovalMode.AUTO_EDIT,
@@ -938,7 +938,7 @@ describe('Plan Mode Denial Consistency', () => {
           ApprovalMode.AUTO_EDIT,
           ApprovalMode.YOLO,
         ],
-        description: 'restrict modes when granted in AUTO_EDIT mode',
+        description: 'exclude Plan Mode when granted in AUTO_EDIT mode',
       },
       {
         currentMode: ApprovalMode.YOLO,
@@ -947,12 +947,13 @@ describe('Plan Mode Denial Consistency', () => {
           ApprovalMode.AUTO_EDIT,
           ApprovalMode.YOLO,
         ],
-        description: 'restrict modes when granted in YOLO mode',
+        description: 'exclude Plan Mode when granted in YOLO mode',
       },
       {
         currentMode: ApprovalMode.PLAN,
         expectedModes: undefined,
-        description: 'NOT restrict modes when granted in PLAN mode',
+        description:
+          'include all modes (global trust) when granted in PLAN mode',
       },
     ];
 
