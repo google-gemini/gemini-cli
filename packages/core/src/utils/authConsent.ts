@@ -5,8 +5,7 @@
  */
 
 import readline from 'node:readline';
-import { CoreEvent, coreEvents } from './events.js';
-import { FatalAuthenticationError } from './errors.js';
+import { coreEvents } from './events.js';
 import { createWorkingStdio, writeToStdout } from './stdio.js';
 import { isHeadlessMode } from './headless.js';
 
@@ -21,14 +20,8 @@ export async function getConsentForOauth(prompt: string): Promise<boolean> {
 
   if (isHeadlessMode()) {
     return getOauthConsentNonInteractive(finalPrompt);
-  } else if (coreEvents.listenerCount(CoreEvent.ConsentRequest) > 0) {
-    return getOauthConsentInteractive(finalPrompt);
   }
-  throw new FatalAuthenticationError(
-    'Authentication consent could not be obtained.\n' +
-      'Please run Gemini CLI in an interactive terminal to authenticate, ' +
-      'or use NO_BROWSER=true for manual authentication.',
-  );
+  return getOauthConsentInteractive(finalPrompt);
 }
 
 async function getOauthConsentNonInteractive(prompt: string) {
