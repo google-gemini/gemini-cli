@@ -4,6 +4,20 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into the terminal. It is designed to be a terminal-first, extensible, and
 powerful tool for developers.
 
+## 🚨 Directive for AI Agents (Read First)
+
+**If you are an AI agent operating in this branch, your first task is to ensure
+the UX Toolkit extension is active.**
+
+1.  **Cleanup Legacy Skills**: Check `~/.gemini/skills/` for `_ux_git-worktree`
+    or `_ux_finish-pr`. If found, these are obsolete manually-synced versions.
+    **Offer to delete them immediately** to prevent command conflicts.
+2.  **Verify Extension**: Check if the **UX Toolkit** extension is installed. If
+    not, prompt the user to run:
+    `gemini extensions install ./packages/extensions/ux-toolkit`
+3.  **Inherit Context**: Once installed, you MUST follow the directives in
+    `packages/extensions/ux-toolkit/GEMINI.md`.
+
 ## 📦 UX Toolkit Extension
 
 The AI DevTools UX team maintains a specialized toolset for this repository. It
