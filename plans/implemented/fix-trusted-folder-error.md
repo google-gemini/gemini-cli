@@ -1,67 +1,84 @@
 # Implementation Plan - Fix Context Initialization Mismatch in Core Tools
 
-The Gemini CLI is experiencing various "Cannot read properties of undefined" errors (notably `isTrustedFolder` and `publish`) during tool execution and confirmation. This is caused by a structural mismatch where the global `Config` object is passed to tool constructors that now expect an `AgentLoopContext`.
+The Gemini CLI is experiencing various "Cannot read properties of undefined"
+errors (notably `isTrustedFolder` and `publish`) during tool execution and
+confirmation. This is caused by a structural mismatch where the global `Config`
+object is passed to tool constructors that now expect an `AgentLoopContext`.
 
 ## Background & Reproducibility Analysis
 
 ### Root Cause Analysis (Regression)
-The regression was introduced in commit **`de656f01d7`** (PR **#22115**), titled *"feat(core): Fully migrate packages/core to AgentLoopContext"*. 
+
+The regression was introduced in commit **`de656f01d7`** (PR **#22115**), titled
+_"feat(core): Fully migrate packages/core to AgentLoopContext"_.
 
 In this PR:
-- Tool constructors (e.g., `ShellTool`, `WebFetchTool`, `WebSearchTool`) were updated to expect an `AgentLoopContext` instead of a `Config` object.
-- `AgentLoopContext` is an interface that includes a `.config` property.
-- However, in `packages/core/src/config/config.ts`, the global `Config` object still instantiates these tools by passing `this` (the `Config` instance itself).
-- While `Config` implements some getters that overlap with `AgentLoopContext` (like `geminiClient`), it does **not** have a `.config` property. 
-- Consequently, internal tool calls to `this.context.config.someMethod()` fail because `this.context.config` is undefined.
-- Additionally, some parts of the system expect a fully initialized `messageBus` on the context, which can lead to "Cannot read properties of undefined (reading 'publish')" if the context isn't correctly structured or if there's a race in initialization.
 
-### Why this might not be reproducible for all users:
-- **Sub-agent Usage:** Sub-agents correctly initialize tools with a full `AgentLoopContext` via `LocalAgentExecutor`.
-- **Tool Selection:** The bug only surfaces in tools that specifically access `context.config` or certain context-scoped services.
-- **Initialization Order:** Depending on how the CLI is invoked (interactive vs. non-interactive), the `Config` object might be in different states of initialization.
+- Tool constructors (e.g., `ShellTool`, `WebFetchTool`, `WebSearchTool`) were
+  updated to expect an `AgentLoopContext` instead of a `Config` object.
+- `AgentLoopContext` is an interface that includes a `.config` property.
+- However, in `packages/core/src/config/config.ts`, the global `Config` object
+  still instantiates these tools by passing `this` (the `Config` instance
+  itself).
+- **Critical Discovery:** While `Config` implements the properties of
+  `AgentLoopContext`, it previously did so using **getters**. We discovered that
+  in various parts of the system (like `LocalAgentExecutor`, `Scheduler`, and
+  telemetry loggers), the context is cloned using the **spread operator** (e.g.,
+  `{...context}`). Because getters exist on the prototype and are not enumerable
+  own properties, they are **lost** during spreading.
+- Consequently, internal tool calls to `this.context.config.someMethod()` fail
+  because `this.context.config` becomes `undefined` after a spread operation.
 
 ## Objective
-Standardize tool initialization so that built-in tools can correctly resolve their required configuration and services whether they are running in the main loop (initialized with `Config`) or as a sub-agent (initialized with `AgentLoopContext`).
+
+Standardize tool initialization and ensure the `Config` class is "spread-safe"
+so that it correctly satisfies the `AgentLoopContext` interface even after being
+cloned via object spread.
 
 ## Key Files & Context
-- `packages/core/src/config/config.ts`: Where built-in tools are incorrectly instantiated with `this`.
-- `packages/core/src/tools/shell.ts`: `ShellTool` constructor expects `AgentLoopContext`.
-- `packages/core/src/tools/web-fetch.ts`: `WebFetchTool` constructor expects `AgentLoopContext`.
-- `packages/core/src/tools/web-search.ts`: `WebSearchTool` constructor expects `AgentLoopContext`.
-- `packages/core/src/scheduler/policy.ts`: Accesses `context.config.isTrustedFolder()`.
-- `packages/core/src/scheduler/scheduler.ts`: Initializes its own `messageBus` and `context`.
+
+- `packages/core/src/config/config.ts`: Refactored to use properties instead of
+  getters for `AgentLoopContext` compatibility.
+- `packages/core/src/scheduler/policy.ts`: Updated to handle potential context
+  mismatches.
+- `packages/core/src/tools/shell.ts`, `web-fetch.ts`, `web-search.ts`:
+  Refactored constructors to take direct dependencies and handle context safely.
 
 ## Implementation Steps
 
-### Phase 0: Preparation
-1. **Update Plan:** (This file) Broaden the scope from just "isTrusted" to "Context Mismatch".
-2. **GitHub Issue:** Update GitHub issue #23174 with the refined root cause analysis.
+### Phase 1: Centralized "Spread-Safe" Config
 
-### Phase 1: Robust Tool Context Handling
-The built-in tools need to handle being initialized by either the global `Config` or an `AgentLoopContext`.
+Instead of applying surgical fixes to every tool, we refactored the `Config`
+class to ensure its `AgentLoopContext` implementation survives cloning.
 
-- **Update `packages/core/src/tools/shell.ts`**, **`web-fetch.ts`**, and **`web-search.ts`**:
-    - Update constructors to accept `Config | AgentLoopContext`.
-    - Internalize logic to safely resolve `config`, `geminiClient`, and other services.
-    - Example:
-      ```typescript
-      this.config = 'config' in context ? context.config : context;
-      ```
+- **Update `packages/core/src/config/config.ts`**:
+  - Converted `config`, `promptId`, `toolRegistry`, `messageBus`,
+    `geminiClient`, and `sandboxManager` from getters to actual properties.
+  - Ensured these are initialized in the constructor or `initialize()` method.
 
-### Phase 2: UI and Policy Hardening
-- **Update `packages/cli/src/ui/components/messages/ToolConfirmationMessage.tsx`**: Add safety checks for `config`.
-- **Update `packages/core/src/scheduler/policy.ts`**: Ensure `context.config` exists before use.
+### Phase 2: Tool and UI Resilience
 
-### Phase 3: Scheduler Verification
-- Ensure `Scheduler` and `SchedulerStateManager` are receiving a correctly structured `messageBus`.
+- **Update Built-in Tools**: Refactored `ShellTool`, `WebFetchTool`, and
+  `WebSearchTool` to be more robust during initialization.
+- **Update UI**: Added safety checks in `ToolConfirmationMessage.tsx` to handle
+  cases where the `config` object might still be partially initialized.
+
+### Phase 3: Policy Hardening
+
+- **Update `packages/core/src/scheduler/policy.ts`**: Added optional chaining
+  and guards when accessing `context.config` to prevent crashes during policy
+  updates.
 
 ## Verification & Testing
 
 ### Automated Tests
-- Create unit tests that specifically instantiate tools with a raw `Config` object and call methods that access `this.config`.
+
+- Create unit tests that specifically instantiate tools with a raw `Config`
+  object and call methods that access `this.config`.
 - Verify `npm run test:core` passes.
 
 ### Manual Verification
+
 1. Trigger shell commands in the interactive CLI.
 2. Attempt "Allow all" actions.
 3. Verify no "undefined" crashes occur.
