@@ -43,10 +43,11 @@ const CWD = '/test/project';
 const GIT_LOGS_HEAD_PATH = path.join(CWD, '.git', 'logs', 'HEAD');
 
 describe('useGitBranchName', () => {
-  let deferredSpawn: {
+  let deferredSpawn: Array<{
     resolve: (val: { stdout: string; stderr: string }) => void;
     reject: (err: Error) => void;
-  } | null = null;
+    args: string[];
+  }> = [];
 
   beforeEach(() => {
     vol.reset(); // Reset in-memory filesystem
@@ -54,11 +55,11 @@ describe('useGitBranchName', () => {
       [GIT_LOGS_HEAD_PATH]: 'ref: refs/heads/main',
     });
 
-    deferredSpawn = null;
+    deferredSpawn = [];
     vi.mocked(mockSpawnAsync).mockImplementation(
-      () =>
+      (_command: string, args: string[]) =>
         new Promise((resolve, reject) => {
-          deferredSpawn = { resolve, reject };
+          deferredSpawn.push({ resolve, reject, args });
         }),
     );
   });
@@ -91,7 +92,9 @@ describe('useGitBranchName', () => {
     expect(result.current).toBeUndefined();
 
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'main\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'main\n', stderr: '' });
     });
 
     expect(result.current).toBe('main');
@@ -101,7 +104,9 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      deferredSpawn?.reject(new Error('Git error'));
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.reject(new Error('Git error'));
     });
 
     expect(result.current).toBeUndefined();
@@ -111,12 +116,16 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'HEAD\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'HEAD\n', stderr: '' });
     });
 
     // It should now call spawnAsync again for the short hash
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'a1b2c3d\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--short');
+      spawn.resolve({ stdout: 'a1b2c3d\n', stderr: '' });
     });
 
     expect(result.current).toBe('a1b2c3d');
@@ -126,11 +135,15 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'HEAD\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'HEAD\n', stderr: '' });
     });
 
     await act(async () => {
-      deferredSpawn?.reject(new Error('Git error'));
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--short');
+      spawn.reject(new Error('Git error'));
     });
 
     expect(result.current).toBeUndefined();
@@ -143,7 +156,9 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'main\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'main\n', stderr: '' });
     });
 
     expect(result.current).toBe('main');
@@ -160,7 +175,9 @@ describe('useGitBranchName', () => {
 
     // Resolving the new branch name fetch
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'develop\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'develop\n', stderr: '' });
     });
 
     expect(result.current).toBe('develop');
@@ -173,7 +190,9 @@ describe('useGitBranchName', () => {
     const { result } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'main\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'main\n', stderr: '' });
     });
 
     expect(result.current).toBe('main');
@@ -188,8 +207,8 @@ describe('useGitBranchName', () => {
       fs.writeFileSync(GIT_LOGS_HEAD_PATH, 'ref: refs/heads/develop');
     });
 
-    // spawnAsync should NOT have been called again
-    expect(vi.mocked(mockSpawnAsync)).toHaveBeenCalledTimes(1);
+    // spawnAsync should NOT have been called again for updating
+    expect(deferredSpawn.length).toBe(0);
     expect(result.current).toBe('main');
   });
 
@@ -203,7 +222,9 @@ describe('useGitBranchName', () => {
     const { unmount } = await renderGitBranchNameHook(CWD);
 
     await act(async () => {
-      deferredSpawn?.resolve({ stdout: 'main\n', stderr: '' });
+      const spawn = deferredSpawn.shift()!;
+      expect(spawn.args).toContain('--abbrev-ref');
+      spawn.resolve({ stdout: 'main\n', stderr: '' });
     });
 
     // Wait for watcher to be set up BEFORE unmounting
