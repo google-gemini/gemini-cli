@@ -157,8 +157,12 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
 
   // If error is a string, try to parse it.
   if (typeof errorObj === 'string') {
+    // Try to decode byte-coded strings (e.g. from Uint8Array.toString())
+    // before attempting JSON parse.
+    errorObj = tryDecodeByteCodedMessage(errorObj);
+
     try {
-      errorObj = JSON.parse(sanitizeJsonString(errorObj));
+      errorObj = JSON.parse(sanitizeJsonString(errorObj as string));
     } catch (_) {
       // Not a JSON string, can't parse.
       return null;
@@ -281,6 +285,10 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
     let data = gaxiosError.response.data;
 
     if (typeof data === 'string') {
+      // Try to decode byte-coded strings (e.g. from Uint8Array.toString())
+      // before attempting JSON parse.
+      data = tryDecodeByteCodedMessage(data);
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(sanitizeJsonString(data));
@@ -331,6 +339,10 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     let data = apiError.message;
 
     if (typeof data === 'string') {
+      // Try to decode byte-coded strings (e.g. from Uint8Array.toString())
+      // before attempting JSON parse.
+      data = tryDecodeByteCodedMessage(data);
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(sanitizeJsonString(data));
@@ -370,4 +382,65 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     }
   }
   return outerError;
+}
+
+/**
+ * Detects if a string looks like comma-separated byte values (e.g. from a
+ * Uint8Array.toString()) and decodes it to readable UTF-8 text. This handles
+ * API error responses where the body is returned as raw byte codes instead of
+ * decoded text.
+ *
+ * The message may have a prefix (e.g., "got status: 429 Too Many Requests. ")
+ * followed by the byte-coded body.
+ */
+function tryDecodeByteCodedMessage(value: string): string {
+  if (!value || !value.includes(',')) {
+    return value;
+  }
+
+  const decoded = tryDecodeByteString(value);
+  if (decoded !== null) {
+    return decoded;
+  }
+
+  // Try splitting on ". " to find a prefix + byte-coded body
+  const dotIndex = value.lastIndexOf('. ');
+  if (dotIndex !== -1) {
+    const prefix = value.substring(0, dotIndex + 2);
+    const rest = value.substring(dotIndex + 2);
+    const decodedRest = tryDecodeByteString(rest);
+    if (decodedRest !== null) {
+      return prefix + decodedRest;
+    }
+  }
+
+  return value;
+}
+
+/**
+ * Attempts to decode a string of comma-separated byte values into UTF-8 text.
+ * Returns the decoded string, or null if the input doesn't look like byte codes.
+ */
+function tryDecodeByteString(value: string): string | null {
+  const parts = value.split(',');
+  if (parts.length < 4) {
+    return null;
+  }
+  const bytes: number[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!/^\d{1,3}$/.test(trimmed)) {
+      return null;
+    }
+    const num = Number(trimmed);
+    if (num > 255 || (trimmed.length > 1 && trimmed.startsWith('0'))) {
+      return null;
+    }
+    bytes.push(num);
+  }
+  try {
+    return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+  } catch {
+    return null;
+  }
 }

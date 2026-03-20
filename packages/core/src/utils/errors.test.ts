@@ -15,6 +15,7 @@ import {
   AccountSuspendedError,
   getErrorMessage,
   getErrorType,
+  decodeByteCodedString,
   FatalAuthenticationError,
   FatalCancellationError,
   FatalInputError,
@@ -46,6 +47,75 @@ describe('getErrorMessage', () => {
       },
     };
     expect(getErrorMessage(error)).toBe('Bad Request Message');
+  });
+
+  it('should decode byte-coded error messages from ApiError', () => {
+    // Simulates the issue where Uint8Array.toString() produces comma-separated bytes
+    const jsonError = JSON.stringify({
+      error: {
+        code: 429,
+        message:
+          'No capacity available for model gemini-3-flash-preview on the server',
+        status: 'RESOURCE_EXHAUSTED',
+      },
+    });
+    const byteValues = Array.from(new TextEncoder().encode(jsonError)).join(
+      ',',
+    );
+
+    const error = new Error(byteValues);
+    const message = getErrorMessage(error);
+    expect(message).toContain('No capacity available');
+    expect(message).not.toContain('91,123');
+  });
+
+  it('should decode byte-coded messages with a prefix', () => {
+    const jsonBody = '{"error":"Resource exhausted"}';
+    const byteValues = Array.from(new TextEncoder().encode(jsonBody)).join(',');
+    const error = new Error(`got status: 429 Too Many Requests. ${byteValues}`);
+    const message = getErrorMessage(error);
+    expect(message).toContain('got status: 429 Too Many Requests.');
+    expect(message).toContain('Resource exhausted');
+    expect(message).not.toContain('123,34');
+  });
+
+  it('should not modify normal error messages', () => {
+    const error = new Error('Regular error message with no byte codes');
+    expect(getErrorMessage(error)).toBe(
+      'Regular error message with no byte codes',
+    );
+  });
+});
+
+describe('decodeByteCodedString', () => {
+  it('should decode pure byte-coded strings', () => {
+    const text = 'Hello, World!';
+    const byteCoded = Array.from(new TextEncoder().encode(text)).join(',');
+    expect(decodeByteCodedString(byteCoded)).toBe(text);
+  });
+
+  it('should return non-byte strings unchanged', () => {
+    expect(decodeByteCodedString('Normal error message')).toBe(
+      'Normal error message',
+    );
+  });
+
+  it('should handle empty strings', () => {
+    expect(decodeByteCodedString('')).toBe('');
+  });
+
+  it('should return strings with normal commas unchanged', () => {
+    expect(decodeByteCodedString('Error: foo, bar, baz')).toBe(
+      'Error: foo, bar, baz',
+    );
+  });
+
+  it('should handle prefix followed by byte-coded body', () => {
+    const body = '{"error":"test"}';
+    const byteCoded = Array.from(new TextEncoder().encode(body)).join(',');
+    const input = `got status: 429. ${byteCoded}`;
+    const result = decodeByteCodedString(input);
+    expect(result).toBe(`got status: 429. ${body}`);
   });
 });
 
