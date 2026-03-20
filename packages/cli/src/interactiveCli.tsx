@@ -10,6 +10,7 @@ import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import { cleanupTerminalOnExit } from './ui/utils/terminalCapabilityManager.js';
 import {
   type StartupWarning,
   type Config,
@@ -173,6 +174,7 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 
   registerCleanup(setupTtyCheck());
+  registerCleanup(cleanupTerminalOnExit);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
