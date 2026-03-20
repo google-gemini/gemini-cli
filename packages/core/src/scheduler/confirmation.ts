@@ -33,6 +33,7 @@ import {
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { isCancellationError } from '../utils/errors.js';
 
 export interface ConfirmationResult {
   outcome: ToolConfirmationOutcome;
@@ -89,8 +90,7 @@ async function awaitConfirmation(
       }
     }
   } catch (error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if (signal.aborted || (error as Error).name === 'AbortError') {
+    if (signal.aborted || isCancellationError(error)) {
       throw new Error('Operation cancelled');
     }
     throw error;
