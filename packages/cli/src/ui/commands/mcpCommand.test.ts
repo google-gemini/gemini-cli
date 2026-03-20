@@ -17,7 +17,7 @@ import {
 } from '@google/gemini-cli-core';
 
 import type { CallableTool } from '@google/genai';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemMcpStatus } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -297,8 +297,8 @@ describe('mcpCommand', () => {
       );
 
       // Should NOT contain server2 or server3
-      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0][0];
-       
+      const call = vi.mocked(mockContext.ui.addItem).mock
+        .calls[0][0] as HistoryItemMcpStatus;
       expect(Object.keys(call.servers)).toEqual(['server1']);
     });
 
@@ -318,8 +318,8 @@ describe('mcpCommand', () => {
         }),
       );
 
-      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0][0];
-       
+      const call = vi.mocked(mockContext.ui.addItem).mock
+        .calls[0][0] as HistoryItemMcpStatus;
       expect(Object.keys(call.servers)).toEqual(['server2']);
     });
   });
