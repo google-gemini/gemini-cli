@@ -292,9 +292,15 @@ export async function createProxyAwareFetch(ideServerHost: string) {
   undiciPromise.catch(() => {});
   return async (url: string | URL, init?: RequestInit): Promise<Response> => {
     const undiciExports = await undiciPromise;
-    const fetchFn =
-      undiciExports.fetch ??
-      (undiciExports as { default?: { fetch?: typeof undiciExports.fetch } }).default?.fetch;
+    const fetchFn = (() => {
+      const fn =
+        undiciExports.fetch ??
+        (undiciExports as { default?: { fetch?: typeof undiciExports.fetch } }).default?.fetch;
+      if (typeof fn !== 'function') {
+        throw new Error('Failed to import `fetch` from `undici`.');
+      }
+      return fn;
+    })();
     const fetchOptions: RequestInit & { dispatcher?: unknown } = {
       ...init,
       dispatcher: agent,
