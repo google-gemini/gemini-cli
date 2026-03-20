@@ -248,6 +248,9 @@ export class DiffManager {
           tab.input.modified.toString() === rightDocUri.toString()
         ) {
           await vscode.window.tabGroups.close(tab);
+          await vscode.commands.executeCommand(
+            'workbench.action.terminal.focus',
+          );
           return;
         }
       }
