@@ -96,10 +96,6 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
-  /** State for action rate limiting */
-  private actionCounter = 0;
-  private readonly maxActionsPerTask: number;
-
   /**
    * Whether to inject the automation overlay.
    * Always false in headless mode (no visible window to decorate).
@@ -111,8 +107,6 @@ export class BrowserManager {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
-    this.maxActionsPerTask =
-      browserConfig?.customConfig?.maxActionsPerTask ?? 100;
   }
 
   /**
@@ -155,15 +149,6 @@ export class BrowserManager {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
-
-    // Hard enforcement of per-action rate limit
-    if (this.actionCounter >= this.maxActionsPerTask) {
-      throw new Error(
-        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
-          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
-      );
-    }
-    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
