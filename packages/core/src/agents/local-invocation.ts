@@ -24,6 +24,11 @@ import {
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  sanitizeThoughtContent,
+  sanitizeToolArgs,
+  sanitizeErrorMessage,
+} from '../utils/agent-sanitization-utils.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -118,17 +123,18 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'THOUGHT_CHUNK': {
             const text = String(activity.data['text']);
             const lastItem = recentActivity[recentActivity.length - 1];
+
             if (
               lastItem &&
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content = text;
+              lastItem.content = sanitizeThoughtContent(text);
             } else {
               recentActivity.push({
                 id: randomUUID(),
                 type: 'thought',
-                content: text,
+                content: sanitizeThoughtContent(text),
                 status: 'running',
               });
             }
@@ -138,12 +144,14 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'TOOL_CALL_START': {
             const name = String(activity.data['name']);
             const displayName = activity.data['displayName']
-              ? String(activity.data['displayName'])
+              ? sanitizeErrorMessage(String(activity.data['displayName']))
               : undefined;
             const description = activity.data['description']
-              ? String(activity.data['description'])
+              ? sanitizeErrorMessage(String(activity.data['description']))
               : undefined;
-            const args = JSON.stringify(activity.data['args']);
+            const args = JSON.stringify(
+              sanitizeToolArgs(activity.data['args']),
+            );
             recentActivity.push({
               id: randomUUID(),
               type: 'tool_call',
@@ -175,6 +183,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'ERROR': {
             const error = String(activity.data['error']);
             const errorType = activity.data['errorType'];
+            const sanitizedError = sanitizeErrorMessage(error);
             const isCancellation =
               errorType === SubagentActivityErrorType.CANCELLED ||
               error === SUBAGENT_CANCELLED_ERROR_MESSAGE;
@@ -217,7 +226,9 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               id: randomUUID(),
               type: 'thought',
               content:
-                isCancellation || isRejection ? error : `Error: ${error}`,
+                isCancellation || isRejection
+                  ? sanitizedError
+                  : `Error: ${sanitizedError}`,
               status: isCancellation || isRejection ? 'cancelled' : 'error',
             });
             updated = true;
