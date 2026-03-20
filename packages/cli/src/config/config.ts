@@ -36,6 +36,7 @@ import {
   Config,
   resolveToRealPath,
   applyAdminAllowlist,
+  applyRequiredServers,
   getAdminBlockedMcpServersMessage,
   type HookDefinition,
   type HookEventName,
@@ -430,8 +431,6 @@ export async function loadCliConfig(
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
 
-  const loadedSettings = loadSettings(cwd);
-
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -475,9 +474,31 @@ export async function loadCliConfig(
     ...settings.context?.fileFiltering,
   };
 
+  //changes the includeDirectories to be absolute paths based on the cwd, and also include any additional directories specified via CLI args
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
+
+  // When running inside VSCode with multiple workspace folders,
+  // automatically add the other folders as include directories
+  // so Gemini has context of all open folders, not just the cwd.
+  const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+  if (ideWorkspacePath) {
+    const realCwd = resolveToRealPath(cwd);
+    const ideFolders = ideWorkspacePath.split(path.delimiter).filter((p) => {
+      const trimmedPath = p.trim();
+      if (!trimmedPath) return false;
+      try {
+        return resolveToRealPath(trimmedPath) !== realCwd;
+      } catch (e) {
+        debugLogger.debug(
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+        );
+        return false;
+      }
+    });
+    includeDirectories.push(...ideFolders);
+  }
 
   const extensionManager = new ExtensionManager({
     settings,
@@ -682,6 +703,19 @@ export async function loadCliConfig(
       ? defaultModel
       : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  if (sandboxConfig) {
+    const existingPaths = sandboxConfig.allowedPaths || [];
+    if (settings.tools.sandboxAllowedPaths?.length) {
+      sandboxConfig.allowedPaths = [
+        ...new Set([...existingPaths, ...settings.tools.sandboxAllowedPaths]),
+      ];
+    }
+    if (settings.tools.sandboxNetworkAccess !== undefined) {
+      sandboxConfig.networkAccess =
+        sandboxConfig.networkAccess || settings.tools.sandboxNetworkAccess;
+    }
+  }
+
   const screenReader =
     argv.screenReader !== undefined
       ? argv.screenReader
@@ -714,6 +748,25 @@ export async function loadCliConfig(
         undefined,
       );
       coreEvents.emitConsoleLog('warn', message);
+    }
+  }
+
+  // Apply admin-required MCP servers (injected regardless of allowlist)
+  if (mcpEnabled) {
+    const requiredMcpConfig = settings.admin?.mcp?.requiredConfig;
+    if (requiredMcpConfig && Object.keys(requiredMcpConfig).length > 0) {
+      const requiredResult = applyRequiredServers(
+        mcpServers ?? {},
+        requiredMcpConfig,
+      );
+      mcpServers = requiredResult.mcpServers;
+
+      if (requiredResult.requiredServerNames.length > 0) {
+        coreEvents.emitConsoleLog(
+          'info',
+          `Admin-required MCP servers injected: ${requiredResult.requiredServerNames.join(', ')}`,
+        );
+      }
     }
   }
 
@@ -820,6 +873,7 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    experimentalMemoryManager: settings.experimental?.memoryManager,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
@@ -864,7 +918,7 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {

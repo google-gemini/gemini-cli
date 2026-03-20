@@ -50,7 +50,25 @@ Cross-platform sandboxing with complete process isolation.
 **Note**: Requires building the sandbox image locally or using a published image
 from your organization's registry.
 
-### 3. gVisor / runsc (Linux only)
+### 3. Windows Native Sandbox (Windows only)
+
+... **Troubleshooting and Side Effects:**
+
+The Windows Native sandbox uses the `icacls` command to set a "Low Mandatory
+Level" on files and directories it needs to write to.
+
+- **Persistence**: These integrity level changes are persistent on the
+  filesystem. Even after the sandbox session ends, files created or modified by
+  the sandbox will retain their "Low" integrity level.
+- **Manual Reset**: If you need to reset the integrity level of a file or
+  directory, you can use:
+  ```powershell
+  icacls "C:\path\to\dir" /setintegritylevel Medium
+  ```
+- **System Folders**: The sandbox manager automatically skips setting integrity
+  levels on system folders (like `C:\Windows`) for safety.
+
+### 4. gVisor / runsc (Linux only)
 
 Strongest isolation available: runs containers inside a user-space kernel via
 [gVisor](https://github.com/google/gvisor). gVisor intercepts all container
@@ -253,9 +271,11 @@ $env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 DEBUG=1 gemini -s -p "debug command"
 ```
 
-**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect
-gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli
-specific debug settings.
+<!-- prettier-ignore -->
+> [!NOTE]
+> If you have `DEBUG=true` in a project's `.env` file, it won't affect
+> gemini-cli due to automatic exclusion. Use `.gemini/.env` files for
+> gemini-cli specific debug settings.
 
 ### Inspect sandbox
 
