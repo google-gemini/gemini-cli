@@ -295,6 +295,30 @@ describe('runNonInteractive', () => {
     expect(streamSpy).toHaveBeenCalledWith({ streamId: expect.any(String) });
   });
 
+  it('fails fast if the session acknowledges a message send without a stream', async () => {
+    const { LegacyAgentSession } = await import('@google/gemini-cli-core');
+    const sendSpy = vi
+      .spyOn(LegacyAgentSession.prototype, 'send')
+      .mockResolvedValue({ streamId: null });
+    const streamSpy = vi.spyOn(LegacyAgentSession.prototype, 'stream');
+
+    await expect(
+      runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Test input',
+        prompt_id: 'prompt-id-null-stream',
+      }),
+    ).rejects.toThrow(
+      'LegacyAgentSession.send() unexpectedly returned no stream for a message send.',
+    );
+
+    expect(streamSpy).not.toHaveBeenCalled();
+
+    sendSpy.mockRestore();
+    streamSpy.mockRestore();
+  });
+
   it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
     vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
     const events: ServerGeminiStreamEvent[] = [
@@ -655,6 +679,21 @@ describe('runNonInteractive', () => {
     ).rejects.toThrow('process.exit(53) called');
   });
 
+  it('should exit when the session reports max turns through agent_end', async () => {
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents([{ type: GeminiEventType.MaxSessionTurns }]),
+    );
+
+    await expect(
+      runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Trigger max turns event',
+        prompt_id: 'prompt-id-max-turns-event',
+      }),
+    ).rejects.toThrow('process.exit(53) called');
+  });
+
   it('should preprocess @include commands before sending to the model', async () => {
     // 1. Mock the imported atCommandProcessor
     const { handleAtCommand } = await import(
@@ -837,6 +876,79 @@ describe('runNonInteractive', () => {
     );
   });
 
+  it('should keep only the final post-tool assistant text in JSON output', async () => {
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'tool-1',
+        name: 'testTool',
+        args: { arg1: 'value1' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-json-tool-text',
+      },
+    };
+    mockSchedulerSchedule.mockResolvedValue([
+      {
+        status: CoreToolCallStatus.Success,
+        request: toolCallEvent.value,
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          responseParts: [{ text: 'Tool executed successfully' }],
+          callId: 'tool-1',
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
+      },
+    ]);
+
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(
+        createStreamFromEvents([
+          { type: GeminiEventType.Content, value: 'Let me check that...' },
+          toolCallEvent,
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: undefined, usageMetadata: { totalTokenCount: 5 } },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(
+        createStreamFromEvents([
+          { type: GeminiEventType.Content, value: 'Final answer' },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: undefined, usageMetadata: { totalTokenCount: 3 } },
+          },
+        ]),
+      );
+
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Use a tool',
+      prompt_id: 'prompt-id-json-tool-text',
+    });
+
+    expect(processStdoutSpy).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: 'Final answer',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
   it('should write JSON output with stats for empty response commands', async () => {
     // Test the scenario where a command completes but produces no content at all
     const events: ServerGeminiStreamEvent[] = [
@@ -953,7 +1065,7 @@ describe('runNonInteractive', () => {
         {
           session_id: 'test-session-id',
           error: {
-            type: 'Error',
+            type: 'FatalInputError',
             message: 'Invalid command syntax provided',
             code: 42,
           },
@@ -1074,10 +1186,11 @@ describe('runNonInteractive', () => {
 
     // Spy on handleCancellationError to verify it's called
     const errors = await import('./utils/errors.js');
+    const cancellationSentinel = new Error('Cancelled');
     const handleCancellationErrorSpy = vi
       .spyOn(errors, 'handleCancellationError')
       .mockImplementation(() => {
-        throw new Error('Cancelled');
+        throw cancellationSentinel;
       });
 
     const events: ServerGeminiStreamEvent[] = [
@@ -1093,7 +1206,7 @@ describe('runNonInteractive', () => {
             signal.addEventListener('abort', () => {
               clearTimeout(timeout);
               setTimeout(() => {
-                reject(new Error('Aborted')); // This will be caught by nonInteractiveCli and passed to handleError
+                reject(new Error('Aborted'));
               }, 300);
             });
           });
@@ -1126,20 +1239,10 @@ describe('runNonInteractive', () => {
       keypressHandler('\u0003', { ctrl: true, name: 'c' });
     }
 
-    // The promise should reject with 'Aborted' because our mock stream throws it,
-    // and nonInteractiveCli catches it and calls handleError, which doesn't necessarily throw.
-    // Wait, if handleError is called, we should check that.
-    // But here we want to check if Ctrl+C works.
-
-    // In our current setup, Ctrl+C aborts the signal. The stream throws 'Aborted'.
-    // nonInteractiveCli catches 'Aborted' and calls handleError.
-
-    // If we want to test that handleCancellationError is called, we need the loop to detect abortion.
-    // But our stream throws before the loop can detect it.
-
-    // Let's just check that the promise rejects with 'Aborted' for now,
-    // which proves the abortion signal reached the stream.
-    await expect(runPromise).rejects.toThrow('Aborted');
+    // The Ctrl+C path should route through handleCancellationError rather than
+    // surfacing the raw stream abort.
+    await expect(runPromise).rejects.toBe(cancellationSentinel);
+    expect(handleCancellationErrorSpy).toHaveBeenCalledTimes(1);
 
     expect(
       processStderrSpy.mock.calls.some(
@@ -1164,6 +1267,79 @@ describe('runNonInteractive', () => {
     }
     // Spies are automatically restored by vi.restoreAllMocks() in afterEach,
     // but we can also do it manually if needed.
+  });
+
+  it('should honor cancellation that happens before session.send()', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const originalSetRawMode = (process.stdin as any).setRawMode;
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    if (!originalSetRawMode) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process.stdin as any).setRawMode = vi.fn();
+    }
+
+    const stdinOnSpy = vi.spyOn(process.stdin, 'on').mockImplementation(
+      (
+        event: string | symbol,
+        listener: (...args: unknown[]) => void,
+      ) => {
+        if (event === 'keypress') {
+          listener('\u0003', { ctrl: true, name: 'c' });
+        }
+        return process.stdin;
+      },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(process.stdin as any, 'setRawMode').mockImplementation(() => true);
+    vi.spyOn(process.stdin, 'resume').mockImplementation(() => process.stdin);
+    vi.spyOn(process.stdin, 'pause').mockImplementation(() => process.stdin);
+    vi.spyOn(process.stdin, 'removeAllListeners').mockImplementation(
+      () => process.stdin,
+    );
+
+    const errors = await import('./utils/errors.js');
+    const cancellationSentinel = new Error('Cancelled before send');
+    const handleCancellationErrorSpy = vi
+      .spyOn(errors, 'handleCancellationError')
+      .mockImplementation(() => {
+        throw cancellationSentinel;
+      });
+
+    const { LegacyAgentSession } = await import('@google/gemini-cli-core');
+    const sendSpy = vi.spyOn(LegacyAgentSession.prototype, 'send');
+
+    await expect(
+      runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Cancelled query',
+        prompt_id: 'prompt-id-pre-send-cancel',
+      }),
+    ).rejects.toBe(cancellationSentinel);
+
+    expect(handleCancellationErrorSpy).toHaveBeenCalledTimes(1);
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(stdinOnSpy).toHaveBeenCalled();
+
+    handleCancellationErrorSpy.mockRestore();
+    sendSpy.mockRestore();
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+    if (originalSetRawMode) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process.stdin as any).setRawMode = originalSetRawMode;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (process.stdin as any).setRawMode;
+    }
   });
 
   it('should throw FatalInputError if a command requires confirmation', async () => {
@@ -1679,17 +1855,9 @@ describe('runNonInteractive', () => {
       input: 'Loop test',
       promptId: 'prompt-id-loop',
     },
-    {
-      name: 'max session turns',
-      events: [
-        { type: GeminiEventType.MaxSessionTurns },
-      ] as ServerGeminiStreamEvent[],
-      input: 'Max turns test',
-      promptId: 'prompt-id-max-turns',
-    },
   ])(
     'should emit appropriate error event in streaming JSON mode: $name',
-    async ({ events, input, promptId }) => {
+    async ({ name, events, input, promptId }) => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
@@ -1726,6 +1894,52 @@ describe('runNonInteractive', () => {
       expect(sanitizedOutput).toMatchSnapshot();
     },
   );
+
+  it('should emit a terminal max-turns error event in streaming JSON mode', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+      OutputFormat.STREAM_JSON,
+    );
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents([
+        { type: GeminiEventType.MaxSessionTurns },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+        },
+      ]),
+    );
+
+    try {
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Max turns test',
+        prompt_id: 'prompt-id-max-turns',
+      });
+    } catch (_error) {
+      // Expected exit
+    }
+
+    const streamEvents = getWrittenOutput()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+    expect(streamEvents).toHaveLength(3);
+    expect(streamEvents[2]).toMatchObject({
+      type: 'result',
+      status: 'error',
+      error: {
+        type: 'FatalTurnLimitedError',
+        message:
+          'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+      },
+    });
+  });
 
   it('should log error when tool recording fails', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
