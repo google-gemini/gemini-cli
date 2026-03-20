@@ -22,6 +22,7 @@ import {
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
   EXIT_PLAN_PARAM_PLAN_FILENAME,
+  SHELL_PARAM_WAIT_SECONDS,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
   UPDATE_TOPIC_TOOL_NAME,
@@ -36,7 +37,9 @@ import {
 export function getShellToolDescription(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  interactiveShellMode?: string,
 ): string {
+  const isAiMode = interactiveShellMode === 'ai';
   const efficiencyGuidelines = enableEfficiency
     ? `
 
@@ -55,6 +58,11 @@ export function getShellToolDescription(
       Signal: Only included if process was terminated by a signal.
       Background PIDs: Only included if background processes were started.
       Process Group PGID: Only included if available.`;
+
+  if (isAiMode) {
+    const autoPromoteInstructions = `Commands that do not complete within \`${SHELL_PARAM_WAIT_SECONDS}\` seconds are automatically promoted to background. Once promoted, use \`write_to_shell\` and \`read_shell\` to interact with the process. Do NOT use \`&\` to background commands.`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${autoPromoteInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
+  }
 
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
@@ -86,12 +94,33 @@ export function getShellDeclaration(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
   enableToolSandboxing: boolean = false,
+  interactiveShellMode?: string,
 ): FunctionDeclaration {
+  const isAiMode = interactiveShellMode === 'ai';
+
+  // In AI mode, use wait_for_output_seconds instead of is_background
+  const backgroundParam = isAiMode
+    ? {
+        [SHELL_PARAM_WAIT_SECONDS]: {
+          type: 'number' as const,
+          description:
+            'Max seconds to wait for command to complete before auto-promoting to background (default: 5). Set low (2-5) for commands likely to prompt for input (npx, installers, REPLs). Set high (60-300) for long builds or installs. Once promoted, use write_to_shell/read_shell to interact.',
+        },
+      }
+    : {
+        [SHELL_PARAM_IS_BACKGROUND]: {
+          type: 'boolean' as const,
+          description:
+            'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
+        },
+      };
+
   return {
     name: SHELL_TOOL_NAME,
     description: getShellToolDescription(
       enableInteractiveShell,
       enableEfficiency,
+      interactiveShellMode,
     ),
     parametersJsonSchema: {
       type: 'object',
@@ -120,6 +149,7 @@ export function getShellDeclaration(
           description:
             'Optional. Delay in milliseconds to wait after starting the process in the background. Useful to allow the process to start and generate initial output before returning.',
         },
+        ...backgroundParam,
         ...(enableToolSandboxing
           ? {
               [PARAM_ADDITIONAL_PERMISSIONS]: {

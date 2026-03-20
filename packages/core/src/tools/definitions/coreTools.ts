@@ -27,6 +27,8 @@ export {
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
+  WRITE_TO_SHELL_TOOL_NAME,
+  READ_SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
@@ -73,6 +75,12 @@ export {
   LS_PARAM_IGNORE,
   SHELL_PARAM_COMMAND,
   SHELL_PARAM_IS_BACKGROUND,
+  SHELL_PARAM_WAIT_SECONDS,
+  WRITE_TO_SHELL_PARAM_PID,
+  WRITE_TO_SHELL_PARAM_INPUT,
+  WRITE_TO_SHELL_PARAM_SPECIAL_KEYS,
+  READ_SHELL_PARAM_PID,
+  READ_SHELL_PARAM_WAIT_SECONDS,
   WEB_SEARCH_PARAM_QUERY,
   WEB_FETCH_PARAM_PROMPT,
   READ_MANY_PARAM_INCLUDE,
@@ -249,18 +257,21 @@ export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
   enableToolSandboxing: boolean = false,
+  interactiveShellMode?: string,
 ): ToolDefinition {
   return {
     base: getShellDeclaration(
       enableInteractiveShell,
       enableEfficiency,
       enableToolSandboxing,
+      interactiveShellMode,
     ),
     overrides: (modelId) =>
       getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
         enableToolSandboxing,
+        interactiveShellMode,
       ),
   };
 }

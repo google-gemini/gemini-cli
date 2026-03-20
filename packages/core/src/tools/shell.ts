@@ -33,6 +33,7 @@ import {
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
+import { formatShellOutput } from './shellOutputFormatter.js';
 import {
   ShellExecutionService,
   type ShellOutputEvent,
@@ -71,6 +72,7 @@ export interface ShellToolParams {
   is_background?: boolean;
   delay_ms?: number;
   [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
+  wait_for_output_seconds?: number;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -78,6 +80,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private proactivePermissionsConfirmed?: SandboxPermissions;
+  private _autoPromoteTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly context: AgentLoopContext,
@@ -223,7 +226,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   override getExplanation(): string {
-    return this.getContextualDetails().trim();
+    let explanation = this.getContextualDetails().trim();
+    const isAiMode = this.context.config.getInteractiveShellMode() === 'ai';
+    if (this.params.wait_for_output_seconds !== undefined || isAiMode) {
+      explanation += ` [auto-background after ${this.params.wait_for_output_seconds ?? 5}s]`;
+    }
+    return explanation;
   }
 
   override getPolicyUpdateOptions(
@@ -497,6 +505,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }, timeoutMs);
       };
 
+      let currentPid: number | undefined;
+      const isAiMode = this.context.config.getInteractiveShellMode() === 'ai';
+      const shouldAutoPromote =
+        this.params.wait_for_output_seconds !== undefined || isAiMode;
+      const waitMs = (this.params.wait_for_output_seconds ?? 5) * 1000;
+
+      const resetAutoPromoteTimer = () => {
+        if (shouldAutoPromote && currentPid) {
+          if (this._autoPromoteTimer) clearTimeout(this._autoPromoteTimer);
+          this._autoPromoteTimer = setTimeout(() => {
+            ShellExecutionService.background(currentPid!);
+          }, waitMs);
+        }
+      };
+
       signal.addEventListener('abort', onAbort, { once: true });
       timeoutController.signal.addEventListener('abort', onAbort, {
         once: true,
@@ -511,6 +534,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           cwd,
           (event: ShellOutputEvent) => {
             resetTimeout(); // Reset timeout on any event
+            resetAutoPromoteTimer(); // Reset auto-promote on any event
             if (!updateOutput) {
               return;
             }
@@ -582,6 +606,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             backgroundCompletionBehavior:
               this.context.config.getShellBackgroundCompletionBehavior(),
             originalCommand: strippedCommand,
+            autoPromoteTimeoutMs: shouldAutoPromote ? waitMs : undefined,
           },
         );
 
@@ -618,6 +643,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
             };
           }
         }
+
+        // In AI mode with wait_for_output_seconds, set up auto-promotion timer.
+        // When the timer fires, promote to background instead of cancelling.
+        currentPid = pid;
+        resetAutoPromoteTimer();
       }
 
       const result = await resultPromise;
@@ -658,95 +688,73 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      let data: BackgroundExecutionData | undefined;
-
-      let llmContent = '';
       let timeoutMessage = '';
       if (result.aborted) {
         if (timeoutController.signal.aborted) {
           timeoutMessage = `Command was automatically cancelled because it exceeded the timeout of ${(
             timeoutMs / 60000
           ).toFixed(1)} minutes without output.`;
-          llmContent = timeoutMessage;
-        } else {
-          llmContent =
-            'Command was cancelled by user before it could complete.';
         }
-        if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
-        } else {
-          llmContent += ' There was no output before it was cancelled.';
-        }
-      } else if (this.params.is_background || result.backgrounded) {
-        llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
-        data = {
-          pid: result.pid,
-          command: this.params.command,
-          initialOutput: result.output,
-        };
-      } else {
-        // Create a formatted error string for display, replacing the wrapper command
-        // with the user-facing command.
-        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
-
-        if (result.error) {
-          const finalError = result.error.message.replaceAll(
-            commandToExecute,
-            this.params.command,
-          );
-          llmContentParts.push(`Error: ${finalError}`);
-        }
-
-        if (result.exitCode !== null && result.exitCode !== 0) {
-          llmContentParts.push(`Exit Code: ${result.exitCode}`);
-          data = {
-            exitCode: result.exitCode,
-            isError: true,
-          };
-        }
-
-        if (result.signal) {
-          llmContentParts.push(`Signal: ${result.signal}`);
-        }
-        if (backgroundPIDs.length) {
-          llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
-        }
-        if (result.pid) {
-          llmContentParts.push(`Process Group PGID: ${result.pid}`);
-        }
-
-        llmContent = llmContentParts.join('\n');
       }
 
-      let returnDisplay: string | AnsiOutput = '';
-      if (this.context.config.getDebugMode()) {
-        returnDisplay = llmContent;
-      } else {
-        if (this.params.is_background || result.backgrounded) {
-          returnDisplay = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
-        } else if (result.aborted) {
-          const cancelMsg = timeoutMessage || 'Command cancelled by user.';
-          if (result.output.trim()) {
-            returnDisplay = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+      const formatterOutput = formatShellOutput({
+        params: this.params,
+        result,
+        debugMode: this.context.config.getDebugMode(),
+        backgroundPIDs,
+        isAiMode,
+        timeoutMessage,
+      });
+
+      let data: BackgroundExecutionData | undefined;
+      data = formatterOutput.data as BackgroundExecutionData | undefined;
+      let returnDisplay: string | AnsiOutput = formatterOutput.returnDisplay;
+      let llmContent = formatterOutput.llmContent;
+
+      if (!this.context.config.getDebugMode()) {
+        if (
+          !this.params.is_background &&
+          !result.backgrounded &&
+          !result.aborted
+        ) {
+          if (result.output.trim() || result.ansiOutput) {
+            returnDisplay =
+              result.ansiOutput && result.ansiOutput.length > 0
+                ? result.ansiOutput
+                : result.output;
           } else {
-            returnDisplay = cancelMsg;
+            if (result.signal) {
+              returnDisplay = `Command terminated by signal: ${result.signal}`;
+            } else if (result.error) {
+              returnDisplay = `Command failed: ${getErrorMessage(result.error)}`;
+            } else if (result.exitCode !== null && result.exitCode !== 0) {
+              returnDisplay = `Command exited with code: ${result.exitCode}`;
+            }
           }
-        } else if (result.output.trim() || result.ansiOutput) {
-          returnDisplay =
-            result.ansiOutput && result.ansiOutput.length > 0
-              ? result.ansiOutput
-              : result.output;
-        } else {
-          if (result.signal) {
-            returnDisplay = `Command terminated by signal: ${result.signal}`;
-          } else if (result.error) {
-            returnDisplay = `Command failed: ${getErrorMessage(result.error)}`;
-          } else if (result.exitCode !== null && result.exitCode !== 0) {
-            returnDisplay = `Command exited with code: ${result.exitCode}`;
-          }
-          // If output is empty and command succeeded (code 0, no error/signal/abort),
-          // returnDisplay will remain empty, which is fine.
         }
+      }
+
+      // Replace wrapper command with actual command in error messages
+      if (result.error && !result.aborted) {
+        llmContent = llmContent.replaceAll(
+          commandToExecute,
+          this.params.command,
+        );
+      }
+
+      // Update data with specific things needed by ShellTool
+      if (this.params.is_background || result.backgrounded) {
+        data = {
+          ...data,
+          initialOutput: result.output,
+          pid: result.pid!,
+          command: this.params.command,
+        };
+      } else if (result.exitCode !== null && result.exitCode !== 0) {
+        data = {
+          exitCode: result.exitCode,
+          isError: true,
+        } as BackgroundExecutionData;
       }
 
       // Heuristic Sandbox Denial Detection
@@ -929,6 +937,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
+      const autoTimer = this._autoPromoteTimer;
+      if (autoTimer) clearTimeout(autoTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
       try {
@@ -1007,6 +1017,7 @@ export class ShellTool extends BaseDeclarativeTool<
       this.context.config.getEnableInteractiveShell(),
       this.context.config.getEnableShellOutputEfficiency(),
       this.context.config.getSandboxEnabled(),
+      this.context.config.getInteractiveShellMode(),
     );
     return resolveToolDeclaration(definition, modelId);
   }
