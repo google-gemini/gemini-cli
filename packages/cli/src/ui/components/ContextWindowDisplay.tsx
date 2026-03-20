@@ -206,7 +206,13 @@ export const ContextWindowDisplay: React.FC<{ data: ContextWindowData }> = ({
       : '';
 
   return (
-    <Box flexDirection="column" marginY={1}>
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      paddingTop={1}
+      paddingX={2}
+    >
       {/* Header */}
       <Box
         flexDirection="row"
@@ -214,7 +220,7 @@ export const ContextWindowDisplay: React.FC<{ data: ContextWindowData }> = ({
         width={BAR_WIDTH + 2}
       >
         <Box flexDirection="row">
-          <Text bold color={theme.text.primary}>
+          <Text bold color={theme.text.accent}>
             Context
           </Text>
           <Text color={theme.text.secondary}>
@@ -228,12 +234,12 @@ export const ContextWindowDisplay: React.FC<{ data: ContextWindowData }> = ({
       </Box>
 
       {/* Segmented bar */}
-      <Box marginTop={1}>
-        <SegmentedBar data={data} />
-      </Box>
+      <Box height={1} />
+      <SegmentedBar data={data} />
 
       {/* Remaining headline */}
-      <Box marginTop={1}>
+      <Box height={1} />
+      <Box>
         <Text
           bold
           color={
@@ -250,7 +256,8 @@ export const ContextWindowDisplay: React.FC<{ data: ContextWindowData }> = ({
       </Box>
 
       {/* Breakdown table */}
-      <Box flexDirection="column" marginTop={1}>
+      <Box height={1} />
+      <Box flexDirection="column">
         <CategoryRow
           label="System prompt"
           tokens={data.systemPromptTokens}
