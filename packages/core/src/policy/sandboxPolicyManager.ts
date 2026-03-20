@@ -15,6 +15,7 @@ export interface SandboxModeConfig {
   network: boolean;
   readonly: boolean;
   approvedTools: string[];
+  allowOverrides?: boolean;
 }
 
 export interface PersistentCommandConfig {
@@ -25,6 +26,7 @@ export interface PersistentCommandConfig {
 export interface SandboxTomlSchema {
   modes: {
     plan: SandboxModeConfig;
+    default: SandboxModeConfig;
     accepting_edits: SandboxModeConfig;
   };
   commands: Record<string, PersistentCommandConfig>;
@@ -37,11 +39,19 @@ export class SandboxPolicyManager {
         network: false,
         readonly: true,
         approvedTools: [],
+        allowOverrides: false,
+      },
+      default: {
+        network: false,
+        readonly: true,
+        approvedTools: [],
+        allowOverrides: true,
       },
       accepting_edits: {
-        network: true,
+        network: false,
         readonly: false,
-        approvedTools: ['sed', 'grep', 'awk', 'perl', 'cat', 'echo', 'mkdir', 'touch', 'rm'],
+        approvedTools: ['sed', 'grep', 'awk', 'perl', 'cat', 'echo'],
+        allowOverrides: true,
       },
     },
     commands: {},
@@ -52,7 +62,9 @@ export class SandboxPolicyManager {
   private sessionApprovals: Record<string, SandboxPermissions> = {};
 
   constructor(customConfigPath?: string) {
-    this.configPath = customConfigPath ?? path.join(os.homedir(), '.gemini', 'policies', 'sandbox.toml');
+    this.configPath =
+      customConfigPath ??
+      path.join(os.homedir(), '.gemini', 'policies', 'sandbox.toml');
     this.config = this.loadConfig();
   }
 
@@ -85,12 +97,16 @@ export class SandboxPolicyManager {
     }
   }
 
-  getModeConfig(mode: 'plan' | 'accepting_edits' | string): SandboxModeConfig {
+  getModeConfig(
+    mode: 'plan' | 'accepting_edits' | 'default' | string,
+  ): SandboxModeConfig {
     if (mode === 'plan') return this.config.modes.plan;
-    if (mode === 'accepting_edits' || mode === 'autoEdit') return this.config.modes.accepting_edits;
-    
+    if (mode === 'accepting_edits' || mode === 'autoEdit')
+      return this.config.modes.accepting_edits;
+    if (mode === 'default') return this.config.modes.default;
+
     // Default fallback
-    return this.config.modes.plan;
+    return this.config.modes.default ?? this.config.modes.plan;
   }
 
   getCommandPermissions(commandName: string): SandboxPermissions {
@@ -112,21 +128,43 @@ export class SandboxPolicyManager {
     };
   }
 
-  addSessionApproval(commandName: string, permissions: SandboxPermissions): void {
-    const existing = this.sessionApprovals[commandName] || { fileSystem: { read: [], write: [] }, network: false };
-    
+  addSessionApproval(
+    commandName: string,
+    permissions: SandboxPermissions,
+  ): void {
+    const existing = this.sessionApprovals[commandName] || {
+      fileSystem: { read: [], write: [] },
+      network: false,
+    };
+
     this.sessionApprovals[commandName] = {
       fileSystem: {
-        read: Array.from(new Set([...(existing.fileSystem?.read ?? []), ...(permissions.fileSystem?.read ?? [])])),
-        write: Array.from(new Set([...(existing.fileSystem?.write ?? []), ...(permissions.fileSystem?.write ?? [])])),
+        read: Array.from(
+          new Set([
+            ...(existing.fileSystem?.read ?? []),
+            ...(permissions.fileSystem?.read ?? []),
+          ]),
+        ),
+        write: Array.from(
+          new Set([
+            ...(existing.fileSystem?.write ?? []),
+            ...(permissions.fileSystem?.write ?? []),
+          ]),
+        ),
       },
       network: existing.network || permissions.network || false,
     };
   }
 
-  addPersistentApproval(commandName: string, permissions: SandboxPermissions): void {
-    const existing = this.config.commands[commandName] || { allowed_paths: [], allow_network: false };
-    
+  addPersistentApproval(
+    commandName: string,
+    permissions: SandboxPermissions,
+  ): void {
+    const existing = this.config.commands[commandName] || {
+      allowed_paths: [],
+      allow_network: false,
+    };
+
     const newPaths = new Set([
       ...(existing.allowed_paths ?? []),
       ...(permissions.fileSystem?.read ?? []),

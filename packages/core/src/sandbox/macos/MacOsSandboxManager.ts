@@ -16,7 +16,12 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
-import { getCommandRoots, initializeShellParsers, splitCommands, stripShellWrapper } from '../../utils/shell-utils.js';
+import {
+  getCommandRoots,
+  initializeShellParsers,
+  splitCommands,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
 import { isKnownSafeCommand } from './commandSafety.js';
 import { parse as shellParse } from 'shell-quote';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
@@ -39,6 +44,7 @@ export interface MacOsSandboxOptions {
     readonly?: boolean;
     network?: boolean;
     approvedTools?: string[];
+    allowOverrides?: boolean;
   };
   /** The policy manager for persistent approvals. */
   policyManager?: SandboxPolicyManager;
@@ -57,15 +63,17 @@ export class MacOsSandboxManager implements SandboxManager {
     }
 
     await initializeShellParsers();
-    
+
     const fullCmd = [req.command, ...req.args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
 
     // 1. Check roots against explicitly approved tools from config
     const roots = getCommandRoots(stripped);
     if (roots.length === 0) return false;
-    
-    const allRootsApproved = roots.every(root => approvedTools.includes(root));
+
+    const allRootsApproved = roots.every((root) =>
+      approvedTools.includes(root),
+    );
     if (allRootsApproved) {
       return true;
     }
@@ -88,7 +96,9 @@ export class MacOsSandboxManager implements SandboxManager {
     await initializeShellParsers();
     const fullCmd = [req.command, ...req.args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
-    const roots = getCommandRoots(stripped).filter(r => r !== 'shopt' && r !== 'set');
+    const roots = getCommandRoots(stripped).filter(
+      (r) => r !== 'shopt' && r !== 'set',
+    );
     if (roots.length > 0) {
       return roots[0];
     }
@@ -103,16 +113,37 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
-    const isApproved = await this.isStrictlyApproved(req);
-    
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
+
+    // Reject override attempts in plan mode
+    if (!allowOverrides && req.config?.additionalPermissions) {
+      const perms = req.config.additionalPermissions;
+      if (
+        perms.network ||
+        (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
+      ) {
+        throw new Error(
+          'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
+        );
+      }
+    }
+
+    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
+    const isApproved = allowOverrides
+      ? await this.isStrictlyApproved(req)
+      : false;
+
     const workspaceWrite = !isReadonlyMode || isApproved;
-    const networkAccess = this.options.modeConfig?.network ?? this.options.networkAccess ?? false;
+    const networkAccess =
+      this.options.modeConfig?.network ??
+      (allowOverrides ? (this.options.networkAccess ?? false) : false);
 
     // Fetch persistent approvals for this command
     const commandName = await this.getCommandName(req);
-    const persistentPermissions = this.options.policyManager?.getCommandPermissions(commandName);
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
 
     // Merge all permissions
     const mergedAdditional: SandboxPermissions = {
@@ -126,7 +157,11 @@ export class MacOsSandboxManager implements SandboxManager {
           ...(req.config?.additionalPermissions?.fileSystem?.write ?? []),
         ],
       },
-      network: networkAccess || persistentPermissions?.network || req.config?.additionalPermissions?.network || false,
+      network:
+        networkAccess ||
+        persistentPermissions?.network ||
+        req.config?.additionalPermissions?.network ||
+        false,
     };
 
     const sandboxArgs = buildSeatbeltArgs({

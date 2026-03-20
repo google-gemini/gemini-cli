@@ -679,6 +679,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
+  private readonly toolSandboxing: boolean;
   private readonly question: string | undefined;
   readonly enableConseca: boolean;
 
@@ -895,6 +896,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
+    this.toolSandboxing = params.toolSandboxing ?? false;
     this.question = params.question;
 
     this.coreTools = params.coreTools;
@@ -1520,9 +1522,9 @@ export class Config implements McpContext, AgentLoopContext {
     return this._geminiClient;
   }
 
-    private refreshSandboxManager(): void {
+  private refreshSandboxManager(): void {
     this._sandboxManager = createSandboxManager(
-      this.getSandboxEnabled(),
+      this.toolSandboxing,
       this.targetDir,
       this._sandboxPolicyManager,
       this.getApprovalMode(),
