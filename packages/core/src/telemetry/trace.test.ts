@@ -133,33 +133,45 @@ describe('runInDevTraceSpan', () => {
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
-  it('should respect noAutoEnd option', async () => {
-    let capturedEndSpan: () => void = () => {};
-    const result = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, noAutoEnd: true },
-      async ({ endSpan }) => {
-        capturedEndSpan = endSpan;
-        return 'streaming';
-      },
+  it('should auto-wrap async iterators and end span when iterator completes', async () => {
+    async function* testStream() {
+      yield 1;
+      yield 2;
+    }
+
+    const resultStream = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall },
+      async () => testStream(),
     );
 
-    expect(result).toBe('streaming');
     expect(mockSpan.end).not.toHaveBeenCalled();
 
-    capturedEndSpan();
+    const results = [];
+    for await (const val of resultStream) {
+      results.push(val);
+    }
+
+    expect(results).toEqual([1, 2]);
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
-  it('should automatically end span on error even if noAutoEnd is true', async () => {
+  it('should end span automatically on error in async iterators', async () => {
     const error = new Error('streaming error');
-    await expect(
-      runInDevTraceSpan(
-        { operation: GeminiCliOperation.LLMCall, noAutoEnd: true },
-        async () => {
-          throw error;
-        },
-      ),
-    ).rejects.toThrow(error);
+    async function* errorStream() {
+      yield 1;
+      throw error;
+    }
+
+    const resultStream = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall },
+      async () => errorStream(),
+    );
+
+    await expect(async () => {
+      for await (const _ of resultStream) {
+        // iterate
+      }
+    }).rejects.toThrow(error);
 
     expect(mockSpan.end).toHaveBeenCalled();
   });
