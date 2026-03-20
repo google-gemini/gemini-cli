@@ -181,6 +181,8 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let terminalProcessExitHandled = false;
+    let abortSession = () => {};
     try {
       consolePatcher.patch();
 
@@ -289,14 +291,23 @@ export async function runNonInteractive({
       });
 
       // Wire Ctrl+C to session abort
-      abortController.signal.addEventListener('abort', () => {
+      abortSession = () => {
         void session.abort();
-      });
+      };
+      abortController.signal.addEventListener('abort', abortSession);
+      if (abortController.signal.aborted) {
+        return handleCancellationError(config);
+      }
 
       // Start the agentic loop (runs in background)
       const { streamId } = await session.send({
         message: geminiPartsToContentParts(query),
       });
+      if (streamId === null) {
+        throw new Error(
+          'LegacyAgentSession.send() unexpectedly returned no stream for a message send.',
+        );
+      }
 
       const getTextContent = (parts?: ContentPart[]): string | undefined => {
         const text = parts
@@ -347,11 +358,23 @@ export async function runNonInteractive({
             enumerable: true,
           });
         }
+        if (errorMeta?.['status'] !== undefined) {
+          Object.defineProperty(errToThrow, 'status', {
+            value: errorMeta['status'],
+            enumerable: true,
+          });
+        }
         return errToThrow;
+      };
+
+      const runTerminalExitHandler = (handler: () => never): never => {
+        terminalProcessExitHandled = true;
+        return handler();
       };
 
       // Consume AgentEvents for output formatting
       let responseText = '';
+      let preToolResponseText: string | undefined;
       let streamEnded = false;
       for await (const event of session.stream({ streamId })) {
         if (streamEnded) break;
@@ -384,6 +407,12 @@ export async function runNonInteractive({
             break;
           }
           case 'tool_request': {
+            if (config.getOutputFormat() === OutputFormat.JSON) {
+              // Final JSON output should reflect the last assistant answer after
+              // any tool orchestration, not intermediate pre-tool text.
+              preToolResponseText = responseText || preToolResponseText;
+              responseText = '';
+            }
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_USE,
@@ -422,12 +451,33 @@ export async function runNonInteractive({
               const errorMsg = getTextContent(event.content) ?? 'Tool error';
 
               if (event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION) {
+                if (
+                  config.getOutputFormat() === OutputFormat.JSON &&
+                  !responseText &&
+                  preToolResponseText
+                ) {
+                  responseText = preToolResponseText;
+                }
                 const stopMessage = `Agent execution stopped: ${errorMsg}`;
                 if (config.getOutputFormat() === OutputFormat.TEXT) {
                   process.stderr.write(`${stopMessage}\n`);
                 }
               }
 
+              if (event.data?.['errorType'] === ToolErrorType.NO_SPACE_LEFT) {
+                runTerminalExitHandler(() =>
+                  handleToolError(
+                    event.name,
+                    new Error(errorMsg),
+                    config,
+                    typeof event.data?.['errorType'] === 'string'
+                      ? event.data['errorType']
+                      : undefined,
+                    displayText,
+                  ),
+                );
+                break;
+              }
               handleToolError(
                 event.name,
                 new Error(errorMsg),
@@ -471,22 +521,9 @@ export async function runNonInteractive({
           }
           case 'agent_end': {
             if (event.reason === 'aborted') {
-              handleCancellationError(config);
+              runTerminalExitHandler(() => handleCancellationError(config));
             } else if (event.reason === 'max_turns') {
-              const isSessionLimit =
-                typeof event.data?.['maxTurns'] === 'number' &&
-                typeof event.data?.['turnCount'] === 'number';
-              if (isSessionLimit) {
-                handleMaxTurnsExceededError(config);
-              }
-              if (streamFormatter) {
-                streamFormatter.emitEvent({
-                  type: JsonStreamEventType.ERROR,
-                  timestamp: new Date().toISOString(),
-                  severity: 'error',
-                  message: 'Maximum session turns exceeded',
-                });
-              }
+              runTerminalExitHandler(() => handleMaxTurnsExceededError(config));
             }
 
             const stopMessage =
@@ -523,12 +560,16 @@ export async function runNonInteractive({
     } finally {
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
+      abortController.signal.removeEventListener('abort', abortSession);
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
 
     if (errorToHandle) {
+      if (terminalProcessExitHandled) {
+        throw errorToHandle;
+      }
       handleError(errorToHandle, config);
     }
   });
