@@ -1378,6 +1378,14 @@ describe('Server Config (config.ts)', () => {
         mockAgentDefinition.name,
       ]);
 
+      const mockOnReload = vi.fn().mockResolvedValue({
+        agents: {
+          overrides: {
+            codebase_investigator: { enabled: false },
+          },
+        },
+      });
+
       const params: ConfigParameters = {
         ...baseParams,
         agents: {
@@ -1385,6 +1393,7 @@ describe('Server Config (config.ts)', () => {
             codebase_investigator: { enabled: true },
           },
         },
+        onReload: mockOnReload,
       };
       const config = new Config(params);
 
@@ -1394,14 +1403,18 @@ describe('Server Config (config.ts)', () => {
       // Clear mock history before we trigger the refresh
       vi.mocked(toolRegistry.unregisterTool).mockClear();
 
-      // Now disable the agent in config and refresh
-      vi.stubEnv('GEMINI_AGENTS_CODEBASE_INVESTIGATOR_ENABLED', 'false');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (config as any).agents = {
-        overrides: {
-          codebase_investigator: { enabled: false },
-        },
-      };
+      const SubAgentToolMock = (
+        (await vi.importMock('../agents/subagent-tool.js')) as {
+          SubagentTool: Mock;
+        }
+      ).SubagentTool;
+
+      const mockTool = Object.create(SubAgentToolMock.prototype);
+      mockTool.name = 'codebase_investigator';
+      vi.spyOn(toolRegistry, 'getTool').mockReturnValue(mockTool);
+
+      // Now disable the agent in config and refresh using the public API
+      await config.reloadAgents();
 
       // @ts-expect-error accessing private method for testing
       await config.onAgentsRefreshed();
@@ -1410,7 +1423,6 @@ describe('Server Config (config.ts)', () => {
       expect(toolRegistry.unregisterTool).toHaveBeenCalledWith(
         'codebase_investigator',
       );
-      vi.unstubAllEnvs();
     });
 
     it('should register EnterPlanModeTool and ExitPlanModeTool when plan is enabled', async () => {
