@@ -133,33 +133,44 @@ describe('runInDevTraceSpan', () => {
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
-  it('should respect noAutoEnd option', async () => {
-    let capturedEndSpan: () => void = () => {};
-    const result = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, noAutoEnd: true },
-      async ({ endSpan }) => {
-        capturedEndSpan = endSpan;
-        return 'streaming';
-      },
-    );
+  it('should auto-wrap AsyncGenerators to end span only on completion', async () => {
+    const asyncGen = async function* () {
+      yield 'part1';
+      yield 'part2';
+    };
 
-    expect(result).toBe('streaming');
+    const result = (await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall },
+      async () => asyncGen(),
+    )) as unknown as AsyncGenerator<string>;
+
     expect(mockSpan.end).not.toHaveBeenCalled();
 
-    capturedEndSpan();
+    const parts = [];
+    for await (const part of result) {
+      parts.push(part);
+    }
+    expect(parts).toEqual(['part1', 'part2']);
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
-  it('should automatically end span on error even if noAutoEnd is true', async () => {
+  it('should automatically end span on error even if it is an AsyncGenerator', async () => {
     const error = new Error('streaming error');
-    await expect(
-      runInDevTraceSpan(
-        { operation: GeminiCliOperation.LLMCall, noAutoEnd: true },
-        async () => {
-          throw error;
-        },
-      ),
-    ).rejects.toThrow(error);
+    const asyncGen = async function* () {
+      yield 'part1';
+      throw error;
+    };
+
+    const result = (await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall },
+      async () => asyncGen(),
+    )) as unknown as AsyncGenerator<string>;
+
+    await expect(async () => {
+      for await (const _ of result) {
+        // Wait for throw
+      }
+    }).rejects.toThrow(error);
 
     expect(mockSpan.end).toHaveBeenCalled();
   });
