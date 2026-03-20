@@ -16,7 +16,7 @@ import {
   type AgentLoopContext,
   type ToolLiveOutput,
 } from '../index.js';
-import { isAbortError } from '../utils/errors.js';
+import { isCancellationError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ToolOutputDistillationService } from '../context/toolDistillationService.js';
@@ -163,17 +163,12 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          const abortedByError =
-            isAbortError(executionError) ||
-            (executionError instanceof Error &&
-              executionError.message.includes('Operation cancelled by user'));
+          const abortedByError = isCancellationError(executionError);
 
           if (signal.aborted || abortedByError) {
             completedToolCall = await this.createCancelledResult(
               call,
-              isAbortError(executionError)
-                ? 'Operation cancelled.'
-                : 'User cancelled tool execution.',
+              'Operation cancelled.',
             );
           } else {
             const error =

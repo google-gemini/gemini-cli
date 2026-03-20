@@ -512,6 +512,20 @@ describe('LocalSubagentInvocation', () => {
       );
     });
 
+    it('should treat plain cancellation messages as cancellation', async () => {
+      const abortError = new Error('The user aborted a request.');
+      mockExecutorInstance.run.mockRejectedValue(abortError);
+
+      await expect(invocation.execute(signal, updateOutput)).rejects.toThrow(
+        'The user aborted a request.',
+      );
+
+      const lastCall = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ]?.[0] as SubagentProgress;
+      expect(lastCall.state).toBe('cancelled');
+    });
+
     it('should throw an error and bubble cancellation when execution returns ABORTED', async () => {
       const mockOutput = {
         result: 'Cancelled by user',

@@ -43,6 +43,7 @@ import {
   sanitizeErrorMessage,
 } from '../../utils/agent-sanitization-utils.js';
 import { removeAutomationOverlay } from './automationOverlay.js';
+import { isCancellationError } from '../../utils/errors.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -359,9 +360,7 @@ ${output.result}`;
     } catch (error) {
       const rawErrorMessage =
         error instanceof Error ? error.message : String(error);
-      const isAbort =
-        (error instanceof Error && error.name === 'AbortError') ||
-        rawErrorMessage.includes('Aborted');
+      const isAbort = isCancellationError(error);
       const errorMessage = sanitizeErrorMessage(rawErrorMessage);
 
       // Mark any running items as error/cancelled
@@ -382,9 +381,11 @@ ${output.result}`;
         updateOutput(progress);
       }
 
-      const llmContent = isAbort
-        ? 'Browser agent execution was aborted.'
-        : `Browser agent failed. Error: ${errorMessage}`;
+      if (isAbort) {
+        throw error;
+      }
+
+      const llmContent = `Browser agent failed. Error: ${errorMessage}`;
 
       return {
         llmContent: [{ text: llmContent }],
