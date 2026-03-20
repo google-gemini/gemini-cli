@@ -44,21 +44,21 @@ describe('translateEvent', () => {
   });
 
   describe('Content events', () => {
-    it('emits stream_start + message for first content event', () => {
+    it('emits agent_start + message for first content event', () => {
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.Content,
         value: 'Hello world',
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(2);
-      expect(result[0]?.type).toBe('stream_start');
+      expect(result[0]?.type).toBe('agent_start');
       expect(result[1]?.type).toBe('message');
       const msg = result[1] as AgentEvent<'message'>;
       expect(msg.role).toBe('agent');
       expect(msg.content).toEqual([{ type: 'text', text: 'Hello world' }]);
     });
 
-    it('skips stream_start for subsequent content events', () => {
+    it('skips agent_start for subsequent content events', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.Content,
@@ -301,14 +301,14 @@ describe('translateEvent', () => {
   });
 
   describe('ModelInfo events', () => {
-    it('emits stream_start and session_update when no stream started yet', () => {
+    it('emits agent_start and session_update when no stream started yet', () => {
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.ModelInfo,
         value: 'gemini-2.5-pro',
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(2);
-      expect(result[0]?.type).toBe('stream_start');
+      expect(result[0]?.type).toBe('agent_start');
       expect(result[1]?.type).toBe('session_update');
       const sessionUpdate = result[1] as AgentEvent<'session_update'>;
       expect(sessionUpdate.model).toBe('gemini-2.5-pro');
@@ -329,7 +329,7 @@ describe('translateEvent', () => {
   });
 
   describe('AgentExecutionStopped events', () => {
-    it('emits stream_end with the final stop message in data.message', () => {
+    it('emits agent_end with the final stop message in data.message', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.AgentExecutionStopped,
@@ -341,8 +341,8 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
-      const streamEnd = result[0] as AgentEvent<'stream_end'>;
-      expect(streamEnd.type).toBe('stream_end');
+      const streamEnd = result[0] as AgentEvent<'agent_end'>;
+      expect(streamEnd.type).toBe('agent_end');
       expect(streamEnd.reason).toBe('completed');
       expect(streamEnd.data).toEqual({ message: 'Stopped by hook' });
     });
@@ -355,7 +355,7 @@ describe('translateEvent', () => {
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
-      const streamEnd = result[0] as AgentEvent<'stream_end'>;
+      const streamEnd = result[0] as AgentEvent<'agent_end'>;
       expect(streamEnd.data).toEqual({ message: 'hook' });
     });
   });
@@ -408,22 +408,22 @@ describe('translateEvent', () => {
   });
 
   describe('MaxSessionTurns events', () => {
-    it('emits stream_end with max_turns', () => {
+    it('emits agent_end with max_turns', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.MaxSessionTurns,
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
-      const streamEnd = result[0] as AgentEvent<'stream_end'>;
-      expect(streamEnd.type).toBe('stream_end');
+      const streamEnd = result[0] as AgentEvent<'agent_end'>;
+      expect(streamEnd.type).toBe('agent_end');
       expect(streamEnd.reason).toBe('max_turns');
       expect(streamEnd.data).toEqual({ code: 'MAX_TURNS_EXCEEDED' });
     });
   });
 
   describe('Finished events', () => {
-    it('emits usage + stream_end for STOP', () => {
+    it('emits usage for STOP', () => {
       state.streamStartEmitted = true;
       state.model = 'gemini-2.5-pro';
       const event: ServerGeminiStreamEvent = {
@@ -438,27 +438,23 @@ describe('translateEvent', () => {
         },
       };
       const result = translateEvent(event, state);
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(1);
 
       const usage = result[0] as AgentEvent<'usage'>;
       expect(usage.model).toBe('gemini-2.5-pro');
       expect(usage.inputTokens).toBe(100);
       expect(usage.outputTokens).toBe(50);
       expect(usage.cachedTokens).toBe(10);
-
-      const end = result[1] as AgentEvent<'stream_end'>;
-      expect(end.reason).toBe('completed');
     });
 
-    it('emits stream_end without usage when no metadata', () => {
+    it('emits nothing when no usage metadata is present', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.Finished,
         value: { reason: undefined, usageMetadata: undefined },
       };
       const result = translateEvent(event, state);
-      expect(result).toHaveLength(1);
-      expect(result[0]?.type).toBe('stream_end');
+      expect(result).toHaveLength(0);
     });
   });
 
@@ -480,15 +476,15 @@ describe('translateEvent', () => {
   });
 
   describe('UserCancelled events', () => {
-    it('emits stream_end with reason aborted', () => {
+    it('emits agent_end with reason aborted', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.UserCancelled,
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
-      const end = result[0] as AgentEvent<'stream_end'>;
-      expect(end.type).toBe('stream_end');
+      const end = result[0] as AgentEvent<'agent_end'>;
+      expect(end.type).toBe('agent_end');
       expect(end.reason).toBe('aborted');
     });
   });

@@ -77,7 +77,7 @@ function makeEvent(
 
 function ensureStreamStart(state: TranslationState, out: AgentEvent[]): void {
   if (!state.streamStartEmitted) {
-    out.push(makeEvent('stream_start', state, {}));
+    out.push(makeEvent('agent_start', state, {}));
     state.streamStartEmitted = true;
   }
 }
@@ -148,7 +148,7 @@ export function translateEvent(
     case GeminiEventType.UserCancelled:
       ensureStreamStart(state, out);
       out.push(
-        makeEvent('stream_end', state, {
+        makeEvent('agent_end', state, {
           reason: 'aborted',
         }),
       );
@@ -157,7 +157,7 @@ export function translateEvent(
     case GeminiEventType.MaxSessionTurns:
       ensureStreamStart(state, out);
       out.push(
-        makeEvent('stream_end', state, {
+        makeEvent('agent_end', state, {
           reason: 'max_turns',
           data: {
             code: 'MAX_TURNS_EXCEEDED',
@@ -173,7 +173,7 @@ export function translateEvent(
           kind: 'loop_detected',
         }),
       );
-      // No stream_end — the stream continues. Consumer decides how to handle:
+      // No agent_end — the stream continues. Consumer decides how to handle:
       // non-interactive emits a warning, interactive shows a confirmation dialog.
       break;
 
@@ -191,7 +191,7 @@ export function translateEvent(
     case GeminiEventType.AgentExecutionStopped:
       ensureStreamStart(state, out);
       out.push(
-        makeEvent('stream_end', state, {
+        makeEvent('agent_end', state, {
           reason: 'completed',
           data: {
             message: event.value.systemMessage?.trim() || event.value.reason,
@@ -285,18 +285,11 @@ function handleFinished(
   state: TranslationState,
   out: AgentEvent[],
 ): void {
-  ensureStreamStart(state, out);
-
   if (value.usageMetadata) {
+    ensureStreamStart(state, out);
     const usage = mapUsage(value.usageMetadata, state.model);
     out.push(makeEvent('usage', state, usage));
   }
-
-  out.push(
-    makeEvent('stream_end', state, {
-      reason: mapFinishReason(value.reason),
-    }),
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +312,7 @@ function handleError(
 // ---------------------------------------------------------------------------
 
 /**
- * Maps a Gemini FinishReason to a StreamEndReason.
+ * Maps a Gemini FinishReason to an AgentEnd reason.
  */
 export function mapFinishReason(
   reason: FinishReason | undefined,
