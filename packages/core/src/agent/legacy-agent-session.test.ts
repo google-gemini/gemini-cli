@@ -101,24 +101,12 @@ async function collectEvents(
   options?: { streamId?: string; eventId?: string },
 ): Promise<AgentEvent[]> {
   const events: AgentEvent[] = [];
-  const streamOptions: { streamId?: string; eventId?: string } =
-    options?.eventId
-      ? {
-          eventId: options.eventId,
-          ...(options.streamId ? { streamId: options.streamId } : {}),
-        }
-      : {
-          streamId:
-            options?.streamId ??
-            session.events.findLast((event) => event.type === 'agent_start')
-              ?.streamId,
-        };
+  const streamOptions =
+    options?.eventId || options?.streamId ? options : undefined;
 
-  if (!streamOptions.eventId && !streamOptions.streamId) {
-    return events;
-  }
-
-  for await (const event of session.stream(streamOptions)) {
+  for await (const event of streamOptions
+    ? session.stream(streamOptions)
+    : session.stream()) {
     events.push(event);
   }
   return events;
@@ -188,6 +176,40 @@ describe('LegacyAgentSession', () => {
       await collectEvents(session, { streamId: streamId ?? undefined });
     });
 
+    it('returns streamId before emitting agent_start', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+      sendMock.mockReturnValue(
+        makeStream([
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      const session = new LegacyAgentSession(deps);
+      const liveEvents: AgentEvent[] = [];
+      session.subscribe((event) => {
+        liveEvents.push(event);
+      });
+
+      const { streamId } = await session.send({
+        message: [{ type: 'text', text: 'hi' }],
+      });
+
+      expect(streamId).toBe('test-stream');
+      expect(liveEvents.some((event) => event.type === 'agent_start')).toBe(
+        false,
+      );
+
+      await collectEvents(session, { streamId: streamId ?? undefined });
+      expect(liveEvents.some((event) => event.type === 'agent_start')).toBe(
+        true,
+      );
+    });
+
     it('throws for non-message payloads', async () => {
       const session = new LegacyAgentSession(deps);
       await expect(session.send({ update: { title: 'test' } })).rejects.toThrow(
@@ -213,14 +235,17 @@ describe('LegacyAgentSession', () => {
       );
 
       const session = new LegacyAgentSession(deps);
-      await session.send({ message: [{ type: 'text', text: 'first' }] });
+      const { streamId } = await session.send({
+        message: [{ type: 'text', text: 'first' }],
+      });
+      await vi.advanceTimersByTimeAsync(0);
 
       await expect(
         session.send({ message: [{ type: 'text', text: 'second' }] }),
       ).rejects.toThrow('cannot be called while a stream is active');
 
       resolveHang?.();
-      await collectEvents(session);
+      await collectEvents(session, { streamId: streamId ?? undefined });
     });
 
     it('creates a new streamId after the previous stream completes', async () => {
@@ -756,6 +781,48 @@ describe('LegacyAgentSession', () => {
   });
 
   describe('abort', () => {
+    it('treats abort before the first model event as aborted without fatal error', async () => {
+      let releaseAbort: (() => void) | undefined;
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+      sendMock.mockReturnValue(
+        (async function* () {
+          await new Promise<void>((resolve) => {
+            releaseAbort = resolve;
+          });
+          yield* [];
+          const abortError = new Error('Aborted');
+          abortError.name = 'AbortError';
+          throw abortError;
+        })(),
+      );
+
+      const session = new LegacyAgentSession(deps);
+      const { streamId } = await session.send({
+        message: [{ type: 'text', text: 'hi' }],
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      await session.abort();
+      releaseAbort?.();
+
+      const events = await collectEvents(session, {
+        streamId: streamId ?? undefined,
+      });
+      expect(
+        events.some(
+          (event): event is AgentEvent<'error'> =>
+            event.type === 'error' && event.fatal,
+        ),
+      ).toBe(false);
+
+      const streamEnd = events.findLast(
+        (event): event is AgentEvent<'agent_end'> => event.type === 'agent_end',
+      );
+      expect(streamEnd?.reason).toBe('aborted');
+    });
+
     it('aborts the stream', async () => {
       const sendMock = deps.client.sendMessageStream as ReturnType<
         typeof vi.fn
@@ -794,6 +861,59 @@ describe('LegacyAgentSession', () => {
 
       const streamEnd = events.find(
         (e): e is AgentEvent<'agent_end'> => e.type === 'agent_end',
+      );
+      expect(streamEnd?.reason).toBe('aborted');
+    });
+
+    it('treats abort during pending scheduler work as aborted without fatal error', async () => {
+      let resolveSchedule: ((value: CompletedToolCall[]) => void) | undefined;
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+      sendMock.mockReturnValue(
+        makeStream([
+          {
+            type: GeminiEventType.ToolCallRequest,
+            value: makeToolRequest('call-1', 'slow_tool'),
+          },
+          {
+            type: GeminiEventType.Finished,
+            value: { reason: FinishReason.STOP, usageMetadata: undefined },
+          },
+        ]),
+      );
+
+      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      scheduleMock.mockReturnValue(
+        new Promise<CompletedToolCall[]>((resolve) => {
+          resolveSchedule = resolve;
+        }),
+      );
+
+      const session = new LegacyAgentSession(deps);
+      const { streamId } = await session.send({
+        message: [{ type: 'text', text: 'hi' }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      await session.abort();
+      resolveSchedule?.([makeCompletedToolCall('call-1', 'slow_tool', 'done')]);
+
+      const events = await collectEvents(session, {
+        streamId: streamId ?? undefined,
+      });
+      expect(
+        events.some(
+          (event): event is AgentEvent<'error'> =>
+            event.type === 'error' && event.fatal,
+        ),
+      ).toBe(false);
+      expect(events.some((event) => event.type === 'tool_response')).toBe(
+        false,
+      );
+
+      const streamEnd = events.findLast(
+        (event): event is AgentEvent<'agent_end'> => event.type === 'agent_end',
       );
       expect(streamEnd?.reason).toBe('aborted');
     });
@@ -1272,6 +1392,26 @@ describe('LegacyAgentSession', () => {
         (e): e is AgentEvent<'error'> => e.type === 'error',
       );
       expect(err?._meta?.['code']).toBe('ENOENT');
+    });
+
+    it('preserves status in _meta for errors with status property', async () => {
+      const sendMock = deps.client.sendMessageStream as ReturnType<
+        typeof vi.fn
+      >;
+      const statusError = new Error('rate limited');
+      (statusError as Error & { status: string }).status = 'RESOURCE_EXHAUSTED';
+      sendMock.mockImplementation(() => {
+        throw statusError;
+      });
+
+      const session = new LegacyAgentSession(deps);
+      await session.send({ message: [{ type: 'text', text: 'hi' }] });
+      const events = await collectEvents(session);
+
+      const err = events.find(
+        (e): e is AgentEvent<'error'> => e.type === 'error',
+      );
+      expect(err?._meta?.['status']).toBe('RESOURCE_EXHAUSTED');
     });
   });
 });
