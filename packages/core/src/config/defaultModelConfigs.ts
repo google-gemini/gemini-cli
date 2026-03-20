@@ -28,7 +28,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
           thinkingConfig: {
             includeThoughts: true,
           },
-          temperature: 1,
+          temperature: 0,
           topP: 0.95,
           topK: 64,
         },
@@ -244,7 +244,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       match: { model: 'chat-base', isRetry: true },
       modelConfig: {
         generateContentConfig: {
-          temperature: 1,
+          temperature: 0,
         },
       },
     },
