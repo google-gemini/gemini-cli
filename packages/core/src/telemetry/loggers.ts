@@ -905,7 +905,7 @@ export function logOnboardingSuccess(
     };
     logger.emit(logRecord);
 
-    recordOnboardingSuccess(config);
+    recordOnboardingSuccess(config, event.userTier);
   });
 }
 

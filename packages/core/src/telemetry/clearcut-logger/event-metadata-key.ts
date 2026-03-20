@@ -713,6 +713,10 @@ export enum EventMetadataKey {
   // Logs the source of a credit purchase click (e.g. overage_menu, empty_wallet_menu, manage).
   GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
 
+  // ==========================================================================
+  // Gemini Enterprise (GE) Event Keys
+  // ==========================================================================
+
   // Logs the start of the onboarding process.
   GEMINI_CLI_ONBOARDING_START = 191,
 

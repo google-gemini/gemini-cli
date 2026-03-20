@@ -2577,7 +2577,10 @@ describe('loggers', () => {
         },
       });
 
-      expect(metrics.recordOnboardingSuccess).toHaveBeenCalledWith(mockConfig);
+      expect(metrics.recordOnboardingSuccess).toHaveBeenCalledWith(
+        mockConfig,
+        'standard-tier',
+      );
     });
   });
 

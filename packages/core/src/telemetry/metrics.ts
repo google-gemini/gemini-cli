@@ -311,7 +311,9 @@ const COUNTER_DEFINITIONS = {
     description: 'Counts onboarding succeeded',
     valueType: ValueType.INT,
     assign: (c: Counter) => (onboardingSuccessCounter = c),
-    attributes: {} as Record<string, never>,
+    attributes: {} as {
+      user_tier?: string;
+    },
   },
 } as const;
 
@@ -842,12 +844,15 @@ export function recordOnboardingStart(config: Config): void {
 /**
  * Records a metric for when the Google auth process ends successfully.
  */
-export function recordOnboardingSuccess(config: Config): void {
+export function recordOnboardingSuccess(
+  config: Config,
+  userTier?: string,
+): void {
   if (!onboardingSuccessCounter || !isMetricsInitialized) return;
-  onboardingSuccessCounter.add(
-    1,
-    baseMetricDefinition.getCommonAttributes(config),
-  );
+  onboardingSuccessCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...(userTier && { user_tier: userTier }),
+  });
 }
 
 /**
