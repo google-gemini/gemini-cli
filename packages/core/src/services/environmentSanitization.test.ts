@@ -306,6 +306,24 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
+  it('should block NEVER_ALLOWED_ENVIRONMENT_VARIABLES even when explicitly added to the allow-list', () => {
+    // The user-configured allow-list must not be able to bypass the hard denylist
+    // (e.g. DATABASE_URL, GOOGLE_CLOUD_PROJECT). Without this guarantee, a user
+    // setting security.environmentVariableRedaction.allowed = ['DATABASE_URL']
+    // would silently expose credentials to the LLM.
+    const env = {
+      DATABASE_URL: 'postgres://user:pass@host/db',
+      SAFE_VAR: 'fine',
+    };
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: ['DATABASE_URL'],
+      blockedEnvironmentVariables: [],
+      enableEnvironmentVariableRedaction: true,
+    });
+    expect(sanitized).toEqual({ SAFE_VAR: 'fine' });
+    expect(sanitized).not.toHaveProperty('DATABASE_URL');
+  });
+
   it('should block variables specified in blockedEnvironmentVariables', () => {
     const env = {
       SAFE_VAR: 'safe-value',
