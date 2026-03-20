@@ -270,6 +270,43 @@ describe('BrowserManager', () => {
       expect(result.isError).toBe(true);
       expect((result.content || [])[0]?.text).toContain('not permitted');
     });
+
+    it('should block URL matching blockedUrlPatterns', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+            blockedUrlPatterns: ['*translate.google.*/translate*'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?u=https://blocked.org',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'blocked by a URL pattern',
+      );
+    });
+
+    it('should allow URL on allowed domain when not matching blockedUrlPatterns', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+            blockedUrlPatterns: ['*translate.google.*/translate*'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://www.google.com/search?q=test',
+      });
+
+      expect(result.isError).toBe(false);
+    });
   });
 
   describe('MCP connection', () => {

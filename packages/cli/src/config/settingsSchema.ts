@@ -1188,6 +1188,20 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
             items: { type: 'string' },
           },
+          blockedUrlPatterns: {
+            type: 'array',
+            label: 'Blocked URL Patterns',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: [] as string[],
+            description: oneLine`
+              URL glob patterns to always block, even on allowed domains.
+              Useful for blocking proxy services that bypass allowedDomains
+              (e.g., ["*translate.google.*/translate*"]).
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
           disableUserInput: {
             type: 'boolean',
             label: 'Disable User Input',

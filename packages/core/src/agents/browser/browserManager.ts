@@ -29,6 +29,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import picomatch from 'picomatch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -573,8 +574,8 @@ export class BrowserManager {
       return undefined;
     }
 
-    const allowedDomains =
-      this.config.getBrowserAgentConfig().customConfig.allowedDomains;
+    const browserConfig = this.config.getBrowserAgentConfig().customConfig;
+    const allowedDomains = browserConfig.allowedDomains;
     if (!allowedDomains || allowedDomains.length === 0) {
       return undefined;
     }
@@ -585,6 +586,15 @@ export class BrowserManager {
     }
     if (typeof url !== 'string') {
       return `Invalid URL: URL must be a string.`;
+    }
+
+    // Check blockedUrlPatterns first — these take precedence over allowedDomains.
+    const blockedPatterns = browserConfig.blockedUrlPatterns;
+    if (blockedPatterns && blockedPatterns.length > 0) {
+      const isBlocked = picomatch(blockedPatterns, { contains: true });
+      if (isBlocked(url)) {
+        return `Tool '${toolName}' is blocked by a URL pattern in your browser settings.`;
+      }
     }
 
     try {

@@ -328,6 +328,8 @@ export interface BrowserAgentCustomConfig {
   visualModel?: string;
   /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
   allowedDomains?: string[];
+  /** URL glob patterns to always block, even on allowed domains. */
+  blockedUrlPatterns?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
 }
@@ -3121,6 +3123,7 @@ export class Config implements McpContext, AgentLoopContext {
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
+        blockedUrlPatterns: customConfig.blockedUrlPatterns,
         disableUserInput: customConfig.disableUserInput,
       },
     };
