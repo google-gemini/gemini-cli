@@ -194,7 +194,7 @@ describe('ToolConfirmationMessage', () => {
       urls: ['https://example.com'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -221,7 +221,7 @@ describe('ToolConfirmationMessage', () => {
       ],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -245,7 +245,7 @@ describe('ToolConfirmationMessage', () => {
       urls: ['https://täst.com'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -276,7 +276,7 @@ describe('ToolConfirmationMessage', () => {
       rootCommands: ['curl'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -307,7 +307,7 @@ describe('ToolConfirmationMessage', () => {
       rootCommands: ['curl'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -337,7 +337,7 @@ describe('ToolConfirmationMessage', () => {
       urls: ['https://еxample.com', 'https://täst.com'],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -367,7 +367,7 @@ describe('ToolConfirmationMessage', () => {
       commands: ['echo "hello"', 'ls -la', 'whoami'], // Multi-command list
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -396,7 +396,7 @@ describe('ToolConfirmationMessage', () => {
       rootCommands: ['echo'],
     };
 
-    const result = renderWithProviders(
+    const result = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -481,16 +481,17 @@ describe('ToolConfirmationMessage', () => {
           getDisableAlwaysAllow: () => false,
           getApprovalMode: () => 'default',
         } as unknown as Config;
-        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-          <ToolConfirmationMessage
-            callId="test-call-id"
-            confirmationDetails={details}
-            config={mockConfig}
-            getPreferredEditor={vi.fn()}
-            availableTerminalHeight={30}
-            terminalWidth={80}
-          />,
-        );
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ToolConfirmationMessage
+              callId="test-call-id"
+              confirmationDetails={details}
+              config={mockConfig}
+              getPreferredEditor={vi.fn()}
+              availableTerminalHeight={30}
+              terminalWidth={80}
+            />,
+          );
         await waitUntilReady();
 
         expect(lastFrame()).toMatchSnapshot();
@@ -505,16 +506,17 @@ describe('ToolConfirmationMessage', () => {
           getApprovalMode: () => 'default',
         } as unknown as Config;
 
-        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-          <ToolConfirmationMessage
-            callId="test-call-id"
-            confirmationDetails={details}
-            config={mockConfig}
-            getPreferredEditor={vi.fn()}
-            availableTerminalHeight={30}
-            terminalWidth={80}
-          />,
-        );
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ToolConfirmationMessage
+              callId="test-call-id"
+              confirmationDetails={details}
+              config={mockConfig}
+              getPreferredEditor={vi.fn()}
+              availableTerminalHeight={30}
+              terminalWidth={80}
+            />,
+          );
         await waitUntilReady();
 
         expect(lastFrame()).toMatchSnapshot();
@@ -541,7 +543,7 @@ describe('ToolConfirmationMessage', () => {
         getDisableAlwaysAllow: () => false,
         getApprovalMode: () => 'default',
       } as unknown as Config;
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -569,7 +571,7 @@ describe('ToolConfirmationMessage', () => {
         getDisableAlwaysAllow: () => false,
         getApprovalMode: () => 'default',
       } as unknown as Config;
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -618,7 +620,7 @@ describe('ToolConfirmationMessage', () => {
         isDiffingEnabled: false,
       });
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -647,7 +649,7 @@ describe('ToolConfirmationMessage', () => {
         isDiffingEnabled: false,
       });
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -676,7 +678,7 @@ describe('ToolConfirmationMessage', () => {
         isDiffingEnabled: true,
       });
 
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
@@ -703,7 +705,7 @@ describe('ToolConfirmationMessage', () => {
       onConfirm: vi.fn(),
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -749,7 +751,7 @@ describe('ToolConfirmationMessage', () => {
       onConfirm: vi.fn(),
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -781,7 +783,7 @@ describe('ToolConfirmationMessage', () => {
       onConfirm: vi.fn(),
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
@@ -826,7 +828,7 @@ describe('ToolConfirmationMessage', () => {
         urls: ['https://example.com'],
       };
 
-      const { stdin, waitUntilReady, unmount } = renderWithProviders(
+      const { stdin, waitUntilReady, unmount } = await renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
           confirmationDetails={confirmationDetails}

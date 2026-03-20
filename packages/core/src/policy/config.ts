@@ -576,6 +576,7 @@ export function createPolicyUpdater(
               decision: PolicyDecision.ALLOW,
               priority,
               argsPattern: new RegExp(pattern),
+              mcpName: message.mcpName,
               source: 'Dynamic (Confirmed)',
             });
           }
@@ -611,6 +612,7 @@ export function createPolicyUpdater(
           decision: PolicyDecision.ALLOW,
           priority,
           argsPattern,
+          mcpName: message.mcpName,
           source: 'Dynamic (Confirmed)',
         });
       }
