@@ -144,6 +144,7 @@ export async function startInteractiveUI(
   const simulatedStdin = new PassThrough({ encoding: 'utf8' });
 
   let lastFrame: string | undefined;
+  const staticHistory: string[] = [];
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
@@ -161,6 +162,12 @@ export async function startInteractiveUI(
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: (metrics: RenderMetrics) => {
         lastFrame = metrics.output;
+        if (metrics.staticOutput) {
+          staticHistory.push(metrics.staticOutput);
+          if (staticHistory.length > 50) {
+            staticHistory.shift();
+          }
+        }
         if (metrics.renderTime > SLOW_RENDER_MS) {
           recordSlowRender(config, metrics.renderTime);
         }
@@ -196,7 +203,12 @@ export async function startInteractiveUI(
   if (simulateUser) {
     const simulator = new UserSimulator(
       config,
-      () => lastFrame,
+      () => {
+        if (lastFrame === undefined) return undefined;
+        // Combine history with latest frame for the simulator
+        const historyText = staticHistory.join('\n');
+        return historyText ? `${historyText}\n${lastFrame}` : lastFrame;
+      },
       simulatedStdin,
     );
     simulator.start();
