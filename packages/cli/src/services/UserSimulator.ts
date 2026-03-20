@@ -53,11 +53,13 @@ export class UserSimulator {
       const screen = this.getScreen();
       if (!screen) return;
 
-      const strippedScreen = screen.replace(
-        // eslint-disable-next-line no-control-regex
-        /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
-        '',
-      );
+      const strippedScreen = screen
+        .replace(
+          // eslint-disable-next-line no-control-regex
+          /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+          '',
+        )
+        .replace(/\n([ \t]*\n)+/g, '\n\n');
 
       const normalizedScreen = strippedScreen
         .replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g, '')
