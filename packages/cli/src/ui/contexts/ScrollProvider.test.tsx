@@ -82,7 +82,7 @@ describe('ScrollProvider', () => {
   });
 
   describe('Event Handling Status', () => {
-    it('returns true when scroll event is handled', () => {
+    it('returns true when scroll event is handled', async () => {
       const scrollBy = vi.fn();
       const getScrollState = vi.fn(() => ({
         scrollTop: 0,
@@ -90,7 +90,7 @@ describe('ScrollProvider', () => {
         innerHeight: 10,
       }));
 
-      render(
+      await render(
         <ScrollProvider>
           <TestScrollable
             id="test-scrollable"
@@ -119,7 +119,7 @@ describe('ScrollProvider', () => {
       expect(handled).toBe(true);
     });
 
-    it('returns false when scroll event is ignored (cannot scroll further)', () => {
+    it('returns false when scroll event is ignored (cannot scroll further)', async () => {
       const scrollBy = vi.fn();
       // Already at bottom
       const getScrollState = vi.fn(() => ({
@@ -128,7 +128,7 @@ describe('ScrollProvider', () => {
         innerHeight: 10,
       }));
 
-      render(
+      await render(
         <ScrollProvider>
           <TestScrollable
             id="test-scrollable"
@@ -167,7 +167,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -211,7 +211,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -244,7 +244,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -289,7 +289,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -347,7 +347,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -408,7 +408,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -470,7 +470,7 @@ describe('ScrollProvider', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"

@@ -70,7 +70,6 @@ describe('Focus Hint', () => {
         <Component {...baseProps} resultDisplay={undefined} />,
         { uiState: { streamingState: StreamingState.Idle } },
       );
-      await waitUntilReady();
 
       // Initially, no focus hint
       expect(lastFrame()).toMatchSnapshot('initial-no-output');
@@ -92,7 +91,6 @@ describe('Focus Hint', () => {
         <Component {...baseProps} resultDisplay="Some output" />,
         { uiState: { streamingState: StreamingState.Idle } },
       );
-      await waitUntilReady();
 
       // Initially, no focus hint
       expect(lastFrame()).toMatchSnapshot('initial-with-output');
@@ -119,7 +117,6 @@ describe('Focus Hint', () => {
       />,
       { uiState: { streamingState: StreamingState.Idle } },
     );
-    await waitUntilReady();
 
     await act(async () => {
       vi.advanceTimersByTime(SHELL_FOCUS_HINT_DELAY_MS + 100);

@@ -26,10 +26,9 @@ vi.mock('../semantic-colors.js', () => ({
 
 describe('ThemedGradient', () => {
   it('renders children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ThemedGradient>Hello</ThemedGradient>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Hello');
     unmount();
   });

@@ -27,13 +27,12 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
@@ -50,13 +49,12 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('There are capacity issues');
     expect(lastFrame()).toMatchSnapshot();
@@ -72,13 +70,12 @@ describe('<AppHeader />', () => {
       },
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('Banner');
     expect(lastFrame()).toMatchSnapshot();
@@ -103,13 +100,12 @@ describe('<AppHeader />', () => {
       },
     });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
@@ -129,13 +125,12 @@ describe('<AppHeader />', () => {
     // and interfering with the expected persistentState.set call.
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { waitUntilReady, unmount } = await renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(persistentStateMock.set).toHaveBeenCalledWith(
       'defaultBannerShownCount',
@@ -159,13 +154,12 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('First line\\nSecond line');
     unmount();
@@ -183,13 +177,12 @@ describe('<AppHeader />', () => {
 
     persistentStateMock.setData({ tipsShown: 5 });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Tips');
     expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', 6);
@@ -206,13 +199,12 @@ describe('<AppHeader />', () => {
 
     persistentStateMock.setData({ tipsShown: 10 });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <AppHeader version="1.0.0" />,
       {
         uiState,
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame()).not.toContain('Tips');
     unmount();
@@ -234,7 +226,6 @@ describe('<AppHeader />', () => {
     const session1 = await renderWithProviders(<AppHeader version="1.0.0" />, {
       uiState,
     });
-    await session1.waitUntilReady();
 
     expect(session1.lastFrame()).toContain('Tips');
     expect(persistentStateMock.get('tipsShown')).toBe(10);
@@ -245,7 +236,6 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {},
     );
-    await session2.waitUntilReady();
 
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();

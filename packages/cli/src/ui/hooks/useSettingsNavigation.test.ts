@@ -18,8 +18,8 @@ describe('useSettingsNavigation', () => {
     { key: 'e' },
   ];
 
-  it('should initialize with the first item active', () => {
-    const { result } = renderHook(() =>
+  it('should initialize with the first item active', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
     expect(result.current.activeIndex).toBe(0);
@@ -27,8 +27,8 @@ describe('useSettingsNavigation', () => {
     expect(result.current.windowStart).toBe(0);
   });
 
-  it('should move down correctly', () => {
-    const { result } = renderHook(() =>
+  it('should move down correctly', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
     act(() => result.current.moveDown());
@@ -36,8 +36,8 @@ describe('useSettingsNavigation', () => {
     expect(result.current.activeItemKey).toBe('b');
   });
 
-  it('should move up correctly', () => {
-    const { result } = renderHook(() =>
+  it('should move up correctly', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
     act(() => result.current.moveDown()); // to index 1
@@ -45,8 +45,8 @@ describe('useSettingsNavigation', () => {
     expect(result.current.activeIndex).toBe(0);
   });
 
-  it('should wrap around from top to bottom', () => {
-    const { result } = renderHook(() =>
+  it('should wrap around from top to bottom', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
     act(() => result.current.moveUp());
@@ -54,8 +54,8 @@ describe('useSettingsNavigation', () => {
     expect(result.current.activeItemKey).toBe('e');
   });
 
-  it('should wrap around from bottom to top', () => {
-    const { result } = renderHook(() =>
+  it('should wrap around from bottom to top', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
     // Move to last item
@@ -71,8 +71,8 @@ describe('useSettingsNavigation', () => {
     expect(result.current.activeIndex).toBe(0);
   });
 
-  it('should adjust scrollOffset when moving down past visible area', () => {
-    const { result } = renderHook(() =>
+  it('should adjust scrollOffset when moving down past visible area', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
 
@@ -84,8 +84,8 @@ describe('useSettingsNavigation', () => {
     expect(result.current.windowStart).toBe(1);
   });
 
-  it('should adjust scrollOffset when moving up past visible area', () => {
-    const { result } = renderHook(() =>
+  it('should adjust scrollOffset when moving up past visible area', async () => {
+    const { result } = await renderHook(() =>
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
 
@@ -100,9 +100,9 @@ describe('useSettingsNavigation', () => {
     expect(result.current.windowStart).toBe(0);
   });
 
-  it('should handle item preservation when list filters (Part 1 logic)', () => {
+  it('should handle item preservation when list filters (Part 1 logic)', async () => {
     let items = mockItems;
-    const { result, rerender } = renderHook(
+    const { result, rerender } = await renderHook(
       ({ list }) => useSettingsNavigation({ items: list, maxItemsToShow: 3 }),
       { initialProps: { list: items } },
     );

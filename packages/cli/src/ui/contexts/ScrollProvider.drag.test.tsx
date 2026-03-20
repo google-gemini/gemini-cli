@@ -87,7 +87,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -190,7 +190,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -253,7 +253,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -291,7 +291,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -329,7 +329,7 @@ describe('ScrollProvider Drag', () => {
       innerHeight: 10,
     }));
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollable
           id="test-scrollable"
@@ -397,7 +397,7 @@ describe('ScrollProvider Drag', () => {
     );
     TestScrollableWithScrollTo.displayName = 'TestScrollableWithScrollTo';
 
-    render(
+    await render(
       <ScrollProvider>
         <TestScrollableWithScrollTo
           id="test-scrollable-scrollto"

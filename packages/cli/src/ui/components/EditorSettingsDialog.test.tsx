@@ -55,27 +55,25 @@ describe('EditorSettingsDialog', () => {
     renderWithProviders(ui);
 
   it('renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = await renderWithProvider(
+    const { lastFrame } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('calls onSelect when an editor is selected', async () => {
     const onSelect = vi.fn();
-    const { lastFrame, waitUntilReady } = await renderWithProvider(
+    const { lastFrame } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={onSelect}
         settings={mockSettings}
         onExit={vi.fn()}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('VS Code');
   });
@@ -88,7 +86,6 @@ describe('EditorSettingsDialog', () => {
         onExit={vi.fn()}
       />,
     );
-    await waitUntilReady();
 
     // Initial focus on editor
     expect(lastFrame()).toContain('> Select Editor');
@@ -134,7 +131,6 @@ describe('EditorSettingsDialog', () => {
         onExit={onExit}
       />,
     );
-    await waitUntilReady();
 
     await act(async () => {
       stdin.write('\u001B'); // Escape
@@ -162,14 +158,13 @@ describe('EditorSettingsDialog', () => {
       },
     } as unknown as LoadedSettings;
 
-    const { lastFrame, waitUntilReady } = await renderWithProvider(
+    const { lastFrame } = await renderWithProvider(
       <EditorSettingsDialog
         onSelect={vi.fn()}
         settings={settingsWithOtherScope}
         onExit={vi.fn()}
       />,
     );
-    await waitUntilReady();
 
     const frame = lastFrame() || '';
     if (!frame.includes('(Also modified')) {

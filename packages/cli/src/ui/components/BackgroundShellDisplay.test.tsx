@@ -145,7 +145,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('renders the output of the active shell', async () => {
     const width = 80;
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -158,7 +158,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -166,7 +165,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('renders tabs for multiple shells', async () => {
     const width = 100;
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -179,7 +178,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -187,7 +185,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('highlights the focused state', async () => {
     const width = 80;
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -200,7 +198,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -208,7 +205,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('resizes the PTY on mount and when dimensions change', async () => {
     const width = 80;
-    const { rerender, waitUntilReady, unmount } = render(
+    const { rerender, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -221,7 +218,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
@@ -241,7 +237,6 @@ describe('<BackgroundShellDisplay />', () => {
         />
       </ScrollProvider>,
     );
-    await waitUntilReady();
 
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
@@ -253,7 +248,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('renders the process list when isListOpenProp is true', async () => {
     const width = 80;
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -266,7 +261,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -274,7 +268,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('selects the current process and closes the list when Ctrl+L is pressed in list view', async () => {
     const width = 80;
-    const { waitUntilReady, unmount } = render(
+    const { unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -287,19 +281,16 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     // Simulate down arrow to select the second process (handled by RadioButtonSelect)
     await act(async () => {
       simulateKey({ name: 'down' });
     });
-    await waitUntilReady();
 
     // Simulate Ctrl+L (handled by BackgroundShellDisplay)
     await act(async () => {
       simulateKey({ name: 'l', ctrl: true });
     });
-    await waitUntilReady();
 
     expect(mockSetActiveBackgroundShellPid).toHaveBeenCalledWith(shell2.pid);
     expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
@@ -308,7 +299,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('kills the highlighted process when Ctrl+K is pressed in list view', async () => {
     const width = 80;
-    const { waitUntilReady, unmount } = render(
+    const { unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -321,7 +312,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     // Initial state: shell1 (active) is highlighted
 
@@ -329,13 +319,11 @@ describe('<BackgroundShellDisplay />', () => {
     await act(async () => {
       simulateKey({ name: 'down' });
     });
-    await waitUntilReady();
 
     // Press Ctrl+K
     await act(async () => {
       simulateKey({ name: 'k', ctrl: true });
     });
-    await waitUntilReady();
 
     expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell2.pid);
     unmount();
@@ -343,7 +331,7 @@ describe('<BackgroundShellDisplay />', () => {
 
   it('kills the active process when Ctrl+K is pressed in output view', async () => {
     const width = 80;
-    const { waitUntilReady, unmount } = render(
+    const { unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -356,12 +344,10 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     await act(async () => {
       simulateKey({ name: 'k', ctrl: true });
     });
-    await waitUntilReady();
 
     expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell1.pid);
     unmount();
@@ -370,7 +356,7 @@ describe('<BackgroundShellDisplay />', () => {
   it('scrolls to active shell when list opens', async () => {
     // shell2 is active
     const width = 80;
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -383,7 +369,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -402,7 +387,7 @@ describe('<BackgroundShellDisplay />', () => {
     mockShells.set(exitedShell.pid, exitedShell);
 
     const width = 80;
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
@@ -415,7 +400,6 @@ describe('<BackgroundShellDisplay />', () => {
       </ScrollProvider>,
       width,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
     unmount();

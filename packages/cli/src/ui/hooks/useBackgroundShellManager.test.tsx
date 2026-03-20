@@ -21,13 +21,13 @@ describe('useBackgroundShellManager', () => {
     vi.clearAllMocks();
   });
 
-  const renderHook = (props: BackgroundShellManagerProps) => {
+  const renderHook = async (props: BackgroundShellManagerProps) => {
     let hookResult: ReturnType<typeof useBackgroundShellManager>;
     function TestComponent({ p }: { p: BackgroundShellManagerProps }) {
       hookResult = useBackgroundShellManager(p);
       return null;
     }
-    const { rerender } = render(<TestComponent p={props} />);
+    const { rerender } = await render(<TestComponent p={props} />);
     return {
       result: {
         get current() {
@@ -39,9 +39,9 @@ describe('useBackgroundShellManager', () => {
     };
   };
 
-  it('should initialize with correct default values', () => {
+  it('should initialize with correct default values', async () => {
     const backgroundShells = new Map<number, BackgroundShell>();
-    const { result } = renderHook({
+    const { result } = await renderHook({
       backgroundShells,
       backgroundShellCount: 0,
       isBackgroundShellVisible: false,
@@ -56,9 +56,9 @@ describe('useBackgroundShellManager', () => {
     expect(result.current.backgroundShellHeight).toBe(0);
   });
 
-  it('should auto-select the first background shell when added', () => {
+  it('should auto-select the first background shell when added', async () => {
     const backgroundShells = new Map<number, BackgroundShell>();
-    const { result, rerender } = renderHook({
+    const { result, rerender } = await renderHook({
       backgroundShells,
       backgroundShellCount: 0,
       isBackgroundShellVisible: false,
@@ -84,11 +84,11 @@ describe('useBackgroundShellManager', () => {
     expect(result.current.activeBackgroundShellPid).toBe(123);
   });
 
-  it('should reset state when all shells are removed', () => {
+  it('should reset state when all shells are removed', async () => {
     const backgroundShells = new Map<number, BackgroundShell>([
       [123, {} as BackgroundShell],
     ]);
-    const { result, rerender } = renderHook({
+    const { result, rerender } = await renderHook({
       backgroundShells,
       backgroundShellCount: 1,
       isBackgroundShellVisible: true,
@@ -117,11 +117,11 @@ describe('useBackgroundShellManager', () => {
     expect(result.current.isBackgroundShellListOpen).toBe(false);
   });
 
-  it('should unfocus embedded shell when no shells are active', () => {
+  it('should unfocus embedded shell when no shells are active', async () => {
     const backgroundShells = new Map<number, BackgroundShell>([
       [123, {} as BackgroundShell],
     ]);
-    renderHook({
+    await renderHook({
       backgroundShells,
       backgroundShellCount: 1,
       isBackgroundShellVisible: false, // Background shell not visible
@@ -134,11 +134,11 @@ describe('useBackgroundShellManager', () => {
     expect(setEmbeddedShellFocused).toHaveBeenCalledWith(false);
   });
 
-  it('should calculate backgroundShellHeight correctly when visible', () => {
+  it('should calculate backgroundShellHeight correctly when visible', async () => {
     const backgroundShells = new Map<number, BackgroundShell>([
       [123, {} as BackgroundShell],
     ]);
-    const { result } = renderHook({
+    const { result } = await renderHook({
       backgroundShells,
       backgroundShellCount: 1,
       isBackgroundShellVisible: true,
@@ -152,12 +152,12 @@ describe('useBackgroundShellManager', () => {
     expect(result.current.backgroundShellHeight).toBe(30);
   });
 
-  it('should maintain current active shell if it still exists', () => {
+  it('should maintain current active shell if it still exists', async () => {
     const backgroundShells = new Map<number, BackgroundShell>([
       [123, {} as BackgroundShell],
       [456, {} as BackgroundShell],
     ]);
-    const { result, rerender } = renderHook({
+    const { result, rerender } = await renderHook({
       backgroundShells,
       backgroundShellCount: 2,
       isBackgroundShellVisible: true,
