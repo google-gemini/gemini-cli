@@ -19,6 +19,9 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -30,9 +33,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -65,6 +65,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -76,9 +79,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -111,6 +111,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Auto Update                                                                     true*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -122,9 +125,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -157,6 +157,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -168,9 +171,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -203,6 +203,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -214,9 +217,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -249,6 +249,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -260,9 +263,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -295,6 +295,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -306,9 +309,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -341,6 +341,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -352,9 +355,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -387,6 +387,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
+│    Enable Auto Update Notification                                                         true  │
+│    Enable update notification prompts.                                                           │
+│                                                                                                  │
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
@@ -398,9 +401,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Retry Fetch Errors                                                                      true  │
 │    Retry on "exception TypeError: fetch failed sending request" errors.                          │
-│                                                                                                  │
-│    Max Chat Model Attempts                                                                   10  │
-│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

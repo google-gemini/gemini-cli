@@ -97,9 +97,15 @@ export function handleAutoUpdate(
     return;
   }
 
+  const isNightly = info.update.latest.includes('nightly');
+
   let combinedMessage = info.message;
   if (installationInfo.updateMessage) {
-    combinedMessage += `\n${installationInfo.updateMessage}`;
+    const updateMessage = installationInfo.updateMessage.replace(
+      '@latest',
+      isNightly ? '@nightly' : `@${info.update.latest}`,
+    );
+    combinedMessage += `\n${updateMessage}`;
   }
 
   updateEventEmitter.emit('update-received', {
@@ -116,8 +122,6 @@ export function handleAutoUpdate(
   if (_updateInProgress) {
     return;
   }
-
-  const isNightly = info.update.latest.includes('nightly');
 
   const updateCommand = installationInfo.updateCommand.replace(
     '@latest',
