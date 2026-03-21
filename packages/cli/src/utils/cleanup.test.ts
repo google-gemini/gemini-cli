@@ -183,6 +183,7 @@ describe('signal and TTY handling', () => {
 
       const sigtermHandlers = processOnHandlers.get('SIGTERM') || [];
       expect(sigtermHandlers.length).toBeGreaterThan(0);
+      // eslint-disable-next-line no-restricted-syntax
       expect(typeof sigtermHandlers[0]).toBe('function');
     });
   });
