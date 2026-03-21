@@ -215,6 +215,7 @@ export class McpClientManager {
     await Promise.all(
       Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
         this.maybeDiscoverMcpServer(name, {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...config,
           extension,
         }),
@@ -331,7 +332,9 @@ export class McpClientManager {
     const env = { ...(base.env ?? {}), ...(override.env ?? {}) };
 
     return {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...base,
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...override,
       includeTools,
       excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
