@@ -7,6 +7,7 @@
 import { Storage, debugLogger } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { TaskRun } from '../services/task/types.js';
 
 const STATE_FILENAME = 'state.json';
 
@@ -17,6 +18,8 @@ interface PersistentStateData {
   hasSeenScreenReaderNudge?: boolean;
   focusUiEnabled?: boolean;
   startupWarningCounts?: Record<string, number>;
+  taskWorkflow?: TaskRun | null;
+  taskWorkflowHistory?: TaskRun[];
   // Add other persistent state keys here as needed
 }
 
