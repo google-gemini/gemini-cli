@@ -9,7 +9,7 @@ import { decodeByteCodedString } from './byteDecoder.js';
 
 describe('decodeByteCodedString', () => {
   it('should decode pure byte-coded strings', () => {
-    const text = 'Hello, World!';
+    const text = 'Hello, World! How are you?';
     const byteCoded = Array.from(new TextEncoder().encode(text)).join(',');
     expect(decodeByteCodedString(byteCoded)).toBe(text);
   });
@@ -59,7 +59,7 @@ describe('decodeByteCodedString', () => {
   });
 
   it('should handle space-only prefix followed by byte-coded body', () => {
-    const body = 'error text';
+    const body = 'Resource exhausted for this model';
     const byteCoded = Array.from(new TextEncoder().encode(body)).join(',');
     const input = `status 429 ${byteCoded}`;
     const result = decodeByteCodedString(input);
@@ -70,8 +70,31 @@ describe('decodeByteCodedString', () => {
     expect(decodeByteCodedString('300,200,100,50')).toBe('300,200,100,50');
   });
 
-  it('should not decode strings with fewer than 4 parts', () => {
+  it('should not decode strings with fewer than 16 parts', () => {
     expect(decodeByteCodedString('72,101,108')).toBe('72,101,108');
+    // 4 parts — too short
+    expect(decodeByteCodedString('1,2,3,4')).toBe('1,2,3,4');
+    // 8 parts — still under threshold
+    expect(decodeByteCodedString('72,101,108,108,111,33,10,32')).toBe(
+      '72,101,108,108,111,33,10,32',
+    );
+    // 15 parts — just under threshold
+    expect(
+      decodeByteCodedString('72,101,108,108,111,32,87,111,114,108,100,33,10,13,9'),
+    ).toBe('72,101,108,108,111,32,87,111,114,108,100,33,10,13,9');
+  });
+
+  it('should not false-positive on version-like strings', () => {
+    expect(decodeByteCodedString('v1,2,3,4')).toBe('v1,2,3,4');
+  });
+
+  it('should handle spaced byte sequences in prefix mode', () => {
+    const body = '{"error":"capacity limit reached"}';
+    const byteCoded = Array.from(new TextEncoder().encode(body))
+      .join(', ');
+    const input = `Error: ${byteCoded}`;
+    const result = decodeByteCodedString(input);
+    expect(result).toBe(`Error: ${body}`);
   });
 
   it('should not decode strings with leading zeros', () => {
@@ -80,5 +103,17 @@ describe('decodeByteCodedString', () => {
 
   it('should not decode strings with non-numeric parts', () => {
     expect(decodeByteCodedString('abc,def,ghi,jkl')).toBe('abc,def,ghi,jkl');
+  });
+
+  it('should reject invalid UTF-8 byte sequences', () => {
+    // 0xFF,0xFE is not valid UTF-8 — repeated 16+ times to meet threshold
+    const invalidUtf8 = Array(20).fill('255').join(',');
+    expect(decodeByteCodedString(invalidUtf8)).toBe(invalidUtf8);
+  });
+
+  it('should reject decoded text dominated by control characters', () => {
+    // 16+ byte values that are valid UTF-8 but mostly control chars (0x01-0x08)
+    const controlBytes = Array(20).fill('1').join(',');
+    expect(decodeByteCodedString(controlBytes)).toBe(controlBytes);
   });
 });

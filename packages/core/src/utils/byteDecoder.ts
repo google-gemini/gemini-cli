@@ -28,7 +28,8 @@ export function decodeByteCodedString(value: string): string {
 
   // If the whole string isn't bytes, it might have a prefix. Try to find
   // a byte-like sequence at the end of the string.
-  const match = value.match(/((?:\d{1,3},)+\d{1,3})$/);
+  // Allow optional whitespace after commas to handle edge cases.
+  const match = value.match(/((?:\d{1,3},\s*)+\d{1,3})$/);
   if (match) {
     const byteString = match[1];
     const decodedRest = tryDecodeBytes(byteString);
@@ -47,8 +48,11 @@ export function decodeByteCodedString(value: string): string {
  */
 function tryDecodeBytes(value: string): string | null {
   const parts = value.split(',');
-  // Require at least a few parts to avoid false positives on normal text with commas
-  if (parts.length < 4) {
+  // Real byte-coded API errors are typically 50+ bytes. The smallest
+  // realistic JSON error '{"error":"x"}' is 14 bytes. Require a minimum
+  // of 16 parts to avoid false positives on short numeric CSV fragments
+  // like version strings, coordinates, or IP addresses.
+  if (parts.length < 16) {
     return null;
   }
   const bytes: number[] = [];
@@ -65,8 +69,45 @@ function tryDecodeBytes(value: string): string | null {
     bytes.push(num);
   }
   try {
-    return new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+    // Use fatal: true to reject invalid UTF-8 sequences instead of
+    // silently replacing them with U+FFFD replacement characters.
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(
+      new Uint8Array(bytes),
+    );
+
+    // Validate the decoded string is mostly printable text.
+    // Random byte sequences that happen to be valid UTF-8 would still
+    // produce strings dominated by control characters.
+    if (!isPrintableText(decoded)) {
+      return null;
+    }
+
+    return decoded;
   } catch {
     return null;
   }
+}
+
+/**
+ * Checks that a string is mostly printable characters (ASCII 0x20-0x7E,
+ * plus common whitespace \n, \r, \t, and non-ASCII Unicode >= 0x80).
+ * Returns false if more than 10% of characters are control characters,
+ * which indicates the decoded bytes aren't meaningful text.
+ */
+function isPrintableText(text: string): boolean {
+  if (text.length === 0) {
+    return false;
+  }
+  let controlCount = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    // Allow printable ASCII (0x20-0x7E), tab, newline, carriage return,
+    // and all non-ASCII Unicode (>= 0x80)
+    if (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) {
+      controlCount++;
+    } else if (code === 0x7f) {
+      controlCount++;
+    }
+  }
+  return controlCount / text.length < 0.1;
 }
