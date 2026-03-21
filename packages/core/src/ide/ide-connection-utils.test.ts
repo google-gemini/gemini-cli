@@ -696,4 +696,14 @@ describe('ide-connection-utils', () => {
       ); // Short-circuiting
     });
   });
+
+  describe('createProxyAwareFetch', () => {
+    it('should return a proxy-aware fetcher function', async () => {
+      const { createProxyAwareFetch } = await import(
+        './ide-connection-utils.js'
+      );
+      const fetcher = await createProxyAwareFetch('127.0.0.1');
+      expect(typeof fetcher).toBe('function');
+    });
+  });
 });
