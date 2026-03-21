@@ -197,10 +197,17 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Check if this output represents a blocking decision
+   * Check if this output represents a blocking decision (block or deny)
    */
   isBlockingDecision(): boolean {
     return this.decision === 'block' || this.decision === 'deny';
+  }
+
+  /**
+   * Check if this output represents an 'ask' decision
+   */
+  isAskDecision(): boolean {
+    return this.decision === 'ask';
   }
 
   /**

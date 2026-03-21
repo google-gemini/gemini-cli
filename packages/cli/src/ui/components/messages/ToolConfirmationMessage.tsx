@@ -735,6 +735,15 @@ export const ToolConfirmationMessage: React.FC<
       paddingTop={0}
       paddingBottom={handlesOwnUI ? 0 : 1}
     >
+      {/* System message from hook */}
+      {confirmationDetails.systemMessage && (
+        <Box marginBottom={1}>
+          <Text color={theme.status.warning}>
+            {confirmationDetails.systemMessage}
+          </Text>
+        </Box>
+      )}
+
       {handlesOwnUI ? (
         bodyContent
       ) : (
