@@ -249,8 +249,10 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
-    it('should log a warning and remove the extension if a context file path is outside the extension directory', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should skip the extension if a context file path is outside the extension directory and log an error', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
         name: 'traversal-extension',
@@ -660,8 +662,10 @@ name = "yolo-checker"
       expect(serverConfig.env!['MISSING_VAR_BRACES']).toBe('${ALSO_UNDEFINED}');
     });
 
-    it('should remove an extension with invalid JSON config and log a warning', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should skip an extension with invalid JSON config and log an error', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       // Good extension
       createExtension({
@@ -682,15 +686,17 @@ name = "yolo-checker"
       expect(extensions[0].name).toBe('good-ext');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          `Warning: Removing broken extension bad-ext: Failed to load extension config from ${badConfigPath}`,
+          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}`,
         ),
       );
 
       consoleSpy.mockRestore();
     });
 
-    it('should remove an extension with missing "name" in config and log a warning', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should skip an extension with missing "name" in config and log an error', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       // Good extension
       createExtension({
@@ -711,7 +717,7 @@ name = "yolo-checker"
       expect(extensions[0].name).toBe('good-ext');
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          `Warning: Removing broken extension bad-ext-no-name: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
+          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
         ),
       );
 
@@ -737,8 +743,10 @@ name = "yolo-checker"
       expect(extensions[0].mcpServers?.['test-server'].trust).toBeUndefined();
     });
 
-    it('should log a warning for invalid extension names during loading', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('should log an error for invalid extension names during loading', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
         name: 'bad_name',

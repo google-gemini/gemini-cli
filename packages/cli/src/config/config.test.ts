@@ -226,6 +226,51 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
+  describe('worktree', () => {
+    it('should parse --worktree flag when provided with a name', async () => {
+      process.argv = ['node', 'script.js', '--worktree', 'my-feature'];
+      const settings = createTestMergedSettings();
+      settings.experimental.worktrees = true;
+      const argv = await parseArguments(settings);
+      expect(argv.worktree).toBe('my-feature');
+    });
+
+    it('should generate a random name when --worktree is provided without a name', async () => {
+      process.argv = ['node', 'script.js', '--worktree'];
+      const settings = createTestMergedSettings();
+      settings.experimental.worktrees = true;
+      const argv = await parseArguments(settings);
+      expect(argv.worktree).toBeDefined();
+      expect(argv.worktree).not.toBe('');
+      expect(typeof argv.worktree).toBe('string');
+    });
+
+    it('should throw an error when --worktree is used but experimental.worktrees is not enabled', async () => {
+      process.argv = ['node', 'script.js', '--worktree', 'feature'];
+      const settings = createTestMergedSettings();
+      settings.experimental.worktrees = false;
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(parseArguments(settings)).rejects.toThrow(
+        'process.exit called',
+      );
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'The --worktree flag is only available when experimental.worktrees is enabled in your settings.',
+        ),
+      );
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+  });
+
   it.each([
     {
       description: 'long flags',
@@ -1671,6 +1716,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
 
     const serverA = config.getMcpServers()?.['serverA'];
     expect(serverA).toEqual({
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...localMcpServers['serverA'],
       type: 'sse',
       url: 'https://admin-server-a.com/sse',
@@ -1721,6 +1767,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     };
     const localMcpServersWithTools: Record<string, MCPServerConfig> = {
       serverA: {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localMcpServers['serverA'],
         includeTools: ['local_tool'],
         timeout: 1234,
@@ -1763,6 +1810,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     };
     const localMcpServersWithTools: Record<string, MCPServerConfig> = {
       serverA: {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localMcpServers['serverA'],
         includeTools: ['local_tool'],
       },
@@ -2222,6 +2270,30 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
+    expect(config.getExcludeTools()).toContain('ask_user');
+  });
+
+  it('should exclude ask_user in interactive mode when --acp is provided', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getExcludeTools()).toContain('ask_user');
+  });
+
+  it('should exclude ask_user in interactive mode when --experimental-acp is provided', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
     expect(config.getExcludeTools()).toContain('ask_user');
   });
 

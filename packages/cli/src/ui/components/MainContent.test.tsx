@@ -350,7 +350,7 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: defaultMockUiState as Partial<UIState>,
     });
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
@@ -364,14 +364,9 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -382,7 +377,7 @@ describe('MainContent', () => {
   it('renders minimal header in minimal mode (alternate buffer)', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
 
-    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -417,7 +412,7 @@ describe('MainContent', () => {
       );
     };
 
-    const { lastFrame } = renderWithProviders(<ToggleHarness />, {
+    const { lastFrame } = await renderWithProviders(<ToggleHarness />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -439,7 +434,7 @@ describe('MainContent', () => {
 
   it('always renders full header details in normal buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
-    const { lastFrame } = renderWithProviders(<MainContent />, {
+    const { lastFrame } = await renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -452,14 +447,9 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -479,16 +469,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -507,16 +492,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as unknown as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as unknown as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -564,14 +544,9 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
     const output = lastFrame();
     // Verify Part 1 and Part 2 are rendered.
     expect(output).toContain('Part 1');
@@ -626,10 +601,9 @@ describe('MainContent', () => {
       ],
     };
 
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
       uiState: uiState as Partial<UIState>,
     });
-    await renderResult.waitUntilReady();
 
     const output = renderResult.lastFrame();
     expect(output).toContain('Initial analysis');
@@ -732,7 +706,7 @@ describe('MainContent', () => {
           bannerVisible: false,
         };
 
-        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        const { lastFrame, unmount } = await renderWithProviders(
           <MainContent />,
           {
             uiState: uiState as Partial<UIState>,
@@ -742,7 +716,6 @@ describe('MainContent', () => {
             }),
           },
         );
-        await waitUntilReady();
 
         const output = lastFrame();
 
