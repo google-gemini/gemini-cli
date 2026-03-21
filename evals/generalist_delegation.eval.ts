@@ -21,7 +21,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'file1.ts': 'console.log("no semi")',
@@ -65,7 +64,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'src/a.ts': 'export const a = 1;',
@@ -106,7 +104,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'README.md': 'This is a proyect.',
@@ -141,7 +138,6 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-      excludeTools: ['run_shell_command'],
     },
     files: {
       'src/VERSION': '1.2.3',
