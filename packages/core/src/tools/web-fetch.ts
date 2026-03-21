@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  ToolConfirmationOutcome,
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
-  ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -499,25 +498,9 @@ ${aggregatedContent}
   }
 
   override getPolicyUpdateOptions(
-    outcome: ToolConfirmationOutcome,
+    _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (
-      outcome === ToolConfirmationOutcome.ProceedAlways ||
-      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
-    ) {
-      return {};
-    }
-
-    if (this.params.url) {
-      return {
-        argsPattern: buildParamArgsPattern('url', this.params.url),
-      };
-    } else if (this.params.prompt) {
-      return {
-        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
-      };
-    }
-    return undefined;
+    return {};
   }
 
   protected override async getConfirmationDetails(
