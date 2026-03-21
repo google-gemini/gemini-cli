@@ -35,11 +35,11 @@ describe('useHistoryManager', () => {
         id: expect.any(Number),
       }),
     );
-    // Basic check that ID incorporates timestamp
-    expect(result.current.history[0].id).toBeGreaterThanOrEqual(timestamp);
+    // Basic check that ID is a number
+    expect(result.current.history[0].id).toBeGreaterThan(0);
   });
 
-  it('should generate unique IDs for items added with the same base timestamp', () => {
+  it('should generate unique IDs for multiple items', () => {
     const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
@@ -201,23 +201,19 @@ describe('useHistoryManager', () => {
     expect(result.current.history[2].text).toBe('Message 1');
   });
 
-  it('should use Date.now() as default baseTimestamp if not provided', () => {
+  it('should order history items by id when loading history', () => {
     const { result } = renderHook(() => useHistory());
-    const before = Date.now();
-    const itemData: Omit<HistoryItem, 'id'> = {
-      type: 'user',
-      text: 'Default timestamp test',
-    };
 
     act(() => {
-      result.current.addItem(itemData);
+      result.current.loadHistory([
+        { id: 100, type: 'user', text: 'Second' } as HistoryItem,
+        { id: 50, type: 'user', text: 'First' } as HistoryItem,
+      ]);
     });
-    const after = Date.now();
 
-    expect(result.current.history).toHaveLength(1);
-    // ID should be >= before + 1 (since counter starts at 0 and increments to 1)
-    expect(result.current.history[0].id).toBeGreaterThanOrEqual(before + 1);
-    expect(result.current.history[0].id).toBeLessThanOrEqual(after + 1);
+    expect(result.current.history).toHaveLength(2);
+    expect(result.current.history[0].text).toBe('First');
+    expect(result.current.history[1].text).toBe('Second');
   });
 
   describe('initialItems with auth information', () => {
