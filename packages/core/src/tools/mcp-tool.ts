@@ -80,11 +80,11 @@ export function formatMcpToolName(
   serverName: string,
   toolName?: string,
 ): string {
-  if (serverName === '*' && !toolName) {
+  if (serverName === '*' && (toolName === undefined || toolName === '*')) {
     return `${MCP_TOOL_PREFIX}*`;
   } else if (serverName === '*') {
     return `${MCP_TOOL_PREFIX}*_${toolName}`;
-  } else if (!toolName) {
+  } else if (toolName === undefined || toolName === '*') {
     return `${MCP_TOOL_PREFIX}${serverName}_*`;
   } else {
     return `${MCP_TOOL_PREFIX}${serverName}_${toolName}`;
@@ -108,7 +108,7 @@ export function isMcpToolAnnotation(
   return (
     typeof annotation === 'object' &&
     annotation !== null &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, no-restricted-syntax
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
   );
 }

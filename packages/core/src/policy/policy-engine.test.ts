@@ -2039,6 +2039,39 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match global wildcard (*) for checkers', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: '*', decision: PolicyDecision.ALLOW },
+      ];
+      const globalChecker: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'global' },
+        toolName: '*',
+      };
+
+      engine = new PolicyEngine(
+        { rules, checkers: [globalChecker] },
+        mockCheckerRunner,
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
+      await engine.check({ name: 'any_tool' }, undefined);
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'global' }),
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockClear();
+
+      await engine.check({ name: 'mcp_server_tool' }, 'server');
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'global' }),
+      );
+    });
+
     it('should support wildcard patterns for checkers', async () => {
       const rules: PolicyRule[] = [
         {
@@ -3131,14 +3164,17 @@ describe('PolicyEngine', () => {
   describe('removeCheckersByTier', () => {
     it('should remove checkers matching a specific tier', () => {
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c1' },
         priority: 1.1,
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c2' },
         priority: 1.9,
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c3' },
         priority: 2.5,
       });
@@ -3156,14 +3192,17 @@ describe('PolicyEngine', () => {
   describe('removeCheckersBySource', () => {
     it('should remove checkers matching a specific source', () => {
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c1' },
         source: 'sourceA',
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c2' },
         source: 'sourceB',
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c3' },
         source: 'sourceA',
       });

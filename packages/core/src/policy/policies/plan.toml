@@ -80,6 +80,7 @@ deny_message = "You are in Plan Mode with access to read-only tools. Execution o
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "ask_user"
