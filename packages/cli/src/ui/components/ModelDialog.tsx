@@ -5,12 +5,13 @@
  */
 
 import type React from 'react';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -21,6 +22,8 @@ import {
   getDisplayString,
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  isProModel,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -35,8 +38,25 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
-  const [view, setView] = useState<'main' | 'manual'>('main');
+  const [hasAccessToProModel, setHasAccessToProModel] = useState<boolean>(
+    () => !(config?.getProModelNoAccessSync() ?? false),
+  );
+  const [view, setView] = useState<'main' | 'manual'>(() =>
+    config?.getProModelNoAccessSync() ? 'manual' : 'main',
+  );
   const [persistMode, setPersistMode] = useState(false);
+
+  useEffect(() => {
+    async function checkAccess() {
+      if (!config) return;
+      const noAccess = await config.getProModelNoAccess();
+      setHasAccessToProModel(!noAccess);
+      if (noAccess) {
+        setView('manual');
+      }
+    }
+    void checkAccess();
+  }, [config]);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -48,6 +68,17 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
   const manualModelSelected = useMemo(() => {
+    if (
+      config?.getExperimentalDynamicModelConfiguration?.() === true &&
+      config.modelConfigService
+    ) {
+      const def = config.modelConfigService.getModelDefinition(preferredModel);
+      // Only treat as manual selection if it's a visible, non-auto model.
+      return def && def.tier !== 'auto' && def.isVisible === true
+        ? preferredModel
+        : '';
+    }
+
     const manualModels = [
       DEFAULT_GEMINI_MODEL,
       DEFAULT_GEMINI_FLASH_MODEL,
@@ -61,12 +92,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       return preferredModel;
     }
     return '';
-  }, [preferredModel]);
+  }, [preferredModel, config]);
 
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        if (view === 'manual') {
+        if (view === 'manual' && hasAccessToProModel) {
           setView('main');
         } else {
           onClose();
@@ -83,6 +114,47 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   );
 
   const mainOptions = useMemo(() => {
+    // --- DYNAMIC PATH ---
+    if (
+      config?.getExperimentalDynamicModelConfiguration?.() === true &&
+      config.modelConfigService
+    ) {
+      const list = Object.entries(
+        config.modelConfigService.getModelDefinitions?.() ?? {},
+      )
+        .filter(([_, m]) => {
+          // Basic visibility and Preview access
+          if (m.isVisible !== true) return false;
+          if (m.isPreview && !shouldShowPreviewModels) return false;
+          // Only auto models are shown on the main menu
+          if (m.tier !== 'auto') return false;
+          return true;
+        })
+        .map(([id, m]) => ({
+          value: id,
+          title: m.displayName ?? getDisplayString(id, config ?? undefined),
+          description:
+            id === 'auto-gemini-3' && useGemini31
+              ? (m.dialogDescription ?? '').replace(
+                  'gemini-3-pro',
+                  'gemini-3.1-pro',
+                )
+              : (m.dialogDescription ?? ''),
+          key: id,
+        }));
+
+      list.push({
+        value: 'Manual',
+        title: manualModelSelected
+          ? `Manual (${getDisplayString(manualModelSelected, config ?? undefined)})`
+          : 'Manual',
+        description: 'Manually select a model',
+        key: 'Manual',
+      });
+      return list;
+    }
+
+    // --- LEGACY PATH ---
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL_AUTO,
@@ -112,9 +184,66 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       });
     }
     return list;
-  }, [shouldShowPreviewModels, manualModelSelected, useGemini31]);
+  }, [config, shouldShowPreviewModels, manualModelSelected, useGemini31]);
 
   const manualOptions = useMemo(() => {
+    const isFreeTier = config?.getUserTier() === UserTierId.FREE;
+    // --- DYNAMIC PATH ---
+    if (
+      config?.getExperimentalDynamicModelConfiguration?.() === true &&
+      config.modelConfigService
+    ) {
+      const list = Object.entries(
+        config.modelConfigService.getModelDefinitions?.() ?? {},
+      )
+        .filter(([id, m]) => {
+          // Basic visibility and Preview access
+          if (m.isVisible !== true) return false;
+          if (m.isPreview && !shouldShowPreviewModels) return false;
+          // Auto models are for main menu only
+          if (m.tier === 'auto') return false;
+          // Pro models are shown for users with pro access
+          if (!hasAccessToProModel && m.tier === 'pro') return false;
+          // 3.1 Preview Flash-lite is only available on free tier
+          if (m.tier === 'flash-lite' && m.isPreview && !isFreeTier)
+            return false;
+
+          // Flag Guard: Versioned models only show if their flag is active.
+          if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
+          if (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL && !useGemini31)
+            return false;
+
+          return true;
+        })
+        .map(([id, m]) => {
+          const resolvedId = config.modelConfigService.resolveModelId(id, {
+            useGemini3_1: useGemini31,
+            useCustomTools: useCustomToolModel,
+          });
+          // Title ID is the resolved ID without custom tools flag
+          const titleId = config.modelConfigService.resolveModelId(id, {
+            useGemini3_1: useGemini31,
+          });
+          return {
+            value: resolvedId,
+            title:
+              m.displayName ?? getDisplayString(titleId, config ?? undefined),
+            key: id,
+          };
+        });
+
+      // Deduplicate: only show one entry per unique resolved model value.
+      // This is needed because 3 pro and 3.1 pro models can resolve to the same
+      // value, depending on the useGemini31 flag.
+      const seen = new Set<string>();
+      return list.filter((option) => {
+        if (seen.has(option.value)) return false;
+        seen.add(option.value);
+        return true;
+      });
+    }
+
+    // --- LEGACY PATH ---
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
@@ -142,7 +271,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
         : previewProModel;
 
-      list.unshift(
+      const previewOptions = [
         {
           value: previewProValue,
           title: getDisplayString(previewProModel),
@@ -153,10 +282,32 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
           key: PREVIEW_GEMINI_FLASH_MODEL,
         },
-      );
+      ];
+
+      if (isFreeTier) {
+        previewOptions.push({
+          value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+          key: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+        });
+      }
+
+      list.unshift(...previewOptions);
     }
+
+    if (!hasAccessToProModel) {
+      // Filter out all Pro models for free tier
+      return list.filter((option) => !isProModel(option.value));
+    }
+
     return list;
-  }, [shouldShowPreviewModels, useGemini31, useCustomToolModel]);
+  }, [
+    shouldShowPreviewModels,
+    useGemini31,
+    useCustomToolModel,
+    hasAccessToProModel,
+    config,
+  ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 

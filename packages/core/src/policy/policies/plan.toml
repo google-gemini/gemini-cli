@@ -33,6 +33,13 @@
 toolName = "enter_plan_mode"
 decision = "ask_user"
 priority = 50
+interactive = true
+
+[[rule]]
+toolName = "enter_plan_mode"
+decision = "allow"
+priority = 50
+interactive = false
 
 [[rule]]
 toolName = "enter_plan_mode"
@@ -46,6 +53,13 @@ toolName = "exit_plan_mode"
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
+interactive = true
+
+[[rule]]
+toolName = "exit_plan_mode"
+decision = "allow"
+priority = 70
+interactive = false
 
 [[rule]]
 toolName = "exit_plan_mode"
@@ -80,7 +94,8 @@ toolName = [
   "google_web_search",
   "activate_skill",
   "codebase_investigator",
-  "cli_help"
+  "cli_help",
+  "get_internal_docs"
 ]
 decision = "allow"
 priority = 70

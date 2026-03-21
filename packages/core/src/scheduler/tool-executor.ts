@@ -112,13 +112,27 @@ export class ToolExecutor {
             signal,
             tool,
             liveOutputCallback,
-            shellExecutionConfig,
-            setExecutionIdCallback,
+            { shellExecutionConfig, setExecutionIdCallback },
             this.config,
             request.originalRequestName,
+            true, // skipBeforeHook
           );
 
           const toolResult: ToolResult = await promise;
+
+          if (call.request.inputModifiedByHook) {
+            const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
+            if (typeof toolResult.llmContent === 'string') {
+              toolResult.llmContent += modificationMsg;
+            } else if (Array.isArray(toolResult.llmContent)) {
+              toolResult.llmContent.push({ text: modificationMsg });
+            } else if (toolResult.llmContent) {
+              toolResult.llmContent = [
+                toolResult.llmContent,
+                { text: modificationMsg },
+              ];
+            }
+          }
 
           if (signal.aborted) {
             completedToolCall = await this.createCancelledResult(
@@ -296,6 +310,7 @@ export class ToolExecutor {
         call.request.callId,
         output,
         this.config.getActiveModel(),
+        this.config,
       );
 
       // Inject the cancellation error into the response object
@@ -352,6 +367,7 @@ export class ToolExecutor {
       callId,
       content,
       this.config.getActiveModel(),
+      this.config,
     );
 
     const successResponse: ToolCallResponseInfo = {
