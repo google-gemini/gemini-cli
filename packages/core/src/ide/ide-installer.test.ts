@@ -396,3 +396,51 @@ describe('AntigravityInstaller', () => {
     expect(result.message).toContain('agy, antigravity');
   });
 });
+
+describe('JetBrainsInstaller', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    { ide: IDE_DEFINITIONS.jetbrains },
+    { ide: IDE_DEFINITIONS.intellijidea },
+    { ide: IDE_DEFINITIONS.webstorm },
+    { ide: IDE_DEFINITIONS.pycharm },
+    { ide: IDE_DEFINITIONS.goland },
+    { ide: IDE_DEFINITIONS.androidstudio },
+    { ide: IDE_DEFINITIONS.clion },
+    { ide: IDE_DEFINITIONS.rustrover },
+    { ide: IDE_DEFINITIONS.datagrip },
+    { ide: IDE_DEFINITIONS.phpstorm },
+  ])('returns an installer for "$ide.name"', ({ ide }) => {
+    const installer = getIdeInstaller(ide);
+    expect(installer).not.toBeNull();
+    expect(installer?.install).toEqual(expect.any(Function));
+  });
+
+  it.each([
+    { ide: IDE_DEFINITIONS.jetbrains },
+    { ide: IDE_DEFINITIONS.intellijidea },
+    { ide: IDE_DEFINITIONS.webstorm },
+    { ide: IDE_DEFINITIONS.pycharm },
+    { ide: IDE_DEFINITIONS.goland },
+  ])(
+    'returns a failure message with JetBrains Marketplace link for "$ide.displayName"',
+    async ({ ide }) => {
+      const installer = getIdeInstaller(ide)!;
+      const result = await installer.install();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain(ide.displayName);
+      expect(result.message).toContain('plugins.jetbrains.com');
+    },
+  );
+
+  it('does not attempt to spawn any child processes', async () => {
+    const installer = getIdeInstaller(IDE_DEFINITIONS.intellijidea)!;
+    await installer.install();
+    expect(child_process.spawnSync).not.toHaveBeenCalled();
+  });
+});
