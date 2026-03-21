@@ -129,6 +129,19 @@ describe('getFsErrorMessage', () => {
           'Resource busy or locked. Close any programs that might be using the file.',
       },
       {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        path: '/some/file.txt/child',
+        expected:
+          "Not a directory: '/some/file.txt/child'. A component of the path is a file, not a directory.",
+      },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        expected:
+          'Not a directory. A component of the path is a file, not a directory.',
+      },
+      {
         code: 'EMFILE',
         message: 'EMFILE: too many open files',
         expected:
