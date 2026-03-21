@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import {
@@ -23,9 +24,12 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       process.stdin.resume();
       const errorMessage =
         error instanceof Error ? (error.stack ?? error.message) : String(error);
-      writeToStderr(
-        `Fatal error: Failed to relaunch the CLI process.\n${errorMessage}\n`,
-      );
+      const message = `Fatal error: Failed to relaunch the CLI process.\n${errorMessage}\n`;
+      // Use synchronous write to fd 2 (stderr) to guarantee the message is
+      // visible before process.exit() terminates. The buffered writeToStderr()
+      // can lose output on macOS when stderr is piped.
+      writeFileSync(2, message);
+      writeToStderr(message);
       process.exit(1);
     }
   }
