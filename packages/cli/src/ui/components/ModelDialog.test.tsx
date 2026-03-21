@@ -108,11 +108,13 @@ describe('<ModelDialog />', () => {
       },
     });
 
-    const result = renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
-      config: configValue,
-      settings,
-    });
-    await result.waitUntilReady();
+    const result = await renderWithProviders(
+      <ModelDialog onClose={mockOnClose} />,
+      {
+        config: configValue,
+        settings,
+      },
+    );
     return result;
   };
 

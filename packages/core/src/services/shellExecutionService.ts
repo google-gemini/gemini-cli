@@ -27,8 +27,12 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import { type EnvironmentSanitizationConfig } from './environmentSanitization.js';
-import { type SandboxManager } from './sandboxManager.js';
+import {
+  sanitizeEnvironment,
+  type EnvironmentSanitizationConfig,
+} from './environmentSanitization.js';
+import { NoopSandboxManager, type SandboxManager } from './sandboxManager.js';
+import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -92,6 +96,7 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  sandboxConfig?: SandboxConfig;
 }
 
 /**
@@ -331,37 +336,119 @@ export class ShellExecutionService {
   }
 
   private static async prepareExecution(
-    executable: string,
-    args: string[],
+    commandToExecute: string,
     cwd: string,
-    env: NodeJS.ProcessEnv,
     shellExecutionConfig: ShellExecutionConfig,
-    sanitizationConfigOverride?: EnvironmentSanitizationConfig,
+    isInteractive: boolean,
   ): Promise<{
     program: string;
     args: string[];
-    env: NodeJS.ProcessEnv;
+    env: Record<string, string | undefined>;
     cwd: string;
   }> {
+    const sandboxManager =
+      shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
+
+    // 1. Determine Shell Configuration
+    const isWindows = os.platform() === 'win32';
+    const isStrictSandbox =
+      isWindows &&
+      shellExecutionConfig.sandboxConfig?.enabled &&
+      shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
+      !shellExecutionConfig.sandboxConfig?.networkAccess;
+
+    let { executable, argsPrefix, shell } = getShellConfiguration();
+    if (isStrictSandbox) {
+      shell = 'cmd';
+      argsPrefix = ['/c'];
+      executable = 'cmd.exe';
+    }
+
     const resolvedExecutable =
       (await resolveExecutable(executable)) ?? executable;
 
-    const prepared = await shellExecutionConfig.sandboxManager.prepareCommand({
+    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+    const spawnArgs = [...argsPrefix, guardedCommand];
+
+    // 2. Prepare Environment
+    const gitConfigKeys: string[] = [];
+    if (!isInteractive) {
+      for (const key in process.env) {
+        if (key.startsWith('GIT_CONFIG_')) {
+          gitConfigKeys.push(key);
+        }
+      }
+    }
+
+    const sanitizationConfig = {
+      ...shellExecutionConfig.sanitizationConfig,
+      allowedEnvironmentVariables: [
+        ...(shellExecutionConfig.sanitizationConfig
+          .allowedEnvironmentVariables || []),
+        ...gitConfigKeys,
+      ],
+    };
+
+    const sanitizedEnv = sanitizeEnvironment(process.env, sanitizationConfig);
+
+    const baseEnv: Record<string, string | undefined> = {
+      ...sanitizedEnv,
+      [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+        GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+      TERM: 'xterm-256color',
+      PAGER: shellExecutionConfig.pager ?? 'cat',
+      GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
+    };
+
+    if (!isInteractive) {
+      // Ensure all GIT_CONFIG_* variables are preserved even if they were redacted
+      for (const key of gitConfigKeys) {
+        baseEnv[key] = process.env[key];
+      }
+
+      const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+      const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
+      const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
+
+      // Ensure these new keys are allowed through sanitization
+      sanitizationConfig.allowedEnvironmentVariables.push(
+        'GIT_CONFIG_COUNT',
+        newKey,
+        newValue,
+      );
+
+      Object.assign(baseEnv, {
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_ASKPASS: '',
+        SSH_ASKPASS: '',
+        GH_PROMPT_DISABLED: '1',
+        GCM_INTERACTIVE: 'never',
+        DISPLAY: '',
+        DBUS_SESSION_BUS_ADDRESS: '',
+        GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
+        [newKey]: 'credential.helper',
+        [newValue]: '',
+      });
+    }
+
+    // 3. Prepare Sandboxed Command
+    const sandboxedCommand = await sandboxManager.prepareCommand({
       command: resolvedExecutable,
-      args,
+      args: spawnArgs,
+      env: baseEnv,
       cwd,
-      env,
       config: {
-        sanitizationConfig:
-          sanitizationConfigOverride ?? shellExecutionConfig.sanitizationConfig,
+        ...shellExecutionConfig,
+        ...(shellExecutionConfig.sandboxConfig || {}),
+        sanitizationConfig,
       },
     });
 
     return {
-      program: prepared.program,
-      args: prepared.args,
-      env: prepared.env,
-      cwd: prepared.cwd ?? cwd,
+      program: sandboxedCommand.program,
+      args: sandboxedCommand.args,
+      env: sandboxedCommand.env,
+      cwd: sandboxedCommand.cwd ?? cwd,
     };
   }
 
@@ -375,69 +462,18 @@ export class ShellExecutionService {
   ): Promise<ShellExecutionHandle> {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
-
-      // Specifically allow GIT_CONFIG_* variables to pass through sanitization
-      // in non-interactive mode so we can safely append our overrides.
-      const gitConfigKeys = !isInteractive
-        ? Object.keys(process.env).filter((k) => k.startsWith('GIT_CONFIG_'))
-        : [];
-      const localSanitizationConfig = {
-        ...shellExecutionConfig.sanitizationConfig,
-        allowedEnvironmentVariables: [
-          ...(shellExecutionConfig.sanitizationConfig
-            .allowedEnvironmentVariables || []),
-          ...gitConfigKeys,
-        ],
-      };
-
-      const env = {
-        ...process.env,
-        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-        TERM: 'xterm-256color',
-        PAGER: 'cat',
-        GIT_PAGER: 'cat',
-      };
 
       const {
         program: finalExecutable,
         args: finalArgs,
-        env: sanitizedEnv,
+        env: finalEnv,
         cwd: finalCwd,
       } = await this.prepareExecution(
-        executable,
-        spawnArgs,
+        commandToExecute,
         cwd,
-        env,
         shellExecutionConfig,
-        localSanitizationConfig,
+        isInteractive,
       );
-
-      const finalEnv = { ...sanitizedEnv };
-
-      if (!isInteractive) {
-        const gitConfigCount = parseInt(
-          finalEnv['GIT_CONFIG_COUNT'] || '0',
-          10,
-        );
-        Object.assign(finalEnv, {
-          // Disable interactive prompts and session-linked credential helpers
-          // in non-interactive mode to prevent hangs in detached process groups.
-          GIT_TERMINAL_PROMPT: '0',
-          GIT_ASKPASS: '',
-          SSH_ASKPASS: '',
-          GH_PROMPT_DISABLED: '1',
-          GCM_INTERACTIVE: 'never',
-          DISPLAY: '',
-          DBUS_SESSION_BUS_ADDRESS: '',
-          GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
-          [`GIT_CONFIG_KEY_${gitConfigCount}`]: 'credential.helper',
-          [`GIT_CONFIG_VALUE_${gitConfigCount}`]: '',
-        });
-      }
 
       const child = cpSpawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
@@ -732,32 +768,6 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
-
-      const env = {
-        ...process.env,
-        GEMINI_CLI: '1',
-        TERM: 'xterm-256color',
-        PAGER: shellExecutionConfig.pager ?? 'cat',
-        GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
-      };
-
-      // Specifically allow GIT_CONFIG_* variables to pass through sanitization
-      // so we can safely append our overrides if needed.
-      const gitConfigKeys = Object.keys(process.env).filter((k) =>
-        k.startsWith('GIT_CONFIG_'),
-      );
-      const localSanitizationConfig = {
-        ...shellExecutionConfig.sanitizationConfig,
-        allowedEnvironmentVariables: [
-          ...(shellExecutionConfig.sanitizationConfig
-            ?.allowedEnvironmentVariables ?? []),
-          ...gitConfigKeys,
-        ],
-      };
 
       const {
         program: finalExecutable,
@@ -765,12 +775,10 @@ export class ShellExecutionService {
         env: finalEnv,
         cwd: finalCwd,
       } = await this.prepareExecution(
-        executable,
-        args,
+        commandToExecute,
         cwd,
-        env,
         shellExecutionConfig,
-        localSanitizationConfig,
+        true,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -782,6 +790,7 @@ export class ShellExecutionService {
         env: finalEnv,
         handleFlowControl: true,
       });
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       spawnedPty = ptyProcess as IPty;
       const ptyPid = Number(ptyProcess.pid);

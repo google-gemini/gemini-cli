@@ -57,6 +57,8 @@ import {
   type ToolOutputMaskingEvent,
   type KeychainAvailabilityEvent,
   type TokenStorageInitializationEvent,
+  type OnboardingStartEvent,
+  type OnboardingSuccessEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -79,6 +81,8 @@ import {
   recordKeychainAvailability,
   recordTokenStorageInitialization,
   recordInvalidChunk,
+  recordOnboardingStart,
+  recordOnboardingSuccess,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
@@ -131,6 +135,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
 export function logToolCall(config: Config, event: ToolCallEvent): void {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     ...event,
     'event.name': EVENT_TOOL_CALL,
     'event.timestamp': new Date().toISOString(),
@@ -265,6 +270,7 @@ export function logRipgrepFallback(
 export function logApiError(config: Config, event: ApiErrorEvent): void {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     ...event,
     'event.name': EVENT_API_ERROR,
     'event.timestamp': new Date().toISOString(),
@@ -297,6 +303,7 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     ...event,
     'event.name': EVENT_API_RESPONSE,
     'event.timestamp': new Date().toISOString(),
@@ -397,6 +404,7 @@ export function logSlashCommand(
 export function logRewind(config: Config, event: RewindEvent): void {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     ...event,
     'event.name': EVENT_REWIND,
     'event.timestamp': new Date().toISOString(),
@@ -868,6 +876,40 @@ export function logTokenStorageInitialization(
     logger.emit(logRecord);
 
     recordTokenStorageInitialization(config, event);
+  });
+}
+
+export function logOnboardingStart(
+  config: Config,
+  event: OnboardingStartEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logOnboardingStartEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordOnboardingStart(config);
+  });
+}
+
+export function logOnboardingSuccess(
+  config: Config,
+  event: OnboardingSuccessEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logOnboardingSuccessEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordOnboardingSuccess(config, event.userTier);
   });
 }
 

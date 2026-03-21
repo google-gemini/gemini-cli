@@ -115,7 +115,7 @@ describe('AgentConfigDialog', () => {
     settings: LoadedSettings,
     definition: AgentDefinition = createMockAgentDefinition(),
   ) => {
-    const result = renderWithProviders(
+    const result = await renderWithProviders(
       <AgentConfigDialog
         agentName="test-agent"
         displayName="Test Agent"
@@ -126,7 +126,6 @@ describe('AgentConfigDialog', () => {
       />,
       { settings, uiState: { mainAreaWidth: 100 } },
     );
-    await result.waitUntilReady();
     return result;
   };
 
@@ -323,7 +322,7 @@ describe('AgentConfigDialog', () => {
       const settings = createMockSettings();
       // Agent config has about 6 base items + 2 per tool
       // Render with very small height (20)
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <AgentConfigDialog
           agentName="test-agent"
           displayName="Test Agent"

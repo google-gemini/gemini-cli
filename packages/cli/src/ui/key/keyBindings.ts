@@ -194,6 +194,7 @@ export class KeyBinding {
 
     const key = remains;
 
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     const isSingleChar = [...key].length === 1;
 
     if (!isSingleChar && !KeyBinding.VALID_LONG_KEYS.has(key.toLowerCase())) {
