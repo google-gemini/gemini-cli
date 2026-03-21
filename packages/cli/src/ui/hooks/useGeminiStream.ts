@@ -44,6 +44,7 @@ import {
   type CompressionStatus,
 >>>>>>> 12bc9cace (fix(cli): resolve merge conflicts and align with async test helpers)
   Kind,
+<<<<<<< HEAD
   ACTIVATE_SKILL_TOOL_NAME,
 =======
   CompressionStatus,
@@ -62,6 +63,20 @@ import type {
   ToolCallResponseInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
+=======
+  type Config,
+  type EditorType,
+  type GeminiClient,
+  type ServerGeminiChatCompressedEvent,
+  type ServerGeminiContentEvent as ContentEvent,
+  type ServerGeminiFinishedEvent,
+  type ServerGeminiStreamEvent as GeminiEvent,
+  type ThoughtSummary,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type GeminiErrorEventValue,
+  type RetryAttemptPayload,
+>>>>>>> 17740dc2d (fix(cli): resolve merge conflicts and align with async test helpers)
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {

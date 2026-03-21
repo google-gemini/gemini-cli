@@ -5,13 +5,13 @@
  */
 
 import * as Core from '@google/gemini-cli-core';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { compressCommand } from './compressCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     tokenLimit: vi.fn(),
@@ -21,6 +21,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 describe('compressCommand', () => {
   let context: ReturnType<typeof createMockCommandContext>;
   let mockTryCompressChat: ReturnType<typeof vi.fn>;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   beforeEach(() => {
     mockTryCompressChat = vi.fn();
