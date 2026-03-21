@@ -361,6 +361,31 @@ describe('LoggingContentGenerator', () => {
         });
       });
 
+      it('should decode 3-byte UTF-8 from comma-separated byte strings', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        // "こんにちは" in UTF-8 bytes (3 bytes per character)
+        const utf8Data =
+          '227,129,147,227,130,147,227,129,171,227,129,161,227,129,175';
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: utf8Data },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        await expect(
+          loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe('こんにちは');
+          return true;
+        });
+      });
+
       it('should reject byte strings with values outside 0-255 range', async () => {
         const req = { contents: [], model: 'gemini-pro' };
 
