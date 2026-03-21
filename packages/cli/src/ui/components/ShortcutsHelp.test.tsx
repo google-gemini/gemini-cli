@@ -42,13 +42,12 @@ describe('ShortcutsHelp', () => {
         value: platform.value,
       });
 
-      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      const { lastFrame, unmount } = await renderWithProviders(
         <ShortcutsHelp />,
         {
           width,
         },
       );
-      await waitUntilReady();
       expect(lastFrame()).toContain('shell mode');
       expect(lastFrame()).toMatchSnapshot();
       unmount();
@@ -57,7 +56,7 @@ describe('ShortcutsHelp', () => {
 
   it('always shows Tab focus UI shortcut', async () => {
     const rendered = await renderWithProviders(<ShortcutsHelp />);
-    await rendered.waitUntilReady();
+
     expect(rendered.lastFrame()).toContain('Tab focus UI');
     rendered.unmount();
   });

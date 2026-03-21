@@ -287,9 +287,11 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => false,
+    getHookSystem: () => undefined,
     getExperiments: () => {},
   } as unknown as Config;
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread
   const finalConfig = { ...baseConfig, ...overrides } as Config;
 
   (finalConfig as unknown as { config: Config }).config = finalConfig;
@@ -1028,7 +1030,12 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith(
+      { param: 'value' },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // 2. The tool call status never entered CoreToolCallStatus.AwaitingApproval.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1131,7 +1138,12 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     // Ensure the second tool call hasn't been executed yet.
-    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { a: 1 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // Complete the first tool call.
     resolveFirstCall!({
@@ -1155,7 +1167,12 @@ describe('CoreToolScheduler request queueing', () => {
       // Now the second tool call should have been executed.
       expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { b: 2 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -1250,7 +1267,12 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith(
+      { param: 'value' },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // 2. The tool call status never entered CoreToolCallStatus.AwaitingApproval.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1432,8 +1454,18 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure the tool was called twice with the correct arguments.
     expect(executeFn).toHaveBeenCalledTimes(2);
-    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
-    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { a: 1 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
+    expect(executeFn).toHaveBeenCalledWith(
+      { b: 2 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
@@ -1790,8 +1822,18 @@ describe('CoreToolScheduler Sequential Execution', () => {
 
     // Check that execute was called for the first two tools only
     expect(executeFn).toHaveBeenCalledTimes(2);
-    expect(executeFn).toHaveBeenCalledWith({ call: 1 });
-    expect(executeFn).toHaveBeenCalledWith({ call: 2 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { call: 1 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
+    expect(executeFn).toHaveBeenCalledWith(
+      { call: 2 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];

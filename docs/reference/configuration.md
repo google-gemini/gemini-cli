@@ -1210,6 +1210,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable user input on browser window during automation.
   - **Default:** `true`
 
+- **`agents.browser.confirmSensitiveActions`** (boolean):
+  - **Description:** Require manual confirmation for sensitive browser actions
+    (e.g., fill_form, evaluate_script).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.blockFileUploads`** (boolean):
+  - **Description:** Hard-block file upload requests from the browser agent.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -1525,6 +1536,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
   - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.worktrees`** (boolean):
+  - **Description:** Enable automated Git worktree management for parallel work.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionManagement`** (boolean):
