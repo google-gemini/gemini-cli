@@ -355,14 +355,6 @@ export async function initializeTelemetry(
   // Note: We don't use process.on('exit') here because that callback is synchronous
   // and won't wait for the async shutdownTelemetry() to complete.
   // Instead, telemetry shutdown is handled in runExitCleanup() in cleanup.ts
-  process.on('SIGTERM', () => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    shutdownTelemetry(config);
-  });
-  process.on('SIGINT', () => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    shutdownTelemetry(config);
-  });
 }
 
 /**

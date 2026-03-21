@@ -175,6 +175,23 @@ export class McpClient implements McpProgressReporter {
     return this.serverName;
   }
 
+  getPid(): number | undefined {
+    let t = this.transport;
+    if (t instanceof XcodeMcpBridgeFixTransport) {
+      // Access the internal transport which is not exposed in the FixTransport type.
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+      t = (t as any).transport;
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+    }
+    if (t instanceof StdioClientTransport) {
+      // StdioClientTransport has a process property at runtime but it's not in the public types.
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+      return (t as any).process?.pid;
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+    }
+    return undefined;
+  }
+
   /**
    * Connects to the MCP server.
    */
@@ -186,7 +203,7 @@ export class McpClient implements McpProgressReporter {
     }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
-      this.client = await connectToMcpServer(
+      const result = await connectToMcpServer(
         this.clientVersion,
         this.serverName,
         this.serverConfig,
@@ -194,6 +211,8 @@ export class McpClient implements McpProgressReporter {
         this.workspaceContext,
         this.cliConfig,
       );
+      this.client = result.client;
+      this.transport = result.transport;
 
       this.registerNotificationHandlers();
 
@@ -288,13 +307,36 @@ export class McpClient implements McpProgressReporter {
     }
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
+    const transport = this.transport;
     this.client = undefined;
-    if (this.transport) {
-      await this.transport.close();
-    }
-    if (client) {
-      await client.close();
-    }
+    this.transport = undefined;
+
+    // Use a 2-second timeout for graceful disconnection to prevent hangs
+    const disconnectWithTimeout = async (
+      closeable: { close(): Promise<void> } | undefined,
+      label: string,
+    ) => {
+      if (!closeable) return;
+      try {
+        await Promise.race([
+          closeable.close(),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`${label} disconnect timed out`)),
+              2000,
+            ),
+          ),
+        ]);
+      } catch (error) {
+        debugLogger.error(
+          `Error during ${this.serverName} ${label} disconnect: ${getErrorMessage(error)}`,
+        );
+      }
+    };
+
+    await disconnectWithTimeout(transport, 'transport');
+    await disconnectWithTimeout(client, 'client');
+
     this.updateStatus(MCPServerStatus.DISCONNECTED);
   }
 
@@ -1189,8 +1231,9 @@ export async function connectAndDiscover(
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
   let mcpClient: Client | undefined;
+  let transport: Transport | undefined;
   try {
-    mcpClient = await connectToMcpServer(
+    const result = await connectToMcpServer(
       clientVersion,
       mcpServerName,
       mcpServerConfig,
@@ -1198,6 +1241,8 @@ export async function connectAndDiscover(
       workspaceContext,
       cliConfig,
     );
+    mcpClient = result.client;
+    transport = result.transport;
 
     mcpClient.onerror = (error) => {
       cliConfig.emitMcpDiagnostic(
@@ -1222,6 +1267,8 @@ export async function connectAndDiscover(
 
     // If we have neither prompts nor tools, it's a failed discovery
     if (prompts.length === 0 && tools.length === 0) {
+      if (transport) await transport.close();
+      if (mcpClient) await mcpClient.close();
       throw new Error('No prompts or tools found on the server.');
     }
 
@@ -1237,6 +1284,10 @@ export async function connectAndDiscover(
     }
     toolRegistry.sortTools();
   } catch (error) {
+    if (transport) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      transport.close();
+    }
     if (mcpClient) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       mcpClient.close();
@@ -1637,11 +1688,12 @@ async function connectWithSSETransport(
   client: Client,
   config: MCPServerConfig,
   accessToken?: string | null,
-): Promise<void> {
+): Promise<{ client: Client; transport: Transport }> {
   const transport = createSSETransportWithAuth(config, accessToken);
   await client.connect(transport, {
     timeout: config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
   });
+  return { client, transport };
 }
 
 /**
@@ -1683,17 +1735,17 @@ async function retryWithOAuth(
   accessToken: string,
   httpReturned404: boolean,
   cliConfig: McpContext,
-): Promise<void> {
+): Promise<{ client: Client; transport: Transport }> {
   if (httpReturned404) {
     // HTTP returned 404, only try SSE
     debugLogger.log(
       `Retrying SSE connection to '${serverName}' with OAuth token...`,
     );
-    await connectWithSSETransport(client, config, accessToken);
+    const result = await connectWithSSETransport(client, config, accessToken);
     debugLogger.log(
       `Successfully connected to '${serverName}' using SSE with OAuth.`,
     );
-    return;
+    return result;
   }
 
   // HTTP returned 401, try HTTP with OAuth first
@@ -1718,6 +1770,7 @@ async function retryWithOAuth(
     debugLogger.log(
       `Successfully connected to '${serverName}' using HTTP with OAuth.`,
     );
+    return { client, transport: httpTransport };
   } catch (httpError) {
     await httpTransport.close();
 
@@ -1729,10 +1782,11 @@ async function retryWithOAuth(
       !config.httpUrl
     ) {
       debugLogger.log(`HTTP with OAuth returned 404, trying SSE with OAuth...`);
-      await connectWithSSETransport(client, config, accessToken);
+      const result = await connectWithSSETransport(client, config, accessToken);
       debugLogger.log(
         `Successfully connected to '${serverName}' using SSE with OAuth.`,
       );
+      return result;
     } else {
       throw httpError;
     }
@@ -1776,7 +1830,7 @@ export async function connectToMcpServer(
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
   cliConfig: McpContext,
-): Promise<Client> {
+): Promise<{ client: Client; transport: Transport }> {
   const mcpClient = new Client(
     {
       name: 'gemini-cli-mcp-client',
@@ -1848,7 +1902,7 @@ export async function connectToMcpServer(
       await mcpClient.connect(transport, {
         timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
       });
-      return mcpClient;
+      return { client: mcpClient, transport };
     } catch (error) {
       await transport.close();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -1889,7 +1943,16 @@ export async function connectToMcpServer(
         debugLogger.log(
           `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
         );
-        return mcpClient;
+        const result = await connectWithSSETransport(
+          mcpClient,
+          mcpServerConfig,
+          await getStoredOAuthToken(mcpServerName),
+        );
+
+        debugLogger.log(
+          `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
+        );
+        return result;
       } catch (sseFallbackError) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         sseError = sseFallbackError as Error;
@@ -1998,7 +2061,7 @@ export async function connectToMcpServer(
             );
           }
 
-          await retryWithOAuth(
+          return await retryWithOAuth(
             mcpClient,
             mcpServerName,
             mcpServerConfig,
@@ -2006,7 +2069,6 @@ export async function connectToMcpServer(
             httpReturned404,
             cliConfig,
           );
-          return mcpClient;
         } else {
           throw new Error(
             `Failed to handle automatic OAuth for server '${mcpServerName}'`,
@@ -2089,7 +2151,7 @@ export async function connectToMcpServer(
               timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             });
             // Connection successful with OAuth
-            return mcpClient;
+            return { client: mcpClient, transport: oauthTransport };
           } else {
             throw new Error(
               `OAuth configuration failed for '${mcpServerName}'. Please authenticate manually with /mcp auth ${mcpServerName}`,

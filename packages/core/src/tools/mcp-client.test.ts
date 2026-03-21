@@ -2420,7 +2420,7 @@ describe('connectToMcpServer with OAuth', () => {
       },
     );
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
@@ -2465,7 +2465,7 @@ describe('connectToMcpServer with OAuth', () => {
       },
     );
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
@@ -2505,7 +2505,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     vi.mocked(mockedClient.connect).mockResolvedValueOnce(undefined);
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
@@ -2549,7 +2549,7 @@ describe('connectToMcpServer with OAuth', () => {
 
     vi.mocked(mockedClient.connect).mockResolvedValueOnce(undefined);
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { httpUrl: serverUrl, oauth: { enabled: true } },
@@ -2644,7 +2644,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       .mockRejectedValueOnce(new StreamableHTTPError(500, 'Server error'))
       .mockResolvedValueOnce(undefined);
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { url: 'http://test-server' },
@@ -2685,7 +2685,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       .mockRejectedValueOnce(new StreamableHTTPError(404, 'Not Found'))
       .mockResolvedValueOnce(undefined);
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { url: 'http://test-server' },
@@ -2770,7 +2770,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       .mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'))
       .mockResolvedValueOnce(undefined);
 
-    const client = await connectToMcpServer(
+    const { client } = await connectToMcpServer(
       '0.0.1',
       'test-server',
       { url: 'http://test-server', oauth: { enabled: true } },
