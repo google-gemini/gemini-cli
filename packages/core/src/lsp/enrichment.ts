@@ -8,6 +8,8 @@ import * as path from 'node:path';
 import type { Diagnostic, LspSettings } from './types.js';
 import { DiagnosticSeverity } from './types.js';
 import type { LspManager } from './manager.js';
+import type { Config } from '../config/config.js';
+import type { FileDiff } from '../tools/tools.js';
 
 const MAX_DIAGNOSTICS = 20;
 
@@ -138,6 +140,52 @@ export function appendLspDiagnostics(
 ): string {
   if (!lspOutput) return llmContent;
   return `${llmContent}${lspOutput}`;
+}
+
+/**
+ * Enrich a tool result with LSP diagnostics. Shared by write_file and edit.
+ *
+ * Appends diagnostic XML to llmContent and sets a user-facing summary on
+ * the display result. No-ops silently if LSP is disabled, no server is
+ * available for the file type, or an error occurs.
+ *
+ * @returns The (possibly enriched) llmContent string.
+ */
+export async function enrichToolResultWithLsp(
+  config: Config,
+  filePath: string,
+  fileContent: string,
+  llmContent: string,
+  displayResult: FileDiff,
+  signal?: AbortSignal,
+): Promise<string> {
+  if (!config.isLspEnabled()) return llmContent;
+
+  try {
+    const lspMgr = await config.getLspManager();
+    if (!lspMgr) return llmContent;
+
+    const collected = await collectDiagnosticsForOutput(
+      lspMgr,
+      filePath,
+      fileContent,
+      config.getLspDiagnosticSeverity(),
+      signal,
+    );
+
+    if (!collected.applicable) return llmContent;
+
+    const enriched = appendLspDiagnostics(llmContent, collected.llmOutput);
+    displayResult.lspDiagnosticSummary = buildDiagnosticSummary(
+      collected.diagnostics,
+      config.getLspDiagnosticSeverity(),
+      collected.timedOut,
+    );
+    return enriched;
+  } catch {
+    // LSP enrichment is supplementary — never fail the tool.
+    return llmContent;
+  }
 }
 
 /**
