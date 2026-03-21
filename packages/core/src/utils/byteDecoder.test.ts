@@ -42,12 +42,28 @@ describe('decodeByteCodedString', () => {
     );
   });
 
-  it('should handle prefix followed by byte-coded body', () => {
+  it('should handle ". " prefix followed by byte-coded body', () => {
     const body = '{"error":"test"}';
     const byteCoded = Array.from(new TextEncoder().encode(body)).join(',');
     const input = `got status: 429. ${byteCoded}`;
     const result = decodeByteCodedString(input);
     expect(result).toBe(`got status: 429. ${body}`);
+  });
+
+  it('should handle ": " prefix followed by byte-coded body', () => {
+    const body = '{"error":"Resource exhausted"}';
+    const byteCoded = Array.from(new TextEncoder().encode(body)).join(',');
+    const input = `API Error: ${byteCoded}`;
+    const result = decodeByteCodedString(input);
+    expect(result).toBe(`API Error: ${body}`);
+  });
+
+  it('should handle space-only prefix followed by byte-coded body', () => {
+    const body = 'error text';
+    const byteCoded = Array.from(new TextEncoder().encode(body)).join(',');
+    const input = `status 429 ${byteCoded}`;
+    const result = decodeByteCodedString(input);
+    expect(result).toBe(`status 429 ${body}`);
   });
 
   it('should not decode strings with values above 255', () => {

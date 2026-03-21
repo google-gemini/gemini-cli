@@ -26,14 +26,14 @@ export function decodeByteCodedString(value: string): string {
     return decoded;
   }
 
-  // Try splitting on ". " to find a prefix + byte-coded body
-  // (e.g., "got status: 429 Too Many Requests. 91,123,10,...")
-  const dotIndex = value.lastIndexOf('. ');
-  if (dotIndex !== -1) {
-    const prefix = value.substring(0, dotIndex + 2);
-    const rest = value.substring(dotIndex + 2);
-    const decodedRest = tryDecodeBytes(rest);
+  // If the whole string isn't bytes, it might have a prefix. Try to find
+  // a byte-like sequence at the end of the string.
+  const match = value.match(/((?:\d{1,3},)+\d{1,3})$/);
+  if (match) {
+    const byteString = match[1];
+    const decodedRest = tryDecodeBytes(byteString);
     if (decodedRest !== null) {
+      const prefix = value.substring(0, value.length - byteString.length);
       return prefix + decodedRest;
     }
   }
