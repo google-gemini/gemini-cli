@@ -42,6 +42,7 @@ describe('AuthInProgress', () => {
     vi.useFakeTimers();
     vi.mocked(debugLogger.error).mockImplementation((...args) => {
       if (
+        // eslint-disable-next-line no-restricted-syntax
         typeof args[0] === 'string' &&
         args[0].includes('was not wrapped in act')
       ) {

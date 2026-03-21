@@ -1137,6 +1137,7 @@ describe('runNonInteractive', () => {
 
     expect(
       processStderrSpy.mock.calls.some(
+        // eslint-disable-next-line no-restricted-syntax
         (call) => typeof call[0] === 'string' && call[0].includes('Cancelling'),
       ),
     ).toBe(true);
