@@ -327,7 +327,21 @@
         "hideContextSummary": {
           "title": "Hide Context Summary",
           "description": "Hide the context summary (GEMINI.md, MCP servers) above the input.",
-          "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "markdownDescription": "Hide the context summary (GEMINI.md, MCP servers) above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showContextWindowWarning": {
+          "title": "Show Context Window Warning",
+          "description": "Show a warning message when the context window limit is nearly reached. If disabled, the CLI will attempt to automatically compress the history when the limit is reached.",
+          "markdownDescription": "Show a warning message when the context window limit is nearly reached. If disabled, the CLI will attempt to automatically compress the history when the limit is reached.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showContextCompression": {
+          "title": "Show Context Compression Messages",
+          "description": "Show a message in the chat history when it is compressed.",
+          "markdownDescription": "Show a message in the chat history when it is compressed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
