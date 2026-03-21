@@ -298,7 +298,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         // Gaxios returned bytes as a comma-separated string
         try {
           const byteValues = data.split(',').map(Number);
-          if (byteValues.every((b) => !isNaN(b) && b >= 0 && b <= 255)) {
+          if (
+            byteValues.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)
+          ) {
             response.data = new TextDecoder().decode(
               new Uint8Array(byteValues),
             );
