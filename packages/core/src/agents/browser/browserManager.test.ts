@@ -9,6 +9,7 @@ import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { coreEvents } from '../../utils/events.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -77,6 +78,7 @@ describe('BrowserManager', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(injectAutomationOverlay).mockClear();
+    vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
 
     // Re-establish consent mock after resetAllMocks
     vi.mocked(getBrowserConsentIfNeeded).mockResolvedValue(true);
@@ -427,6 +429,11 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).toContain('--autoConnect');
       expect(args).not.toContain('--isolated');
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('saved logins will be visible'),
+      );
     });
 
     it('should throw actionable error when existing mode connection fails', async () => {
