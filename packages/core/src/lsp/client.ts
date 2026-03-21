@@ -17,6 +17,7 @@ import type {
   Location,
   LspServerDefinition,
 } from './types.js';
+import { isRecord } from '../utils/markdownUtils.js';
 
 /**
  * Minimal JSON-RPC client that communicates with an LSP server over stdio.
@@ -114,12 +115,11 @@ export class LspClient extends EventEmitter {
       initializationOptions: this.serverDef.initializationOptions,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const result = (await this.sendRequest(
+    const result = await this.sendRequest<InitializeResult>(
       'initialize',
       initParams,
       signal,
-    )) as InitializeResult;
+    );
 
     this._serverCapabilities = result.capabilities;
 
@@ -227,15 +227,14 @@ export class LspClient extends EventEmitter {
     character: number,
     signal?: AbortSignal,
   ): Promise<Hover | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await this.sendRequest(
+    return this.sendRequest<Hover | null>(
       'textDocument/hover',
       {
         textDocument: { uri },
         position: { line, character },
       },
       signal,
-    )) as Hover | null;
+    );
   }
 
   /**
@@ -247,15 +246,14 @@ export class LspClient extends EventEmitter {
     character: number,
     signal?: AbortSignal,
   ): Promise<Location | Location[] | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await this.sendRequest(
+    return this.sendRequest<Location | Location[] | null>(
       'textDocument/definition',
       {
         textDocument: { uri },
         position: { line, character },
       },
       signal,
-    )) as Location | Location[] | null;
+    );
   }
 
   /**
@@ -267,8 +265,7 @@ export class LspClient extends EventEmitter {
     character: number,
     signal?: AbortSignal,
   ): Promise<Location[] | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await this.sendRequest(
+    return this.sendRequest<Location[] | null>(
       'textDocument/references',
       {
         textDocument: { uri },
@@ -276,7 +273,7 @@ export class LspClient extends EventEmitter {
         context: { includeDeclaration: true },
       },
       signal,
-    )) as Location[] | null;
+    );
   }
 
   /**
@@ -286,14 +283,11 @@ export class LspClient extends EventEmitter {
     uri: string,
     signal?: AbortSignal,
   ): Promise<DocumentSymbol[] | SymbolInformation[] | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await this.sendRequest(
+    return this.sendRequest<DocumentSymbol[] | SymbolInformation[] | null>(
       'textDocument/documentSymbol',
-      {
-        textDocument: { uri },
-      },
+      { textDocument: { uri } },
       signal,
-    )) as DocumentSymbol[] | SymbolInformation[] | null;
+    );
   }
 
   /**
@@ -303,14 +297,11 @@ export class LspClient extends EventEmitter {
     query: string,
     signal?: AbortSignal,
   ): Promise<SymbolInformation[] | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await this.sendRequest(
+    return this.sendRequest<SymbolInformation[] | null>(
       'workspace/symbol',
-      {
-        query,
-      },
+      { query },
       signal,
-    )) as SymbolInformation[] | null;
+    );
   }
 
   /**
@@ -344,17 +335,20 @@ export class LspClient extends EventEmitter {
   // JSON-RPC protocol
   // -----------------------------------------------------------------------
 
-  private sendRequest(
+  // The generic parameter T is a trust assertion: we trust the LSP server
+  // to return the type specified by the protocol for each method. This is
+  // unavoidable in a JSON-RPC client where responses are untyped `unknown`.
+  private sendRequest<T = unknown>(
     method: string,
     params: unknown,
     signal?: AbortSignal,
     timeout?: number,
-  ): Promise<unknown> {
+  ): Promise<T> {
     const id = this.nextId++;
     const message = { jsonrpc: '2.0', id, method, params };
     this.writeMessage(message);
 
-    return new Promise<unknown>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const effectiveTimeout = timeout ?? this.requestTimeout;
 
       const timer = setTimeout(() => {
@@ -366,7 +360,8 @@ export class LspClient extends EventEmitter {
         );
       }, effectiveTimeout);
 
-      this.pending.set(id, { resolve, reject, timer });
+      const wrappedResolve = (value: unknown) => resolve(value as T); // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+      this.pending.set(id, { resolve: wrappedResolve, reject, timer });
 
       if (signal) {
         signal.addEventListener(
@@ -423,9 +418,10 @@ export class LspClient extends EventEmitter {
       this.buffer = this.buffer.substring(bodyStart + contentLength);
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = JSON.parse(body) as Record<string, unknown>;
-        this.handleMessage(message);
+        const parsed: unknown = JSON.parse(body);
+        if (isRecord(parsed)) {
+          this.handleMessage(parsed);
+        }
       } catch {
         // Malformed JSON — skip.
       }
@@ -447,7 +443,7 @@ export class LspClient extends EventEmitter {
       this.handleServerRequest(
         reqId,
         method,
-        params as Record<string, unknown> | undefined, // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+        isRecord(params) ? params : undefined,
       );
       return;
     }
@@ -458,10 +454,9 @@ export class LspClient extends EventEmitter {
       if (pending) {
         clearTimeout(pending.timer);
         this.pending.delete(id);
-        if (error) {
-          const errObj = error as Record<string, unknown>; // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion
+        if (isRecord(error)) {
           pending.reject(
-            new Error(String(errObj['message'] ?? 'Unknown LSP error')),
+            new Error(String(error['message'] ?? 'Unknown LSP error')),
           );
         } else {
           pending.resolve(result);
@@ -472,9 +467,8 @@ export class LspClient extends EventEmitter {
 
     // Notification from the server (has method but no id).
     if (typeof method === 'string') {
-      if (method === 'textDocument/publishDiagnostics') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        this.emit('diagnostics', params as PublishDiagnosticsParams);
+      if (method === 'textDocument/publishDiagnostics' && isRecord(params)) {
+        this.emit('diagnostics', params);
       }
       // All other notifications (window/logMessage, etc.) are silently ignored.
     }
@@ -494,9 +488,8 @@ export class LspClient extends EventEmitter {
 
     if (method === 'workspace/configuration') {
       // Respond with empty config for each requested item.
-      const items = Array.isArray(params?.['items'])
-        ? (params['items'] as unknown[])
-        : [];  
+      const itemsRaw = params?.['items'];
+      const items = Array.isArray(itemsRaw) ? itemsRaw : [];
       responseResult = items.map(() => ({}));
     } else if (method === 'client/registerCapability') {
       responseResult = null;
