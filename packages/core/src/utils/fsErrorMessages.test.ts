@@ -140,6 +140,19 @@ describe('getFsErrorMessage', () => {
         expected:
           'Too many open files in system. Close some unused files or applications.',
       },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        path: '/some/file.txt/subpath',
+        expected:
+          "Not a directory: '/some/file.txt/subpath'. Please provide a valid directory path instead of a file.",
+      },
+      {
+        code: 'ENOTDIR',
+        message: 'ENOTDIR: not a directory',
+        expected:
+          'Not a directory. Please provide a valid directory path instead of a file.',
+      },
     ];
 
     it.each(testCases)(
