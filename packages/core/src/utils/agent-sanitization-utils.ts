@@ -81,6 +81,12 @@ export function sanitizeErrorMessage(message: string): string {
 
   let sanitized = message;
 
+  // 0. Redact credentials embedded in URLs (e.g. proxy URLs)
+  sanitized = sanitized.replace(
+    /\b([a-z][a-z0-9+.-]*:\/\/)([^/\s@]+)@/gi,
+    '$1[REDACTED]@',
+  );
+
   // 1. Redact inline PEM content (Safe iterative approach to avoid ReDoS)
   let startIndex = 0;
   while ((startIndex = sanitized.indexOf('-----BEGIN', startIndex)) !== -1) {

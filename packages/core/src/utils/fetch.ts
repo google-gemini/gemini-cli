@@ -5,6 +5,7 @@
  */
 
 import { getErrorMessage, isNodeError } from './errors.js';
+import { sanitizeErrorMessage } from './agent-sanitization-utils.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
@@ -191,11 +192,25 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
-  setGlobalDispatcher(
-    new ProxyAgent({
-      uri: proxy,
-      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-      bodyTimeout: DEFAULT_BODY_TIMEOUT,
-    }),
-  );
+  try {
+    setGlobalDispatcher(
+      new ProxyAgent({
+        uri: proxy,
+        headersTimeout: DEFAULT_HEADERS_TIMEOUT,
+        bodyTimeout: DEFAULT_BODY_TIMEOUT,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof Error) {
+      const sanitizedError = new Error(sanitizeErrorMessage(error.message), {
+        cause: error.cause,
+      });
+      sanitizedError.name = error.name;
+      sanitizedError.stack = error.stack
+        ? sanitizeErrorMessage(error.stack)
+        : undefined;
+      throw sanitizedError;
+    }
+    throw error;
+  }
 }

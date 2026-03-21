@@ -49,6 +49,16 @@ describe('agent-sanitization-utils', () => {
       expect(result).not.toContain('secret123');
     });
 
+    it('should redact credentials embedded in URLs', () => {
+      const input =
+        'Invalid proxy URL: http://api-key-123:super-secret@proxy.example.com:8080';
+      const result = sanitizeErrorMessage(input);
+
+      expect(result).toContain('http://[REDACTED]@proxy.example.com:8080');
+      expect(result).not.toContain('api-key-123');
+      expect(result).not.toContain('super-secret');
+    });
+
     it('should redact space-separated sensitive keywords', () => {
       // The keyword regex requires tokens to be 8+ chars
       const input = 'Using password mySuperSecretPassword123';
