@@ -172,6 +172,18 @@ export class LspClient extends EventEmitter<LspClientEvents> {
   }
 
   /**
+   * Notify the server that a document was saved.
+   * Some servers use this as a trigger for heavier analysis.
+   */
+  didSave(uri: string, text?: string): void {
+    if (!this.initialized) return;
+    this.sendNotification('textDocument/didSave', {
+      textDocument: { uri },
+      ...(text !== undefined ? { text } : {}),
+    });
+  }
+
+  /**
    * Notify the server that a document was closed.
    */
   didClose(uri: string): void {
@@ -179,6 +191,21 @@ export class LspClient extends EventEmitter<LspClientEvents> {
     this.sendNotification('textDocument/didClose', {
       textDocument: { uri },
     });
+  }
+
+  /**
+   * Notify the server that files changed on disk. This is important for
+   * files the agent creates, deletes, or modifies without opening via
+   * didOpen — servers relying on client-side watching will miss changes
+   * without this.
+   *
+   * FileChangeType: 1 = Created, 2 = Changed, 3 = Deleted
+   */
+  didChangeWatchedFiles(
+    changes: Array<{ uri: string; type: 1 | 2 | 3 }>,
+  ): void {
+    if (!this.initialized) return;
+    this.sendNotification('workspace/didChangeWatchedFiles', { changes });
   }
 
   /**

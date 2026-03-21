@@ -150,7 +150,7 @@ export class LspManager {
         signal,
       );
 
-      // Open or update the document.
+      // Open or update the document, then notify the server it was saved.
       const version = (state.fileVersions.get(uri) ?? 0) + 1;
       state.fileVersions.set(uri, version);
 
@@ -159,6 +159,11 @@ export class LspManager {
       } else {
         client.didChange(uri, version, content);
       }
+      client.didSave(uri);
+
+      // Also notify about the on-disk change so servers using client-side
+      // file watching (e.g. TypeScript 5.0+ with canUseWatchEvents) detect it.
+      client.didChangeWatchedFiles([{ uri, type: 2 }]);
 
       // Wait for the server to publish diagnostics.
       // null = timeout (server didn't respond), [] = server said "clean".
@@ -190,6 +195,22 @@ export class LspManager {
       if (cached) return cached;
     }
     return [];
+  }
+
+  /**
+   * Get all cached diagnostics across all servers and files.
+   * Useful for workspace-wide diagnostic summaries.
+   */
+  getAllCachedDiagnostics(): Map<string, Diagnostic[]> {
+    const all = new Map<string, Diagnostic[]>();
+    for (const state of this.servers.values()) {
+      for (const [uri, diags] of state.diagnosticCache) {
+        if (diags.length > 0) {
+          all.set(uri, diags);
+        }
+      }
+    }
+    return all;
   }
 
   /** Request hover info at a position. */
@@ -471,6 +492,15 @@ export class LspManager {
       await client.start(signal);
       state.client = client;
       this.activeServerCount++;
+
+      // Listen for ALL diagnostics from this server, not just the ones
+      // we explicitly wait for. Servers publish diagnostics for transitive
+      // dependents (e.g., changing a function signature triggers diagnostics
+      // in all importers). Cache them all.
+      client.on('diagnostics', (params) => {
+        state.diagnosticCache.set(params.uri, params.diagnostics);
+      });
+
       logger.debug(`LSP: started ${serverDef.id} server for ${projectRoot}`);
       return client;
     } catch (e) {
