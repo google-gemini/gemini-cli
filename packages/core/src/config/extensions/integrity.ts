@@ -23,6 +23,7 @@ import { KeychainService } from '../../services/keychainService.js';
 import { isNodeError, getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { homedir, GEMINI_DIR } from '../../utils/paths.js';
+import stableStringify from 'json-stable-stringify';
 import {
   type IExtensionIntegrity,
   IntegrityDataStatus,
@@ -30,22 +31,6 @@ import {
   type IntegrityStore,
   IntegrityStoreSchema,
 } from './integrityTypes.js';
-
-function stableStringify(value: unknown): string | undefined {
-  const replacer = (_key: string, currentValue: unknown): unknown => {
-    if (!currentValue || typeof currentValue !== 'object' || Array.isArray(currentValue)) {
-      return currentValue;
-    }
-
-    return Object.fromEntries(
-      Object.entries(currentValue).sort(([left], [right]) =>
-        left.localeCompare(right),
-      ),
-    );
-  };
-
-  return JSON.stringify(value, replacer);
-}
 
 export * from './integrityTypes.js';
 

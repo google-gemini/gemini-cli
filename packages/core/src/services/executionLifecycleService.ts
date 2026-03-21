@@ -11,7 +11,6 @@ import { debugLogger } from '../utils/debugLogger.js';
 export type ExecutionMethod =
   | 'lydell-node-pty'
   | 'node-pty'
-  | 'script'
   | 'child_process'
   | 'remote_agent'
   | 'none';
