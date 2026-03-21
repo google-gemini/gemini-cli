@@ -1155,4 +1155,28 @@ describe('normalizeToolSchema', () => {
       properties: {},
     });
   });
+
+  it('should fix null properties even when type is already object', () => {
+    const schema = { type: 'object', properties: null };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should fix non-object properties when type is already object', () => {
+    const schema = { type: 'object', properties: 'invalid' };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should fix array properties when type is already object', () => {
+    const schema = { type: 'object', properties: [{ type: 'string' }] };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
 });

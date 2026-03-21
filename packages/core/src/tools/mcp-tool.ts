@@ -128,10 +128,16 @@ export function normalizeToolSchema(schema: unknown): Record<string, unknown> {
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- narrowed by typeof+Array guards above
   const obj = schema as Record<string, unknown>;
-  if (obj['type'] !== 'object') {
-    return { ...obj, type: 'object', properties: obj['properties'] ?? {} };
-  }
-  return obj;
+
+  const properties = obj['properties'];
+  const hasValidProperties =
+    properties && typeof properties === 'object' && !Array.isArray(properties);
+
+  return {
+    ...obj,
+    type: 'object',
+    properties: hasValidProperties ? properties : {},
+  };
 }
 
 // Discriminated union for MCP Content Blocks to ensure type safety.
