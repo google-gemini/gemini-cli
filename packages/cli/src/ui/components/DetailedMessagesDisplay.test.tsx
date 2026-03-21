@@ -41,13 +41,12 @@ describe('DetailedMessagesDisplay', () => {
     });
   });
   it('renders nothing when messages are empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
-    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
@@ -64,13 +63,12 @@ describe('DetailedMessagesDisplay', () => {
       clearConsoleMessages: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
-    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -86,13 +84,12 @@ describe('DetailedMessagesDisplay', () => {
       clearConsoleMessages: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'low' } }),
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('(F12 to close)');
     unmount();
   });
@@ -106,13 +103,12 @@ describe('DetailedMessagesDisplay', () => {
       clearConsoleMessages: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('(F12 to close)');
     unmount();
   });
@@ -126,13 +122,12 @@ describe('DetailedMessagesDisplay', () => {
       clearConsoleMessages: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
-    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();

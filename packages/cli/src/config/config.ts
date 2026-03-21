@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yargs from 'yargs/yargs';
+import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
+import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -36,7 +37,11 @@ import {
   Config,
   resolveToRealPath,
   applyAdminAllowlist,
+  applyRequiredServers,
   getAdminBlockedMcpServersMessage,
+  getProjectRootForWorktree,
+  isGeminiWorktree,
+  type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
@@ -47,6 +52,8 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  isWorktreeEnabled,
+  type LoadedSettings,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -73,6 +80,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  worktree?: string;
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -113,6 +121,36 @@ const coerceCommaSeparated = (values: string[]): string[] => {
       .filter(Boolean),
   );
 };
+
+/**
+ * Pre-parses the command line arguments to find the worktree flag.
+ * Used for early setup before full argument parsing with settings.
+ */
+export function getWorktreeArg(argv: string[]): string | undefined {
+  const result = yargs(hideBin(argv))
+    .help(false)
+    .version(false)
+    .option('worktree', { alias: 'w', type: 'string' })
+    .strict(false)
+    .exitProcess(false)
+    .parseSync();
+
+  if (result.worktree === undefined) return undefined;
+  return typeof result.worktree === 'string' ? result.worktree.trim() : '';
+}
+
+/**
+ * Checks if a worktree is requested via CLI and enabled in settings.
+ * Returns the requested name (can be empty string for auto-generated) or undefined.
+ */
+export function getRequestedWorktreeName(
+  settings: LoadedSettings,
+): string | undefined {
+  if (!isWorktreeEnabled(settings)) {
+    return undefined;
+  }
+  return getWorktreeArg(process.argv);
+}
 
 export async function parseArguments(
   settings: MergedSettings,
@@ -156,6 +194,20 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('worktree', {
+          alias: 'w',
+          type: 'string',
+          skipValidation: true,
+          description:
+            'Start Gemini in a new git worktree. If no name is provided, one is generated automatically.',
+          coerce: (value: unknown): string => {
+            const trimmed = typeof value === 'string' ? value.trim() : '';
+            if (trimmed === '') {
+              return Math.random().toString(36).substring(2, 10);
+            }
+            return trimmed;
+          },
         })
         .option('sandbox', {
           alias: 's',
@@ -334,6 +386,9 @@ export async function parseArguments(
       ) {
         return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
       }
+      if (argv['worktree'] && !settings.experimental?.worktrees) {
+        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
+      }
       return true;
     });
 
@@ -419,6 +474,7 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  worktreeSettings?: WorktreeSettings;
 }
 
 export async function loadCliConfig(
@@ -429,6 +485,9 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
+
+  const worktreeSettings =
+    options.worktreeSettings ?? (await resolveWorktreeSettings(cwd));
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -648,12 +707,16 @@ export async function loadCliConfig(
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
 
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
-  if (!interactive) {
+  if (!interactive || isAcpMode) {
     // The Policy Engine natively handles headless safety by translating ASK_USER
     // decisions to DENY. However, we explicitly block ask_user here to guarantee
     // it can never be allowed via a high-priority policy rule when no human is present.
+    // We also exclude it in ACP mode as IDEs intercept tool calls and ask for permission,
+    // breaking conversational flows.
     extraExcludes.push(ASK_USER_TOOL_NAME);
   }
 
@@ -702,6 +765,19 @@ export async function loadCliConfig(
       ? defaultModel
       : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
+  if (sandboxConfig) {
+    const existingPaths = sandboxConfig.allowedPaths || [];
+    if (settings.tools.sandboxAllowedPaths?.length) {
+      sandboxConfig.allowedPaths = [
+        ...new Set([...existingPaths, ...settings.tools.sandboxAllowedPaths]),
+      ];
+    }
+    if (settings.tools.sandboxNetworkAccess !== undefined) {
+      sandboxConfig.networkAccess =
+        sandboxConfig.networkAccess || settings.tools.sandboxNetworkAccess;
+    }
+  }
+
   const screenReader =
     argv.screenReader !== undefined
       ? argv.screenReader
@@ -737,7 +813,25 @@ export async function loadCliConfig(
     }
   }
 
-  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+  // Apply admin-required MCP servers (injected regardless of allowlist)
+  if (mcpEnabled) {
+    const requiredMcpConfig = settings.admin?.mcp?.requiredConfig;
+    if (requiredMcpConfig && Object.keys(requiredMcpConfig).length > 0) {
+      const requiredResult = applyRequiredServers(
+        mcpServers ?? {},
+        requiredMcpConfig,
+      );
+      mcpServers = requiredResult.mcpServers;
+
+      if (requiredResult.requiredServerNames.length > 0) {
+        coreEvents.emitConsoleLog(
+          'info',
+          `Admin-required MCP servers injected: ${requiredResult.requiredServerNames.join(', ')}`,
+        );
+      }
+    }
+  }
+
   let clientName: string | undefined = undefined;
   if (isAcpMode) {
     const ide = detectIdeFromEnv();
@@ -766,6 +860,7 @@ export async function loadCliConfig(
     importFormat: settings.context?.importFormat,
     debugMode,
     question,
+    worktreeSettings,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -906,4 +1001,49 @@ function mergeExcludeTools(
     ...extraExcludes,
   ]);
   return Array.from(allExcludeTools);
+}
+
+async function resolveWorktreeSettings(
+  cwd: string,
+): Promise<WorktreeSettings | undefined> {
+  let worktreePath: string | undefined;
+  try {
+    const { stdout } = await execa('git', ['rev-parse', '--show-toplevel'], {
+      cwd,
+    });
+    const toplevel = stdout.trim();
+    const projectRoot = await getProjectRootForWorktree(toplevel);
+
+    if (isGeminiWorktree(toplevel, projectRoot)) {
+      worktreePath = toplevel;
+    }
+  } catch (_e) {
+    return undefined;
+  }
+
+  if (!worktreePath) {
+    return undefined;
+  }
+
+  let worktreeBaseSha: string | undefined;
+  try {
+    const { stdout } = await execa('git', ['rev-parse', 'HEAD'], {
+      cwd: worktreePath,
+    });
+    worktreeBaseSha = stdout.trim();
+  } catch (e: unknown) {
+    debugLogger.debug(
+      `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  if (!worktreeBaseSha) {
+    return undefined;
+  }
+
+  return {
+    name: path.basename(worktreePath),
+    path: worktreePath,
+    baseSha: worktreeBaseSha,
+  };
 }
