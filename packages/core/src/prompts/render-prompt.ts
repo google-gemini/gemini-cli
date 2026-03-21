@@ -4,15 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SystemPromptOptions } from 'src/prompts/snippets.js';
-import type { PromptContent, PromptSlot } from './types.js';
+import type { SystemPromptOptions } from './snippets.js';
+
+export type ContextResolver<C, O> = O | ((ctx: C) => O | Promise<O>);
+
+export type PromptSlot = { slot: string; content?: never };
+
+export type PromptSection<C> = {
+  /** Add a Markdown heading of appropriate level to this section. */
+  heading?: string;
+  /** If supplied, wrap this section in an XML tag. */
+  tag?: string;
+  /** If supplied, add attributes to the XML section tag. */
+  attrs?: Record<string, string>;
+  /** Formatting of the content inside this section. Defaults to 'block'. */
+  format?: 'inline' | 'block' | 'list' | ((parts: string[]) => string);
+
+  /** Condition that must evaluate to true for the section to be rendered. */
+  condition?: (ctx: C) => boolean | Promise<boolean>;
+  content: PromptContent<C>;
+};
+
+// The core recursive type.
+// It wraps your 3 base node shapes (string, section, or array) in the resolver.
+export type PromptContent<C> = ContextResolver<
+  C,
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | PromptSection<C>
+  | PromptSlot
+  | Array<PromptContent<C>>
+>;
 
 type BaseContent = string | BaseSection | PromptSlot | BaseContent[];
 type BaseSection = {
   heading?: string;
   tag?: string;
   attrs?: Record<string, string>;
-  format?: 'inline' | 'block';
+  format?: 'inline' | 'block' | 'list' | ((parts: string[]) => string);
   content: BaseContent;
 };
 
@@ -68,6 +100,7 @@ export async function renderPrompt<C = SystemPromptOptions>({
   const resolveToBasic = async (
     c: PromptContent<C>,
   ): Promise<BaseContent | null> => {
+    if (c === undefined || c === null) return null;
     if (typeof c === 'function') {
       const resolved = await c(context);
       return resolveToBasic(resolved);
@@ -133,14 +166,21 @@ export async function renderPrompt<C = SystemPromptOptions>({
   const formatBasic = (
     c: BaseContent | null,
     depth: number,
-    format: 'inline' | 'block',
+    format: 'inline' | 'block' | 'list' | ((parts: string[]) => string),
   ): string => {
     if (c === null) return '';
     if (typeof c === 'string') return c;
     if (Array.isArray(c)) {
-      return c
+      const parts = c
         .map((item) => formatBasic(item, depth, format))
-        .join(format === 'inline' ? '' : '\n\n');
+        .filter((p) => p !== '');
+      if (typeof format === 'function') {
+        return format(parts);
+      }
+      if (format === 'list') {
+        return parts.map((p) => '- ' + p).join('\n');
+      }
+      return parts.join(format === 'inline' ? '' : '\n\n');
     }
     if ('slot' in c) {
       const slotContributions = resolvedContributions[c.slot];

@@ -5,8 +5,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { renderPrompt, p } from './prompter.js';
-import type { PromptContent } from './types.js';
+import { renderPrompt, p } from './render-prompt.js';
+import type { PromptContent } from './render-prompt.js';
 
 type TestContext = { name?: string; shouldRender?: boolean };
 
@@ -214,6 +214,42 @@ const tests: TestCase[] = [
     contributions: [{ inline_multi: 'First' }, { inline_multi: 'Second' }],
     context: {},
     expect: 'Prefix: FirstSecond',
+  },
+  {
+    desc: 'conditionally omits items when null or undefined are present',
+    content: [
+      'Item 1',
+      null,
+      'Item 2',
+      undefined,
+      {
+        heading: 'Optional Section',
+        content: null,
+      },
+      'Item 3',
+    ],
+    context: {},
+    expect: 'Item 1\n\nItem 2\n\nItem 3',
+  },
+  {
+    desc: 'renders lists with dashes',
+    content: {
+      heading: 'My List',
+      format: 'list',
+      content: ['Apple', 'Banana', null, 'Cherry'],
+    },
+    context: {},
+    expect: '# My List\n\n- Apple\n- Banana\n- Cherry',
+  },
+  {
+    desc: 'supports custom format functions',
+    content: {
+      heading: 'Custom Format',
+      format: (parts) => parts.join(' | '),
+      content: ['A', 'B', undefined, 'C'],
+    },
+    context: {},
+    expect: '# Custom Format\n\nA | B | C',
   },
 ];
 
