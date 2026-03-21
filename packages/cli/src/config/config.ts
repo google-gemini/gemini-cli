@@ -90,6 +90,7 @@ export interface CliArgs {
   allowedTools: string[] | undefined;
   acp?: boolean;
   experimentalAcp?: boolean;
+  headlessInteractive?: boolean;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -254,6 +255,11 @@ export async function parseArguments(
           description:
             'Starts the agent in ACP mode (deprecated, use --acp instead)',
         })
+        .option('headless-interactive', {
+          type: 'boolean',
+          description:
+            'Run in headless interactive mode: read newline-delimited prompts from stdin, maintain conversation state, output to stdout.',
+        })
         .option('allowed-mcp-server-names', {
           type: 'array',
           string: true,
@@ -376,6 +382,12 @@ export async function parseArguments(
       }
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+      if (argv['headlessInteractive'] && argv['prompt']) {
+        return 'Cannot use both --headless-interactive and --prompt (-p) together.';
+      }
+      if (argv['headlessInteractive'] && argv['promptInteractive']) {
+        return 'Cannot use both --headless-interactive and --prompt-interactive (-i) together.';
       }
       if (
         argv['outputFormat'] &&

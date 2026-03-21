@@ -75,6 +75,7 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { runAcpClient } from './acp/acpClient.js';
+import { runHeadlessInteractive } from './headlessInteractiveCli.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SessionError, SessionSelector } from './utils/sessionUtils.js';
@@ -595,6 +596,20 @@ export async function main() {
     }
 
     cliStartupHandle?.end();
+
+    if (argv.headlessInteractive) {
+      await config.initialize();
+      startupProfiler.flush(config);
+      initializeOutputListenersAndFlush();
+      await runHeadlessInteractive({
+        config,
+        settings,
+        resumedSessionData,
+      });
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       await startInteractiveUI(
