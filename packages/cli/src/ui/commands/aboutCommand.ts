@@ -41,7 +41,8 @@ export const aboutCommand: SlashCommand = {
         process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;
     }
-    const modelVersion = context.services.config?.getModel() || 'Unknown';
+    const modelVersion =
+      context.services.agentContext?.config.getModel() || 'Unknown';
     const cliVersion = await getVersion();
     const selectedAuthType =
       context.services.settings.merged.security.auth.selectedType || '';
@@ -55,7 +56,7 @@ export const aboutCommand: SlashCommand = {
     });
     const rawUserEmail = cachedAccount ?? undefined;
 
-    const tier = context.services.config?.getUserTierName();
+    const tier = context.services.agentContext?.config.getUserTierName();
 
     // Determine email display and whether to show a warning.
     const emailDetected =
@@ -83,7 +84,7 @@ export const aboutCommand: SlashCommand = {
 };
 
 async function getIdeClientName(context: CommandContext) {
-  if (!context.services.config?.getIdeMode()) {
+  if (!context.services.agentContext?.config.getIdeMode()) {
     return '';
   }
   const ideClient = await IdeClient.getInstance();

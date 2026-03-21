@@ -13,7 +13,7 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
-import { A2AClientManager } from './a2a-client-manager.js';
+import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -69,7 +69,7 @@ export class AgentRegistry {
    * Clears the current registry and re-scans for agents.
    */
   async reload(): Promise<void> {
-    A2AClientManager.getInstance(this.config).clearCache();
+    this.config.getA2AClientManager()?.clearCache();
     await this.config.reloadAgents();
     this.agents.clear();
     this.allDefinitions.clear();
@@ -250,6 +250,24 @@ export class AgentRegistry {
     if (browserConfig.enabled) {
       this.registerLocalAgent(BrowserAgentDefinition(this.config));
     }
+
+    // Register the memory manager agent as a replacement for the save_memory tool.
+    if (this.config.isMemoryManagerEnabled()) {
+      this.registerLocalAgent(MemoryManagerAgent(this.config));
+
+      // Ensure the global .gemini directory is accessible to tools.
+      // This allows the save_memory agent to read and write to it.
+      // Access control is enforced by the Policy Engine (memory-manager.toml).
+      try {
+        const globalDir = Storage.getGlobalGeminiDir();
+        this.config.getWorkspaceContext().addDirectory(globalDir);
+      } catch (e) {
+        debugLogger.warn(
+          `[AgentRegistry] Could not add global .gemini directory to workspace:`,
+          e,
+        );
+      }
+    }
   }
 
   private async refreshAgents(): Promise<void> {
@@ -414,7 +432,13 @@ export class AgentRegistry {
 
     // Load the remote A2A agent card and register.
     try {
-      const clientManager = A2AClientManager.getInstance(this.config);
+      const clientManager = this.config.getA2AClientManager();
+      if (!clientManager) {
+        debugLogger.warn(
+          `[AgentRegistry] Skipping remote agent '${definition.name}': A2AClientManager is not available.`,
+        );
+        return;
+      }
       let authHandler: AuthenticationHandler | undefined;
       if (definition.auth) {
         const provider = await A2AAuthProviderFactory.create({

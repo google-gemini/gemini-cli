@@ -118,6 +118,7 @@ export * from './utils/channel.js';
 export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
 export * from './utils/cache.js';
+export * from './utils/markdownUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -125,6 +126,8 @@ export * from './services/gitService.js';
 export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
+export * from './services/sandboxedFileSystemService.js';
+export * from './services/windowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
 export * from './services/trackerService.js';
@@ -234,6 +237,7 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+export * from './services/worktreeService.js';
 
 // Export voice utilities
 export * from './voice/responseFormatter.js';

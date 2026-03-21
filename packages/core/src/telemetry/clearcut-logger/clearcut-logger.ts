@@ -51,6 +51,8 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
   StartupStatsEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../types.js';
 import type {
   CreditsUsedEvent,
@@ -124,6 +126,8 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  ONBOARDING_START = 'onboarding_start',
+  ONBOARDING_SUCCESS = 'onboarding_success',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
   STARTUP_STATS = 'startup_stats',
@@ -686,6 +690,11 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE,
+        value: event.worktree_active.toString(),
       },
     ];
 
@@ -1787,6 +1796,33 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logOnboardingStartEvent(_event: OnboardingStartEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        value: 'true',
+      },
+    ];
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_START, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logOnboardingSuccessEvent(event: OnboardingSuccessEvent): void {
+    const data: EventValue[] = [];
+    if (event.userTier) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        value: event.userTier,
+      });
+    }
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_SUCCESS, data),
     );
     this.flushIfNeeded();
   }

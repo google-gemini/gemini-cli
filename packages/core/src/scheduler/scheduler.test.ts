@@ -170,6 +170,8 @@ describe('Scheduler (Orchestrator)', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       toolRegistry: mockToolRegistry,
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
@@ -1346,6 +1348,7 @@ describe('Scheduler MCP Progress', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
