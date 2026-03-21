@@ -168,22 +168,23 @@ export async function enrichToolResultWithLsp(
   }
 }
 
+export interface DiagnosticSummary {
+  text: string;
+  severity: 'error' | 'warning' | 'clean' | 'timeout';
+}
+
 /**
- * Build a short user-facing summary of diagnostics (for display in the tool
- * output footer).
- *
- * Examples:
- *   "LSP: 2 errors"
- *   "LSP: 1 error, 3 warnings"
- *   "LSP: no issues found"
- *   "LSP: timed out waiting for diagnostics (server may still be starting)"
+ * Build a structured summary of diagnostics for the tool output footer.
  */
 export function buildDiagnosticSummary(
   diagnostics: Diagnostic[],
   timedOut?: boolean,
-): string {
+): DiagnosticSummary {
   if (timedOut && diagnostics.length === 0) {
-    return 'LSP: timed out waiting for diagnostics (server may still be starting)';
+    return {
+      text: 'LSP: timed out waiting for diagnostics (server may still be starting)',
+      severity: 'timeout',
+    };
   }
 
   const errors = diagnostics.filter(
@@ -206,8 +207,11 @@ export function buildDiagnosticSummary(
   if (infos > 0) parts.push(`${infos} info`);
 
   if (parts.length === 0) {
-    return 'LSP: no issues found';
+    return { text: 'LSP: no issues found', severity: 'clean' };
   }
 
-  return `LSP: ${parts.join(', ')}`;
+  return {
+    text: `LSP: ${parts.join(', ')}`,
+    severity: errors > 0 ? 'error' : 'warning',
+  };
 }

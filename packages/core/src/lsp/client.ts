@@ -20,12 +20,26 @@ import type {
 import { isRecord } from '../utils/markdownUtils.js';
 
 /**
+ * Events emitted by LspClient.
+ *
+ * - `diagnostics`: Published when the server sends a
+ *   `textDocument/publishDiagnostics` notification.
+ * - `exit`: The server process exited. Payload is the exit code.
+ * - `error`: The server process encountered a spawn or runtime error.
+ */
+interface LspClientEvents {
+  diagnostics: [params: PublishDiagnosticsParams];
+  exit: [code: number | null];
+  error: [err: Error];
+}
+
+/**
  * Minimal JSON-RPC client that communicates with an LSP server over stdio.
  *
  * Handles the LSP base protocol framing (Content-Length headers), message
  * routing, and the initialize/shutdown lifecycle.
  */
-export class LspClient extends EventEmitter {
+export class LspClient extends EventEmitter<LspClientEvents> {
   private process: ChildProcess | null = null;
   private buffer = '';
   private nextId = 1;
@@ -467,7 +481,10 @@ export class LspClient extends EventEmitter {
 
     // Notification from the server (has method but no id).
     if (typeof method === 'string') {
-      if (method === 'textDocument/publishDiagnostics' && isRecord(params)) {
+      if (
+        method === 'textDocument/publishDiagnostics' &&
+        isDiagnosticsParams(params)
+      ) {
         this.emit('diagnostics', params);
       }
       // All other notifications (window/logMessage, etc.) are silently ignored.
@@ -531,4 +548,18 @@ function normalizeUri(uri: string): string {
   } catch {
     return uri;
   }
+}
+
+/**
+ * Type guard for PublishDiagnosticsParams: checks that the value has the
+ * required `uri` and `diagnostics` fields.
+ */
+function isDiagnosticsParams(
+  value: unknown,
+): value is PublishDiagnosticsParams {
+  return (
+    isRecord(value) &&
+    typeof value['uri'] === 'string' &&
+    Array.isArray(value['diagnostics'])
+  );
 }

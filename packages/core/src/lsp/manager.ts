@@ -136,7 +136,7 @@ export class LspManager {
 
       const resolved = await this.resolveServer(filePath, signal);
       if (!resolved) return { diagnostics: [], timedOut: false };
-      const { client, state, key } = resolved;
+      const { client, state } = resolved;
 
       const uri = filePathToUri(filePath);
       const languageId = this.registry.getLanguageId(filePath);
@@ -168,7 +168,7 @@ export class LspManager {
 
       // Adaptive timeout: on success, settle to configured value.
       // On timeout, halve for next attempt.
-      this.updateTimeout(key, state, timedOut);
+      this.updateTimeout(state, timedOut);
 
       // Cache for later diff comparisons.
       state.diagnosticCache.set(uri, diagnostics);
@@ -412,13 +412,7 @@ export class LspManager {
     }
 
     // Start a new client.
-    const promise = this.startClient(
-      key,
-      state,
-      serverDef,
-      projectRoot,
-      signal,
-    );
+    const promise = this.startClient(state, serverDef, projectRoot, signal);
     state.starting = promise;
 
     try {
@@ -446,7 +440,6 @@ export class LspManager {
   }
 
   private async startClient(
-    _key: ServerKey,
     state: ServerState,
     serverDef: LspServerDefinition,
     projectRoot: string,
@@ -493,11 +486,7 @@ export class LspManager {
   // Adaptive timeout
   // -----------------------------------------------------------------------
 
-  private updateTimeout(
-    _key: ServerKey,
-    state: ServerState,
-    timedOut: boolean,
-  ): void {
+  private updateTimeout(state: ServerState, timedOut: boolean): void {
     if (!timedOut) {
       state.timeout = this.settings.diagnosticTimeout;
     } else {

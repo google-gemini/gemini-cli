@@ -36,10 +36,15 @@ export interface ToolResultDisplayProps {
   overflowDirection?: 'top' | 'bottom';
 }
 
+interface LspDiagnosticSummary {
+  text: string;
+  severity: 'error' | 'warning' | 'clean' | 'timeout';
+}
+
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
-  lspDiagnosticSummary?: string;
+  lspDiagnosticSummary?: LspDiagnosticSummary;
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -122,18 +127,13 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const fileDiffData = contentData as FileDiffResult;
-      const lspSummary = fileDiffData.lspDiagnosticSummary;
-      const hasErrors = lspSummary?.includes('error');
-      const hasWarnings = lspSummary?.includes('warning');
-      const isTimeout = lspSummary?.includes('timed out');
-      const isClean = lspSummary?.includes('no issues');
-      const lspColor = isTimeout
-        ? theme.status.warning
-        : hasErrors
-          ? theme.status.error
-          : hasWarnings
-            ? theme.status.warning
-            : theme.status.success;
+      const lsp = fileDiffData.lspDiagnosticSummary;
+      const LSP_COLORS: Record<string, string> = {
+        error: theme.status.error,
+        warning: theme.status.warning,
+        timeout: theme.status.warning,
+        clean: theme.status.success,
+      };
       content = (
         <Box flexDirection="column">
           <DiffRenderer
@@ -142,10 +142,13 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
             availableTerminalHeight={availableHeight}
             terminalWidth={childWidth}
           />
-          {lspSummary && (
+          {lsp && (
             <Box paddingLeft={1} paddingTop={0}>
-              <Text color={lspColor} dimColor={isClean}>
-                {lspSummary}
+              <Text
+                color={LSP_COLORS[lsp.severity] ?? theme.text.secondary}
+                dimColor={lsp.severity === 'clean'}
+              >
+                {lsp.text}
               </Text>
             </Box>
           )}
