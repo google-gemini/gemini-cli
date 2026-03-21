@@ -1094,7 +1094,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         additionalProperties: {
           type: 'array',
-          ref: 'ModelPolicy',
+          ref: 'ModelPolicyChain',
         },
       },
     },
@@ -1197,6 +1197,26 @@ const SETTINGS_SCHEMA = {
             description:
               'Disable user input on browser window during automation.',
             showInDialog: false,
+          },
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
           },
         },
       },
@@ -3008,6 +3028,14 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+    },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A chain of model policies for fallback behavior.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
     },
   },
   ModelPolicy: {
