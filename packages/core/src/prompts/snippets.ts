@@ -381,7 +381,17 @@ export function renderOperationalGuidelines(
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
 - **Feedback:** To report a bug or provide feedback, please use the /bug command.
+${!options.interactive ? nonInteractiveErrorRecovery() : ''}
 `.trim();
+}
+
+function nonInteractiveErrorRecovery(): string {
+  return `
+## Error Recovery (Non-Interactive)
+- **Analyze before retrying:** When a command or tool call fails, read the error message carefully. Identify the root cause before attempting a fix. Do not blindly retry the same command.
+- **Two-strike rule:** If the same approach fails twice, try a fundamentally different approach. Do not repeat a failing strategy more than twice.
+- **Avoid loops:** If you find yourself alternating between two approaches that both fail, stop and reassess. Consider whether the task requirements need to be adjusted or a completely different tool/method is needed.
+- **Incremental progress:** After recovering from an error, verify the fix worked before moving on. Do not assume success.`;
 }
 
 export function renderSandbox(mode?: SandboxMode): string {
