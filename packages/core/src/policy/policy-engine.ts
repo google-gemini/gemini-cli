@@ -30,6 +30,8 @@ import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
   parseMcpToolName,
+  formatMcpToolName,
+  isMcpToolName,
 } from '../tools/mcp-tool.js';
 
 function isWildcardPattern(name: string): boolean {
@@ -74,6 +76,7 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
+  nonInteractive: boolean,
   toolAnnotations?: Record<string, unknown>,
   subagent?: string,
 ): boolean {
@@ -115,7 +118,28 @@ function ruleMatches(
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
-      return false;
+      // If names don't match exactly, check for MCP short/full name mismatches
+      let mcpMatch = false;
+      if (serverName && toolCall.name) {
+        // Case 1: Rule uses short name + mcpName -> match FQN tool call
+        if (rule.mcpName && !isMcpToolName(rule.toolName)) {
+          if (
+            toolCall.name === formatMcpToolName(rule.mcpName, rule.toolName)
+          ) {
+            mcpMatch = true;
+          }
+        }
+        // Case 2: Rule uses FQN -> match short tool call (qualified by serverName)
+        if (!mcpMatch && isMcpToolName(rule.toolName)) {
+          if (rule.toolName === formatMcpToolName(serverName, toolCall.name)) {
+            mcpMatch = true;
+          }
+        }
+      }
+
+      if (!mcpMatch) {
+        return false;
+      }
     }
   }
 
@@ -142,6 +166,16 @@ function ruleMatches(
       stringifiedArgs === undefined ||
       !rule.argsPattern.test(stringifiedArgs)
     ) {
+      return false;
+    }
+  }
+
+  // Check interactive if specified
+  if ('interactive' in rule && rule.interactive !== undefined) {
+    if (rule.interactive && nonInteractive) {
+      return false;
+    }
+    if (!rule.interactive && !nonInteractive) {
       return false;
     }
   }
@@ -443,6 +477,7 @@ export class PolicyEngine {
           stringifiedArgs,
           serverName,
           this.approvalMode,
+          this.nonInteractive,
           toolAnnotations,
           subagent,
         ),
@@ -521,6 +556,7 @@ export class PolicyEngine {
             stringifiedArgs,
             serverName,
             this.approvalMode,
+            this.nonInteractive,
             toolAnnotations,
             subagent,
           )
@@ -713,6 +749,7 @@ export class PolicyEngine {
           undefined, // stringifiedArgs
           serverName,
           this.approvalMode,
+          this.nonInteractive,
           annotations,
         );
 
