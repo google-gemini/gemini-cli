@@ -74,6 +74,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       }) as unknown as PolicyEngine,
   } as unknown as Config;
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread
   return { ...baseConfig, ...overrides } as Config;
 }
 
