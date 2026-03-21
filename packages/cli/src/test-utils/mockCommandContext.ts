@@ -37,14 +37,12 @@ export const createMockCommandContext = (
     },
     services: {
       agentContext: null,
-
       settings: {
         merged: defaultMergedSettings,
         setValue: vi.fn(),
         forScope: vi.fn().mockReturnValue({ settings: {} }),
       } as unknown as LoadedSettings,
       git: undefined as GitService | undefined,
-
       logger: {
         log: vi.fn(),
         logMessage: vi.fn(),
@@ -53,7 +51,6 @@ export const createMockCommandContext = (
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any, // Cast because Logger is a class.
     },
-
     ui: {
       addItem: vi.fn(),
       clear: vi.fn(),
@@ -72,7 +69,6 @@ export const createMockCommandContext = (
     } as any,
     session: {
       sessionShellAllowlist: new Set<string>(),
-
       stats: {
         sessionStartTime: new Date(),
         lastPromptTokenCount: 0,
@@ -98,7 +94,6 @@ export const createMockCommandContext = (
     for (const key in source) {
       if (Object.prototype.hasOwnProperty.call(source, key)) {
         const sourceValue = source[key];
-
         const targetValue = output[key];
 
         if (
@@ -109,7 +104,6 @@ export const createMockCommandContext = (
           output[key] = merge(targetValue, sourceValue);
         } else {
           // If not, we do a direct assignment. This preserves Date objects and others.
-
           output[key] = sourceValue;
         }
       }

@@ -48,14 +48,14 @@ describe('useRewindLogic', () => {
     vi.clearAllMocks();
   });
 
-  it('should initialize with no selection', () => {
-    const { result } = renderHook(() => useRewind(mockConversation));
+  it('should initialize with no selection', async () => {
+    const { result } = await renderHook(() => useRewind(mockConversation));
 
     expect(result.current.selectedMessageId).toBeNull();
     expect(result.current.confirmationStats).toBeNull();
   });
 
-  it('should update state when a message is selected', () => {
+  it('should update state when a message is selected', async () => {
     const mockStats: FileChangeStats = {
       fileCount: 1,
       addedLines: 5,
@@ -63,7 +63,7 @@ describe('useRewindLogic', () => {
     };
     vi.mocked(rewindFileOps.calculateRewindImpact).mockReturnValue(mockStats);
 
-    const { result } = renderHook(() => useRewind(mockConversation));
+    const { result } = await renderHook(() => useRewind(mockConversation));
 
     act(() => {
       result.current.selectMessage('msg-1');
@@ -77,8 +77,8 @@ describe('useRewindLogic', () => {
     );
   });
 
-  it('should not update state if selected message is not found', () => {
-    const { result } = renderHook(() => useRewind(mockConversation));
+  it('should not update state if selected message is not found', async () => {
+    const { result } = await renderHook(() => useRewind(mockConversation));
 
     act(() => {
       result.current.selectMessage('non-existent-id');
@@ -88,7 +88,7 @@ describe('useRewindLogic', () => {
     expect(result.current.confirmationStats).toBeNull();
   });
 
-  it('should clear selection correctly', () => {
+  it('should clear selection correctly', async () => {
     const mockStats: FileChangeStats = {
       fileCount: 1,
       addedLines: 5,
@@ -96,7 +96,7 @@ describe('useRewindLogic', () => {
     };
     vi.mocked(rewindFileOps.calculateRewindImpact).mockReturnValue(mockStats);
 
-    const { result } = renderHook(() => useRewind(mockConversation));
+    const { result } = await renderHook(() => useRewind(mockConversation));
 
     // Select first
     act(() => {
@@ -113,7 +113,7 @@ describe('useRewindLogic', () => {
     expect(result.current.confirmationStats).toBeNull();
   });
 
-  it('should proxy getStats call to utility function', () => {
+  it('should proxy getStats call to utility function', async () => {
     const mockStats: FileChangeStats = {
       fileCount: 2,
       addedLines: 10,
@@ -121,7 +121,7 @@ describe('useRewindLogic', () => {
     };
     vi.mocked(rewindFileOps.calculateTurnStats).mockReturnValue(mockStats);
 
-    const { result } = renderHook(() => useRewind(mockConversation));
+    const { result } = await renderHook(() => useRewind(mockConversation));
 
     const stats = result.current.getStats(mockUserMessage);
 
