@@ -1207,6 +1207,25 @@ const SETTINGS_SCHEMA = {
             description:
               'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
             showInDialog: false,
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
           },
         },
       },
