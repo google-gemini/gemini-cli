@@ -16,10 +16,8 @@ import {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import type { Config } from '../config/config.js';
-import {
-  type DefaultHookOutput,
-  BeforeToolHookOutput,
-} from '../hooks/types.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
+import { BeforeToolHookOutput } from '../hooks/types.js';
 
 class MockInvocation extends BaseToolInvocation<{ key?: string }, ToolResult> {
   constructor(params: { key?: string }, messageBus: MessageBus) {
@@ -140,17 +138,10 @@ describe('executeToolWithHooks', () => {
     expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
     expect(result.error?.message).toBe('Execution blocked');
   });
-
   it('should handle continue: false in AfterTool', async () => {
     const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
     const spy = vi.spyOn(invocation, 'execute');
-
-    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue({
-      shouldStopExecution: () => false,
-      getEffectiveReason: () => '',
-      getBlockingError: () => ({ blocked: false, reason: '' }),
-    } as unknown as DefaultHookOutput);
 
     vi.mocked(mockHookSystem.fireAfterToolEvent).mockResolvedValue({
       shouldStopExecution: () => true,
@@ -176,12 +167,6 @@ describe('executeToolWithHooks', () => {
   it('should block result in AfterTool if decision is deny', async () => {
     const invocation = new MockInvocation({}, messageBus);
     const abortSignal = new AbortController().signal;
-
-    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue({
-      shouldStopExecution: () => false,
-      getEffectiveReason: () => '',
-      getBlockingError: () => ({ blocked: false, reason: '' }),
-    } as unknown as DefaultHookOutput);
 
     vi.mocked(mockHookSystem.fireAfterToolEvent).mockResolvedValue({
       shouldStopExecution: () => false,
