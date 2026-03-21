@@ -63,8 +63,10 @@ Use the `/skills` slash command to view and manage available expertise:
 - `/skills enable <name>`: Re-enables a disabled skill.
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
 
-_Note: `/skills disable` and `/skills enable` default to the `user` scope. Use
-`--scope workspace` to manage workspace-specific settings._
+<!-- prettier-ignore -->
+> [!NOTE]
+> `/skills disable` and `/skills enable` default to the `user` scope. Use
+> `--scope workspace` to manage workspace-specific settings.
 
 ### From the Terminal
 

@@ -68,18 +68,19 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
-      expect(tools).toHaveLength(3);
+      expect(tools).toHaveLength(2);
       expect(tools[0].name).toBe('take_snapshot');
       expect(tools[1].name).toBe('click');
-      expect(tools[2].name).toBe('type_text');
     });
 
     it('should return tools with correct description', async () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       // Descriptions include augmented hints, so we check they contain the original
@@ -93,6 +94,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const schema = tools[0].schema;
@@ -106,6 +108,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -118,6 +121,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({});
@@ -131,6 +135,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[1].build({ uid: 'elem-123' });
@@ -149,6 +154,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -167,6 +173,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[1].build({ uid: 'invalid' });
@@ -184,6 +191,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({});
@@ -291,6 +299,57 @@ describe('mcpToolWrapper', () => {
       expect(result.error).toBeDefined();
       // Should still try to resume
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('Hard Block: upload_file', () => {
+    beforeEach(() => {
+      mockMcpTools.push({
+        name: 'upload_file',
+        description: 'Upload a file',
+        inputSchema: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+        },
+      });
+    });
+
+    it('should block upload_file when blockFileUploads is true', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        true, // blockFileUploads
+      );
+
+      const uploadTool = tools.find((t) => t.name === 'upload_file')!;
+      const invocation = uploadTool.build({ path: 'test.txt' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeDefined();
+      expect(result.llmContent).toContain('File uploads are blocked');
+      expect(mockBrowserManager.callTool).not.toHaveBeenCalled();
+    });
+
+    it('should NOT block upload_file when blockFileUploads is false', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        false, // blockFileUploads
+      );
+
+      const uploadTool = tools.find((t) => t.name === 'upload_file')!;
+      const invocation = uploadTool.build({ path: 'test.txt' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toBe('Tool result');
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'upload_file',
+        expect.anything(),
+        expect.anything(),
+      );
     });
   });
 });

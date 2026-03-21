@@ -41,6 +41,9 @@ import {
   loadSkillsFromDir,
   loadAgentsFromDirectory,
   homedir,
+  ExtensionIntegrityManager,
+  type IExtensionIntegrity,
+  type IntegrityDataStatus,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -89,6 +92,7 @@ interface ExtensionManagerParams {
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
+  integrityManager?: IExtensionIntegrity;
 }
 
 /**
@@ -98,6 +102,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
+  private integrityManager: IExtensionIntegrity;
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
@@ -127,10 +132,26 @@ export class ExtensionManager extends ExtensionLoader {
     });
     this.requestConsent = options.requestConsent;
     this.requestSetting = options.requestSetting ?? undefined;
+    this.integrityManager =
+      options.integrityManager ?? new ExtensionIntegrityManager();
   }
 
   getEnablementManager(): ExtensionEnablementManager {
     return this.extensionEnablementManager;
+  }
+
+  async verifyExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata | undefined,
+  ): Promise<IntegrityDataStatus> {
+    return this.integrityManager.verify(extensionName, metadata);
+  }
+
+  async storeExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata,
+  ): Promise<void> {
+    return this.integrityManager.store(extensionName, metadata);
   }
 
   setRequestConsent(
@@ -159,10 +180,7 @@ export class ExtensionManager extends ExtensionLoader {
     previousExtensionConfig?: ExtensionConfig,
     requestConsentOverride?: (consent: string) => Promise<boolean>,
   ): Promise<GeminiCLIExtension> {
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
         (pattern) => {
           try {
@@ -420,6 +438,12 @@ Would you like to attempt to install via "git clone" instead?`,
           INSTALL_METADATA_FILENAME,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
+
+        // Establish trust at point of installation
+        await this.storeExtensionIntegrity(
+          newExtensionConfig.name,
+          installMetadata,
+        );
 
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.
@@ -693,10 +717,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       if (!installMetadata?.source) {
         throw new Error(
           `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
@@ -1220,11 +1241,32 @@ function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
   return Object.freeze(rest);
 }
 
+/**
+ * Recursively ensures that the owner has write permissions for all files
+ * and directories within the target path.
+ */
+async function makeWritableRecursive(targetPath: string): Promise<void> {
+  const stats = await fs.promises.lstat(targetPath);
+
+  if (stats.isDirectory()) {
+    // Ensure directory is rwx for the owner (0o700)
+    await fs.promises.chmod(targetPath, stats.mode | 0o700);
+    const children = await fs.promises.readdir(targetPath);
+    for (const child of children) {
+      await makeWritableRecursive(path.join(targetPath, child));
+    }
+  } else if (stats.isFile()) {
+    // Ensure file is rw for the owner (0o600)
+    await fs.promises.chmod(targetPath, stats.mode | 0o600);
+  }
+}
+
 export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
   await fs.promises.cp(source, destination, { recursive: true });
+  await makeWritableRecursive(destination);
 }
 
 function getContextFileNames(config: ExtensionConfig): string[] {

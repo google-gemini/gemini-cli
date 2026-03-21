@@ -143,7 +143,9 @@ Hooks are executed with a sanitized environment.
 
 ## Security and risks
 
-> **Warning: Hooks execute arbitrary code with your user privileges.** By
+<!-- prettier-ignore -->
+> [!WARNING]
+> Hooks execute arbitrary code with your user privileges. By
 > configuring hooks, you are allowing scripts to run shell commands on your
 > machine.
 
