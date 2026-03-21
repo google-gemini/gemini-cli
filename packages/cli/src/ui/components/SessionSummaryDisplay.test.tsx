@@ -207,7 +207,29 @@ describe('<SessionSummaryDisplay />', () => {
   });
 
   describe('Worktree status', () => {
-    it('renders worktree instructions when worktreeSettings are present', async () => {
+    it('renders cleanup message when worktree was removed', async () => {
+      const worktreeSettings: WorktreeSettings = {
+        name: 'foo-bar',
+        path: '/path/to/foo-bar',
+        baseSha: 'base-sha',
+        removed: true,
+      };
+
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        'test-session',
+        worktreeSettings,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('Worktree cleaned up (no changes detected).');
+      expect(output).toContain('gemini --resume test-session');
+      expect(output).not.toContain('To resume work in this worktree:');
+      expect(output).not.toContain('git worktree remove');
+      unmount();
+    });
+
+    it('renders preserved worktree resume instructions when worktreeSettings are present', async () => {
       const worktreeSettings: WorktreeSettings = {
         name: 'foo-bar',
         path: '/path/to/foo-bar',
@@ -221,6 +243,7 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
+      expect(output).toContain('Worktree preserved.');
       expect(output).toContain('To resume work in this worktree:');
       expect(output).toContain(
         'cd /path/to/foo-bar && gemini --resume test-session',

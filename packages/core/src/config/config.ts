@@ -536,6 +536,8 @@ export interface WorktreeSettings {
   name: string;
   path: string;
   baseSha: string;
+  /** Set when the worktree was auto-removed on exit (clean session). */
+  removed?: boolean;
 }
 
 export interface ConfigParameters {
@@ -1570,6 +1572,16 @@ export class Config implements McpContext, AgentLoopContext {
 
   getWorktreeSettings(): WorktreeSettings | undefined {
     return this.worktreeSettings;
+  }
+
+  /**
+   * Marks the active Gemini worktree as auto-removed so the exit summary can
+   * show resume instructions without a stale worktree path.
+   */
+  markWorktreeRemoved(): void {
+    if (this.worktreeSettings) {
+      this.worktreeSettings.removed = true;
+    }
   }
 
   getClientName(): string | undefined {

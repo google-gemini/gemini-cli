@@ -64,7 +64,7 @@ import {
   registerTelemetryConfig,
   setupSignalHandlers,
 } from './utils/cleanup.js';
-import { setupWorktree } from './utils/worktreeSetup.js';
+import { cleanupWorktreeOnExit, setupWorktree } from './utils/worktreeSetup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
@@ -466,6 +466,10 @@ export async function main() {
     registerCleanup(async () => {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
+
+    if (config.getWorktreeSettings()) {
+      registerCleanup(() => cleanupWorktreeOnExit(config));
+    }
 
     // Cleanup sessions after config initialization
     try {

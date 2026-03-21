@@ -130,6 +130,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
+import { cleanupWorktreeOnExit } from '../utils/worktreeSetup.js';
 import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
@@ -908,11 +909,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
-        setQuittingMessages(messages);
-        setTimeout(async () => {
-          await runExitCleanup();
-          process.exit(0);
-        }, 100);
+        void (async () => {
+          await cleanupWorktreeOnExit(config);
+          setQuittingMessages(messages);
+          setTimeout(async () => {
+            await runExitCleanup();
+            process.exit(0);
+          }, 100);
+        })();
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
@@ -951,6 +955,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      config,
     ],
   );
 
