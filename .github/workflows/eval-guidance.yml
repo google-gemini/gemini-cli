@@ -4,8 +4,6 @@ on:
   pull_request:
     paths:
       - 'packages/core/src/**/*.ts'
-      - '.gemini/commands/*.toml'
-      - '.gemini/skills/**/SKILL.md'
       - '!**/*.test.ts'
       - '!**/*.test.tsx'
 
@@ -29,33 +27,8 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          # 1. Path-based detection (The "Knowns")
-          KNOWN_PATHS=("packages/core/src/prompts/snippets" "packages/core/src/tools/definitions" ".gemini/commands" ".gemini/skills")
-          PR_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
-
-          IS_STEERING_CHANGE=false
-          for path in "${KNOWN_PATHS[@]}"; do
-            if echo "$PR_FILES" | grep -q "$path"; then
-              IS_STEERING_CHANGE=true
-              break
-            fi
-          done
-
-          # 2. Signature-based detection (The "Unknowns")
-          # We look for patterns that define tools or agents in any file
-          SIGNATURES=("LocalAgentDefinition" "LocalInvocation" "ToolDefinition" "inputSchema" "kind: 'local'")
-          if [ "$IS_STEERING_CHANGE" = false ]; then
-            PR_DIFF=$(git diff -U0 origin/${{ github.base_ref }}...HEAD)
-            for sig in "${SIGNATURES[@]}"; do
-              if echo "$PR_DIFF" | grep -q "$sig"; then
-                IS_STEERING_CHANGE=true
-                echo "DEBUG: Detected steering via signature: $sig"
-                break
-              fi
-            done
-          fi
-
-          echo "STEERING_DETECTED=$IS_STEERING_CHANGE" >> "$GITHUB_OUTPUT"
+          STEERING_DETECTED=$(node scripts/changed_prompt.js --steering-only)
+          echo "STEERING_DETECTED=$STEERING_DETECTED" >> "$GITHUB_OUTPUT"
 
       - name: 'Analyze PR Content'
         if: "steps.detect.outputs.STEERING_DETECTED == 'true'"
