@@ -48,6 +48,8 @@ export {
   logWebFetchFallbackAttempt,
   logNetworkRetryAttempt,
   logRewind,
+  logOnboardingStart,
+  logOnboardingSuccess,
 } from './loggers.js';
 export {
   logConsecaPolicyGeneration,
@@ -70,6 +72,8 @@ export {
   NetworkRetryAttemptEvent,
   ToolCallDecision,
   RewindEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
   ConsecaPolicyGenerationEvent,
   ConsecaVerdictEvent,
 } from './types.js';
