@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { renderPrompt, renderPromptSync, p } from './render-prompt.js';
+import { renderPrompt, p } from './render-prompt.js';
 import type { PromptContent } from './render-prompt.js';
 
 type TestContext = { name?: string; shouldRender?: boolean };
@@ -345,27 +345,6 @@ describe('renderPrompt', () => {
     const result = await renderPrompt({
       content: test.content,
       contributions: test.contributions,
-      context: test.context,
-    });
-    expect(result).toBe(test.expect);
-  });
-});
-
-describe('renderPromptSync', () => {
-  const syncTests = tests.filter(
-    (t) =>
-      !t.desc.includes('async') &&
-      !t.desc.includes('Promise') &&
-      !t.desc.includes('resolves recursive async functions') &&
-      !t.desc.includes('async condition'),
-  );
-
-  it.each(syncTests)('$desc', (test) => {
-    const result = renderPromptSync({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      content: test.content as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      contributions: test.contributions as any,
       context: test.context,
     });
     expect(result).toBe(test.expect);
