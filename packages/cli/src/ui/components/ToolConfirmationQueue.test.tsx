@@ -163,6 +163,7 @@ describe('ToolConfirmationQueue', () => {
       </Box>,
       {
         config: {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...mockConfig,
           getUseAlternateBuffer: () => true,
         } as unknown as Config,

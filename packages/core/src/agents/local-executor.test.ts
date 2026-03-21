@@ -175,6 +175,7 @@ vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
   return {
     ...actual,
     promptIdContext: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.promptIdContext,
       getStore: vi.fn(),
       run: vi.fn((_id, fn) => fn()),
