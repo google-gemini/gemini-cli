@@ -156,11 +156,13 @@ async function truncateHistoryToBudget(
           } else if (responseObj && typeof responseObj === 'object') {
             if (
               'output' in responseObj &&
+              // eslint-disable-next-line no-restricted-syntax
               typeof responseObj['output'] === 'string'
             ) {
               contentStr = responseObj['output'];
             } else if (
               'content' in responseObj &&
+              // eslint-disable-next-line no-restricted-syntax
               typeof responseObj['content'] === 'string'
             ) {
               contentStr = responseObj['content'];
