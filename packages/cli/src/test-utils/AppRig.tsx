@@ -433,7 +433,7 @@ export class AppRig {
   ) {
     if (!this.config) throw new Error('AppRig not initialized');
     this.config.getPolicyEngine().addRule({
-      toolName,
+      toolName: toolName ?? '*',
       decision,
       priority,
       source: 'AppRig Override',
