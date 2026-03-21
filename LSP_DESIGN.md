@@ -31,6 +31,175 @@ Claude Code and opencode both ship LSP integration. Users are building
 workarounds (Serena MCP server, Neovim LSP bridges). This is the most-upvoted
 open feature request (112 thumbs-up on #2465).
 
+## LSP protocol reference for agentic tools
+
+This section summarizes how LSP works from a client's perspective, focused on
+the subset relevant to an agentic coding tool rather than an interactive IDE.
+Sources:
+[LSP 3.18 specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/),
+VS Code's `vscode-languageclient` source, and observed behavior of
+`typescript-language-server` and `pyright-langserver`.
+
+### Lifecycle
+
+1. **`initialize` request.** Client sends `processId`, `rootUri`,
+   `workspaceFolders`, and `capabilities` (what the client supports). Server
+   responds with its own capabilities. This is a handshake — nothing else can
+   happen until it completes.
+
+2. **`initialized` notification.** Client tells the server it's ready. After
+   this, the server may send requests back to the client
+   (`workspace/configuration`, `client/registerCapability`, etc.) that **must be
+   answered** or the server will deadlock.
+
+3. **`workspace/didChangeConfiguration` notification.** Some servers (notably
+   pyright) require this to trigger workspace initialization. Send it
+   immediately after `initialized`, even with `{ settings: {} }`. See
+   [pyright#6874](https://github.com/microsoft/pyright/issues/6874).
+
+4. **Normal operation.** Open/change/close documents, make queries.
+
+5. **`shutdown` request + `exit` notification.** Graceful teardown.
+
+### How servers discover files
+
+Servers **scan the filesystem themselves** using `rootUri`/`workspaceFolders`
+from initialize. They do not rely on the client to enumerate files:
+
+- **TypeScript:** Walks up from files looking for `tsconfig.json`. Loads all
+  files referenced by the config (`include`/`exclude`/`files`) plus transitive
+  imports. Reads these directly from disk — no `didOpen` needed.
+- **Pyright:** Loads files referenced by `pyrightconfig.json` plus transitive
+  imports. Has `diagnosticMode: "openFilesOnly"` vs `"workspace"` setting.
+
+The client only needs to send `textDocument/didOpen` for files it wants to
+explicitly manage (provide in-memory content that supersedes disk).
+
+### Document synchronization
+
+- **`textDocument/didOpen`:** Transfers ownership of a document from disk to
+  client. After this, the server uses the client-provided content, not the file
+  on disk. Must include `uri`, `languageId`, `version`, and full `text`.
+- **`textDocument/didChange`:** Sends content updates. Can be full
+  (`TextDocumentSyncKind.Full` = send entire content) or incremental. Full sync
+  is simpler and universally supported.
+- **`textDocument/didClose`:** Returns ownership to disk. Server should clear
+  diagnostics and read from disk on next access.
+- **`textDocument/didSave`:** Optional notification that the file was saved.
+  Some servers use it as a trigger for heavier analysis.
+
+**Key insight for agentic tools:** If you write to disk but only sent `didOpen`
+previously, the server still uses the stale in-memory content. You must send
+`didChange` for every modification, OR `didClose` + `didOpen` to re-sync from
+disk.
+
+### File watching (`workspace/didChangeWatchedFiles`)
+
+Servers register glob patterns (e.g., `**/*.{ts,js}`) via
+`client/registerCapability`. The client watches the filesystem and sends
+`workspace/didChangeWatchedFiles` when matching files are created, changed, or
+deleted.
+
+This is important for:
+
+- Files the agent creates or deletes (the server doesn't know about them unless
+  told)
+- Files modified on disk that haven't been opened via `didOpen`
+- TypeScript 5.0+ with `--canUseWatchEvents` delegates all file watching to the
+  client instead of spawning its own watchers
+
+**For agentic tools:** After any `write_file`, `edit`, or file creation, send
+`workspace/didChangeWatchedFiles` for the affected files. Without this, servers
+relying on client-side watching will miss changes.
+
+### Diagnostics: push vs pull
+
+**Push model (`textDocument/publishDiagnostics`):** The original model. The
+server sends diagnostics whenever it wants — after `didOpen`, after `didChange`,
+after analyzing transitive dependencies, or at any other time. The client has
+**no way to know when the server is "done"**. This is the model used by
+`typescript-language-server` and `pyright-langserver`.
+
+**Pull model (`textDocument/diagnostic`):** Added in LSP 3.17. The client
+requests diagnostics for a specific document and gets a response. Also
+`workspace/diagnostic` for workspace-wide pulls. This is a proper
+request/response pattern — much better for agentic tools. However, **TypeScript
+and Pyright do not support it yet.** Only some Microsoft HTML/CSS/JSON servers
+implement it.
+
+**Implications for our design:** We are stuck with the push model for the
+servers that matter. This means:
+
+- After `didOpen`/`didChange`, we start a listener, then wait for
+  `publishDiagnostics` with a timeout.
+- An empty timeout means "server hasn't responded yet" (not "no issues").
+- The server explicitly sending `diagnostics: []` means "no issues."
+- There is no "request diagnostics" operation in the push model.
+
+### What servers publish diagnostics for
+
+This is **server-specific**, not defined by the protocol:
+
+- Servers can publish diagnostics for any document, including ones never opened
+  via `didOpen`.
+- TypeScript typically publishes for open files and their direct dependents.
+- Pyright in `"workspace"` mode publishes for all project files.
+- When a file is closed (`didClose`), servers conventionally send empty
+  diagnostics to clear them — but this is convention, not enforced.
+
+### Requests available for semantic queries
+
+All are request/response (unlike diagnostics):
+
+- **`textDocument/hover`:** Type info and documentation at a position.
+- **`textDocument/definition`:** Jump to definition.
+- **`textDocument/references`:** Find all references (includes declaration).
+- **`textDocument/documentSymbol`:** Symbol tree for a file.
+- **`workspace/symbol`:** Search symbols by name across the workspace.
+- **`textDocument/completion`:** Code completion suggestions.
+- **`textDocument/codeAction`:** Suggested fixes and refactorings.
+
+These work on any file the server knows about (via project config + imports),
+not just files opened via `didOpen`. Some may require the file to be opened
+first for accurate results.
+
+### Server-initiated requests we must handle
+
+Some servers send requests back to the client during initialization or
+operation. These are **blocking JSON-RPC requests** — if unanswered, the server
+deadlocks:
+
+- **`workspace/configuration`:** Server asks for settings (e.g., pyright asks
+  for `python`, `python.analysis`, `pyright` sections). Return an array with one
+  result per `items` entry.
+- **`client/registerCapability`:** Server registers dynamic capabilities (e.g.,
+  file watchers). Acknowledge with `null`.
+- **`window/workDoneProgress/create`:** Server wants to report progress.
+  Acknowledge with `null`.
+- **`workspace/workspaceFolders`:** Server asks for the workspace folders.
+  Return the array from initialization.
+
+### Fundamental tension with agentic tools
+
+LSP is designed for an **interactive IDE** where:
+
+- The user edits one file at a time
+- Diagnostics trickle in asynchronously (latency is fine)
+- The server has time to warm up while the user reads code
+- Files are opened and stay open for long periods
+
+An agentic tool is different:
+
+- It writes files in bursts and needs immediate feedback
+- It creates/modifies multiple files in quick succession
+- It doesn't "open" files in the IDE sense — it reads and writes
+- There is no "user is looking at this file" concept
+
+The push diagnostic model is the biggest mismatch. The pull model
+(`textDocument/diagnostic`) would be ideal but isn't widely supported yet. Our
+adaptive timeout is the best available workaround: be patient for cold starts,
+fast once the server is warm.
+
 ## Design principles
 
 1. **Implicit first.** The agent should get LSP-powered feedback automatically
