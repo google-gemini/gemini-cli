@@ -6,7 +6,7 @@
 
 import { MessageType, type HistoryItemCompression } from '../types.js';
 import { CommandKind, type SlashCommand } from './types.js';
-import { tokenLimit, CompressionStatus } from '@google/gemini-cli-core';
+import { tokenLimit, type CompressionStatus } from '@google/gemini-cli-core';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
@@ -76,7 +76,9 @@ export const compressCommand: SlashCommand = {
               isPending: false,
               beforePercentage,
               afterPercentage,
-              compressionStatus: (Number(compressed.compressionStatus) as unknown) as CompressionStatus,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              compressionStatus:
+                Number(compressed.compressionStatus) as unknown as CompressionStatus,
               isManual: true,
               thresholdPercentage: Math.round(threshold * 100),
             },

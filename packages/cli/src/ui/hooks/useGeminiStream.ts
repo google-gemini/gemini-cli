@@ -39,6 +39,10 @@ import {
   getPlanModeExitMessage,
   isBackgroundExecutionData,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+  type CompressionStatus,
+>>>>>>> 12bc9cace (fix(cli): resolve merge conflicts and align with async test helpers)
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
 =======
@@ -1173,6 +1177,7 @@ export const useGeminiStream = (
             isPending: false,
             beforePercentage,
             afterPercentage,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             compressionStatus: eventValue ? ((Number(eventValue.compressionStatus) as unknown) as CompressionStatus) : null,
             isManual: false,
             thresholdPercentage: Math.round(threshold * 100),
