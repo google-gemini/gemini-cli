@@ -287,9 +287,12 @@ function geminiContentsToOpenAIMessages(
       // Deduplicate by tool_call_id — some providers require exactly one
       // tool_result per tool_use. Keep last occurrence (most complete).
       const seenToolIds = new Map<string, Part>();
-      for (const fr of funcResponses) {
+      for (let frIdx = 0; frIdx < funcResponses.length; frIdx++) {
+        const fr = funcResponses[frIdx];
+        // Use index-based fallback for responses missing an id to avoid
+        // collapsing distinct responses into a single empty-string key.
          
-        const frId = fr.functionResponse!.id ?? '';
+        const frId = fr.functionResponse!.id || `_fr_${frIdx}`;
         seenToolIds.set(frId, fr);
       }
       for (const [frId, fr] of seenToolIds) {
@@ -297,7 +300,6 @@ function geminiContentsToOpenAIMessages(
           role: 'tool',
           tool_call_id: frId,
           content:
-             
             typeof fr.functionResponse!.response === 'object'
               ? JSON.stringify(fr.functionResponse!.response)
               : String(fr.functionResponse!.response ?? ''),
@@ -649,7 +651,6 @@ export class OpenAIContentGenerator implements ContentGenerator {
         first !== null &&
         first !== undefined &&
         !Array.isArray(first) &&
-         
         typeof first === 'object' &&
         'role' in first;
       if (isContentArray) {
@@ -662,7 +663,6 @@ export class OpenAIContentGenerator implements ContentGenerator {
           if (
             entry !== null &&
             entry !== undefined &&
-             
             typeof entry === 'object' &&
             'text' in entry
           ) {
