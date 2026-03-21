@@ -166,15 +166,14 @@ function shouldRedactEnvironmentVariable(
     return false;
   }
 
-  // NEVER_ALLOWED variables are blocked regardless of the user allow-list.
-  if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
-    return true;
-  }
-
   if (allowedSet?.has(key)) {
     return false;
   }
   if (blockedSet?.has(key)) {
+    return true;
+  }
+
+  if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
     return true;
   }
 

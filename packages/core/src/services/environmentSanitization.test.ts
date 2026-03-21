@@ -306,22 +306,23 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
-  it('should block NEVER_ALLOWED_ENVIRONMENT_VARIABLES even when explicitly added to the allow-list', () => {
-    // The user-configured allow-list must not be able to bypass the hard denylist
-    // (e.g. DATABASE_URL, GOOGLE_CLOUD_PROJECT). Without this guarantee, a user
-    // setting security.environmentVariableRedaction.allowed = ['DATABASE_URL']
-    // would silently expose credentials to the LLM.
+  it('should allow user allow-list to override NEVER_ALLOWED_ENVIRONMENT_VARIABLES name list', () => {
+    // The allowlist purpose is to let users bypass overly broad security policies.
+    // NEVER_ALLOWED_ENVIRONMENT_VARIABLES contains entries like GOOGLE_CLOUD_PROJECT
+    // that are not secrets — users must be able to explicitly allow them.
+    // Value-pattern checks (NEVER_ALLOWED_VALUE_PATTERNS) still protect against
+    // actual credentials regardless of the allow-list.
     const env = {
-      DATABASE_URL: 'postgres://user:pass@host/db',
+      GOOGLE_CLOUD_PROJECT: 'my-project-id',
       SAFE_VAR: 'fine',
     };
     const sanitized = sanitizeEnvironment(env, {
-      allowedEnvironmentVariables: ['DATABASE_URL'],
+      allowedEnvironmentVariables: ['GOOGLE_CLOUD_PROJECT'],
       blockedEnvironmentVariables: [],
       enableEnvironmentVariableRedaction: true,
     });
-    expect(sanitized).toEqual({ SAFE_VAR: 'fine' });
-    expect(sanitized).not.toHaveProperty('DATABASE_URL');
+    expect(sanitized).toHaveProperty('GOOGLE_CLOUD_PROJECT', 'my-project-id');
+    expect(sanitized).toHaveProperty('SAFE_VAR', 'fine');
   });
 
   it('should block variables specified in blockedEnvironmentVariables', () => {
