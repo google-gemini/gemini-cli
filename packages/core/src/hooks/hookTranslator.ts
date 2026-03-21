@@ -220,23 +220,105 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
 
   /**
    * Convert stable LLMRequest to genai SDK GenerateContentParameters
+   *
+   * When baseRequest is provided, merges hook messages back into the original
+   * contents, preserving non-text parts (functionCall, functionResponse, etc.)
+   * that were filtered out by toHookLLMRequest. Without this merge, returning
+   * a modified llm_request from a BeforeModel hook would destroy tool call
+   * history and cause the model to loop.
    */
   fromHookLLMRequest(
     hookRequest: LLMRequest,
     baseRequest?: GenerateContentParameters,
   ): GenerateContentParameters {
-    // Convert hook messages back to SDK Content format
-    const contents = hookRequest.messages.map((message) => ({
-      role: message.role === 'model' ? 'model' : message.role,
-      parts: [
-        {
-          text:
+    let contents;
+
+    if (baseRequest?.contents) {
+      // Merge hook messages back into base contents, preserving non-text parts
+      const baseContents = Array.isArray(baseRequest.contents)
+        ? baseRequest.contents
+        : [baseRequest.contents];
+
+      let messageIndex = 0;
+      contents = baseContents.map((content) => {
+        if (typeof content === 'string') {
+          // String content always contributed a message
+          if (messageIndex < hookRequest.messages.length) {
+            const message = hookRequest.messages[messageIndex++];
+            return typeof message.content === 'string'
+              ? message.content
+              : String(message.content);
+          }
+          return content;
+        }
+
+        if (!isContentWithParts(content)) {
+          return content;
+        }
+
+        const parts = Array.isArray(content.parts)
+          ? content.parts
+          : [content.parts];
+        const hasText = parts.some(hasTextProperty);
+
+        if (!hasText) {
+          // This content was skipped by toHookLLMRequest — preserve as-is
+          return content;
+        }
+
+        // This content contributed a message — merge the hook text back in
+        if (messageIndex < hookRequest.messages.length) {
+          const message = hookRequest.messages[messageIndex++];
+          const newText =
             typeof message.content === 'string'
               ? message.content
-              : String(message.content),
-        },
-      ],
-    }));
+              : String(message.content);
+
+          // Separate non-text parts to preserve them
+          const nonTextParts = parts.filter(
+            (p: unknown) => !hasTextProperty(p),
+          );
+
+          return {
+            ...content,
+            role: message.role === 'model' ? 'model' : message.role,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            parts: [{ text: newText }, ...nonTextParts],
+          };
+        }
+
+        return content;
+      });
+
+      // Append any remaining hook messages beyond base contents
+      while (messageIndex < hookRequest.messages.length) {
+        const message = hookRequest.messages[messageIndex++];
+        contents.push({
+          role: message.role === 'model' ? 'model' : message.role,
+          parts: [
+            {
+              text:
+                typeof message.content === 'string'
+                  ? message.content
+                  : String(message.content),
+            },
+          ],
+        });
+      }
+    } else {
+      // No baseRequest — fall back to current behavior (text-only)
+      contents = hookRequest.messages.map((message) => ({
+        role: message.role === 'model' ? 'model' : message.role,
+        parts: [
+          {
+            text:
+              typeof message.content === 'string'
+                ? message.content
+                : String(message.content),
+          },
+        ],
+      }));
+    }
 
     // Build the result with proper typing
     const result: GenerateContentParameters = {
