@@ -30,7 +30,10 @@ import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
-import { SHELL_TOOL_NAME, SENSITIVE_TOOLS } from '../tools/tool-names.js';
+import {
+  SHELL_TOOL_NAME,
+  TOOLS_REQUIRING_NARROWING,
+} from '../tools/tool-names.js';
 import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
@@ -560,7 +563,7 @@ export function createPolicyUpdater(
             : WORKSPACE_POLICY_TIER;
         const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
 
-        if (SENSITIVE_TOOLS.has(toolName) && !message.commandPrefix) {
+        if (TOOLS_REQUIRING_NARROWING.has(toolName) && !message.commandPrefix) {
           debugLogger.warn(
             `Attempted to update policy for sensitive tool '${toolName}' without a commandPrefix. Skipping.`,
           );
@@ -600,7 +603,7 @@ export function createPolicyUpdater(
             : WORKSPACE_POLICY_TIER;
         const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
 
-        if (SENSITIVE_TOOLS.has(toolName) && !message.argsPattern) {
+        if (TOOLS_REQUIRING_NARROWING.has(toolName) && !message.argsPattern) {
           debugLogger.warn(
             `Attempted to update policy for sensitive tool '${toolName}' without an argsPattern. Skipping.`,
           );

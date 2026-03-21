@@ -76,5 +76,11 @@ required_context = ["environment"]
 
 [[rule]]
 toolName = "web_fetch"
+decision = "allow"
+priority = 15
+modes = ["autoEdit"]
+
+[[rule]]
+toolName = "web_fetch"
 decision = "ask_user"
 priority = 10
