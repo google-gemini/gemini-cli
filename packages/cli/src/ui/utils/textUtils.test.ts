@@ -514,6 +514,7 @@ describe('textUtils', () => {
           const b = sanitized.b as { c: string; d: Array<string | object> };
           expect(b.c).toBe('\\u001b[32mgreen\\u001b[0m');
           expect(b.d[0]).toBe('\\u001b[33myellow\\u001b[0m');
+          // eslint-disable-next-line no-restricted-syntax
           if (typeof b.d[1] === 'object' && b.d[1] !== null) {
             const e = b.d[1] as { e: string };
             expect(e.e).toBe('\\u001b[34mblue\\u001b[0m');

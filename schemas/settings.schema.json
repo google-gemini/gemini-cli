@@ -2134,6 +2134,20 @@
               "markdownDescription": "Disable user input on browser window during automation.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "confirmSensitiveActions": {
+              "title": "Confirm Sensitive Actions",
+              "description": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).",
+              "markdownDescription": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "blockFileUploads": {
+              "title": "Block File Uploads",
+              "description": "Hard-block file upload requests from the browser agent.",
+              "markdownDescription": "Hard-block file upload requests from the browser agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
