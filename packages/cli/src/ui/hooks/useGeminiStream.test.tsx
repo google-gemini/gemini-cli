@@ -32,7 +32,10 @@ import type {
   Config,
   EditorType,
   AnyToolInvocation,
+  AnyDeclarativeTool,
   SpanMetadata,
+  CompletedToolCall,
+  ToolCallRequestInfo,
 } from '@google/gemini-cli-core';
 import {
   CoreToolCallStatus,
@@ -52,7 +55,11 @@ import {
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import type { SlashCommandProcessorResult } from '../types.js';
+import type {
+  SlashCommandProcessorResult,
+  HistoryItemWithoutId,
+  HistoryItem,
+} from '../types.js';
 import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
@@ -243,8 +250,10 @@ describe('useGeminiStream', () => {
   let mockMarkToolsAsSubmitted: Mock;
   let handleAtCommandSpy: MockInstance;
 
-  const emptyHistory: any[] = [];
-  let capturedOnComplete: any = null;
+  const emptyHistory: HistoryItem[] = [];
+  let capturedOnComplete:
+    | ((tools: CompletedToolCall[]) => Promise<void>)
+    | null = null;
   const mockGetPreferredEditor = vi.fn(() => 'vscode' as EditorType);
   const mockOnAuthError = vi.fn();
   const mockPerformMemoryRefresh = vi.fn(() => Promise.resolve());
@@ -403,13 +412,17 @@ describe('useGeminiStream', () => {
         lastToolCalls,
         mockScheduleToolCalls,
         mockMarkToolsAsSubmitted,
-        (updater: any) => {
+        (
+          updater:
+            | TrackedToolCall[]
+            | ((prev: TrackedToolCall[]) => TrackedToolCall[]),
+        ) => {
           lastToolCalls =
             typeof updater === 'function' ? updater(lastToolCalls) : updater;
           rerender({ ...initialProps, toolCalls: lastToolCalls });
         },
-        (...args: any[]) => {
-          mockCancelAllToolCalls(...args);
+        (signal: AbortSignal) => {
+          mockCancelAllToolCalls(signal);
           lastToolCalls = lastToolCalls.map((tc) => {
             if (
               tc.status === CoreToolCallStatus.AwaitingApproval ||
@@ -1937,7 +1950,7 @@ describe('useGeminiStream', () => {
       });
 
       // Simulate tool completion
-      const completedTool: any = {
+      const completedTool = {
         request: {
           callId: 'test-call-id',
           name: 'activate_skill',
@@ -1961,7 +1974,7 @@ describe('useGeminiStream', () => {
             },
           ],
         },
-      };
+      } as unknown as TrackedCompletedToolCall;
 
       await act(async () => {
         await capturedOnComplete([completedTool]);
@@ -1999,7 +2012,7 @@ describe('useGeminiStream', () => {
       });
 
       // Simulate tool completion
-      const completedTool: any = {
+      const completedTool = {
         request: {
           callId: 'test-call-id',
           name: 'save_memory',
@@ -2023,7 +2036,7 @@ describe('useGeminiStream', () => {
             },
           ],
         },
-      };
+      } as unknown as TrackedCompletedToolCall;
 
       await act(async () => {
         await capturedOnComplete([completedTool]);
@@ -2059,7 +2072,7 @@ describe('useGeminiStream', () => {
           displayName: 'save_memory',
           description: 'Saves memory',
           build: vi.fn(),
-        } as any,
+        } as unknown as AnyDeclarativeTool,
         invocation: {
           getDescription: () => `Mock description`,
         } as unknown as AnyToolInvocation,
@@ -2298,7 +2311,7 @@ describe('useGeminiStream', () => {
             displayName: 'replace',
             description: 'Replace text',
             build: vi.fn(),
-          } as any,
+          } as unknown as AnyDeclarativeTool,
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
@@ -2339,7 +2352,7 @@ describe('useGeminiStream', () => {
             displayName: 'write_file',
             description: 'Write file',
             build: vi.fn(),
-          } as any,
+          } as unknown as AnyDeclarativeTool,
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
@@ -2684,14 +2697,14 @@ describe('useGeminiStream', () => {
 
   it('should flush pending text rationale before scheduling tool calls to ensure correct history order', async () => {
     const addItemOrder: string[] = [];
-    let capturedOnComplete: any;
+    let capturedOnComplete: (tools: CompletedToolCall[]) => Promise<void>;
 
     const mockScheduleToolCalls = vi.fn(async (requests) => {
       addItemOrder.push('scheduleToolCalls_START');
       // Simulate tools completing and triggering onComplete immediately.
       // This mimics the behavior that caused the regression where tool results
       // were added to history during the await scheduleToolCalls(...) block.
-      const tools = requests.map((r: any) => ({
+      const tools = requests.map((r: ToolCallRequestInfo) => ({
         request: r,
         status: CoreToolCallStatus.Success,
         tool: { displayName: r.name, name: r.name },
@@ -2706,7 +2719,7 @@ describe('useGeminiStream', () => {
       addItemOrder.push('scheduleToolCalls_END');
     });
 
-    mockAddItem.mockImplementation((item: any) => {
+    mockAddItem.mockImplementation((item: HistoryItemWithoutId) => {
       addItemOrder.push(`addItem:${item.type}`);
     });
 
