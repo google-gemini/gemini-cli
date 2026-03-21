@@ -223,10 +223,8 @@ describe('ListCheckpointsCommand', () => {
     mockReadFile.mockResolvedValue('{"raw":"data"}');
     mockGetCheckpointInfoList.mockReturnValue([
       {
-        fileName: 'cp-1.json',
-        toolName: 'edit',
-        status: 'success',
-        timestamp: 0,
+        checkpoint: 'cp-1',
+        messageId: 'msg-1',
       },
     ]);
 
@@ -237,7 +235,7 @@ describe('ListCheckpointsCommand', () => {
     );
     expect(result.name).toBe('restore list');
     expect(result.data).toContain('Available Checkpoints:');
-    expect(result.data).toContain('**cp-1.json**: edit (Status: success)');
+    expect(result.data).toContain('**cp-1** (Message ID: msg-1)');
   });
 
   it('returns generic error on unexpected list failures', async () => {
