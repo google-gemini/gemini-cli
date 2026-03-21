@@ -627,7 +627,6 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   lspEnabled?: boolean;
-  lspDiagnosticSeverity?: 'error' | 'warning' | 'info' | 'hint';
   lspDiagnosticTimeout?: number;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
@@ -852,7 +851,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly lspEnabled: boolean;
-  private readonly lspDiagnosticSeverity: 'error' | 'warning' | 'info' | 'hint';
   private readonly lspDiagnosticTimeout: number;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
@@ -1005,7 +1003,6 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.lspEnabled = params.lspEnabled ?? false;
-    this.lspDiagnosticSeverity = params.lspDiagnosticSeverity ?? 'error';
     this.lspDiagnosticTimeout = params.lspDiagnosticTimeout ?? 5000;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
@@ -2123,10 +2120,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.lspEnabled;
   }
 
-  getLspDiagnosticSeverity(): 'error' | 'warning' | 'info' | 'hint' {
-    return this.lspDiagnosticSeverity;
-  }
-
   getLspDiagnosticTimeout(): number {
     return this.lspDiagnosticTimeout;
   }
@@ -2139,7 +2132,6 @@ export class Config implements McpContext, AgentLoopContext {
       const { LspManager } = await import('../lsp/manager.js');
       this.lspManager = new LspManager({
         enabled: this.lspEnabled,
-        diagnosticSeverity: this.lspDiagnosticSeverity,
         diagnosticTimeout: this.lspDiagnosticTimeout,
       });
     }

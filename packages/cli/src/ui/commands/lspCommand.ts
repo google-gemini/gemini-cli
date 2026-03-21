@@ -89,7 +89,6 @@ async function showStatus(
 
   // Settings section
   lines.push('\n**Settings:**');
-  lines.push(`  Diagnostic severity: ${settings.diagnosticSeverity}`);
   lines.push(`  Diagnostic timeout: ${settings.diagnosticTimeout}ms`);
   lines.push(`  Max servers: ${settings.maxServers}`);
 

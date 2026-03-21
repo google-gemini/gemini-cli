@@ -1496,18 +1496,6 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
-          diagnosticSeverity: {
-            type: 'string',
-            label: 'Diagnostic Severity',
-            category: 'Tools',
-            requiresRestart: false,
-            default: 'error',
-            description: oneLine`
-              Minimum severity level for diagnostics included in tool output.
-              One of: error, warning, info, hint.
-            `,
-            showInDialog: true,
-          },
           diagnosticTimeout: {
             type: 'number',
             label: 'Diagnostic Timeout (ms)',

@@ -114,16 +114,6 @@ const coerceCommaSeparated = (values: string[]): string[] => {
   );
 };
 
-const LSP_SEVERITY_VALUES = new Set(['error', 'warning', 'info', 'hint']);
-type LspSeverity = 'error' | 'warning' | 'info' | 'hint';
-
-function parseLspSeverity(value: unknown): LspSeverity | undefined {
-  if (typeof value === 'string' && LSP_SEVERITY_VALUES.has(value)) {
-    return value as LspSeverity; // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion -- validated by Set.has
-  }
-  return undefined;
-}
-
 export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
@@ -826,9 +816,6 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     lspEnabled: settings.tools?.lsp?.enabled,
-    lspDiagnosticSeverity: parseLspSeverity(
-      settings.tools?.lsp?.diagnosticSeverity,
-    ),
     lspDiagnosticTimeout: settings.tools?.lsp?.diagnosticTimeout,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,

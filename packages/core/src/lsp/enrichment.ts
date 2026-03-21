@@ -5,7 +5,7 @@
  */
 
 import * as path from 'node:path';
-import type { Diagnostic, LspSettings } from './types.js';
+import type { Diagnostic } from './types.js';
 import { DiagnosticSeverity } from './types.js';
 import type { LspManager } from './manager.js';
 import type { Config } from '../config/config.js';
@@ -20,20 +20,6 @@ const SEVERITY_LABELS: Record<number, string> = {
   [DiagnosticSeverity.Hint]: 'HINT',
 };
 
-const SEVERITY_THRESHOLD: Record<string, number> = {
-  error: DiagnosticSeverity.Error,
-  warning: DiagnosticSeverity.Warning,
-  info: DiagnosticSeverity.Information,
-  hint: DiagnosticSeverity.Hint,
-};
-
-/**
- * Collect LSP diagnostics for a file after a write/edit operation and format
- * them for inclusion in tool output.
- *
- * @returns A formatted string to append to llmContent, or empty string if no
- *   diagnostics are available.
- */
 /**
  * Result from collecting diagnostics, including whether we timed out.
  */
@@ -48,11 +34,15 @@ export interface CollectedDiagnostics {
   diagnostics: Diagnostic[];
 }
 
+/**
+ * Collect LSP diagnostics for a file after a write/edit operation and format
+ * them for inclusion in tool output. All severity levels are included — the
+ * agent benefits from seeing warnings and hints, not just errors.
+ */
 export async function collectDiagnosticsForOutput(
   lspManager: LspManager,
   filePath: string,
   content: string,
-  severitySetting: LspSettings['diagnosticSeverity'],
   signal?: AbortSignal,
 ): Promise<CollectedDiagnostics> {
   if (!lspManager.hasServerFor(filePath)) {
@@ -76,7 +66,7 @@ export async function collectDiagnosticsForOutput(
   }
 
   return {
-    llmOutput: formatDiagnostics(result.diagnostics, filePath, severitySetting),
+    llmOutput: formatDiagnostics(result.diagnostics, filePath),
     timedOut: false,
     applicable: true,
     diagnostics: result.diagnostics,
@@ -85,24 +75,16 @@ export async function collectDiagnosticsForOutput(
 
 /**
  * Format a list of diagnostics into the XML-tagged output format.
+ * All severity levels are included.
  */
 export function formatDiagnostics(
   diagnostics: Diagnostic[],
   filePath: string,
-  severitySetting: LspSettings['diagnosticSeverity'],
 ): string {
-  const threshold =
-    SEVERITY_THRESHOLD[severitySetting] ?? DiagnosticSeverity.Error;
-
-  // Filter by severity (lower number = higher severity in LSP).
-  const filtered = diagnostics.filter(
-    (d) => (d.severity ?? DiagnosticSeverity.Error) <= threshold,
-  );
-
-  if (filtered.length === 0) return '';
+  if (diagnostics.length === 0) return '';
 
   // Sort by severity (errors first), then by line number.
-  filtered.sort((a, b) => {
+  const sorted = [...diagnostics].sort((a, b) => {
     const sevDiff =
       (a.severity ?? DiagnosticSeverity.Error) -
       (b.severity ?? DiagnosticSeverity.Error);
@@ -110,8 +92,8 @@ export function formatDiagnostics(
     return a.range.start.line - b.range.start.line;
   });
 
-  const truncated = filtered.length > MAX_DIAGNOSTICS;
-  const shown = truncated ? filtered.slice(0, MAX_DIAGNOSTICS) : filtered;
+  const truncated = sorted.length > MAX_DIAGNOSTICS;
+  const shown = truncated ? sorted.slice(0, MAX_DIAGNOSTICS) : sorted;
 
   const fileName = path.basename(filePath);
   const lines = shown.map((d) => {
@@ -125,7 +107,7 @@ export function formatDiagnostics(
 
   let body = `Compiler feedback for ${fileName}:\n\n${lines.join('\n')}`;
   if (truncated) {
-    body += `\n\n(${filtered.length - MAX_DIAGNOSTICS} more diagnostics omitted)`;
+    body += `\n\n(${sorted.length - MAX_DIAGNOSTICS} more diagnostics omitted)`;
   }
 
   return `\n\n<lsp_diagnostics file="${filePath}">\n${body}\n</lsp_diagnostics>`;
@@ -169,7 +151,6 @@ export async function enrichToolResultWithLsp(
       lspMgr,
       filePath,
       fileContent,
-      config.getLspDiagnosticSeverity(),
       signal,
     );
 
@@ -178,7 +159,6 @@ export async function enrichToolResultWithLsp(
     const enriched = appendLspDiagnostics(llmContent, collected.llmOutput);
     displayResult.lspDiagnosticSummary = buildDiagnosticSummary(
       collected.diagnostics,
-      config.getLspDiagnosticSeverity(),
       collected.timedOut,
     );
     return enriched;
@@ -190,8 +170,7 @@ export async function enrichToolResultWithLsp(
 
 /**
  * Build a short user-facing summary of diagnostics (for display in the tool
- * output footer). Shows ALL diagnostics regardless of severity setting —
- * the severity filter only applies to what the model sees in llmContent.
+ * output footer).
  *
  * Examples:
  *   "LSP: 2 errors"
@@ -201,7 +180,6 @@ export async function enrichToolResultWithLsp(
  */
 export function buildDiagnosticSummary(
   diagnostics: Diagnostic[],
-  _severitySetting: LspSettings['diagnosticSeverity'],
   timedOut?: boolean,
 ): string {
   if (timedOut && diagnostics.length === 0) {

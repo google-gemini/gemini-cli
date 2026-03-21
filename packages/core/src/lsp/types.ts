@@ -211,7 +211,6 @@ export interface PublishDiagnosticsParams {
 
 export interface LspSettings {
   enabled: boolean;
-  diagnosticSeverity: 'error' | 'warning' | 'info' | 'hint';
   diagnosticTimeout: number;
   maxServers: number;
   idleTimeout: number;
@@ -225,7 +224,6 @@ export interface LspServerUserConfig {
 
 export const DEFAULT_LSP_SETTINGS: LspSettings = {
   enabled: false,
-  diagnosticSeverity: 'error',
   diagnosticTimeout: 5000,
   maxServers: 4,
   idleTimeout: 600_000, // 10 minutes
