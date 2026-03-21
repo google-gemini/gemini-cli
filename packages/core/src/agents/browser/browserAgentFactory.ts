@@ -37,6 +37,11 @@ import {
   recordBrowserAgentVisionStatus,
   recordBrowserAgentCleanup,
 } from '../../telemetry/metrics.js';
+import {
+  PolicyDecision,
+  PRIORITY_SUBAGENT_TOOL,
+  type PolicyRule,
+} from '../../policy/types.js';
 
 /**
  * Structured return type for vision disabled reasons.
@@ -47,10 +52,6 @@ type VisionDisabledReason =
   | { code: 'missing_visual_tools'; message: string }
   | { code: 'blocked_auth_type'; message: string }
   | undefined;
-  PolicyDecision,
-  PRIORITY_SUBAGENT_TOOL,
-  type PolicyRule,
-} from '../../policy/types.js';
 
 /**
  * Creates a browser agent definition with MCP tools configured.

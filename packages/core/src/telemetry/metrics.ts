@@ -372,6 +372,8 @@ const COUNTER_DEFINITIONS = {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       session_mode: 'persistent' | 'isolated' | 'existing';
+    },
+  },
   [EVENT_ONBOARDING_START]: {
     description: 'Counts onboarding started',
     valueType: ValueType.INT,
