@@ -11,7 +11,8 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { MessageType } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     tokenLimit: vi.fn(),
