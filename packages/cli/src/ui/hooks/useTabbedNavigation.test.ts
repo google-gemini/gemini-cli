@@ -40,8 +40,8 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('keyboard navigation', () => {
-    it('moves to next tab on Right arrow', () => {
-      const { result } = renderHook(() =>
+    it('moves to next tab on Right arrow', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, enableArrowNavigation: true }),
       );
 
@@ -52,8 +52,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(1);
     });
 
-    it('moves to previous tab on Left arrow', () => {
-      const { result } = renderHook(() =>
+    it('moves to previous tab on Left arrow', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({
           tabCount: 3,
           initialIndex: 1,
@@ -68,8 +68,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(0);
     });
 
-    it('moves to next tab on Tab key', () => {
-      const { result } = renderHook(() =>
+    it('moves to next tab on Tab key', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, enableTabKey: true }),
       );
 
@@ -80,8 +80,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(1);
     });
 
-    it('moves to previous tab on Shift+Tab key', () => {
-      const { result } = renderHook(() =>
+    it('moves to previous tab on Shift+Tab key', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({
           tabCount: 3,
           initialIndex: 1,
@@ -96,8 +96,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(0);
     });
 
-    it('does not navigate when isNavigationBlocked returns true', () => {
-      const { result } = renderHook(() =>
+    it('does not navigate when isNavigationBlocked returns true', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({
           tabCount: 3,
           enableArrowNavigation: true,
@@ -114,25 +114,27 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('initialization', () => {
-    it('returns initial index of 0 by default', () => {
-      const { result } = renderHook(() => useTabbedNavigation({ tabCount: 3 }));
+    it('returns initial index of 0 by default', async () => {
+      const { result } = await renderHook(() =>
+        useTabbedNavigation({ tabCount: 3 }),
+      );
       expect(result.current.currentIndex).toBe(0);
     });
 
-    it('returns specified initial index', () => {
-      const { result } = renderHook(() =>
+    it('returns specified initial index', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 2 }),
       );
       expect(result.current.currentIndex).toBe(2);
     });
 
-    it('clamps initial index to valid range', () => {
-      const { result: high } = renderHook(() =>
+    it('clamps initial index to valid range', async () => {
+      const { result: high } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 10 }),
       );
       expect(high.current.currentIndex).toBe(2);
 
-      const { result: negative } = renderHook(() =>
+      const { result: negative } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: -1 }),
       );
       expect(negative.current.currentIndex).toBe(0);
@@ -140,8 +142,10 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('goToNextTab', () => {
-    it('advances to next tab', () => {
-      const { result } = renderHook(() => useTabbedNavigation({ tabCount: 3 }));
+    it('advances to next tab', async () => {
+      const { result } = await renderHook(() =>
+        useTabbedNavigation({ tabCount: 3 }),
+      );
 
       act(() => {
         result.current.goToNextTab();
@@ -150,8 +154,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(1);
     });
 
-    it('stops at last tab when wrapAround is false', () => {
-      const { result } = renderHook(() =>
+    it('stops at last tab when wrapAround is false', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({
           tabCount: 3,
           initialIndex: 2,
@@ -166,8 +170,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(2);
     });
 
-    it('wraps to first tab when wrapAround is true', () => {
-      const { result } = renderHook(() =>
+    it('wraps to first tab when wrapAround is true', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 2, wrapAround: true }),
       );
 
@@ -180,8 +184,8 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('goToPrevTab', () => {
-    it('moves to previous tab', () => {
-      const { result } = renderHook(() =>
+    it('moves to previous tab', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 2 }),
       );
 
@@ -192,8 +196,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(1);
     });
 
-    it('stops at first tab when wrapAround is false', () => {
-      const { result } = renderHook(() =>
+    it('stops at first tab when wrapAround is false', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({
           tabCount: 3,
           initialIndex: 0,
@@ -208,8 +212,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(0);
     });
 
-    it('wraps to last tab when wrapAround is true', () => {
-      const { result } = renderHook(() =>
+    it('wraps to last tab when wrapAround is true', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 0, wrapAround: true }),
       );
 
@@ -222,8 +226,10 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('setCurrentIndex', () => {
-    it('sets index directly', () => {
-      const { result } = renderHook(() => useTabbedNavigation({ tabCount: 3 }));
+    it('sets index directly', async () => {
+      const { result } = await renderHook(() =>
+        useTabbedNavigation({ tabCount: 3 }),
+      );
 
       act(() => {
         result.current.setCurrentIndex(2);
@@ -232,8 +238,8 @@ describe('useTabbedNavigation', () => {
       expect(result.current.currentIndex).toBe(2);
     });
 
-    it('ignores out-of-bounds index', () => {
-      const { result } = renderHook(() =>
+    it('ignores out-of-bounds index', async () => {
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 1 }),
       );
 
@@ -250,9 +256,9 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('isNavigationBlocked', () => {
-    it('blocks navigation when callback returns true', () => {
+    it('blocks navigation when callback returns true', async () => {
       const isNavigationBlocked = vi.fn(() => true);
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, isNavigationBlocked }),
       );
 
@@ -264,9 +270,9 @@ describe('useTabbedNavigation', () => {
       expect(isNavigationBlocked).toHaveBeenCalled();
     });
 
-    it('allows navigation when callback returns false', () => {
+    it('allows navigation when callback returns false', async () => {
       const isNavigationBlocked = vi.fn(() => false);
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, isNavigationBlocked }),
       );
 
@@ -279,9 +285,9 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('onTabChange callback', () => {
-    it('calls onTabChange when tab changes via goToNextTab', () => {
+    it('calls onTabChange when tab changes via goToNextTab', async () => {
       const onTabChange = vi.fn();
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, onTabChange }),
       );
 
@@ -292,9 +298,9 @@ describe('useTabbedNavigation', () => {
       expect(onTabChange).toHaveBeenCalledWith(1);
     });
 
-    it('calls onTabChange when tab changes via setCurrentIndex', () => {
+    it('calls onTabChange when tab changes via setCurrentIndex', async () => {
       const onTabChange = vi.fn();
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, onTabChange }),
       );
 
@@ -305,9 +311,9 @@ describe('useTabbedNavigation', () => {
       expect(onTabChange).toHaveBeenCalledWith(2);
     });
 
-    it('does not call onTabChange when tab does not change', () => {
+    it('does not call onTabChange when tab does not change', async () => {
       const onTabChange = vi.fn();
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, onTabChange }),
       );
 
@@ -320,20 +326,20 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('isFirstTab and isLastTab', () => {
-    it('returns correct boundary flags based on position', () => {
-      const { result: first } = renderHook(() =>
+    it('returns correct boundary flags based on position', async () => {
+      const { result: first } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 0 }),
       );
       expect(first.current.isFirstTab).toBe(true);
       expect(first.current.isLastTab).toBe(false);
 
-      const { result: last } = renderHook(() =>
+      const { result: last } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 2 }),
       );
       expect(last.current.isFirstTab).toBe(false);
       expect(last.current.isLastTab).toBe(true);
 
-      const { result: middle } = renderHook(() =>
+      const { result: middle } = await renderHook(() =>
         useTabbedNavigation({ tabCount: 3, initialIndex: 1 }),
       );
       expect(middle.current.isFirstTab).toBe(false);
@@ -342,9 +348,9 @@ describe('useTabbedNavigation', () => {
   });
 
   describe('tabCount changes', () => {
-    it('reinitializes when tabCount changes', () => {
+    it('reinitializes when tabCount changes', async () => {
       let tabCount = 5;
-      const { result, rerender } = renderHook(() =>
+      const { result, rerender } = await renderHook(() =>
         useTabbedNavigation({ tabCount, initialIndex: 4 }),
       );
 

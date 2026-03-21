@@ -115,7 +115,6 @@ describe('<ModelDialog />', () => {
         settings,
       },
     );
-    await result.waitUntilReady();
     return result;
   };
 

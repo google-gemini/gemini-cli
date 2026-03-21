@@ -106,8 +106,7 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.activeBackgroundShellPid = 123;
     mockUIState.backgroundShellHeight = 5;
 
-    const { lastFrame, waitUntilReady, unmount } = render(<DefaultAppLayout />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<DefaultAppLayout />);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -118,8 +117,7 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.backgroundShellHeight = 5;
     mockUIState.streamingState = StreamingState.WaitingForConfirmation;
 
-    const { lastFrame, waitUntilReady, unmount } = render(<DefaultAppLayout />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<DefaultAppLayout />);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -130,8 +128,7 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.backgroundShellHeight = 5;
     mockUIState.streamingState = StreamingState.Responding;
 
-    const { lastFrame, waitUntilReady, unmount } = render(<DefaultAppLayout />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<DefaultAppLayout />);
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

@@ -16,9 +16,7 @@ describe('save_memory', () => {
   const rememberingFavoriteColor = "Agent remembers user's favorite color";
   evalTest('ALWAYS_PASSES', {
     name: rememberingFavoriteColor,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `remember that my favorite color is  blue.
   
     what is my favorite color? tell me that and surround it with $ symbol`,
@@ -38,9 +36,7 @@ describe('save_memory', () => {
   const rememberingCommandRestrictions = 'Agent remembers command restrictions';
   evalTest('USUALLY_PASSES', {
     name: rememberingCommandRestrictions,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `I don't want you to ever run npm commands.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
@@ -59,9 +55,7 @@ describe('save_memory', () => {
   const rememberingWorkflow = 'Agent remembers workflow preferences';
   evalTest('USUALLY_PASSES', {
     name: rememberingWorkflow,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `I want you to always lint after building.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
@@ -81,9 +75,7 @@ describe('save_memory', () => {
     'Agent ignores temporary conversation details';
   evalTest('ALWAYS_PASSES', {
     name: ignoringTemporaryInformation,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `I'm going to get a coffee.`,
     assert: async (rig, result) => {
       await rig.waitForTelemetryReady();
@@ -106,9 +98,7 @@ describe('save_memory', () => {
   const rememberingPetName = "Agent remembers user's pet's name";
   evalTest('ALWAYS_PASSES', {
     name: rememberingPetName,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `Please remember that my dog's name is Buddy.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
@@ -127,9 +117,7 @@ describe('save_memory', () => {
   const rememberingCommandAlias = 'Agent remembers custom command aliases';
   evalTest('ALWAYS_PASSES', {
     name: rememberingCommandAlias,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `When I say 'start server', you should run 'npm run dev'.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
@@ -149,18 +137,6 @@ describe('save_memory', () => {
     "Agent ignores workspace's database schema location";
   evalTest('USUALLY_PASSES', {
     name: ignoringDbSchemaLocation,
-    params: {
-      settings: {
-        tools: {
-          core: [
-            'save_memory',
-            'list_directory',
-            'read_file',
-            'run_shell_command',
-          ],
-        },
-      },
-    },
     prompt: `The database schema for this workspace is located in \`db/schema.sql\`.`,
     assert: async (rig, result) => {
       await rig.waitForTelemetryReady();
@@ -180,9 +156,7 @@ describe('save_memory', () => {
     "Agent remembers user's coding style preference";
   evalTest('ALWAYS_PASSES', {
     name: rememberingCodingStyle,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `I prefer to use tabs instead of spaces for indentation.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
@@ -202,18 +176,6 @@ describe('save_memory', () => {
     'Agent ignores workspace build artifact location';
   evalTest('USUALLY_PASSES', {
     name: ignoringBuildArtifactLocation,
-    params: {
-      settings: {
-        tools: {
-          core: [
-            'save_memory',
-            'list_directory',
-            'read_file',
-            'run_shell_command',
-          ],
-        },
-      },
-    },
     prompt: `In this workspace, build artifacts are stored in the \`dist/artifacts\` directory.`,
     assert: async (rig, result) => {
       await rig.waitForTelemetryReady();
@@ -232,18 +194,6 @@ describe('save_memory', () => {
   const ignoringMainEntryPoint = "Agent ignores workspace's main entry point";
   evalTest('USUALLY_PASSES', {
     name: ignoringMainEntryPoint,
-    params: {
-      settings: {
-        tools: {
-          core: [
-            'save_memory',
-            'list_directory',
-            'read_file',
-            'run_shell_command',
-          ],
-        },
-      },
-    },
     prompt: `The main entry point for this workspace is \`src/index.js\`.`,
     assert: async (rig, result) => {
       await rig.waitForTelemetryReady();
@@ -262,9 +212,7 @@ describe('save_memory', () => {
   const rememberingBirthday = "Agent remembers user's birthday";
   evalTest('ALWAYS_PASSES', {
     name: rememberingBirthday,
-    params: {
-      settings: { tools: { core: ['save_memory'] } },
-    },
+
     prompt: `My birthday is on June 15th.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
