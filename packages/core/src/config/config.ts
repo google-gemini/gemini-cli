@@ -186,7 +186,7 @@ export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
   otlpEndpoint?: string;
-  otlpProtocol?: 'grpc' | 'http';
+  otlpProtocol?: 'grpc' | 'http' | 'http/protobuf';
   logPrompts?: boolean;
   outfile?: string;
   useCollector?: boolean;
@@ -2367,7 +2367,7 @@ export class Config implements McpContext, AgentLoopContext {
     return this.telemetrySettings.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT;
   }
 
-  getTelemetryOtlpProtocol(): 'grpc' | 'http' {
+  getTelemetryOtlpProtocol(): 'grpc' | 'http' | 'http/protobuf' {
     return this.telemetrySettings.otlpProtocol ?? 'grpc';
   }
 

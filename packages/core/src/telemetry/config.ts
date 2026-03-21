@@ -82,15 +82,16 @@ export async function resolveTelemetrySettings(options: {
   const rawProtocol =
     argv.telemetryOtlpProtocol ??
     env['GEMINI_TELEMETRY_OTLP_PROTOCOL'] ??
+    env['OTEL_EXPORTER_OTLP_PROTOCOL'] ??
     settings.otlpProtocol;
-  const otlpProtocol = (['grpc', 'http'] as const).find(
+  const otlpProtocol = (['grpc', 'http', 'http/protobuf'] as const).find(
     (p) => p === rawProtocol,
   );
   if (rawProtocol !== undefined && otlpProtocol === undefined) {
     throw new FatalConfigError(
       `Invalid telemetry OTLP protocol: ${String(
         rawProtocol,
-      )}. Valid values are: grpc, http`,
+      )}. Valid values are: grpc, http, http/protobuf`,
     );
   }
 

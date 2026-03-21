@@ -1041,6 +1041,15 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTelemetryOtlpProtocol()).toBe('http');
     });
 
+    it('should return http/protobuf OTLP protocol when provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpProtocol: 'http/protobuf' },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('http/protobuf');
+    });
+
     it('should return default OTLP protocol if not provided', () => {
       const params: ConfigParameters = {
         ...baseParams,
