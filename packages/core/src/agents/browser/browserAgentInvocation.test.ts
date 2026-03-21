@@ -343,7 +343,55 @@ describe('BrowserAgentInvocation', () => {
             a.content.includes('Navigating to the page...'),
         ),
       );
+
       expect(thoughtProgress).toBeDefined();
+    });
+
+    it('should overwrite the thought content with new THOUGHT_CHUNK activity', async () => {
+      const { fireActivity } = setupActivityCapture();
+      const updateOutput = vi.fn();
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        updateOutput,
+      );
+
+      // Allow createBrowserAgentDefinition to resolve and onActivity to be registered
+      await Promise.resolve();
+      await Promise.resolve();
+
+      fireActivity({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: { text: 'I am thinking.' },
+      });
+      fireActivity({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: { text: 'Now I will act.' },
+      });
+
+      await executePromise;
+
+      const progressCalls = updateOutput.mock.calls
+        .map((c) => c[0] as SubagentProgress)
+        .filter((p) => p.isSubagentProgress);
+
+      const lastCall = progressCalls[progressCalls.length - 1];
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Now I will act.',
+        }),
+      );
     });
 
     it('should handle TOOL_CALL_START and TOOL_CALL_END with callId tracking', async () => {
