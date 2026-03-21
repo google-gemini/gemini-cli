@@ -838,6 +838,8 @@ export interface FileDiff {
   newContent: string;
   diffStat?: DiffStat;
   isNewFile?: boolean;
+  /** Summary of LSP diagnostics found after this write/edit. */
+  lspDiagnosticSummary?: string;
 }
 
 export interface DiffStat {

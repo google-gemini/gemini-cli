@@ -626,6 +626,9 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  lspEnabled?: boolean;
+  lspDiagnosticSeverity?: 'error' | 'warning' | 'info' | 'hint';
+  lspDiagnosticTimeout?: number;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -848,6 +851,9 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly lspEnabled: boolean;
+  private readonly lspDiagnosticSeverity: 'error' | 'warning' | 'info' | 'hint';
+  private readonly lspDiagnosticTimeout: number;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -855,6 +861,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
+  private lspManager?: import('../lsp/manager.js').LspManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
@@ -997,6 +1004,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
+    this.lspEnabled = params.lspEnabled ?? false;
+    this.lspDiagnosticSeverity = params.lspDiagnosticSeverity ?? 'error';
+    this.lspDiagnosticTimeout = params.lspDiagnosticTimeout ?? 5000;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2107,6 +2117,40 @@ export class Config implements McpContext, AgentLoopContext {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  isLspEnabled(): boolean {
+    return this.lspEnabled;
+  }
+
+  getLspDiagnosticSeverity(): 'error' | 'warning' | 'info' | 'hint' {
+    return this.lspDiagnosticSeverity;
+  }
+
+  getLspDiagnosticTimeout(): number {
+    return this.lspDiagnosticTimeout;
+  }
+
+  async getLspManager(): Promise<
+    import('../lsp/manager.js').LspManager | undefined
+  > {
+    if (!this.lspEnabled) return undefined;
+    if (!this.lspManager) {
+      const { LspManager } = await import('../lsp/manager.js');
+      this.lspManager = new LspManager({
+        enabled: this.lspEnabled,
+        diagnosticSeverity: this.lspDiagnosticSeverity,
+        diagnosticTimeout: this.lspDiagnosticTimeout,
+      });
+    }
+    return this.lspManager;
+  }
+
+  async shutdownLsp(): Promise<void> {
+    if (this.lspManager) {
+      await this.lspManager.shutdown();
+      this.lspManager = undefined;
+    }
   }
 
   isTopicUpdateNarrationEnabled(): boolean {

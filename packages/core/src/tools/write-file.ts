@@ -402,6 +402,41 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         llmContent = appendJitContext(llmContent, jitContext);
       }
 
+      // Append LSP diagnostics if enabled.
+      if (this.config.isLspEnabled()) {
+        try {
+          const lspMgr = await this.config.getLspManager();
+          if (lspMgr) {
+            const {
+              collectDiagnosticsForOutput,
+              appendLspDiagnostics,
+              buildDiagnosticSummary,
+            } = await import('../lsp/enrichment.js');
+            const collected = await collectDiagnosticsForOutput(
+              lspMgr,
+              this.resolvedPath,
+              finalContent,
+              this.config.getLspDiagnosticSeverity(),
+              abortSignal,
+            );
+            if (collected.applicable) {
+              llmContent = appendLspDiagnostics(
+                llmContent,
+                collected.llmOutput,
+              );
+              const summary = buildDiagnosticSummary(
+                collected.diagnostics,
+                this.config.getLspDiagnosticSeverity(),
+                collected.timedOut,
+              );
+              displayResult.lspDiagnosticSummary = summary;
+            }
+          }
+        } catch {
+          // LSP enrichment is supplementary — never fail the tool.
+        }
+      }
+
       return {
         llmContent,
         returnDisplay: displayResult,

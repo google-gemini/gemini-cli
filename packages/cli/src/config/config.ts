@@ -815,6 +815,15 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    lspEnabled: settings.tools?.lsp?.enabled,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    lspDiagnosticSeverity: settings.tools?.lsp?.diagnosticSeverity as
+      | 'error'
+      | 'warning'
+      | 'info'
+      | 'hint'
+      | undefined,
+    lspDiagnosticTimeout: settings.tools?.lsp?.diagnosticTimeout,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
