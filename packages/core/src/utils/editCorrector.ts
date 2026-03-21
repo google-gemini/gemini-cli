@@ -47,13 +47,8 @@ export async function ensureCorrectFileContent(
   }
 
   if (disableLLMCorrection) {
-    if (aggressiveUnescape) {
-      fileContentCorrectionCache.set(content, unescapedContent);
-      return unescapedContent;
-    }
-    fileContentCorrectionCache.set(content, content);
-    return content;
-  }
+  return aggressiveUnescape ? unescapedContent : content;
+}
 
   const correctedContent = await correctStringEscaping(
     content,
