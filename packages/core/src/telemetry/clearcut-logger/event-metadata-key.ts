@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 191
+  // Next ID: 194
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -712,4 +712,14 @@ export enum EventMetadataKey {
 
   // Logs the source of a credit purchase click (e.g. overage_menu, empty_wallet_menu, manage).
   GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
+
+  // ==========================================================================
+  // Gemini Enterprise (GE) Event Keys
+  // ==========================================================================
+
+  // Logs the start of the onboarding process.
+  GEMINI_CLI_ONBOARDING_START = 192,
+
+  // Logs the user tier for onboarding success events.
+  GEMINI_CLI_ONBOARDING_USER_TIER = 193,
 }
