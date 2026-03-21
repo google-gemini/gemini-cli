@@ -43,7 +43,7 @@ export async function performInitialAuth(
     if (e instanceof ValidationRequiredError) {
       // Don't treat validation required as a fatal auth error during startup.
       // This allows the React UI to load and show the ValidationDialog.
-      return { authError: null, accountSuspensionInfo: null };
+      return { authError: null, accountSuspensionInfo: null, authSucceeded: false };
     }
     const suspendedError = isAccountSuspendedError(e);
     if (suspendedError) {
