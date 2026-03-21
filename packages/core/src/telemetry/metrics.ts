@@ -51,6 +51,8 @@ const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
 const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
 const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
+const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -370,6 +372,18 @@ const COUNTER_DEFINITIONS = {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       session_mode: 'persistent' | 'isolated' | 'existing';
+  [EVENT_ONBOARDING_START]: {
+    description: 'Counts onboarding started',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingStartCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EVENT_ONBOARDING_SUCCESS]: {
+    description: 'Counts onboarding succeeded',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingSuccessCounter = c),
+    attributes: {} as {
+      user_tier?: string;
     },
   },
 } as const;
@@ -758,6 +772,8 @@ let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
 let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
+let onboardingStartCounter: Counter | undefined;
+let onboardingSuccessCounter: Counter | undefined;
 
 let browserAgentConnectionDurationHistogram: Histogram | undefined;
 let browserAgentConnectionFailureCounter: Counter | undefined;
@@ -939,6 +955,31 @@ export function recordLinesChanged(
 }
 
 // --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when the Google auth process starts.
+ */
+export function recordOnboardingStart(config: Config): void {
+  if (!onboardingStartCounter || !isMetricsInitialized) return;
+  onboardingStartCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
+}
+
+/**
+ * Records a metric for when the Google auth process ends successfully.
+ */
+export function recordOnboardingSuccess(
+  config: Config,
+  userTier?: string,
+): void {
+  if (!onboardingSuccessCounter || !isMetricsInitialized) return;
+  onboardingSuccessCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...(userTier && { user_tier: userTier }),
+  });
+}
 
 /**
  * Records a metric for when a UI frame flickers.

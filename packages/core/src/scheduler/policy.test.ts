@@ -824,6 +824,7 @@ describe('Plan Mode Denial Consistency', () => {
       toolRegistry: mockToolRegistry,
       getToolRegistry: () => mockToolRegistry,
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN), // Key: Plan Mode
