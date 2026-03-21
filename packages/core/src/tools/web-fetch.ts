@@ -5,16 +5,15 @@
  */
 
 import {
+  type ToolConfirmationOutcome,
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
-  type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -509,16 +508,7 @@ ${aggregatedContent}
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (this.params.url) {
-      return {
-        argsPattern: buildParamArgsPattern('url', this.params.url),
-      };
-    } else if (this.params.prompt) {
-      return {
-        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
-      };
-    }
-    return undefined;
+    return {};
   }
 
   protected override async getConfirmationDetails(

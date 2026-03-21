@@ -155,14 +155,13 @@ export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anyth
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
 /**
- * Tools that can access local files or remote resources and should be
- * treated with extra caution when updating policies.
+ * Tools that require mandatory argument narrowing (e.g., file paths, command prefixes)
+ * when granting persistent or session-wide approval.
  */
-export const SENSITIVE_TOOLS = new Set([
+export const TOOLS_REQUIRING_NARROWING = new Set([
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  WEB_FETCH_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   LS_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
