@@ -985,7 +985,10 @@ describe('gemini.tsx main function exit codes', () => {
     vi.restoreAllMocks();
   });
 
-  it('should exit with 42 for invalid input combination (prompt-interactive with non-TTY)', async () => {
+  it('should handle prompt-interactive with non-TTY without crashing', async () => {
+    // -i without TTY now falls through to headless interactive path.
+    // With mocked config (isInteractive=false), it exits with 42 (no input)
+    // because the mock doesn't derive interactive from argv.
     vi.mocked(loadCliConfig).mockResolvedValue(createMockConfig());
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
