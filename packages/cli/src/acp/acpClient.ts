@@ -699,9 +699,21 @@ export class Session {
       // It uses `parts` argument but effectively ignores it in current implementation
       const handled = await this.handleCommand(commandText, parts);
       if (handled) {
-        return { stopReason: 'end_turn' };
+        return {
+          stopReason: 'end_turn',
+          _meta: {
+            quota: {
+              token_count: { input_tokens: 0, output_tokens: 0 },
+              model_usage: [],
+            },
+          },
+        };
       }
     }
+
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const modelUsageMap = new Map<string, { input: number; output: number }>();
 
     let nextMessage: Content | null = { role: 'user', parts };
 
@@ -727,9 +739,23 @@ export class Session {
         );
         nextMessage = null;
 
+        let turnInputTokens = 0;
+        let turnOutputTokens = 0;
+        let turnModelId = model;
+
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
             return { stopReason: CoreToolCallStatus.Cancelled };
+          }
+
+          if (resp.type === StreamEventType.CHUNK && resp.value.usageMetadata) {
+            turnInputTokens =
+              resp.value.usageMetadata.promptTokenCount ?? turnInputTokens;
+            turnOutputTokens =
+              resp.value.usageMetadata.candidatesTokenCount ?? turnOutputTokens;
+            if (resp.value.modelVersion) {
+              turnModelId = resp.value.modelVersion;
+            }
           }
 
           if (
@@ -761,6 +787,19 @@ export class Session {
           if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
             functionCalls.push(...resp.value.functionCalls);
           }
+        }
+
+        totalInputTokens += turnInputTokens;
+        totalOutputTokens += turnOutputTokens;
+
+        if (turnInputTokens > 0 || turnOutputTokens > 0) {
+          const existing = modelUsageMap.get(turnModelId) ?? {
+            input: 0,
+            output: 0,
+          };
+          existing.input += turnInputTokens;
+          existing.output += turnOutputTokens;
+          modelUsageMap.set(turnModelId, existing);
         }
 
         if (pendingSend.signal.aborted) {
@@ -799,7 +838,28 @@ export class Session {
       }
     }
 
-    return { stopReason: 'end_turn' };
+    const modelUsageArray = Array.from(modelUsageMap.entries()).map(
+      ([modelName, counts]) => ({
+        model: modelName,
+        token_count: {
+          input_tokens: counts.input,
+          output_tokens: counts.output,
+        },
+      }),
+    );
+
+    return {
+      stopReason: 'end_turn',
+      _meta: {
+        quota: {
+          token_count: {
+            input_tokens: totalInputTokens,
+            output_tokens: totalOutputTokens,
+          },
+          model_usage: modelUsageArray,
+        },
+      },
+    };
   }
 
   private async handleCommand(
