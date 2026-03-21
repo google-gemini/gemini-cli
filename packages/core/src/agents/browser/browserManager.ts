@@ -21,6 +21,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
@@ -346,6 +347,10 @@ export class BrowserManager {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
       mcpArgs.push('--autoConnect');
+      const message =
+        '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
+      coreEvents.emitFeedback('info', message);
+      coreEvents.emitConsoleLog('info', message);
     }
 
     // Add optional settings from config
