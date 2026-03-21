@@ -1207,6 +1207,7 @@ const SETTINGS_SCHEMA = {
             description:
               'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
             showInDialog: false,
+          },
           confirmSensitiveActions: {
             type: 'boolean',
             label: 'Confirm Sensitive Actions',

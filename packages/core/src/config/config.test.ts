@@ -1608,6 +1608,7 @@ describe('Server Config (config.ts)', () => {
 
       expect(browserConfig.customConfig.maxActionsPerTask).toBe(50);
     });
+
     it('should apply defaults for partial custom config', () => {
       const params: ConfigParameters = {
         ...baseParams,
