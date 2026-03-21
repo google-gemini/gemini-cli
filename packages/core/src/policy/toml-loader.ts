@@ -409,14 +409,44 @@ export async function loadPoliciesFromToml(
         // Validate tool names in rules
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
-          // We no longer skip MCP-scoped rules because we need to specifically
-          // warn users if they use deprecated "__" syntax for MCP tool names
 
-          const toolNames: string[] = rule.toolName
+          const hasMcpName = !!rule.mcpName && rule.mcpName !== '';
+          const toolNamesRaw: string[] = rule.toolName
             ? Array.isArray(rule.toolName)
               ? rule.toolName
               : [rule.toolName]
             : [];
+
+          if (toolNamesRaw.length === 0 && !hasMcpName) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Invalid policy rule: toolName or mcpName is required',
+              details: `Rule #${i + 1} must specify at least "toolName" or "mcpName". Use toolName = "*" to match all tools.`,
+            });
+            continue;
+          }
+
+          if (toolNamesRaw.some((name) => name === '')) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Invalid policy rule: toolName cannot be empty string',
+              details: `Rule #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
+            });
+            continue;
+          }
+
+          // We no longer skip MCP-scoped rules because we need to specifically
+          // warn users if they use deprecated "__" syntax for MCP tool names
+
+          const toolNames: string[] = toolNamesRaw;
 
           for (const name of toolNames) {
             const warning = validateToolName(name, i);
@@ -532,13 +562,45 @@ export async function loadPoliciesFromToml(
         const tomlCheckerRules = validationResult.data.safety_checker ?? [];
         for (let i = 0; i < tomlCheckerRules.length; i++) {
           const checker = tomlCheckerRules[i];
-          if (checker.mcpName) continue;
 
-          const checkerToolNames: string[] = checker.toolName
+          const hasMcpName = !!checker.mcpName && checker.mcpName !== '';
+          const checkerToolNamesRaw: string[] = checker.toolName
             ? Array.isArray(checker.toolName)
               ? checker.toolName
               : [checker.toolName]
             : [];
+
+          if (checkerToolNamesRaw.length === 0 && !hasMcpName) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message:
+                'Invalid safety checker rule: toolName or mcpName is required',
+              details: `Checker #${i + 1} must specify at least "toolName" or "mcpName". Use toolName = "*" to match all tools.`,
+            });
+            continue;
+          }
+
+          if (checkerToolNamesRaw.some((name) => name === '')) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message:
+                'Invalid safety checker rule: toolName cannot be empty string',
+              details: `Checker #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
+            });
+            continue;
+          }
+
+          if (checker.mcpName) continue;
+
+          const checkerToolNames: string[] = checkerToolNamesRaw;
 
           for (const name of checkerToolNames) {
             const warning = validateToolName(name, i);

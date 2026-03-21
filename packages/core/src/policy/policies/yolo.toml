@@ -49,6 +49,7 @@ interactive = true
 
 # Allow everything else in YOLO mode
 [[rule]]
+toolName = "*"
 decision = "allow"
 priority = 998
 modes = ["yolo"]

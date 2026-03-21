@@ -71,6 +71,7 @@ deny_message = "You are not currently in Plan Mode. Use enter_plan_mode first to
 # Catch-All: Deny everything by default in Plan mode.
 
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 60
 modes = ["plan"]
