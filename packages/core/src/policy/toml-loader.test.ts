@@ -767,9 +767,10 @@ priority = 100
       expect(result.rules).toHaveLength(2);
     });
 
-    it('should not warn for catch-all rules (no toolName)', async () => {
+    it('should not warn for catch-all rules (toolName = "*")', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 100
 `);
@@ -838,7 +839,7 @@ priority = 100
         const denyRule = result.rules.find(
           (r) =>
             r.decision === PolicyDecision.DENY &&
-            r.toolName === undefined &&
+            r.toolName === '*' &&
             r.denyMessage?.includes('Plan Mode'),
         );
         expect(
@@ -1061,13 +1062,12 @@ priority = 100
       expect(warnings).toHaveLength(0);
     });
 
-    it('should skip rules without toolName', () => {
+    it('should skip rules without toolName (using mcpName only)', () => {
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1'],
-        [{ toolName: undefined }],
+        [{ mcpName: 'my-server' }],
       );
-
       expect(warnings).toHaveLength(0);
     });
 
