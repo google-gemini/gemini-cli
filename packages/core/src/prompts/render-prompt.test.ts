@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { renderPrompt, p } from './render-prompt.js';
+import { renderPrompt, renderPromptSync, p } from './render-prompt.js';
 import type { PromptContent } from './render-prompt.js';
 
 type TestContext = { name?: string; shouldRender?: boolean };
@@ -251,6 +251,39 @@ const tests: TestCase[] = [
     context: {},
     expect: '# Custom Format\n\nA | B | C',
   },
+  {
+    desc: 'filters out boolean values',
+    content: ['First', true, 'Second', false, 'Third'],
+    context: {},
+    expect: 'First\n\nSecond\n\nThird',
+  },
+  {
+    desc: 'supports static condition booleans',
+    content: [
+      {
+        heading: 'Shown',
+        condition: true,
+        content: 'This should show',
+      },
+      {
+        heading: 'Hidden',
+        condition: false,
+        content: 'This should hide',
+      },
+    ],
+    context: {},
+    expect: '# Shown\n\nThis should show',
+  },
+  {
+    desc: 'supports lines format',
+    content: {
+      heading: 'Lines List',
+      format: 'lines',
+      content: ['Line 1', 'Line 2', 'Line 3'],
+    },
+    context: {},
+    expect: '# Lines List\n\nLine 1\nLine 2\nLine 3',
+  },
 ];
 
 describe('renderPrompt', () => {
@@ -258,6 +291,27 @@ describe('renderPrompt', () => {
     const result = await renderPrompt({
       content: test.content,
       contributions: test.contributions,
+      context: test.context,
+    });
+    expect(result).toBe(test.expect);
+  });
+});
+
+describe('renderPromptSync', () => {
+  const syncTests = tests.filter(
+    (t) =>
+      !t.desc.includes('async') &&
+      !t.desc.includes('Promise') &&
+      !t.desc.includes('resolves recursive async functions') &&
+      !t.desc.includes('async condition'),
+  );
+
+  it.each(syncTests)('$desc', (test) => {
+    const result = renderPromptSync({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      content: test.content as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      contributions: test.contributions as any,
       context: test.context,
     });
     expect(result).toBe(test.expect);
