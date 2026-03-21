@@ -313,39 +313,53 @@ async function calculateAstReplacement(
     true,
   );
 
-  let match: { start: number; end: number } | undefined;
-  let occurrences = 0;
+  const matches: Array<{ start: number; end: number }> = [];
 
   function visit(node: ts.Node) {
-    if (occurrences > 1 && !params.allow_multiple) return;
-
     const nodeText = node.getText(sourceFile).trim();
     if (nodeText === normalizedSearch) {
-      occurrences++;
-      match = { start: node.getStart(sourceFile), end: node.getEnd() };
+      matches.push({ start: node.getStart(sourceFile), end: node.getEnd() });
     }
 
     ts.forEachChild(node, visit);
   }
 
   visit(sourceFile);
+  const occurrences = matches.length;
 
-  if (occurrences === 1 || (occurrences > 1 && params.allow_multiple)) {
-    // For simplicity in this first version, we only handle single AST match if not allow_multiple
-    // A full implementation would handle multiple ranges.
-    if (occurrences === 1 && match) {
-      const prefix = currentContent.substring(0, match.start);
-      const suffix = currentContent.substring(match.end);
-      const modifiedCode = prefix + normalizedReplace + suffix;
-      return {
-        newContent: restoreTrailingNewline(currentContent, modifiedCode),
-        occurrences,
-        finalOldString: normalizedSearch,
-        finalNewString: normalizedReplace,
-        strategy: 'ast',
-        matchRanges: [match],
-      };
+  if (occurrences > 0 && (occurrences === 1 || params.allow_multiple)) {
+    // Sort matches by start position descending to replace from bottom to top
+    // so that the offsets for the remaining matches stay valid.
+    matches.sort((a, b) => b.start - a.start);
+
+    let modifiedCode = currentContent;
+    const newLines = normalizedReplace.split('\n');
+
+    for (const match of matches) {
+      // Determine the indentation of the line where the match starts
+      const { line } = ts.getLineAndCharacterOfPosition(sourceFile, match.start);
+      // We use the original currentContent to determine indentation to avoid
+      // issues with shifting lines, which is safe since we replace bottom-up.
+      const sourceLines = currentContent.split('\n');
+      const indentationMatch = sourceLines[line].match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+
+      const indentedReplace = applyIndentation(newLines, indentation).join('\n');
+
+      modifiedCode =
+        modifiedCode.substring(0, match.start) +
+        indentedReplace +
+        modifiedCode.substring(match.end);
     }
+
+    return {
+      newContent: restoreTrailingNewline(currentContent, modifiedCode),
+      occurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+      strategy: 'ast',
+      matchRanges: matches.sort((a, b) => a.start - b.start),
+    };
   }
 
   return null;
