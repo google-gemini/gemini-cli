@@ -11,7 +11,6 @@ import os from 'node:os';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
 
 import {
   BaseDeclarativeTool,
@@ -156,7 +155,16 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -186,10 +194,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,

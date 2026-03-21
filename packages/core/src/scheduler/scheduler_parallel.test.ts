@@ -212,6 +212,8 @@ describe('Scheduler Parallel Execution', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       toolRegistry: mockToolRegistry,
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),

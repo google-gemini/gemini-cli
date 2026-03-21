@@ -47,7 +47,7 @@ describe('EnterPlanModeTool', () => {
           getMessageBusDecision: () => Promise<string>;
         },
         'getMessageBusDecision',
-      ).mockResolvedValue('ASK_USER');
+      ).mockResolvedValue('ask_user');
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -74,7 +74,7 @@ describe('EnterPlanModeTool', () => {
           getMessageBusDecision: () => Promise<string>;
         },
         'getMessageBusDecision',
-      ).mockResolvedValue('ALLOW');
+      ).mockResolvedValue('allow');
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -92,7 +92,7 @@ describe('EnterPlanModeTool', () => {
           getMessageBusDecision: () => Promise<string>;
         },
         'getMessageBusDecision',
-      ).mockResolvedValue('DENY');
+      ).mockResolvedValue('deny');
 
       await expect(
         invocation.shouldConfirmExecute(new AbortController().signal),
@@ -136,7 +136,7 @@ describe('EnterPlanModeTool', () => {
           getMessageBusDecision: () => Promise<string>;
         },
         'getMessageBusDecision',
-      ).mockResolvedValue('ASK_USER');
+      ).mockResolvedValue('ask_user');
 
       const details = await invocation.shouldConfirmExecute(
         new AbortController().signal,
