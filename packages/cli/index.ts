@@ -16,12 +16,15 @@ if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) {
   process.exit(0);
 }
 
-const [{ main }, { FatalError, writeToStderr }, { runExitCleanup }] =
-  await Promise.all([
-    import('./src/gemini.js'),
-    import('@google/gemini-cli-core'),
-    import('./src/utils/cleanup.js'),
-  ]);
+const [geminiModule, coreModule, cleanupModule] = await Promise.all([
+  import('./src/gemini.js'),
+  import('@google/gemini-cli-core'),
+  import('./src/utils/cleanup.js'),
+]);
+
+const { main } = geminiModule;
+const { FatalError, writeToStderr } = coreModule;
+const { runExitCleanup } = cleanupModule;
 
 // --- Global Entry Point ---
 
