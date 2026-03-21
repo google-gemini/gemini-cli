@@ -10,10 +10,9 @@ import { describe, it, expect } from 'vitest';
 
 describe('UpdateNotification', () => {
   it('renders message', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <UpdateNotification message="Update available!" />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Update available!');
     unmount();
   });
