@@ -41,6 +41,8 @@ import {
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
   HookCallEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../types.js';
 import { HookType } from '../../hooks/types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
@@ -1649,6 +1651,40 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_BILLING_PURCHASE_SOURCE,
         '"empty_wallet_menu"',
+      ]);
+    });
+  });
+
+  describe('logOnboardingStartEvent', () => {
+    it('logs an event with proper name and start key', () => {
+      const { logger } = setup();
+      const event = new OnboardingStartEvent();
+
+      logger?.logOnboardingStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.ONBOARDING_START);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        'true',
+      ]);
+    });
+  });
+
+  describe('logOnboardingSuccessEvent', () => {
+    it('logs an event with proper name and user tier', () => {
+      const { logger } = setup();
+      const event = new OnboardingSuccessEvent('standard-tier');
+
+      logger?.logOnboardingSuccessEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.ONBOARDING_SUCCESS);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        'standard-tier',
       ]);
     });
   });
