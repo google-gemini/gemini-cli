@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SettingScope } from '../config/settings.js';
-import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import {
   getScopeItems,
   getScopeMessageForSetting,

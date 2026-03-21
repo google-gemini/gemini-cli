@@ -16,6 +16,8 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
@@ -48,14 +50,6 @@ describe('<ShellToolMessage />', () => {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   };
 
-  const renderShell = (
-    props: Partial<ShellToolMessageProps> = {},
-    options: Parameters<typeof renderWithProviders>[1] = {},
-  ) =>
-    renderWithProviders(<ShellToolMessage {...baseProps} {...props} />, {
-      uiActions,
-      ...options,
-    });
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -65,9 +59,9 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { lastFrame, simulateClick, unmount } = renderShell(
-        { name },
-        { mouseEventsEnabled: true },
+      const { lastFrame, simulateClick, unmount } = await renderWithProviders(
+        <ShellToolMessage {...baseProps} name={name} />,
+        { uiActions, mouseEventsEnabled: true },
       );
 
       await waitFor(() => {
@@ -92,7 +86,7 @@ describe('<ShellToolMessage />', () => {
         return <ShellToolMessage {...baseProps} status={status} ptyId={1} />;
       };
 
-      const { lastFrame, unmount } = renderWithProviders(<Wrapper />, {
+      const { lastFrame, unmount } = await renderWithProviders(<Wrapper />, {
         uiActions,
         uiState: {
           streamingState: StreamingState.Idle,
@@ -138,13 +132,22 @@ describe('<ShellToolMessage />', () => {
         undefined,
       ],
       [
+        'renders in Cancelled state with partial output',
+        {
+          status: CoreToolCallStatus.Cancelled,
+          resultDisplay: 'Partial output before cancellation',
+        },
+        undefined,
+      ],
+      [
         'renders in Alternate Buffer mode while focused',
         {
           status: CoreToolCallStatus.Executing,
           ptyId: 1,
         },
         {
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             embeddedShellFocused: true,
             activePtyId: 1,
@@ -158,7 +161,8 @@ describe('<ShellToolMessage />', () => {
           ptyId: 1,
         },
         {
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             embeddedShellFocused: false,
             activePtyId: 1,
@@ -166,11 +170,10 @@ describe('<ShellToolMessage />', () => {
         },
       ],
     ])('%s', async (_, props, options) => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
-        props,
-        options,
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ShellToolMessage {...baseProps} {...props} />,
+        { uiActions, ...options },
       );
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
@@ -183,59 +186,82 @@ describe('<ShellToolMessage />', () => {
         10,
         8,
         false,
+        true,
       ],
       [
         'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
         100,
-        ACTIVE_SHELL_MAX_LINES,
+        ACTIVE_SHELL_MAX_LINES - 3,
         false,
+        true,
       ],
       [
         'uses full availableTerminalHeight when focused in alternate buffer mode',
         100,
-        98, // 100 - 2
+        98,
         true,
+        false,
       ],
       [
         'defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined',
         undefined,
-        ACTIVE_SHELL_MAX_LINES,
+        ACTIVE_SHELL_MAX_LINES - 3,
+        false,
         false,
       ],
-    ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
-        {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight,
-          ptyId: 1,
-          status: CoreToolCallStatus.Executing,
-        },
-        {
-          useAlternateBuffer: true,
-          uiState: {
-            activePtyId: focused ? 1 : 2,
-            embeddedShellFocused: focused,
+    ])(
+      '%s',
+      async (
+        _,
+        availableTerminalHeight,
+        expectedMaxLines,
+        focused,
+        constrainHeight,
+      ) => {
+        const { lastFrame, unmount } = await renderWithProviders(
+          <ShellToolMessage
+            {...baseProps}
+            resultDisplay={LONG_OUTPUT}
+            renderOutputAsMarkdown={false}
+            availableTerminalHeight={availableTerminalHeight}
+            ptyId={1}
+            status={CoreToolCallStatus.Executing}
+          />,
+          {
+            uiActions,
+            config: makeFakeConfig({ useAlternateBuffer: true }),
+            settings: createMockSettings({
+              ui: { useAlternateBuffer: true },
+            }),
+            uiState: {
+              activePtyId: focused ? 1 : 2,
+              embeddedShellFocused: focused,
+              constrainHeight,
+            },
           },
-        },
-      );
+        );
 
-      await waitUntilReady();
-      const frame = lastFrame();
-      expect(frame.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
-      expect(frame).toMatchSnapshot();
-      unmount();
-    });
+        const frame = lastFrame();
+        expect(frame.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
+        expect(frame).toMatchSnapshot();
+        unmount();
+      },
+    );
 
     it('fully expands in standard mode when availableTerminalHeight is undefined', async () => {
-      const { lastFrame, unmount } = renderShell(
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={LONG_OUTPUT}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+          status={CoreToolCallStatus.Executing}
+        />,
         {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight: undefined,
-          status: CoreToolCallStatus.Executing,
+          uiActions,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
-        { useAlternateBuffer: false },
       );
 
       await waitFor(() => {
@@ -247,23 +273,25 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('fully expands in alternate buffer mode when constrainHeight is false and isExpandable is true', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={LONG_OUTPUT}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+          status={CoreToolCallStatus.Success}
+          isExpandable={true}
+        />,
         {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight: undefined,
-          status: CoreToolCallStatus.Success,
-          isExpandable: true,
-        },
-        {
-          useAlternateBuffer: true,
+          uiActions,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
           },
         },
       );
 
-      await waitUntilReady();
       await waitFor(() => {
         const frame = lastFrame();
         // Should show all 100 lines because constrainHeight is false and isExpandable is true
@@ -274,27 +302,29 @@ describe('<ShellToolMessage />', () => {
     });
 
     it('stays constrained in alternate buffer mode when isExpandable is false even if constrainHeight is false', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderShell(
+      const { lastFrame, unmount } = await renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={LONG_OUTPUT}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+          status={CoreToolCallStatus.Success}
+          isExpandable={false}
+        />,
         {
-          resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
-          availableTerminalHeight: undefined,
-          status: CoreToolCallStatus.Success,
-          isExpandable: false,
-        },
-        {
-          useAlternateBuffer: true,
+          uiActions,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
           },
         },
       );
 
-      await waitUntilReady();
       await waitFor(() => {
         const frame = lastFrame();
-        // Should still be constrained to ACTIVE_SHELL_MAX_LINES (15) because isExpandable is false
-        expect(frame.match(/Line \d+/g)?.length).toBe(15);
+        // Should still be constrained to 12 (15 - 3) because isExpandable is false
+        expect(frame.match(/Line \d+/g)?.length).toBe(12);
       });
       expect(lastFrame()).toMatchSnapshot();
       unmount();

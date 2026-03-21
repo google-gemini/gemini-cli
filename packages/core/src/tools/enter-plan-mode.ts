@@ -87,11 +87,11 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
   ): Promise<ToolInfoConfirmationDetails | false> {
     const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       return false;
     }
 
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -99,7 +99,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    // ASK_USER
+    // ask_user
     return {
       type: 'info',
       title: 'Enter Plan Mode',

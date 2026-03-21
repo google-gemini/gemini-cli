@@ -43,8 +43,7 @@ describe('ShowMoreLines layout and padding', () => {
       </Box>
     );
 
-    const { lastFrame, waitUntilReady, unmount } = render(<TestComponent />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<TestComponent />);
 
     // lastFrame() strips some formatting but keeps layout
     const output = lastFrame({ allowEmpty: true });
@@ -52,6 +51,33 @@ describe('ShowMoreLines layout and padding', () => {
     // With paddingX=1, there should be a space before the text
     // With marginBottom=1, there should be an empty line between the text and "Bottom"
     // Since "Top" is just above it without margin, it should be on the previous line
+    const lines = output.split('\n');
+
+    expect(lines).toEqual([
+      'Top',
+      ' Press Ctrl+O to show more lines',
+      '',
+      'Bottom',
+      '',
+    ]);
+
+    unmount();
+  });
+
+  it('renders in Standard mode as well', async () => {
+    mockUseAlternateBuffer.mockReturnValue(false); // Standard mode
+
+    const TestComponent = () => (
+      <Box flexDirection="column">
+        <Text>Top</Text>
+        <ShowMoreLines constrainHeight={true} />
+        <Text>Bottom</Text>
+      </Box>
+    );
+
+    const { lastFrame, unmount } = await render(<TestComponent />);
+
+    const output = lastFrame({ allowEmpty: true });
     const lines = output.split('\n');
 
     expect(lines).toEqual([

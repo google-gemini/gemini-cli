@@ -400,12 +400,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
-      );
+      expect(setting.description).toBe('Enable local and remote subagents.');
     });
 
     it('should have skills setting enabled by default', () => {
@@ -424,12 +422,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe(
-        'Enable planning features (Plan Mode and tools).',
-      );
+      expect(setting.description).toBe('Enable Plan Mode.');
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {
@@ -461,7 +457,7 @@ describe('SettingsSchema', () => {
       expect(gemmaModelRouter.category).toBe('Experimental');
       expect(gemmaModelRouter.default).toEqual({});
       expect(gemmaModelRouter.requiresRestart).toBe(true);
-      expect(gemmaModelRouter.showInDialog).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(false);
       expect(gemmaModelRouter.description).toBe(
         'Enable Gemma model router (experimental).',
       );
@@ -472,9 +468,9 @@ describe('SettingsSchema', () => {
       expect(enabled.category).toBe('Experimental');
       expect(enabled.default).toBe(false);
       expect(enabled.requiresRestart).toBe(true);
-      expect(enabled.showInDialog).toBe(true);
+      expect(enabled.showInDialog).toBe(false);
       expect(enabled.description).toBe(
-        'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+        'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
       );
 
       const classifier = gemmaModelRouter.properties.classifier;
@@ -542,7 +538,31 @@ describe('SettingsSchema', () => {
       }
     };
 
+    const visitJsonSchema = (jsonSchema: Record<string, unknown>) => {
+      const ref = jsonSchema['ref'];
+      if (typeof ref === 'string') {
+        referenced.add(ref);
+      }
+      const properties = jsonSchema['properties'];
+      if (
+        properties &&
+        typeof properties === 'object' &&
+        !Array.isArray(properties)
+      ) {
+        Object.values(properties as Record<string, unknown>).forEach((prop) =>
+          visitJsonSchema(prop as Record<string, unknown>),
+        );
+      }
+      const items = jsonSchema['items'];
+      if (items && typeof items === 'object' && !Array.isArray(items)) {
+        visitJsonSchema(items as Record<string, unknown>);
+      }
+    };
+
     Object.values(schema).forEach(visitDefinition);
+
+    // Also visit all definitions to find nested references
+    Object.values(SETTINGS_SCHEMA_DEFINITIONS).forEach(visitJsonSchema);
 
     // Ensure definitions map doesn't accumulate stale entries.
     Object.keys(SETTINGS_SCHEMA_DEFINITIONS).forEach((key) => {

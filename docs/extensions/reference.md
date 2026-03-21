@@ -23,7 +23,7 @@ Gemini CLI creates a copy of the extension during installation. You must run
 GitHub, you must have `git` installed on your machine.
 
 ```bash
-gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
+gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent] [--skip-settings]
 ```
 
 - `<source>`: The GitHub URL or local path of the extension.
@@ -31,6 +31,7 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 - `--auto-update`: Enable automatic updates for this extension.
 - `--pre-release`: Enable installation of pre-release versions.
 - `--consent`: Acknowledge security risks and skip the confirmation prompt.
+- `--skip-settings`: Skip the configuration on install process.
 
 ### Uninstall an extension
 
@@ -123,6 +124,7 @@ The manifest file defines the extension's behavior and configuration.
   },
   "contextFileName": "GEMINI.md",
   "excludeTools": ["run_shell_command"],
+  "migratedTo": "https://github.com/new-owner/new-extension-repo",
   "plan": {
     "directory": ".gemini/plans"
   }
@@ -138,6 +140,9 @@ The manifest file defines the extension's behavior and configuration.
 - `version`: The version of the extension.
 - `description`: A short description of the extension. This will be displayed on
   [geminicli.com/extensions](https://geminicli.com/extensions).
+- `migratedTo`: The URL of the new repository source for the extension. If this
+  is set, the CLI will automatically check this new source for updates and
+  migrate the extension's installation to the new source if an update is found.
 - `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
   loaded on startup just like MCP servers defined in a
@@ -230,7 +235,9 @@ skill definitions in a `skills/` directory. For example,
 
 ### Sub-agents
 
-> **Note:** Sub-agents are a preview feature currently under active development.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Sub-agents are a preview feature currently under active development.
 
 Provide [sub-agents](../core/subagents.md) that users can delegate tasks to. Add
 agent definition files (`.md`) to an `agents/` directory in your extension root.
@@ -249,7 +256,9 @@ Rules contributed by extensions run in their own tier (tier 2), alongside
 workspace-defined policies. This tier has higher priority than the default rules
 but lower priority than user or admin policies.
 
-> **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
+<!-- prettier-ignore -->
+> [!WARNING]
+> For security, Gemini CLI ignores any `allow` decisions or `yolo`
 > mode configurations in extension policies. This ensures that an extension
 > cannot automatically approve tool calls or bypass security measures without
 > your confirmation.
@@ -258,12 +267,14 @@ but lower priority than user or admin policies.
 
 ```toml
 [[rule]]
-toolName = "my_server__dangerous_tool"
+mcpName = "my_server"
+toolName = "dangerous_tool"
 decision = "ask_user"
 priority = 100
 
 [[safety_checker]]
-toolName = "my_server__write_data"
+mcpName = "my_server"
+toolName = "write_data"
 priority = 200
 [safety_checker.checker]
 type = "in-process"

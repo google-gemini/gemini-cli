@@ -6,11 +6,12 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
+│ Line 9                                                                                       │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
-│ Line 14                                                                                      │
+│ Line 14                                                                                    █ │
 │ Line 15                                                                                    █ │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
@@ -18,7 +19,6 @@ AppHeader(full)
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -28,11 +28,12 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
+│ Line 9                                                                                       │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
-│ Line 14                                                                                      │
+│ Line 14                                                                                    █ │
 │ Line 15                                                                                    █ │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
@@ -40,7 +41,6 @@ AppHeader(full)
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -49,7 +49,9 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
+│ ... first 9 lines hidden (Ctrl+O to show) ...                                                │
+│ Line 10                                                                                      │
+│ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │
@@ -150,4 +152,47 @@ AppHeader(full)
   Gemini message 2
   Gemini message 2
 "
+`;
+
+exports[`MainContent > renders multiple thinking messages sequentially correctly 1`] = `
+"ScrollableList
+AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Plan a solution                                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ Thinking... 
+ │
+ │ Initial analysis
+ │ This is a multiple line paragraph for the first thinking message of how the model analyzes the
+ │ problem.
+ │
+ │ Planning execution
+ │ This a second multiple line paragraph for the second thinking message explaining the plan in
+ │ detail so that it wraps around the terminal display.
+ │
+ │ Refining approach
+ │ And finally a third multiple line paragraph for the third thinking message to refine the
+ │ solution.
+"
+`;
+
+exports[`MainContent > renders multiple thinking messages sequentially correctly 2`] = `
+"ScrollableList
+AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Plan a solution                                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ Thinking... 
+ │
+ │ Initial analysis
+ │ This is a multiple line paragraph for the first thinking message of how the model analyzes the
+ │ problem.
+ │
+ │ Planning execution
+ │ This a second multiple line paragraph for the second thinking message explaining the plan in
+ │ detail so that it wraps around the terminal display.
+ │
+ │ Refining approach
+ │ And finally a third multiple line paragraph for the third thinking message to refine the
+ │ solution."
 `;

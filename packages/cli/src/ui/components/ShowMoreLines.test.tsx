@@ -36,26 +36,26 @@ describe('ShowMoreLines', () => {
         ReturnType<typeof useOverflowState>
       >);
       mockUseStreamingContext.mockReturnValue(streamingState);
-      const { lastFrame, waitUntilReady, unmount } = render(
+      const { lastFrame, unmount } = await render(
         <ShowMoreLines constrainHeight={constrainHeight} />,
       );
-      await waitUntilReady();
       expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     },
   );
 
-  it('renders nothing in STANDARD mode even if overflowing', async () => {
+  it('renders message in STANDARD mode when overflowing', async () => {
     mockUseAlternateBuffer.mockReturnValue(false);
     mockUseOverflowState.mockReturnValue({
       overflowingIds: new Set(['1']),
     } as NonNullable<ReturnType<typeof useOverflowState>>);
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ShowMoreLines constrainHeight={true} />,
     );
-    await waitUntilReady();
-    expect(lastFrame({ allowEmpty: true })).toBe('');
+    expect(lastFrame().toLowerCase()).toContain(
+      'press ctrl+o to show more lines',
+    );
     unmount();
   });
 
@@ -71,10 +71,9 @@ describe('ShowMoreLines', () => {
         overflowingIds: new Set(['1']),
       } as NonNullable<ReturnType<typeof useOverflowState>>);
       mockUseStreamingContext.mockReturnValue(streamingState);
-      const { lastFrame, waitUntilReady, unmount } = render(
+      const { lastFrame, unmount } = await render(
         <ShowMoreLines constrainHeight={true} />,
       );
-      await waitUntilReady();
       expect(lastFrame().toLowerCase()).toContain(
         'press ctrl+o to show more lines',
       );
@@ -88,10 +87,9 @@ describe('ShowMoreLines', () => {
       overflowingIds: new Set(),
     } as NonNullable<ReturnType<typeof useOverflowState>>);
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ShowMoreLines constrainHeight={true} isOverflowing={true} />,
     );
-    await waitUntilReady();
     expect(lastFrame().toLowerCase()).toContain(
       'press ctrl+o to show more lines',
     );
@@ -103,10 +101,9 @@ describe('ShowMoreLines', () => {
       overflowingIds: new Set(['1']),
     } as NonNullable<ReturnType<typeof useOverflowState>>);
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ShowMoreLines constrainHeight={true} isOverflowing={false} />,
     );
-    await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });

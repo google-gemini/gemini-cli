@@ -5,6 +5,8 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
@@ -18,21 +20,22 @@ import {
   useUIState,
   type UIState,
 } from '../contexts/UIStateContext.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay } from '../types.js';
 
 // Mock dependencies
+const mockUseSettings = vi.fn().mockReturnValue({
+  merged: {
+    ui: {
+      inlineThinkingMode: 'off',
+    },
+  },
+});
+
 vi.mock('../contexts/SettingsContext.js', async () => {
   const actual = await vi.importActual('../contexts/SettingsContext.js');
   return {
     ...actual,
-    useSettings: () => ({
-      merged: {
-        ui: {
-          inlineThinkingMode: 'off',
-        },
-      },
-    }),
+    useSettings: () => mockUseSettings(),
   };
 });
 
@@ -333,6 +336,13 @@ describe('MainContent', () => {
 
   beforeEach(() => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
+    mockUseSettings.mockReturnValue({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'off',
+        },
+      },
+    });
   });
 
   afterEach(() => {
@@ -340,7 +350,7 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: defaultMockUiState as Partial<UIState>,
     });
     await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
@@ -354,14 +364,9 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -372,7 +377,7 @@ describe('MainContent', () => {
   it('renders minimal header in minimal mode (alternate buffer)', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
 
-    const { lastFrame, unmount } = renderWithProviders(<MainContent />, {
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -407,7 +412,7 @@ describe('MainContent', () => {
       );
     };
 
-    const { lastFrame } = renderWithProviders(<ToggleHarness />, {
+    const { lastFrame } = await renderWithProviders(<ToggleHarness />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -429,7 +434,7 @@ describe('MainContent', () => {
 
   it('always renders full header details in normal buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
-    const { lastFrame } = renderWithProviders(<MainContent />, {
+    const { lastFrame } = await renderWithProviders(<MainContent />, {
       uiState: {
         ...defaultMockUiState,
         cleanUiDetailsVisible: false,
@@ -442,14 +447,9 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -469,15 +469,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-        useAlternateBuffer: true,
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -496,15 +492,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as unknown as Partial<UIState>,
-        useAlternateBuffer: true,
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as unknown as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -552,14 +544,9 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
     const output = lastFrame();
     // Verify Part 1 and Part 2 are rendered.
     expect(output).toContain('Part 1');
@@ -568,6 +555,63 @@ describe('MainContent', () => {
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
     expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  it('renders multiple thinking messages sequentially correctly', async () => {
+    mockUseSettings.mockReturnValue({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'expanded',
+        },
+      },
+    });
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 0, type: 'user' as const, text: 'Plan a solution' },
+        {
+          id: 1,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Initial analysis',
+            description:
+              'This is a multiple line paragraph for the first thinking message of how the model analyzes the problem.',
+          },
+        },
+        {
+          id: 2,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Planning execution',
+            description:
+              'This a second multiple line paragraph for the second thinking message explaining the plan in detail so that it wraps around the terminal display.',
+          },
+        },
+        {
+          id: 3,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Refining approach',
+            description:
+              'And finally a third multiple line paragraph for the third thinking message to refine the solution.',
+          },
+        },
+      ],
+    };
+
+    const renderResult = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
+
+    const output = renderResult.lastFrame();
+    expect(output).toContain('Initial analysis');
+    expect(output).toContain('Planning execution');
+    expect(output).toContain('Refining approach');
+    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
   });
 
   describe('MainContent Tool Output Height Logic', () => {
@@ -662,14 +706,16 @@ describe('MainContent', () => {
           bannerVisible: false,
         };
 
-        const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        const { lastFrame, unmount } = await renderWithProviders(
           <MainContent />,
           {
             uiState: uiState as Partial<UIState>,
-            useAlternateBuffer: isAlternateBuffer,
+            config: makeFakeConfig({ useAlternateBuffer: isAlternateBuffer }),
+            settings: createMockSettings({
+              ui: { useAlternateBuffer: isAlternateBuffer },
+            }),
           },
         );
-        await waitUntilReady();
 
         const output = lastFrame();
 

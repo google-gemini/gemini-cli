@@ -11,8 +11,8 @@ persistent facts, and inspect the active context.
 
 ## Why manage context?
 
-Out of the box, Gemini CLI is smart but generic. It doesn't know your preferred
-testing framework, your indentation style, or that you hate using `any` in
+Gemini CLI is powerful but general. It doesn't know your preferred testing
+framework, your indentation style, or your preference against `any` in
 TypeScript. Context management solves this by giving the agent persistent
 memory.
 
@@ -105,15 +105,15 @@ excellent for debugging why the agent might be ignoring a rule.
 If you edit a `GEMINI.md` file while a session is running, the agent won't know
 immediately. Force a reload with:
 
-**Command:** `/memory refresh`
+**Command:** `/memory reload`
 
 ## Best practices
 
-- **Keep it focused:** Don't dump your entire internal wiki into `GEMINI.md`.
-  Keep instructions actionable and relevant to code generation.
+- **Keep it focused:** Avoid adding excessive content to `GEMINI.md`. Keep
+  instructions actionable and relevant to code generation.
 - **Use negative constraints:** Explicitly telling the agent what _not_ to do
-  (e.g., "Do not use class components") is often more effective than vague
-  positive instructions.
+  (for example, "Do not use class components") is often more effective than
+  vague positive instructions.
 - **Review often:** Periodically check your `GEMINI.md` files to remove outdated
   rules.
 

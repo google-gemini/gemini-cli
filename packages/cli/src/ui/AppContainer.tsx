@@ -85,6 +85,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -102,7 +103,7 @@ import {
   useOverflowActions,
   useOverflowState,
 } from './contexts/OverflowContext.js';
-import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { useErrorCount } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
@@ -119,7 +120,7 @@ import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
-import { keyMatchers, Command } from './keyMatchers.js';
+import { Command } from './key/keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -162,9 +163,10 @@ import {
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
+import { parseSlashCommand } from '../utils/commands.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
-import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
+import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
@@ -205,6 +207,7 @@ import {
   useVisibilityToggle,
   APPROVAL_MODE_REVEAL_DURATION_MS,
 } from './hooks/useVisibilityToggle.js';
+import { useKeyMatchers } from './hooks/useKeyMatchers.js';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -219,6 +222,8 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
+  const isHelpDismissKey = useIsHelpDismissKey();
+  const keyMatchers = useKeyMatchers();
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
@@ -283,19 +288,18 @@ export const AppContainer = (props: AppContainerProps) => {
    * Manages the visibility and x-second timer for the expansion hint.
    *
    * This effect triggers the timer countdown whenever an overflow is detected
-   * or the user manually toggles the expansion state with Ctrl+O. We use a stable
-   * boolean dependency (hasOverflowState) to ensure the timer only resets on
-   * genuine state transitions, preventing it from infinitely resetting during
-   * active text streaming.
+   * or the user manually toggles the expansion state with Ctrl+O.
+   * By depending on overflowingIdsSize, the timer resets when *new* views
+   * overflow, but avoids infinitely resetting during single-view streaming.
    *
    * In alternate buffer mode, we don't trigger the hint automatically on overflow
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (hasOverflowState && !isAlternateBuffer) {
+    if (hasOverflowState) {
       triggerExpandHint(true);
     }
-  }, [hasOverflowState, isAlternateBuffer, triggerExpandHint]);
+  }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -471,9 +475,11 @@ export const AppContainer = (props: AppContainerProps) => {
       disableMouseEvents();
 
       // Kill all background shells
-      for (const pid of backgroundShellsRef.current.keys()) {
-        ShellExecutionService.kill(pid);
-      }
+      await Promise.all(
+        Array.from(backgroundShellsRef.current.keys()).map((pid) =>
+          ShellExecutionService.kill(pid),
+        ),
+      );
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
@@ -546,8 +552,7 @@ export const AppContainer = (props: AppContainerProps) => {
     };
   }, [settings]);
 
-  const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
-    useConsoleMessages();
+  const { errorCount, clearErrorCount } = useErrorCount();
 
   const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
@@ -1002,18 +1007,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
       Date.now(),
     );
     try {
-      const { memoryContent, fileCount } =
-        await refreshServerHierarchicalMemory(config);
+      let flattenedMemory: string;
+      let fileCount: number;
 
-      const flattenedMemory = flattenMemory(memoryContent);
+      if (config.isJitContextEnabled()) {
+        await config.getContextManager()?.refresh();
+        flattenedMemory = flattenMemory(config.getUserMemory());
+        fileCount = config.getGeminiMdFileCount();
+      } else {
+        const result = await refreshServerHierarchicalMemory(config);
+        flattenedMemory = flattenMemory(result.memoryContent);
+        fileCount = result.fileCount;
+      }
 
       historyManager.addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${
+          text: `Memory reloaded successfully. ${
             flattenedMemory.length > 0
-              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s).`
-              : 'No memory content found.'
+              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s)`
+              : 'No memory content found'
           }`,
         },
         Date.now(),
@@ -1084,13 +1097,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
 
   useEffect(() => {
-    const hintListener = (hint: string) => {
-      pendingHintsRef.current.push(hint);
+    const hintListener = (text: string, source: InjectionSource) => {
+      if (source !== 'user_steering') {
+        return;
+      }
+      pendingHintsRef.current.push(text);
       setPendingHintCount((prev) => prev + 1);
     };
-    config.userHintService.onUserHint(hintListener);
+    config.injectionService.onInjection(hintListener);
     return () => {
-      config.userHintService.offUserHint(hintListener);
+      config.injectionService.offInjection(hintListener);
     };
   }, [config]);
 
@@ -1218,8 +1234,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      // If cancelling (shouldRestorePrompt=false), never modify the buffer
+      // User is in control - preserve whatever text they typed, pasted, or restored
+      if (!shouldRestorePrompt) {
+        return;
+      }
+
+      // Restore the last message when shouldRestorePrompt=true
       const lastUserMessage = inputHistory.at(-1);
-      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
+      let textToSet = lastUserMessage || '';
 
       const queuedText = getQueuedMessagesText();
       if (queuedText) {
@@ -1227,7 +1250,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         clearQueue();
       }
 
-      if (textToSet || !shouldRestorePrompt) {
+      if (textToSet) {
         buffer.setText(textToSet);
       }
     },
@@ -1247,7 +1270,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (!trimmed) {
         return;
       }
-      config.userHintService.addUserHint(trimmed);
+      config.injectionService.addInjection(trimmed, 'user_steering');
       // Render hints with a distinct style.
       historyManager.addItem({
         type: 'hint',
@@ -1277,6 +1300,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
           ...pendingSlashCommandHistoryItems,
           ...pendingGeminiHistoryItems,
         ]);
+
+      if (isSlash && isAgentRunning) {
+        const { commandToExecute } = parseSlashCommand(
+          submittedValue,
+          slashCommands ?? [],
+        );
+        if (commandToExecute?.isSafeConcurrent) {
+          void handleSlashCommand(submittedValue);
+          addInput(submittedValue);
+          return;
+        }
+      }
 
       if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
         handleHintSubmit(submittedValue);
@@ -1321,6 +1356,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addMessage,
       addInput,
       submitQuery,
+      handleSlashCommand,
+      slashCommands,
       isMcpReady,
       streamingState,
       messageQueue.length,
@@ -1342,11 +1379,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
     triggerExpandHint(null);
     historyManager.clearItems();
-    clearConsoleMessagesState();
+    clearErrorCount();
     refreshStatic();
   }, [
     historyManager,
-    clearConsoleMessagesState,
+    clearErrorCount,
     refreshStatic,
     reset,
     triggerExpandHint,
@@ -1387,11 +1424,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
     0,
-    terminalHeight -
-      controlsHeight -
-      staticExtraHeight -
-      2 -
-      backgroundShellHeight,
+    terminalHeight - controlsHeight - backgroundShellHeight - 1,
   );
 
   config.setShellExecutionConfig({
@@ -1403,6 +1436,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pager: settings.merged.tools.shell.pager,
     showColor: settings.merged.tools.shell.showColor,
     sanitizationConfig: config.sanitizationConfig,
+    sandboxManager: config.sandboxManager,
   });
 
   const { isFocused, hasReceivedFocusEvent } = useFocus();
@@ -1420,32 +1454,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
   const geminiClient = config.getGeminiClient();
-
-  useEffect(() => {
-    if (activePtyId) {
-      try {
-        ShellExecutionService.resizePty(
-          activePtyId,
-          Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-          Math.max(
-            Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
-            1,
-          ),
-        );
-      } catch (e) {
-        // This can happen in a race condition where the pty exits
-        // right before we try to resize it.
-        if (
-          !(
-            e instanceof Error &&
-            e.message.includes('Cannot resize a pty that has already exited')
-          )
-        ) {
-          throw e;
-        }
-      }
-    }
-  }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
   useEffect(() => {
     if (
@@ -1676,12 +1684,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
-      // Debug log keystrokes if enabled
-      if (settings.merged.general.debugKeystrokeLogging) {
-        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
-      }
-
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
 
@@ -1859,7 +1862,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activePtyId,
       handleSuspend,
       embeddedShellFocused,
-      settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
       tabFocusTimeoutRef,
@@ -1875,13 +1877,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.devtools,
       showErrorDetails,
       triggerExpandHint,
+      keyMatchers,
+      isHelpDismissKey,
     ],
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
-    () => {
+    (key: Key) => {
+      if (
+        keyMatchers[Command.SCROLL_UP](key) ||
+        keyMatchers[Command.SCROLL_DOWN](key) ||
+        keyMatchers[Command.PAGE_UP](key) ||
+        keyMatchers[Command.PAGE_DOWN](key) ||
+        keyMatchers[Command.SCROLL_HOME](key) ||
+        keyMatchers[Command.SCROLL_END](key)
+      ) {
+        return false;
+      }
+
       setCopyModeEnabled(false);
       enableMouseEvents();
       return true;
@@ -1974,22 +1989,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     };
   }, [historyManager]);
-
-  const filteredConsoleMessages = useMemo(() => {
-    if (config.getDebugMode()) {
-      return consoleMessages;
-    }
-    return consoleMessages.filter((msg) => msg.type !== 'debug');
-  }, [consoleMessages, config]);
-
-  // Computed values
-  const errorCount = useMemo(
-    () =>
-      filteredConsoleMessages
-        .filter((msg) => msg.type === 'error')
-        .reduce((total, msg) => total + msg.count, 0),
-    [filteredConsoleMessages],
-  );
 
   const nightly = props.version.includes('nightly');
 
@@ -2225,7 +2224,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
-      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressedOnce: ctrlCPressCount >= 1,
@@ -2353,7 +2351,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       constrainHeight,
       showErrorDetails,
       showFullTodos,
-      filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
       ctrlCPressCount,

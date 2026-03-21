@@ -11,6 +11,7 @@ import type { ShellExecutionConfig } from '../services/shellExecutionService.js'
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import { randomUUID } from 'node:crypto';
 import {
   MessageBusType,
@@ -18,8 +19,23 @@ import {
   type ToolConfirmationResponse,
   type Question,
 } from '../confirmation-bus/types.js';
-import { type ApprovalMode } from '../policy/types.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
+
+/**
+/**
+ * Supported decisions for forcing tool execution behavior.
+ */
+export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
+
+/**
+ * Options bag for tool execution, replacing positional parameters that are
+ * only relevant to specific tool types.
+ */
+export interface ExecuteOptions {
+  shellExecutionConfig?: ShellExecutionConfig;
+  setExecutionIdCallback?: (executionId: number) => void;
+}
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -55,27 +71,73 @@ export interface ToolInvocation<
    */
   shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
    * Executes the tool with the validated parameters.
    * @param signal AbortSignal for tool cancellation.
    * @param updateOutput Optional callback to stream output.
+   * @param setExecutionIdCallback Optional callback for tools that expose a background execution handle.
    * @returns Result of the tool execution.
    */
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
+
+  /**
+   * Returns tool-specific options for policy updates.
+   * This is used by the scheduler to narrow policy rules when a tool is approved.
+   */
+  getPolicyUpdateOptions?(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined;
+}
+
+/**
+ * Structured payload used by tools to surface background execution metadata to
+ * the CLI UI.
+ *
+ * NOTE: `pid` is used as the canonical identifier for now to stay consistent
+ * with existing types (ExecutingToolCall.pid, ExecutionHandle.pid, etc.).
+ * A future rename to `executionId` is planned once the codebase is fully
+ * migrated — not done in this PR to keep the diff focused on the abstraction.
+ */
+export interface BackgroundExecutionData extends Record<string, unknown> {
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
+
+export function isBackgroundExecutionData(
+  data: unknown,
+): data is BackgroundExecutionData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+
+  const pid = 'pid' in data ? data.pid : undefined;
+  const command = 'command' in data ? data.command : undefined;
+  const initialOutput =
+    'initialOutput' in data ? data.initialOutput : undefined;
+
+  return (
+    (pid === undefined || typeof pid === 'number') &&
+    (command === undefined || typeof command === 'string') &&
+    (initialOutput === undefined || typeof initialOutput === 'string')
+  );
 }
 
 /**
  * Options for policy updates that can be customized by tool invocations.
  */
 export interface PolicyUpdateOptions {
+  argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  toolName?: string;
 }
 
 /**
@@ -93,6 +155,8 @@ export abstract class BaseToolInvocation<
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
     readonly _toolAnnotations?: Record<string, unknown>,
+    readonly respectsAutoEdit: boolean = false,
+    readonly getApprovalMode: () => ApprovalMode = () => ApprovalMode.DEFAULT,
   ) {}
 
   abstract getDescription(): string;
@@ -103,13 +167,23 @@ export abstract class BaseToolInvocation<
 
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    if (
+      this.respectsAutoEdit &&
+      this.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
+      forcedDecision !== 'ask_user'
+    ) {
       return false;
     }
 
-    if (decision === 'DENY') {
+    const decision =
+      forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
+    if (decision === 'allow') {
+      return false;
+    }
+
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -117,7 +191,7 @@ export abstract class BaseToolInvocation<
       );
     }
 
-    if (decision === 'ASK_USER') {
+    if (decision === 'ask_user') {
       return this.getConfirmationDetails(abortSignal);
     }
 
@@ -130,7 +204,7 @@ export abstract class BaseToolInvocation<
    * Subclasses can override this to provide additional options like
    * commandPrefix (for shell) or mcpName (for MCP tools).
    */
-  protected getPolicyUpdateOptions(
+  getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return undefined;
@@ -161,7 +235,7 @@ export abstract class BaseToolInvocation<
 
   /**
    * Subclasses should override this method to provide custom confirmation UI
-   * when the policy engine's decision is 'ASK_USER'.
+   * when the policy engine's decision is 'ask_user'.
    * The base implementation provides a generic confirmation prompt.
    */
   protected async getConfirmationDetails(
@@ -184,11 +258,12 @@ export abstract class BaseToolInvocation<
 
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
-  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
+    forcedDecision?: ForcedToolDecision,
+  ): Promise<ForcedToolDecision> {
     if (!this.messageBus || !this._toolName) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
-      return Promise.resolve('ALLOW');
+      return Promise.resolve('allow');
     }
 
     const correlationId = randomUUID();
@@ -202,11 +277,12 @@ export abstract class BaseToolInvocation<
       },
       serverName: this._serverName,
       toolAnnotations: this._toolAnnotations,
+      forcedDecision,
     };
 
-    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
+    return new Promise<ForcedToolDecision>((resolve) => {
       if (!this.messageBus) {
-        resolve('ALLOW');
+        resolve('allow');
         return;
       }
 
@@ -227,11 +303,11 @@ export abstract class BaseToolInvocation<
 
       const abortHandler = () => {
         cleanup();
-        resolve('DENY');
+        resolve('deny');
       };
 
       if (abortSignal.aborted) {
-        resolve('DENY');
+        resolve('deny');
         return;
       }
 
@@ -239,11 +315,11 @@ export abstract class BaseToolInvocation<
         if (response.correlationId === correlationId) {
           cleanup();
           if (response.requiresUserConfirmation) {
-            resolve('ASK_USER');
+            resolve('ask_user');
           } else if (response.confirmed) {
-            resolve('ALLOW');
+            resolve('allow');
           } else {
-            resolve('DENY');
+            resolve('deny');
           }
         }
       };
@@ -252,7 +328,7 @@ export abstract class BaseToolInvocation<
 
       timeoutId = setTimeout(() => {
         cleanup();
-        resolve('ASK_USER'); // Default to ASK_USER on timeout
+        resolve('ask_user'); // Default to ask_user on timeout
       }, 30000);
 
       this.messageBus.subscribe(
@@ -270,7 +346,7 @@ export abstract class BaseToolInvocation<
         void this.messageBus.publish(request);
       } catch (_error) {
         cleanup();
-        resolve('ALLOW');
+        resolve('allow');
       }
     });
   }
@@ -278,7 +354,7 @@ export abstract class BaseToolInvocation<
   abstract execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 }
 
@@ -350,6 +426,15 @@ export interface ToolBuilder<
 }
 
 /**
+ * Represents the expected JSON Schema structure for tool parameters.
+ */
+export interface ToolParameterSchema {
+  type: string;
+  properties?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * New base class for tools that separates validation from execution.
  * New tools should extend this class.
  */
@@ -371,6 +456,25 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
+  clone(messageBus?: MessageBus): this {
+    // Note: we cannot use structuredClone() here because it does not preserve
+    // prototype chains or handle non-serializable properties (like functions).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const cloned = Object.assign(
+      // eslint-disable-next-line no-restricted-syntax
+      Object.create(Object.getPrototypeOf(this)),
+      this,
+    ) as this;
+    if (messageBus) {
+      Object.defineProperty(cloned, 'messageBus', {
+        value: messageBus,
+        writable: false,
+        configurable: true,
+      });
+    }
+    return cloned;
+  }
+
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
   }
@@ -383,7 +487,49 @@ export abstract class DeclarativeTool<
     return {
       name: this.name,
       description: this.description,
-      parametersJsonSchema: this.parameterSchema,
+      parametersJsonSchema: this.addWaitForPreviousParameter(
+        this.parameterSchema,
+      ),
+    };
+  }
+
+  /**
+   * Type guard to check if an unknown value represents a ToolParameterSchema object.
+   */
+  private isParameterSchema(obj: unknown): obj is ToolParameterSchema {
+    return isRecord(obj) && 'type' in obj;
+  }
+
+  /**
+   * Adds the `wait_for_previous` parameter to the tool's schema.
+   * This allows the model to explicitly control parallel vs sequential execution.
+   */
+  private addWaitForPreviousParameter(schema: unknown): unknown {
+    if (!this.isParameterSchema(schema) || schema.type !== 'object') {
+      return schema;
+    }
+
+    const props = schema.properties;
+    let propertiesObj: Record<string, unknown> = {};
+
+    if (props !== undefined) {
+      if (!isRecord(props)) {
+        // properties exists but is not an object, so it's a malformed schema.
+        return schema;
+      }
+      propertiesObj = props;
+    }
+
+    return {
+      ...schema,
+      properties: {
+        ...propertiesObj,
+        wait_for_previous: {
+          type: 'boolean',
+          description:
+            'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+        },
+      },
     };
   }
 
@@ -424,10 +570,10 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, shellExecutionConfig);
+    return invocation.execute(signal, updateOutput, options);
   }
 
   /**
@@ -698,7 +844,12 @@ export type ToolResultDisplay =
   | TodoList
   | SubagentProgress;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TodoStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'blocked';
 
 export interface Todo {
   description: string;
@@ -729,6 +880,7 @@ export interface DiffStat {
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
+  systemMessage?: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
     payload?: ToolConfirmationPayload,
@@ -767,6 +919,7 @@ export type ToolConfirmationPayload =
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
@@ -777,6 +930,7 @@ export interface ToolExecuteConfirmationDetails {
 export interface ToolMcpConfirmationDetails {
   type: 'mcp';
   title: string;
+  systemMessage?: string;
   serverName: string;
   toolName: string;
   toolDisplayName: string;
@@ -789,6 +943,7 @@ export interface ToolMcpConfirmationDetails {
 export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   prompt: string;
   urls?: string[];
@@ -797,6 +952,7 @@ export interface ToolInfoConfirmationDetails {
 export interface ToolAskUserConfirmationDetails {
   type: 'ask_user';
   title: string;
+  systemMessage?: string;
   questions: Question[];
   onConfirm: (
     outcome: ToolConfirmationOutcome,
@@ -807,6 +963,7 @@ export interface ToolAskUserConfirmationDetails {
 export interface ToolExitPlanModeConfirmationDetails {
   type: 'exit_plan_mode';
   title: string;
+  systemMessage?: string;
   planPath: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
