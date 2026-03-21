@@ -511,6 +511,7 @@ describe('McpClientManager', () => {
       await manager.startExtension(extension);
 
       mockedMcpClient.getServerConfig.mockReturnValue({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...extension.mcpServers!['test-server'],
         extension,
       });

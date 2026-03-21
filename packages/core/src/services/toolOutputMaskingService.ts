@@ -226,6 +226,7 @@ export class ToolOutputMaskingService {
       const maskedPart = {
         ...part,
         functionResponse: {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...part.functionResponse,
           response: { output: maskedSnippet },
         },

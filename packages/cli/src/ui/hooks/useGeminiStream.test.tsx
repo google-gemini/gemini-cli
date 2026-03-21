@@ -1069,6 +1069,7 @@ describe('useGeminiStream', () => {
       } as unknown as TrackedCompletedToolCall,
     ];
     const lowVerbositySettings = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockLoadedSettings,
       merged: {
         ...mockLoadedSettings.merged,
@@ -2023,6 +2024,7 @@ describe('useGeminiStream', () => {
       );
 
       const testConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getContentGenerator: vi.fn(),
         getContentGeneratorConfig: vi.fn(() => ({
@@ -2826,6 +2828,7 @@ describe('useGeminiStream', () => {
   describe('Thought Reset', () => {
     it('should keep full thinking entries in history when mode is full', async () => {
       const fullThinkingSettings: LoadedSettings = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockLoadedSettings,
         merged: {
           ...mockLoadedSettings.merged,
