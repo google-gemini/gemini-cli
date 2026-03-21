@@ -28,9 +28,12 @@ export interface OAuthCredentials {
 }
 
 export interface TokenStorage {
-  getCredentials(serverName: string): Promise<OAuthCredentials | null>;
+  getCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<OAuthCredentials | null>;
   setCredentials(credentials: OAuthCredentials): Promise<void>;
-  deleteCredentials(serverName: string): Promise<void>;
+  deleteCredentials(serverName: string, mcpServerUrl?: string): Promise<void>;
   listServers(): Promise<string[]>;
   getAllCredentials(): Promise<Map<string, OAuthCredentials>>;
   clearAll(): Promise<void>;

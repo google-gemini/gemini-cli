@@ -179,15 +179,11 @@ export class McpClient implements McpProgressReporter {
     let t = this.transport;
     if (t instanceof XcodeMcpBridgeFixTransport) {
       // Access the internal transport which is not exposed in the FixTransport type.
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
-      t = (t as any).transport;
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion */
+      t = (t as unknown as { transport: Transport }).transport;
     }
     if (t instanceof StdioClientTransport) {
       // StdioClientTransport has a process property at runtime but it's not in the public types.
-      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
-      return (t as any).process?.pid;
-      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+      return (t as unknown as { process?: { pid?: number } }).process?.pid;
     }
     return undefined;
   }
@@ -1641,9 +1637,12 @@ export function hasNetworkTransport(config: MCPServerConfig): boolean {
  * @param serverName The name of the MCP server
  * @returns The valid access token, or null if no token is stored
  */
-async function getStoredOAuthToken(serverName: string): Promise<string | null> {
+async function getStoredOAuthToken(
+  serverName: string,
+  serverUrl?: string,
+): Promise<string | null> {
   const tokenStorage = new MCPOAuthTokenStorage();
-  const credentials = await tokenStorage.getCredentials(serverName);
+  const credentials = await tokenStorage.getCredentials(serverName, serverUrl);
   if (!credentials) return null;
 
   const authProvider = new MCPOAuthProvider(tokenStorage);
@@ -1706,8 +1705,10 @@ async function connectWithSSETransport(
 async function showAuthRequiredMessage(
   serverName: string,
   cliConfig: McpContext,
+  mcpServerConfig: MCPServerConfig,
 ): Promise<never> {
-  const hasRejectedToken = !!(await getStoredOAuthToken(serverName));
+  const hasRejectedToken = !!(await getStoredOAuthToken(serverName, mcpServerConfig.url))
+;
 
   const message = hasRejectedToken
     ? `MCP server '${serverName}' rejected stored OAuth token. Please re-authenticate using: /mcp auth ${serverName}`
@@ -1932,21 +1933,13 @@ export async function connectToMcpServer(
       debugLogger.log(`MCP server '${mcpServerName}': ${logMessage}`);
 
       try {
+        const sseUrl = mcpServerConfig.url;
         // Try SSE with stored OAuth token if available
         // This ensures that SSE fallback works for authenticated servers
-        await connectWithSSETransport(
-          mcpClient,
-          mcpServerConfig,
-          await getStoredOAuthToken(mcpServerName),
-        );
-
-        debugLogger.log(
-          `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
-        );
         const result = await connectWithSSETransport(
           mcpClient,
           mcpServerConfig,
-          await getStoredOAuthToken(mcpServerName),
+          await getStoredOAuthToken(mcpServerName, sseUrl),
         );
 
         debugLogger.log(
@@ -1984,7 +1977,7 @@ export async function connectToMcpServer(
       const shouldTriggerOAuth = mcpServerConfig.oauth?.enabled;
 
       if (!shouldTriggerOAuth) {
-        await showAuthRequiredMessage(mcpServerName, cliConfig);
+        await showAuthRequiredMessage(mcpServerName, cliConfig, mcpServerConfig);
       }
 
       // Try to extract www-authenticate header from the error
@@ -2054,7 +2047,10 @@ export async function connectToMcpServer(
         );
         if (oauthSuccess) {
           // Retry connection with OAuth token
-          const accessToken = await getStoredOAuthToken(mcpServerName);
+          const accessToken = await getStoredOAuthToken(
+            mcpServerName,
+            mcpServerConfig.httpUrl || mcpServerConfig.url,
+          );
           if (!accessToken) {
             throw new Error(
               `Failed to get OAuth token for server '${mcpServerName}'`,
@@ -2080,7 +2076,7 @@ export async function connectToMcpServer(
         const shouldTryDiscovery = mcpServerConfig.oauth?.enabled;
 
         if (!shouldTryDiscovery) {
-          await showAuthRequiredMessage(mcpServerName, cliConfig);
+          await showAuthRequiredMessage(mcpServerName, cliConfig, mcpServerConfig);
         }
 
         // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
@@ -2127,7 +2123,10 @@ export async function connectToMcpServer(
             );
 
             // Retry connection with OAuth token
-            const accessToken = await getStoredOAuthToken(mcpServerName);
+            const accessToken = await getStoredOAuthToken(
+              mcpServerName,
+              mcpServerConfig.httpUrl || mcpServerConfig.url,
+            );
             if (!accessToken) {
               throw new Error(
                 `Failed to get OAuth token for server '${mcpServerName}'`,
@@ -2274,7 +2273,10 @@ export async function createTransport(
         }
       } else {
         // Check if we have stored OAuth tokens for this server (from previous authentication)
-        accessToken = await getStoredOAuthToken(mcpServerName);
+        accessToken = await getStoredOAuthToken(
+          mcpServerName,
+          mcpServerConfig.httpUrl || mcpServerConfig.url,
+        );
         if (accessToken) {
           debugLogger.log(
             `Found stored OAuth token for server '${mcpServerName}'`,

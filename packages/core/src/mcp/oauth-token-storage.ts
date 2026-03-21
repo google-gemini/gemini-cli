@@ -164,12 +164,27 @@ export class MCPOAuthTokenStorage implements TokenStorage {
    * @param serverName The name of the MCP server
    * @returns The stored credentials or null if not found
    */
-  async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
+  async getCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<OAuthCredentials | null> {
     if (this.useEncryptedFile) {
-      return this.hybridTokenStorage.getCredentials(serverName);
+      return this.hybridTokenStorage.getCredentials(serverName, mcpServerUrl);
     }
-    const tokens = await this.getAllCredentials();
-    return tokens.get(serverName) || null;
+    const all = await this.getAllCredentialsList();
+    if (mcpServerUrl) {
+      return (
+        all.find(
+          (c) => c.serverName === serverName && c.mcpServerUrl === mcpServerUrl,
+        ) || null
+      );
+    }
+    // Fallback to name-only match for legacy tokens
+    return (
+      Array.from((await this.getAllCredentials()).values()).find(
+        (c) => c.serverName === serverName,
+      ) || null
+    );
   }
 
   /**
@@ -177,22 +192,36 @@ export class MCPOAuthTokenStorage implements TokenStorage {
    *
    * @param serverName The name of the MCP server
    */
-  async deleteCredentials(serverName: string): Promise<void> {
+  async deleteCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<void> {
     if (this.useEncryptedFile) {
-      return this.hybridTokenStorage.deleteCredentials(serverName);
+      return this.hybridTokenStorage.deleteCredentials(
+        serverName,
+        mcpServerUrl,
+      );
     }
-    const tokens = await this.getAllCredentials();
+    const all = await this.getAllCredentialsList();
+    const initialLength = all.length;
+    let filtered: OAuthCredentials[];
 
-    if (tokens.delete(serverName)) {
-      const tokenArray = Array.from(tokens.values());
+    if (mcpServerUrl) {
+      filtered = all.filter(
+        (c) =>
+          !(c.serverName === serverName && c.mcpServerUrl === mcpServerUrl),
+      );
+    } else {
+      filtered = all.filter((c) => c.serverName !== serverName);
+    }
+
+    if (filtered.length < initialLength) {
       const tokenFile = this.getTokenFilePath();
-
       try {
-        if (tokenArray.length === 0) {
-          // Remove file if no tokens left
+        if (filtered.length === 0) {
           await fs.unlink(tokenFile);
         } else {
-          await fs.writeFile(tokenFile, JSON.stringify(tokenArray, null, 2), {
+          await fs.writeFile(tokenFile, JSON.stringify(filtered, null, 2), {
             mode: 0o600,
           });
         }
@@ -203,6 +232,20 @@ export class MCPOAuthTokenStorage implements TokenStorage {
           error,
         );
       }
+    }
+  }
+
+  /**
+   * Helper to get all credentials as a flat list, preserving duplicates (if any).
+   */
+  private async getAllCredentialsList(): Promise<OAuthCredentials[]> {
+    try {
+      const tokenFile = this.getTokenFilePath();
+      const data = await fs.readFile(tokenFile, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return JSON.parse(data) as OAuthCredentials[];
+    } catch {
+      return [];
     }
   }
 
