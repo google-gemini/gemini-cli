@@ -62,7 +62,9 @@ structure. It will return the specific path (for example,
 `src/components/UserProfile.tsx`), which you can then use with `@` in your next
 turn.
 
-> **Tip:** You can also ask for lists of files, like "Show me all the TypeScript
+<!-- prettier-ignore -->
+> [!TIP]
+> You can also ask for lists of files, like "Show me all the TypeScript
 > configuration files in the root directory."
 
 ## How to modify code

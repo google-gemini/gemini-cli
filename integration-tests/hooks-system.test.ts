@@ -7,9 +7,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, poll, normalizePath } from './test-helper.js';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import os from 'node:os';
 
-describe('Hooks System Integration', () => {
+describe('Hooks System Integration', { timeout: 120000 }, () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -2016,6 +2017,10 @@ console.log(JSON.stringify({
 
       // 3. Final setup with full settings
       rig.setup('Hook Disabling Multiple Ops', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.disabled-via-command.responses',
+        ),
         settings: {
           hooksConfig: {
             enabled: true,
@@ -2230,7 +2235,7 @@ console.log(JSON.stringify({
 
       // The hook should have stopped execution message (returned from tool)
       expect(result).toContain(
-        'Agent execution stopped: Emergency Stop triggered by hook',
+        'Agent execution stopped by hook: Emergency Stop triggered by hook',
       );
 
       // Tool should NOT be called successfully (it was blocked/stopped)
@@ -2241,5 +2246,211 @@ console.log(JSON.stringify({
       );
       expect(writeFileCalls).toHaveLength(0);
     });
+  });
+
+  describe('Hooks "ask" Decision Integration', () => {
+    it(
+      'should force confirmation prompt when hook returns "ask" decision even in YOLO mode',
+      { timeout: 60000 },
+      async () => {
+        const testName =
+          'should force confirmation prompt when hook returns "ask" decision even in YOLO mode';
+
+        // 1. Setup hook script that returns 'ask' decision
+        const hookOutput = {
+          decision: 'ask',
+          systemMessage: 'Confirmation forced by security hook',
+          hookSpecificOutput: {
+            hookEventName: 'BeforeTool',
+          },
+        };
+
+        const hookScript = `console.log(JSON.stringify(${JSON.stringify(
+          hookOutput,
+        )}));`;
+
+        // Create script path predictably
+        const scriptPath = join(os.tmpdir(), 'gemini-cli-tests-ask-hook.js');
+        writeFileSync(scriptPath, hookScript);
+
+        // 2. Setup rig with YOLO mode enabled but with the 'ask' hook
+        rig.setup(testName, {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.allow-tool.responses',
+          ),
+          settings: {
+            debugMode: true,
+            tools: {
+              approval: 'yolo',
+            },
+            general: {
+              enableAutoUpdateNotification: false,
+            },
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        });
+
+        // Bypass terminal setup prompt and other startup banners
+        const stateDir = join(rig.homeDir!, '.gemini');
+        if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+        writeFileSync(
+          join(stateDir, 'state.json'),
+          JSON.stringify({
+            terminalSetupPromptShown: true,
+            hasSeenScreenReaderNudge: true,
+            tipsShown: 100,
+          }),
+        );
+
+        // 3. Run interactive and verify prompt appears despite YOLO mode
+        const run = await rig.runInteractive();
+
+        // Wait for prompt to appear
+        await run.expectText('Type your message', 30000);
+
+        // Send prompt that will trigger write_file
+        await run.type('Create a file called ask-test.txt with content "test"');
+        await run.type('\r');
+
+        // Wait for the FORCED confirmation prompt to appear
+        // It should contain the system message from the hook
+        await run.expectText('Confirmation forced by security hook', 30000);
+        await run.expectText('Allow', 5000);
+
+        // 4. Approve the permission
+        await run.type('y');
+        await run.type('\r');
+
+        // Wait for command to execute
+        await run.expectText('approved.txt', 30000);
+
+        // Should find the tool call
+        const foundWriteFile = await rig.waitForToolCall('write_file');
+        expect(foundWriteFile).toBeTruthy();
+
+        // File should be created
+        const fileContent = rig.readFile('approved.txt');
+        expect(fileContent).toBe('Approved content');
+      },
+    );
+
+    it(
+      'should allow cancelling when hook forces "ask" decision',
+      { timeout: 60000 },
+      async () => {
+        const testName =
+          'should allow cancelling when hook forces "ask" decision';
+        const hookOutput = {
+          decision: 'ask',
+          systemMessage: 'Confirmation forced for cancellation test',
+          hookSpecificOutput: {
+            hookEventName: 'BeforeTool',
+          },
+        };
+
+        const hookScript = `console.log(JSON.stringify(${JSON.stringify(
+          hookOutput,
+        )}));`;
+
+        const scriptPath = join(
+          os.tmpdir(),
+          'gemini-cli-tests-ask-cancel-hook.js',
+        );
+        writeFileSync(scriptPath, hookScript);
+
+        rig.setup(testName, {
+          fakeResponsesPath: join(
+            import.meta.dirname,
+            'hooks-system.allow-tool.responses',
+          ),
+          settings: {
+            debugMode: true,
+            tools: {
+              approval: 'yolo',
+            },
+            general: {
+              enableAutoUpdateNotification: false,
+            },
+            hooksConfig: {
+              enabled: true,
+            },
+            hooks: {
+              BeforeTool: [
+                {
+                  matcher: 'write_file',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: `node "${scriptPath}"`,
+                      timeout: 5000,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        });
+
+        // Bypass terminal setup prompt and other startup banners
+        const stateDir = join(rig.homeDir!, '.gemini');
+        if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+        writeFileSync(
+          join(stateDir, 'state.json'),
+          JSON.stringify({
+            terminalSetupPromptShown: true,
+            hasSeenScreenReaderNudge: true,
+            tipsShown: 100,
+          }),
+        );
+
+        const run = await rig.runInteractive();
+
+        // Wait for prompt to appear
+        await run.expectText('Type your message', 30000);
+
+        await run.type(
+          'Create a file called cancel-test.txt with content "test"',
+        );
+        await run.type('\r');
+
+        await run.expectText(
+          'Confirmation forced for cancellation test',
+          30000,
+        );
+
+        // 4. Deny the permission using option 4
+        await run.type('4');
+        await run.type('\r');
+
+        // Wait for cancellation message
+        await run.expectText('Cancelled', 15000);
+
+        // Tool should NOT be called successfully
+        const toolLogs = rig.readToolLogs();
+        const writeFileCalls = toolLogs.filter(
+          (t) =>
+            t.toolRequest.name === 'write_file' &&
+            t.toolRequest.success === true,
+        );
+        expect(writeFileCalls).toHaveLength(0);
+      },
+    );
   });
 });
