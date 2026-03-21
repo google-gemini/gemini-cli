@@ -18,8 +18,7 @@ type TokenCount = number;
 export const DEFAULT_TOKEN_LIMIT = 1_048_576;
 
 export function tokenLimit(model: Model): TokenCount {
-  // Add other models as they become relevant or if specified by config
-  // Pulled from https://ai.google.dev/gemini-api/docs/models
+  // Exact matches for known Gemini models
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_FLASH_MODEL:
@@ -28,6 +27,21 @@ export function tokenLimit(model: Model): TokenCount {
     case DEFAULT_GEMINI_FLASH_LITE_MODEL:
       return 1_048_576;
     default:
-      return DEFAULT_TOKEN_LIMIT;
+      break;
   }
+
+  // Pattern-based matching for models routed via OpenAI-compatible endpoints
+  if (!model) return DEFAULT_TOKEN_LIMIT;
+  const m = model.toLowerCase();
+
+  if (/claude/.test(m)) return 200_000;
+  if (/gpt-4o|gpt-4-turbo/.test(m)) return 128_000;
+  if (/gpt-4(?!o|-turbo)/.test(m)) return 8_192;
+  if (/^o[134]/.test(m)) return 200_000;
+  if (/codex/.test(m)) return 200_000;
+  if (/gemini/.test(m)) return 1_048_576;
+
+  // Unknown models: 128K is a safe middle ground.
+  // 1M is dangerous (causes 403s on smaller-context models).
+  return 128_000;
 }
