@@ -1214,6 +1214,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The maximum number of tool calls allowed per browser task.
     Enforcement is hard: the agent will be terminated when the limit is reached.
   - **Default:** `100`
+
 - **`agents.browser.confirmSensitiveActions`** (boolean):
   - **Description:** Require manual confirmation for sensitive browser actions
     (e.g., fill_form, evaluate_script).
