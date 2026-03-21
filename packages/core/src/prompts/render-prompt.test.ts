@@ -284,6 +284,60 @@ const tests: TestCase[] = [
     context: {},
     expect: '# Lines List\n\nLine 1\nLine 2\nLine 3',
   },
+  {
+    desc: 'renders fallback when content is falsy (boolean)',
+    content: {
+      heading: 'Fallback Boolean',
+      content: false,
+      fallback: 'This is the fallback',
+    },
+    context: {},
+    expect: '# Fallback Boolean\n\nThis is the fallback',
+  },
+  {
+    desc: 'renders fallback when content is falsy (empty string via short-circuit)',
+    content: {
+      heading: 'Fallback Empty String',
+      content: String('') && 'something',
+      fallback: 'Fallback for empty string',
+    },
+    context: {},
+    expect: '# Fallback Empty String\n\nFallback for empty string',
+  },
+  {
+    desc: 'renders fallback when content is an array that filters down to empty',
+    content: {
+      heading: 'Fallback Empty Array',
+      content: [false, null, '', undefined],
+      fallback: 'Fallback for empty array',
+    },
+    context: {},
+    expect: '# Fallback Empty Array\n\nFallback for empty array',
+  },
+  {
+    desc: 'renders normal content and ignores fallback when content is present',
+    content: {
+      heading: 'No Fallback',
+      content: 'Primary content',
+      fallback: 'Should not see this',
+    },
+    context: {},
+    expect: '# No Fallback\n\nPrimary content',
+  },
+  {
+    desc: 'does not render section if both content and fallback are falsy',
+    content: [
+      'Visible start',
+      {
+        heading: 'Double Falsy',
+        content: '',
+        fallback: null,
+      },
+      'Visible end',
+    ],
+    context: {},
+    expect: 'Visible start\n\nVisible end',
+  },
 ];
 
 describe('renderPrompt', () => {

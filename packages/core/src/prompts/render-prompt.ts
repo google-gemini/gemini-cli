@@ -34,6 +34,8 @@ export type PromptSection<C, Sync extends boolean = false> = {
   /** Condition that must evaluate to true for the section to be rendered. */
   condition?: boolean | ((ctx: C) => MaybePromise<boolean, Sync>);
   content: PromptContent<C, Sync>;
+  /** Alternate content to render if the primary content resolves to a falsy value. */
+  fallback?: PromptContent<C, Sync>;
 };
 
 // The core recursive type.
@@ -189,7 +191,8 @@ export async function renderPrompt<C = SystemPromptOptions>({
       return null;
     }
     if (typeof c === 'string' || typeof c === 'number') {
-      return String(c);
+      const val = String(c);
+      return val === '' ? null : val;
     }
     if (Array.isArray(c)) {
       const resolved = await Promise.all(c.map((item) => resolveToBasic(item)));
@@ -212,7 +215,18 @@ export async function renderPrompt<C = SystemPromptOptions>({
             : section.condition;
         if (!shouldRender) return null;
       }
-      const resolvedInner = await resolveToBasic(section.content);
+      let resolvedInner = await resolveToBasic(section.content);
+
+      if (
+        resolvedInner === null ||
+        resolvedInner === '' ||
+        (Array.isArray(resolvedInner) && resolvedInner.length === 0)
+      ) {
+        if (section.fallback !== undefined) {
+          resolvedInner = await resolveToBasic(section.fallback);
+        }
+      }
+
       if (
         resolvedInner === null ||
         resolvedInner === '' ||
@@ -294,7 +308,8 @@ export function renderPromptSync<C = SystemPromptOptions>({
       return null;
     }
     if (typeof c === 'string' || typeof c === 'number') {
-      return String(c);
+      const val = String(c);
+      return val === '' ? null : val;
     }
     if (Array.isArray(c)) {
       const resolved = c.map((item) => resolveToBasicSync(item));
@@ -324,7 +339,18 @@ export function renderPromptSync<C = SystemPromptOptions>({
         }
         if (!shouldRender) return null;
       }
-      const resolvedInner = resolveToBasicSync(section.content);
+      let resolvedInner = resolveToBasicSync(section.content);
+
+      if (
+        resolvedInner === null ||
+        resolvedInner === '' ||
+        (Array.isArray(resolvedInner) && resolvedInner.length === 0)
+      ) {
+        if (section.fallback !== undefined) {
+          resolvedInner = resolveToBasicSync(section.fallback);
+        }
+      }
+
       if (
         resolvedInner === null ||
         resolvedInner === '' ||
@@ -366,6 +392,5 @@ export function renderPromptSync<C = SystemPromptOptions>({
 export function prompt<C = SystemPromptOptions, Sync extends boolean = false>(
   ...content: Array<PromptContent<C, Sync>>
 ): PromptContent<C, Sync> {
-   
-  return (content.length === 1 ? content[0] : content);
+  return content.length === 1 ? content[0] : content;
 }
