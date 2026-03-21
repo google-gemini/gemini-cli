@@ -106,8 +106,8 @@ describe('useQuotaAndFallback', () => {
     vi.restoreAllMocks();
   });
 
-  it('should register a fallback handler on initialization', () => {
-    renderHook(() =>
+  it('should register a fallback handler on initialization', async () => {
+    await renderHook(() =>
       useQuotaAndFallback({
         config: mockConfig,
         historyManager: mockHistoryManager,
@@ -130,7 +130,7 @@ describe('useQuotaAndFallback', () => {
         authType: AuthType.USE_GEMINI,
       });
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -162,7 +162,7 @@ describe('useQuotaAndFallback', () => {
     });
 
     it('should auto-retry transient capacity failures in low verbosity mode', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -190,7 +190,7 @@ describe('useQuotaAndFallback', () => {
     });
 
     it('should still prompt for terminal quota in low verbosity mode', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -224,7 +224,7 @@ describe('useQuotaAndFallback', () => {
 
     describe('Interactive Fallback', () => {
       it('should set an interactive request for a terminal quota error', async () => {
-        const { result } = renderHook(() =>
+        const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
@@ -279,7 +279,7 @@ describe('useQuotaAndFallback', () => {
       });
 
       it('should show the model name for a terminal quota error on a non-pro model', async () => {
-        const { result } = renderHook(() =>
+        const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
@@ -320,7 +320,7 @@ describe('useQuotaAndFallback', () => {
       });
 
       it('should handle terminal quota error without retry delay', async () => {
-        const { result } = renderHook(() =>
+        const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
@@ -354,7 +354,7 @@ describe('useQuotaAndFallback', () => {
       });
 
       it('should handle race conditions by stopping subsequent requests', async () => {
-        const { result } = renderHook(() =>
+        const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
@@ -421,7 +421,7 @@ describe('useQuotaAndFallback', () => {
 
       for (const { description, error } of testCases) {
         it(`should handle ${description} correctly`, async () => {
-          const { result } = renderHook(() =>
+          const { result } = await renderHook(() =>
             useQuotaAndFallback({
               config: mockConfig,
               historyManager: mockHistoryManager,
@@ -479,7 +479,7 @@ describe('useQuotaAndFallback', () => {
       }
 
       it('should handle ModelNotFoundError correctly', async () => {
-        const { result } = renderHook(() =>
+        const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
@@ -526,7 +526,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       });
 
       it('should handle ModelNotFoundError with invalid model correctly', async () => {
-        const { result } = renderHook(() =>
+        const { result } = await renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
@@ -592,7 +592,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       // so the user can downgrade to Flash instead of retrying infinitely.
       vi.mocked(shouldAutoUseCredits).mockReturnValue(true);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -637,7 +637,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       vi.mocked(shouldAutoUseCredits).mockReturnValue(false);
       vi.mocked(shouldShowOverageMenu).mockReturnValue(true);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -679,7 +679,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       vi.mocked(shouldAutoUseCredits).mockReturnValue(false);
       vi.mocked(shouldShowOverageMenu).mockReturnValue(true);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -719,7 +719,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       vi.mocked(shouldShowOverageMenu).mockReturnValue(false);
       vi.mocked(shouldShowEmptyWalletMenu).mockReturnValue(true);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -762,7 +762,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       vi.mocked(shouldShowOverageMenu).mockReturnValue(false);
       vi.mocked(shouldShowEmptyWalletMenu).mockReturnValue(true);
 
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -807,8 +807,8 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
   });
 
   describe('handleProQuotaChoice', () => {
-    it('should do nothing if there is no pending pro quota request', () => {
-      const { result } = renderHook(() =>
+    it('should do nothing if there is no pending pro quota request', async () => {
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -828,7 +828,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should resolve intent to "retry_later"', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -861,7 +861,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should resolve intent to "retry_always" and add info message on continue', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -907,7 +907,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should show a special message when falling back from the preview model', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -945,7 +945,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should show a special message when falling back from the preview model, but do not show periodical check message for flash model fallback', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -990,8 +990,8 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       setValidationHandlerSpy = vi.spyOn(mockConfig, 'setValidationHandler');
     });
 
-    it('should register a validation handler on initialization', () => {
-      renderHook(() =>
+    it('should register a validation handler on initialization', async () => {
+      await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -1008,7 +1008,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should set a validation request when handler is called', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -1052,7 +1052,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should handle race conditions by returning cancel for subsequent requests', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -1096,7 +1096,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should call onShowAuthSelection when change_auth is chosen', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -1128,7 +1128,7 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
     });
 
     it('should call onShowAuthSelection when cancel is chosen', async () => {
-      const { result } = renderHook(() =>
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -1159,8 +1159,8 @@ Your admin might have disabled the access. Contact them to enable the Preview Re
       expect(mockOnShowAuthSelection).toHaveBeenCalledTimes(1);
     });
 
-    it('should do nothing if handleValidationChoice is called without pending request', () => {
-      const { result } = renderHook(() =>
+    it('should do nothing if handleValidationChoice is called without pending request', async () => {
+      const { result } = await renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,

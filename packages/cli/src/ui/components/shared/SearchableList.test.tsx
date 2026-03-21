@@ -95,8 +95,7 @@ describe('SearchableList', () => {
   };
 
   it('should render all items initially', async () => {
-    const { lastFrame, waitUntilReady } = await renderList();
-    await waitUntilReady();
+    const { lastFrame } = await renderList();
     const frame = lastFrame();
 
     expect(frame).toContain('Test List');
@@ -109,10 +108,9 @@ describe('SearchableList', () => {
   });
 
   it('should reset selection to top when items change if resetSelectionOnItemsChange is true', async () => {
-    const { lastFrame, stdin, waitUntilReady } = await renderList({
+    const { lastFrame, stdin } = await renderList({
       resetSelectionOnItemsChange: true,
     });
-    await waitUntilReady();
 
     await React.act(async () => {
       stdin.write('\u001B[B'); // Down arrow
@@ -218,8 +216,7 @@ describe('SearchableList', () => {
   });
 
   it('should match snapshot', async () => {
-    const { lastFrame, waitUntilReady } = await renderList();
-    await waitUntilReady();
+    const { lastFrame } = await renderList();
     expect(lastFrame()).toMatchSnapshot();
   });
 });
