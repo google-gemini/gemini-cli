@@ -48,6 +48,11 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
   EMFILE: () => 'Too many open files. Close some unused files or applications.',
   ENFILE: () =>
     'Too many open files in system. Close some unused files or applications.',
+  ETIMEDOUT: (path) =>
+    (path
+      ? `Operation timed out: could not access '${path}'. `
+      : 'Operation timed out. ') +
+    'Check your network connection or try again later.',
 };
 
 /**
