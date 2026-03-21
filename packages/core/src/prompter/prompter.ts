@@ -5,7 +5,16 @@
  */
 
 import type { SystemPromptOptions } from 'src/prompts/snippets.js';
-import type { PromptContent, PromptSection } from './types.js';
+import type { PromptContent, PromptSlot } from './types.js';
+
+type BaseContent = string | BaseSection | PromptSlot | BaseContent[];
+type BaseSection = {
+  heading?: string;
+  tag?: string;
+  attrs?: Record<string, string>;
+  format?: 'inline' | 'block';
+  content: BaseContent;
+};
 
 // Helper to stringify XML attributes cleanly
 function renderAttributes(attrs?: Record<string, string>): string {
@@ -15,125 +24,176 @@ function renderAttributes(attrs?: Record<string, string>): string {
     .join('');
 }
 
-export class Prompt<C = SystemPromptOptions> {
-  private contents: Array<PromptContent<C>>;
+export function p<C = SystemPromptOptions>(
+  strings: TemplateStringsArray,
+  ...values: Array<PromptContent<C>>
+): PromptContent<C> {
+  const content = strings.reduce<Array<PromptContent<C>>>(
+    (acc, str, i) => [...acc, str, values[i] ?? ''],
+    [],
+  );
+  return { format: 'inline', content };
+}
 
-  constructor(...contents: Array<PromptContent<C>>) {
-    this.contents = contents;
-  }
+export interface RenderPromptOptions<C> {
+  content: PromptContent<C> | Array<PromptContent<C>>;
+  contributions?:
+    | Record<string, PromptContent<C>>
+    | Array<Record<string, PromptContent<C>>>;
+  context: C;
+  options?: { depth?: number };
+}
 
-  add(content: PromptContent<C>): void {
-    this.contents.push(content);
-  }
+export async function renderPrompt<C = SystemPromptOptions>({
+  content,
+  contributions,
+  context,
+  options,
+}: RenderPromptOptions<C>): Promise<string> {
+  const contents = Array.isArray(content) ? content : [content];
+  const _contributions: Record<string, Array<PromptContent<C>>> = {};
 
-  contribute(contributions: Record<string, PromptContent<C>>): void {
-    const traverse = (node: PromptContent<C>) => {
-      if (Array.isArray(node)) {
-        node.forEach(traverse);
-      } else if (typeof node === 'object' && node !== null) {
-        // In this branch, node is a PromptSection<C>
-        const section = node;
-        const contribution = contributions[section.id ?? ''];
-        if (section.id && contribution) {
-          const content = section.content;
-          if (Array.isArray(content)) {
-            content.push(contribution);
-          } else {
-            section.content = [content, contribution];
-          }
-        }
-        traverse(section.content);
+  if (contributions) {
+    const batches = Array.isArray(contributions)
+      ? contributions
+      : [contributions];
+    for (const batch of batches) {
+      for (const [slot, c] of Object.entries(batch)) {
+        _contributions[slot] = _contributions[slot] || [];
+        _contributions[slot].push(c);
       }
-    };
-
-    this.contents.forEach(traverse);
+    }
   }
 
-  async render(context: C, options?: { depth?: number }): Promise<string> {
-    const parts = await Promise.all(
-      this.contents.map((item) => Prompt.renderContent(context, item, options)),
-    );
-    return parts.filter((part) => part.length > 0).join('\n\n');
-  }
-
-  private static async renderContent<C>(
-    context: C,
-    content: PromptContent<C>,
-    options?: { depth?: number },
-  ): Promise<string> {
-    // 1. if function: run function with context and process result
-    if (typeof content === 'function') {
-      const resolved = await content(context);
-      // keep passing options down so depth isn't lost
-      return Prompt.renderContent(context, resolved, options);
+  const resolveToBasic = async (
+    c: PromptContent<C>,
+  ): Promise<BaseContent | null> => {
+    if (typeof c === 'function') {
+      const resolved = await c(context);
+      return resolveToBasic(resolved);
     }
-
-    // 2. if string: simple string append
-    if (typeof content === 'string') {
-      return content;
+    if (
+      typeof c === 'string' ||
+      typeof c === 'number' ||
+      typeof c === 'boolean'
+    ) {
+      return String(c);
     }
-
-    // 3. if array: process and concatenate each item in the array
-    if (Array.isArray(content)) {
-      const parts = await Promise.all(
-        content.map((item) => Prompt.renderContent(context, item, options)),
+    if (Array.isArray(c)) {
+      const resolved = await Promise.all(c.map((item) => resolveToBasic(item)));
+      const filtered = resolved.filter(
+        (item): item is BaseContent => item !== null,
       );
-      // Filter out empty strings to prevent huge gaps, then separate with double newline
-      return parts.filter((part) => part.length > 0).join('\n\n');
+      if (filtered.length === 0) return null;
+      return filtered;
     }
-
-    // 4. if object: process as section
-    if (typeof content === 'object' && content !== null) {
-      if (content.condition) {
-        const shouldRender = await content.condition(context);
-        if (!shouldRender) {
-          return '';
-        }
+    if (typeof c === 'object' && c !== null) {
+      if ('slot' in c) {
+        return c;
       }
-      return Prompt.renderSection(context, content, options);
-    }
 
-    return '';
+      const section = c;
+      if (section.condition) {
+        const shouldRender = await section.condition(context);
+        if (!shouldRender) return null;
+      }
+      const resolvedInner = await resolveToBasic(section.content);
+      if (
+        resolvedInner === null ||
+        resolvedInner === '' ||
+        (Array.isArray(resolvedInner) && resolvedInner.length === 0)
+      ) {
+        return null;
+      }
+      return {
+        heading: section.heading,
+        tag: section.tag,
+        attrs: section.attrs,
+        format: section.format,
+        content: resolvedInner,
+      };
+    }
+    return null;
+  };
+
+  const resolvedContents = await Promise.all(
+    contents.map((c) => resolveToBasic(c)),
+  );
+
+  const resolvedContributions: Record<string, BaseContent[]> = {};
+  for (const [slot, slotContributions] of Object.entries(_contributions)) {
+    const resolved = await Promise.all(
+      slotContributions.map((c) => resolveToBasic(c)),
+    );
+    resolvedContributions[slot] = resolved.filter(
+      (c): c is BaseContent => c !== null,
+    );
   }
 
-  private static async renderSection<C>(
-    context: C,
-    section: PromptSection<C>,
-    options?: { depth?: number },
-  ): Promise<string> {
-    const depth = options?.depth ?? 1;
-    // Standard Markdown headings max out at h6 (######)
-    const headingLevel = Math.min(depth, 6);
-
-    // Pass context and increment depth for nested sections
-    // section.content is an array, which renderPrompt already knows how to handle
-    const innerContent = await Prompt.renderContent(context, section.content, {
-      depth: depth + 1,
-    });
-
-    if (!innerContent) {
-      return '';
+  const formatBasic = (
+    c: BaseContent | null,
+    depth: number,
+    format: 'inline' | 'block',
+  ): string => {
+    if (c === null) return '';
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) {
+      return c
+        .map((item) => formatBasic(item, depth, format))
+        .join(format === 'inline' ? '' : '\n\n');
+    }
+    if ('slot' in c) {
+      const slotContributions = resolvedContributions[c.slot];
+      if (!slotContributions || slotContributions.length === 0) return '';
+      return formatBasic(slotContributions, depth, format);
     }
 
-    let result = '';
+    const section = c;
+    const sectionFormat = section.format || 'block';
+    const innerContent = formatBasic(
+      section.content,
+      depth + 1,
+      sectionFormat,
+    ).trim();
+    if (!innerContent) return '';
 
-    if (section.heading) {
-      result += `${'#'.repeat(headingLevel)} ${section.heading}\n\n`;
-    }
+    let result = innerContent;
 
     if (section.tag) {
       const attrs = renderAttributes(section.attrs);
-      result += `<${section.tag}${attrs}>\n${innerContent}\n</${section.tag}>`;
-    } else {
-      result += innerContent;
+      result = `\n<${section.tag}${attrs}>\n${result}\n</${section.tag}>\n`;
     }
 
-    return result.trim();
-  }
+    if (section.heading) {
+      const headingLevel = Math.min(depth, 6);
+      result = `\n\n${'#'.repeat(headingLevel)} ${section.heading}\n\n${result.trim()}`;
+    }
+
+    return result;
+  };
+
+  const parts = resolvedContents
+    .map((c) => formatBasic(c, options?.depth ?? 1, 'block'))
+    .filter((p) => p !== null && p !== '');
+
+  const rawResult = parts.join('\n\n').trim();
+
+  // Normalize newlines: collapse 3+ consecutive newlines into exactly 2
+  // but skip content inside markdown code fences (```)
+  const segments = rawResult.split(/(```[\s\S]*?```)/);
+  return segments
+    .map((segment, index) => {
+      // Even indices are outside code fences, odd indices are inside
+      if (index % 2 === 0) {
+        return segment.replace(/\n{3,}/g, '\n\n');
+      }
+      return segment;
+    })
+    .join('');
 }
 
 export function prompt(
-  content: PromptContent<SystemPromptOptions>,
+  ...content: Array<PromptContent<SystemPromptOptions>>
 ): PromptContent<SystemPromptOptions> {
-  return content;
+  return content.length === 1 ? content[0] : content;
 }

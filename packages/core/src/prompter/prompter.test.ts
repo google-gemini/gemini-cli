@@ -5,158 +5,225 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { Prompt } from './prompter.js';
+import { renderPrompt, p } from './prompter.js';
+import type { PromptContent } from './types.js';
 
-describe('Prompt', () => {
-  it('renders a simple string', async () => {
-    const prompt = new Prompt('Hello world');
-    expect(await prompt.render({})).toBe('Hello world');
-  });
+type TestContext = { name?: string; shouldRender?: boolean };
 
-  it('renders a function content resolving dynamically', async () => {
-    const prompt = new Prompt<{ name: string }>((ctx) => `Hello ${ctx.name}`);
-    expect(await prompt.render({ name: 'Alice' })).toBe('Hello Alice');
-  });
+type TestCase = {
+  desc: string;
+  content: PromptContent<TestContext> | Array<PromptContent<TestContext>>;
+  context: TestContext;
+  contributions?:
+    | Record<string, PromptContent<TestContext>>
+    | Array<Record<string, PromptContent<TestContext>>>;
+  expect: string;
+};
 
-  it('renders an array of contents', async () => {
-    const prompt = new Prompt(['Part 1', 'Part 2']);
-    expect(await prompt.render({})).toBe('Part 1\n\nPart 2');
-  });
-
-  it('renders a section with heading', async () => {
-    const prompt = new Prompt({
+const tests: TestCase[] = [
+  {
+    desc: 'renders a simple string',
+    content: 'Hello world',
+    context: {},
+    expect: 'Hello world',
+  },
+  {
+    desc: 'renders a function content resolving dynamically',
+    content: (ctx) => `Hello ${ctx.name}`,
+    context: { name: 'Alice' },
+    expect: 'Hello Alice',
+  },
+  {
+    desc: 'renders an array of contents with block spacing',
+    content: [['Part 1', 'Part 2']],
+    context: {},
+    expect: 'Part 1\n\nPart 2',
+  },
+  {
+    desc: 'p tag renders inline spacing',
+    content: p`Part ${1} and Part ${2}`,
+    context: {},
+    expect: 'Part 1 and Part 2',
+  },
+  {
+    desc: 'renders a section with heading',
+    content: {
       heading: 'My Section',
       content: 'This is the body',
-    });
-    expect(await prompt.render({})).toBe('# My Section\n\nThis is the body');
-  });
-
-  it('renders a section with tag and attrs', async () => {
-    const prompt = new Prompt({
+    },
+    context: {},
+    expect: '# My Section\n\nThis is the body',
+  },
+  {
+    desc: 'renders a section with tag and attrs',
+    content: {
       tag: 'foo',
       attrs: { bar: 'baz' },
       content: 'Hello',
-    });
-    expect(await prompt.render({})).toBe('<foo bar="baz">\nHello\n</foo>');
-  });
-
-  it('allows adding content via .add()', async () => {
-    const prompt = new Prompt('Original');
-    prompt.add('Added later');
-    expect(await prompt.render({})).toBe('Original\n\nAdded later');
-  });
-
-  it('conditionally omits rendering a section based on condition', async () => {
-    const prompt = new Prompt<{ shouldRender: boolean }>(
+    },
+    context: {},
+    expect: '<foo bar="baz">\nHello\n</foo>',
+  },
+  {
+    desc: 'conditionally omits rendering a section based on condition',
+    content: [
       {
         heading: 'Conditional',
-        condition: (ctx) => ctx.shouldRender,
+        condition: (ctx) => ctx.shouldRender ?? false,
         content: 'This might not appear',
       },
       'Always appears',
-    );
-    expect(await prompt.render({ shouldRender: false })).toBe('Always appears');
-    expect(await prompt.render({ shouldRender: true })).toBe(
-      '# Conditional\n\nThis might not appear\n\nAlways appears',
-    );
-  });
-
-  it('conditionally omits rendering a section based on an async condition', async () => {
-    const prompt = new Prompt<{ shouldRender: boolean }>(
+    ],
+    context: { shouldRender: false },
+    expect: 'Always appears',
+  },
+  {
+    desc: 'conditionally includes rendering a section based on condition',
+    content: [
       {
         heading: 'Conditional',
-        condition: async (ctx) => ctx.shouldRender,
+        condition: (ctx) => ctx.shouldRender ?? false,
         content: 'This might not appear',
       },
       'Always appears',
-    );
-    expect(await prompt.render({ shouldRender: false })).toBe('Always appears');
-    expect(await prompt.render({ shouldRender: true })).toBe(
-      '# Conditional\n\nThis might not appear\n\nAlways appears',
-    );
-  });
-
-  it('allows dynamic contributions via .contribute()', async () => {
-    const prompt = new Prompt(
+    ],
+    context: { shouldRender: true },
+    expect: '# Conditional\n\nThis might not appear\n\nAlways appears',
+  },
+  {
+    desc: 'conditionally omits rendering a section based on an async condition',
+    content: [
       {
-        id: 'target',
+        heading: 'Conditional',
+        condition: async (ctx) => ctx.shouldRender ?? false,
+        content: 'This might not appear',
+      },
+      'Always appears',
+    ],
+    context: { shouldRender: false },
+    expect: 'Always appears',
+  },
+  {
+    desc: 'allows dynamic contributions via .contribute() to {slot}',
+    content: [
+      {
         heading: 'Target Section',
-        content: ['Initial content'],
+        content: ['Initial content', { slot: 'target' }],
       },
       {
-        id: 'other',
+        heading: 'Other Section',
         content: 'Other content',
       },
-    );
-
-    prompt.contribute({
+    ],
+    contributions: {
       target: 'Contributed content',
       missing: 'Should be ignored',
-    });
-
-    const result = await prompt.render({});
-    expect(result).toBe(
-      '# Target Section\n\nInitial content\n\nContributed content\n\nOther content',
-    );
-  });
-
-  it('converts single content into an array when contributing', async () => {
-    const prompt = new Prompt({
-      id: 'target',
+    },
+    context: {},
+    expect:
+      '# Target Section\n\nInitial content\n\nContributed content\n\n# Other Section\n\nOther content',
+  },
+  {
+    desc: 'handles slot contribution even when missing',
+    content: {
       heading: 'Target Section',
-      content: 'Initial content', // String, not array
-    });
-
-    prompt.contribute({
-      target: 'Contributed content',
-    });
-
-    const result = await prompt.render({});
-    expect(result).toBe(
-      '# Target Section\n\nInitial content\n\nContributed content',
-    );
-  });
-
-  it('skips rendering headings and tags if the content is empty', async () => {
-    const prompt = new Prompt(
+      content: ['Initial content', { slot: 'target' }],
+    },
+    context: {},
+    expect: '# Target Section\n\nInitial content',
+  },
+  {
+    desc: 'skips rendering headings and tags if the content is empty',
+    content: [
       {
         heading: 'Empty Section',
         tag: 'empty',
-        content: '', // Empty string
+        content: '',
       },
       {
         heading: 'Empty Array Section',
-        content: [], // Empty array
+        content: [],
       },
       {
         heading: 'Function resolving to empty',
         content: () => '',
       },
       'Visible content',
-    );
-
-    expect(await prompt.render({})).toBe('Visible content');
-  });
-
-  it('handles nested structures properly in contribute', async () => {
-    const prompt = new Prompt({
+    ],
+    context: {},
+    expect: 'Visible content',
+  },
+  {
+    desc: 'handles nested structures properly in contribute',
+    content: {
       heading: 'Outer',
       content: [
         {
-          id: 'inner',
           heading: 'Inner',
-          content: 'Inner content',
+          content: ['Inner content', { slot: 'inner' }],
         },
       ],
-    });
-
-    prompt.contribute({
+    },
+    contributions: {
       inner: 'Injected into inner',
-    });
+    },
+    context: {},
+    expect: '# Outer\n\n## Inner\n\nInner content\n\nInjected into inner',
+  },
+  {
+    desc: 'resolves recursive async functions correctly before filling slots',
+    content: {
+      heading: 'Async Section',
+      content: async () => [
+        'Content from async function',
+        { slot: 'async_slot' },
+      ],
+    },
+    contributions: {
+      async_slot: async () => 'Contributed async content',
+    },
+    context: {},
+    expect:
+      '# Async Section\n\nContent from async function\n\nContributed async content',
+  },
+  {
+    desc: 'collapses 3+ newlines into 2',
+    content: ['First', '\n\n\n\n\n', 'Second'],
+    context: {},
+    expect: 'First\n\nSecond',
+  },
+  {
+    desc: 'does not collapse 3+ newlines inside markdown code fences',
+    content: ['First', '```\n\n\n\n\n```', 'Second'],
+    context: {},
+    expect: 'First\n\n```\n\n\n\n\n```\n\nSecond',
+  },
+  {
+    desc: 'appends multiple contributions to the same slot',
+    content: {
+      heading: 'Multi Section',
+      content: [{ slot: 'multi' }],
+    },
+    contributions: [{ multi: 'First' }, { multi: 'Second' }],
+    context: {},
+    expect: '# Multi Section\n\nFirst\n\nSecond',
+  },
+  {
+    desc: 'appends multiple contributions to an inline slot',
+    content: p`Prefix: ${{ slot: 'inline_multi' }}`,
+    contributions: [{ inline_multi: 'First' }, { inline_multi: 'Second' }],
+    context: {},
+    expect: 'Prefix: FirstSecond',
+  },
+];
 
-    const result = await prompt.render({});
-    expect(result).toBe(
-      '# Outer\n\n## Inner\n\nInner content\n\nInjected into inner',
-    );
+describe('renderPrompt', () => {
+  it.each(tests)('$desc', async (test) => {
+    const result = await renderPrompt({
+      content: test.content,
+      contributions: test.contributions,
+      context: test.context,
+    });
+    expect(result).toBe(test.expect);
   });
 });
