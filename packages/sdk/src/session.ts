@@ -243,10 +243,10 @@ export class GeminiCliSession {
 
       const loopContext: AgentLoopContext = this.config;
       const originalRegistry = loopContext.toolRegistry;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const scopedRegistry: ToolRegistry = Object.create(originalRegistry);
+      const scopedRegistry: ToolRegistry = originalRegistry.clone();
+      const originalGetTool = scopedRegistry.getTool.bind(scopedRegistry);
       scopedRegistry.getTool = (name: string) => {
-        const tool = originalRegistry.getTool(name);
+        const tool = originalGetTool(name);
         if (tool instanceof SdkTool) {
           return tool.bindContext(context);
         }

@@ -53,6 +53,6 @@ decision = "allow"
 priority = 50
 
 [[rule]]
-toolName = ["codebase_investigator", "cli_help"]
+toolName = ["codebase_investigator", "cli_help", "get_internal_docs"]
 decision = "allow"
 priority = 50

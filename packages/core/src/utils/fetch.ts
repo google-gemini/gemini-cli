@@ -8,6 +8,7 @@ import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
+import { lookup } from 'node:dns/promises';
 
 const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
 const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
@@ -20,6 +21,13 @@ export class FetchError extends Error {
   ) {
     super(message, options);
     this.name = 'FetchError';
+  }
+}
+
+export class PrivateIpError extends Error {
+  constructor(message = 'Access to private network is blocked') {
+    super(message);
+    this.name = 'PrivateIpError';
   }
 }
 
@@ -112,6 +120,30 @@ export function isAddressPrivate(address: string): boolean {
   } catch {
     // If parsing fails despite isValid(), we treat it as potentially unsafe.
     return true;
+  }
+}
+
+/**
+ * Checks if a URL resolves to a private IP address.
+ */
+export async function isPrivateIpAsync(url: string): Promise<boolean> {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname;
+
+    if (isLoopbackHost(hostname)) {
+      return false;
+    }
+
+    const addresses = await lookup(hostname, { all: true });
+    return addresses.some((addr) => isAddressPrivate(addr.address));
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw new Error('Failed to verify if URL resolves to private IP', {
+      cause: error,
+    });
   }
 }
 

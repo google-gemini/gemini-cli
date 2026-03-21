@@ -176,6 +176,10 @@ describe('GeminiAgent', () => {
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+      getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
+      get config() {
+        return this;
+      },
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -547,7 +551,7 @@ describe('GeminiAgent', () => {
     });
 
     expect(session.prompt).toHaveBeenCalled();
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should delegate setMode to session', async () => {
@@ -654,6 +658,13 @@ describe('Session', () => {
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getGitService: vi.fn().mockResolvedValue({} as GitService),
       waitForMcpInit: vi.fn(),
+      getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
+      get config() {
+        return this;
+      },
+      get toolRegistry() {
+        return mockToolRegistry;
+      },
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -739,7 +750,7 @@ describe('Session', () => {
         content: { type: 'text', text: 'Hello' },
       },
     });
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should handle /memory command', async () => {
@@ -756,7 +767,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/memory view',
       expect.any(Object),
@@ -778,7 +789,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/extensions list' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/extensions list',
       expect.any(Object),
@@ -800,7 +811,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/extensions explore' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/extensions explore',
       expect.any(Object),
@@ -822,7 +833,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/restore' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith(
       '/restore',
       expect.any(Object),
@@ -844,7 +855,7 @@ describe('Session', () => {
       prompt: [{ type: 'text', text: '/init' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
     expect(handleCommandSpy).toHaveBeenCalledWith('/init', expect.any(Object));
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
@@ -892,10 +903,13 @@ describe('Session', () => {
         update: expect.objectContaining({
           sessionUpdate: 'tool_call_update',
           status: 'completed',
+          title: 'Test Tool',
+          locations: [],
+          kind: 'read',
         }),
       }),
     );
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should handle tool call permission request', async () => {
@@ -944,6 +958,61 @@ describe('Session', () => {
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+    );
+  });
+
+  it('should exclude always allow options when disableAlwaysAllow is true', async () => {
+    mockConfig.getDisableAlwaysAllow = vi.fn().mockReturnValue(true);
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlways,
+          }),
+        ]),
+      }),
     );
   });
 
@@ -1249,6 +1318,18 @@ describe('Session', () => {
     expect(path.resolve).toHaveBeenCalled();
     expect(fs.stat).toHaveBeenCalled();
 
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          status: 'completed',
+          title: 'Read files',
+          locations: [],
+          kind: 'read',
+        }),
+      }),
+    );
+
     // Verify ReadManyFilesTool was used (implicitly by checking if sendMessageStream was called with resolved content)
     // Since we mocked ReadManyFilesTool to return specific content, we can check the args passed to sendMessageStream
     expect(mockChat.sendMessageStream).toHaveBeenCalledWith(
@@ -1261,6 +1342,65 @@ describe('Session', () => {
       expect.anything(),
       expect.any(AbortSignal),
       LlmRole.MAIN,
+    );
+  });
+
+  it('should handle @path resolution error', async () => {
+    (path.resolve as unknown as Mock).mockReturnValue('/tmp/error.txt');
+    (fs.stat as unknown as Mock).mockResolvedValue({
+      isDirectory: () => false,
+    });
+    (isWithinRoot as unknown as Mock).mockReturnValue(true);
+
+    const MockReadManyFilesTool = ReadManyFilesTool as unknown as Mock;
+    MockReadManyFilesTool.mockImplementationOnce(() => ({
+      name: 'read_many_files',
+      kind: 'read',
+      build: vi.fn().mockReturnValue({
+        getDescription: () => 'Read files',
+        toolLocations: () => [],
+        execute: vi.fn().mockRejectedValue(new Error('File read failed')),
+      }),
+    }));
+
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await expect(
+      session.prompt({
+        sessionId: 'session-1',
+        prompt: [
+          { type: 'text', text: 'Read' },
+          {
+            type: 'resource_link',
+            uri: 'file://error.txt',
+            mimeType: 'text/plain',
+            name: 'error.txt',
+          },
+        ],
+      }),
+    ).rejects.toThrow('File read failed');
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'tool_call_update',
+          status: 'failed',
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              content: expect.objectContaining({
+                text: expect.stringMatching(/File read failed/),
+              }),
+            }),
+          ]),
+          kind: 'read',
+        }),
+      }),
     );
   });
 
@@ -1377,6 +1517,7 @@ describe('Session', () => {
               content: expect.objectContaining({ text: 'Tool failed' }),
             }),
           ]),
+          kind: 'read',
         }),
       }),
     );

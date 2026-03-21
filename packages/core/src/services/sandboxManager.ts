@@ -1,11 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
   sanitizeEnvironment,
+  getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 
@@ -24,6 +25,8 @@ export interface SandboxRequest {
   /** Optional sandbox-specific configuration. */
   config?: {
     sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+    allowedPaths?: string[];
+    networkAccess?: boolean;
   };
 }
 
@@ -37,6 +40,8 @@ export interface SandboxedCommand {
   args: string[];
   /** Sanitized environment variables. */
   env: NodeJS.ProcessEnv;
+  /** The working directory. */
+  cwd?: string;
 }
 
 /**
@@ -59,13 +64,9 @@ export class NoopSandboxManager implements SandboxManager {
    * the original program and arguments.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction: true, // Forced for safety
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.config?.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
@@ -76,3 +77,14 @@ export class NoopSandboxManager implements SandboxManager {
     };
   }
 }
+
+/**
+ * SandboxManager that implements actual sandboxing.
+ */
+export class LocalSandboxManager implements SandboxManager {
+  async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
+    throw new Error('Tool sandboxing is not yet implemented.');
+  }
+}
+
+export { createSandboxManager } from './sandboxManagerFactory.js';

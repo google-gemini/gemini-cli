@@ -47,6 +47,7 @@ describe('ExitPlanModeTool', () => {
       storage: {
         getPlansDir: vi.fn().mockReturnValue(mockPlansDir),
       } as unknown as Config['storage'],
+      isInteractive: vi.fn().mockReturnValue(true),
     };
     tool = new ExitPlanModeTool(
       mockConfig as Config,
@@ -58,7 +59,7 @@ describe('ExitPlanModeTool', () => {
         getMessageBusDecision: () => Promise<string>;
       },
       'getMessageBusDecision',
-    ).mockResolvedValue('ASK_USER');
+    ).mockResolvedValue('ask_user');
   });
 
   afterEach(() => {
@@ -126,7 +127,7 @@ describe('ExitPlanModeTool', () => {
           getMessageBusDecision: () => Promise<string>;
         },
         'getMessageBusDecision',
-      ).mockResolvedValue('ALLOW');
+      ).mockResolvedValue('allow');
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -149,7 +150,7 @@ describe('ExitPlanModeTool', () => {
           getMessageBusDecision: () => Promise<string>;
         },
         'getMessageBusDecision',
-      ).mockResolvedValue('DENY');
+      ).mockResolvedValue('deny');
 
       await expect(
         invocation.shouldConfirmExecute(new AbortController().signal),
@@ -359,6 +360,36 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
   });
 
+  describe('getAllowApprovalMode (internal)', () => {
+    it('should return YOLO when config.isInteractive() is false', async () => {
+      mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      // Directly call execute to trigger the internal getAllowApprovalMode
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('YOLO mode');
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.YOLO,
+      );
+    });
+
+    it('should return DEFAULT when config.isInteractive() is true', async () => {
+      mockConfig.isInteractive = vi.fn().mockReturnValue(true);
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      // Directly call execute to trigger the internal getAllowApprovalMode
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Default mode');
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.DEFAULT,
+      );
+    });
+  });
+
   describe('getApprovalModeDescription (internal)', () => {
     it('should handle all valid approval modes', async () => {
       const planRelativePath = createPlanFile('test.md', '# Content');
@@ -387,6 +418,10 @@ Ask the user for specific feedback on how to improve the plan.`,
         ApprovalMode.DEFAULT,
         'Default mode (edits will require confirmation)',
       );
+      await testMode(
+        ApprovalMode.YOLO,
+        'YOLO mode (all tool calls auto-approved)',
+      );
     });
 
     it('should throw for invalid post-planning modes', async () => {
@@ -409,7 +444,6 @@ Ask the user for specific feedback on how to improve the plan.`,
         ).rejects.toThrow(/Unexpected approval mode/);
       };
 
-      await testInvalidMode(ApprovalMode.YOLO);
       await testInvalidMode(ApprovalMode.PLAN);
     });
   });
