@@ -27,11 +27,14 @@ describe('<GeminiSpinner />', () => {
 
   beforeEach(() => {
     vi.unstubAllEnvs();
+    vi.stubEnv('TMUX', '');
+    vi.stubEnv('TERM', '');
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
@@ -42,7 +45,7 @@ describe('<GeminiSpinner />', () => {
 
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('MockCliSpinner');
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -54,20 +57,19 @@ describe('<GeminiSpinner />', () => {
     );
 
     await waitUntilReady();
-    expect(lastFrame()).toContain('.');
-    expect(lastFrame()).not.toContain('MockCliSpinner');
+    expect(lastFrame()).toMatchSnapshot();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(750);
     });
     await waitUntilReady();
-    expect(lastFrame()).toContain('..');
+    expect(lastFrame()).toMatchSnapshot();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(750);
     });
     await waitUntilReady();
-    expect(lastFrame()).toContain('...');
+    expect(lastFrame()).toMatchSnapshot();
 
     unmount();
   });
@@ -80,8 +82,7 @@ describe('<GeminiSpinner />', () => {
 
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('Responding');
-    expect(lastFrame()).not.toContain('MockCliSpinner');
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 });

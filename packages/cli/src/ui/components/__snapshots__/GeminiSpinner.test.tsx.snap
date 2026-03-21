@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<GeminiSpinner /> > renders a tmux-safe fixed-width dots indicator when in tmux 1`] = `
+".
+"
+`;
+
+exports[`<GeminiSpinner /> > renders a tmux-safe fixed-width dots indicator when in tmux 2`] = `
+"..
+"
+`;
+
+exports[`<GeminiSpinner /> > renders a tmux-safe fixed-width dots indicator when in tmux 3`] = `
+"...
+"
+`;
+
+exports[`<GeminiSpinner /> > renders alt text for screen readers 1`] = `
+"Responding
+"
+`;
+
+exports[`<GeminiSpinner /> > renders the normal spinner when not in tmux 1`] = `
+"MockCliSpinner
+"
+`;
