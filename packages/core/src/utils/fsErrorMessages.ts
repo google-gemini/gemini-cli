@@ -51,6 +51,11 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
   ENOTDIR: (path) =>
     (path ? `Not a directory: '${path}'. ` : 'Not a directory. ') +
     'Please provide a valid directory path instead of a file.',
+  ETIMEDOUT: (path) =>
+    (path
+      ? `Operation timed out: could not access '${path}'. `
+      : 'Operation timed out. ') +
+    'Check your network connection or try again later.',
 };
 
 /**
