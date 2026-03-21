@@ -260,7 +260,7 @@ export class PolicyEngine {
       return roots.every((root) => REDIRECTION_ONLY_ROOTS.has(root));
     }
 
-    return /^\d*(?:>>?|<<<?|<)(?!\()/.test(command.trim());
+    return /^\d*(?:\u003e\u003e?|\u0026\u003e|\u003c\u003c\u003c?|\u003c|\u003e\u0026|\u003c\u0026)(?!\()/.test(command.trim());
   }
 
   /**
