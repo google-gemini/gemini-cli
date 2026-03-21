@@ -13,6 +13,15 @@ import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import { useIsScreenReaderEnabled } from 'ink';
+
+vi.mock('ink', async () => {
+  const actual = await vi.importActual('ink');
+  return {
+    ...actual,
+    useIsScreenReaderEnabled: vi.fn(() => false),
+  };
+});
 
 // Helper to write to stdin with proper act() wrapping
 const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
@@ -1450,6 +1459,221 @@ describe('AskUserDialog', () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
         '0': `TypeScript, ${pastedText}`,
+      });
+    });
+  });
+  describe('Screen reader mode', () => {
+    let mockUseIsScreenReaderEnabled: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
+      mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      mockUseIsScreenReaderEnabled.mockReturnValue(false);
+    });
+
+    const choiceQuestion: Question[] = [
+      {
+        question: 'Which language do you prefer?',
+        header: 'Language',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'TypeScript', description: 'Typed JavaScript' },
+          { label: 'Python', description: 'Great for data science' },
+          { label: 'Rust', description: 'Memory safe' },
+        ],
+        multiSelect: false,
+      },
+    ];
+
+    const multiSelectQuestion: Question[] = [
+      {
+        question: 'Which languages do you use?',
+        header: 'Languages',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'TypeScript', description: 'Typed JavaScript' },
+          { label: 'Python', description: 'Great for data science' },
+          { label: 'Rust', description: 'Memory safe' },
+        ],
+        multiSelect: true,
+      },
+    ];
+
+    const yesNoQuestion: Question[] = [
+      {
+        question: 'Do you like TypeScript?',
+        header: 'TypeScript',
+        type: QuestionType.YESNO,
+      },
+    ];
+
+    const textQuestion: Question[] = [
+      {
+        question: 'What is your name?',
+        header: 'Name',
+        type: QuestionType.TEXT,
+      },
+    ];
+
+    it('renders plain text options for CHOICE question', async () => {
+      const { lastFrame, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      const frame = lastFrame();
+      expect(frame).toContain('Which language do you prefer?');
+      expect(frame).toContain('1. TypeScript - Typed JavaScript');
+      expect(frame).toContain('2. Python - Great for data science');
+      expect(frame).toContain('3. Rust - Memory safe');
+      expect(frame).toContain('Type a number and press Enter');
+    });
+
+    it('renders plain text options for YESNO question', async () => {
+      const { lastFrame, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={yesNoQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      const frame = lastFrame();
+      expect(frame).toContain('Do you like TypeScript?');
+      expect(frame).toContain('1. Yes');
+      expect(frame).toContain('2. No');
+      expect(frame).toContain('Type a number and press Enter');
+    });
+
+    it('renders text input prompt for TEXT question', async () => {
+      const { lastFrame, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={textQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      const frame = lastFrame();
+      expect(frame).toContain('What is your name?');
+      expect(frame).toContain('Type your answer and press Enter');
+    });
+
+    it('submits correct answer for single select', async () => {
+      const onSubmit = vi.fn();
+      const { stdin, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      writeKey(stdin, '2');
+      writeKey(stdin, '\r');
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith({ '0': 'Python' });
+      });
+    });
+
+    it('submits correct answers for multiSelect', async () => {
+      const onSubmit = vi.fn();
+      const { stdin, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={multiSelectQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      writeKey(stdin, '1');
+      writeKey(stdin, ' ');
+      writeKey(stdin, '3');
+      writeKey(stdin, '\r');
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith({ '0': 'TypeScript, Rust' });
+      });
+    });
+
+    it('shows error for out of range input', async () => {
+      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      writeKey(stdin, '9');
+      writeKey(stdin, '\r');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Invalid input');
+      });
+    });
+
+    it('shows error for multiple numbers on single select', async () => {
+      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      writeKey(stdin, '1');
+      writeKey(stdin, ' ');
+      writeKey(stdin, '2');
+      writeKey(stdin, '\r');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('only accepts one answer');
+      });
+    });
+
+    it('backspace removes last character from input', async () => {
+      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      writeKey(stdin, '1');
+      writeKey(stdin, '2');
+      writeKey(stdin, '\x7f');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Input: 1');
+      });
+    });
+
+    it('escape cancels the dialog', async () => {
+      const onCancel = vi.fn();
+      const { stdin, waitUntilReady } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={vi.fn()}
+          onCancel={onCancel}
+          width={80}
+        />,
+      );
+      await waitUntilReady();
+      writeKey(stdin, '\x1b');
+      await waitFor(() => {
+        expect(onCancel).toHaveBeenCalled();
       });
     });
   });
