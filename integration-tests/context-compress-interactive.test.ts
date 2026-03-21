@@ -48,7 +48,8 @@ describe('Interactive Mode', () => {
       true,
     );
 
-    await run.expectText('Chat history compressed', 5000);
+    await run.expectText('Context compressed', 5000);
+    await run.expectText('Adjust threshold', 5000);
   });
 
   // TODO: Context compression is broken and doesn't include the system

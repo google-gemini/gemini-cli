@@ -1192,12 +1192,13 @@ export const useGeminiStream = (
             isPending: false,
             beforePercentage,
             afterPercentage,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
             compressionStatus: eventValue
               ? (Number(
                   eventValue.compressionStatus,
                 ) as unknown as CompressionStatus)
               : null,
+            /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
             isManual: false,
             thresholdPercentage: Math.round(threshold * 100),
           },
