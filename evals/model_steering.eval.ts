@@ -15,7 +15,6 @@ describe('Model Steering Behavioral Evals', () => {
   appEvalTest('USUALLY_PASSES', {
     name: 'Corrective Hint: Model switches task based on hint during tool turn',
     configOverrides: {
-      excludeTools: ['run_shell_command', 'ls', 'google_web_search'],
       modelSteering: true,
     },
     files: {
@@ -55,7 +54,6 @@ describe('Model Steering Behavioral Evals', () => {
   appEvalTest('USUALLY_PASSES', {
     name: 'Suggestive Hint: Model incorporates user guidance mid-stream',
     configOverrides: {
-      excludeTools: ['run_shell_command', 'ls', 'google_web_search'],
       modelSteering: true,
     },
     files: {},

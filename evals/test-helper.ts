@@ -197,9 +197,25 @@ export function symlinkNodeModules(testDir: string) {
   }
 }
 
+/**
+ * Settings that are forbidden in evals. Evals should never restrict which
+ * tools are available — they must test against the full, default tool set
+ * to ensure realistic behavior.
+ */
+interface ForbiddenToolSettings {
+  tools?: {
+    /** Restricting core tools in evals is forbidden. */
+    core?: never;
+    [key: string]: unknown;
+  };
+}
+
 export interface EvalCase {
   name: string;
-  params?: Record<string, any>;
+  params?: {
+    settings?: ForbiddenToolSettings & Record<string, unknown>;
+    [key: string]: unknown;
+  };
   prompt: string;
   timeout?: number;
   files?: Record<string, string>;
