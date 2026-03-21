@@ -376,6 +376,14 @@ export type RenderInstance = {
   capturedOverflowActions: OverflowActions | undefined;
 };
 
+export type RenderWithProvidersInstance = RenderInstance & {
+  simulateClick: (
+    col: number,
+    row: number,
+    button?: 0 | 1 | 2,
+  ) => Promise<void>;
+};
+
 const instances: InkInstance[] = [];
 
 export const render = async (
@@ -618,15 +626,7 @@ export const renderWithProviders = async (
     };
     appState?: AppState;
   } = {},
-): Promise<
-  RenderInstance & {
-    simulateClick: (
-      col: number,
-      row: number,
-      button?: 0 | 1 | 2,
-    ) => Promise<void>;
-  }
-> => {
+): Promise<RenderWithProvidersInstance> => {
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
@@ -861,13 +861,7 @@ export async function renderHookWithProviders<Result, Props>(
 
   const Wrapper = options.wrapper || (({ children }) => <>{children}</>);
 
-  let renderResult: RenderInstance & {
-    simulateClick: (
-      col: number,
-      row: number,
-      button?: 0 | 1 | 2,
-    ) => Promise<void>;
-  };
+  let renderResult: RenderWithProvidersInstance;
 
   await act(async () => {
     renderResult = await renderWithProviders(

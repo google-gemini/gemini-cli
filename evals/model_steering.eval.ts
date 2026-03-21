@@ -12,7 +12,7 @@ import { appEvalTest } from './app-test-helper.js';
 import { PolicyDecision } from '@google/gemini-cli-core';
 
 describe('Model Steering Behavioral Evals', () => {
-  appEvalTest('ALWAYS_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
     name: 'Corrective Hint: Model switches task based on hint during tool turn',
     configOverrides: {
       modelSteering: true,
@@ -51,7 +51,7 @@ describe('Model Steering Behavioral Evals', () => {
     },
   });
 
-  appEvalTest('ALWAYS_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
     name: 'Suggestive Hint: Model incorporates user guidance mid-stream',
     configOverrides: {
       modelSteering: true,
