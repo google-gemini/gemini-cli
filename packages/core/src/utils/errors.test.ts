@@ -15,7 +15,6 @@ import {
   AccountSuspendedError,
   getErrorMessage,
   getErrorType,
-  decodeByteCodedString,
   FatalAuthenticationError,
   FatalCancellationError,
   FatalInputError,
@@ -84,38 +83,6 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage(error)).toBe(
       'Regular error message with no byte codes',
     );
-  });
-});
-
-describe('decodeByteCodedString', () => {
-  it('should decode pure byte-coded strings', () => {
-    const text = 'Hello, World!';
-    const byteCoded = Array.from(new TextEncoder().encode(text)).join(',');
-    expect(decodeByteCodedString(byteCoded)).toBe(text);
-  });
-
-  it('should return non-byte strings unchanged', () => {
-    expect(decodeByteCodedString('Normal error message')).toBe(
-      'Normal error message',
-    );
-  });
-
-  it('should handle empty strings', () => {
-    expect(decodeByteCodedString('')).toBe('');
-  });
-
-  it('should return strings with normal commas unchanged', () => {
-    expect(decodeByteCodedString('Error: foo, bar, baz')).toBe(
-      'Error: foo, bar, baz',
-    );
-  });
-
-  it('should handle prefix followed by byte-coded body', () => {
-    const body = '{"error":"test"}';
-    const byteCoded = Array.from(new TextEncoder().encode(body)).join(',');
-    const input = `got status: 429. ${byteCoded}`;
-    const result = decodeByteCodedString(input);
-    expect(result).toBe(`got status: 429. ${body}`);
   });
 });
 
