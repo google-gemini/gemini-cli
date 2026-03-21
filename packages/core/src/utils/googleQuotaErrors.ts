@@ -59,6 +59,36 @@ export class RetryableQuotaError extends Error {
   }
 }
 
+function hasErrorInfoReason(
+  googleApiError: GoogleApiError | undefined,
+  reason: string,
+): boolean {
+  if (!googleApiError || !Array.isArray(googleApiError.details)) {
+    return false;
+  }
+
+  return googleApiError.details.some(
+    (detail): detail is ErrorInfo =>
+      detail['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
+      detail.reason === reason,
+  );
+}
+
+export function isModelCapacityExhaustedError(error: unknown): boolean {
+  if (
+    error instanceof RetryableQuotaError ||
+    error instanceof TerminalQuotaError
+  ) {
+    return hasErrorInfoReason(error.cause, 'MODEL_CAPACITY_EXHAUSTED');
+  }
+
+  const googleApiError = parseGoogleApiError(error);
+  return hasErrorInfoReason(
+    googleApiError ?? undefined,
+    'MODEL_CAPACITY_EXHAUSTED',
+  );
+}
+
 /**
  * An error indicating that user validation is required to continue.
  */
@@ -345,6 +375,13 @@ export function classifyGoogleError(error: unknown): unknown {
             `${googleApiError.message}`,
             googleApiError,
             effectiveDelay,
+          );
+        }
+        if (errorInfo.reason === 'MODEL_CAPACITY_EXHAUSTED') {
+          return new RetryableQuotaError(
+            `${googleApiError.message}`,
+            googleApiError,
+            delaySeconds,
           );
         }
         if (errorInfo.reason === 'QUOTA_EXHAUSTED') {
