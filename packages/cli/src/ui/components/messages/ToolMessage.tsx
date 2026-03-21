@@ -109,48 +109,53 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         />
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
-      <Box
-        width={terminalWidth}
-        borderStyle="round"
-        borderColor={borderColor}
-        borderDimColor={borderDimColor}
-        borderTop={false}
-        borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
-        paddingX={1}
-        flexDirection="column"
-      >
-        {status === CoreToolCallStatus.Executing && progress !== undefined && (
-          <McpProgressIndicator
-            progress={progress}
-            total={progressTotal}
-            message={progressMessage}
-            barWidth={20}
+      {(!!resultDisplay ||
+        (status === CoreToolCallStatus.Executing && progress !== undefined) ||
+        (isThisShellFocused && !!config)) && (
+        <Box
+          width={terminalWidth}
+          borderStyle="round"
+          borderColor={borderColor}
+          borderDimColor={borderDimColor}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={true}
+          borderRight={true}
+          paddingX={1}
+          flexDirection="column"
+        >
+          {status === CoreToolCallStatus.Executing &&
+            progress !== undefined && (
+              <McpProgressIndicator
+                progress={progress}
+                total={progressTotal}
+                message={progressMessage}
+                barWidth={20}
+              />
+            )}
+          <ToolResultDisplay
+            resultDisplay={resultDisplay}
+            availableTerminalHeight={availableTerminalHeight}
+            terminalWidth={terminalWidth}
+            renderOutputAsMarkdown={renderOutputAsMarkdown}
+            hasFocus={isThisShellFocused}
+            maxLines={
+              kind === Kind.Agent && availableTerminalHeight !== undefined
+                ? SUBAGENT_MAX_LINES
+                : undefined
+            }
+            overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
           />
-        )}
-        <ToolResultDisplay
-          resultDisplay={resultDisplay}
-          availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
-          renderOutputAsMarkdown={renderOutputAsMarkdown}
-          hasFocus={isThisShellFocused}
-          maxLines={
-            kind === Kind.Agent && availableTerminalHeight !== undefined
-              ? SUBAGENT_MAX_LINES
-              : undefined
-          }
-          overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
-        />
-        {isThisShellFocused && config && (
-          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
-            <ShellInputPrompt
-              activeShellPtyId={activeShellPtyId ?? null}
-              focus={embeddedShellFocused}
-            />
-          </Box>
-        )}
-      </Box>
+          {isThisShellFocused && config && (
+            <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+              <ShellInputPrompt
+                activeShellPtyId={activeShellPtyId ?? null}
+                focus={embeddedShellFocused}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
     </>
   );
 };

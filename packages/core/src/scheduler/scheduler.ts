@@ -457,9 +457,9 @@ export class Scheduler {
         c.status === CoreToolCallStatus.Validating,
     );
     if (validatingCalls.length > 0) {
-      await Promise.all(
-        validatingCalls.map((c) => this._processValidatingCall(c, signal)),
-      );
+      for (const c of validatingCalls) {
+        await this._processValidatingCall(c, signal);
+      }
     }
 
     // 2. Execute scheduled calls
