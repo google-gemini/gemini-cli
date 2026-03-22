@@ -206,16 +206,16 @@ const ModelUsageTable: React.FC<{
     color: string,
     totalSteps = 20,
   ) => {
+    if (screenReaderEnabled) {
+      return null;
+    }
+
     let filledSteps = Math.round(usedFraction * totalSteps);
 
     // If something is used (fraction > 0) but rounds to 0, show 1 tick.
     // If < 100% (fraction < 1) but rounds to 20, show 19 ticks.
     if (usedFraction > 0 && usedFraction < 1) {
       filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
-    }
-
-    if (screenReaderEnabled) {
-      return null;
     }
 
     const emptySteps = Math.max(0, totalSteps - filledSteps);
