@@ -28,6 +28,24 @@ describe('Web Tools', () => {
         searchCalls.length,
         'Expected agent to call google_web_search for current information',
       ).toBeGreaterThanOrEqual(1);
+
+      // Agent should not also call web_fetch for the same query (wrong tool)
+      const fetchCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === 'web_fetch',
+      );
+      expect(
+        fetchCalls.length,
+        'Expected agent to use google_web_search, not web_fetch, for open-ended queries',
+      ).toBe(0);
+
+      // Search should complete in a single turn
+      const uniqueTurns = new Set(
+        searchCalls.map((call) => call.toolRequest.prompt_id).filter(Boolean),
+      );
+      expect(
+        uniqueTurns.size,
+        'Expected web search to occur within a single turn',
+      ).toBeLessThanOrEqual(1);
     },
   });
 
@@ -51,6 +69,15 @@ describe('Web Tools', () => {
         fetchCalls.length,
         'Expected agent to call web_fetch for a specific URL',
       ).toBeGreaterThanOrEqual(1);
+
+      // Agent should not use google_web_search when a direct URL is given
+      const searchCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === 'google_web_search',
+      );
+      expect(
+        searchCalls.length,
+        'Expected agent to use web_fetch, not google_web_search, when given a specific URL',
+      ).toBe(0);
     },
   });
 
