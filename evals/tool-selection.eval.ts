@@ -52,6 +52,15 @@ describe('Tool Selection', () => {
         readCalls.length,
         'Expected agent not to read all files individually when grep_search is available',
       ).toBeLessThan(5);
+
+      // Agent should complete the search in a single turn
+      const uniqueTurns = new Set(
+        grepCalls.map((call) => call.toolRequest.prompt_id).filter(Boolean),
+      );
+      expect(
+        uniqueTurns.size,
+        'Expected grep_search calls to occur within a single turn',
+      ).toBeLessThanOrEqual(1);
     },
   });
 
@@ -86,6 +95,15 @@ describe('Tool Selection', () => {
         readCalls.length,
         'Expected agent not to read files individually when shell counting is available',
       ).toBeLessThan(3);
+
+      // Agent should complete the count in a single turn
+      const uniqueTurns = new Set(
+        shellCalls.map((call) => call.toolRequest.prompt_id).filter(Boolean),
+      );
+      expect(
+        uniqueTurns.size,
+        'Expected shell counting to occur within a single turn',
+      ).toBeLessThanOrEqual(1);
     },
   });
 
