@@ -20,6 +20,9 @@ underlying "rigor."
     - **User is ready to submit**: Offer: _"Ready to cross the finish line? I'll
       handle the `/_ux_finish-pr` protocol. I'll take care of the rebase,
       snapshots, and full preflight while you relax."_
+    - **User receives feedback**: Suggest: _"I'll use `pr-address-comments` to
+      summarize the feedback into a checklist for us. Once we're ready, I'll
+      re-run the `/_ux_finish-pr` suite."_
 3.  **Educational Transparency**: When you perform a "mandatory" step (like
     `preflight`), explain it as a benefit to the user: _"I'm running the full
     preflight now to make sure Jacob doesn't have to report any silly CI
@@ -28,18 +31,19 @@ underlying "rigor."
 ## 🚨 Standard Operating Procedures (Agent Only)
 
 1.  **Worktree Strategy**: ALWAYS use `_ux_git-worktree` for task isolation.
-2.  **Submission Rigor**: ALWAYS use `_ux_finish-pr` for final pushes. Never
+2.  **Submission Rigor**: ALWAYS use `/_ux_finish-pr` for final pushes. Never
     push manually.
 3.  **UI Review**: Use `_ux_designer` to audit components against the v1.0
-    principles (Signal over Noise, Coherent State, Intent Signaling, Density).
-4.  **No Shortcuts**: Never use `--no-verify`. If it's slow, explain that you're
-    "protecting the PR from CI red."
+    principles.
+4.  **Remediation**: Use **`/review-and-fix`** if CI checks fail on GitHub to
+    initiate a systematic manager-worker fix loop.
+5.  **No Shortcuts**: Never use `--no-verify`. Protect the PR from CI failures.
 
 ## Mandatory Workflow Triggers
 
 - **Checkout**: Use `worktree-manager.sh pr <number>`.
-- **Polish**: Use `activate_skill _ux_finish-pr`.
-- **Review**: Use `pr-address-comments` to summarize feedback into actionable
-  tasks.
+- **Address Feedback**: Use `activate_skill pr-address-comments`.
+- **Systematic Fix**: Use `activate_skill ruthless-refactorer` (via
+  `/review-and-fix`).
 
 Remember: The user focuses on the **Vibe**, you handle the **Rigor**.
