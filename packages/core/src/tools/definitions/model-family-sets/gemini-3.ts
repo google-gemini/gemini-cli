@@ -73,6 +73,11 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  LSP_QUERY_TOOL_NAME,
+  LSP_QUERY_PARAM_OPERATION,
+  LSP_QUERY_PARAM_LINE,
+  LSP_QUERY_PARAM_CHARACTER,
+  LSP_QUERY_PARAM_QUERY,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -709,4 +714,46 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  lsp_query: {
+    name: LSP_QUERY_TOOL_NAME,
+    description:
+      'Query Language Server for semantic code intelligence (diagnostics, hover, definition, references, document_symbols, workspace_symbols). Use instead of grep when you need compiler-accurate results.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [LSP_QUERY_PARAM_OPERATION]: {
+          type: 'string',
+          enum: [
+            'diagnostics',
+            'hover',
+            'definition',
+            'references',
+            'document_symbols',
+            'workspace_symbols',
+          ],
+          description: 'The LSP operation to perform.',
+        },
+        [PARAM_FILE_PATH]: {
+          type: 'string',
+          description: 'Absolute path to the file.',
+        },
+        [LSP_QUERY_PARAM_LINE]: {
+          type: 'integer',
+          description:
+            'Zero-based line number. Required for hover, definition, references.',
+        },
+        [LSP_QUERY_PARAM_CHARACTER]: {
+          type: 'integer',
+          description:
+            'Zero-based character offset. Required for hover, definition, references.',
+        },
+        [LSP_QUERY_PARAM_QUERY]: {
+          type: 'string',
+          description: 'Search query for workspace_symbols.',
+        },
+      },
+      required: [LSP_QUERY_PARAM_OPERATION, PARAM_FILE_PATH],
+    },
+  },
 };

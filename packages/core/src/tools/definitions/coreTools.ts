@@ -91,6 +91,11 @@ export {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
+  LSP_QUERY_TOOL_NAME,
+  LSP_QUERY_PARAM_OPERATION,
+  LSP_QUERY_PARAM_LINE,
+  LSP_QUERY_PARAM_CHARACTER,
+  LSP_QUERY_PARAM_QUERY,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -219,6 +224,13 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.enter_plan_mode;
   },
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
+};
+
+export const LSP_QUERY_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_query;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_query,
 };
 
 // ============================================================================
