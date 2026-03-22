@@ -5,18 +5,18 @@ and parameters.
 
 ## CLI commands
 
-| Command                            | Description                        | Example                                             |
-| ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
-| `gemini`                           | Start interactive REPL             | `gemini`                                            |
-| `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                     |
-| `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`                            |
-| `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
-| `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
-| `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
-| `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`               |
-| `gemini update`                    | Update to latest version           | `gemini update`                                     |
-| `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management) |
-| `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management) |
+| Command                            | Description                                         | Example                                                             |
+| ---------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------- |
+| `gemini`                           | Start interactive REPL                              | `gemini`                                                            |
+| `gemini "query"`                   | Query non-interactively, then exit                  | `gemini "explain this project"`                                     |
+| `cat file \| gemini`               | Process piped content                               | `cat logs.txt \| gemini`                                            |
+| `gemini -i "query"`                | Execute and continue interactively                  | `gemini -i "What is the purpose of this project?"`                  |
+| `gemini -r "latest"`               | Continue the most recent session across all folders | `gemini -r "latest"`                                                |
+| `gemini -r "latest" "query"`       | Continue a previous session with a new prompt       | `gemini -r "latest" "Check for type errors"`                        |
+| `gemini -r "<session-id>" "query"` | Resume a specific session by UUID from any folder   | `gemini -r "a1b2c3d4-e5f6-7890-abcd-ef1234567890" "Finish this PR"` |
+| `gemini update`                    | Update to latest version                            | `gemini update`                                                     |
+| `gemini extensions`                | Manage extensions                                   | See [Extensions Management](#extensions-management)                 |
+| `gemini mcp`                       | Configure MCP servers                               | See [MCP Server Management](#mcp-server-management)                 |
 
 ### Positional arguments
 
@@ -43,9 +43,9 @@ and parameters.
 | `--allowed-tools`                | -     | array   | -         | **Deprecated.** Use the [Policy Engine](../reference/policy-engine.md) instead. Tools that are allowed to run without confirmation (comma-separated or multiple flags) |
 | `--extensions`                   | `-e`  | array   | -         | List of extensions to use. If not provided, all extensions are enabled (comma-separated or multiple flags)                                                             |
 | `--list-extensions`              | `-l`  | boolean | -         | List all available extensions and exit                                                                                                                                 |
-| `--resume`                       | `-r`  | string  | -         | Resume a previous session. Use `"latest"` for most recent or index number (e.g. `--resume 5`)                                                                          |
-| `--list-sessions`                | -     | boolean | -         | List available sessions for the current project and exit                                                                                                               |
-| `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
+| `--resume`                       | `-r`  | string  | -         | Resume a previous session globally. Use `"latest"`, an index number from `--list-sessions`, or a full UUID (for example `--resume 5` or `--resume <uuid>`)             |
+| `--list-sessions`                | -     | boolean | -         | List available sessions across all folders and exit                                                                                                                    |
+| `--delete-session`               | -     | string  | -         | Delete a session globally by index number or UUID (use `--list-sessions` to see available sessions)                                                                    |
 | `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
 | `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                            |
 | `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                                   |

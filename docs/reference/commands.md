@@ -320,8 +320,12 @@ Slash commands provide meta-level control over the CLI itself.
   - **Search:** Use `/` to search through conversation content across all
     sessions
   - **Session Browser:** Interactive interface showing all saved sessions with
-    timestamps, message counts, and first user message for context
+    timestamps, message counts, the first user message for context, and the
+    original folder path
   - **Sorting:** Sort sessions by date or message count
+- **Cross-folder behavior:** `/resume` shows sessions across all folders. If you
+  choose a session that was created in a different folder, Gemini CLI shows the
+  original folder and asks whether you want to continue in the current folder.
 - **Note:** All conversations are automatically saved as you chat - no manual
   saving required. See [Session Management](../cli/session-management.md) for
   complete details.

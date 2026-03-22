@@ -26,6 +26,19 @@ gemini -r
 This restores your chat history and memory, so you can say "Continue with the
 next step" immediately.
 
+### Scenario: Resume a session from another folder
+
+If you know the session UUID, you can resume it from any folder:
+
+```bash
+gemini -r a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+If that session was created in a different folder, Gemini CLI shows the original
+folder and asks whether you want to continue in the current one. If you say no,
+the CLI exits so you can `cd` to the original folder and rerun the command
+there.
+
 ### Scenario: Browse past sessions
 
 If you want to find a specific conversation from yesterday, use the interactive
@@ -33,11 +46,13 @@ browser.
 
 **Command:** `/resume`
 
-This opens a searchable list of all your past sessions. You'll see:
+This opens a searchable list of all your past sessions across all folders.
+You'll see:
 
 - A timestamp (e.g., "2 hours ago").
 - The first user message (helping you identify the topic).
 - The number of turns in the conversation.
+- The original folder for each session.
 
 Select a session and press **Enter** to load it.
 

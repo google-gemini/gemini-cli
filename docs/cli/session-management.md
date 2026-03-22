@@ -15,11 +15,12 @@ session.
   - All tool executions (inputs and outputs).
   - Token usage statistics (input, output, cached, etc.).
   - Assistant thoughts and reasoning summaries (when available).
-- **Location:** Sessions are stored in `~/.gemini/tmp/<project_hash>/chats/`,
-  where `<project_hash>` is a unique identifier based on your project's root
+- **Location:** Sessions are stored under `~/.gemini/tmp/<project_hash>/chats/`,
+  where `<project_hash>` is a unique identifier based on a project's root
   directory.
-- **Scope:** Sessions are project-specific. Switching directories to a different
-  project switches to that project's session history.
+- **Scope:** Session storage remains organized per project, but session
+  discovery is global. You can list, resume, and delete auto-saved sessions from
+  any folder by index or UUID.
 
 ## Resuming sessions
 
@@ -38,19 +39,27 @@ sessions.
   gemini --resume
   ```
 
-  This immediately loads the most recent session.
+  This immediately loads the most recent session across all folders.
 
 - **Resume by index:** List available sessions first (see
-  [Listing sessions](#listing-sessions)), then use the index number:
+  [Listing sessions](#listing-sessions)), then use the index number from the
+  global session list:
 
   ```bash
   gemini --resume 1
   ```
 
-- **Resume by ID:** You can also provide the full session UUID:
+- **Resume by ID:** You can also provide the full session UUID from any folder:
   ```bash
   gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890
   ```
+
+If the current folder is different from the session's original folder:
+
+- **Interactive mode:** Gemini CLI shows the original folder, your current
+  folder, and asks whether you want to resume the session in the current folder.
+- **Non-interactive mode:** Gemini CLI exits with guidance telling you to `cd`
+  to the original folder and rerun the resume command there.
 
 ### From the interactive interface
 
@@ -64,12 +73,13 @@ Browser**:
 The Session Browser provides an interactive interface where you can perform the
 following actions:
 
-- **Browse:** Scroll through a list of your past sessions.
+- **Browse:** Scroll through a list of your past sessions across all folders.
 - **Preview:** See details like the session date, message count, and the first
-  user prompt.
+  user prompt, plus the original folder path.
 - **Search:** Press `/` to enter search mode, then type to filter sessions by ID
   or content.
-- **Select:** Press **Enter** to resume the selected session.
+- **Select:** Press **Enter** to resume the selected session. If the session was
+  created in a different folder, Gemini CLI confirms before continuing there.
 - **Esc:** Press **Esc** to exit the Session Browser.
 
 ## Managing sessions
@@ -79,8 +89,8 @@ space.
 
 ### Listing sessions
 
-To see a list of all available sessions for the current project from the command
-line, use the `--list-sessions` flag:
+To see a list of all available sessions from the command line, use the
+`--list-sessions` flag:
 
 ```bash
 gemini --list-sessions
@@ -89,11 +99,11 @@ gemini --list-sessions
 Output example:
 
 ```text
-Available sessions for this project (3):
+Available sessions (3):
 
-  1. Fix bug in auth (2 days ago) [a1b2c3d4]
-  2. Refactor database schema (5 hours ago) [e5f67890]
-  3. Update documentation (Just now) [abcd1234]
+  1. Fix bug in auth (2 days ago) [a1b2c3d4-e5f6-7890-abcd-ef1234567890] @ /Users/alex/project-a
+  2. Refactor database schema (5 hours ago) [e5f67890-1234-5678-9abc-def012345678] @ /Users/alex/project-b
+  3. Update documentation (Just now) [abcd1234-5678-90ef-abcd-1234567890ef] @ /Users/alex/project-c
 ```
 
 ### Deleting sessions
@@ -101,7 +111,8 @@ Available sessions for this project (3):
 You can remove old or unwanted sessions to free up space or declutter your
 history.
 
-**From the command line:** Use the `--delete-session` flag with an index or ID:
+**From the command line:** Use the `--delete-session` flag with an index or UUID
+from the global list:
 
 ```bash
 gemini --delete-session 2
