@@ -3317,8 +3317,12 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
 
-    const definitions = this.agentRegistry.getAllDefinitions();
-    for (const definition of definitions) {
+    const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
+    for (const agentName of discoveredNames) {
+      const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
+      if (!definition) {
+        continue;
+      }
       try {
         if (
           !this.isAgentsEnabled() ||
