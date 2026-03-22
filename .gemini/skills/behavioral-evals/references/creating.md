@@ -62,6 +62,25 @@ assert: async (rig, result) => {
 };
 ```
 
+### 4. Mock MCP Facades
+
+To evaluate tools connected via MCP without hitting live endpoints, load a mock server configuration in the `setup` hook.
+
+```typescript
+setup: async (rig) => {
+  rig.addMockMcpServer('workspace-server', 'google-workspace');
+},
+assert: async (rig) => {
+  await rig.waitForTelemetryReady();
+  const toolLogs = rig.readToolLogs();
+  const workspaceCall = toolLogs.find(
+    (log) => log.toolRequest.name === 'mcp_workspace-server_docs.getText'
+  );
+  expect(workspaceCall).toBeDefined();
+};
+```
+
+
 ---
 
 ## ⚠️ Safety & Efficiency Guardrails

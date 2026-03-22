@@ -5,6 +5,10 @@ describe('core_feature', () => {
   // New tests MUST start as USUALLY_PASSES
   evalTest('USUALLY_PASSES', {
     name: 'should perform expected agent action',
+    setup: async (rig) => {
+      // For mocking offline MCP:
+      // rig.addMockMcpServer('workspace-server', 'google-workspace');
+    },
     files: {
       'src/app.ts': '// some code',
     },

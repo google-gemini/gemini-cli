@@ -37,6 +37,7 @@ Seed the workspace with necessary files using the `files` object in your eval ca
 Use assertions that audit agent decisions:
 *   **Breakpoints**: Pause *before* tools using `rig.setBreakpoint(['tool_name'])`.
 *   **Tool Tracing**: Audit history via `rig.readToolLogs()`.
+*   **Mock MCP Facades**: Simulate offline cloud endpoints safely using `rig.addMockMcpServer()`.
 
 > Detailed patterns in [creating.md](references/creating.md)
 
