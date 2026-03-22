@@ -99,6 +99,11 @@ export {
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
+  LSP_QUERY_TOOL_NAME,
+  LSP_QUERY_PARAM_OPERATION,
+  LSP_QUERY_PARAM_LINE,
+  LSP_QUERY_PARAM_CHARACTER,
+  LSP_QUERY_PARAM_QUERY,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -234,6 +239,13 @@ export const UPDATE_TOPIC_DEFINITION: ToolDefinition = {
     return getUpdateTopicDeclaration();
   },
   overrides: (modelId) => getToolSet(modelId).update_topic,
+};
+
+export const LSP_QUERY_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_query;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_query,
 };
 
 // ============================================================================

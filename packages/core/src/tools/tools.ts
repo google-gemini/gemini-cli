@@ -954,6 +954,11 @@ export interface FileDiff {
   newContent: string;
   diffStat?: DiffStat;
   isNewFile?: boolean;
+  /** LSP diagnostic summary for display in the tool output footer. */
+  lspDiagnosticSummary?: {
+    text: string;
+    severity: 'error' | 'warning' | 'clean' | 'timeout';
+  };
 }
 
 export const isFileDiff = (res: unknown): res is FileDiff =>

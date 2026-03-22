@@ -68,3 +68,8 @@ priority = 50
 toolName = "complete_task"
 decision = "allow"
 priority = 50
+
+[[rule]]
+toolName = "lsp_query"
+decision = "allow"
+priority = 50

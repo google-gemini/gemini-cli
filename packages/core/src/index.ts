@@ -274,6 +274,9 @@ export * from './services/worktreeService.js';
 // Export voice utilities
 export * from './voice/responseFormatter.js';
 
+// Export LSP integration
+export { LspManager, type LspServerStatus } from './lsp/index.js';
+
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
 

@@ -38,6 +38,7 @@ import { shortcutsCommand } from '../ui/commands/shortcutsCommand.js';
 import { rewindCommand } from '../ui/commands/rewindCommand.js';
 import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
+import { lspCommand } from '../ui/commands/lspCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
@@ -161,6 +162,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       rewindCommand,
       await ideCommand(),
       initCommand,
+      lspCommand,
       ...(isNightlyBuild ? [oncallCommand] : []),
       ...(this.config?.getMcpEnabled() === false
         ? [
