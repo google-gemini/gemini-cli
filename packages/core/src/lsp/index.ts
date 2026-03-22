@@ -5,6 +5,7 @@
  */
 
 export { LspManager, type LspServerStatus } from './manager.js';
+export { LspTimeoutError } from './client.js';
 export { LspServerRegistry } from './server-registry.js';
 export {
   collectDiagnosticsForOutput,
