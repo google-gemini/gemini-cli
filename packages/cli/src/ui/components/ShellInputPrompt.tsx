@@ -57,7 +57,7 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         ShellExecutionService.scrollPty(activeShellPtyId, 1);
         return true;
       }
-      // TODO: Check pty service actually scrolls (request)[https://github.com/google-gemini/gemini-cli/pull/17438/changes/c9fdaf8967da0036bfef43592fcab5a69537df35#r2776479023].
+      // TODO: Check pty service actually scrolls [request](https://github.com/google-gemini/gemini-cli/pull/17438/changes/c9fdaf8967da0036bfef43592fcab5a69537df35#r2776479023).
       if (keyMatchers[Command.PAGE_UP](key)) {
         ShellExecutionService.scrollPty(activeShellPtyId, -scrollPageSize);
         return true;
