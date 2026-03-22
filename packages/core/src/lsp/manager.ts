@@ -476,6 +476,10 @@ export class LspManager {
     );
     const projectRoot =
       workspaceDir ?? (await this.findProjectRoot(filePath, serverDef));
+    // Key format: "serverId:projectRoot". The first colon is the separator;
+    // server IDs never contain colons. On Windows the projectRoot will
+    // contain a drive colon (e.g. "C:\...") which is fine — restart()
+    // parses using indexOf(':') to find only the first one.
     const key = `${serverDef.id}:${projectRoot}`;
 
     const state = this.getOrCreateState(key);

@@ -1524,7 +1524,7 @@ const SETTINGS_SCHEMA = {
             >,
             description: oneLine`
               Custom language server configurations. Keys are server IDs.
-              Override built-in servers (typescript, pyright) or add new ones.
+              Override built-in servers (typescript, pyright, gopls, rust-analyzer) or add new ones.
             `,
             showInDialog: false,
             mergeStrategy: MergeStrategy.SHALLOW_MERGE,

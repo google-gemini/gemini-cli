@@ -50,6 +50,7 @@ const BUILTIN_SERVERS: LspServerDefinition[] = [
     id: 'gopls',
     languageIds: ['go'],
     command: 'gopls',
+    // gopls defaults to stdio mode — no --stdio flag needed.
     args: [],
     useShell: process.platform === 'win32',
     rootMarkers: ['go.work', 'go.mod'],

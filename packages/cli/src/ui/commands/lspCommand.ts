@@ -171,6 +171,15 @@ const addSubCommand: SlashCommand = {
     }
 
     const id = tokens[0];
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Server ID must contain only letters, numbers, hyphens, and underscores.',
+      };
+    }
+
     let languages: string[] | undefined;
     const commandTokens: string[] = [];
 
@@ -206,10 +215,11 @@ const addSubCommand: SlashCommand = {
       serverConfig['languages'] = languages;
     }
 
-    // Write to settings.
+    // Write to user settings only — don't leak workspace servers into user scope.
     try {
       const settings = loadSettings(process.cwd());
-      const existingServers = settings.merged.tools?.lsp?.servers ?? {};
+      const userSettings = settings.forScope(SettingScope.User).settings;
+      const existingServers = userSettings.tools?.lsp?.servers ?? {};
       const servers = { ...existingServers, [id]: serverConfig };
       settings.setValue(SettingScope.User, 'tools.lsp.servers', servers);
     } catch (e) {
@@ -250,13 +260,27 @@ const removeSubCommand: SlashCommand = {
 
     try {
       const settings = loadSettings(process.cwd());
-      const existingServers = settings.merged.tools?.lsp?.servers ?? {};
+      const userSettings = settings.forScope(SettingScope.User).settings;
+      const existingServers = userSettings.tools?.lsp?.servers ?? {};
 
       if (!existingServers[id]) {
+        // Check if it's a built-in server the user is trying to remove.
+        const BUILTIN_IDS = ['typescript', 'pyright', 'gopls', 'rust-analyzer'];
+        if (BUILTIN_IDS.includes(id)) {
+          return {
+            type: 'message',
+            messageType: 'info',
+            content:
+              `**${id}** is a built-in server. To disable it, add to your settings:\n` +
+              '```json\n' +
+              `{ "tools": { "lsp": { "servers": { "${id}": { "enabled": false } } } } }\n` +
+              '```',
+          };
+        }
         return {
           type: 'message',
           messageType: 'error',
-          content: `Server **${id}** not found in settings. Run \`/lsp status\` to see configured servers.`,
+          content: `Server **${id}** not found in user settings. Run \`/lsp status\` to see configured servers.`,
         };
       }
 
