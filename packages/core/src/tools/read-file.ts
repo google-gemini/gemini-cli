@@ -185,6 +185,21 @@ ${result.llmContent}`;
       }
     }
 
+    // Enrich with LSP data (symbol summary + pre-existing diagnostics).
+    // Only applies to string content (not images/PDFs).
+    if (
+      typeof llmContent === 'string' &&
+      typeof result.llmContent === 'string'
+    ) {
+      const { enrichReadWithLsp } = await import('../lsp/enrichment.js');
+      llmContent = await enrichReadWithLsp(
+        this.config,
+        this.resolvedPath,
+        result.llmContent,
+        llmContent,
+      );
+    }
+
     return {
       llmContent,
       returnDisplay: result.returnDisplay || '',

@@ -7,5 +7,10 @@
   },
   "general": {
     "devtools": true
+  },
+  "tools": {
+    "lsp": {
+      "enabled": true
+    }
   }
 }
