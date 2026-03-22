@@ -248,6 +248,11 @@ export const useGeminiStream = (
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+  const [
+    pendingSystemMessages,
+    pendingSystemMessagesRef,
+    setPendingSystemMessages,
+  ] = useStateAndRef<HistoryItemWithoutId[]>([]);
 
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
@@ -1296,6 +1301,19 @@ export const useGeminiStream = (
     ],
   );
 
+  const handleSystemMessageEvent = useCallback(
+    (systemMessage: string, _userMessageTimestamp: number) => {
+      setPendingSystemMessages([
+        ...pendingSystemMessagesRef.current,
+        {
+          type: MessageType.INFO,
+          text: systemMessage,
+        } as HistoryItemWithoutId,
+      ]);
+    },
+    [setPendingSystemMessages, pendingSystemMessagesRef],
+  );
+
   const processGeminiStreamEvents = useCallback(
     async (
       stream: AsyncIterable<GeminiEvent>,
@@ -1333,6 +1351,9 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
+            break;
+          case ServerGeminiEventType.SystemMessage:
+            handleSystemMessageEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.AgentExecutionStopped:
             handleAgentExecutionStoppedEvent(
@@ -1413,6 +1434,7 @@ export const useGeminiStream = (
       handleContextWindowWillOverflowEvent,
       handleCitationEvent,
       handleChatModelEvent,
+      handleSystemMessageEvent,
       handleAgentExecutionStoppedEvent,
       handleAgentExecutionBlockedEvent,
       addItem,
@@ -1527,6 +1549,12 @@ export const useGeminiStream = (
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
                 setPendingHistoryItem(null);
               }
+              if (pendingSystemMessagesRef.current.length > 0) {
+                pendingSystemMessagesRef.current.forEach((item) => {
+                  addItem(item, userMessageTimestamp);
+                });
+                setPendingSystemMessages([]);
+              }
               if (loopDetectedRef.current) {
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
@@ -1616,6 +1644,8 @@ export const useGeminiStream = (
       maybeAddLowVerbosityFailureNote,
       settings.merged.billing?.overageStrategy,
       setIsResponding,
+      pendingSystemMessagesRef,
+      setPendingSystemMessages,
     ],
   );
 
@@ -1878,10 +1908,12 @@ export const useGeminiStream = (
 
   const pendingHistoryItems = useMemo(
     () =>
-      [pendingHistoryItem, ...pendingToolGroupItems].filter(
-        (i): i is HistoryItemWithoutId => i !== undefined && i !== null,
-      ),
-    [pendingHistoryItem, pendingToolGroupItems],
+      [
+        pendingHistoryItem,
+        ...pendingSystemMessages,
+        ...pendingToolGroupItems,
+      ].filter((i): i is HistoryItemWithoutId => i !== undefined && i !== null),
+    [pendingHistoryItem, pendingSystemMessages, pendingToolGroupItems],
   );
 
   useEffect(() => {
