@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text, useStdout } from 'ink';
+import { Box, Text, useStdout, useIsScreenReaderEnabled } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
@@ -168,6 +168,7 @@ const ModelUsageTable: React.FC<{
 }) => {
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 84;
+  const screenReaderEnabled = useIsScreenReaderEnabled();
   const rows = buildModelRows(
     models,
     config,
@@ -211,6 +212,10 @@ const ModelUsageTable: React.FC<{
     // If < 100% (fraction < 1) but rounds to 20, show 19 ticks.
     if (usedFraction > 0 && usedFraction < 1) {
       filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
+    }
+
+    if (screenReaderEnabled) {
+      return null;
     }
 
     const emptySteps = Math.max(0, totalSteps - filledSteps);
