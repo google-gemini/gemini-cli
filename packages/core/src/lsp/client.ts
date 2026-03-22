@@ -57,6 +57,7 @@ export class LspClient extends EventEmitter<LspClientEvents> {
   constructor(
     private readonly serverDef: LspServerDefinition,
     private readonly rootUri: string,
+    private readonly workspaceFolderUris: string[] = [],
     private readonly requestTimeout: number = 10_000,
   ) {
     super();
@@ -123,9 +124,13 @@ export class LspClient extends EventEmitter<LspClientEvents> {
           workDoneProgress: true,
         },
       },
-      workspaceFolders: [
-        { uri: this.rootUri, name: this.rootUri.split('/').pop() || '' },
-      ],
+      workspaceFolders:
+        this.workspaceFolderUris.length > 0
+          ? this.workspaceFolderUris.map((uri) => ({
+              uri,
+              name: uri.split('/').pop() || '',
+            }))
+          : [{ uri: this.rootUri, name: this.rootUri.split('/').pop() || '' }],
       initializationOptions: this.serverDef.initializationOptions,
     };
 

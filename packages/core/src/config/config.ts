@@ -2130,9 +2130,18 @@ export class Config implements McpContext, AgentLoopContext {
     if (!this.lspEnabled) return undefined;
     if (!this.lspManager) {
       const { LspManager } = await import('../lsp/manager.js');
-      this.lspManager = new LspManager({
-        enabled: this.lspEnabled,
-        diagnosticTimeout: this.lspDiagnosticTimeout,
+      const workspaceDirs = [...this.getWorkspaceContext().getDirectories()];
+      this.lspManager = new LspManager(
+        {
+          enabled: this.lspEnabled,
+          diagnosticTimeout: this.lspDiagnosticTimeout,
+        },
+        workspaceDirs,
+      );
+      // Re-sync workspace folders when directories change.
+      this.getWorkspaceContext().onDirectoriesChanged(() => {
+        const dirs = [...this.getWorkspaceContext().getDirectories()];
+        void this.lspManager?.updateWorkspaceFolders(dirs);
       });
     }
     return this.lspManager;

@@ -75,6 +75,7 @@ export class LspManager {
   private readonly servers = new Map<ServerKey, ServerState>();
   private readonly registry: LspServerRegistry;
   private readonly settings: LspSettings;
+  private workspaceDirs: string[];
 
   /** Track how many server processes are alive for maxServers enforcement. */
   private activeServerCount = 0;
@@ -82,9 +83,21 @@ export class LspManager {
   private static readonly MIN_TIMEOUT = 1000;
   private static readonly COLD_START_MULTIPLIER = 3;
 
-  constructor(settings?: Partial<LspSettings>) {
+  constructor(settings?: Partial<LspSettings>, workspaceDirs?: string[]) {
     this.settings = { ...DEFAULT_LSP_SETTINGS, ...settings };
     this.registry = new LspServerRegistry(this.settings.servers);
+    this.workspaceDirs = workspaceDirs ?? [];
+  }
+
+  /**
+   * Update workspace folders. Called when gemini-cli's workspace context
+   * changes (e.g., user adds a directory via /directory). Restarts all
+   * running servers so they see the new workspace layout.
+   */
+  async updateWorkspaceFolders(dirs: string[]): Promise<void> {
+    this.workspaceDirs = dirs;
+    // Restart all servers so they reinitialize with updated folders.
+    await this.shutdown();
   }
 
   // -----------------------------------------------------------------------
@@ -413,7 +426,14 @@ export class LspManager {
     const serverDef = this.registry.getServerForFile(filePath);
     if (!serverDef) return null;
 
-    const projectRoot = await this.findProjectRoot(filePath, serverDef);
+    // Use the gemini-cli workspace directory that contains this file,
+    // falling back to marker-based root detection.
+    const resolvedPath = path.resolve(filePath);
+    const workspaceDir = this.workspaceDirs.find((dir) =>
+      resolvedPath.startsWith(path.resolve(dir)),
+    );
+    const projectRoot =
+      workspaceDir ?? (await this.findProjectRoot(filePath, serverDef));
     const key = `${serverDef.id}:${projectRoot}`;
 
     const state = this.getOrCreateState(key);
@@ -474,7 +494,10 @@ export class LspManager {
     }
 
     const rootUri = pathToFileURL(projectRoot).href;
-    const client = new LspClient(serverDef, rootUri);
+    const workspaceFolderUris = this.workspaceDirs.map(
+      (dir) => pathToFileURL(path.resolve(dir)).href,
+    );
+    const client = new LspClient(serverDef, rootUri, workspaceFolderUris);
 
     client.on('exit', () => {
       state.client = null;
