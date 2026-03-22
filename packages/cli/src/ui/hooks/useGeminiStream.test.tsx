@@ -2488,7 +2488,7 @@ describe('useGeminiStream', () => {
           remainingTokens: 70,
           shouldShow: true,
           expectedMessage:
-            'Context 30% full. Message may exceed limit. Reduce size or /compress.',
+            'Context 30% full. Message may exceed window. Reduce size or /compress.',
         },
       ])(
         'should $name',

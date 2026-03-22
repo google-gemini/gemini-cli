@@ -1234,7 +1234,7 @@ export const useGeminiStream = (
         ((limit - remainingTokenCount) / limit) * 100,
       );
 
-      const text = `Context ${usedPercentage}% full. Message may exceed limit. Reduce size or /compress.`;
+      const text = `Context ${usedPercentage}% full. Message may exceed window. Reduce size or /compress.`;
 
       addItem({
         type: 'info',
