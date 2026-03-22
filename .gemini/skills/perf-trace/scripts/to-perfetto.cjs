@@ -234,7 +234,9 @@ function main() {
   console.log(`  Generated ${events.length} trace events`);
   console.log(`\nTo explore visually:`);
   console.log(`  1. Open https://ui.perfetto.dev`);
-  console.log(`  2. Click "Open trace file" or drag-and-drop the .perfetto-trace file`);
+  console.log(
+    `  2. Click "Open trace file" or drag-and-drop the .perfetto-trace file`,
+  );
   console.log(`  3. Navigate the flame chart to identify hot paths`);
 }
 

@@ -297,10 +297,7 @@ async function main() {
   if (snapshots.length >= 2) {
     const growth =
       snapshots[snapshots.length - 1].sizeBytes - snapshots[0].sizeBytes;
-    const growthPercent = (
-      (growth / snapshots[0].sizeBytes) *
-      100
-    ).toFixed(1);
+    const growthPercent = ((growth / snapshots[0].sizeBytes) * 100).toFixed(1);
     console.log(
       `\n  Heap growth: ${formatBytes(Math.abs(growth))} (${growth >= 0 ? '+' : ''}${growthPercent}%)`,
     );

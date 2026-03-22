@@ -182,7 +182,9 @@ function main() {
   console.log(
     `  ${'Constructor'.padEnd(40)} ${'Baseline'.padStart(10)} ${'Target'.padStart(10)} ${'Growth'.padStart(10)}`,
   );
-  console.log(`  ${'─'.repeat(40)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`);
+  console.log(
+    `  ${'─'.repeat(40)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`,
+  );
   for (const d of byCount.slice(0, args.top)) {
     console.log(
       `  ${d.name.slice(0, 40).padEnd(40)} ${String(d.baseCount).padStart(10)} ${String(d.targetCount).padStart(10)} ${('+' + d.countDiff).padStart(10)}`,
@@ -196,7 +198,9 @@ function main() {
   console.log(
     `  ${'Constructor'.padEnd(40)} ${'Baseline'.padStart(10)} ${'Target'.padStart(10)} ${'Growth'.padStart(10)}`,
   );
-  console.log(`  ${'─'.repeat(40)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`);
+  console.log(
+    `  ${'─'.repeat(40)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`,
+  );
   for (const d of bySize.slice(0, args.top)) {
     console.log(
       `  ${d.name.slice(0, 40).padEnd(40)} ${formatBytes(d.baseSize).padStart(10)} ${formatBytes(d.targetSize).padStart(10)} ${('+' + formatBytes(d.sizeDiff)).padStart(10)}`,

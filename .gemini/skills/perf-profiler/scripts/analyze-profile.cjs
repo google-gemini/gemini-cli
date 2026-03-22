@@ -130,7 +130,9 @@ function main() {
   console.log(`  Total nodes:    ${nodes.length}`);
   console.log(`  Total samples:  ${samples.length}`);
   console.log(`  Total time:     ${formatMicroseconds(totalTime)}`);
-  console.log(`  Sample rate:    ${samples.length > 0 ? formatMicroseconds(totalTime / samples.length) : 'N/A'}/sample`);
+  console.log(
+    `  Sample rate:    ${samples.length > 0 ? formatMicroseconds(totalTime / samples.length) : 'N/A'}/sample`,
+  );
 
   // Top by self-time
   const bySelfTime = [...funcStats.values()].sort(
@@ -142,10 +144,13 @@ function main() {
   console.log(
     `  ${'Function'.padEnd(40)} ${'Self-Time'.padStart(12)} ${'%'.padStart(6)} ${'Hits'.padStart(8)}`,
   );
-  console.log(`  ${'─'.repeat(40)} ${'─'.repeat(12)} ${'─'.repeat(6)} ${'─'.repeat(8)}`);
+  console.log(
+    `  ${'─'.repeat(40)} ${'─'.repeat(12)} ${'─'.repeat(6)} ${'─'.repeat(8)}`,
+  );
 
   for (const fn of bySelfTime.slice(0, args.top)) {
-    const pct = totalTime > 0 ? ((fn.selfTime / totalTime) * 100).toFixed(1) : '0.0';
+    const pct =
+      totalTime > 0 ? ((fn.selfTime / totalTime) * 100).toFixed(1) : '0.0';
     const location = fn.url !== '(native)' ? `${fn.url}:${fn.lineNumber}` : '';
     console.log(
       `  ${fn.functionName.slice(0, 40).padEnd(40)} ${formatMicroseconds(fn.selfTime).padStart(12)} ${(pct + '%').padStart(6)} ${String(fn.hitCount).padStart(8)}`,
@@ -194,7 +199,9 @@ function main() {
     }
   } else {
     console.log(`  No common optimization patterns detected.`);
-    console.log(`  Review the top functions above and their call sites for optimization opportunities.`);
+    console.log(
+      `  Review the top functions above and their call sites for optimization opportunities.`,
+    );
   }
 
   console.log(
