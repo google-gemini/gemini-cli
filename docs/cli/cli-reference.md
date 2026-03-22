@@ -12,6 +12,7 @@ and parameters.
 | `gemini "query"`                   | Query and continue interactively   | `gemini "explain this project"`                              |
 | `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`<br>`Get-Content logs.txt \| gemini` |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`           |
+| `gemini -w <path>`                 | Override working directory         | `gemini -w /path/to/project`                                 |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                         |
 | `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`                 |
 | `gemini -r "<session-id>" "query"` | Resume session by ID               | `gemini -r "abc123" "Finish this PR"`                        |
@@ -47,6 +48,7 @@ These commands are available within the interactive REPL.
 | `--debug`                        | `-d`  | boolean | `false`   | Run in debug mode with verbose logging                                                                                                                                 |
 | `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                                                                                       |
 | `--help`                         | `-h`  | -       | -         | Show help information                                                                                                                                                  |
+| `--workspace`                    | `-w`  | string  | -         | Override the current working directory. This enables the CLI to operate on a target project directory regardless of where the command is executed from.                |
 | `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                            |
 | `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. Forces non-interactive mode.                                                                                         |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |

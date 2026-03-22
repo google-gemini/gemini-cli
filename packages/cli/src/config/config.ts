@@ -102,6 +102,7 @@ export interface CliArgs {
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
   startupMessages?: string[];
+  workspace: string | undefined;
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
@@ -168,6 +169,12 @@ export async function parseArguments(
       type: 'boolean',
       description: 'Run in debug mode (open debug console with F12)',
       default: false,
+    })
+    .option('workspace', {
+      alias: 'w',
+      type: 'string',
+      nargs: 1,
+      description: 'The workspace directory to operate in',
     })
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
@@ -452,6 +459,9 @@ export async function parseArguments(
 
   // Keep CliArgs.query as a string for downstream typing
   (result as Record<string, unknown>)['query'] = q || undefined;
+  if (result['workspace']) {
+    startupMessages.push(`Workspace overridden to: ${result['workspace']}`);
+  }
   (result as Record<string, unknown>)['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat

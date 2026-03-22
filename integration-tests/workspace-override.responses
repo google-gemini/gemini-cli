@@ -1,0 +1,1 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Hello from override!"}]},"finishReason":"STOP","index":0}]}]}
