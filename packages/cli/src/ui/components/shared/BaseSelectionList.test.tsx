@@ -75,8 +75,9 @@ describe('BaseSelectionList', () => {
       ...props,
     };
 
-    const result = renderWithProviders(<BaseSelectionList {...defaultProps} />);
-    await result.waitUntilReady();
+    const result = await renderWithProviders(
+      <BaseSelectionList {...defaultProps} />,
+    );
     return result;
   };
 
@@ -310,8 +311,7 @@ describe('BaseSelectionList', () => {
       );
 
       const { rerender, lastFrame, waitUntilReady, unmount } =
-        renderWithProviders(<BaseSelectionList {...componentProps} />);
-      await waitUntilReady();
+        await renderWithProviders(<BaseSelectionList {...componentProps} />);
 
       // Function to simulate the activeIndex changing over time
       const updateActiveIndex = async (newIndex: number) => {

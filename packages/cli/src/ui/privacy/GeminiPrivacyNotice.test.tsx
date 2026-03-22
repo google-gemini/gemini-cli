@@ -25,10 +25,9 @@ describe('GeminiPrivacyNotice', () => {
   });
 
   it('renders correctly', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <GeminiPrivacyNotice onExit={onExit} />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Gemini API Key Notice');
     expect(lastFrame()).toContain('By using the Gemini API');
@@ -37,10 +36,9 @@ describe('GeminiPrivacyNotice', () => {
   });
 
   it('exits on Escape', async () => {
-    const { waitUntilReady, unmount } = render(
+    const { waitUntilReady, unmount } = await render(
       <GeminiPrivacyNotice onExit={onExit} />,
     );
-    await waitUntilReady();
 
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
     await act(async () => {
