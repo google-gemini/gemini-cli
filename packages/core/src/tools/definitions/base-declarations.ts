@@ -133,3 +133,10 @@ export const UPDATE_TOPIC_DISPLAY_NAME = 'Update Topic Context';
 export const TOPIC_PARAM_TITLE = 'title';
 export const TOPIC_PARAM_SUMMARY = 'summary';
 export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';
+
+// -- lsp_query --
+export const LSP_QUERY_TOOL_NAME = 'lsp_query';
+export const LSP_QUERY_PARAM_OPERATION = 'operation';
+export const LSP_QUERY_PARAM_LINE = 'line';
+export const LSP_QUERY_PARAM_CHARACTER = 'character';
+export const LSP_QUERY_PARAM_QUERY = 'query';

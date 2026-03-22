@@ -62,3 +62,8 @@ priority = 50
 toolName = "update_topic"
 decision = "allow"
 priority = 50
+
+[[rule]]
+toolName = "lsp_query"
+decision = "allow"
+priority = 50
