@@ -717,8 +717,17 @@ The agent did not use the todo list because this task could be completed by a ti
 
   lsp_query: {
     name: LSP_QUERY_TOOL_NAME,
-    description:
-      'Query Language Server for semantic code intelligence (diagnostics, hover, definition, references, document_symbols, workspace_symbols). Use instead of grep when you need compiler-accurate results.',
+    description: `Query Language Server for semantic code intelligence. Use this instead of grep-based searching when you need compiler-accurate results.
+
+Operations:
+- "diagnostics": Get compiler errors/warnings for a file. Use instead of running build commands to check for type errors.
+- "hover": Get the resolved type and documentation for a symbol at a position. Use to understand types without reading source files.
+- "definition": Find where a symbol is defined. Use instead of grepping for function/class declarations.
+- "references": Find ALL usages of a symbol across the workspace. Use for refactoring — unlike grep, this won't match comments or strings.
+- "document_symbols": Get the symbol tree (functions, classes, types) for a file. Use to understand file structure without reading full content.
+- "workspace_symbols": Search for symbols by name across the workspace. Use to find classes/functions when you know the name but not the file.
+
+Only available for file types with a configured language server (e.g. TypeScript, Python). Returns empty results for unsupported file types.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -741,12 +750,12 @@ The agent did not use the todo list because this task could be completed by a ti
         [LSP_QUERY_PARAM_LINE]: {
           type: 'integer',
           description:
-            'Zero-based line number. Required for hover, definition, references.',
+            '1-based line number. Required for hover, definition, references.',
         },
         [LSP_QUERY_PARAM_CHARACTER]: {
           type: 'integer',
           description:
-            'Zero-based character offset. Required for hover, definition, references.',
+            '1-based character offset for hover, definition, references. If omitted, defaults to first non-whitespace character on the line.',
         },
         [LSP_QUERY_PARAM_QUERY]: {
           type: 'string',

@@ -776,12 +776,12 @@ Only available for file types with a configured language server (e.g. TypeScript
         [LSP_QUERY_PARAM_LINE]: {
           type: 'integer',
           description:
-            'Zero-based line number. Required for hover, definition, and references.',
+            '1-based line number. Required for hover, definition, and references.',
         },
         [LSP_QUERY_PARAM_CHARACTER]: {
           type: 'integer',
           description:
-            'Zero-based character offset. Required for hover, definition, and references.',
+            '1-based character offset for hover, definition, and references. If omitted, defaults to the first non-whitespace character on the line.',
         },
         [LSP_QUERY_PARAM_QUERY]: {
           type: 'string',

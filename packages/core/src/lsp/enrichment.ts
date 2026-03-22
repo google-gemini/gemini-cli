@@ -142,7 +142,7 @@ export async function enrichToolResultWithLsp(
   displayResult: FileDiff,
   signal?: AbortSignal,
 ): Promise<string> {
-  if (!config.isLspEnabled()) return llmContent;
+  if (!config.isLspEnabled?.()) return llmContent;
 
   try {
     const lspMgr = await config.getLspManager();
@@ -324,7 +324,7 @@ export async function enrichReadWithLsp(
   fileContent: string,
   llmContent: string,
 ): Promise<string> {
-  if (!config.isLspEnabled()) return llmContent;
+  if (!config.isLspEnabled?.()) return llmContent;
 
   try {
     const lspMgr = await config.getLspManager();

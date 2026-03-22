@@ -58,11 +58,38 @@ class LspQueryInvocation extends BaseToolInvocation<
     this.resolvedPath = path.resolve(config.getTargetDir(), params.file_path);
   }
 
+  /**
+   * Convert 1-based line/character from the model to 0-based for LSP.
+   * If character is omitted, defaults to the first non-whitespace
+   * character on that line (reads from disk).
+   */
+  private async getPosition(): Promise<{ line: number; character: number }> {
+    const line = Math.max(0, (this.params.line ?? 1) - 1);
+    if (this.params.character !== undefined) {
+      return { line, character: Math.max(0, this.params.character - 1) };
+    }
+    // Default to first non-whitespace character on the line.
+    try {
+      const content = await fs.readFile(this.resolvedPath, 'utf-8');
+      const lines = content.split('\n');
+      if (line < lines.length) {
+        const lineText = lines[line];
+        const match = lineText.match(/\S/);
+        if (match?.index !== undefined) {
+          return { line, character: match.index };
+        }
+      }
+    } catch {
+      // Fall through to default.
+    }
+    return { line, character: 0 };
+  }
+
   getDescription(): string {
     const op = this.params.operation;
     const file = path.basename(this.resolvedPath);
     if (op === 'hover' || op === 'definition' || op === 'references') {
-      return `lsp_query ${op} at ${file}:${this.params.line}:${this.params.character}`;
+      return `lsp_query ${op} at ${file}:${this.params.line}:${this.params.character ?? '?'}`;
     }
     if (op === 'workspace_symbols') {
       return `lsp_query workspace_symbols "${this.params.query}"`;
@@ -161,10 +188,11 @@ class LspQueryInvocation extends BaseToolInvocation<
 
   private async runHover(signal: AbortSignal): Promise<ToolResult> {
     const lspMgr = (await this.config.getLspManager())!;
+    const pos = await this.getPosition();
     const hover = await lspMgr.getHover(
       this.resolvedPath,
-      this.params.line ?? 0,
-      this.params.character ?? 0,
+      pos.line,
+      pos.character,
       signal,
     );
 
@@ -181,10 +209,11 @@ class LspQueryInvocation extends BaseToolInvocation<
 
   private async runDefinition(signal: AbortSignal): Promise<ToolResult> {
     const lspMgr = (await this.config.getLspManager())!;
+    const pos = await this.getPosition();
     const locations = await lspMgr.getDefinition(
       this.resolvedPath,
-      this.params.line ?? 0,
-      this.params.character ?? 0,
+      pos.line,
+      pos.character,
       signal,
     );
 
@@ -204,10 +233,11 @@ class LspQueryInvocation extends BaseToolInvocation<
 
   private async runReferences(signal: AbortSignal): Promise<ToolResult> {
     const lspMgr = (await this.config.getLspManager())!;
+    const pos = await this.getPosition();
     const locations = await lspMgr.getReferences(
       this.resolvedPath,
-      this.params.line ?? 0,
-      this.params.character ?? 0,
+      pos.line,
+      pos.character,
       signal,
     );
 
@@ -353,8 +383,8 @@ export class LspQueryTool extends BaseDeclarativeTool<
     }
 
     if (POSITION_OPERATIONS.has(params.operation)) {
-      if (params.line === undefined || params.character === undefined) {
-        return `Operation "${params.operation}" requires line and character parameters.`;
+      if (params.line === undefined) {
+        return `Operation "${params.operation}" requires a line parameter.`;
       }
     }
 
