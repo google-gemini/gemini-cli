@@ -1,0 +1,16 @@
+description = "High-integrity UX PR submission. Automates rebase, cross-platform snapshots, and full preflight validation."
+prompt = """
+# Mission: Final PR Submission (_ux_finish-pr)
+
+You are initiating the High-Integrity Submission protocol. Your goal is to submit this PR so that it passes CI on the FIRST attempt.
+
+## Step 1: Context Injection
+First, you MUST ensure you have the full project context and standards.
+!{cat .gemini/commands/frontend.toml}
+
+## Step 2: Submission Protocol
+Now, activate the submission engine and follow its instructions to the letter.
+**CRITICAL**: Do NOT skip any validation steps (preflight, snapshots, rebase).
+
+activate_skill(name="_ux_finish-pr")
+"""

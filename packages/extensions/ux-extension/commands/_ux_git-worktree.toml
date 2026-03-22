@@ -1,0 +1,2 @@
+description = "Manage Git Worktrees using the Base Folder Strategy."
+prompt = "Activate the `_ux_git-worktree` skill to manage workspaces or check out a PR."

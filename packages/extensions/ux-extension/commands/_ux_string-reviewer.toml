@@ -1,0 +1,2 @@
+description = "Audit UI text for project terminology and clarity."
+prompt = "Activate the `_ux_string-reviewer` skill to review user-facing strings."

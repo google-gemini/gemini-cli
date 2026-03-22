@@ -9,5 +9,11 @@
     "skills/_ux_designer",
     "skills/_ux_string-reviewer"
   ],
-  "commands": ["commands/_ux_help.toml"]
+  "commands": [
+    "commands/_ux_help.toml",
+    "commands/_ux_finish-pr.toml",
+    "commands/_ux_git-worktree.toml",
+    "commands/_ux_designer.toml",
+    "commands/_ux_string-reviewer.toml"
+  ]
 }

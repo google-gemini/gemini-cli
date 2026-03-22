@@ -1,0 +1,2 @@
+description = "Audit React/Ink components against v1.0 Design Principles."
+prompt = "Activate the `_ux_designer` skill to review UI components for signal, density, and state coherence."
