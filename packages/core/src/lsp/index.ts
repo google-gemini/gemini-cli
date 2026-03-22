@@ -12,6 +12,8 @@ export {
   appendLspDiagnostics,
   buildDiagnosticSummary,
   enrichToolResultWithLsp,
+  formatSymbolSummary,
+  enrichReadWithLsp,
 } from './enrichment.js';
 export type {
   LspSettings,

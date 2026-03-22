@@ -5,13 +5,14 @@
  */
 
 import * as path from 'node:path';
-import type { Diagnostic } from './types.js';
-import { DiagnosticSeverity } from './types.js';
+import type { Diagnostic, DocumentSymbol, SymbolInformation } from './types.js';
+import { DiagnosticSeverity, SymbolKind } from './types.js';
 import type { LspManager } from './manager.js';
 import type { Config } from '../config/config.js';
 import type { FileDiff } from '../tools/tools.js';
 
 const MAX_DIAGNOSTICS = 20;
+const MAX_SYMBOLS = 50;
 
 const SEVERITY_LABELS: Record<number, string> = {
   [DiagnosticSeverity.Error]: 'ERROR',
@@ -214,4 +215,140 @@ export function buildDiagnosticSummary(
     text: `LSP: ${parts.join(', ')}`,
     severity: errors > 0 ? 'error' : 'warning',
   };
+}
+
+// -----------------------------------------------------------------------
+// Symbol formatting
+// -----------------------------------------------------------------------
+
+const SYMBOL_KIND_LABELS: Partial<Record<SymbolKind, string>> = {
+  [SymbolKind.Class]: 'class',
+  [SymbolKind.Interface]: 'interface',
+  [SymbolKind.Function]: 'function',
+  [SymbolKind.Method]: 'method',
+  [SymbolKind.Property]: 'property',
+  [SymbolKind.Field]: 'field',
+  [SymbolKind.Variable]: 'variable',
+  [SymbolKind.Constant]: 'constant',
+  [SymbolKind.Enum]: 'enum',
+  [SymbolKind.EnumMember]: 'member',
+  [SymbolKind.Constructor]: 'constructor',
+  [SymbolKind.Module]: 'module',
+  [SymbolKind.Namespace]: 'namespace',
+  [SymbolKind.TypeParameter]: 'type param',
+  [SymbolKind.Struct]: 'struct',
+};
+
+/**
+ * Check if a symbol array contains hierarchical DocumentSymbol objects
+ * (with children) vs flat SymbolInformation objects.
+ */
+function isDocumentSymbols(
+  symbols: DocumentSymbol[] | SymbolInformation[],
+): symbols is DocumentSymbol[] {
+  return (
+    symbols.length > 0 &&
+    'range' in symbols[0] &&
+    'selectionRange' in symbols[0]
+  );
+}
+
+/**
+ * Format document symbols into a condensed text summary for llmContent.
+ * Shows top-level symbols + one nesting level (e.g., class methods).
+ */
+export function formatSymbolSummary(
+  symbols: DocumentSymbol[] | SymbolInformation[],
+  filePath: string,
+): string {
+  if (symbols.length === 0) return '';
+
+  const fileName = path.basename(filePath);
+  const lines: string[] = [];
+  let count = 0;
+
+  if (isDocumentSymbols(symbols)) {
+    for (const sym of symbols) {
+      if (count >= MAX_SYMBOLS) break;
+      const kind = SYMBOL_KIND_LABELS[sym.kind] ?? 'symbol';
+      const detail = sym.detail ? ` ${sym.detail}` : '';
+      const line = sym.range.start.line + 1;
+      lines.push(`${kind.padEnd(12)} ${sym.name}${detail} (line ${line})`);
+      count++;
+
+      // One nesting level: show children (methods, properties, etc.)
+      if (sym.children) {
+        for (const child of sym.children) {
+          if (count >= MAX_SYMBOLS) break;
+          const childKind = SYMBOL_KIND_LABELS[child.kind] ?? 'symbol';
+          const childDetail = child.detail ? ` ${child.detail}` : '';
+          lines.push(`  ${childKind.padEnd(12)} ${child.name}${childDetail}`);
+          count++;
+        }
+      }
+    }
+  } else {
+    // Flat SymbolInformation — no hierarchy
+    for (const sym of symbols) {
+      if (count >= MAX_SYMBOLS) break;
+      const kind = SYMBOL_KIND_LABELS[sym.kind] ?? 'symbol';
+      const line = sym.location.range.start.line + 1;
+      const container = sym.containerName ? ` (in ${sym.containerName})` : '';
+      lines.push(`${kind.padEnd(12)} ${sym.name}${container} (line ${line})`);
+      count++;
+    }
+  }
+
+  const truncated =
+    count >= MAX_SYMBOLS
+      ? `\n(${symbols.length - MAX_SYMBOLS} more symbols omitted)`
+      : '';
+
+  return `\n\n<lsp_symbols file="${filePath}">\nSymbol index for ${fileName}:\n\n${lines.join('\n')}${truncated}\n</lsp_symbols>`;
+}
+
+// -----------------------------------------------------------------------
+// Read enrichment
+// -----------------------------------------------------------------------
+
+/**
+ * Enrich a read_file result with LSP data: pre-existing diagnostics and
+ * a symbol summary. Only touches llmContent (reads have no structured
+ * display to annotate).
+ *
+ * @returns The (possibly enriched) llmContent string.
+ */
+export async function enrichReadWithLsp(
+  config: Config,
+  filePath: string,
+  fileContent: string,
+  llmContent: string,
+): Promise<string> {
+  if (!config.isLspEnabled()) return llmContent;
+
+  try {
+    const lspMgr = await config.getLspManager();
+    if (!lspMgr || !lspMgr.hasServerFor(filePath)) return llmContent;
+
+    // Touch the file to keep the server warm and get diagnostics.
+    const diagResult = await lspMgr.getDiagnostics(filePath, fileContent);
+
+    let enriched = llmContent;
+
+    // Append symbol summary.
+    const symbols = await lspMgr.getDocumentSymbols(filePath);
+    if (symbols.length > 0) {
+      enriched += formatSymbolSummary(symbols, filePath);
+    }
+
+    // Append pre-existing diagnostics.
+    if (diagResult.diagnostics.length > 0) {
+      enriched += formatDiagnostics(diagResult.diagnostics, filePath);
+    }
+
+    return enriched;
+  } catch {
+    // LSP enrichment is supplementary — never fail the tool.
+    return llmContent;
+  }
 }
