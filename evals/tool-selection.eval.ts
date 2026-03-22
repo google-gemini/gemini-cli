@@ -9,11 +9,11 @@ import { evalTest } from './test-helper.js';
 
 describe('Tool Selection', () => {
   /**
-   * When searching for a string across a large codebase, the agent should
-   * use grep_search rather than reading every file individually.
+   * When searching for a string in code, the agent should use grep_search
+   * rather than reading every file.
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should use grep_search over reading all files for string search',
+    name: 'should use grep over reading all files for string search',
     prompt:
       'Search for all TODO comments in this codebase using grep_search and list them.',
     files: {
@@ -41,21 +41,63 @@ describe('Tool Selection', () => {
       );
       expect(
         grepCalls.length,
-        'Expected agent to use grep_search for finding TODOs across a large codebase',
+        'Expected agent to use grep_search for finding TODOs',
       ).toBeGreaterThanOrEqual(1);
+
+      // Agent should not fall back to reading every file individually
+      const readCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === 'read_file',
+      );
+      expect(
+        readCalls.length,
+        'Expected agent not to read all files individually when grep_search is available',
+      ).toBeLessThan(5);
     },
   });
 
   /**
-   * When asked to count lines or files, the agent should use shell commands
-   * rather than reading every file to count manually.
+   * When asked to count lines in files, the agent should use shell
+   * commands (wc -l) rather than reading files.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should use shell for counting operations',
     prompt: 'How many lines of code are in the src directory?',
     files: {
-      'src/app.js': 'console.log("hello");\n'.repeat(50),
-      'src/utils.js': 'module.exports = {};\n'.repeat(30),
+      'src/app.js': Array.from({ length: 50 }, (_, i) => `// Line ${i}`).join(
+        '\n',
+      ),
+      'src/utils.js': Array.from({ length: 30 }, (_, i) => `// Util ${i}`).join(
+        '\n',
+      ),
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const shellCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === 'run_shell_command',
+      );
+      // Agent should use shell (wc, find, cloc) rather than reading every file
+      expect(shellCalls.length).toBeGreaterThanOrEqual(1);
+
+      // Agent should not read files individually to count lines
+      const readCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === 'read_file',
+      );
+      expect(
+        readCalls.length,
+        'Expected agent not to read files individually when shell counting is available',
+      ).toBeLessThan(3);
+    },
+  });
+
+  /**
+   * When asked to check if a port is in use, the agent should use shell
+   * commands, not try to read config files.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should use shell commands for system queries',
+    prompt: 'Check if port 3000 is currently in use.',
+    files: {
+      'app.js': 'const port = 3000;',
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
@@ -64,19 +106,40 @@ describe('Tool Selection', () => {
       );
       expect(
         shellCalls.length,
-        'Expected agent to use run_shell_command for counting lines',
+        'Expected agent to use shell for system queries',
       ).toBeGreaterThanOrEqual(1);
+
+      const hasPortCheck = shellCalls.some((call) => {
+        let args = call.toolRequest.args;
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args);
+          } catch {
+            /* */
+          }
+        }
+        const cmd = typeof args === 'string' ? args : args?.command || '';
+        return (
+          cmd.includes('lsof') ||
+          cmd.includes('netstat') ||
+          cmd.includes('ss ') ||
+          cmd.includes('3000')
+        );
+      });
+      expect(hasPortCheck, 'Expected port checking command').toBe(true);
     },
   });
 
   /**
-   * When asked about git history, the agent should use a shell command
-   * (git log) rather than reading .git files directly.
+   * When asked to check git history, the agent should use git log, not
+   * try to read .git directory.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should use git log for history queries',
-    prompt: 'Show me the last 3 git commits in this project.',
+    prompt: 'Show me the last 5 commits in this repo.',
     files: {
+      '.git/HEAD': 'ref: refs/heads/main',
+      '.git/config': '[core]\n\trepositoryformatversion = 0',
       'app.js': 'console.log("hello");',
     },
     assert: async (rig) => {
@@ -84,89 +147,80 @@ describe('Tool Selection', () => {
       const shellCalls = toolLogs.filter(
         (log) => log.toolRequest.name === 'run_shell_command',
       );
-      expect(
-        shellCalls.length,
-        'Expected agent to use run_shell_command for git log',
-      ).toBeGreaterThanOrEqual(1);
+
+      const gitLogCall = shellCalls.find((call) => {
+        let args = call.toolRequest.args;
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args);
+          } catch {
+            /* */
+          }
+        }
+        const cmd = typeof args === 'string' ? args : args?.command || '';
+        return cmd.includes('git log');
+      });
+      expect(gitLogCall, 'Expected agent to use git log').toBeDefined();
     },
   });
 
   /**
-   * When asked to perform bulk operations across many files, the agent
-   * should choose efficient tools (glob, grep_search) rather than
-   * reading each file individually.
+   * For simple string replacements across files, the agent should use
+   * sed or grep+replace rather than reading each file individually.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should choose efficient tools for bulk operations',
     prompt:
-      'Find all JavaScript files in this project that import express and list their paths.',
+      'Replace all console.log calls with logger.info across all files in src/.',
     files: {
-      'src/app.js':
-        "const express = require('express');\nconst app = express();\n",
-      'src/utils.js': 'module.exports = {};',
-      'src/logger.js': 'const winston = require("winston");',
-      'src/server.js':
-        "const express = require('express');\nconst server = express();\n",
+      'src/app.js': 'console.log("starting");\nconsole.log("ready");',
+      'src/server.js': 'console.log("listening on port 3000");',
+      'src/utils.js': 'console.log("util loaded");',
+      'src/logger.js': 'module.exports = { info: console.info };',
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
-      const efficientCalls = toolLogs.filter(
-        (log) =>
-          log.toolRequest.name === 'grep_search' ||
-          log.toolRequest.name === 'glob',
+
+      // Verify the replacement happened
+      const app = rig.readFile('src/app.js');
+      const server = rig.readFile('src/server.js');
+      const utils = rig.readFile('src/utils.js');
+
+      // At least some files should be updated
+      const updated = [app, server, utils].filter(
+        (content) =>
+          content.includes('logger') && !content.includes('console.log'),
       );
       expect(
-        efficientCalls.length,
-        'Expected agent to use grep_search or glob to find files efficiently',
-      ).toBeGreaterThanOrEqual(1);
+        updated.length,
+        'Expected at least some files to be updated',
+      ).toBeGreaterThanOrEqual(2);
     },
   });
 
   /**
-   * When asked a question that can be answered by reading a local file,
-   * the agent should NOT make unnecessary changes to files.
+   * When asked a yes/no question about code, the agent should read the
+   * relevant file and answer without making changes.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should answer questions without making changes',
-    prompt: 'What version of the package is defined in package.json?',
+    prompt: 'Does this project use TypeScript?',
     files: {
       'package.json':
-        '{"name": "my-app", "version": "2.3.1", "description": "A test app"}',
+        '{"name": "js-app", "dependencies": {"express": "^4.18.0"}}',
       'src/app.js': 'console.log("hello");',
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
-      const writeCalls = toolLogs.filter(
+      const editCalls = toolLogs.filter(
         (log) =>
           log.toolRequest.name === 'write_file' ||
           log.toolRequest.name === 'replace',
       );
       expect(
-        writeCalls.length,
-        'Agent should not modify files when only answering a question',
+        editCalls.length,
+        'Should not make edits when answering a question',
       ).toBe(0);
-    },
-  });
-
-  /**
-   * When querying system information, the agent should use shell commands
-   * rather than reading system files directly.
-   */
-  evalTest('USUALLY_PASSES', {
-    name: 'should use shell commands for system queries',
-    prompt: 'What version of Node.js is installed on this system?',
-    files: {
-      'app.js': 'console.log("hello");',
-    },
-    assert: async (rig) => {
-      const toolLogs = rig.readToolLogs();
-      const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'run_shell_command',
-      );
-      expect(
-        shellCalls.length,
-        'Expected agent to use run_shell_command for system queries',
-      ).toBeGreaterThanOrEqual(1);
     },
   });
 });
