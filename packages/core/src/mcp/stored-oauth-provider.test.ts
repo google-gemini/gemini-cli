@@ -107,6 +107,49 @@ describe('StoredOAuthMcpProvider', () => {
     );
   });
 
+  it('does not preserve a stale expiresAt when refreshed tokens omit expires_in', async () => {
+    const expiredCredentials: OAuthCredentials = {
+      ...storedCredentials,
+      token: {
+        ...storedCredentials.token,
+        expiresAt: Date.now() - 60_000,
+      },
+    };
+
+    vi.mocked(tokenStorage.getCredentials)
+      .mockResolvedValueOnce(expiredCredentials)
+      .mockResolvedValueOnce({
+        ...expiredCredentials,
+        token: {
+          accessToken: 'refreshed-access-token',
+          refreshToken: 'stored-refresh-token',
+          tokenType: 'Bearer',
+          scope: 'scope-a scope-b',
+        },
+      });
+
+    const provider = new StoredOAuthMcpProvider(
+      'test-server',
+      oauthConfig,
+      tokenStorage,
+    );
+
+    await provider.saveTokens({
+      access_token: 'refreshed-access-token',
+      token_type: 'Bearer',
+    });
+
+    expect(tokenStorage.saveToken).toHaveBeenCalledWith(
+      'test-server',
+      expect.not.objectContaining({
+        expiresAt: expect.any(Number),
+      }),
+      'stored-client-id',
+      'https://auth.example.com/token',
+      'https://example.com/mcp',
+    );
+  });
+
   it('invalidates stored credentials', async () => {
     const provider = new StoredOAuthMcpProvider(
       'test-server',

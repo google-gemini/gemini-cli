@@ -54,8 +54,6 @@ function toStoredToken(
 
   if (tokens.expires_in !== undefined) {
     storedToken.expiresAt = Date.now() + tokens.expires_in * 1000;
-  } else if (previousToken?.expiresAt) {
-    storedToken.expiresAt = previousToken.expiresAt;
   }
 
   return storedToken;
