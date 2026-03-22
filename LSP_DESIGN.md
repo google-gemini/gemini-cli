@@ -1,10 +1,15 @@
 # LSP Integration Design for Gemini CLI
 
-> Status: Phase 1 in progress (TypeScript working, Python blocked on pyright
-> langserver issue) Target issue:
-> [#2465](https://github.com/google-gemini/gemini-cli/issues/2465) Related:
-> [#6690](https://github.com/google-gemini/gemini-cli/issues/6690)
-> (maintainer-only roadmap item — IDE-connected LSP) Prior art:
+> **Status:** Phases 1–3 implemented and tested. Phases 4–5 remaining.
+>
+> **Target issue:**
+> [#2465](https://github.com/google-gemini/gemini-cli/issues/2465) (112+
+> thumbs-up)
+>
+> **Related:** [#6690](https://github.com/google-gemini/gemini-cli/issues/6690)
+> (maintainer-only — IDE-connected LSP)
+>
+> **Prior art:**
 > [PR #15149](https://github.com/google-gemini/gemini-cli/pulls/15149) (shelved
 > maintainer WIP — diagnostics-only MVP)
 
@@ -21,15 +26,14 @@ symbol references, diagnostics, or structural information. This leads to:
   documentation, and unrelated identifiers. `find_references` is semantically
   precise.
 - **Avoidable errors.** The agent writes code that doesn't type-check, then
-  discovers this only after running the build. Inline diagnostics on write would
-  catch this immediately.
+  discovers this only after running the build. Inline diagnostics on write catch
+  this immediately.
 - **Missed context.** The agent can't see resolved types, inferred generics, or
   interface implementations without reading additional files. LSP hover and
   go-to-definition provide this instantly.
 
 Claude Code and opencode both ship LSP integration. Users are building
-workarounds (Serena MCP server, Neovim LSP bridges). This is the most-upvoted
-open feature request (112 thumbs-up on #2465).
+workarounds (Serena MCP server, Neovim LSP bridges).
 
 ## LSP protocol reference for agentic tools
 
@@ -43,9 +47,8 @@ VS Code's `vscode-languageclient` source, and observed behavior of
 ### Lifecycle
 
 1. **`initialize` request.** Client sends `processId`, `rootUri`,
-   `workspaceFolders`, and `capabilities` (what the client supports). Server
-   responds with its own capabilities. This is a handshake — nothing else can
-   happen until it completes.
+   `workspaceFolders`, and `capabilities`. Server responds with its
+   capabilities. Nothing else can happen until this completes.
 
 2. **`initialized` notification.** Client tells the server it's ready. After
    this, the server may send requests back to the client
@@ -67,8 +70,8 @@ Servers **scan the filesystem themselves** using `rootUri`/`workspaceFolders`
 from initialize. They do not rely on the client to enumerate files:
 
 - **TypeScript:** Walks up from files looking for `tsconfig.json`. Loads all
-  files referenced by the config (`include`/`exclude`/`files`) plus transitive
-  imports. Reads these directly from disk — no `didOpen` needed.
+  files referenced by the config plus transitive imports. Reads directly from
+  disk — no `didOpen` needed.
 - **Pyright:** Loads files referenced by `pyrightconfig.json` plus transitive
   imports. Has `diagnosticMode: "openFilesOnly"` vs `"workspace"` setting.
 
@@ -77,1092 +80,297 @@ explicitly manage (provide in-memory content that supersedes disk).
 
 ### Document synchronization
 
-- **`textDocument/didOpen`:** Transfers ownership of a document from disk to
-  client. After this, the server uses the client-provided content, not the file
-  on disk. Must include `uri`, `languageId`, `version`, and full `text`.
-- **`textDocument/didChange`:** Sends content updates. Can be full
-  (`TextDocumentSyncKind.Full` = send entire content) or incremental. Full sync
-  is simpler and universally supported.
-- **`textDocument/didClose`:** Returns ownership to disk. Server should clear
-  diagnostics and read from disk on next access.
-- **`textDocument/didSave`:** Optional notification that the file was saved.
-  Some servers use it as a trigger for heavier analysis.
+- **`textDocument/didOpen`:** Transfers ownership from disk to client. Server
+  uses client-provided content, not the file on disk.
+- **`textDocument/didChange`:** Sends content updates. We use full sync (send
+  entire content) — simpler and universally supported.
+- **`textDocument/didSave`:** Notification that the file was saved. Some servers
+  use it as a trigger for heavier analysis.
+- **`textDocument/didClose`:** Returns ownership to disk.
 
-**Key insight for agentic tools:** If you write to disk but only sent `didOpen`
-previously, the server still uses the stale in-memory content. You must send
-`didChange` for every modification, OR `didClose` + `didOpen` to re-sync from
-disk.
+**Key insight:** If you write to disk but only sent `didOpen` previously, the
+server still uses the stale in-memory content. Send `didChange` for every
+modification, OR `didClose` + `didOpen` to re-sync.
 
 ### File watching (`workspace/didChangeWatchedFiles`)
 
-Servers register glob patterns (e.g., `**/*.{ts,js}`) via
-`client/registerCapability`. The client watches the filesystem and sends
+Servers register glob patterns via `client/registerCapability`. The client sends
 `workspace/didChangeWatchedFiles` when matching files are created, changed, or
-deleted.
-
-This is important for:
-
-- Files the agent creates or deletes (the server doesn't know about them unless
-  told)
-- Files modified on disk that haven't been opened via `didOpen`
-- TypeScript 5.0+ with `--canUseWatchEvents` delegates all file watching to the
-  client instead of spawning its own watchers
-
-**For agentic tools:** After any `write_file`, `edit`, or file creation, send
-`workspace/didChangeWatchedFiles` for the affected files. Without this, servers
-relying on client-side watching will miss changes.
+deleted. Important for files the agent creates or deletes that haven't been
+opened via `didOpen`. TypeScript 5.0+ delegates all file watching to the client.
 
 ### Diagnostics: push vs pull
 
-**Push model (`textDocument/publishDiagnostics`):** The original model. The
-server sends diagnostics whenever it wants — after `didOpen`, after `didChange`,
-after analyzing transitive dependencies, or at any other time. The client has
-**no way to know when the server is "done"**. This is the model used by
-`typescript-language-server` and `pyright-langserver`.
+**Push model (`textDocument/publishDiagnostics`):** Server sends diagnostics
+whenever it wants. The client has **no way to know when the server is "done"**.
+Used by `typescript-language-server` and `pyright-langserver`.
 
-**Pull model (`textDocument/diagnostic`):** Added in LSP 3.17. The client
-requests diagnostics for a specific document and gets a response. Also
-`workspace/diagnostic` for workspace-wide pulls. This is a proper
-request/response pattern — much better for agentic tools. However, **TypeScript
-and Pyright do not support it yet.** Only some Microsoft HTML/CSS/JSON servers
-implement it.
+**Pull model (`textDocument/diagnostic`):** Added in LSP 3.17. Proper
+request/response — ideal for agentic tools. **Not supported by TypeScript or
+Pyright yet.** Only some Microsoft HTML/CSS/JSON servers implement it.
 
-**Implications for our design:** We are stuck with the push model for the
-servers that matter. This means:
+We use the push model with an adaptive timeout (see below).
 
-- After `didOpen`/`didChange`, we start a listener, then wait for
-  `publishDiagnostics` with a timeout.
-- An empty timeout means "server hasn't responded yet" (not "no issues").
-- The server explicitly sending `diagnostics: []` means "no issues."
-- There is no "request diagnostics" operation in the push model.
+### Semantic queries (all request/response)
 
-### What servers publish diagnostics for
+- `textDocument/hover` — type info and documentation at a position
+- `textDocument/definition` — jump to definition
+- `textDocument/references` — find all references (includes declaration)
+- `textDocument/documentSymbol` — symbol tree for a file
+- `workspace/symbol` — search symbols by name across the workspace
 
-This is **server-specific**, not defined by the protocol:
-
-- Servers can publish diagnostics for any document, including ones never opened
-  via `didOpen`.
-- TypeScript typically publishes for open files and their direct dependents.
-- Pyright in `"workspace"` mode publishes for all project files.
-- When a file is closed (`didClose`), servers conventionally send empty
-  diagnostics to clear them — but this is convention, not enforced.
-
-### Requests available for semantic queries
-
-All are request/response (unlike diagnostics):
-
-- **`textDocument/hover`:** Type info and documentation at a position.
-- **`textDocument/definition`:** Jump to definition.
-- **`textDocument/references`:** Find all references (includes declaration).
-- **`textDocument/documentSymbol`:** Symbol tree for a file.
-- **`workspace/symbol`:** Search symbols by name across the workspace.
-- **`textDocument/completion`:** Code completion suggestions.
-- **`textDocument/codeAction`:** Suggested fixes and refactorings.
-
-These work on any file the server knows about (via project config + imports),
-not just files opened via `didOpen`. Some may require the file to be opened
-first for accurate results.
+These work on any file the server knows about via project config + imports.
 
 ### Server-initiated requests we must handle
 
-Some servers send requests back to the client during initialization or
-operation. These are **blocking JSON-RPC requests** — if unanswered, the server
-deadlocks:
+Blocking JSON-RPC requests — if unanswered, the server deadlocks:
 
-- **`workspace/configuration`:** Server asks for settings (e.g., pyright asks
-  for `python`, `python.analysis`, `pyright` sections). Return an array with one
-  result per `items` entry.
-- **`client/registerCapability`:** Server registers dynamic capabilities (e.g.,
-  file watchers). Acknowledge with `null`.
-- **`window/workDoneProgress/create`:** Server wants to report progress.
-  Acknowledge with `null`.
-- **`workspace/workspaceFolders`:** Server asks for the workspace folders.
-  Return the array from initialization.
+- **`workspace/configuration`:** Return array with one result per item.
+- **`client/registerCapability`:** Acknowledge with `null`.
+- **`window/workDoneProgress/create`:** Acknowledge with `null`.
+- **`workspace/workspaceFolders`:** Return the workspace folders.
 
 ### Fundamental tension with agentic tools
 
-LSP is designed for an **interactive IDE** where:
-
-- The user edits one file at a time
-- Diagnostics trickle in asynchronously (latency is fine)
-- The server has time to warm up while the user reads code
-- Files are opened and stay open for long periods
-
-An agentic tool is different:
-
-- It writes files in bursts and needs immediate feedback
-- It creates/modifies multiple files in quick succession
-- It doesn't "open" files in the IDE sense — it reads and writes
-- There is no "user is looking at this file" concept
-
-The push diagnostic model is the biggest mismatch. The pull model
-(`textDocument/diagnostic`) would be ideal but isn't widely supported yet. Our
-adaptive timeout is the best available workaround: be patient for cold starts,
-fast once the server is warm.
+LSP is designed for an interactive IDE where the user edits one file at a time
+and diagnostics trickle in asynchronously. An agentic tool writes files in
+bursts and needs immediate feedback. The push diagnostic model is the biggest
+mismatch — our adaptive timeout is the best available workaround.
 
 ## Design principles
 
-1. **Implicit first.** The agent should get LSP-powered feedback automatically
-   when it reads or writes files, without needing to know LSP exists. This is
-   the highest-value, lowest-friction integration.
-2. **Explicit tools second.** For complex tasks like refactoring, the agent can
-   opt in to semantic queries (references, definitions, symbols). These are
-   exposed as a single tool to minimize tool-list bloat.
-3. **Graceful degradation.** If no language server is available for a file type,
-   or if the server crashes, everything falls back to current behavior silently.
-   LSP is supplementary — it never blocks or fails a tool operation.
-4. **Shareable core.** The LSP module lives in `packages/core` and is agnostic
-   to whether the CLI is running standalone or inside an IDE. A future IDE
-   companion integration can provide an alternative LSP backend without changing
-   the tool surface.
-5. **Feature-gated.** All LSP functionality is behind a setting (`lsp.enabled`),
-   disabled by default initially, with no impact on users who don't opt in.
+1. **Implicit first.** The agent gets LSP-powered feedback automatically on
+   reads and writes, without needing to know LSP exists.
+2. **Explicit tools second.** For refactoring, the agent can opt in to semantic
+   queries via a single `lsp_query` tool.
+3. **Graceful degradation.** Missing servers, crashes, and timeouts all fall
+   back silently to current behavior. LSP never blocks a tool.
+4. **Shareable core.** The LSP module lives in `packages/core`, agnostic to
+   standalone vs IDE mode.
+5. **Feature-gated.** Behind `tools.lsp.enabled`, disabled by default.
 
-## UX design: user journeys and debuggability
+## What we built
 
-LSP integration is fundamentally different from built-in tools. It depends on
-external software the user installs separately, that may or may not be on PATH,
-that may be the wrong version, and that communicates via a protocol where
-failures are often silent. The UX must account for every failure mode.
-
-### User journey 1: Discovery and setup
-
-**Goal:** User learns LSP exists, enables it, and gets it working.
-
-1. **Discovery.** When the agent writes code that could benefit from LSP
-   feedback but LSP is disabled, the system prompt can mention it. Or the user
-   discovers it via `/help`, `/tools`, or documentation. No nudge dialog (unlike
-   IDE integration) — LSP is opt-in for power users.
-
-2. **Enablement.** User enables LSP:
-
-   ```
-   /lsp enable
-   ```
-
-   This sets `tools.lsp.enabled: true` in user settings and prints what happens
-   next: which language servers will be used, whether they're found on PATH.
-
-3. **Validation.** Immediately after enabling, `/lsp enable` runs a health
-   check:
-
-   ```
-   LSP enabled. Checking language servers...
-
-   🟢 typescript-language-server (v5.1.3) — found on PATH
-   🔴 pyright-langserver — not found on PATH
-      Install: pip install pyright  or  npm install -g pyright
-
-   TypeScript/JavaScript files will get compiler feedback on writes.
-   Python files will not (no server available).
-   ```
-
-   This is the critical moment — the user immediately knows what works and what
-   doesn't, with actionable install instructions.
-
-### User journey 2: Normal operation
-
-**Goal:** LSP works invisibly. User sees compiler feedback on writes.
-
-1. Agent calls `write_file` or `edit` on a `.ts` file.
-2. LSP diagnostics are appended to `llmContent` in `<lsp_diagnostics>` tags.
-3. The user sees nothing different in the UI — the agent just happens to
-   self-correct type errors without being asked.
-4. If the server crashes mid-session, the next write silently falls back to
-   no-LSP behavior. The user is not interrupted.
-
-### User journey 3: Something is wrong
-
-**Goal:** User suspects LSP isn't working and wants to diagnose it.
-
-1. User runs `/lsp status`:
-
-   ```
-   LSP Integration Status
-
-   Servers:
-   🟢 typescript (pid 12345) — c:\project (2 files tracked, 4 diagnostics cached)
-      Last activity: 3s ago
-   🔴 pyright — failed to start
-      Error: spawn pyright-langserver ENOENT
-      Fix: Install pyright (pip install pyright) and ensure it's on PATH
-
-   Settings:
-     enabled: true
-     diagnosticSeverity: error
-     diagnosticTimeout: 2000ms
-   ```
-
-2. If the agent is available, the user can ask: "LSP doesn't seem to be working
-   for my Python files, can you help?" The agent can call `/lsp status` (or the
-   underlying `lsp_query` tool with `operation: "diagnostics"`) and reason about
-   the output. This is the "agent helps debug" path.
-
-### User journey 4: Server configuration override
-
-**Goal:** User wants a different server (e.g., `pylsp` instead of `pyright`).
-
-1. User runs `/lsp servers` to see available server definitions:
-
-   ```
-   Configured language servers:
-
-   typescript:
-     command: typescript-language-server --stdio
-     languages: typescript, typescriptreact, javascript, javascriptreact
-     root markers: tsconfig.json, jsconfig.json, package.json
-
-   pyright:
-     command: pyright-langserver --stdio
-     languages: python
-     root markers: pyproject.toml, setup.py, pyrightconfig.json
-   ```
-
-2. User overrides in settings:
-
-   ```json
-   { "tools": { "lsp": { "servers": { "python": { "command": "pylsp" } } } } }
-   ```
-
-3. After restart, `/lsp status` shows the override in effect.
-
-### The `/lsp` command
-
-Subcommands:
-
-| Command        | Description                                                   |
-| -------------- | ------------------------------------------------------------- |
-| `/lsp`         | Alias for `/lsp status`                                       |
-| `/lsp status`  | Show server health, tracked files, cached diagnostics, errors |
-| `/lsp enable`  | Enable LSP + run health check                                 |
-| `/lsp disable` | Disable LSP + shut down servers                               |
-| `/lsp servers` | Show configured server definitions and detected binaries      |
-| `/lsp restart` | Shut down all servers and let them respawn on next use        |
-
-### Status tracking in LspManager
-
-The manager tracks per-server state visible to the UI:
-
-```typescript
-interface LspServerStatus {
-  id: string; // e.g. 'typescript'
-  state: 'running' | 'starting' | 'stopped' | 'failed';
-  pid?: number; // OS process ID when running
-  projectRoot?: string; // Resolved project root
-  error?: string; // Why it failed (ENOENT, crash, etc.)
-  filesTracked: number; // Open documents in server
-  diagnosticsCached: number; // Diagnostics in cache
-  lastActivity?: number; // Timestamp of last query
-  serverVersion?: string; // From InitializeResult.serverInfo
-  command: string; // What was spawned
-}
-```
-
-### Error messages — specific and actionable
-
-Every error state has a message that tells the user what went wrong and how to
-fix it:
-
-| Error                        | Message                                                                                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server binary not found      | `pyright-langserver not found on PATH. Install: pip install pyright`                                                                            |
-| Server crashed on startup    | `typescript-language-server exited with code 1. Check that TypeScript is installed in your project (npm install typescript).`                   |
-| Server timed out during init | `pyright-langserver did not respond within 10s. It may be incompatible with this project. Try /lsp restart.`                                    |
-| No project root found        | `No tsconfig.json, jsconfig.json, or package.json found. The TypeScript server needs a project root.`                                           |
-| Server crashed mid-session   | `typescript-language-server crashed (signal SIGSEGV). It will not be restarted for this session. Diagnostics unavailable for TypeScript files.` |
-| Max servers reached          | `Maximum language servers (4) already running. Increase tools.lsp.maxServers in settings to allow more.`                                        |
-
-### Agent-assisted debugging
-
-When the agent has access to the `lsp_query` tool (Phase 3), it can diagnose LSP
-issues itself:
-
-- "My TypeScript file has errors but the agent didn't catch them" → Agent runs
-  `lsp_query diagnostics` and sees an empty result → checks `/lsp status` → sees
-  server is in `failed` state → suggests a fix.
-- "Why is the agent slow when editing files?" → Agent checks `/lsp status` →
-  sees diagnostic timeout is high → suggests reducing it.
-
-Even before Phase 3, the agent sees `<lsp_diagnostics>` blocks (or their
-absence) in tool output. If it writes a file and gets no diagnostics back, it
-knows LSP isn't working for that file type and can tell the user.
-
-### Binary detection at startup
-
-When LSP is enabled, during the first access to a language, the manager checks
-whether the server binary exists before trying to spawn it:
-
-```typescript
-async function findExecutable(command: string): Promise<string | null> {
-  // 1. Check if it's an absolute path that exists
-  // 2. Check PATH using `which` (Unix) or `where` (Windows)
-  // 3. Check common locations:
-  //    - node_modules/.bin/ (for typescript-language-server)
-  //    - Python venv bin/ (for pyright)
-  // Return null if not found, with a specific reason
-}
-```
-
-This avoids the confusing `ENOENT` error from `spawn()` and instead produces a
-helpful "not found, install with X" message.
-
-## Architecture overview
+### Architecture
 
 ```
 packages/core/src/lsp/
-  ├── types.ts              # LSP protocol types and internal interfaces
-  ├── client.ts             # JSON-RPC client over stdio (speaks LSP)
-  ├── server-registry.ts    # Server definitions per language
-  ├── manager.ts            # LspManager singleton — lifecycle, caching, queries
-  ├── enrichment.ts         # Helpers for formatting LSP data into tool output
-  └── index.ts              # Public API surface
+  types.ts              LSP protocol types (minimal subset, no npm deps)
+  client.ts             JSON-RPC client over stdio with typed events
+  server-registry.ts    Built-in server definitions (TS, Python)
+  manager.ts            LspManager — per-server state, adaptive timeouts
+  enrichment.ts         Diagnostic/symbol formatting, tool enrichment
+  index.ts              Public API
 
 packages/core/src/tools/
-  └── lsp-query.ts          # The lsp_query tool (explicit semantic queries)
+  lsp-query.ts          The lsp_query tool (6 semantic operations)
 
-packages/core/src/tools/definitions/
-  └── (update coreTools.ts) # Register lsp_query tool definition
+packages/cli/src/ui/commands/
+  lspCommand.ts         /lsp slash command (status, restart)
 ```
 
-### Data flow
+### Per-server state model
 
-```
-                      ┌─────────────────────────────────────┐
-                      │           LspManager                │
-                      │  (singleton, lazy server spawning)  │
-                      │                                     │
-                      │  ┌───────────┐  ┌───────────────┐  │
-                      │  │ LspClient │  │ ServerRegistry │  │
-                      │  │ (jsonrpc) │  │ (ts, py, go…) │  │
-                      │  └─────┬─────┘  └───────┬───────┘  │
-                      │        │                │           │
-                      │        ▼                ▼           │
-                      │  spawn server ◄── find server def   │
-                      │  for language     for file ext      │
-                      └────────┬──────────────────┬─────────┘
-                               │                  │
-              ┌────────────────┼──────────────────┼────────────────┐
-              │                │                  │                │
-              ▼                ▼                  ▼                ▼
-        ┌──────────┐   ┌──────────┐       ┌──────────┐    ┌────────────┐
-        │read_file │   │write_file│       │  edit    │    │ lsp_query  │
-        │(implicit)│   │(implicit)│       │(implicit)│    │ (explicit) │
-        └──────────┘   └──────────┘       └──────────┘    └────────────┘
-
-  Implicit enrichment:              Explicit tool:
-  - diagnostics on write/edit       - references, definitions
-  - symbol summary on read          - hover, workspace symbols
-  - fires automatically             - agent chooses to call
-```
-
-## Phase 1: Implicit enrichment on writes
-
-This matches the scope of the shelved PR #15149 but fixes its known issues.
-
-### What happens
-
-When `write_file` or `edit` (replace) completes successfully on a file whose
-language has an available server, the LSP manager is asked for diagnostics. If
-any are returned, they are appended to `llmContent` in a structured block.
-
-### Integration point
-
-Inside the `execute()` method of `WriteFileTool` and `EditTool`, after the file
-is written to disk, before returning `ToolResult`:
+All state for a `(serverId, projectRoot)` pair is bundled in `ServerState`:
 
 ```typescript
-// After file write succeeds:
-const lspDiagnostics = await collectDiagnosticsForOutput(
-  config,
-  resolvedPath,
-  newContent,
-  signal,
-);
-if (lspDiagnostics) {
-  llmContent = appendLspContext(llmContent, lspDiagnostics);
+interface ServerState {
+  client: LspClient | null;
+  broken: boolean;
+  error?: string;
+  starting?: Promise<LspClient | null>;
+  diagnosticCache: Map<string, Diagnostic[]>;
+  fileVersions: Map<string, number>;
+  timeout: number;
 }
 ```
 
-This mirrors the existing JIT context pattern (`discoverJitContext` /
-`appendJitContext` in `jit-context.ts`) — supplementary content appended to
-`llmContent` that never fails the primary operation.
+Servers are keyed by the gemini-cli workspace directory (from
+`WorkspaceContext`), falling back to marker-based root detection for files
+outside any workspace. When workspace directories change (e.g., user adds a
+directory via `/directory`), all servers restart to reinitialize.
 
-### Output format
+### Adaptive timeout
 
-```xml
-<lsp_diagnostics file="src/services/userService.ts">
-Compiler feedback for the file you just modified:
+The push diagnostic model has no "done" signal, so we wait with a timeout that
+adapts per server:
 
-ERROR line 42: Property 'findById' does not exist on type 'Repository<User>'.
-ERROR line 58: Argument of type 'string' is not assignable to parameter of type 'number'.
-WARN  line 12: 'import { Logger }' is declared but its value is never read.
-</lsp_diagnostics>
-```
+- **Cold start:** `diagnosticTimeout × 3` (default: 15s). Pyright can take 10+
+  seconds to load typeshed on first use.
+- **On timeout:** Halve the timeout for next attempt, floor at 1s. If the server
+  is consistently slow, we stop blocking for long.
+- **On success:** Reset to `diagnosticTimeout` (default: 5s). Server is warm and
+  should respond quickly.
 
-Design choices:
+Each server instance has its own timeout — a slow pyright doesn't drag down a
+warm typescript-language-server.
 
-- **XML tags** for clean parsing by the model (consistent with prior art in the
-  shelved PR).
-- **Severity filtering**: Errors always shown. Warnings shown on `write_file`
-  (full-file context), errors-only on `edit` (partial context, warnings may be
-  pre-existing noise). Configurable via `lsp.diagnosticSeverity`.
-- **Compact format**: One line per diagnostic. No stack traces. File path in the
-  tag attribute, not repeated per line.
-- **Truncation**: Cap at 20 diagnostics per file to avoid flooding context. Show
-  count of omitted diagnostics if truncated.
+### Three-state diagnostic result
 
-### Improvements over shelved PR #15149
+We distinguish between "server said clean" and "server didn't respond":
 
-| Issue in #15149                                                      | Fix                                                                                                                  |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 3-second synchronous polling blocks tool return                      | Async with configurable timeout (default 2s). Return without diagnostics if timeout expires — don't block the agent. |
-| Dangling `setTimeout` on successful init (bot-reported)              | Proper cleanup with `finally { clearTimeout(handle) }`                                                               |
-| Off-by-one in `findNearestFile` skips filesystem root (bot-reported) | Restructure to `while(true)` with explicit break                                                                     |
-| No cross-platform validation                                         | Windows-aware path handling; test on all three platforms                                                             |
-| `npx typescript-language-server` spawn is fragile                    | Direct `node_modules/.bin` resolution first, `npx` fallback. Configurable server command via settings.               |
+- `publishDiagnostics` with `diagnostics: []` → **clean** (green footer)
+- No response within timeout → **timed out** (yellow footer with message)
+- `publishDiagnostics` with errors → **issues found** (red footer)
+
+### Workspace-wide diagnostic caching
+
+A persistent listener on each server captures ALL incoming `publishDiagnostics`
+notifications, not just the file we asked about. When the agent edits `utils.ts`
+and that breaks `app.ts`, the diagnostic for `app.ts` lands in the cache.
+Available via `getAllCachedDiagnostics()`.
+
+### LSP protocol compliance
+
+After every file write, we send:
+
+1. `textDocument/didOpen` or `textDocument/didChange` (in-memory sync)
+2. `textDocument/didSave` (triggers heavier analysis in some servers)
+3. `workspace/didChangeWatchedFiles` (for servers using client-side watching)
 
 ### Settings
 
-```toml
-# In settings.json or settings.toml:
-[lsp]
-enabled = true              # Master switch (default: false)
-diagnosticSeverity = "error" # "error" | "warning" | "info" | "hint" (default: "error")
-diagnosticTimeout = 2000     # ms to wait for diagnostics before giving up (default: 2000)
-```
-
-Settings schema entry (matches existing patterns in `settingsSchema.ts`):
-
-```typescript
-lsp: {
-  type: 'object',
-  label: 'Language Server Protocol',
-  category: 'Tools',
-  requiresRestart: true,
-  default: { enabled: false },
-  description: 'Language Server Protocol integration for compiler feedback and semantic code queries.',
-  showInDialog: true,
-  properties: {
-    enabled: {
-      type: 'boolean',
-      label: 'Enable LSP',
-      category: 'Tools',
-      requiresRestart: true,
-      default: false,
-      description: 'Enable Language Server Protocol integration for compiler diagnostics and semantic queries.',
-      showInDialog: true,
-    },
-    diagnosticSeverity: {
-      type: 'enum',
-      label: 'Diagnostic severity',
-      category: 'Tools',
-      requiresRestart: false,
-      default: 'error',
-      description: 'Minimum severity level for diagnostics included in tool output.',
-      showInDialog: true,
-      options: ['error', 'warning', 'info', 'hint'],
-    },
-    diagnosticTimeout: {
-      type: 'number',
-      label: 'Diagnostic timeout (ms)',
-      category: 'Tools',
-      requiresRestart: false,
-      default: 2000,
-      description: 'Maximum time to wait for LSP diagnostics before returning without them.',
-      showInDialog: false,
-    },
-  },
-}
-```
-
-## Phase 2: Implicit enrichment on reads
-
-### What happens
-
-When `read_file` returns content for a file with an active language server, the
-result is enriched with a lightweight symbol summary — the exported/top-level
-symbols, their kinds, and condensed type signatures. This helps the agent
-understand file structure without reading the entire file or grepping for
-definitions.
-
-### Integration point
-
-Same pattern as Phase 1, inside `ReadFileTool.execute()`:
-
-```typescript
-const lspSummary = await collectSymbolSummary(config, resolvedPath, signal);
-if (lspSummary) {
-  llmContent = appendLspContext(llmContent, lspSummary);
-}
-```
-
-### Output format
-
-```xml
-<lsp_symbols file="src/services/userService.ts">
-Symbol index for this file:
-
-class  UserService (line 15)
-  method  constructor(repo: UserRepository, logger: Logger)
-  method  findUser(id: number): Promise<User | null>
-  method  createUser(data: CreateUserInput): Promise<User>
-  method  deleteUser(id: number): Promise<void>
-
-interface CreateUserInput (line 52)
-  property name: string
-  property email: string
-  property role?: UserRole
-
-type UserRole = "admin" | "member" | "viewer" (line 60)
-</lsp_symbols>
-```
-
-Design choices:
-
-- **Document symbols** (not workspace symbols) — scoped to the file being read.
-- **Top-level + one nesting level**: Classes show their methods and properties.
-  Deeply nested symbols are omitted.
-- **Condensed signatures**: Parameter names and types, return types. No full
-  JSDoc or implementation details.
-- **Only on supported languages**: Files without an active server get no
-  enrichment (no change from current behavior).
-
-### Diagnostics on read (optional)
-
-If the file has existing diagnostics (errors/warnings), these are also appended:
-
-```xml
-<lsp_diagnostics file="src/services/userService.ts">
-Pre-existing issues in this file:
-
-ERROR line 42: Property 'findById' does not exist on type 'Repository<User>'.
-</lsp_diagnostics>
-```
-
-This is gated behind a sub-setting (`lsp.diagnosticsOnRead`, default: `true`).
-The agent sees what's broken before it starts editing, reducing wasted attempts.
-
-### Token budget considerations
-
-Symbol summaries add tokens to every `read_file` result. Mitigation:
-
-- Cap at ~50 symbols per file. For larger files, show only exported symbols.
-- Omit symbols for trivial files (< 20 lines) — the file content is small enough
-  that the agent can parse it directly.
-- Add a setting `lsp.symbolSummary` (`true`/`false`, default `true`) for users
-  who want diagnostics but not symbol summaries.
-
-## Phase 3: Explicit semantic tool — `lsp_query`
-
-### What happens
-
-A new tool `lsp_query` is registered, giving the agent direct access to LSP
-operations. The agent calls this when it needs semantic information beyond what
-implicit enrichment provides.
-
-### Tool definition
-
-Single tool, operation-based parameter (matching gemini-cli's convention of
-fewer, more capable tools — cf. `run_shell_command`):
-
-```typescript
-const LSP_QUERY_TOOL_NAME = 'lsp_query';
-
-// FunctionDeclaration for the model:
+```json
 {
-  name: 'lsp_query',
-  description: `Query the Language Server for semantic code information. Use this for precise code navigation and refactoring instead of grep-based searching.
-
-Available operations:
-- "diagnostics": Get compiler errors and warnings for a file.
-- "hover": Get type information and documentation at a specific position.
-- "definition": Go to the definition of the symbol at a specific position.
-- "references": Find all references to the symbol at a specific position.
-- "document_symbols": Get the symbol tree (functions, classes, variables) for a file.
-- "workspace_symbols": Search for symbols by name across the entire workspace.`,
-  parameters: {
-    type: 'object',
-    required: ['operation', 'file_path'],
-    properties: {
-      operation: {
-        type: 'string',
-        enum: [
-          'diagnostics',
-          'hover',
-          'definition',
-          'references',
-          'document_symbols',
-          'workspace_symbols',
-        ],
-        description: 'The LSP operation to perform.',
-      },
-      file_path: {
-        type: 'string',
-        description: 'Absolute path to the file.',
-      },
-      line: {
-        type: 'number',
-        description: 'Line number (1-based). Required for hover, definition, references.',
-      },
-      character: {
-        type: 'number',
-        description: 'Character offset (1-based). Required for hover, definition, references.',
-      },
-      query: {
-        type: 'string',
-        description: 'Search query. Required for workspace_symbols.',
-      },
-    },
-  },
+  "tools": {
+    "lsp": {
+      "enabled": true,
+      "diagnosticTimeout": 5000
+    }
+  }
 }
 ```
 
-### Policy
+Only two settings. We deliberately removed `diagnosticSeverity` — the agent
+benefits from seeing all severities (errors, warnings, hints). No reason to
+filter.
 
-`lsp_query` is **read-only** — it never modifies files. It should be
-auto-allowed by default policy, same as `read_file`, `glob`, and `grep_search`.
+### UX: user-facing feedback
 
-```toml
-# Default policy (ships with CLI):
-[[rule]]
-toolName = "lsp_query"
-decision = "allow"
-priority = 0
-```
+**On write/edit:** A color-coded footer below the diff:
 
-Tool annotations: `{ readOnlyHint: true }`.
+- Red: `LSP: 2 errors` / `LSP: 1 error, 3 warnings`
+- Yellow:
+  `LSP: timed out waiting for diagnostics (server may still be starting)`
+- Dimmed green: `LSP: no issues found`
 
-### Output format examples
+Only shown for file types with an LSP server. JSON, markdown, etc. get no
+footer.
 
-**references:**
+The footer uses a structured `DiagnosticSummary { text, severity }` on the
+`FileDiff` return display — color is determined by severity enum, not string
+matching.
 
-```
-Found 7 references to 'UserService.findUser':
+**On read:** No visual change — reads remain silent. Diagnostics and symbol
+summaries are appended to `llmContent` (what the model sees) but not shown to
+the user.
 
-src/routes/userRoutes.ts:23:15  const user = await userService.findUser(id);
-src/routes/userRoutes.ts:45:19  if (await userService.findUser(email)) {
-src/middleware/auth.ts:67:22    const currentUser = await this.users.findUser(req.userId);
-src/services/userService.test.ts:12:5  await service.findUser(1);
-src/services/userService.test.ts:28:5  await service.findUser(999);
-src/services/userService.test.ts:44:5  const result = await service.findUser(testId);
-src/services/adminService.ts:31:18     const user = await this.userService.findUser(userId);
-```
+**`/lsp` command:** Shows server health, tracked files, cached diagnostics,
+error messages with install instructions. `/lsp restart` shuts down all servers.
 
-**hover:**
+### The `lsp_query` tool
 
-```
-(method) UserService.findUser(id: number): Promise<User | null>
-
-Finds a user by their numeric ID. Returns null if not found.
-
-Defined in: src/services/userService.ts:28
-```
-
-**definition:**
+Single tool with 6 operations, registered as `Kind.Search` (read-only,
+auto-allowed by policy, available in plan mode):
 
 ```
-Symbol 'findUser' is defined at:
-
-src/services/userService.ts:28:3
-
-  async findUser(id: number): Promise<User | null> {
-    return this.repo.findOne({ where: { id } });
-  }
+lsp_query(operation: "references", file_path: "src/foo.ts", line: 10)
+lsp_query(operation: "hover", file_path: "src/foo.ts", line: 10, character: 5)
+lsp_query(operation: "diagnostics", file_path: "src/foo.ts")
+lsp_query(operation: "document_symbols", file_path: "src/foo.ts")
+lsp_query(operation: "workspace_symbols", file_path: "src/foo.ts", query: "UserService")
 ```
 
-### System prompt addition
+**Line/character are 1-based** — matching every other tool in the CLI
+(`read_file`, `grep_search`, etc.) and the output of `formatSymbolSummary`. The
+invocation converts to 0-based internally before calling LSP.
 
-The tool description above is sufficient for the model to understand when to use
-`lsp_query`. No system prompt modification is needed beyond what the tool
-registry provides automatically. However, we should update the bundled
-documentation (`bundle/docs/tools/`) with a `lsp-query.md` reference page.
+**Character is optional.** When omitted, defaults to the first non-whitespace
+character on the line. The agent often knows the line but not the exact column.
 
-## Phase 4: Diagnostic diff on writes
+**Tool description includes strategic hints** like "Use instead of grep for
+refactoring — won't match comments or strings." These prevent the model from
+falling back to less efficient tools.
 
-### What happens
+### No new npm dependencies
 
-After a write or edit, instead of just showing the current diagnostics, we show
-the **change** in diagnostic state — what was introduced and what was fixed.
-This gives the agent a clear signal about whether its edit moved in the right
-direction.
+The JSON-RPC client is implemented directly using Node.js `child_process` and
+manual Content-Length framing (~530 lines). The shelved PR #15149 used
+`vscode-jsonrpc` and `vscode-languageserver-types` (+146 kB) — unnecessary for
+our use case.
 
-### Implementation
+## Key design decisions and rationale
 
-The `LspManager` maintains a diagnostic cache per file. On write:
+| Decision                                          | Rationale                                                                                                                                 |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| No `diagnosticSeverity` filter                    | Agent benefits from all severities. Removed after initial implementation — it was cargo-culted from the shelved PR with no justification. |
+| Per-server state bundles                          | Prevents cache pollution between servers. Enables clean restart of individual servers without losing others' state.                       |
+| Workspace directories from `WorkspaceContext`     | Matches what VS Code does — send the user's actual workspace, not guessed roots. Servers get the right scope.                             |
+| 1-based line numbers in `lsp_query`               | Every other tool and output in the CLI uses 1-based. Zero-based would cause off-by-one bugs constantly.                                   |
+| Optional `character` with smart default           | Agent rarely knows the exact column. First non-whitespace is almost always correct for hover/definition queries.                          |
+| Detailed tool descriptions in both model families | The strategic hints ("unlike grep") are worth their token cost — they prevent the model from wasting context on bad grep searches.        |
+| `enrichToolResultWithLsp` shared helper           | Eliminated duplication between edit.ts and write-file.ts. Single place to maintain the enrichment logic.                                  |
+| Optional chaining on `config.isLspEnabled?.()`    | Mock configs in tests don't have LSP methods. Optional chaining avoids test crashes without modifying every mock.                         |
+| Dynamic imports for LSP in tool files             | `await import('../lsp/enrichment.js')` — LSP code is only loaded when the feature is enabled. Zero cost for users who don't opt in.       |
 
-1. Snapshot pre-write diagnostics from cache.
-2. Notify the LSP server of the file change (`textDocument/didChange`).
-3. Collect post-write diagnostics.
-4. Diff the two sets.
+## Remaining work
 
-### Output format
+### Phase 4: Diagnostic diffs (not started)
+
+After a write or edit, show the **change** in diagnostic state — what was
+introduced and what was fixed. The per-server `diagnosticCache` already stores
+pre-edit state. Needs diff logic in `enrichment.ts`.
 
 ```xml
-<lsp_diagnostics file="src/services/userService.ts" introduced="1" fixed="2">
-Diagnostic changes from your edit:
-
+<lsp_diagnostics file="src/foo.ts" introduced="1" fixed="2">
 FIXED   line 42: Property 'findById' does not exist on type 'Repository<User>'.
-FIXED   line 58: Argument of type 'string' is not assignable to parameter of type 'number'.
 NEW     line 35: Parameter 'id' implicitly has an 'any' type.
 </lsp_diagnostics>
 ```
 
-The `introduced`/`fixed` counts in the tag attributes give the model an instant
-pass/fail signal before it even reads the details.
+### Phase 5: Multi-language servers (not started)
 
-## Phase 5: Multi-language server support
+Adding Go (`gopls`) and Rust (`rust-analyzer`) is just adding entries to
+`BUILTIN_SERVERS` in `server-registry.ts`. TypeScript and Python are already
+working. Each new server may need testing for server-initiated request quirks
+(like pyright's `workspace/configuration` requirement).
 
-### Server registry
+### Phase 1c: Binary detection (partial)
 
-Phase 1 ships with TypeScript/JavaScript only (via `typescript-language-server`
-or `ts_ls`). The server registry is designed for extension:
+Currently, if a server binary isn't found, the user sees a raw `ENOENT` error in
+`/lsp status`. A pre-spawn binary check using `which`/`where` would produce a
+cleaner "not found, install with X" message. Low priority since the error is
+still surfaced and actionable.
 
-```typescript
-interface LspServerDefinition {
-  /** LSP language IDs this server handles. */
-  languageIds: string[];
+### Future: IDE-connected `LspProvider`
 
-  /** How to find/spawn the server binary. */
-  command: string;
-  args: string[];
-
-  /**
-   * Strategy for finding the project root.
-   * 'marker' walks up looking for marker files.
-   */
-  rootStrategy: 'marker';
-  rootMarkers: string[];
-
-  /** Initialization options passed to the server. */
-  initializationOptions?: Record<string, unknown>;
-}
-
-const BUILTIN_SERVERS: LspServerDefinition[] = [
-  {
-    languageIds: [
-      'typescript',
-      'typescriptreact',
-      'javascript',
-      'javascriptreact',
-    ],
-    command: 'typescript-language-server',
-    args: ['--stdio'],
-    rootStrategy: 'marker',
-    rootMarkers: ['tsconfig.json', 'jsconfig.json', 'package.json'],
-  },
-  {
-    languageIds: ['python'],
-    command: 'pyright-langserver',
-    args: ['--stdio'],
-    rootStrategy: 'marker',
-    rootMarkers: ['pyproject.toml', 'setup.py', 'pyrightconfig.json'],
-  },
-  {
-    languageIds: ['go'],
-    command: 'gopls',
-    args: ['serve'],
-    rootStrategy: 'marker',
-    rootMarkers: ['go.mod'],
-  },
-  {
-    languageIds: ['rust'],
-    command: 'rust-analyzer',
-    args: [],
-    rootStrategy: 'marker',
-    rootMarkers: ['Cargo.toml'],
-  },
-];
-```
-
-### User-configurable servers
-
-Users can override or add servers via settings:
-
-```toml
-[lsp.servers.typescript]
-command = "typescript-language-server"
-args = ["--stdio"]
-
-[lsp.servers.python]
-command = "pylsp"
-args = []
-```
-
-This allows users to substitute their preferred server (e.g., `pylsp` instead of
-`pyright`, or a custom wrapper) without modifying core code.
-
-## LspManager — lifecycle and caching
-
-### Singleton with lazy spawning
-
-```typescript
-class LspManager {
-  private clients: Map<string, LspClient>; // key: `${serverId}:${projectRoot}`
-  private brokenServers: Set<string>; // servers that crashed, don't retry
-  private diagnosticCache: Map<string, Diagnostic[]>; // per-file cache
-  private touchedFiles: Map<string, number>; // file URI → version counter
-
-  /** Get or create a client for the given file. */
-  async getClient(
-    filePath: string,
-    signal: AbortSignal,
-  ): Promise<LspClient | null>;
-
-  /** Notify server of file content (for read tracking). */
-  async touchFile(filePath: string, content?: string): Promise<void>;
-
-  /** Get diagnostics, waiting up to timeout. */
-  async getDiagnostics(
-    filePath: string,
-    signal: AbortSignal,
-  ): Promise<Diagnostic[]>;
-
-  /** Get hover info at position. */
-  async getHover(
-    filePath: string,
-    line: number,
-    character: number,
-    signal: AbortSignal,
-  ): Promise<HoverResult | null>;
-
-  /** Get definition location(s). */
-  async getDefinition(
-    filePath: string,
-    line: number,
-    character: number,
-    signal: AbortSignal,
-  ): Promise<Location[]>;
-
-  /** Get all references to symbol at position. */
-  async getReferences(
-    filePath: string,
-    line: number,
-    character: number,
-    signal: AbortSignal,
-  ): Promise<Location[]>;
-
-  /** Get document symbol tree. */
-  async getDocumentSymbols(
-    filePath: string,
-    signal: AbortSignal,
-  ): Promise<DocumentSymbol[]>;
-
-  /** Search workspace symbols by query. */
-  async getWorkspaceSymbols(
-    query: string,
-    signal: AbortSignal,
-  ): Promise<SymbolInformation[]>;
-
-  /** Shut down all active servers. */
-  async shutdown(): Promise<void>;
-}
-```
-
-### Key lifecycle rules
-
-- **Lazy**: Servers are spawned on first access to a file of that language. No
-  server process is started until LSP is actually needed.
-- **Cached**: One client per `(serverId, projectRoot)` pair. Reused across all
-  files in the same project for that language.
-- **Resilient**: If a server crashes or fails to initialize, it's added to
-  `brokenServers` and not retried for the session. The feature silently
-  degrades.
-- **Bounded**: Track at most 1000 touched files. Evict LRU when the cap is
-  reached (full-document sync means each touched file holds a version in the
-  server's memory).
-- **Shutdown**: All clients are shut down via `registerCleanup()` in the CLI
-  initialization pipeline, matching the existing cleanup pattern.
-
-### Document synchronization
-
-Use `TextDocumentSyncKind.Full` (send entire file content on each change). This
-is simpler than incremental sync and acceptable for our use case — we only sync
-files when the agent reads or writes them, not on every keystroke.
-
-## Shareability: standalone vs. IDE-connected
-
-The `LspManager` in `packages/core` is the single integration point for all LSP
-consumers. It exposes a uniform API regardless of where the language server
-actually runs.
-
-### Current design (Phase 1–5): Standalone
-
-The `LspManager` spawns and manages its own language server processes. This
-works in any terminal — no IDE required.
-
-### Future: IDE-connected provider
-
-The `packages/vscode-ide-companion` extension already runs an MCP server. A
-future enhancement could expose LSP operations as MCP tools on that server,
-delegating to VS Code's built-in language servers (which are already running,
-already warmed up, and already have the project indexed).
-
-The integration path:
-
-1. The IDE companion exposes tools like `lsp/diagnostics`, `lsp/hover`, etc. via
-   its existing MCP server.
-2. The `LspManager` detects that the CLI is running in IDE mode
-   (`config.getIdeMode()`).
-3. Instead of spawning servers, it delegates queries to the IDE companion's MCP
-   tools via the existing `IdeClient`.
-4. The tool surface (`lsp_query`) and implicit enrichment remain identical — the
-   agent doesn't know or care where the LSP data comes from.
-
-This requires no changes to `packages/core` beyond an `LspProvider` interface:
-
-```typescript
-interface LspProvider {
-  getDiagnostics(filePath: string, signal: AbortSignal): Promise<Diagnostic[]>;
-  getHover(
-    filePath: string,
-    line: number,
-    char: number,
-    signal: AbortSignal,
-  ): Promise<HoverResult | null>;
-  getDefinition(
-    filePath: string,
-    line: number,
-    char: number,
-    signal: AbortSignal,
-  ): Promise<Location[]>;
-  getReferences(
-    filePath: string,
-    line: number,
-    char: number,
-    signal: AbortSignal,
-  ): Promise<Location[]>;
-  getDocumentSymbols(
-    filePath: string,
-    signal: AbortSignal,
-  ): Promise<DocumentSymbol[]>;
-  getWorkspaceSymbols(
-    query: string,
-    signal: AbortSignal,
-  ): Promise<SymbolInformation[]>;
-  touchFile(filePath: string, content?: string): Promise<void>;
-  shutdown(): Promise<void>;
-}
-
-// Phase 1-5: StandaloneLspProvider (spawns servers via LspClient)
-// Future:    IdeLspProvider (delegates to IDE companion MCP tools)
-```
+The `LspManager` public API maps cleanly to an `LspProvider` interface. In IDE
+mode, a future `IdeLspProvider` could delegate to the IDE companion extension's
+existing MCP server, using the IDE's already-running language servers. No
+changes to the tool surface or enrichment logic needed.
 
 ## Security considerations
 
-### Sandbox interaction
-
-Language servers execute code (e.g., TypeScript's `tsserver` runs Node.js). In
-sandboxed environments:
-
-- **macOS Seatbelt**: Servers spawned by the CLI inherit the sandbox profile.
-  They can read workspace files but are restricted by the active profile.
-- **Container sandbox**: Servers run inside the container alongside the CLI. No
-  additional exposure beyond what the sandbox already permits.
-- **Policy engine**: `lsp_query` is read-only and auto-allowed by default
-  policy. The tool annotation `readOnlyHint: true` enables policy rules to match
-  it.
-
-### Untrusted workspace risk
-
-A malicious workspace could include a `tsconfig.json` or `.pyrightconfig.json`
-that configures plugins or paths designed to exfiltrate data. Mitigations:
-
-- Servers are spawned only for files within trusted workspace roots (matching
-  existing `trustedFolders` behavior).
-- No server-provided code execution (we don't use LSP code actions or
-  refactoring commands, only read-only queries).
-- Server commands are from a built-in allowlist or explicit user configuration —
-  never derived from workspace files.
-
-### Resource limits
-
-- Maximum 4 concurrent language server processes (configurable via
-  `lsp.maxServers`).
-- Per-server memory: not directly controllable, but bounded indirectly by the
-  1000-file touched-file cap and session lifetime.
-- Idle timeout: servers unused for 10 minutes are shut down (configurable via
-  `lsp.idleTimeout`).
-
-## Implementation roadmap
-
-| Phase      | Scope                                          | Files touched                                                                             | Dependency                      |
-| ---------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------- |
-| **1a**     | LSP core + diagnostics on write/edit (TS only) | `lsp/*` (new), `edit.ts`, `write-file.ts`, `settingsSchema.ts`, `config.ts`, `cleanup.ts` | None (no new npm deps)          |
-| **1b**     | `/lsp` command + status/health UI              | `lspCommand.ts` (new), `BuiltinCommandLoader.ts`, `manager.ts` (status API)               | Phase 1a                        |
-| **1c**     | Binary detection + actionable error messages   | `lsp/server-registry.ts`, `lsp/manager.ts`                                                | Phase 1a                        |
-| **2**      | Symbol summary on read, diagnostics on read    | `read-file.ts`                                                                            | Phase 1a                        |
-| **3**      | `lsp_query` tool (all 6 operations)            | `lsp-query.ts` (new), `coreTools.ts`, `tool-names.ts`, default policy                     | Phase 1a                        |
-| **4**      | Diagnostic diffs (introduced/fixed counts)     | `lsp/enrichment.ts`, `edit.ts`, `write-file.ts`                                           | Phase 1a                        |
-| **5**      | Multi-language servers (Python, Go, Rust)      | `lsp/server-registry.ts`                                                                  | Phase 1a + server testing       |
-| **Future** | IDE-connected `LspProvider` via MCP companion  | `lsp/manager.ts`, `ide-client.ts`, `vscode-ide-companion`                                 | Phase 3 + IDE companion changes |
-
-### PR strategy (if contributing upstream)
-
-Each phase is a self-contained PR. Phase 1 is the minimum viable contribution.
-Phases 2–5 build incrementally and can be reviewed independently. This follows
-the project's preference for small, focused PRs linked to a single issue.
-
-Phase 1 alone provides meaningful value (the agent self-corrects type errors on
-writes) and matches the scope the maintainers already prototyped in PR #15149,
-making it the most likely to be accepted.
-
-## Dependencies
-
-**No new npm dependencies.** The LSP JSON-RPC client is implemented directly
-using Node.js `child_process` and manual Content-Length framing (~450 lines).
-The shelved PR #15149 used `vscode-jsonrpc` and `vscode-languageserver-types`
-(+146 kB), but those are unnecessary — LSP's wire protocol is simple enough to
-implement inline, and we define only the subset of types we need.
-
-## Known issues
-
-### Pyright langserver on Windows
-
-Pyright's language server mode (`pyright-langserver --stdio`) does not publish
-`textDocument/publishDiagnostics` notifications on Windows, despite the CLI
-`pyright` working correctly on the same files. Tested with v1.1.390 and
-v1.1.408, multiple spawn strategies, workspace/configuration responses, and
-didChangeConfiguration triggers. The server finds source files but never
-completes analysis.
-
-This is likely a Windows-specific or typeshed-loading issue. Needs testing on
-Linux/macOS. The opencode project has reported similar pyright issues
-([anomalyco/opencode#6131](https://github.com/anomalyco/opencode/issues/6131)).
-
-**Workaround:** TypeScript/JavaScript LSP works perfectly. Python users can
-check `/lsp status` and will see a clear error message with install
-instructions.
+- Language servers execute code (TypeScript's `tsserver` runs Node.js). In
+  sandboxed environments, spawned servers inherit the sandbox profile.
+- `lsp_query` is read-only (`Kind.Search`) and auto-allowed by policy.
+- Server commands are from a built-in allowlist or explicit user config — never
+  derived from workspace files.
+- Maximum 4 concurrent server processes (configurable via
+  `tools.lsp.maxServers`).
 
 ## Open questions
 
-1. **Token budget governance.** Should there be a hard cap on total LSP tokens
-   per tool result? The JIT context system doesn't have one, but LSP output
-   could be significantly larger for files with many symbols or diagnostics.
+1. **Token budget governance.** Should there be a hard cap on LSP tokens per
+   tool result? Symbol summaries on large files could be significant.
 
-2. **Warm-up latency.** The first LSP query for a project requires server
-   initialization (can take 5–15 seconds for large TypeScript projects). Should
-   we pre-warm the server on session start for the workspace's primary language?
-   Or accept the cold-start penalty on first use? The `/lsp enable` health check
-   partially addresses this — it spawns the server as a side effect.
+2. **Diagnostic debounce.** Some servers publish diagnostics incrementally
+   (initial batch then final). We resolve on the first match. A short debounce
+   window (100–200ms) after the first match could capture the more complete set.
 
-3. **`read_many_files` for reference results.** When `lsp_query references`
-   returns locations, should it automatically include the surrounding code
-   context (like `grep_search` does with `--context`)? Or return just locations
-   and let the agent `read_file` the ones it needs?
+3. **`read_many_files` enrichment.** Batch reads could get noisy with per-file
+   symbol summaries. Possibly enrich only the first N files.
 
-4. **Server auto-detection vs. manual config.** Should the CLI attempt to detect
-   installed language servers at startup (scanning PATH), or only try to spawn
-   them on first use? Early detection enables better `/lsp status` output but
-   adds startup cost.
-
-5. **Pyright alternatives.** If pyright langserver remains broken on Windows,
-   should we support `pylsp` (python-lsp-server) as an alternative? It's a
-   different architecture (plugin-based) but more widely tested as a standalone
-   server.
-
-6. **Telemetry.** The existing codebase instruments most features with
-   OpenTelemetry events. LSP would benefit from similar instrumentation
+4. **Telemetry.** If contributing upstream, instrument with OpenTelemetry events
    (`lsp_server_started`, `lsp_server_failed`, `lsp_diagnostics_collected`,
-   `lsp_diagnostics_timeout`) to help understand which servers work well in
-   practice and where users hit problems. Worth discussing with maintainers if
-   contributing upstream.
+   `lsp_diagnostics_timeout`) to understand real-world reliability.
