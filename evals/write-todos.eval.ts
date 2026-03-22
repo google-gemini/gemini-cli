@@ -9,16 +9,11 @@ import { evalTest } from './test-helper.js';
 
 describe('Write Todos', () => {
   /**
-   * When the user explicitly asks the agent to create a todo list or track
-   * tasks, the agent should use write_todos.
+   * When the user explicitly asks the agent to track tasks with write_todos,
+   * the agent should use write_todos and populate it with meaningful items.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should use write_todos when asked to create a task list',
-    settings: {
-      tools: {
-        core: ['write_todos', 'read_file', 'write_file', 'run_shell_command'],
-      },
-    },
     prompt:
       'I have a multi-step task. Please use write_todos to track your progress as you work: (1) extract all helper functions from app.js into utils.js, (2) add error handling to each function, (3) write unit tests in app.test.js, (4) update app.js to import from utils.js.',
     files: {
