@@ -27,6 +27,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  NetworkRetryAttemptEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
@@ -49,7 +50,16 @@ import type {
   ToolOutputMaskingEvent,
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
+  StartupStatsEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../types.js';
+import type {
+  CreditsUsedEvent,
+  OverageOptionSelectedEvent,
+  EmptyWalletMenuShownEvent,
+  CreditPurchaseClickEvent,
+} from '../billingEvents.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -93,6 +103,7 @@ export enum EventNames {
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
+  RETRY_ATTEMPT = 'retry_attempt',
   EXTENSION_ENABLE = 'extension_enable',
   EXTENSION_DISABLE = 'extension_disable',
   EXTENSION_INSTALL = 'extension_install',
@@ -115,8 +126,15 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  ONBOARDING_START = 'onboarding_start',
+  ONBOARDING_SUCCESS = 'onboarding_success',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
+  STARTUP_STATS = 'startup_stats',
+  CREDITS_USED = 'credits_used',
+  OVERAGE_OPTION_SELECTED = 'overage_option_selected',
+  EMPTY_WALLET_MENU_SHOWN = 'empty_wallet_menu_shown',
+  CREDIT_PURCHASE_CLICK = 'credit_purchase_click',
 }
 
 export interface LogResponse {
@@ -186,6 +204,34 @@ function determineGHWorkflowName(): string | undefined {
  */
 function determineGHRepositoryName(): string | undefined {
   return process.env['GITHUB_REPOSITORY'];
+}
+
+/**
+ * Determines the GitHub event name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHEventName(): string | undefined {
+  return process.env['GITHUB_EVENT_NAME'];
+}
+
+/**
+ * Determines the GitHub Pull Request number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHPRNumber(): string | undefined {
+  return process.env['GH_PR_NUMBER'];
+}
+
+/**
+ * Determines the GitHub Issue number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHIssueNumber(): string | undefined {
+  return process.env['GH_ISSUE_NUMBER'];
+}
+
+/**
+ * Determines the GitHub custom tracking ID if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHCustomTrackingId(): string | undefined {
+  return process.env['GH_CUSTOM_TRACKING_ID'];
 }
 
 /**
@@ -370,6 +416,10 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
+    const ghEventName = determineGHEventName();
+    const ghPRNumber = determineGHPRNumber();
+    const ghIssueNumber = determineGHIssueNumber();
+    const ghCustomTrackingId = determineGHCustomTrackingId();
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -401,6 +451,34 @@ export class ClearcutLogger {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
         value: this.hashedGHRepositoryName,
+      });
+    }
+
+    if (ghEventName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+        value: ghEventName,
+      });
+    }
+
+    if (ghPRNumber) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
+        value: ghPRNumber,
+      });
+    }
+
+    if (ghIssueNumber) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+        value: ghIssueNumber,
+      });
+    }
+
+    if (ghCustomTrackingId) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+        value: ghCustomTrackingId,
       });
     }
 
@@ -612,6 +690,11 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE,
+        value: event.worktree_active.toString(),
       },
     ];
 
@@ -1168,6 +1251,32 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logNetworkRetryAttemptEvent(event: NetworkRetryAttemptEvent): void {
+    // This event is generic for any retry attempt (Gemini, WebFetch, etc.)
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ATTEMPT_NUMBER,
+        value: String(event.attempt),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_DELAY_MS,
+        value: String(event.delay_ms),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE,
+        value: event.error_type,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
+        value: event.model,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RETRY_ATTEMPT, data));
+    this.flushIfNeeded();
+  }
+
   async logExtensionInstallEvent(event: ExtensionInstallEvent): Promise<void> {
     const data: EventValue[] = [
       {
@@ -1687,6 +1796,135 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logOnboardingStartEvent(_event: OnboardingStartEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        value: 'true',
+      },
+    ];
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_START, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logOnboardingSuccessEvent(event: OnboardingSuccessEvent): void {
+    const data: EventValue[] = [];
+    if (event.userTier) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        value: event.userTier,
+      });
+    }
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_SUCCESS, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logStartupStatsEvent(event: StartupStatsEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_PHASES,
+        value: JSON.stringify(event.phases),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_PLATFORM,
+        value: event.os_platform,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_RELEASE,
+        value: event.os_release,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_IS_DOCKER,
+        value: JSON.stringify(event.is_docker),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.STARTUP_STATS, data));
+    this.flushIfNeeded();
+  }
+
+  // ==========================================================================
+  // Billing / AI Credits Events
+  // ==========================================================================
+
+  logCreditsUsedEvent(event: CreditsUsedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_CONSUMED,
+        value: JSON.stringify(event.credits_consumed),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_REMAINING,
+        value: JSON.stringify(event.credits_remaining),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.CREDITS_USED, data));
+    this.flushIfNeeded();
+  }
+
+  logOverageOptionSelectedEvent(event: OverageOptionSelectedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_SELECTED_OPTION,
+        value: JSON.stringify(event.selected_option),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_CREDIT_BALANCE,
+        value: JSON.stringify(event.credit_balance),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.OVERAGE_OPTION_SELECTED, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logEmptyWalletMenuShownEvent(event: EmptyWalletMenuShownEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EMPTY_WALLET_MENU_SHOWN, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logCreditPurchaseClickEvent(event: CreditPurchaseClickEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_PURCHASE_SOURCE,
+        value: JSON.stringify(event.source),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.CREDIT_PURCHASE_CLICK, data),
     );
     this.flushIfNeeded();
   }

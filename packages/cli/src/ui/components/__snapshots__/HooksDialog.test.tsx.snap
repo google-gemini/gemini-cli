@@ -1,0 +1,134 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`HooksDialog > snapshots > renders empty hooks dialog 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ No hooks configured.                                                                             │
+│                                                                                                  │
+│ (Press Esc to close)                                                                             │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`HooksDialog > snapshots > renders hook using command as name when name is not provided 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Security Warning:                                                                                │
+│ Hooks can execute arbitrary commands on your system. Only use hooks from sources you trust.      │
+│ Review hook scripts carefully.                                                                   │
+│                                                                                                  │
+│ Learn more: https://geminicli.com/docs/hooks                                                     │
+│                                                                                                  │
+│ Configured Hooks                                                                                 │
+│                                                                                                  │
+│   before-tool                                                                                    │
+│                                                                                                  │
+│   echo hello [enabled]                                                                           │
+│     Source: /mock/path                                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│ Tip: Use /hooks enable <hook-name> or /hooks disable <hook-name> to toggle individual hooks. Use │
+│ /hooks enable-all or /hooks disable-all to toggle all hooks at once.                             │
+│                                                                                                  │
+│ (Press Esc to close)                                                                             │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`HooksDialog > snapshots > renders hook with all metadata (matcher, sequential, timeout) 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Security Warning:                                                                                │
+│ Hooks can execute arbitrary commands on your system. Only use hooks from sources you trust.      │
+│ Review hook scripts carefully.                                                                   │
+│                                                                                                  │
+│ Learn more: https://geminicli.com/docs/hooks                                                     │
+│                                                                                                  │
+│ Configured Hooks                                                                                 │
+│                                                                                                  │
+│   before-tool                                                                                    │
+│                                                                                                  │
+│   my-hook [enabled]                                                                              │
+│     A hook with all metadata fields                                                              │
+│     Source: /mock/path/GEMINI.md | Matcher: shell_exec | Sequential | Timeout: 30s               │
+│                                                                                                  │
+│                                                                                                  │
+│ Tip: Use /hooks enable <hook-name> or /hooks disable <hook-name> to toggle individual hooks. Use │
+│ /hooks enable-all or /hooks disable-all to toggle all hooks at once.                             │
+│                                                                                                  │
+│ (Press Esc to close)                                                                             │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`HooksDialog > snapshots > renders hooks grouped by event name with enabled and disabled status 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Security Warning:                                                                                │
+│ Hooks can execute arbitrary commands on your system. Only use hooks from sources you trust.      │
+│ Review hook scripts carefully.                                                                   │
+│                                                                                                  │
+│ Learn more: https://geminicli.com/docs/hooks                                                     │
+│                                                                                                  │
+│ Configured Hooks                                                                                 │
+│                                                                                                  │
+│   before-tool                                                                                    │
+│                                                                                                  │
+│   hook1 [enabled]                                                                                │
+│     Test hook: hook1                                                                             │
+│     Source: /mock/path/GEMINI.md | Command: run-hook1                                            │
+│                                                                                                  │
+│   hook2 [disabled]                                                                               │
+│     Test hook: hook2                                                                             │
+│     Source: /mock/path/GEMINI.md | Command: run-hook2                                            │
+│                                                                                                  │
+│   after-agent                                                                                    │
+│                                                                                                  │
+│   hook3 [enabled]                                                                                │
+│     Test hook: hook3                                                                             │
+│     Source: /mock/path/GEMINI.md | Command: run-hook3                                            │
+│                                                                                                  │
+│                                                                                                  │
+│ Tip: Use /hooks enable <hook-name> or /hooks disable <hook-name> to toggle individual hooks. Use │
+│ /hooks enable-all or /hooks disable-all to toggle all hooks at once.                             │
+│                                                                                                  │
+│ (Press Esc to close)                                                                             │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`HooksDialog > snapshots > renders single hook with security warning, source, and tips 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Security Warning:                                                                                │
+│ Hooks can execute arbitrary commands on your system. Only use hooks from sources you trust.      │
+│ Review hook scripts carefully.                                                                   │
+│                                                                                                  │
+│ Learn more: https://geminicli.com/docs/hooks                                                     │
+│                                                                                                  │
+│ Configured Hooks                                                                                 │
+│                                                                                                  │
+│   before-tool                                                                                    │
+│                                                                                                  │
+│   test-hook [enabled]                                                                            │
+│     Test hook: test-hook                                                                         │
+│     Source: /mock/path/GEMINI.md | Command: run-test-hook                                        │
+│                                                                                                  │
+│                                                                                                  │
+│ Tip: Use /hooks enable <hook-name> or /hooks disable <hook-name> to toggle individual hooks. Use │
+│ /hooks enable-all or /hooks disable-all to toggle all hooks at once.                             │
+│                                                                                                  │
+│ (Press Esc to close)                                                                             │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

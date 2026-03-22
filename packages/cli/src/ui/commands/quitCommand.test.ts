@@ -26,8 +26,10 @@ describe('quitCommand', () => {
   it('returns a QuitActionReturn object with the correct messages', () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getSessionId: () => 'test-session-id',
+        agentContext: {
+          config: {
+            getSessionId: () => 'test-session-id',
+          },
         },
       },
       session: {

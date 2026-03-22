@@ -12,8 +12,12 @@ import {
   hasUserOrAssistantMessage,
   SessionError,
 } from './sessionUtils.js';
-import type { Config, MessageRecord } from '@google/gemini-cli-core';
-import { SESSION_FILE_PREFIX, Storage } from '@google/gemini-cli-core';
+import {
+  SESSION_FILE_PREFIX,
+  type Config,
+  type MessageRecord,
+} from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -250,6 +254,43 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Latest session');
   });
 
+  it('should resolve session by UUID with whitespace (trimming)', async () => {
+    const sessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = await createChatsDir();
+
+    const session = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    // Test resolving by UUID with leading/trailing spaces
+    const result = await sessionSelector.resolveSession(`  ${sessionId}  `);
+    expect(result.sessionData.sessionId).toBe(sessionId);
+    expect(result.sessionData.messages[0].content).toBe('Test message');
+  });
+
   it('should deduplicate sessions by ID', async () => {
     const sessionId = randomUUID();
 
@@ -350,6 +391,29 @@ describe('SessionSelector', () => {
 
     await expect(sessionSelector.resolveSession('999')).rejects.toThrow(
       SessionError,
+    );
+  });
+
+  it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
+    // Empty chats directory — no session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const emptyConfig = {
+      storage: {
+        getProjectTempDir: () => tmpDir,
+      },
+      getSessionId: () => 'current-session-id',
+    } as Partial<Config> as Config;
+
+    const sessionSelector = new SessionSelector(emptyConfig);
+
+    await expect(sessionSelector.resolveSession('latest')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('NO_SESSIONS_FOUND');
+        return true;
+      },
     );
   });
 
@@ -563,6 +627,56 @@ describe('SessionSelector', () => {
     expect(result.originProjectPath).toBe('/workspace/original-project');
     expect(result.isOriginProjectMismatch).toBe(true);
     expect(result.sessionData.sessionId).toBe(sessionId);
+  });
+
+  it('ignores symlinked project root markers', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const sessionId = randomUUID();
+    const chatsDir = await createChatsDir(
+      'symlink-project',
+      '/workspace/symlink-project',
+    );
+    const projectTempDir = path.dirname(chatsDir);
+    const markerPath = path.join(projectTempDir, '.project_root');
+    const linkedPath = path.join(tmpDir, 'linked-secret.txt');
+
+    await fs.writeFile(linkedPath, '/workspace/linked-secret', 'utf8');
+    await fs.rm(markerPath);
+    await fs.symlink(linkedPath, markerPath);
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId,
+          projectHash: 'test-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:30:00.000Z',
+          messages: [
+            {
+              type: 'user',
+              content: 'Ignore symlinked origin marker',
+              id: 'msg1',
+              timestamp: '2024-01-01T10:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const result = await sessionSelector.resolveSession(sessionId);
+
+    expect(result.originProjectPath).toBeUndefined();
+    expect(result.isOriginProjectMismatch).toBe(false);
   });
 });
 

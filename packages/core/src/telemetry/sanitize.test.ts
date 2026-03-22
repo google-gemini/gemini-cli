@@ -32,6 +32,7 @@ function createMockConfig(logPromptsEnabled: boolean): Config {
     getModel: () => 'gemini-1.5-flash',
     isInteractive: () => true,
     getUserEmail: () => undefined,
+    getContentGeneratorConfig: () => undefined,
   } as unknown as Config;
 }
 
@@ -135,7 +136,9 @@ describe('Telemetry Sanitization', () => {
         const attributes = event.toOpenTelemetryAttributes(config);
 
         // Should be JSON stringified
+        // eslint-disable-next-line no-restricted-syntax
         expect(typeof attributes['hook_input']).toBe('string');
+        // eslint-disable-next-line no-restricted-syntax
         expect(typeof attributes['hook_output']).toBe('string');
 
         const parsedInput = JSON.parse(attributes['hook_input'] as string);

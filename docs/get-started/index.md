@@ -38,7 +38,7 @@ cases, you can log in with your existing Google account:
    ```
 
 2. When asked "How would you like to authenticate for this project?" select **1.
-   Login with Google**.
+   Sign in with Google**.
 
 3. Select your Google account.
 
@@ -72,7 +72,7 @@ session's token usage, as well as your overall quota and usage for the supported
 models.
 
 For more information on the `/stats` command and its subcommands, see the
-[Command Reference](../../reference/commands.md#stats).
+[Command Reference](../reference/commands.md#stats).
 
 ## Next steps
 

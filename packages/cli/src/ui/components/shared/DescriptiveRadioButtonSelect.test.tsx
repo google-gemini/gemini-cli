@@ -29,6 +29,12 @@ vi.mock('../../semantic-colors.js', () => ({
       primary: 'COLOR_PRIMARY',
       secondary: 'COLOR_SECONDARY',
     },
+    ui: {
+      focus: 'COLOR_FOCUS',
+    },
+    background: {
+      focus: 'COLOR_FOCUS_BG',
+    },
     status: {
       success: 'COLOR_SUCCESS',
     },
@@ -69,7 +75,7 @@ describe('DescriptiveRadioButtonSelect', () => {
       onSelect: mockOnSelect,
       ...props,
     };
-    const result = renderWithProviders(
+    const result = await renderWithProviders(
       <DescriptiveRadioButtonSelect {...defaultProps} />,
     );
     await result.waitUntilReady();

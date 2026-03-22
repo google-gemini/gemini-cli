@@ -6,20 +6,11 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { Scrollable } from './Scrollable.js';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ScrollProviderModule from '../../contexts/ScrollProvider.js';
 import { act } from 'react';
-
-vi.mock('ink', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ink')>();
-  return {
-    ...actual,
-    getInnerHeight: vi.fn(() => 5),
-    getScrollHeight: vi.fn(() => 10),
-    getBoundingBox: vi.fn(() => ({ x: 0, y: 0, width: 10, height: 5 })),
-  };
-});
+import { waitFor } from '../../../test-utils/async.js';
 
 vi.mock('../../hooks/useAnimatedScrollbar.js', () => ({
   useAnimatedScrollbar: (
@@ -38,25 +29,23 @@ describe('<Scrollable />', () => {
   });
 
   it('renders children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Hello World</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Hello World');
     unmount();
   });
 
   it('renders multiple children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
         <Text>Line 3</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Line 1');
     expect(lastFrame()).toContain('Line 2');
     expect(lastFrame()).toContain('Line 3');
@@ -64,14 +53,13 @@ describe('<Scrollable />', () => {
   });
 
   it('matches snapshot', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
         <Text>Line 3</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -86,7 +74,7 @@ describe('<Scrollable />', () => {
       },
     );
 
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <Scrollable hasFocus={true} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
@@ -100,7 +88,6 @@ describe('<Scrollable />', () => {
         <Text>Line 10</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
 
     expect(capturedEntry).toBeDefined();
 
@@ -113,36 +100,40 @@ describe('<Scrollable />', () => {
 
     // Initial state with scrollToBottom={true}
     unmount();
-    const { waitUntilReady: waitUntilReady2, unmount: unmount2 } =
-      renderWithProviders(
-        <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
-          <Text>Line 1</Text>
-          <Text>Line 2</Text>
-          <Text>Line 3</Text>
-          <Text>Line 4</Text>
-          <Text>Line 5</Text>
-          <Text>Line 6</Text>
-          <Text>Line 7</Text>
-          <Text>Line 8</Text>
-          <Text>Line 9</Text>
-          <Text>Line 10</Text>
-        </Scrollable>,
-      );
-    await waitUntilReady2();
-    expect(capturedEntry.getScrollState().scrollTop).toBe(5);
+    const { unmount: unmount2 } = await renderWithProviders(
+      <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+        <Text>Line 1</Text>
+        <Text>Line 2</Text>
+        <Text>Line 3</Text>
+        <Text>Line 4</Text>
+        <Text>Line 5</Text>
+        <Text>Line 6</Text>
+        <Text>Line 7</Text>
+        <Text>Line 8</Text>
+        <Text>Line 9</Text>
+        <Text>Line 10</Text>
+      </Scrollable>,
+    );
+    await waitFor(() => {
+      expect(capturedEntry?.getScrollState().scrollTop).toBe(5);
+    });
 
     // Call scrollBy multiple times (upwards) in the same tick
     await act(async () => {
-      capturedEntry!.scrollBy(-1);
-      capturedEntry!.scrollBy(-1);
+      capturedEntry?.scrollBy(-1);
+      capturedEntry?.scrollBy(-1);
     });
     // Should have moved up by 2 (5 -> 3)
-    expect(capturedEntry.getScrollState().scrollTop).toBe(3);
+    await waitFor(() => {
+      expect(capturedEntry?.getScrollState().scrollTop).toBe(3);
+    });
 
     await act(async () => {
-      capturedEntry!.scrollBy(-2);
+      capturedEntry?.scrollBy(-2);
     });
-    expect(capturedEntry.getScrollState().scrollTop).toBe(1);
+    await waitFor(() => {
+      expect(capturedEntry?.getScrollState().scrollTop).toBe(1);
+    });
     unmount2();
   });
 
@@ -191,10 +182,6 @@ describe('<Scrollable />', () => {
         keySequence,
         expectedScrollTop,
       }) => {
-        // Dynamically import ink to mock getScrollHeight
-        const ink = await import('ink');
-        vi.mocked(ink.getScrollHeight).mockReturnValue(scrollHeight);
-
         let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
         vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
           async (entry, isActive) => {
@@ -204,12 +191,13 @@ describe('<Scrollable />', () => {
           },
         );
 
-        const { stdin, waitUntilReady, unmount } = renderWithProviders(
+        const { stdin, unmount, waitUntilReady } = await renderWithProviders(
           <Scrollable hasFocus={true} height={5}>
-            <Text>Content</Text>
+            <Box height={scrollHeight}>
+              <Text>Content</Text>
+            </Box>
           </Scrollable>,
         );
-        await waitUntilReady();
 
         // Ensure initial state using existing scrollBy method
         await act(async () => {

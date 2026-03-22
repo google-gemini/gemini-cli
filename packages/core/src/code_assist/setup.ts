@@ -4,20 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ClientMetadata,
-  GeminiUserTier,
-  IneligibleTier,
-  LoadCodeAssistResponse,
-  OnboardUserRequest,
+import {
+  UserTierId,
+  IneligibleTierReasonCode,
+  type ClientMetadata,
+  type GeminiUserTier,
+  type IneligibleTier,
+  type LoadCodeAssistResponse,
+  type OnboardUserRequest,
 } from './types.js';
-import { UserTierId, IneligibleTierReasonCode } from './types.js';
-import type { HttpOptions } from './server.js';
-import { CodeAssistServer } from './server.js';
+import { CodeAssistServer, type HttpOptions } from './server.js';
 import type { AuthClient } from 'google-auth-library';
-import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { createCache, type CacheService } from '../utils/cache.js';
+import type { Config } from '../config/config.js';
+import {
+  logOnboardingStart,
+  logOnboardingSuccess,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
+} from '../telemetry/index.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -51,6 +59,31 @@ export interface UserData {
   projectId: string;
   userTier: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
+  hasOnboardedPreviously?: boolean;
+}
+
+// Cache to store the results of setupUser to avoid redundant network calls.
+// The cache is keyed by the AuthClient instance. Inside each entry, we use
+// another cache keyed by project ID to ensure correctness if environment changes.
+let userDataCache = createCache<
+  AuthClient,
+  CacheService<string | undefined, Promise<UserData>>
+>({
+  storage: 'weakmap',
+});
+
+/**
+ * Resets the user data cache. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetUserDataCacheForTesting() {
+  userDataCache = createCache<
+    AuthClient,
+    CacheService<string | undefined, Promise<UserData>>
+  >({
+    storage: 'weakmap',
+  });
 }
 
 /**
@@ -68,7 +101,8 @@ export interface UserData {
  * retry, auth change, or cancellation.
  *
  * @param client - The authenticated client to use for API calls
- * @param validationHandler - Optional handler for account validation flow
+ * @param config - The CLI configuration
+ * @param httpOptions - Optional HTTP options
  * @returns The user's project ID, tier ID, and tier name
  * @throws {ValidationRequiredError} If account validation is required
  * @throws {ProjectIdRequiredError} If no project ID is available and required
@@ -77,13 +111,35 @@ export interface UserData {
  */
 export async function setupUser(
   client: AuthClient,
-  validationHandler?: ValidationHandler,
+  config: Config,
   httpOptions: HttpOptions = {},
 ): Promise<UserData> {
   const projectId =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+
+  const projectCache = userDataCache.getOrCreate(client, () =>
+    createCache<string | undefined, Promise<UserData>>({
+      storage: 'map',
+      defaultTtl: 30000, // 30 seconds
+    }),
+  );
+
+  return projectCache.getOrCreate(projectId, () =>
+    _doSetupUser(client, projectId, config, httpOptions),
+  );
+}
+
+/**
+ * Internal implementation of the user setup logic.
+ */
+async function _doSetupUser(
+  client: AuthClient,
+  projectId: string | undefined,
+  config: Config,
+  httpOptions: HttpOptions = {},
+): Promise<UserData> {
   const caServer = new CodeAssistServer(
     client,
     projectId,
@@ -97,6 +153,8 @@ export async function setupUser(
     platform: 'PLATFORM_UNSPECIFIED',
     pluginType: 'GEMINI',
   };
+
+  const validationHandler = config.getValidationHandler();
 
   let loadRes: LoadCodeAssistResponse;
   while (true) {
@@ -130,12 +188,24 @@ export async function setupUser(
   }
 
   if (loadRes.currentTier) {
+    if (!loadRes.paidTier?.id && !loadRes.currentTier.id) {
+      debugLogger.warn(
+        'Warning: Code Assist API did not return a user tier ID. Defaulting to STANDARD tier.',
+      );
+    }
+
     if (!loadRes.cloudaicompanionProject) {
       if (projectId) {
         return {
           projectId,
-          userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+          userTier:
+            loadRes.paidTier?.id ??
+            loadRes.currentTier.id ??
+            UserTierId.STANDARD,
           userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+          paidTier: loadRes.paidTier ?? undefined,
+          hasOnboardedPreviously:
+            loadRes.currentTier.hasOnboardedPreviously ?? true,
         };
       }
 
@@ -144,12 +214,22 @@ export async function setupUser(
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
-      userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+      userTier:
+        loadRes.paidTier?.id ?? loadRes.currentTier.id ?? UserTierId.STANDARD,
       userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+      paidTier: loadRes.paidTier ?? undefined,
+      hasOnboardedPreviously:
+        loadRes.currentTier.hasOnboardedPreviously ?? true,
     };
   }
 
   const tier = getOnboardTier(loadRes);
+
+  if (!tier.id) {
+    debugLogger.warn(
+      'Warning: Code Assist API did not return an onboarding tier ID. Defaulting to STANDARD tier.',
+    );
+  }
 
   let onboardReq: OnboardUserRequest;
   if (tier.id === UserTierId.FREE) {
@@ -170,6 +250,8 @@ export async function setupUser(
     };
   }
 
+  logOnboardingStart(config, new OnboardingStartEvent());
+
   let lroRes = await caServer.onboardUser(onboardReq);
   if (!lroRes.done && lroRes.name) {
     const operationName = lroRes.name;
@@ -179,12 +261,16 @@ export async function setupUser(
     }
   }
 
+  const userTier = tier.id ?? UserTierId.STANDARD;
+  logOnboardingSuccess(config, new OnboardingSuccessEvent(userTier));
+
   if (!lroRes.response?.cloudaicompanionProject?.id) {
     if (projectId) {
       return {
         projectId,
-        userTier: tier.id,
+        userTier: tier.id ?? UserTierId.STANDARD,
         userTierName: tier.name,
+        hasOnboardedPreviously: tier.hasOnboardedPreviously ?? false,
       };
     }
 
@@ -193,8 +279,9 @@ export async function setupUser(
 
   return {
     projectId: lroRes.response.cloudaicompanionProject.id,
-    userTier: tier.id,
+    userTier: tier.id ?? UserTierId.STANDARD,
     userTierName: tier.name,
+    hasOnboardedPreviously: tier.hasOnboardedPreviously ?? false,
   };
 }
 

@@ -8,10 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Config } from '@google/gemini-cli-core';
-import { SessionBrowser } from './SessionBrowser.js';
-import type { SessionBrowserProps } from './SessionBrowser.js';
-import type { SessionInfo } from '../../utils/sessionUtils.js';
+import { type Config } from '@google/gemini-cli-core';
+import { SessionBrowser, type SessionBrowserProps } from './SessionBrowser.js';
+import { type SessionInfo } from '../../utils/sessionUtils.js';
 
 // Collect key handlers registered via useKeypress so tests can
 // simulate input without going through the full stdin pipeline.
@@ -156,7 +155,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -165,7 +164,6 @@ describe('SessionBrowser component', () => {
         testSessions={[]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -194,7 +192,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -203,7 +201,6 @@ describe('SessionBrowser component', () => {
         testSessions={[session1, session2]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -247,7 +244,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame, waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -256,7 +253,6 @@ describe('SessionBrowser component', () => {
         testSessions={[searchSession, otherSession]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Chat Sessions (2 total');
 
@@ -307,7 +303,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame, waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -316,7 +312,6 @@ describe('SessionBrowser component', () => {
         testSessions={[session1, session2]}
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('Chat Sessions (2 total');
 
@@ -325,7 +320,7 @@ describe('SessionBrowser component', () => {
     await waitUntilReady();
 
     // Press Enter.
-    triggerKey({ name: 'return', sequence: '\r' });
+    triggerKey({ name: 'enter', sequence: '\r' });
     await waitUntilReady();
 
     expect(onResumeSession).toHaveBeenCalledTimes(1);
@@ -356,7 +351,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { waitUntilReady } = render(
+    const { waitUntilReady } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -365,10 +360,9 @@ describe('SessionBrowser component', () => {
         testSessions={[currentSession, otherSession]}
       />,
     );
-    await waitUntilReady();
 
     // Active selection is at 0 (current session).
-    triggerKey({ name: 'return', sequence: '\r' });
+    triggerKey({ name: 'enter', sequence: '\r' });
     await waitUntilReady();
     expect(onResumeSession).not.toHaveBeenCalled();
 
@@ -384,7 +378,7 @@ describe('SessionBrowser component', () => {
     const onDeleteSession = vi.fn().mockResolvedValue(undefined);
     const onExit = vi.fn();
 
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <TestSessionBrowser
         config={config}
         onResumeSession={onResumeSession}
@@ -393,7 +387,6 @@ describe('SessionBrowser component', () => {
         testError="storage failure"
       />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
   });

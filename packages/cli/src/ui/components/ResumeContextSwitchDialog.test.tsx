@@ -42,7 +42,7 @@ describe('ResumeContextSwitchDialog', () => {
   });
 
   it('renders a string prompt with MarkdownDisplay', async () => {
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <ResumeContextSwitchDialog
         prompt="Resume here?"
         terminalWidth={80}
@@ -66,7 +66,7 @@ describe('ResumeContextSwitchDialog', () => {
   it('calls onConfirm when yes is selected', async () => {
     const onConfirm = vi.fn();
     const onDecline = vi.fn();
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <ResumeContextSwitchDialog
         prompt="Resume here?"
         terminalWidth={80}
@@ -91,7 +91,7 @@ describe('ResumeContextSwitchDialog', () => {
     vi.useFakeTimers();
     const onConfirm = vi.fn();
     const onDecline = vi.fn();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ResumeContextSwitchDialog
         prompt="Resume here?"
         terminalWidth={80}
@@ -128,7 +128,7 @@ describe('ResumeContextSwitchDialog', () => {
   it('does not exit for browser decline', async () => {
     const onConfirm = vi.fn();
     const onDecline = vi.fn();
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { waitUntilReady, unmount } = await renderWithProviders(
       <ResumeContextSwitchDialog
         prompt={<Text>Resume here?</Text>}
         terminalWidth={80}
@@ -151,7 +151,7 @@ describe('ResumeContextSwitchDialog', () => {
 
   it('treats escape as decline', async () => {
     const onDecline = vi.fn();
-    const { stdin, waitUntilReady, unmount } = renderWithProviders(
+    const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <ResumeContextSwitchDialog
         prompt="Resume here?"
         terminalWidth={80}

@@ -43,7 +43,7 @@ const EXEMPT_TOOLS = new Set([
 ]);
 
 export interface MaskingResult {
-  newHistory: Content[];
+  newHistory: readonly Content[];
   maskedCount: number;
   tokensSaved: number;
 }
@@ -67,7 +67,10 @@ export interface MaskingResult {
  * are preserved until they collectively reach the threshold.
  */
 export class ToolOutputMaskingService {
-  async mask(history: Content[], config: Config): Promise<MaskingResult> {
+  async mask(
+    history: readonly Content[],
+    config: Config,
+  ): Promise<MaskingResult> {
     const maskingConfig = await config.getToolOutputMaskingConfig();
     if (!maskingConfig.enabled || history.length === 0) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
@@ -223,6 +226,7 @@ export class ToolOutputMaskingService {
       const maskedPart = {
         ...part,
         functionResponse: {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...part.functionResponse,
           response: { output: maskedSnippet },
         },

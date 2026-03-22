@@ -23,7 +23,7 @@ vi.mock('../themes/theme-manager.js', () => ({
   DEFAULT_THEME: { name: 'Default' },
 }));
 
-vi.mock('../themes/holiday.js', () => ({
+vi.mock('../themes/builtin/dark/holiday-dark.js', () => ({
   Holiday: { name: 'Holiday' },
 }));
 
@@ -48,10 +48,13 @@ describe('useSnowfall', () => {
     vi.useRealTimers();
   });
 
-  it('initially enables animation during holiday season with Holiday theme', () => {
-    const { result } = renderHookWithProviders(() => useSnowfall(mockArt), {
-      uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
-    });
+  it('initially enables animation during holiday season with Holiday theme', async () => {
+    const { result } = await renderHookWithProviders(
+      () => useSnowfall(mockArt),
+      {
+        uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+      },
+    );
 
     // Should contain holiday trees
     expect(result.current).toContain('|_|');
@@ -59,10 +62,13 @@ describe('useSnowfall', () => {
     expect(debugState.debugNumAnimatedComponents).toBeGreaterThan(0);
   });
 
-  it('stops animation after 15 seconds', () => {
-    const { result } = renderHookWithProviders(() => useSnowfall(mockArt), {
-      uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
-    });
+  it('stops animation after 15 seconds', async () => {
+    const { result } = await renderHookWithProviders(
+      () => useSnowfall(mockArt),
+      {
+        uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+      },
+    );
 
     expect(debugState.debugNumAnimatedComponents).toBeGreaterThan(0);
 
@@ -76,35 +82,44 @@ describe('useSnowfall', () => {
     expect(result.current).toBe(mockArt);
   });
 
-  it('does not enable animation if not holiday season', () => {
+  it('does not enable animation if not holiday season', async () => {
     vi.setSystemTime(new Date('2025-06-15'));
-    const { result } = renderHookWithProviders(() => useSnowfall(mockArt), {
-      uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
-    });
+    const { result } = await renderHookWithProviders(
+      () => useSnowfall(mockArt),
+      {
+        uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+      },
+    );
 
     expect(result.current).toBe(mockArt);
     expect(debugState.debugNumAnimatedComponents).toBe(0);
   });
 
-  it('does not enable animation if theme is not Holiday', () => {
+  it('does not enable animation if theme is not Holiday', async () => {
     vi.mocked(themeManager.getActiveTheme).mockReturnValue({
       name: 'Default',
     } as Theme);
-    const { result } = renderHookWithProviders(() => useSnowfall(mockArt), {
-      uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
-    });
+    const { result } = await renderHookWithProviders(
+      () => useSnowfall(mockArt),
+      {
+        uiState: { history: [], historyRemountKey: 0 } as Partial<UIState>,
+      },
+    );
 
     expect(result.current).toBe(mockArt);
     expect(debugState.debugNumAnimatedComponents).toBe(0);
   });
 
-  it('does not enable animation if chat has started', () => {
-    const { result } = renderHookWithProviders(() => useSnowfall(mockArt), {
-      uiState: {
-        history: [{ type: 'user', text: 'hello' }],
-        historyRemountKey: 0,
-      } as Partial<UIState>,
-    });
+  it('does not enable animation if chat has started', async () => {
+    const { result } = await renderHookWithProviders(
+      () => useSnowfall(mockArt),
+      {
+        uiState: {
+          history: [{ type: 'user', text: 'hello' }],
+          historyRemountKey: 0,
+        } as Partial<UIState>,
+      },
+    );
 
     expect(result.current).toBe(mockArt);
     expect(debugState.debugNumAnimatedComponents).toBe(0);

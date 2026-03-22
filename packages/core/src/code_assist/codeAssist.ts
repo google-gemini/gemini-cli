@@ -4,12 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ContentGenerator } from '../core/contentGenerator.js';
-import { AuthType } from '../core/contentGenerator.js';
+import { AuthType, type ContentGenerator } from '../core/contentGenerator.js';
 import { getOauthClient } from './oauth2.js';
 import { setupUser } from './setup.js';
-import type { HttpOptions } from './server.js';
-import { CodeAssistServer } from './server.js';
+import { CodeAssistServer, type HttpOptions } from './server.js';
 import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
 
@@ -24,11 +22,7 @@ export async function createCodeAssistContentGenerator(
     authType === AuthType.COMPUTE_ADC
   ) {
     const authClient = await getOauthClient(authType, config);
-    const userData = await setupUser(
-      authClient,
-      config.getValidationHandler(),
-      httpOptions,
-    );
+    const userData = await setupUser(authClient, config, httpOptions);
     return new CodeAssistServer(
       authClient,
       userData.projectId,
@@ -36,6 +30,8 @@ export async function createCodeAssistContentGenerator(
       sessionId,
       userData.userTier,
       userData.userTierName,
+      userData.paidTier,
+      config,
     );
   }
 

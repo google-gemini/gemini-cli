@@ -45,6 +45,10 @@ Write precisely to ensure your instructions are unambiguous.
   specific verbs.
 - **Examples:** Use meaningful names in examples; avoid placeholders like
   "foo" or "bar."
+- **Quota and limit terminology:** For any content involving resource capacity
+  or using the word "quota" or "limit", strictly adhere to the guidelines in
+  the `quota-limit-style-guide.md` resource file. Generally, Use "quota" for the
+  administrative bucket and "limit" for the numerical ceiling.
 
 ### Formatting and syntax
 Apply consistent formatting to make documentation visually organized and
@@ -67,12 +71,44 @@ accessible.
   tables).
 - **Media:** Use lowercase hyphenated filenames. Provide descriptive alt text
   for all images.
+- **Details section:** Use the `<details>` tag to create a collapsible section.
+  This is useful for supplementary or data-heavy information that isn't critical
+  to the main flow.
+
+  Example:
+
+  <details>
+  <summary>Title</summary>
+
+  - First entry
+  - Second entry
+
+  </details>
+
+- **Callouts**: Use GitHub-flavored markdown alerts to highlight important
+  information. To ensure the formatting is preserved by `npm run format`, place
+  an empty line, then the `<!-- prettier-ignore -->` comment directly before
+  the callout block. The callout type (`[!TYPE]`) should be on the first line,
+  followed by a newline, and then the content, with each subsequent line of
+  content starting with `>`. Available types are `NOTE`, `TIP`, `IMPORTANT`,
+  `WARNING`, and `CAUTION`.
+
+  Example:
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an example of a multi-line note that will be preserved
+> by Prettier.
 
 ### Structure
 - **BLUF:** Start with an introduction explaining what to expect.
 - **Experimental features:** If a feature is clearly noted as experimental,
-add the following note immediately after the introductory paragraph:
-  `> **Note:** This is a preview feature currently under active development.`
+  add the following note immediately after the introductory paragraph:
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development.
+
 - **Headings:** Use hierarchical headings to support the user journey.
 - **Procedures:** 
   - Introduce lists of steps with a complete sentence.
@@ -81,8 +117,7 @@ add the following note immediately after the introductory paragraph:
   - Put conditions before instructions (e.g., "On the Settings page, click...").
   - Provide clear context for where the action takes place.
   - Indicate optional steps clearly (e.g., "Optional: ...").
-- **Elements:** Use bullet lists, tables, notes (`> **Note:**`), and warnings 
-  (`> **Warning:**`).
+- **Elements:** Use bullet lists, tables, details, and callouts.
 - **Avoid using a table of contents:** If a table of contents is present, remove
   it.
 - **Next steps:** Conclude with a "Next steps" section if applicable.
@@ -114,6 +149,8 @@ documentation.
   reflects existing code.
 - **Structure:** Apply "Structure (New Docs)" rules (BLUF, headings, etc.) when 
   adding new sections to existing pages.
+- **Headers**: If you change a header, you must check for links that lead to
+  that header and update them.
 - **Tone:** Ensure the tone is active and engaging. Use "you" and contractions.
 - **Clarity:** Correct awkward wording, spelling, and grammar. Rephrase
   sentences to make them easier for users to understand.
@@ -129,7 +166,8 @@ and that all links are functional.
   technical behavior.
 2.  **Self-review:** Re-read changes for formatting, correctness, and flow.
 3.  **Link check:** Verify all new and existing links leading to or from modified
-    pages.
+    pages. If you changed a header, ensure that any links that lead to it are
+    updated.
 4.  **Format:** Once all changes are complete, ask to execute `npm run format`
     to ensure consistent formatting across the project. If the user confirms,
     execute the command.
