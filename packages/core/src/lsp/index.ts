@@ -20,7 +20,6 @@ export type {
   LspServerUserConfig,
   LspServerDefinition,
   Diagnostic,
-  DiagnosticSeverity,
   DocumentSymbol,
   SymbolInformation,
   Hover,
@@ -28,4 +27,4 @@ export type {
   Position,
   Range,
 } from './types.js';
-export { DEFAULT_LSP_SETTINGS } from './types.js';
+export { DiagnosticSeverity, DEFAULT_LSP_SETTINGS } from './types.js';
