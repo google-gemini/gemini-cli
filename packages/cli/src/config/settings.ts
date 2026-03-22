@@ -22,6 +22,7 @@ import {
   createCache,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
+import { parse } from 'comment-json';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { DefaultDark } from '../ui/themes/builtin/dark/default-dark.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -1070,7 +1071,36 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    const settingsToSave = settingsFile.originalSettings;
+    let settingsToSave = settingsFile.originalSettings;
+
+    // If the file exists, re-read it and merge any top-level keys that the CLI doesn't track.
+    // This preserves external modifications (e.g., from hooks) while applying CLI changes.
+    if (fs.existsSync(settingsFile.path)) {
+      try {
+        const fileContent = fs.readFileSync(settingsFile.path, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const currentFileSettings = parse(fileContent) as Record<
+          string,
+          unknown
+        >;
+
+        // Merge external keys: adopt any top-level keys from the file that originalSettings doesn't track
+        // CLI changes take precedence, so we don't overwrite keys that the CLI manages
+        const merged: Record<string, unknown> = {
+          ...currentFileSettings,
+          ...settingsToSave,
+        };
+
+        settingsToSave = merged;
+      } catch (parseError) {
+        // If parsing fails, log but continue with original settings
+        coreEvents.emitFeedback(
+          'warning',
+          'Could not parse existing settings file to preserve external modifications. Saving only CLI changes.',
+          parseError,
+        );
+      }
+    }
 
     // Use the format-preserving update function
     updateSettingsFilePreservingFormat(
