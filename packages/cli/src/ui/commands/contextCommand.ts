@@ -32,7 +32,7 @@ function estimateToolDeclarationTokens(tools: readonly Tool[]): number {
 }
 
 async function contextAction(context: CommandContext): Promise<void> {
-  const config = context.services.config;
+  const config = context.services.agentContext?.config;
   if (!config) {
     context.ui.addItem({
       type: MessageType.ERROR,
