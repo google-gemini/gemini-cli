@@ -100,9 +100,14 @@ safety and workflow rules.
 
 This creates the file and writes the current built‑in system prompt to it.
 
-## Best practices: SYSTEM.md vs GEMINI.md
+## Best practices: system.md vs GEMINI.md
 
-- SYSTEM.md (firmware):
+> Note: File names are case-sensitive. The CLI expects `.gemini/system.md`
+> (lowercase).  
+> References to `SYSTEM.md` in this section describe its conceptual role, not a
+> different filename.
+
+- system.md (firmware):
   - Non‑negotiable operational rules: safety, tool‑use protocols, approvals, and
     mechanics that keep the CLI reliable.
   - Stable across tasks and projects (or per project when needed).
