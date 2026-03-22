@@ -1701,7 +1701,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
         handleCtrlCPress();
         return true;
-      } else if (keyMatchers[Command.EXIT](key)) {
+      } else if (
+        keyMatchers[Command.EXIT](key) &&
+        bufferRef.current.text.length === 0
+      ) {
         handleCtrlDPress();
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
@@ -1879,6 +1882,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       triggerExpandHint,
       keyMatchers,
       isHelpDismissKey,
+      bufferRef,
     ],
   );
 
