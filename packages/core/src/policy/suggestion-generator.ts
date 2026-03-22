@@ -10,7 +10,7 @@ import type { Config } from '../config/config.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { safeTemplateReplace } from '../utils/textUtils.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isSafeRegExp } from './utils.js';
 import {
@@ -111,7 +111,7 @@ function buildToolContext(details: SerializableConfirmationDetails): string {
 }
 
 /**
- * Uses Gemini Flash to suggest a well-scoped policy rule for a tool approval.
+ * Uses Gemini Flash Lite to suggest a well-scoped policy rule for a tool approval.
  *
  * Returns null on any failure (fail-open pattern).
  */
@@ -144,11 +144,11 @@ export async function suggestPolicyScope(
   const TIMEOUT_MS = 5000;
 
   try {
-    // Time-box the Flash call — the user may confirm before it responds.
+    // Time-box the Flash Lite call — the user may confirm before it responds.
     const result = await Promise.race([
       contentGenerator.generateContent(
         {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
+          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
           config: {
             responseMimeType: 'application/json',
             responseSchema: zodToJsonSchema(PolicySuggestionSchema, {
