@@ -403,6 +403,7 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.ProceedOnce,
       );
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
@@ -437,6 +438,7 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.Cancel,
       );
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
@@ -471,6 +473,7 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.ModifyWithEditor,
       );
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
@@ -487,6 +490,7 @@ describe('UiTelemetryService', () => {
     it('should process a ToolCallEvent without a decision', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
@@ -523,10 +527,12 @@ describe('UiTelemetryService', () => {
       );
 
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall1)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall2)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
@@ -558,10 +564,12 @@ describe('UiTelemetryService', () => {
       const toolCall1 = createFakeCompletedToolCall('tool_A', true, 100);
       const toolCall2 = createFakeCompletedToolCall('tool_B', false, 200);
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall1)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
       service.addEvent({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall2)),
         'event.name': EVENT_TOOL_CALL,
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
@@ -818,6 +826,7 @@ describe('UiTelemetryService', () => {
     it('should aggregate valid line count metadata', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       const event = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
         metadata: {
@@ -836,6 +845,7 @@ describe('UiTelemetryService', () => {
     it('should ignore null/undefined values in line count metadata', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       const event = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
         metadata: {
