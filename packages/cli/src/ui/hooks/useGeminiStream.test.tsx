@@ -983,7 +983,7 @@ describe('useGeminiStream', () => {
   });
 
   it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
-    const stopExecutionToolCalls: TrackedToolCall[] = [
+    const stopExecutionToolCalls: TrackedCompletedToolCall[] = [
       {
         request: {
           callId: 'stop-call',
@@ -1055,7 +1055,7 @@ describe('useGeminiStream', () => {
   });
 
   it('should add a compact suppressed-error note before STOP_EXECUTION terminal info in low verbosity mode', async () => {
-    const stopExecutionToolCalls: TrackedToolCall[] = [
+    const stopExecutionToolCalls: TrackedCompletedToolCall[] = [
       {
         request: {
           callId: 'stop-call',
@@ -1977,7 +1977,9 @@ describe('useGeminiStream', () => {
       } as unknown as TrackedCompletedToolCall;
 
       await act(async () => {
-        await capturedOnComplete([completedTool]);
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedTool]);
+        }
       });
 
       // Verify that the tool call and response were added to GeminiChat history
@@ -2039,7 +2041,9 @@ describe('useGeminiStream', () => {
       } as unknown as TrackedCompletedToolCall;
 
       await act(async () => {
-        await capturedOnComplete([completedTool]);
+        if (capturedOnComplete) {
+          await capturedOnComplete([completedTool]);
+        }
       });
 
       // Verify that addHistory was NOT called
