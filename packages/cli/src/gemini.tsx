@@ -268,13 +268,18 @@ export async function main() {
     });
   }
 
-  // Check for invalid input combinations early to prevent crashes
-  if (argv.promptInteractive && !process.stdin.isTTY) {
-    writeToStderr(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
-    );
-    await runExitCleanup();
-    process.exit(ExitCodes.FATAL_INPUT_ERROR);
+  let stdinData: string | undefined = undefined;
+  if (!process.stdin.isTTY) {
+    stdinData = await readStdin();
+    if (stdinData) {
+      if (argv.promptInteractive) {
+        argv.promptInteractive = `${stdinData}\n\n${argv.promptInteractive}`;
+      } else if (argv.prompt) {
+        argv.prompt = `${stdinData}\n\n${argv.prompt}`;
+      } else {
+        argv.prompt = stdinData;
+      }
+    }
   }
 
   const isDebugMode = cliConfig.isDebugMode(argv);
@@ -386,28 +391,29 @@ export async function main() {
         await runExitCleanup();
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }
-      let stdinData = '';
-      if (!process.stdin.isTTY) {
-        stdinData = await readStdin();
-      }
-
-      // This function is a copy of the one from sandbox.ts
-      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
       const injectStdinIntoArgs = (
         args: string[],
         stdinData?: string,
       ): string[] => {
         const finalArgs = [...args];
         if (stdinData) {
+          const promptInteractiveIndex = finalArgs.findIndex(
+            (arg) => arg === '--prompt-interactive' || arg === '-i',
+          );
           const promptIndex = finalArgs.findIndex(
             (arg) => arg === '--prompt' || arg === '-p',
           );
-          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
+
+          if (
+            promptInteractiveIndex > -1 &&
+            finalArgs.length > promptInteractiveIndex + 1
+          ) {
+            finalArgs[promptInteractiveIndex + 1] =
+              `${stdinData}\n\n${finalArgs[promptInteractiveIndex + 1]}`;
+          } else if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
             finalArgs[promptIndex + 1] =
               `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
           } else {
-            // If there's no prompt argument, add stdin as the prompt
             finalArgs.push('--prompt', stdinData);
           }
         }
@@ -611,15 +617,7 @@ export async function main() {
     await config.initialize();
     startupProfiler.flush(config);
 
-    // If not a TTY, read from stdin
-    // This is for cases where the user pipes input directly into the command
-    let stdinData: string | undefined = undefined;
-    if (!process.stdin.isTTY) {
-      stdinData = await readStdin();
-      if (stdinData) {
-        input = input ? `${stdinData}\n\n${input}` : stdinData;
-      }
-    }
+    // Stdin was already read and merged into argv earlier during initialization.
 
     // Fire SessionStart hook through MessageBus (only if hooks are enabled)
     // Must be called AFTER config.initialize() to ensure HookRegistry is loaded

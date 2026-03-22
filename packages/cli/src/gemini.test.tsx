@@ -921,12 +921,12 @@ describe('gemini.tsx main function kitty protocol', () => {
       networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-    vi.mocked(loadCliConfig).mockResolvedValue(
-      createMockConfig({
-        isInteractive: () => false,
-        getQuestion: () => 'test-question',
-        getSandbox: () => undefined,
-      }),
+    vi.mocked(loadCliConfig).mockImplementation(
+      async (settings, sessionId, argv) => createMockConfig({
+          isInteractive: () => false,
+          getQuestion: () => argv.prompt || 'test-question',
+          getSandbox: () => undefined,
+        }),
     );
 
     // Mock stdin to be non-TTY
@@ -948,7 +948,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     // Since vi.mock is hoisted, runNonInteractiveSpy is defined early.
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
-    expect(callArgs.input).toBe('stdin-data\n\ntest-question');
+    // Due to early parsing, stdinData is assigned to argv.prompt
+    expect(callArgs.input).toBe('stdin-data');
     expect(
       terminalNotificationMocks.buildRunEventNotificationContent,
     ).not.toHaveBeenCalled();
@@ -985,8 +986,13 @@ describe('gemini.tsx main function exit codes', () => {
     vi.restoreAllMocks();
   });
 
-  it('should exit with 42 for invalid input combination (prompt-interactive with non-TTY)', async () => {
-    vi.mocked(loadCliConfig).mockResolvedValue(createMockConfig());
+  it('should NOT exit when using prompt-interactive with non-TTY (Fix for #23414)', async () => {
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => 'some combined input',
+      }),
+    );
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: { security: { auth: {} }, ui: {} },
@@ -1001,12 +1007,15 @@ describe('gemini.tsx main function exit codes', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = false;
 
+    // It should not crash with 42 anymore. It might exit with 0 or return cleanly.
     try {
       await main();
-      expect.fail('Should have thrown MockProcessExitError');
     } catch (e) {
-      expect(e).toBeInstanceOf(MockProcessExitError);
-      expect((e as MockProcessExitError).code).toBe(42);
+      if (e instanceof MockProcessExitError) {
+        expect(e.code).toBe(0);
+      } else {
+        throw e;
+      }
     }
   });
 
