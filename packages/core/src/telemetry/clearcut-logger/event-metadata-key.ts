@@ -714,25 +714,25 @@ export enum EventMetadataKey {
   GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
 
   // ==========================================================================
-  // Policy Suggestion Events (Smart Policy Scoping)
-  // ==========================================================================
-
-  // Logs the tool context used for generating a policy suggestion.
-  POLICY_SUGGESTION_TOOL_CONTEXT = 191,
-
-  // Logs the generated policy suggestion.
-  POLICY_SUGGESTION_RESULT = 192,
-
-  // Logs the error message for policy suggestion events.
-  POLICY_SUGGESTION_ERROR = 193,
-
-  // ==========================================================================
   // Gemini Enterprise (GE) Event Keys
   // ==========================================================================
 
   // Logs the start of the onboarding process.
-  GEMINI_CLI_ONBOARDING_START = 194,
+  GEMINI_CLI_ONBOARDING_START = 192,
 
   // Logs the user tier for onboarding success events.
-  GEMINI_CLI_ONBOARDING_USER_TIER = 195,
+  GEMINI_CLI_ONBOARDING_USER_TIER = 193,
+
+  // ==========================================================================
+  // Policy Suggestion Events (Smart Policy Scoping)
+  // ==========================================================================
+
+  // Logs the tool context used for generating a policy suggestion.
+  POLICY_SUGGESTION_TOOL_CONTEXT = 196,
+
+  // Logs the generated policy suggestion.
+  POLICY_SUGGESTION_RESULT = 197,
+
+  // Logs the error message for policy suggestion events.
+  POLICY_SUGGESTION_ERROR = 198,
 }
