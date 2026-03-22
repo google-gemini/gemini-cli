@@ -26,8 +26,13 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   const escapedSessionId = escapeShellArg(stats.sessionId, shell);
   let footer = `To resume this session: gemini --resume ${escapedSessionId}`;
 
-  if (worktreeSettings) {
+  if (worktreeSettings?.removed) {
     footer =
+      `Worktree cleaned up (no changes detected).\n` +
+      `To resume this session: gemini --resume ${escapedSessionId}`;
+  } else if (worktreeSettings) {
+    footer =
+      `Worktree preserved.\n` +
       `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${escapedSessionId}\n` +
       `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
   }
