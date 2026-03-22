@@ -19,6 +19,7 @@ import { LSP_QUERY_TOOL_NAME } from './tool-names.js';
 import { LSP_QUERY_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { formatDiagnostics, formatSymbolSummary } from '../lsp/enrichment.js';
+import { LspTimeoutError } from '../lsp/client.js';
 import type { Hover, Location } from '../lsp/types.js';
 
 // ---------------------------------------------------------------------------
@@ -147,6 +148,13 @@ class LspQueryInvocation extends BaseToolInvocation<
           };
       }
     } catch (e) {
+      if (e instanceof LspTimeoutError) {
+        return {
+          llmContent:
+            'LSP server timed out processing this request. The server may be busy indexing or the file may be very large. Try again shortly.',
+          returnDisplay: 'LSP timed out.',
+        };
+      }
       const msg = e instanceof Error ? e.message : String(e);
       return {
         llmContent: `LSP query failed: ${msg}`,

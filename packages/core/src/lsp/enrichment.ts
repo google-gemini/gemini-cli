@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { Diagnostic, DocumentSymbol, SymbolInformation } from './types.js';
 import { DiagnosticSeverity, SymbolKind } from './types.js';
@@ -321,7 +322,7 @@ export function formatSymbolSummary(
 export async function enrichReadWithLsp(
   config: Config,
   filePath: string,
-  fileContent: string,
+  _fileContent: string,
   llmContent: string,
 ): Promise<string> {
   if (!config.isLspEnabled?.()) return llmContent;
@@ -330,8 +331,12 @@ export async function enrichReadWithLsp(
     const lspMgr = await config.getLspManager();
     if (!lspMgr || !lspMgr.hasServerFor(filePath)) return llmContent;
 
-    // Touch the file to keep the server warm and get diagnostics.
-    const diagResult = await lspMgr.getDiagnostics(filePath, fileContent);
+    // Always send the FULL file to the LSP server, not the possibly-truncated
+    // snippet from read_file. Sending a snippet would make the server think
+    // the entire file is that snippet, causing wrong diagnostics, lost
+    // symbols, and broken go-to-definition coordinates.
+    const fullContent = await fs.readFile(filePath, 'utf-8');
+    const diagResult = await lspMgr.getDiagnostics(filePath, fullContent);
 
     let enriched = llmContent;
 

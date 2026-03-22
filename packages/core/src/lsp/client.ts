@@ -20,6 +20,17 @@ import type {
 import { isRecord } from '../utils/markdownUtils.js';
 
 /**
+ * Thrown when an LSP request times out. Exported so callers can distinguish
+ * a timeout from a genuine "no results" response.
+ */
+export class LspTimeoutError extends Error {
+  constructor(method: string, timeoutMs: number) {
+    super(`LSP request '${method}' timed out after ${timeoutMs}ms`);
+    this.name = 'LspTimeoutError';
+  }
+}
+
+/**
  * Events emitted by LspClient.
  *
  * - `diagnostics`: Published when the server sends a
@@ -399,11 +410,7 @@ export class LspClient extends EventEmitter<LspClientEvents> {
 
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(
-          new Error(
-            `LSP request '${method}' timed out after ${effectiveTimeout}ms`,
-          ),
-        );
+        reject(new LspTimeoutError(method, effectiveTimeout));
       }, effectiveTimeout);
 
       const wrappedResolve = (value: unknown) => resolve(value as T); // eslint-disable-line @typescript-eslint/no-unsafe-type-assertion

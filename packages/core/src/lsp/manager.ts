@@ -7,7 +7,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { LspClient } from './client.js';
+import { LspClient, LspTimeoutError } from './client.js';
 import { LspServerRegistry } from './server-registry.js';
 import type {
   Diagnostic,
@@ -242,7 +242,8 @@ export class LspManager {
         character,
         signal,
       );
-    } catch {
+    } catch (e) {
+      if (e instanceof LspTimeoutError) throw e;
       return null;
     }
   }
@@ -265,7 +266,8 @@ export class LspManager {
       );
       if (!result) return [];
       return Array.isArray(result) ? result : [result];
-    } catch {
+    } catch (e) {
+      if (e instanceof LspTimeoutError) throw e;
       return [];
     }
   }
@@ -288,7 +290,8 @@ export class LspManager {
           signal,
         )) ?? []
       );
-    } catch {
+    } catch (e) {
+      if (e instanceof LspTimeoutError) throw e;
       return [];
     }
   }
@@ -307,7 +310,8 @@ export class LspManager {
           signal,
         )) ?? []
       );
-    } catch {
+    } catch (e) {
+      if (e instanceof LspTimeoutError) throw e;
       return [];
     }
   }
@@ -322,7 +326,8 @@ export class LspManager {
       const resolved = await this.resolveServer(filePath, signal);
       if (!resolved) return [];
       return (await resolved.client.workspaceSymbols(query, signal)) ?? [];
-    } catch {
+    } catch (e) {
+      if (e instanceof LspTimeoutError) throw e;
       return [];
     }
   }
