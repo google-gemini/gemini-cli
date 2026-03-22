@@ -29,7 +29,8 @@ export const useSessionBrowser = (
     uiHistory: HistoryItemWithoutId[],
     clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
     resumedSessionData: ResumedSessionData,
-  ) => Promise<void>,
+    source?: 'startup' | 'browser',
+  ) => Promise<boolean>,
 ) => {
   const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(false);
 
@@ -50,14 +51,13 @@ export const useSessionBrowser = (
     handleResumeSession: useCallback(
       async (session: SessionInfo) => {
         try {
-          const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
-            'chats',
-          );
-
-          const fileName = session.fileName;
-
-          const originalFilePath = path.join(chatsDir, fileName);
+          const originalFilePath =
+            session.sessionPath ??
+            path.join(
+              config.storage.getProjectTempDir(),
+              'chats',
+              session.fileName,
+            );
 
           // Load up the conversation.
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -67,23 +67,32 @@ export const useSessionBrowser = (
 
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
+          const currentSessionId = config.getSessionId();
           config.setSessionId(existingSessionId);
 
           const resumedSessionData = {
             conversation,
             filePath: originalFilePath,
+            originProjectPath:
+              session.originProjectPath ?? conversation.originProjectPath,
           };
 
-          // We've loaded it; tell the UI about it.
-          setIsSessionBrowserOpen(false);
           const historyData = convertSessionToHistoryFormats(
             conversation.messages,
           );
-          await onLoadHistory(
+          const didResume = await onLoadHistory(
             historyData.uiHistory,
             convertSessionToClientHistory(conversation.messages),
             resumedSessionData,
+            'browser',
           );
+          if (!didResume) {
+            config.setSessionId(currentSessionId);
+            return;
+          }
+
+          // We've loaded it; tell the UI about it.
+          setIsSessionBrowserOpen(false);
         } catch (error) {
           coreEvents.emitFeedback('error', 'Error resuming session:', error);
           setIsSessionBrowserOpen(false);
@@ -106,7 +115,14 @@ export const useSessionBrowser = (
             .getGeminiClient()
             ?.getChatRecordingService();
           if (chatRecordingService) {
-            chatRecordingService.deleteSession(session.file);
+            if (session.sessionPath) {
+              chatRecordingService.deleteSessionByPath(
+                session.sessionPath,
+                session.id,
+              );
+            } else {
+              chatRecordingService.deleteSession(session.file);
+            }
           }
         } catch (error) {
           coreEvents.emitFeedback('error', 'Error deleting session:', error);

@@ -25,6 +25,9 @@ vi.mock('./FolderTrustDialog.js', () => ({
 vi.mock('./ConsentPrompt.js', () => ({
   ConsentPrompt: () => <Text>ConsentPrompt</Text>,
 }));
+vi.mock('./ResumeContextSwitchDialog.js', () => ({
+  ResumeContextSwitchDialog: () => <Text>ResumeContextSwitchDialog</Text>,
+}));
 vi.mock('./ThemeDialog.js', () => ({
   ThemeDialog: () => <Text>ThemeDialog</Text>,
 }));
@@ -58,6 +61,9 @@ vi.mock('./ModelDialog.js', () => ({
 vi.mock('./IdeTrustChangeDialog.js', () => ({
   IdeTrustChangeDialog: () => <Text>IdeTrustChangeDialog</Text>,
 }));
+vi.mock('./NewAgentsNotification.js', () => ({
+  NewAgentsNotification: () => <Text>NewAgentsNotification</Text>,
+}));
 vi.mock('./AgentConfigDialog.js', () => ({
   AgentConfigDialog: () => <Text>AgentConfigDialog</Text>,
 }));
@@ -86,6 +92,7 @@ describe('DialogManager', () => {
     loopDetectionConfirmationRequest: null,
     confirmationRequest: null,
     consentRequest: null,
+    resumeContextSwitchConfirmationRequest: null,
     isThemeDialogOpen: false,
     isSettingsDialogOpen: false,
     isModelDialogOpen: false,
@@ -96,6 +103,8 @@ describe('DialogManager', () => {
     showPrivacyNotice: false,
     isPermissionsDialogOpen: false,
     isAgentConfigDialogOpen: false,
+    newAgents: null,
+    customDialog: null,
     selectedAgentName: undefined,
     selectedAgentDisplayName: undefined,
     selectedAgentDefinition: undefined,
@@ -162,6 +171,16 @@ describe('DialogManager', () => {
       },
       'ConsentPrompt',
     ],
+    [
+      {
+        resumeContextSwitchConfirmationRequest: {
+          prompt: 'resume here?',
+          onConfirm: vi.fn(),
+          onDecline: vi.fn(),
+        },
+      },
+      'ResumeContextSwitchDialog',
+    ],
     [{ isThemeDialogOpen: true }, 'ThemeDialog'],
     [{ isSettingsDialogOpen: true }, 'SettingsDialog'],
     [{ isModelDialogOpen: true }, 'ModelDialog'],
@@ -207,4 +226,46 @@ describe('DialogManager', () => {
       unmount();
     },
   );
+
+  it('prioritizes folder trust ahead of resume context confirmation', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <DialogManager {...defaultProps} />,
+      {
+        uiState: {
+          ...baseUiState,
+          isFolderTrustDialogOpen: true,
+          resumeContextSwitchConfirmationRequest: {
+            prompt: 'resume here?',
+            onConfirm: vi.fn(),
+            onDecline: vi.fn(),
+          },
+        } as Partial<UIState> as UIState,
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('FolderTrustDialog');
+    expect(lastFrame()).not.toContain('ResumeContextSwitchDialog');
+    unmount();
+  });
+
+  it('renders custom dialogs only after higher-priority startup dialogs', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <DialogManager {...defaultProps} />,
+      {
+        uiState: {
+          ...baseUiState,
+          resumeContextSwitchConfirmationRequest: {
+            prompt: 'resume here?',
+            onConfirm: vi.fn(),
+            onDecline: vi.fn(),
+          },
+          customDialog: <Text>CustomDialog</Text>,
+        } as Partial<UIState> as UIState,
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('ResumeContextSwitchDialog');
+    expect(lastFrame()).not.toContain('CustomDialog');
+    unmount();
+  });
 });

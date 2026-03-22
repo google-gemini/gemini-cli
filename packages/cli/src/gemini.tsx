@@ -696,9 +696,19 @@ export async function main() {
       const sessionSelector = new SessionSelector(config);
       try {
         const result = await sessionSelector.resolveSession(argv.resume);
+        if (!config.isInteractive() && result.isOriginProjectMismatch) {
+          const originalFolder = result.originProjectPath ?? 'unknown';
+          coreEvents.emitFeedback(
+            'error',
+            `Cannot resume session ${result.sessionData.sessionId} from "${process.cwd()}" in non-interactive mode.\n  Original folder: ${originalFolder}\n  Rerun from the original folder:\n    cd ${originalFolder}\n    gemini --resume ${result.sessionData.sessionId}`,
+          );
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        }
         resumedSessionData = {
           conversation: result.sessionData,
           filePath: result.sessionPath,
+          originProjectPath: result.originProjectPath,
         };
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);

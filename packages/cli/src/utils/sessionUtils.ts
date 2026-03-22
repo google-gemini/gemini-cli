@@ -12,11 +12,14 @@ import {
   type Config,
   type ConversationRecord,
   type MessageRecord,
+  Storage,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
+
+const PROJECT_ROOT_FILE = '.project_root';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -48,10 +51,7 @@ export class SessionError extends Error {
    * Creates an error for when no sessions exist for the current project.
    */
   static noSessionsFound(): SessionError {
-    return new SessionError(
-      'NO_SESSIONS_FOUND',
-      'No previous sessions found for this project.',
-    );
+    return new SessionError('NO_SESSIONS_FOUND', 'No previous sessions found.');
   }
 
   /**
@@ -89,6 +89,8 @@ export interface SessionInfo {
   file: string;
   /** Full filename including .json extension */
   fileName: string;
+  /** Absolute path to the session file */
+  sessionPath?: string;
   /** ISO timestamp when session started */
   startTime: string;
   /** Total number of messages in the session */
@@ -101,6 +103,10 @@ export interface SessionInfo {
   firstUserMessage: string;
   /** Whether this is the currently active session */
   isCurrentSession: boolean;
+  /** Original project root where the session was created */
+  originProjectPath?: string;
+  /** Project storage slug that owns this session */
+  projectSlug?: string;
   /** Display index in the list */
   index: number;
   /** AI-generated summary of the session (if available) */
@@ -132,6 +138,9 @@ export interface SessionSelectionResult {
   sessionPath: string;
   sessionData: ConversationRecord;
   displayInfo: string;
+  originProjectPath?: string;
+  projectSlug?: string;
+  isOriginProjectMismatch: boolean;
 }
 
 /**
@@ -234,6 +243,62 @@ export interface GetSessionOptions {
   includeFullContent?: boolean;
 }
 
+const normalizePathForComparison = (input: string): string => {
+  let normalized = path.resolve(input);
+  if (process.platform === 'win32') {
+    normalized = normalized.toLowerCase();
+  }
+  return normalized;
+};
+
+export const isSameProjectPath = (left?: string, right?: string): boolean => {
+  if (!left || !right) {
+    return false;
+  }
+  return normalizePathForComparison(left) === normalizePathForComparison(right);
+};
+
+const getProjectTempDirForSession = (sessionPath: string): string =>
+  path.dirname(path.dirname(sessionPath));
+
+const readProjectRootMarker = async (
+  projectTempDir: string,
+): Promise<string | undefined> => {
+  try {
+    const projectRoot = (
+      await fs.readFile(path.join(projectTempDir, PROJECT_ROOT_FILE), 'utf8')
+    ).trim();
+    return projectRoot || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const resolveSessionOriginProjectPath = async (
+  sessionPath: string,
+  conversation?: Pick<ConversationRecord, 'originProjectPath'>,
+): Promise<string | undefined> =>
+  conversation?.originProjectPath ??
+  (await readProjectRootMarker(getProjectTempDirForSession(sessionPath)));
+
+export const getGlobalChatsDirs = async (): Promise<string[]> => {
+  try {
+    const entries = await fs.readdir(Storage.getGlobalTempDir(), {
+      withFileTypes: true,
+    });
+    return entries
+      .filter((entry) => entry.isDirectory() && entry.name !== 'bin')
+      .map((entry) =>
+        path.join(Storage.getGlobalTempDir(), entry.name, 'chats'),
+      );
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+};
+
 /**
  * Loads all session files (including corrupted ones) from the chats directory.
  * @returns Array of session file entries, with sessionInfo null for corrupted files
@@ -252,6 +317,8 @@ export const getAllSessionFiles = async (
     const sessionPromises = sessionFiles.map(
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
+        const projectTempDir = path.dirname(chatsDir);
+        const projectSlug = path.basename(projectTempDir);
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const content: ConversationRecord = JSON.parse(
@@ -283,8 +350,12 @@ export const getAllSessionFiles = async (
 
           const firstUserMessage = extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId
-            ? file.includes(currentSessionId.slice(0, 8))
+            ? content.sessionId === currentSessionId
             : false;
+          const originProjectPath = await resolveSessionOriginProjectPath(
+            filePath,
+            content,
+          );
 
           let fullContent: string | undefined;
           let messages:
@@ -308,6 +379,7 @@ export const getAllSessionFiles = async (
             id: content.sessionId,
             file: file.replace('.json', ''),
             fileName: file,
+            sessionPath: filePath,
             startTime: content.startTime,
             lastUpdated: content.lastUpdated,
             messageCount: content.messages.length,
@@ -316,6 +388,8 @@ export const getAllSessionFiles = async (
               : firstUserMessage,
             firstUserMessage,
             isCurrentSession,
+            originProjectPath,
+            projectSlug,
             index: 0, // Will be set after sorting valid sessions
             summary: content.summary,
             fullContent,
@@ -346,18 +420,18 @@ export const getAllSessionFiles = async (
  * Corrupted files are automatically filtered out.
  */
 export const getSessionFiles = async (
-  chatsDir: string,
+  chatsDir: string | string[],
   currentSessionId?: string,
   options: GetSessionOptions = {},
 ): Promise<SessionInfo[]> => {
-  const allFiles = await getAllSessionFiles(
-    chatsDir,
-    currentSessionId,
-    options,
+  const chatsDirs = Array.isArray(chatsDir) ? chatsDir : [chatsDir];
+  const allFiles = await Promise.all(
+    chatsDirs.map((dir) => getAllSessionFiles(dir, currentSessionId, options)),
   );
+  const flattenedFiles = allFiles.flat();
 
   // Filter out corrupted files and extract SessionInfo
-  const validSessions = allFiles
+  const validSessions = flattenedFiles
     .filter(
       (entry): entry is { fileName: string; sessionInfo: SessionInfo } =>
         entry.sessionInfo !== null,
@@ -398,14 +472,13 @@ export class SessionSelector {
   constructor(private config: Config) {}
 
   /**
-   * Lists all available sessions for the current project.
+   * Lists all available sessions across all projects.
    */
   async listSessions(): Promise<SessionInfo[]> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
+    return getSessionFiles(
+      await getGlobalChatsDirs(),
+      this.config.getSessionId(),
     );
-    return getSessionFiles(chatsDir, this.config.getSessionId());
   }
 
   /**
@@ -463,7 +536,7 @@ export class SessionSelector {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
-        throw new Error('No previous sessions found for this project.');
+        throw new Error('No previous sessions found.');
       }
 
       // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -497,17 +570,22 @@ export class SessionSelector {
   private async selectSession(
     sessionInfo: SessionInfo,
   ): Promise<SessionSelectionResult> {
-    const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
-      'chats',
-    );
-    const sessionPath = path.join(chatsDir, sessionInfo.fileName);
+    if (!sessionInfo.sessionPath) {
+      throw new Error(`Failed to locate session file for ${sessionInfo.id}.`);
+    }
+    const sessionPath = sessionInfo.sessionPath;
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const sessionData: ConversationRecord = JSON.parse(
         await fs.readFile(sessionPath, 'utf8'),
       );
+      const originProjectPath =
+        sessionInfo.originProjectPath ??
+        (await resolveSessionOriginProjectPath(sessionPath, sessionData));
+      const isOriginProjectMismatch =
+        !!originProjectPath &&
+        !isSameProjectPath(originProjectPath, this.config.getProjectRoot());
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
@@ -515,6 +593,9 @@ export class SessionSelector {
         sessionPath,
         sessionData,
         displayInfo,
+        originProjectPath,
+        projectSlug: sessionInfo.projectSlug,
+        isOriginProjectMismatch,
       };
     } catch (error) {
       throw new Error(

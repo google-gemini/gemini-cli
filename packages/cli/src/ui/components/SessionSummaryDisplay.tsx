@@ -9,14 +9,20 @@ import { StatsDisplay } from './StatsDisplay.js';
 
 interface SessionSummaryDisplayProps {
   duration: string;
+  sessionId?: string;
 }
 
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
+  sessionId,
 }) => (
   <StatsDisplay
     title="Agent powering down. Goodbye!"
     duration={duration}
-    footer="Tip: Resume a previous session using gemini --resume or /resume"
+    footer={
+      sessionId
+        ? `Tip: Resume from any folder using gemini --resume ${sessionId} or /resume`
+        : 'Tip: Resume from any folder using gemini --resume <session-id> or /resume'
+    }
   />
 );

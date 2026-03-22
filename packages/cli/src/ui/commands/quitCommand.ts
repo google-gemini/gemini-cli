@@ -29,6 +29,7 @@ export const quitCommand: SlashCommand = {
         {
           type: 'quit',
           duration: formatDuration(wallDuration),
+          sessionId: context.services.config?.getSessionId(),
           id: now,
         },
       ],

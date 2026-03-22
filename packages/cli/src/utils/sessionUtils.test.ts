@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   SessionSelector,
   extractFirstUserMessage,
@@ -13,7 +13,7 @@ import {
   SessionError,
 } from './sessionUtils.js';
 import type { Config, MessageRecord } from '@google/gemini-cli-core';
-import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, Storage } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -21,18 +21,34 @@ import { randomUUID } from 'node:crypto';
 describe('SessionSelector', () => {
   let tmpDir: string;
   let config: Config;
+  const createChatsDir = async (
+    slug = 'project-a',
+    projectRoot = `/workspace/${slug}`,
+  ) => {
+    const projectTempDir = path.join(tmpDir, slug);
+    const chatsDir = path.join(projectTempDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+    await fs.writeFile(
+      path.join(projectTempDir, '.project_root'),
+      projectRoot,
+      'utf8',
+    );
+    return chatsDir;
+  };
 
   beforeEach(async () => {
     // Create a temporary directory for testing
     tmpDir = path.join(process.cwd(), '.tmp-test-sessions');
     await fs.mkdir(tmpDir, { recursive: true });
+    vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(tmpDir);
 
     // Mock config
     config = {
       storage: {
-        getProjectTempDir: () => tmpDir,
+        getProjectTempDir: () => path.join(tmpDir, 'current-project'),
       },
       getSessionId: () => 'current-session-id',
+      getProjectRoot: () => '/workspace/current-project',
     } as Partial<Config> as Config;
   });
 
@@ -43,6 +59,7 @@ describe('SessionSelector', () => {
     } catch (_error) {
       // Ignore cleanup errors
     }
+    vi.restoreAllMocks();
   });
 
   it('should resolve session by UUID', async () => {
@@ -50,8 +67,7 @@ describe('SessionSelector', () => {
     const sessionId2 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -116,8 +132,7 @@ describe('SessionSelector', () => {
     const sessionId2 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -180,8 +195,7 @@ describe('SessionSelector', () => {
     const sessionId2 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -240,8 +254,7 @@ describe('SessionSelector', () => {
     const sessionId = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const sessionOriginal = {
       sessionId,
@@ -304,8 +317,7 @@ describe('SessionSelector', () => {
     const sessionId1 = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     const session1 = {
       sessionId: sessionId1,
@@ -346,8 +358,7 @@ describe('SessionSelector', () => {
     const sessionIdSystemOnly = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     // Session with user message - should be listed
     const sessionWithUser = {
@@ -415,8 +426,7 @@ describe('SessionSelector', () => {
     const sessionIdGeminiOnly = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     // Session with only gemini message - should be listed
     const sessionGeminiOnly = {
@@ -455,8 +465,7 @@ describe('SessionSelector', () => {
     const subagentSessionId = randomUUID();
 
     // Create test session files
-    const chatsDir = path.join(tmpDir, 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
+    const chatsDir = await createChatsDir();
 
     // Main session - should be listed
     const mainSession = {
@@ -514,6 +523,46 @@ describe('SessionSelector', () => {
     // Should only list the main session
     expect(sessions.length).toBe(1);
     expect(sessions[0].id).toBe(mainSessionId);
+  });
+
+  it('should resolve sessions across projects and report origin mismatch', async () => {
+    const sessionId = randomUUID();
+    const chatsDir = await createChatsDir(
+      'original-project',
+      '/workspace/original-project',
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(
+        {
+          sessionId,
+          projectHash: 'test-hash',
+          startTime: '2024-01-01T10:00:00.000Z',
+          lastUpdated: '2024-01-01T10:30:00.000Z',
+          messages: [
+            {
+              type: 'user',
+              content: 'Cross project resume',
+              id: 'msg1',
+              timestamp: '2024-01-01T10:00:00.000Z',
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const result = await sessionSelector.resolveSession(sessionId);
+
+    expect(result.originProjectPath).toBe('/workspace/original-project');
+    expect(result.isOriginProjectMismatch).toBe(true);
+    expect(result.sessionData.sessionId).toBe(sessionId);
   });
 });
 

@@ -25,13 +25,11 @@ export async function listSessions(config: Config): Promise<void> {
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    writeToStdout('No previous sessions found for this project.');
+    writeToStdout('No previous sessions found.');
     return;
   }
 
-  writeToStdout(
-    `\nAvailable sessions for this project (${sessions.length}):\n`,
-  );
+  writeToStdout(`\nAvailable sessions (${sessions.length}):\n`);
 
   sessions
     .sort(
@@ -45,8 +43,11 @@ export async function listSessions(config: Config): Promise<void> {
         session.displayName.length > 100
           ? session.displayName.slice(0, 97) + '...'
           : session.displayName;
+      const originSuffix = session.originProjectPath
+        ? ` @ ${session.originProjectPath}`
+        : '';
       writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]${originSuffix}\n`,
       );
     });
 }
@@ -59,7 +60,7 @@ export async function deleteSession(
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    writeToStderr('No sessions found for this project.');
+    writeToStderr('No sessions found.');
     return;
   }
 
@@ -97,7 +98,14 @@ export async function deleteSession(
   try {
     // Use ChatRecordingService to delete the session
     const chatRecordingService = new ChatRecordingService(config);
-    chatRecordingService.deleteSession(sessionToDelete.file);
+    if (sessionToDelete.sessionPath) {
+      chatRecordingService.deleteSessionByPath(
+        sessionToDelete.sessionPath,
+        sessionToDelete.id,
+      );
+    } else {
+      chatRecordingService.deleteSession(sessionToDelete.file);
+    }
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
     writeToStdout(

@@ -73,7 +73,7 @@ describe('listSessions', () => {
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      'No previous sessions found for this project.',
+      'No previous sessions found.',
     );
   });
 
@@ -132,7 +132,7 @@ describe('listSessions', () => {
 
     // Check that the header was displayed
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      '\nAvailable sessions for this project (3):\n',
+      '\nAvailable sessions (3):\n',
     );
 
     // Check that each session was logged
@@ -286,7 +286,7 @@ describe('listSessions', () => {
 
     // Assert
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      '\nAvailable sessions for this project (1):\n',
+      '\nAvailable sessions (1):\n',
     );
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
       expect.stringContaining('1. Only session'),
@@ -379,9 +379,7 @@ describe('deleteSession', () => {
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mocks.writeToStderr).toHaveBeenCalledWith(
-      'No sessions found for this project.',
-    );
+    expect(mocks.writeToStderr).toHaveBeenCalledWith('No sessions found.');
     expect(mockDeleteSession).not.toHaveBeenCalled();
   });
 

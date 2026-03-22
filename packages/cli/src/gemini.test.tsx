@@ -943,6 +943,16 @@ describe('gemini.tsx main function exit codes', () => {
   });
 
   it('should exit with 42 for session resume failure', async () => {
+    const sessionUtils = await import('./utils/sessionUtils.js');
+    vi.spyOn(sessionUtils, 'SessionSelector').mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(new Error('Session not found')),
+        }) as unknown as InstanceType<typeof sessionUtils.SessionSelector>,
+    );
+
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
         isInteractive: () => false,
@@ -959,24 +969,78 @@ describe('gemini.tsx main function exit codes', () => {
       resume: 'invalid-session',
     } as unknown as CliArgs);
 
-    vi.mock('./utils/sessionUtils.js', () => ({
-      SessionSelector: vi.fn().mockImplementation(() => ({
-        resolveSession: vi
-          .fn()
-          .mockRejectedValue(new Error('Session not found')),
-      })),
-    }));
-
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => undefined) as never);
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
       await main();
-      expect.fail('Should have thrown MockProcessExitError');
-    } catch (e) {
-      expect(e).toBeInstanceOf(MockProcessExitError);
-      expect((e as MockProcessExitError).code).toBe(42);
     } finally {
       delete process.env['GEMINI_API_KEY'];
     }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session: Session not found'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(42);
+  });
+
+  it('should exit with 42 when resuming from a different folder in non-interactive mode', async () => {
+    const sessionUtils = await import('./utils/sessionUtils.js');
+    vi.spyOn(sessionUtils, 'SessionSelector').mockImplementation(
+      () =>
+        ({
+          resolveSession: vi.fn().mockResolvedValue({
+            sessionPath: '/tmp/original-project/chats/session.json',
+            sessionData: {
+              sessionId: 'cross-project-session',
+              projectHash: 'test-project-hash',
+              startTime: '2025-01-01T00:00:00.000Z',
+              lastUpdated: '2025-01-01T01:00:00.000Z',
+              messages: [],
+            },
+            displayInfo: 'Cross-project session',
+            originProjectPath: '/tmp/original-project',
+            projectSlug: 'original-project',
+            isOriginProjectMismatch: true,
+          }),
+        }) as unknown as InstanceType<typeof sessionUtils.SessionSelector>,
+    );
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test',
+        getSandbox: () => undefined,
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { security: { auth: {} }, ui: {} },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      resume: 'cross-project-session',
+    } as unknown as CliArgs);
+
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((() => undefined) as never);
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    try {
+      await main();
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
+    }
+
+    expect(emitFeedbackSpy).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Cannot resume session cross-project-session'),
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(42);
   });
 
   it('should exit with 42 for no input provided', async () => {

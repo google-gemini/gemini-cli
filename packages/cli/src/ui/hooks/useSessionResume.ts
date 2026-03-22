@@ -15,6 +15,16 @@ import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
+import { isSameProjectPath } from '../../utils/sessionUtils.js';
+
+export type ResumeSource = 'startup' | 'browser';
+
+export interface ResumeContextSwitchConfirmation {
+  source: ResumeSource;
+  sessionId: string;
+  currentProjectPath: string;
+  originProjectPath: string;
+}
 
 interface UseSessionResumeParams {
   config: Config;
@@ -24,6 +34,10 @@ interface UseSessionResumeParams {
   setQuittingMessages: (messages: null) => void;
   resumedSessionData?: ResumedSessionData;
   isAuthenticating: boolean;
+  canResumeOnStartup?: () => boolean;
+  confirmResumeContextSwitch?: (
+    details: ResumeContextSwitchConfirmation,
+  ) => Promise<boolean>;
 }
 
 /**
@@ -39,6 +53,8 @@ export function useSessionResume({
   setQuittingMessages,
   resumedSessionData,
   isAuthenticating,
+  canResumeOnStartup = () => true,
+  confirmResumeContextSwitch,
 }: UseSessionResumeParams) {
   const [isResuming, setIsResuming] = useState(false);
 
@@ -56,10 +72,31 @@ export function useSessionResume({
       uiHistory: HistoryItemWithoutId[],
       clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
       resumedData: ResumedSessionData,
-    ) => {
+      source: ResumeSource = 'browser',
+    ): Promise<boolean> => {
       // Wait for the client.
       if (!isGeminiClientInitialized) {
-        return;
+        return false;
+      }
+
+      const originProjectPath =
+        resumedData.originProjectPath ??
+        resumedData.conversation.originProjectPath;
+      const currentProjectPath = config.getProjectRoot();
+      const requiresConfirmation =
+        !!originProjectPath &&
+        !isSameProjectPath(originProjectPath, currentProjectPath);
+
+      if (requiresConfirmation && confirmResumeContextSwitch) {
+        const confirmed = await confirmResumeContextSwitch({
+          source,
+          sessionId: resumedData.conversation.sessionId,
+          currentProjectPath,
+          originProjectPath,
+        });
+        if (!confirmed) {
+          return false;
+        }
       }
 
       setIsResuming(true);
@@ -85,17 +122,24 @@ export function useSessionResume({
 
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+        return true;
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
           'Failed to resume session. Please try again.',
           error,
         );
+        return false;
       } finally {
         setIsResuming(false);
       }
     },
-    [config, isGeminiClientInitialized, setQuittingMessages],
+    [
+      config,
+      confirmResumeContextSwitch,
+      isGeminiClientInitialized,
+      setQuittingMessages,
+    ],
   );
 
   // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
@@ -105,6 +149,7 @@ export function useSessionResume({
     if (
       resumedSessionData &&
       !isAuthenticating &&
+      canResumeOnStartup() &&
       isGeminiClientInitialized &&
       !hasLoadedResumedSession.current
     ) {
@@ -116,11 +161,13 @@ export function useSessionResume({
         historyData.uiHistory,
         convertSessionToClientHistory(resumedSessionData.conversation.messages),
         resumedSessionData,
+        'startup',
       );
     }
   }, [
     resumedSessionData,
     isAuthenticating,
+    canResumeOnStartup,
     isGeminiClientInitialized,
     loadHistoryForResume,
   ]);

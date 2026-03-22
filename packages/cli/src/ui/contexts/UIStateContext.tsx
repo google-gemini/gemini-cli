@@ -11,6 +11,7 @@ import type {
   ConsoleMessageItem,
   ConfirmationRequest,
   QuotaStats,
+  ResumeContextSwitchConfirmationRequest,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
@@ -97,6 +98,7 @@ export interface UIState {
   commandContext: CommandContext;
   commandConfirmationRequest: ConfirmationRequest | null;
   authConsentRequest: ConfirmationRequest | null;
+  resumeContextSwitchConfirmationRequest: ResumeContextSwitchConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   permissionConfirmationRequest: PermissionConfirmationRequest | null;

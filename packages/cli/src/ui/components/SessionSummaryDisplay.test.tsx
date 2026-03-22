@@ -36,7 +36,10 @@ const renderWithMockedStats = async (metrics: SessionMetrics) => {
   });
 
   const result = renderWithProviders(
-    <SessionSummaryDisplay duration="1h 23m 45s" />,
+    <SessionSummaryDisplay
+      duration="1h 23m 45s"
+      sessionId="12345678-1234-1234-1234-123456789abc"
+    />,
     {
       width: 100,
     },

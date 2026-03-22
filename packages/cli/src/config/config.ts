@@ -241,13 +241,12 @@ export async function parseArguments(
         })
         .option('list-sessions', {
           type: 'boolean',
-          description:
-            'List available sessions for the current project and exit.',
+          description: 'List available sessions across all projects and exit.',
         })
         .option('delete-session', {
           type: 'string',
           description:
-            'Delete a session by index number (use --list-sessions to see available sessions).',
+            'Delete a session by index number or UUID (use --list-sessions to see available sessions).',
         })
         .option('include-directories', {
           type: 'array',

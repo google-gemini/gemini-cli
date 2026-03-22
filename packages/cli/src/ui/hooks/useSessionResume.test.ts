@@ -25,6 +25,7 @@ describe('useSessionResume', () => {
 
   const mockConfig = {
     getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+    getProjectRoot: vi.fn().mockReturnValue('/current/project'),
   };
 
   const createMockHistoryManager = (): UseHistoryManagerReturn => ({
@@ -48,6 +49,8 @@ describe('useSessionResume', () => {
     setQuittingMessages: mockSetQuittingMessages,
     resumedSessionData: undefined,
     isAuthenticating: false,
+    confirmResumeContextSwitch: undefined,
+    canResumeOnStartup: undefined,
   });
 
   beforeEach(() => {
@@ -255,6 +258,77 @@ describe('useSessionResume', () => {
 
       expect(mockAddDirectories).not.toHaveBeenCalled();
     });
+
+    it('should confirm before resuming from a different project root', async () => {
+      const confirmResumeContextSwitch = vi.fn().mockResolvedValue(true);
+      const { result } = renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          confirmResumeContextSwitch,
+        }),
+      );
+
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          originProjectPath: '/original/project',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+        },
+        filePath: '/path/to/session.json',
+        originProjectPath: '/original/project',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume(
+          [],
+          [],
+          resumedData,
+          'startup',
+        );
+      });
+
+      expect(confirmResumeContextSwitch).toHaveBeenCalledWith({
+        source: 'startup',
+        sessionId: 'test-123',
+        currentProjectPath: '/current/project',
+        originProjectPath: '/original/project',
+      });
+      expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith([], resumedData);
+    });
+
+    it('should abort resume when context switch confirmation is rejected', async () => {
+      const confirmResumeContextSwitch = vi.fn().mockResolvedValue(false);
+      const { result } = renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          confirmResumeContextSwitch,
+        }),
+      );
+
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          originProjectPath: '/original/project',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+        },
+        filePath: '/path/to/session.json',
+        originProjectPath: '/original/project',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
+      });
+
+      expect(confirmResumeContextSwitch).toHaveBeenCalled();
+      expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
+      expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
+    });
   });
 
   describe('callback stability', () => {
@@ -333,6 +407,48 @@ describe('useSessionResume', () => {
       expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
       expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
       expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
+    });
+
+    it('should wait for startup blockers to clear before auto-resuming', async () => {
+      const conversation: ConversationRecord = {
+        sessionId: 'auto-resume-blocked',
+        projectHash: 'project-123',
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          {
+            id: 'msg-1',
+            timestamp: '2025-01-01T00:01:00Z',
+            content: 'Blocked until startup is ready',
+            type: 'user',
+          },
+        ] as MessageRecord[],
+      };
+      let startupReady = false;
+
+      const { rerender } = renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          resumedSessionData: {
+            conversation,
+            filePath: '/path/to/session.json',
+          },
+          canResumeOnStartup: () => startupReady,
+        }),
+      );
+
+      expect(mockHistoryManager.clearItems).not.toHaveBeenCalled();
+      expect(mockGeminiClient.resumeChat).not.toHaveBeenCalled();
+
+      await act(async () => {
+        startupReady = true;
+        rerender();
+      });
+
+      await waitFor(() => {
+        expect(mockHistoryManager.clearItems).toHaveBeenCalled();
+      });
+      expect(mockGeminiClient.resumeChat).toHaveBeenCalled();
     });
 
     it('should not resume when Gemini client is not initialized', () => {

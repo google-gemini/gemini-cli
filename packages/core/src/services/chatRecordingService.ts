@@ -96,6 +96,8 @@ export type MessageRecord = BaseMessageRecord & ConversationRecordExtra;
 export interface ConversationRecord {
   sessionId: string;
   projectHash: string;
+  /** Original project root where this session was first created */
+  originProjectPath?: string;
   startTime: string;
   lastUpdated: string;
   messages: MessageRecord[];
@@ -112,6 +114,7 @@ export interface ConversationRecord {
 export interface ResumedSessionData {
   conversation: ConversationRecord;
   filePath: string;
+  originProjectPath?: string;
 }
 
 /**
@@ -163,6 +166,10 @@ export class ChatRecordingService {
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
+          conversation.originProjectPath =
+            conversation.originProjectPath ??
+            resumedSessionData.originProjectPath ??
+            this.config.getProjectRoot();
         });
 
         // Clear any cached data to force fresh reads
@@ -188,6 +195,7 @@ export class ChatRecordingService {
         this.writeConversation({
           sessionId: this.sessionId,
           projectHash: this.projectHash,
+          originProjectPath: this.config.getProjectRoot(),
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
@@ -565,29 +573,38 @@ export class ChatRecordingService {
       const tempDir = this.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      if (fs.existsSync(sessionPath)) {
-        fs.unlinkSync(sessionPath);
-      }
-
-      // Cleanup tool outputs for this session
-      const safeSessionId = sanitizeFilenamePart(sessionId);
-      const toolOutputDir = path.join(
-        tempDir,
-        'tool-outputs',
-        `session-${safeSessionId}`,
-      );
-
-      // Robustness: Ensure the path is strictly within the tool-outputs base
-      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
-      if (
-        fs.existsSync(toolOutputDir) &&
-        toolOutputDir.startsWith(toolOutputsBase)
-      ) {
-        fs.rmSync(toolOutputDir, { recursive: true, force: true });
-      }
+      this.deleteSessionByPath(sessionPath, sessionId);
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;
+    }
+  }
+
+  /**
+   * Deletes a session file by absolute path.
+   */
+  deleteSessionByPath(sessionPath: string, sessionId?: string): void {
+    if (fs.existsSync(sessionPath)) {
+      fs.unlinkSync(sessionPath);
+    }
+
+    const tempDir = path.dirname(path.dirname(sessionPath));
+    const safeSessionId = sanitizeFilenamePart(
+      sessionId ?? path.basename(sessionPath, '.json'),
+    );
+    const toolOutputDir = path.join(
+      tempDir,
+      'tool-outputs',
+      `session-${safeSessionId}`,
+    );
+
+    // Robustness: Ensure the path is strictly within the tool-outputs base
+    const toolOutputsBase = path.join(tempDir, 'tool-outputs');
+    if (
+      fs.existsSync(toolOutputDir) &&
+      toolOutputDir.startsWith(toolOutputsBase)
+    ) {
+      fs.rmSync(toolOutputDir, { recursive: true, force: true });
     }
   }
 

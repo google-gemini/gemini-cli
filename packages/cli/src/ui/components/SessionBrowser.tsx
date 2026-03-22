@@ -16,6 +16,7 @@ import type { SessionInfo, TextMatch } from '../../utils/sessionUtils.js';
 import {
   cleanMessage,
   formatRelativeTime,
+  getGlobalChatsDirs,
   getSessionFiles,
 } from '../../utils/sessionUtils.js';
 
@@ -250,6 +251,8 @@ const filterSessions = (
     const titleMatch =
       session.displayName.toLowerCase().includes(lowerQuery) ||
       session.id.toLowerCase().includes(lowerQuery) ||
+      session.originProjectPath?.toLowerCase().includes(lowerQuery) ||
+      session.projectSlug?.toLowerCase().includes(lowerQuery) ||
       session.firstUserMessage.toLowerCase().includes(lowerQuery);
 
     const contentMatch = session.fullContent
@@ -442,10 +445,16 @@ const SessionItem = ({
   const prefix = isActive ? '❯ ' : '  ';
   let additionalInfo = '';
   let matchDisplay = null;
+  const projectLabel = session.originProjectPath
+    ? path.basename(session.originProjectPath)
+    : session.projectSlug;
 
   // Add "(current)" label for the current session
   if (session.isCurrentSession) {
     additionalInfo = ' (current)';
+  }
+  if (projectLabel) {
+    additionalInfo += ` [${projectLabel}]`;
   }
 
   // Show match snippets if searching and matches exist
@@ -650,9 +659,8 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
         const sessionData = await getSessionFiles(
-          chatsDir,
+          await getGlobalChatsDirs(),
           config.getSessionId(),
         );
         setSessions(sessionData);
@@ -673,12 +681,8 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     const loadFullContent = async () => {
       if (isSearchMode && !hasLoadedFullContent) {
         try {
-          const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
-            'chats',
-          );
           const sessionData = await getSessionFiles(
-            chatsDir,
+            await getGlobalChatsDirs(),
             config.getSessionId(),
             { includeFullContent: true },
           );
