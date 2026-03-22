@@ -174,7 +174,7 @@ export async function resolveConfirmation(
     // The suggestion is published on the message bus for the UI to display,
     // and also captured locally for use in updatePolicy().
     //
-    // Known limitation: if the user confirms before Flash responds,
+    // Known limitation: if the user confirms before Flash Lite responds,
     // policySuggestion will still be null and updatePolicy() falls back to
     // the heuristic. The UI shows "Suggesting scope..." to hint that
     // waiting a moment may yield a better-scoped rule.

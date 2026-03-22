@@ -1809,7 +1809,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Use AI to suggest better-scoped policy rules when approving tools. Shows a suggested scope description on approval options.',
+          'To suggest better-scoped policy rules, allow Gemini to analyze tool approvals. Displays a suggested scope description on approval options.',
         showInDialog: true,
       },
     },

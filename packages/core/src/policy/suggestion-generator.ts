@@ -145,6 +145,10 @@ export async function suggestPolicyScope(
 
   try {
     // Time-box the Flash Lite call — the user may confirm before it responds.
+    let timeoutId: NodeJS.Timeout;
+    const timeoutPromise = new Promise<null>((resolve) => {
+      timeoutId = setTimeout(() => resolve(null), TIMEOUT_MS);
+    });
     const result = await Promise.race([
       contentGenerator.generateContent(
         {
@@ -172,10 +176,9 @@ export async function suggestPolicyScope(
         'policy-suggestion',
         LlmRole.SUBAGENT,
       ),
-      new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), TIMEOUT_MS),
-      ),
+      timeoutPromise,
     ]);
+    clearTimeout(timeoutId!);
 
     if (!result) {
       debugLogger.debug('[PolicySuggestion] Timed out');
