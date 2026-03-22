@@ -1,38 +1,41 @@
 ---
 name: _ux_finish-pr
-description: Expert PR maintenance with a focus on UX and functional polish. Use to check PR status, address feedback through interactive UX/functional review with the user, and fix failing CI checks.
+description: Expert PR submission tool. Automates safe rebase, cross-platform snapshots, and mandatory full preflight validation.
 ---
 
-# UX Finish PR
+# UX Finish PR (High-Integrity Submission)
 
-You are a senior UX-focused co-author assistant, dedicated to helping the PR author cross the finish line. Your core principle is: **"Always maintain a clean, focused diff by resolving merge conflicts early to unblock CI and squashing your commits into a single logical feature before requesting a final review."**
+You are a senior co-author assistant. Your goal is to ensure this PR passes CI on the FIRST attempt by enforcing project-wide rigor.
 
-## Workflow
+## **Mandatory Submission Protocol**
 
-Follow these steps autonomously, focusing on helping the author complete the PR:
+### **1. Safe Rebase & Conflict Resolution**
+- **Action**: `git fetch origin main && git rebase origin/main`.
+- **Constraint**: NEVER use `git merge -X ours` or `git checkout --ours`. 
+- **Verification**: If conflicts occur, resolve them surgically. After rebase, run `git diff origin/main` to ensure you haven't inadvertently deleted unrelated core features.
 
-1.  **Assess PR Readiness & Atomicity:**
-    -   **Maintain Strict Focus**: Review the diff. Only include changes directly related to the feature or fix. Revert accidental changes to unrelated files (lockfiles, global configs, etc.).
-    -   Identify failing CI checks (lint, tests, builds) and diagnose their root causes.
-    -   Gather unresolved comments from reviewers.
+### **2. Neutral Environment Snapshots**
+- **Action**: If UI files were modified, you MUST run tests with:
+  ```bash
+  TERM_PROGRAM=none npm test -w @google/gemini-cli -- -u
+  ```
+- **Reason**: This prevents macOS-specific icons (like `MAC_TERMINAL_ICON`) from leaking into snapshots, which causes CI failure on Linux runners.
 
-2.  **Author-Centric Comment Addressing:**
-    -   For any comment requesting a UX or functional change:
-        a.  Analyze the feedback and propose a specific technical solution.
-        b.  **Pause and share your proposal with the author.** Explain how it addresses the feedback and what the resulting UX will be.
-        c.  Wait for the author's directive to proceed.
-    -   Autonomously handle minor technical or non-user-facing feedback.
+### **3. Full Validation (No Shortcuts)**
+- **Action**: You MUST run the complete validation suite:
+  ```bash
+  npm run preflight
+  ```
+- **Constraint**: Passing individual tests is NOT enough. `preflight` ensures `tsc --build` passes, catching TypeScript inference bugs that unit tests miss.
+- **TDD Fallback**: If `preflight` fails, you must create a local reproduction test before attempting a fix.
 
-3.  **Autonomous CI Fixes & Pre-flight:**
-    -   Propose and apply fixes for linting or test failures.
-    -   **TDD Fallback**: If an issue persists after 2-3 attempts, switch to a **Test-Driven Development (TDD)** approach: first, create or update a local test case that reproduces the failure, then iterate on the fix until that specific test passes.
-    -   **Run Pre-flight**: Verify fixes locally using project standards: `npm run lint`, `npm run format`, `npm run typecheck`, and `npm run test` (specifically for touched files).
+### **4. UI Dimension Audit**
+- **Action**: If Header or Footer height changed, check `packages/cli/src/test-utils/AppRig.tsx`.
+- **Reason**: Ensure `terminalHeight` is sufficient so the `Composer` prompt isn't pushed off-screen in integration tests.
 
-4.  **Final Cleanup & Update:**
-    -   **Take Ownership of Conflicts**: Sync with latest `main` (`git fetch origin main && git rebase origin/main`). If conflicts exist, resolve them **immediately** to unblock CI.
-    -   **Squash for Clarity**: Squash all changes into a single, clean commit relative to `main` with a descriptive Conventional Commit message. This removes "AI noise" and presents a clear, final intent.
-    -   **Mandatory Verification & Snapshots**: You MUST verify that ALL relevant tests pass locally. If UI changes were made, run tests with `-u` to update snapshots and **carefully review the resulting .snap or .svg files** to ensure they look exactly as intended.
-    -   Verify the final state of the PR with the author if any significant changes were made.
-    -   Force-push with lease: `git push origin HEAD --force-with-lease`.
+### **5. Final Submission**
+- **Squash**: Squash into a single Conventional Commit (e.g., `feat(ui): ...`).
+- **Push**: `git push origin HEAD --force-with-lease`.
+- **Link**: Provide the GitHub PR link.
 
-Always provide a direct link to the PR after each major update. Prioritize brevity and technical rationale in your communication.
+**Note**: If any step fails, do NOT claim completion. Fix the issue and restart from Step 1.

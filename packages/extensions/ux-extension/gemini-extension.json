@@ -9,5 +9,5 @@
     "skills/_ux_designer",
     "skills/_ux_string-reviewer"
   ],
-  "commands": ["commands/ux-help.toml"]
+  "commands": ["commands/_ux_help.toml"]
 }

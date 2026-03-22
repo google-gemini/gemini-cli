@@ -1,40 +1,36 @@
-# 🚀 Welcome to the UX Team "Global Toolbox"
+# 🚀 Your UX "Vibe Coding" Guide
 
-You have successfully installed the Gemini CLI UX power-ups!
+Hey! Welcome to the UX Team's global toolbox. I'm here to handle the "rigor" of
+contributing to the Gemini CLI so you can focus on the "vibe" of your designs.
 
-These tools are designed to help us sprint toward the **Gemini 1.0 Milestone**
-without fighting the CLI. They are "opinionated" and built specifically for the
-UX "Vibe Coding" workflow.
+Here is how we'll work together, step-by-step:
 
-## 🛠️ Your New Superpowers
+### **Step 1: Start Clean**
 
-You now have four new commands available in your Gemini CLI session. Because
-they are synced globally, **you can use them on any branch.**
+When you're ready to build something new, just tell me. I'll suggest using
+`_ux_git-worktree` to create a fresh sibling folder. This keeps your `main`
+branch pristine and avoids macOS sandbox headaches.
 
-- `/_ux_git-worktree` : Ditch nested branches! Use this to manage your tasks in
-  parallel sibling folders (Base Folder Strategy). It auto-runs `npm install`
-  for you!
-- `/_ux_finish-pr` : Your co-author assistant. It runs tests, updates snapshots,
-  fixes CI linting, and squashes your messy trial-and-error commits before
-  force-pushing.
-- `/_ux_designer` : Run this against your new React/Ink components to guarantee
-  they adhere to the v1.0 strict standards (Signal over Noise, Coherent State,
-  Density).
-- `/string-reviewer` : Audits UI text for strict adherence to the project
-  terminology.
+### **Step 2: Prototyping with Context**
 
-## 🧠 Why are we doing this?
+As soon as we start touching UI code, I'll offer to load `/frontend`. This gives
+me the full context of our component library and the strict development rules we
+follow.
 
-We are intentionally keeping these tools in a "floating" Draft PR branch rather
-than merging them to `main`. This isolation lets the UX team iterate at
-lightning speed on our tooling without polluting the main codebase for backend
-engineers.
+### **Step 3: Design Review**
 
-_(Note: We plan to migrate this entire toolbox into a formal **Gemini CLI
-Extension** in the near future!)_
+Before we wrap up, we can run `_ux_designer`. I'll audit your work against our
+v1.0 principles: **Signal over Noise**, **Coherent State**, and **Intent
+Signaling**.
 
-## 🏁 Get Started
+### **Step 4: The Finish Line**
 
-1. Open your terminal.
-2. Ensure you have run `/skills reload`.
-3. Try typing `/_ux_` to see your new tools in action!
+When you're happy with the changes, just say "I'm ready to submit." I'll run the
+**`/_ux_finish-pr`** command for you. It handles the rebase, fixes snapshots for
+CI, and runs the full `preflight` suite so you get a green check on the first
+try.
+
+---
+
+**Need a refresher?** Just type `/_ux_help` anytime. **Ready to build?** Tell me
+what's on your mind!
