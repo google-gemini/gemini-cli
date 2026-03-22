@@ -11,56 +11,50 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 
 describe('ApprovalModeIndicator', () => {
   it('renders correctly for AUTO_EDIT mode', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for AUTO_EDIT mode with plan enabled', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.AUTO_EDIT}
         allowPlanMode={true}
       />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for PLAN mode', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for YOLO mode', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.YOLO} />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for DEFAULT mode', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders correctly for DEFAULT mode with plan enabled', async () => {
-    const { lastFrame, waitUntilReady } = render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.DEFAULT}
         allowPlanMode={true}
       />,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 });
