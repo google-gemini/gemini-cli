@@ -97,7 +97,7 @@ export class LspManager {
   async updateWorkspaceFolders(dirs: string[]): Promise<void> {
     this.workspaceDirs = dirs;
     // Restart all servers so they reinitialize with updated folders.
-    await this.shutdown();
+    await this.restart();
   }
 
   // -----------------------------------------------------------------------
@@ -409,6 +409,48 @@ export class LspManager {
     await Promise.allSettled(shutdowns);
     this.servers.clear();
     this.activeServerCount = 0;
+  }
+
+  /**
+   * Restart all servers: shut down running servers and eagerly re-spawn them.
+   * Servers that were previously running are restarted immediately rather
+   * than waiting for first use.
+   */
+  async restart(): Promise<void> {
+    // Collect which servers were alive before shutdown.
+    const liveKeys: ServerKey[] = [];
+    for (const [key, state] of this.servers.entries()) {
+      if (state.client?.isAlive) {
+        liveKeys.push(key);
+      }
+    }
+
+    await this.shutdown();
+
+    // Re-spawn previously running servers.
+    for (const key of liveKeys) {
+      const sepIdx = key.indexOf(':');
+      if (sepIdx === -1) continue;
+      const serverId = key.substring(0, sepIdx);
+      const projectRoot = key.substring(sepIdx + 1);
+
+      const serverDef = this.registry
+        .getAllServers()
+        .find((s) => s.id === serverId);
+      if (!serverDef) continue;
+
+      const state = this.getOrCreateState(key);
+      const promise = this.startClient(state, serverDef, projectRoot);
+      state.starting = promise;
+      // Fire-and-forget: don't block on startup.
+      promise
+        .then(() => {
+          state.starting = undefined;
+        })
+        .catch(() => {
+          state.starting = undefined;
+        });
+    }
   }
 
   // -----------------------------------------------------------------------

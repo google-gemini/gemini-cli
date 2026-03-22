@@ -10,6 +10,7 @@ import {
   CommandKind,
 } from './types.js';
 import type { MessageActionReturn } from '@google/gemini-cli-core';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 
 const STATE_ICONS: Record<string, string> = {
   running: '\u{1F7E2}', // 🟢
@@ -35,10 +36,9 @@ async function showStatus(
       type: 'message',
       messageType: 'info',
       content:
-        'LSP integration is **disabled**.\n\n' +
-        'To enable it, add to your settings:\n' +
+        'LSP is disabled. Enable it in settings:\n' +
         '```json\n{ "tools": { "lsp": { "enabled": true } } }\n```\n' +
-        'Then restart the CLI.',
+        'Restart the CLI to apply.',
     };
   }
 
@@ -96,14 +96,14 @@ async function showStatus(
 }
 
 function getInstallHint(serverId: string): string {
-  switch (serverId) {
-    case 'typescript':
-      return '\n   Install: `npm install -g typescript-language-server typescript`';
-    case 'pyright':
-      return '\n   Install: `pip install pyright` or `npm install -g pyright`';
-    default:
-      return '';
-  }
+  const hints: Record<string, string> = {
+    typescript:
+      '\n   Install: `npm install -g typescript-language-server typescript`',
+    pyright: '\n   Install: `pip install pyright` or `npm install -g pyright`',
+    gopls: '\n   Install: `go install golang.org/x/tools/gopls@latest`',
+    'rust-analyzer': '\n   Install: `rustup component add rust-analyzer`',
+  };
+  return hints[serverId] ?? '';
 }
 
 const statusSubCommand: SlashCommand = {
@@ -130,21 +130,166 @@ const restartSubCommand: SlashCommand = {
       };
     }
 
-    await config.shutdownLsp();
+    const lspManager = await config.getLspManager();
+    if (!lspManager) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'LSP manager not available.',
+      };
+    }
+
+    context.ui.addItem(
+      { type: 'info', text: 'Restarting LSP servers...' },
+      Date.now(),
+    );
+    await lspManager.restart();
+
+    return showStatus(context);
+  },
+};
+
+const addSubCommand: SlashCommand = {
+  name: 'add',
+  description: 'Add a custom LSP server. Usage: /lsp add <id> <command>',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: async (
+    _context: CommandContext,
+    args: string,
+  ): Promise<MessageActionReturn> => {
+    // Parse: /lsp add <id> <command> [args...] [--languages lang1,lang2]
+    const tokens = args.trim().split(/\s+/);
+    if (tokens.length < 2) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Usage: `/lsp add <id> <command> [args...] [--languages lang1,lang2]`\n\n' +
+          'Example: `/lsp add gopls gopls --languages go`',
+      };
+    }
+
+    const id = tokens[0];
+    let languages: string[] | undefined;
+    const commandTokens: string[] = [];
+
+    // Parse tokens, extracting --languages flag.
+    let i = 1;
+    while (i < tokens.length) {
+      if (tokens[i] === '--languages' && i + 1 < tokens.length) {
+        languages = tokens[i + 1].split(',').map((s) => s.trim());
+        i += 2;
+      } else {
+        commandTokens.push(tokens[i]);
+        i++;
+      }
+    }
+
+    if (commandTokens.length === 0) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'A command is required after the server ID.',
+      };
+    }
+
+    const command = commandTokens[0];
+    const serverArgs = commandTokens.slice(1);
+
+    // Build server config.
+    const serverConfig: Record<string, unknown> = { command };
+    if (serverArgs.length > 0) {
+      serverConfig['args'] = serverArgs;
+    }
+    if (languages && languages.length > 0) {
+      serverConfig['languages'] = languages;
+    }
+
+    // Write to settings.
+    try {
+      const settings = loadSettings(process.cwd());
+      const existingServers = settings.merged.tools?.lsp?.servers ?? {};
+      const servers = { ...existingServers, [id]: serverConfig };
+      settings.setValue(SettingScope.User, 'tools.lsp.servers', servers);
+    } catch (e) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Failed to save settings: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+
+    const langNote =
+      languages && languages.length > 0
+        ? ` for ${languages.join(', ')} files`
+        : '';
+    const msg = `Added LSP server **${id}**${langNote}. Restart the CLI to apply.`;
+
+    return { type: 'message', messageType: 'info', content: msg };
+  },
+};
+
+const removeSubCommand: SlashCommand = {
+  name: 'remove',
+  description: 'Remove a custom LSP server. Usage: /lsp remove <id>',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: async (
+    _context: CommandContext,
+    args: string,
+  ): Promise<MessageActionReturn> => {
+    const id = args.trim();
+    if (!id) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Usage: `/lsp remove <id>`',
+      };
+    }
+
+    try {
+      const settings = loadSettings(process.cwd());
+      const existingServers = settings.merged.tools?.lsp?.servers ?? {};
+
+      if (!existingServers[id]) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Server **${id}** not found in settings. Run \`/lsp status\` to see configured servers.`,
+        };
+      }
+
+      const servers = { ...existingServers };
+      delete servers[id];
+      settings.setValue(SettingScope.User, 'tools.lsp.servers', servers);
+    } catch (e) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Failed to save settings: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+
     return {
       type: 'message',
       messageType: 'info',
-      content: 'All LSP servers shut down. They will restart on next use.',
+      content: `Removed LSP server **${id}**. Restart the CLI to apply.`,
     };
   },
 };
 
 export const lspCommand: SlashCommand = {
   name: 'lsp',
-  description: 'Show Language Server Protocol status.',
+  description: 'Manage Language Server Protocol integration.',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  subCommands: [statusSubCommand, restartSubCommand],
+  subCommands: [
+    statusSubCommand,
+    restartSubCommand,
+    addSubCommand,
+    removeSubCommand,
+  ],
   action: async (context: CommandContext): Promise<MessageActionReturn> =>
     showStatus(context),
 };

@@ -1486,7 +1486,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable LSP',
+            label: 'LSP',
             category: 'Tools',
             requiresRestart: true,
             default: false,
@@ -1505,6 +1505,32 @@ const SETTINGS_SCHEMA = {
             description:
               'Maximum time in milliseconds to wait for LSP diagnostics before returning without them.',
             showInDialog: false,
+          },
+          servers: {
+            type: 'object',
+            label: 'LSP Servers',
+            category: 'Tools',
+            requiresRestart: false,
+            default: {} as Record<
+              string,
+              {
+                command: string;
+                args?: string[];
+                languages?: string[];
+                rootMarkers?: string[];
+                initializationOptions?: Record<string, unknown>;
+                enabled?: boolean;
+              }
+            >,
+            description: oneLine`
+              Custom language server configurations. Keys are server IDs.
+              Override built-in servers (typescript, pyright) or add new ones.
+            `,
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+            additionalProperties: {
+              type: 'object',
+            },
           },
         },
       },

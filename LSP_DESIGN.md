@@ -1,6 +1,6 @@
 # LSP Integration Design for Gemini CLI
 
-> **Status:** Phases 1–3 implemented and tested. Phases 4–5 remaining.
+> **Status:** Feature-complete. All phases implemented.
 >
 > **Target issue:**
 > [#2465](https://github.com/google-gemini/gemini-cli/issues/2465) (112+
@@ -244,19 +244,21 @@ Built-in servers (TypeScript, Python) provide defaults. User settings merge on
 top — override commands, add new servers, or disable specific ones with
 `"enabled": false`.
 
-### `/lsp` command (planned extensions)
+### `/lsp` command
 
-| Command                             | Effect                                       | Restart?                |
-| ----------------------------------- | -------------------------------------------- | ----------------------- |
-| `/lsp status`                       | Show server health, tracked files, errors    | No                      |
-| `/lsp restart`                      | Shut down + eagerly re-spawn running servers | No                      |
-| `/lsp add <id> -- <command> [args]` | Write to settings, restart LSP manager       | No                      |
-| `/lsp remove <id>`                  | Remove from settings, restart LSP manager    | No                      |
-| `/lsp enable`                       | Set `tools.lsp.enabled: true`                | Yes (tool registration) |
-| `/lsp disable`                      | Set `tools.lsp.enabled: false`, shut down    | Yes (tool registration) |
+| Command                                          | Effect                                          |
+| ------------------------------------------------ | ----------------------------------------------- |
+| `/lsp` or `/lsp status`                          | Show server health, tracked files, errors       |
+| `/lsp restart`                                   | Shut down + eagerly re-spawn running servers    |
+| `/lsp add <id> <command> [args] [--languages …]` | Write to user settings, requires CLI restart    |
+| `/lsp remove <id>`                               | Remove from user settings, requires CLI restart |
 
-`/lsp add` and `/lsp remove` follow the MCP pattern: `settings.setValue()` then
-manager restart. Immediate effect, no CLI restart.
+`/lsp add` and `/lsp remove` follow the MCP pattern: persist via
+`settings.setValue()` to user settings. Because LSP tool registration happens at
+startup, a CLI restart is needed for changes to take effect.
+
+`/lsp restart` eagerly re-spawns servers that were previously running, rather
+than just clearing state and waiting for first use.
 
 ## What we built
 
@@ -266,7 +268,7 @@ manager restart. Immediate effect, no CLI restart.
 packages/core/src/lsp/
   types.ts              LSP protocol types (minimal subset, no npm deps)
   client.ts             JSON-RPC client over stdio with typed events
-  server-registry.ts    Built-in server definitions (TS, Python)
+  server-registry.ts    Built-in server definitions (TS, Python, Go, Rust)
   manager.ts            LspManager — per-server state, adaptive timeouts
   enrichment.ts         Diagnostic/symbol formatting, tool enrichment
   index.ts              Public API
@@ -275,7 +277,7 @@ packages/core/src/tools/
   lsp-query.ts          The lsp_query tool (6 semantic operations)
 
 packages/cli/src/ui/commands/
-  lspCommand.ts         /lsp slash command (status, restart)
+  lspCommand.ts         /lsp slash command (status, restart, add, remove)
 ```
 
 ### Per-server state model
@@ -344,15 +346,27 @@ After every file write, we send:
   "tools": {
     "lsp": {
       "enabled": true,
-      "diagnosticTimeout": 5000
+      "diagnosticTimeout": 5000,
+      "servers": {
+        "clangd": {
+          "command": "clangd",
+          "args": ["--background-index"],
+          "languages": ["c", "cpp"],
+          "rootMarkers": ["compile_commands.json", ".clangd"]
+        }
+      }
     }
   }
 }
 ```
 
-Only two settings. We deliberately removed `diagnosticSeverity` — the agent
-benefits from seeing all severities (errors, warnings, hints). No reason to
-filter.
+Three settings: `enabled`, `diagnosticTimeout`, and `servers`. We deliberately
+removed `diagnosticSeverity` — the agent benefits from seeing all severities.
+
+The `servers` map lets users override built-in servers (TypeScript, Python, Go,
+Rust) or add entirely new ones. Each entry supports `command`, `args`,
+`languages` (required for new servers), `rootMarkers`, `initializationOptions`,
+and `enabled` (set to `false` to disable a built-in).
 
 ### UX: user-facing feedback
 
@@ -421,63 +435,12 @@ our use case.
 | `enrichToolResultWithLsp` shared helper           | Eliminated duplication between edit.ts and write-file.ts. Single place to maintain the enrichment logic.                                  |
 | Optional chaining on `config.isLspEnabled?.()`    | Mock configs in tests don't have LSP methods. Optional chaining avoids test crashes without modifying every mock.                         |
 | Dynamic imports for LSP in tool files             | `await import('../lsp/enrichment.js')` — LSP code is only loaded when the feature is enabled. Zero cost for users who don't opt in.       |
+| Settings-driven server configuration              | All server quirks are data on `LspServerDefinition`. No conditional code paths for specific servers. Users add servers via settings.      |
+| Built-in Go + Rust with sensible defaults         | Cover the most-requested languages. rust-analyzer needs `initializationOptions` for cargo build scripts; gopls works out of the box.      |
+| `/lsp add/remove` follows MCP pattern             | Consistent UX with `/mcp`. Write to user settings, require restart for tool registration changes.                                         |
+| Eager restart in `/lsp restart`                   | Tracks which servers were alive, re-spawns them after shutdown. User doesn't have to touch a file to trigger server startup.              |
 
 ## Remaining work
-
-### `/lsp add`/`remove` commands (not started)
-
-Interactive server management following the MCP pattern:
-
-- `/lsp add gopls -- gopls` writes to `tools.lsp.servers.go` in settings
-- `/lsp remove go` removes the entry
-- Both call `settings.setValue()` then restart the LSP manager immediately
-- No CLI restart needed
-
-Also: `/lsp restart` should eagerly re-spawn servers that were previously
-running (not just clear state and wait).
-
-### Built-in server definitions for Go and Rust (not started)
-
-Add to `BUILTIN_SERVERS` in `server-registry.ts`. Based on the survey, these
-need:
-
-```typescript
-// Go — no special init options, but benefits from being told the client name
-{ id: 'go', command: 'gopls', args: [], rootMarkers: ['go.work', 'go.mod'] }
-
-// Rust — config MUST be in initializationOptions
-{ id: 'rust', command: 'rust-analyzer', args: [],
-  rootMarkers: ['Cargo.toml'],
-  initializationOptions: {
-    cargo: { buildScripts: { enable: true } },
-    procMacro: { enable: true }
-  }
-}
-```
-
-Our universal `workspace/configuration` handling already covers gopls's blocking
-behavior. rust-analyzer's `files.watcher: "server"` should be set via
-`initializationOptions` since we don't implement full file watching.
-
-### Phase 4: Diagnostic diffs (not started)
-
-After a write or edit, show the **change** in diagnostic state — what was
-introduced and what was fixed. The per-server `diagnosticCache` already stores
-pre-edit state. Needs diff logic in `enrichment.ts`.
-
-```xml
-<lsp_diagnostics file="src/foo.ts" introduced="1" fixed="2">
-FIXED   line 42: Property 'findById' does not exist on type 'Repository<User>'.
-NEW     line 35: Parameter 'id' implicitly has an 'any' type.
-</lsp_diagnostics>
-```
-
-### User-configurable servers via settings (not started)
-
-The `LspServerRegistry` currently only accepts user overrides of built-in server
-commands. It should also support fully user-defined servers with custom
-`languages`, `rootMarkers`, and `initializationOptions`. This enables languages
-we don't have built-in support for (Ruby, Lua, C++, etc.) without code changes.
 
 ### Future: IDE-connected `LspProvider`
 

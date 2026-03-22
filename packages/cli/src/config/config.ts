@@ -817,6 +817,7 @@ export async function loadCliConfig(
     experimentalJitContext: settings.experimental?.jitContext,
     lspEnabled: settings.tools?.lsp?.enabled,
     lspDiagnosticTimeout: settings.tools?.lsp?.diagnosticTimeout,
+    lspServers: settings.tools?.lsp?.servers,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,

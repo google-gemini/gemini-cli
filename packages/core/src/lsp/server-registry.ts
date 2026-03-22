@@ -12,6 +12,9 @@ import { getLanguageFromFilePath } from '../utils/language-detection.js';
  *
  * Each entry describes how to spawn a language server for a set of language
  * IDs. The `command` and `args` assume the server binary is on PATH.
+ *
+ * All server-specific quirks are expressed as data fields on this definition
+ * (initializationOptions, rootMarkers, useShell) — no conditional code paths.
  */
 const BUILTIN_SERVERS: LspServerDefinition[] = [
   {
@@ -43,32 +46,86 @@ const BUILTIN_SERVERS: LspServerDefinition[] = [
       'requirements.txt',
     ],
   },
+  {
+    id: 'gopls',
+    languageIds: ['go'],
+    command: 'gopls',
+    args: [],
+    useShell: process.platform === 'win32',
+    rootMarkers: ['go.work', 'go.mod'],
+  },
+  {
+    id: 'rust-analyzer',
+    languageIds: ['rust'],
+    command: 'rust-analyzer',
+    args: [],
+    useShell: process.platform === 'win32',
+    rootMarkers: ['Cargo.toml'],
+    // rust-analyzer requires config in initializationOptions, not via
+    // workspace/configuration. Tell it to use server-side file watching
+    // since we don't implement full client-side glob watching.
+    initializationOptions: {
+      cargo: { buildScripts: { enable: true } },
+      procMacro: { enable: true },
+      files: { watcher: 'server' },
+    },
+  },
 ];
 
 /**
  * Registry that resolves file paths to language server definitions.
  *
- * Supports user overrides via settings: if a user configures a server for a
- * given id (e.g. `lsp.servers.typescript`), its command/args replace the
- * built-in definition.
+ * Supports user overrides via settings: users can override built-in server
+ * commands, disable built-in servers with `enabled: false`, or add entirely
+ * new servers with custom language IDs.
  */
 export class LspServerRegistry {
   private readonly servers: LspServerDefinition[];
   private readonly languageIdToServer: Map<string, LspServerDefinition>;
 
   constructor(userServers?: Record<string, LspServerUserConfig>) {
-    // Start with built-in servers, apply user overrides.
-    this.servers = BUILTIN_SERVERS.map((builtin) => {
+    this.servers = [];
+
+    // Apply user overrides to built-in servers.
+    const processedUserIds = new Set<string>();
+
+    for (const builtin of BUILTIN_SERVERS) {
       const override = userServers?.[builtin.id];
       if (override) {
-        return {
+        processedUserIds.add(builtin.id);
+        // User can disable a built-in server.
+        if (override.enabled === false) continue;
+        this.servers.push({
           ...builtin,
           command: override.command,
           args: override.args ?? builtin.args,
-        };
+          rootMarkers: override.rootMarkers ?? builtin.rootMarkers,
+          initializationOptions:
+            override.initializationOptions ?? builtin.initializationOptions,
+        });
+      } else {
+        this.servers.push(builtin);
       }
-      return builtin;
-    });
+    }
+
+    // Add user-defined servers that don't match any built-in ID.
+    if (userServers) {
+      for (const [id, config] of Object.entries(userServers)) {
+        if (processedUserIds.has(id)) continue;
+        if (config.enabled === false) continue;
+        if (!config.languages || config.languages.length === 0) continue;
+
+        this.servers.push({
+          id,
+          languageIds: config.languages,
+          command: config.command,
+          args: config.args ?? [],
+          useShell: process.platform === 'win32',
+          rootMarkers: config.rootMarkers ?? [],
+          initializationOptions: config.initializationOptions,
+        });
+      }
+    }
 
     // Build lookup from language ID → server definition.
     this.languageIdToServer = new Map();

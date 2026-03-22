@@ -629,6 +629,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   lspEnabled?: boolean;
   lspDiagnosticTimeout?: number;
+  lspServers?: Record<string, import('../lsp/types.js').LspServerUserConfig>;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -853,6 +854,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalJitContext: boolean;
   private readonly lspEnabled: boolean;
   private readonly lspDiagnosticTimeout: number;
+  private readonly lspServers?: Record<
+    string,
+    import('../lsp/types.js').LspServerUserConfig
+  >;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -1005,6 +1010,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.lspEnabled = params.lspEnabled ?? false;
     this.lspDiagnosticTimeout = params.lspDiagnosticTimeout ?? 5000;
+    this.lspServers = params.lspServers;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2136,6 +2142,7 @@ export class Config implements McpContext, AgentLoopContext {
         {
           enabled: this.lspEnabled,
           diagnosticTimeout: this.lspDiagnosticTimeout,
+          servers: this.lspServers,
         },
         workspaceDirs,
       );

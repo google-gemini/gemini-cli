@@ -220,6 +220,14 @@ export interface LspSettings {
 export interface LspServerUserConfig {
   command: string;
   args?: string[];
+  /** LSP language IDs this server handles (required for user-defined servers). */
+  languages?: string[];
+  /** Files that indicate a project root for this language. */
+  rootMarkers?: string[];
+  /** Initialization options sent to the server during initialize. */
+  initializationOptions?: Record<string, unknown>;
+  /** Set to false to disable a built-in server. */
+  enabled?: boolean;
 }
 
 export const DEFAULT_LSP_SETTINGS: LspSettings = {
