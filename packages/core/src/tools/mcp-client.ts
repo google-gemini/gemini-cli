@@ -478,6 +478,48 @@ export class McpClient implements McpProgressReporter {
         }
       },
     );
+
+    // Handle channel messages from MCP servers (e.g. Telegram, Slack).
+    // MCP servers can push messages into the conversation by sending a
+    // notification with method "notifications/channel".
+    const existingFallback = this.client.fallbackNotificationHandler;
+    this.client.fallbackNotificationHandler = async (notification: {
+      method: string;
+      params?: Record<string, unknown>;
+    }) => {
+      if (notification.method === 'notifications/channel') {
+        const params = notification.params ?? {};
+        const rawContent = params['content'];
+        const content = isString(rawContent) ? rawContent : '';
+        const rawMeta = params['meta'];
+        const meta: Record<string, string> = isStringRecord(rawMeta)
+          ? rawMeta
+          : {};
+
+        if (content) {
+          debugLogger.log(
+            `📨 Channel message from '${this.serverName}': ${content.slice(0, 100)}...`,
+          );
+
+          // Format as a channel block for the model
+          const metaAttrs = Object.entries(meta)
+            .map(([k, v]) => `${k}="${v}"`)
+            .join(' ');
+          const formatted = `<channel source="${this.serverName}" ${metaAttrs}>\n${content}\n</channel>`;
+
+          coreEvents.emitChannelMessage({
+            serverName: this.serverName,
+            content: formatted,
+            meta,
+          });
+        }
+      }
+
+      // Chain to any existing fallback handler
+      if (existingFallback) {
+        await existingFallback(notification);
+      }
+    };
   }
 
   /**
@@ -877,6 +919,25 @@ export function getMCPDiscoveryState(): MCPDiscoveryState {
  * @param errorString The error message string
  * @returns The www-authenticate header value if found, null otherwise
  */
+function isString(value: unknown): value is string {
+  return Object.prototype.toString.call(value) === '[object String]';
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (value === null || value === undefined || Array.isArray(value)) {
+    return false;
+  }
+  if (Object.prototype.toString.call(value) !== '[object Object]') {
+    return false;
+  }
+  for (const v of Object.values(Object(value))) {
+    if (Object.prototype.toString.call(v) !== '[object String]') {
+      return false;
+    }
+  }
+  return true;
+}
+
 function extractWWWAuthenticateHeader(errorString: string): string | null {
   // Try multiple patterns to extract the header
   const patterns = [
