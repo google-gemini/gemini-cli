@@ -100,7 +100,7 @@ Gemini CLI comes with the following built-in subagents:
 
 ### Generalist Agent
 
-- **Name:** `generalist_agent`
+- **Name:** `generalist`
 - **Purpose:** Route tasks to the appropriate specialized subagent.
 - **When to use:** Implicitly used by the main agent for routing. Not directly
   invoked by the user.
