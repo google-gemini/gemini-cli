@@ -83,8 +83,26 @@ function estimateFunctionResponseTokens(part: Part, depth: number): number {
   if (typeof response === 'string') {
     totalTokens += response.length / 4;
   } else if (response !== undefined && response !== null) {
-    // For objects, stringify only the payload, not the whole Part object.
-    totalTokens += JSON.stringify(response).length / 4;
+    // Check if the response is an array of MCP content blocks
+    if (Array.isArray(response)) {
+      for (const item of response) {
+        if (
+          item &&
+          typeof item === 'object' &&
+          item.type === 'image' &&
+          typeof item.data === 'string' &&
+          item.data.length > 1024
+        ) {
+          // MCP image block with large data: use fixed estimate instead of stringifying Base64
+          totalTokens += IMAGE_TOKEN_ESTIMATE;
+        } else {
+          totalTokens += JSON.stringify(item).length / 4;
+        }
+      }
+    } else {
+      // For other objects, stringify only the payload, not the whole Part object.
+      totalTokens += JSON.stringify(response).length / 4;
+    }
   }
 
   // Gemini 3: Handle nested multimodal parts recursively.
