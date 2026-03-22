@@ -149,6 +149,115 @@ mismatch — our adaptive timeout is the best available workaround.
    standalone vs IDE mode.
 5. **Feature-gated.** Behind `tools.lsp.enabled`, disabled by default.
 
+## Server management philosophy
+
+LSP servers are external dependencies like `git` or `node` — we can't control
+the user's environment. The user installs servers themselves. Our job is to make
+configuration and status clear.
+
+### Principles
+
+- **Settings are the source of truth.** All server configuration lives in
+  `tools.lsp.servers` in settings.json. Built-in defaults provide sensible
+  starting points for common languages.
+- **No server-specific code paths.** The client code has zero
+  `if (serverId === 'gopls')` branches. All server differences are expressed as
+  data on `LspServerDefinition` (command, args, root markers, initialization
+  options).
+- **`/lsp add` and `/lsp remove` for interactive management.** Follow the MCP
+  pattern: write to settings via `settings.setValue()`, restart the LSP manager
+  immediately. No CLI restart needed.
+- **The agent can help.** If the user asks "set up LSP for Go," the agent checks
+  PATH for `gopls`, suggests install commands if missing, and guides the user
+  through `/lsp add` or settings edits.
+
+### How server differences are expressed as data
+
+Every known server quirk maps to a field on `LspServerDefinition`:
+
+| Quirk                            | Data field              | Example                                            |
+| -------------------------------- | ----------------------- | -------------------------------------------------- |
+| Different spawn commands         | `command`, `args`       | bash-language-server needs `start` arg             |
+| Project root detection           | `rootMarkers`           | Go: `go.work`, `go.mod`; Rust: `Cargo.toml`        |
+| Server-specific settings at init | `initializationOptions` | rust-analyzer requires full config here            |
+| Platform-specific shell needs    | `useShell`              | Auto-detected: `true` on Windows for npm/pip shims |
+
+Behaviors we handle universally for ALL servers (no per-server logic):
+
+- Respond to `workspace/configuration` requests (gopls, pyright block without
+  this)
+- Send `workspace/didChangeConfiguration` after `initialized` (pyright needs
+  this)
+- Respond to `client/registerCapability` and `window/workDoneProgress/create`
+- Send `didSave` and `didChangeWatchedFiles` after file mutations
+
+### Server compatibility survey
+
+Based on research of 8 common LSP servers (gopls, rust-analyzer, clangd,
+lua-language-server, vscode-json-language-server, yaml-language-server,
+bash-language-server, vtsls), all work with non-IDE clients. Key findings:
+
+| Server                     | Command                              | Init Options                       | Root Markers                           | Notable                                                   |
+| -------------------------- | ------------------------------------ | ---------------------------------- | -------------------------------------- | --------------------------------------------------------- |
+| typescript-language-server | `typescript-language-server --stdio` | Optional                           | `tsconfig.json`, `package.json`        | Stable, well-tested                                       |
+| pyright-langserver         | `pyright-langserver --stdio`         | Optional                           | `pyproject.toml`, `pyrightconfig.json` | Slow cold start (typeshed loading)                        |
+| gopls                      | `gopls`                              | Settings object                    | `go.work`, `go.mod`                    | Blocks on `workspace/configuration` — we handle this      |
+| rust-analyzer              | `rust-analyzer`                      | **Required** — config must go here | `Cargo.toml`                           | Set `files.watcher: "server"` if no client file watching  |
+| clangd                     | `clangd --background-index`          | None                               | `compile_commands.json`, `.clangd`     | Needs `compile_commands.json` for full analysis           |
+| lua-language-server        | `lua-language-server`                | Optional                           | `.luarc.json`, `.stylua.toml`          | Set `checkThirdParty: false` for non-interactive use      |
+| bash-language-server       | `bash-language-server start`         | None                               | `.git`                                 | **Danger:** scans $HOME if root is home directory         |
+| vtsls                      | `vtsls --stdio`                      | `hostInfo` recommended             | `package-lock.json`, `yarn.lock`       | Alternative to typescript-language-server; bundles own TS |
+
+No server fundamentally requires an IDE. Some (vscode-json, yaml) use
+non-standard LSP extensions for schema fetching, but work without them.
+
+### Settings-driven configuration
+
+```json
+{
+  "tools": {
+    "lsp": {
+      "enabled": true,
+      "diagnosticTimeout": 5000,
+      "servers": {
+        "go": {
+          "command": "gopls",
+          "languages": ["go"],
+          "rootMarkers": ["go.mod", "go.work"]
+        },
+        "rust": {
+          "command": "rust-analyzer",
+          "languages": ["rust"],
+          "rootMarkers": ["Cargo.toml"],
+          "initializationOptions": {
+            "cargo": { "buildScripts": { "enable": true } },
+            "procMacro": { "enable": true }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Built-in servers (TypeScript, Python) provide defaults. User settings merge on
+top — override commands, add new servers, or disable specific ones with
+`"enabled": false`.
+
+### `/lsp` command (planned extensions)
+
+| Command                             | Effect                                       | Restart?                |
+| ----------------------------------- | -------------------------------------------- | ----------------------- |
+| `/lsp status`                       | Show server health, tracked files, errors    | No                      |
+| `/lsp restart`                      | Shut down + eagerly re-spawn running servers | No                      |
+| `/lsp add <id> -- <command> [args]` | Write to settings, restart LSP manager       | No                      |
+| `/lsp remove <id>`                  | Remove from settings, restart LSP manager    | No                      |
+| `/lsp enable`                       | Set `tools.lsp.enabled: true`                | Yes (tool registration) |
+| `/lsp disable`                      | Set `tools.lsp.enabled: false`, shut down    | Yes (tool registration) |
+
+`/lsp add` and `/lsp remove` follow the MCP pattern: `settings.setValue()` then
+manager restart. Immediate effect, no CLI restart.
+
 ## What we built
 
 ### Architecture
@@ -315,6 +424,41 @@ our use case.
 
 ## Remaining work
 
+### `/lsp add`/`remove` commands (not started)
+
+Interactive server management following the MCP pattern:
+
+- `/lsp add gopls -- gopls` writes to `tools.lsp.servers.go` in settings
+- `/lsp remove go` removes the entry
+- Both call `settings.setValue()` then restart the LSP manager immediately
+- No CLI restart needed
+
+Also: `/lsp restart` should eagerly re-spawn servers that were previously
+running (not just clear state and wait).
+
+### Built-in server definitions for Go and Rust (not started)
+
+Add to `BUILTIN_SERVERS` in `server-registry.ts`. Based on the survey, these
+need:
+
+```typescript
+// Go — no special init options, but benefits from being told the client name
+{ id: 'go', command: 'gopls', args: [], rootMarkers: ['go.work', 'go.mod'] }
+
+// Rust — config MUST be in initializationOptions
+{ id: 'rust', command: 'rust-analyzer', args: [],
+  rootMarkers: ['Cargo.toml'],
+  initializationOptions: {
+    cargo: { buildScripts: { enable: true } },
+    procMacro: { enable: true }
+  }
+}
+```
+
+Our universal `workspace/configuration` handling already covers gopls's blocking
+behavior. rust-analyzer's `files.watcher: "server"` should be set via
+`initializationOptions` since we don't implement full file watching.
+
 ### Phase 4: Diagnostic diffs (not started)
 
 After a write or edit, show the **change** in diagnostic state — what was
@@ -328,19 +472,12 @@ NEW     line 35: Parameter 'id' implicitly has an 'any' type.
 </lsp_diagnostics>
 ```
 
-### Phase 5: Multi-language servers (not started)
+### User-configurable servers via settings (not started)
 
-Adding Go (`gopls`) and Rust (`rust-analyzer`) is just adding entries to
-`BUILTIN_SERVERS` in `server-registry.ts`. TypeScript and Python are already
-working. Each new server may need testing for server-initiated request quirks
-(like pyright's `workspace/configuration` requirement).
-
-### Phase 1c: Binary detection (partial)
-
-Currently, if a server binary isn't found, the user sees a raw `ENOENT` error in
-`/lsp status`. A pre-spawn binary check using `which`/`where` would produce a
-cleaner "not found, install with X" message. Low priority since the error is
-still surfaced and actionable.
+The `LspServerRegistry` currently only accepts user overrides of built-in server
+commands. It should also support fully user-defined servers with custom
+`languages`, `rootMarkers`, and `initializationOptions`. This enables languages
+we don't have built-in support for (Ruby, Lua, C++, etc.) without code changes.
 
 ### Future: IDE-connected `LspProvider`
 
