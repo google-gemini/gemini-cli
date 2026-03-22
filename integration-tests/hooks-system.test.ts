@@ -158,9 +158,9 @@ describe('Hooks System Integration', { timeout: 120000 }, () => {
             log.hookCall.stderr.includes('"decision":"deny"')),
       );
       expect(blockHook).toBeDefined();
-      expect(blockHook?.hookCall.stdout + blockHook?.hookCall.stderr).toContain(
-        blockMsg,
-      );
+      expect(
+        (blockHook?.hookCall.stdout ?? '') + (blockHook?.hookCall.stderr ?? ''),
+      ).toContain(blockMsg);
     });
 
     it('should allow tool execution when hook returns allow decision', async () => {
