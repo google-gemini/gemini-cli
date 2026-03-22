@@ -62,7 +62,7 @@ export async function bfsFileSearch(
       const currentDir = queue[queueHead++];
 
       if (visited.has(currentDir)) {
-        continue; // skip visited but keep trying
+        continue;
       }
 
       visited.add(currentDir);
@@ -71,9 +71,7 @@ export async function bfsFileSearch(
 
     scannedDirCount += currentBatch.length;
 
-    // ✅ Prevent useless looping
     if (currentBatch.length === 0) break;
-
     if (debug) {
       logger.debug(
         `Scanning [${scannedDirCount}/${maxDirs}]: batch of ${currentBatch.length}`,
