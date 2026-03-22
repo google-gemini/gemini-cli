@@ -93,6 +93,11 @@ export {
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
 export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
+export { captureHeapSnapshot, formatSnapshotSummary } from './heap-snapshot.js';
+export type {
+  HeapSnapshotResult,
+  HeapSnapshotOptions,
+} from './heap-snapshot.js';
 export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 export { RateLimiter } from './rate-limiter.js';
 export { ActivityType } from './activity-types.js';
