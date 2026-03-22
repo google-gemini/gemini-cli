@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { trace, SpanStatusCode, diag, type Tracer } from '@opentelemetry/api';
-import { runInDevTraceSpan } from './trace.js';
+import { runInDevTraceSpan, truncateForTelemetry } from './trace.js';
 import {
   GeminiCliOperation,
   GEN_AI_CONVERSATION_ID,
@@ -133,34 +133,72 @@ describe('runInDevTraceSpan', () => {
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
-  it('should respect noAutoEnd option', async () => {
-    let capturedEndSpan: () => void = () => {};
+  it('should wrap AsyncIterable results and end span on stream exhaustion', async () => {
+    async function* testStream() {
+      yield 'chunk1';
+      yield 'chunk2';
+    }
+
     const result = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall, noAutoEnd: true },
-      async ({ endSpan }) => {
-        capturedEndSpan = endSpan;
-        return 'streaming';
-      },
+      { operation: GeminiCliOperation.LLMCall },
+      async () => testStream(),
     );
 
-    expect(result).toBe('streaming');
+    // Span should NOT be ended yet (stream not consumed)
     expect(mockSpan.end).not.toHaveBeenCalled();
 
-    capturedEndSpan();
+    // Consume the stream
+    const chunks: string[] = [];
+    for await (const chunk of result as AsyncIterable<string>) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(['chunk1', 'chunk2']);
+    // Now the span should be ended
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
-  it('should automatically end span on error even if noAutoEnd is true', async () => {
-    const error = new Error('streaming error');
-    await expect(
-      runInDevTraceSpan(
-        { operation: GeminiCliOperation.LLMCall, noAutoEnd: true },
-        async () => {
-          throw error;
-        },
-      ),
-    ).rejects.toThrow(error);
+  it('should end span on stream error', async () => {
+    const streamError = new Error('stream failed');
+    async function* failingStream() {
+      yield 'chunk1';
+      throw streamError;
+    }
 
+    const result = await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall },
+      async () => failingStream(),
+    );
+
+    // Consume the stream — should throw
+    const chunks: string[] = [];
+    await expect(async () => {
+      for await (const chunk of result as AsyncIterable<string>) {
+        chunks.push(chunk);
+      }
+    }).rejects.toThrow(streamError);
+
+    expect(chunks).toEqual(['chunk1']);
+    expect(mockSpan.end).toHaveBeenCalled();
+  });
+
+  it('should not set input/output attributes when logPrompts is false', async () => {
+    await runInDevTraceSpan(
+      { operation: GeminiCliOperation.LLMCall, logPrompts: false },
+      async ({ metadata }) => {
+        metadata.input = { secret: 'prompt' };
+        metadata.output = { secret: 'response' };
+      },
+    );
+
+    expect(mockSpan.setAttribute).not.toHaveBeenCalledWith(
+      GEN_AI_INPUT_MESSAGES,
+      expect.anything(),
+    );
+    expect(mockSpan.setAttribute).not.toHaveBeenCalledWith(
+      GEN_AI_OUTPUT_MESSAGES,
+      expect.anything(),
+    );
     expect(mockSpan.end).toHaveBeenCalled();
   });
 
@@ -184,5 +222,35 @@ describe('runInDevTraceSpan', () => {
       }),
     );
     expect(mockSpan.end).toHaveBeenCalled();
+  });
+});
+
+describe('truncateForTelemetry', () => {
+  it('should return short strings unchanged', () => {
+    expect(truncateForTelemetry('hello')).toBe('hello');
+  });
+
+  it('should truncate long strings', () => {
+    const longString = 'a'.repeat(20_000);
+    const result = truncateForTelemetry(longString, 100);
+    expect(typeof result).toBe('string');
+    expect((result as string).length).toBeLessThanOrEqual(200); // truncateString adds suffix
+  });
+
+  it('should handle numbers', () => {
+    expect(truncateForTelemetry(42)).toBe(42);
+  });
+
+  it('should handle booleans', () => {
+    expect(truncateForTelemetry(true)).toBe(true);
+  });
+
+  it('should stringify and truncate objects', () => {
+    const obj = { key: 'value' };
+    expect(truncateForTelemetry(obj)).toBe('{"key":"value"}');
+  });
+
+  it('should return undefined for unsupported types', () => {
+    expect(truncateForTelemetry(undefined)).toBeUndefined();
   });
 });

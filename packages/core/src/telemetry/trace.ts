@@ -30,6 +30,14 @@ const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
 
 /**
+ * Maximum character length for any single telemetry span attribute value.
+ * Chosen to be safe for OTLP collectors (Jaeger, Zipkin, GCP Trace) while
+ * remaining useful for debugging. With multiple attributes per span and
+ * many concurrent spans, 10 KB per attribute prevents unbounded heap growth.
+ */
+const MAX_TELEMETRY_ATTR_LENGTH = 10_000;
+
+/**
  * Metadata for a span.
  */
 export interface SpanMetadata {
@@ -45,9 +53,53 @@ export interface SpanMetadata {
 }
 
 /**
+ * Truncates a value for safe storage as an OpenTelemetry span attribute.
+ * Handles strings, objects (via JSON serialization), and primitive types.
+ * Uses grapheme-aware truncation via `truncateString` from textUtils to
+ * safely handle Unicode surrogate pairs and multi-byte characters.
+ *
+ * @param value The value to truncate.
+ * @param maxLength Maximum character length (defaults to MAX_TELEMETRY_ATTR_LENGTH).
+ * @returns A bounded AttributeValue, or undefined if the value cannot be represented.
+ */
+export function truncateForTelemetry(
+  value: unknown,
+  maxLength: number = MAX_TELEMETRY_ATTR_LENGTH,
+): AttributeValue | undefined {
+  if (typeof value === 'string') {
+    return truncateString(value, maxLength);
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'object' && value !== null) {
+    const stringified = safeJsonStringify(value);
+    return truncateString(stringified, maxLength);
+  }
+  return undefined;
+}
+
+/**
+ * Type guard for AsyncIterable values. Used to detect streaming responses
+ * so that the span lifecycle can be bound to the stream's completion.
+ */
+function isAsyncIterable<T>(value: T): value is T & AsyncIterable<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Symbol.asyncIterator in (value as object)
+  );
+}
+
+/**
  * Runs a function in a new OpenTelemetry span.
  *
  * The `meta` object will be automatically used to set the span's status and attributes upon completion.
+ *
+ * For streaming callers that return an AsyncIterable, the span lifecycle is
+ * automatically bound to the stream: `endSpan()` runs in the generator's
+ * `finally` block, ensuring the span is closed even if the stream is
+ * abandoned mid-way (V8 finalizes suspended generators on GC).
  *
  * @example
  * ```typescript
@@ -64,15 +116,17 @@ export interface SpanMetadata {
  * @returns The result of the function.
  */
 export async function runInDevTraceSpan<R>(
-  opts: SpanOptions & { operation: GeminiCliOperation; noAutoEnd?: boolean },
+  opts: SpanOptions & {
+    operation: GeminiCliOperation;
+    logPrompts?: boolean;
+  },
   fn: ({
     metadata,
   }: {
     metadata: SpanMetadata;
-    endSpan: () => void;
   }) => Promise<R>,
 ): Promise<R> {
-  const { operation, noAutoEnd, ...restOfSpanOpts } = opts;
+  const { operation, logPrompts, ...restOfSpanOpts } = opts;
 
   const tracer = trace.getTracer(TRACER_NAME, TRACER_VERSION);
   return tracer.startActiveSpan(operation, restOfSpanOpts, async (span) => {
@@ -87,20 +141,27 @@ export async function runInDevTraceSpan<R>(
     };
     const endSpan = () => {
       try {
-        if (meta.input !== undefined) {
-          span.setAttribute(
-            GEN_AI_INPUT_MESSAGES,
-            truncateString(safeJsonStringify(meta.input), 160 * 1024),
-          );
+        // Only attach input/output prompt data when user has not opted out.
+        if (logPrompts !== false) {
+          if (meta.input !== undefined) {
+            const truncated = truncateForTelemetry(meta.input);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_INPUT_MESSAGES, truncated);
+            }
+          }
+          if (meta.output !== undefined) {
+            const truncated = truncateForTelemetry(meta.output);
+            if (truncated !== undefined) {
+              span.setAttribute(GEN_AI_OUTPUT_MESSAGES, truncated);
+            }
+          }
         }
-        if (meta.output !== undefined) {
-          span.setAttribute(
-            GEN_AI_OUTPUT_MESSAGES,
-            truncateString(safeJsonStringify(meta.output), 160 * 1024),
-          );
-        }
+        // Truncate ALL custom attributes to prevent unbounded memory growth.
         for (const [key, value] of Object.entries(meta.attributes)) {
-          span.setAttribute(key, value);
+          const truncated = truncateForTelemetry(value);
+          if (truncated !== undefined) {
+            span.setAttribute(key, truncated);
+          }
         }
         if (meta.error) {
           span.setStatus({
@@ -124,20 +185,40 @@ export async function runInDevTraceSpan<R>(
         span.end();
       }
     };
+
+    let isStream = false;
     try {
-      return await fn({ metadata: meta, endSpan });
+      const result = await fn({ metadata: meta });
+
+      // If the result is an AsyncIterable (streaming response), wrap it
+      // in a self-contained generator whose `finally` block always calls
+      // `endSpan()`. This eliminates the V8 closure leak: even if the
+      // consumer abandons the stream, V8 will finalize the generator on
+      // GC and execute the `finally` block, releasing `meta` and `span`.
+      if (isAsyncIterable(result)) {
+        isStream = true;
+        const streamWrapper = (async function* () {
+          try {
+            yield* result;
+          } catch (e) {
+            meta.error = e;
+            throw e;
+          } finally {
+            endSpan();
+          }
+        })();
+        // Preserve any extra properties on the original iterable (e.g.
+        // abort methods, response metadata) so callers see the same shape.
+        return Object.assign(streamWrapper, result) as R;
+      }
+
+      return result;
     } catch (e) {
       meta.error = e;
-      if (noAutoEnd) {
-        // For streaming operations, the delegated endSpan call will not be reached
-        // on an exception, so we must end the span here to prevent a leak.
-        endSpan();
-      }
       throw e;
     } finally {
-      if (!noAutoEnd) {
-        // For non-streaming operations, this ensures the span is always closed,
-        // and if an error occurred, it will be recorded correctly by endSpan.
+      if (!isStream) {
+        // For non-streaming paths, always close the span in finally.
         endSpan();
       }
     }

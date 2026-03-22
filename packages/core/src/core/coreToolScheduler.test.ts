@@ -54,7 +54,6 @@ vi.mock('../telemetry/trace.js', () => ({
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 }));
@@ -289,6 +288,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getEnableHooks: () => false,
     getHookSystem: () => undefined,
     getExperiments: () => {},
+    getTelemetryLogPromptsEnabled: () => true,
   } as unknown as Config;
 
   // eslint-disable-next-line @typescript-eslint/no-misused-spread
@@ -398,7 +398,7 @@ describe('CoreToolScheduler', () => {
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
     const metadata: SpanMetadata = { name: '', attributes: {} };
-    await fn({ metadata, endSpan: vi.fn() });
+    await fn({ metadata });
     expect(metadata).toMatchObject({
       input: [request],
     });
