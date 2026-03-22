@@ -24,6 +24,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const WebSocket = require('ws');
 
 /** Parse CLI arguments into a key-value map. */
 function parseArgs(argv) {
@@ -99,77 +100,108 @@ function getDebuggerUrl(port) {
   });
 }
 
-/** Send a CDP command over WebSocket and wait for the response. */
-function sendCDPCommand(ws, method, params = {}) {
-  return new Promise((resolve, reject) => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    const timeout = setTimeout(
-      () => reject(new Error(`CDP command ${method} timed out`)),
-      60000,
-    );
+/**
+ * Simple CDP client with a centralized message dispatcher.
+ */
+class CDPClient {
+  constructor(ws) {
+    this.ws = ws;
+    this.nextId = 1;
+    this.callbacks = new Map();
+    this.eventHandlers = new Map();
 
-    const handler = (data) => {
+    this.ws.on('message', (raw) => {
+      const text = typeof raw === 'string' ? raw : raw.toString('utf8');
+      let msg;
       try {
-        const msg = JSON.parse(data.toString());
-        if (msg.id === id) {
-          ws.removeListener('message', handler);
-          clearTimeout(timeout);
-          if (msg.error) {
-            reject(new Error(`CDP error: ${msg.error.message}`));
-          } else {
-            resolve(msg.result);
-          }
-        }
+        msg = JSON.parse(text);
       } catch {
-        // Ignore parse errors from event messages
+        return;
       }
-    };
 
-    ws.on('message', handler);
-    ws.send(JSON.stringify({ id, method, params }));
-  });
+      // Response to a command
+      if (msg.id != null && this.callbacks.has(msg.id)) {
+        const cb = this.callbacks.get(msg.id);
+        this.callbacks.delete(msg.id);
+        if (msg.error) {
+          cb.reject(new Error(`CDP error: ${msg.error.message}`));
+        } else {
+          cb.resolve(msg.result);
+        }
+        return;
+      }
+
+      // Event
+      if (msg.method && this.eventHandlers.has(msg.method)) {
+        for (const handler of this.eventHandlers.get(msg.method)) {
+          handler(msg.params);
+        }
+      }
+    });
+  }
+
+  send(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      const id = this.nextId++;
+      const timeout = setTimeout(() => {
+        this.callbacks.delete(id);
+        reject(new Error(`CDP command ${method} timed out after 60s`));
+      }, 60000);
+
+      this.callbacks.set(id, {
+        resolve: (result) => {
+          clearTimeout(timeout);
+          resolve(result);
+        },
+        reject: (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        },
+      });
+
+      this.ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+
+  on(eventName, handler) {
+    if (!this.eventHandlers.has(eventName)) {
+      this.eventHandlers.set(eventName, []);
+    }
+    this.eventHandlers.get(eventName).push(handler);
+  }
+
+  off(eventName) {
+    this.eventHandlers.delete(eventName);
+  }
+
+  close() {
+    this.ws.close();
+  }
 }
 
-/** Capture a single heap snapshot via CDP, returning the snapshot data. */
-function captureSnapshot(ws) {
+/** Capture a single heap snapshot via CDP, collecting chunks. */
+function captureSnapshot(cdp) {
   return new Promise((resolve, reject) => {
     let snapshotData = '';
-    const timeout = setTimeout(
-      () => reject(new Error('Snapshot capture timed out')),
-      120000,
-    );
+    const timeout = setTimeout(() => {
+      cdp.off('HeapProfiler.addHeapSnapshotChunk');
+      reject(new Error('Snapshot capture timed out after 120s'));
+    }, 120000);
 
-    const chunkHandler = (data) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        if (
-          msg.method === 'HeapProfiler.addHeapSnapshotChunk' &&
-          msg.params &&
-          msg.params.chunk
-        ) {
-          snapshotData += msg.params.chunk;
-        }
-        if (msg.method === 'HeapProfiler.reportHeapSnapshotProgress') {
-          // Progress reporting — ignore
-        }
-      } catch {
-        // Ignore
-      }
-    };
+    cdp.on('HeapProfiler.addHeapSnapshotChunk', (params) => {
+      snapshotData += params.chunk;
+    });
 
-    ws.on('message', chunkHandler);
-
-    sendCDPCommand(ws, 'HeapProfiler.takeHeapSnapshot', {
-      reportProgress: false,
-    })
+    cdp
+      .send('HeapProfiler.takeHeapSnapshot', { reportProgress: false })
       .then(() => {
-        ws.removeListener('message', chunkHandler);
         clearTimeout(timeout);
+        cdp.off('HeapProfiler.addHeapSnapshotChunk');
         resolve(snapshotData);
       })
       .catch((err) => {
-        ws.removeListener('message', chunkHandler);
         clearTimeout(timeout);
+        cdp.off('HeapProfiler.addHeapSnapshotChunk');
         reject(err);
       });
   });
@@ -212,8 +244,6 @@ async function main() {
   }
   console.log(`Connected: ${wsUrl}\n`);
 
-  // Dynamic import for WebSocket (Node.js built-in)
-  const WebSocket = require('ws') || (await import('ws')).default;
   const ws = new WebSocket(wsUrl);
 
   await new Promise((resolve, reject) => {
@@ -221,8 +251,11 @@ async function main() {
     ws.on('error', reject);
   });
 
+  const cdp = new CDPClient(ws);
+
   // Enable the HeapProfiler domain
-  await sendCDPCommand(ws, 'HeapProfiler.enable');
+  await cdp.send('HeapProfiler.enable');
+  console.log('HeapProfiler enabled.\n');
 
   const snapshots = [];
 
@@ -234,7 +267,7 @@ async function main() {
 
     console.log(`Capturing snapshot ${i + 1}/${args.count}...`);
     const startTime = Date.now();
-    const data = await captureSnapshot(ws);
+    const data = await captureSnapshot(cdp);
     const elapsed = Date.now() - startTime;
 
     const filename = `snapshot-${i + 1}-${Date.now()}.heapsnapshot`;
@@ -249,8 +282,8 @@ async function main() {
     );
   }
 
-  // Close WebSocket
-  ws.close();
+  // Close connection
+  cdp.close();
 
   // Print summary
   console.log(`\nSummary`);

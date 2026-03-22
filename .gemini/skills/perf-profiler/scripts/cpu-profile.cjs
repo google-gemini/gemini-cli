@@ -21,6 +21,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const WebSocket = require('ws');
 
 function parseArgs(argv) {
   const args = { port: 9229, duration: 10000, output: './profile.cpuprofile' };
@@ -82,31 +83,59 @@ function getDebuggerUrl(port) {
   });
 }
 
-function sendCDPCommand(ws, method, params = {}) {
-  return new Promise((resolve, reject) => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    const timeout = setTimeout(
-      () => reject(new Error(`CDP command ${method} timed out`)),
-      60000,
-    );
+class CDPClient {
+  constructor(ws) {
+    this.ws = ws;
+    this.nextId = 1;
+    this.callbacks = new Map();
 
-    const handler = (data) => {
+    this.ws.on('message', (raw) => {
+      const text = typeof raw === 'string' ? raw : raw.toString('utf8');
+      let msg;
       try {
-        const msg = JSON.parse(data.toString());
-        if (msg.id === id) {
-          ws.removeListener('message', handler);
-          clearTimeout(timeout);
-          if (msg.error) reject(new Error(`CDP error: ${msg.error.message}`));
-          else resolve(msg.result);
-        }
+        msg = JSON.parse(text);
       } catch {
-        // Ignore
+        return;
       }
-    };
 
-    ws.on('message', handler);
-    ws.send(JSON.stringify({ id, method, params }));
-  });
+      if (msg.id != null && this.callbacks.has(msg.id)) {
+        const cb = this.callbacks.get(msg.id);
+        this.callbacks.delete(msg.id);
+        if (msg.error) {
+          cb.reject(new Error(`CDP error: ${msg.error.message}`));
+        } else {
+          cb.resolve(msg.result);
+        }
+      }
+    });
+  }
+
+  send(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      const id = this.nextId++;
+      const timeout = setTimeout(() => {
+        this.callbacks.delete(id);
+        reject(new Error(`CDP command ${method} timed out after 60s`));
+      }, 60000);
+
+      this.callbacks.set(id, {
+        resolve: (result) => {
+          clearTimeout(timeout);
+          resolve(result);
+        },
+        reject: (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        },
+      });
+
+      this.ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+
+  close() {
+    this.ws.close();
+  }
 }
 
 function sleep(ms) {
@@ -128,7 +157,6 @@ async function main() {
   const wsUrl = await getDebuggerUrl(args.port);
   console.log(`Connected: ${wsUrl}\n`);
 
-  const WebSocket = require('ws');
   const ws = new WebSocket(wsUrl);
 
   await new Promise((resolve, reject) => {
@@ -136,17 +164,19 @@ async function main() {
     ws.on('error', reject);
   });
 
+  const cdp = new CDPClient(ws);
+
   // Enable and start profiling
-  await sendCDPCommand(ws, 'Profiler.enable');
-  await sendCDPCommand(ws, 'Profiler.setSamplingInterval', { interval: 100 });
+  await cdp.send('Profiler.enable');
+  await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
 
   console.log(`Starting CPU profiling for ${args.duration}ms...`);
-  await sendCDPCommand(ws, 'Profiler.start');
+  await cdp.send('Profiler.start');
 
   await sleep(args.duration);
 
   console.log(`Stopping profiler...`);
-  const result = await sendCDPCommand(ws, 'Profiler.stop');
+  const result = await cdp.send('Profiler.stop');
 
   // Ensure output directory exists
   const outputDir = path.dirname(path.resolve(args.output));
@@ -169,7 +199,7 @@ async function main() {
     `\nNext step: Run analyze-profile.cjs to identify hot functions.`,
   );
 
-  ws.close();
+  cdp.close();
 }
 
 main().catch((err) => {
