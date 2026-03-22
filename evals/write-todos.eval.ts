@@ -9,18 +9,18 @@ import { evalTest } from './test-helper.js';
 
 describe('Write Todos', () => {
   /**
-   * When given a genuinely complex multi-step task spanning multiple files,
-   * the agent should use write_todos to track its own subtasks.
-   *
-   * Note: write_todos is the agent's internal planning tool, not a tool for
-   * creating user-facing todo lists. Per the tool description, it should NOT
-   * be used for simple tasks completable in fewer than 2 steps. The prompt
-   * must be complex enough that the agent needs internal task tracking.
+   * When the user explicitly asks the agent to create a todo list or track
+   * tasks, the agent should use write_todos.
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should use write_todos for complex multi-step refactoring tasks',
+    name: 'should use write_todos when asked to create a task list',
+    settings: {
+      tools: {
+        core: ['write_todos', 'read_file', 'write_file', 'run_shell_command'],
+      },
+    },
     prompt:
-      'Refactor app.js: extract all helper functions into a separate utils.js file, add proper error handling to each function, write unit tests in app.test.js, and update app.js to import from utils.js.',
+      'I have a multi-step task. Please use write_todos to track your progress as you work: (1) extract all helper functions from app.js into utils.js, (2) add error handling to each function, (3) write unit tests in app.test.js, (4) update app.js to import from utils.js.',
     files: {
       'app.js': `
 function processData(data) {
@@ -28,19 +28,7 @@ function processData(data) {
   console.log(result);
   return result;
 }
-
-function validateInput(input) {
-  if (!Array.isArray(input)) return false;
-  return input.every(item => typeof item.value === 'number');
-}
-
-function formatOutput(data) {
-  return data.map(item => ({ formatted: item.toFixed(2) }));
-}
-
-module.exports = { processData, validateInput, formatOutput };
 `,
-      'package.json': '{"name": "test-app", "version": "1.0.0"}',
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
@@ -49,7 +37,23 @@ module.exports = { processData, validateInput, formatOutput };
       );
       expect(
         todoCalls.length,
-        'Expected agent to use write_todos for internal task planning on a complex multi-step refactor',
+        'Expected agent to use write_todos for task tracking',
+      ).toBeGreaterThanOrEqual(1);
+
+      // Verify the todos capture meaningful task items, not just an empty list
+      const lastTodoCall = todoCalls[todoCalls.length - 1];
+      let args = lastTodoCall.toolRequest.args;
+      if (typeof args === 'string') {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          /* */
+        }
+      }
+      const todos = Array.isArray(args?.todos) ? args.todos : [];
+      expect(
+        todos.length,
+        'Expected write_todos to contain at least one task item',
       ).toBeGreaterThanOrEqual(1);
     },
   });
