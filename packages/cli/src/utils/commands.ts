@@ -34,32 +34,21 @@ export const parseSlashCommand = (
   let pathIndex = 0;
   const canonicalPath: string[] = [];
 
+  // EDITED: Added helper function for single-pass lookup
+  const findCommand = (name: string, commands: readonly SlashCommand[]) =>
+    commands.find((cmd) => cmd.name === name || cmd.altNames?.includes(name));
+
+  // EDITED: Replaced old two-pass loop with single-pass loop using findCommand
   for (const part of commandPath) {
-    // TODO: For better performance and architectural clarity, this two-pass
-    // search could be replaced. A more optimal approach would be to
-    // pre-compute a single lookup map in `CommandService.ts` that resolves
-    // all name and alias conflicts during the initial loading phase. The
-    // processor would then perform a single, fast lookup on that map.
+    const foundCommand = findCommand(part, currentCommands);
 
-    // First pass: check for an exact match on the primary command name.
-    let foundCommand = currentCommands.find((cmd) => cmd.name === part);
+    if (!foundCommand) break;
 
-    // Second pass: if no primary name matches, check for an alias.
-    if (!foundCommand) {
-      foundCommand = currentCommands.find((cmd) =>
-        cmd.altNames?.includes(part),
-      );
-    }
-
-    if (foundCommand) {
-      commandToExecute = foundCommand;
-      canonicalPath.push(foundCommand.name);
-      pathIndex++;
-      if (foundCommand.subCommands) {
-        currentCommands = foundCommand.subCommands;
-      } else {
-        break;
-      }
+    commandToExecute = foundCommand;
+    canonicalPath.push(foundCommand.name);
+    pathIndex++;
+    if (foundCommand.subCommands) {
+      currentCommands = foundCommand.subCommands;
     } else {
       break;
     }
