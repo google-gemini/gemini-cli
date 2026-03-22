@@ -36,10 +36,7 @@ describe('Policy Engine Integration Tests', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-  });
+  afterEach(() => vi.unstubAllEnvs());
 
   describe('Policy configuration produces valid PolicyEngine config', () => {
     it('should create a working PolicyEngine from basic settings', async () => {
