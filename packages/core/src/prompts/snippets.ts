@@ -70,6 +70,7 @@ export interface PrimaryWorkflowsOptions {
   enableEnterPlanModeTool: boolean;
   enableGrep: boolean;
   enableGlob: boolean;
+  hasGraphQuery?: boolean;
   approvedPlan?: { path: string };
   taskTracker?: boolean;
   topicUpdateNarration: boolean;
@@ -163,8 +164,8 @@ ${renderUserMemory(userMemory, contextFilenames)}
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';
   return options.interactive
-    ? 'You are Gemini CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.'
-    : 'You are Gemini CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.';
+    ? 'You are Gemini (exp2) CLI, an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.'
+    : 'You are Gemini (exp2) CLI, an autonomous CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and effectively.';
 }
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
@@ -648,6 +649,11 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
     suggestion = ` If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
   }
 
+  if (options.hasGraphQuery) {
+    suggestion +=
+      ' **Always prioritize using `mcp_gemini_idx_graph_query` for initial discovery** as it provides semantic mapping of the codebase which is more efficient than manual text search.';
+  }
+
   const searchTools: string[] = [];
   if (options.enableGrep) searchTools.push(formatToolName(GREP_TOOL_NAME));
   if (options.enableGlob) searchTools.push(formatToolName(GLOB_TOOL_NAME));
@@ -667,7 +673,7 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
       subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
     }
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) or semantic search tools (e.g., \`mcp_gemini_idx_graph_query\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
   return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;

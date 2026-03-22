@@ -65,6 +65,11 @@ export async function checkForUpdates(
 
     const { name, version: currentVersion } = packageJson;
     const isNightly = currentVersion.includes('nightly');
+    const isExperimental = currentVersion.includes('exp');
+
+    if (isExperimental) {
+      return null;
+    }
 
     if (isNightly) {
       const [nightlyUpdate, latestUpdate] = await Promise.all([

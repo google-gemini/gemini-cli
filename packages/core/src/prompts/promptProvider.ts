@@ -163,6 +163,9 @@ export class PromptProvider {
             ),
             enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
             enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+            hasGraphQuery: Array.from(enabledToolNames).some((name) =>
+              name.endsWith('_graph_query'),
+            ),
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,

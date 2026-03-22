@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.36.0-nightly.20260317.2f90b4653",
+  "version": "0.36.0-experimental",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -10,7 +10,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "gemini": "dist/index.js",
+    "gemini_experimental": "dist/index.js"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
@@ -37,6 +38,7 @@
     "@modelcontextprotocol/sdk": "^1.23.0",
     "ansi-escapes": "^7.3.0",
     "ansi-regex": "^6.2.2",
+    "better-sqlite3": "^12.8.0",
     "chalk": "^4.1.2",
     "cli-spinners": "^2.9.2",
     "clipboardy": "~5.2.0",
@@ -73,6 +75,7 @@
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/command-exists": "^1.2.3",
     "@types/hast": "^3.0.4",
     "@types/node": "^20.11.24",

@@ -45,13 +45,15 @@ interface CommandDirectory {
  * Defines the Zod schema for a command definition file. This serves as the
  * single source of truth for both validation and type inference.
  */
-const TomlCommandDefSchema = z.object({
-  prompt: z.string({
-    required_error: "The 'prompt' field is required.",
-    invalid_type_error: "The 'prompt' field must be a string.",
-  }),
-  description: z.string().optional(),
-});
+const TomlCommandDefSchema = z
+  .object({
+    prompt: z.string().optional(),
+    run: z.string().optional(),
+    description: z.string().optional(),
+  })
+  .refine((data) => data.prompt || data.run, {
+    message: "Either 'prompt' or 'run' must be provided.",
+  });
 
 /**
  * Discovers and loads custom slash commands from .toml files in both the
@@ -234,6 +236,7 @@ export class FileCommandLoader implements ICommandLoader {
     }
 
     const validDef = validationResult.data;
+    const prompt = validDef.prompt ?? `{{shell ${validDef.run}}}`;
 
     const relativePathWithExt = path.relative(baseDir, filePath);
     const relativePath = relativePathWithExt.substring(
@@ -266,13 +269,9 @@ export class FileCommandLoader implements ICommandLoader {
     }
 
     const processors: IPromptProcessor[] = [];
-    const usesArgs = validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
-    const usesShellInjection = validDef.prompt.includes(
-      SHELL_INJECTION_TRIGGER,
-    );
-    const usesAtFileInjection = validDef.prompt.includes(
-      AT_FILE_INJECTION_TRIGGER,
-    );
+    const usesArgs = prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
+    const usesShellInjection = prompt.includes(SHELL_INJECTION_TRIGGER);
+    const usesAtFileInjection = prompt.includes(AT_FILE_INJECTION_TRIGGER);
 
     // 1. @-File Injection (Security First).
     // This runs first to ensure we're not executing shell commands that
@@ -310,14 +309,12 @@ export class FileCommandLoader implements ICommandLoader {
           );
           return {
             type: 'submit_prompt',
-            content: [{ text: validDef.prompt }], // Fallback to unprocessed prompt
+            content: [{ text: prompt }], // Fallback to unprocessed prompt
           };
         }
 
         try {
-          let processedContent: PromptPipelineContent = [
-            { text: validDef.prompt },
-          ];
+          let processedContent: PromptPipelineContent = [{ text: prompt }];
           for (const processor of processors) {
             processedContent = await processor.process(
               processedContent,
