@@ -589,9 +589,7 @@ function normalizeUri(uri: string): string {
 function isDiagnosticsParams(
   value: unknown,
 ): value is PublishDiagnosticsParams {
-  return (
-    isRecord(value) &&
-    typeof value['uri'] === 'string' &&
-    Array.isArray(value['diagnostics'])
-  );
+  if (!isRecord(value)) return false;
+  const { uri, diagnostics } = value;
+  return typeof uri === 'string' && Array.isArray(diagnostics);
 }
