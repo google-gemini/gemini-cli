@@ -315,11 +315,16 @@ export function renderPrimaryWorkflows(
   options?: PrimaryWorkflowsOptions,
 ): string {
   if (!options) return '';
+
+  const transitionOverride = options.approvedPlan
+    ? `\n\n**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Begin executing the steps of the plan immediately.`
+    : '';
+
   return `
 # Primary Workflows
 
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.${transitionOverride}
 
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
