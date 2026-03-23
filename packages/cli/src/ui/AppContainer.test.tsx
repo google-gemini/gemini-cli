@@ -2720,7 +2720,7 @@ describe('AppContainer State Management', () => {
         </SettingsContext.Provider>
       );
 
-      const renderResult = render(getTreeForToggle(testSettings));
+      const renderResult = await render(getTreeForToggle(testSettings));
       await act(async () => {
         vi.advanceTimersByTime(0);
       });
