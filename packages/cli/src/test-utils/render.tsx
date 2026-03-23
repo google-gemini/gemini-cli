@@ -626,12 +626,42 @@ export const renderWithProviders = async (
     appState?: AppState;
   } = {},
 ): Promise<RenderWithProvidersInstance> => {
+  if (persistentState?.get) {
+    persistentStateMock.get.mockImplementation(persistentState.get);
+  }
+  if (persistentState?.set) {
+    persistentStateMock.set.mockImplementation(persistentState.set);
+  }
+
+  persistentStateMock.mockClear();
+
+  if (!config) {
+    config = await loadCliConfig(
+      settings.merged,
+      'random-session-id',
+      {} as unknown as CliArgs,
+      { cwd: '/' },
+    );
+  }
+
+  const defaultIsAlternateBuffer =
+    typeof config.getUseAlternateBuffer === 'function'
+      ? config.getUseAlternateBuffer()
+      : false;
+
   const baseState: UIState = new Proxy(
-    { ...baseMockUiState, ...providedUiState },
+    {
+      ...baseMockUiState,
+      isAlternateBuffer: defaultIsAlternateBuffer,
+      ...providedUiState,
+    },
     {
       get(target, prop) {
         if (prop in target) {
           return target[prop as keyof typeof target];
+        }
+        if (prop === 'isAlternateBuffer') {
+          return defaultIsAlternateBuffer;
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but
@@ -644,25 +674,7 @@ export const renderWithProviders = async (
     },
   ) as UIState;
 
-  if (persistentState?.get) {
-    persistentStateMock.get.mockImplementation(persistentState.get);
-  }
-  if (persistentState?.set) {
-    persistentStateMock.set.mockImplementation(persistentState.set);
-  }
-
-  persistentStateMock.mockClear();
-
   const terminalWidth = width ?? baseState.terminalWidth;
-
-  if (!config) {
-    config = await loadCliConfig(
-      settings.merged,
-      'random-session-id',
-      {} as unknown as CliArgs,
-      { cwd: '/' },
-    );
-  }
 
   const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
