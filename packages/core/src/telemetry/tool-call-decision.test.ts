@@ -24,6 +24,12 @@ describe('getDecisionFromOutcome', () => {
     );
   });
 
+  it('should map ProceedAlwaysAndSave to AUTO_ACCEPT', () => {
+    expect(
+      getDecisionFromOutcome(ToolConfirmationOutcome.ProceedAlwaysAndSave),
+    ).toBe(ToolCallDecision.AUTO_ACCEPT);
+  });
+
   it('should map ProceedAlwaysServer to AUTO_ACCEPT', () => {
     expect(
       getDecisionFromOutcome(ToolConfirmationOutcome.ProceedAlwaysServer),
@@ -46,15 +52,6 @@ describe('getDecisionFromOutcome', () => {
     expect(getDecisionFromOutcome(ToolConfirmationOutcome.Cancel)).toBe(
       ToolCallDecision.REJECT,
     );
-  });
-
-  it('should map ProceedAlwaysAndSave to REJECT via default branch', () => {
-    // ProceedAlwaysAndSave is not explicitly handled in the switch statement
-    // and falls through to the default case. This test documents the current
-    // behavior so that any future change to this mapping is intentional.
-    expect(
-      getDecisionFromOutcome(ToolConfirmationOutcome.ProceedAlwaysAndSave),
-    ).toBe(ToolCallDecision.REJECT);
   });
 
   it('should default unknown outcomes to REJECT for forward-compatibility', () => {
