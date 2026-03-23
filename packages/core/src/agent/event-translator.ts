@@ -59,13 +59,16 @@ export function createTranslationState(streamId?: string): TranslationState {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeEvent(
-  type: AgentEventType,
+function makeEvent<T extends AgentEventType>(
+  type: T,
   state: TranslationState,
-  payload: Partial<AgentEvent>,
+  payload: Partial<AgentEvent<T>>,
 ): AgentEvent {
   const id = `${state.streamId}-${state.eventCounter++}`;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- constructing AgentEvent from common fields + payload
+  // TypeScript cannot preserve the specific discriminated union member across
+  // this generic object assembly, so keep the narrowing local to the event
+  // constructor boundary.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     ...payload,
     id,
@@ -169,12 +172,13 @@ export function translateEvent(
     case GeminiEventType.LoopDetected:
       ensureStreamStart(state, out);
       out.push(
-        makeEvent('custom', state, {
-          kind: 'loop_detected',
+        makeEvent('error', state, {
+          status: 'INTERNAL',
+          message: 'Loop detected, stopping execution',
+          fatal: false,
+          _meta: { code: 'LOOP_DETECTED' },
         }),
       );
-      // No agent_end — the stream continues. Consumer decides how to handle:
-      // non-interactive emits a warning, interactive shows a confirmation dialog.
       break;
 
     case GeminiEventType.ContextWindowWillOverflow:
@@ -380,7 +384,8 @@ export function mapHttpToGrpcStatus(
 
 /**
  * Maps a StructuredError (or unknown error value) to an ErrorData payload.
- * Preserves error metadata (name, code, stack) in _meta.
+ * Preserves selected error metadata in _meta and includes raw structured
+ * errors for lossless debugging.
  */
 export function mapError(
   error: unknown,
@@ -397,14 +402,13 @@ export function mapError(
     }
   }
 
-  const hasMeta = Object.keys(meta).length > 0;
-
   if (isStructuredError(error)) {
+    const structuredMeta = { ...meta, rawError: error };
     return {
       status: mapHttpToGrpcStatus(error.status),
       message: error.message,
       fatal: true,
-      ...(hasMeta ? { _meta: meta } : {}),
+      _meta: structuredMeta,
     };
   }
 
@@ -413,7 +417,7 @@ export function mapError(
       status: 'INTERNAL',
       message: error.message,
       fatal: true,
-      ...(hasMeta ? { _meta: meta } : {}),
+      ...(Object.keys(meta).length > 0 ? { _meta: meta } : {}),
     };
   }
 

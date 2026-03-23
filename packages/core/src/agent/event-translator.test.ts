@@ -395,15 +395,18 @@ describe('translateEvent', () => {
   });
 
   describe('LoopDetected events', () => {
-    it('emits a custom loop_detected event', () => {
+    it('emits a non-fatal warning error event', () => {
       state.streamStartEmitted = true;
       const event: ServerGeminiStreamEvent = {
         type: GeminiEventType.LoopDetected,
       };
       const result = translateEvent(event, state);
       expect(result).toHaveLength(1);
-      expect(result[0]?.type).toBe('custom');
-      expect((result[0] as AgentEvent<'custom'>).kind).toBe('loop_detected');
+      expect(result[0]?.type).toBe('error');
+      const loopWarning = result[0] as AgentEvent<'error'>;
+      expect(loopWarning.fatal).toBe(false);
+      expect(loopWarning.message).toBe('Loop detected, stopping execution');
+      expect(loopWarning._meta?.['code']).toBe('LOOP_DETECTED');
     });
   });
 
@@ -676,6 +679,10 @@ describe('mapError', () => {
     expect(result.status).toBe('RESOURCE_EXHAUSTED');
     expect(result.message).toBe('Rate limit');
     expect(result.fatal).toBe(true);
+    expect(result._meta?.['rawError']).toEqual({
+      message: 'Rate limit',
+      status: 429,
+    });
   });
 
   it('maps Error instances', () => {
