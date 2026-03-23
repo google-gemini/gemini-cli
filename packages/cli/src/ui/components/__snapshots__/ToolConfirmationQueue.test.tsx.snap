@@ -16,7 +16,6 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -77,7 +76,6 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -121,7 +119,6 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -165,7 +162,6 @@ exports[`ToolConfirmationQueue > height allocation and layout > should render th
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -215,26 +211,6 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 │                                                                              │
 │ Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                              │
-│                                                                              │
-│ ?  replace edit file                                                         │
-│                                                                              │
-│ ... 49 hidden (Ctrl+O) ...                                                   │
-│ 50 line                                                                      │
-│ Apply this change?                                                           │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. Modify with external editor                                             │
-│   4. No, suggest changes (esc)                                               │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 

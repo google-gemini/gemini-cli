@@ -12,8 +12,6 @@ import { ToolConfirmationMessage } from './messages/ToolConfirmationMessage.js';
 import { ToolStatusIndicator, ToolInfo } from './messages/ToolShared.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
-import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { ShowMoreLines } from './ShowMoreLines.js';
 import { StickyHeader } from './StickyHeader.js';
 import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -76,84 +74,81 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     : undefined;
 
   const content = (
-    <>
-      <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
-        <StickyHeader
-          width={mainAreaWidth}
-          isFirst={true}
-          borderColor={borderColor}
-          borderDimColor={false}
-        >
-          <Box flexDirection="column" width={mainAreaWidth - 4}>
-            {/* Header */}
-            <Box
-              marginBottom={hideToolIdentity ? 0 : 1}
-              justifyContent="space-between"
-            >
-              <Text color={borderColor} bold>
-                {getConfirmationHeader(tool.confirmationDetails)}
+    <Box flexDirection="column" width={mainAreaWidth} flexShrink={0}>
+      <StickyHeader
+        width={mainAreaWidth}
+        isFirst={true}
+        borderColor={borderColor}
+        borderDimColor={false}
+      >
+        <Box flexDirection="column" width={mainAreaWidth - 4}>
+          {/* Header */}
+          <Box
+            marginBottom={hideToolIdentity ? 0 : 1}
+            justifyContent="space-between"
+          >
+            <Text color={borderColor} bold>
+              {getConfirmationHeader(tool.confirmationDetails)}
+            </Text>
+            {total > 1 && (
+              <Text color={theme.text.secondary}>
+                {index} of {total}
               </Text>
-              {total > 1 && (
-                <Text color={theme.text.secondary}>
-                  {index} of {total}
-                </Text>
-              )}
-            </Box>
-
-            {!hideToolIdentity && (
-              <Box>
-                <ToolStatusIndicator status={tool.status} name={tool.name} />
-                <ToolInfo
-                  name={tool.name}
-                  status={tool.status}
-                  description={tool.description}
-                  emphasis="high"
-                />
-              </Box>
             )}
           </Box>
-        </StickyHeader>
 
-        <Box
-          width={mainAreaWidth}
-          borderStyle="round"
-          borderColor={borderColor}
-          borderTop={false}
-          borderBottom={false}
-          borderLeft={true}
-          borderRight={true}
-          paddingX={1}
-          flexDirection="column"
-        >
-          {/* Interactive Area */}
-          {/*
-            Note: We force isFocused={true} because if this component is rendered,
-            it effectively acts as a modal over the shell/composer.
-          */}
-          <ToolConfirmationMessage
-            callId={tool.callId}
-            confirmationDetails={tool.confirmationDetails}
-            config={config}
-            getPreferredEditor={getPreferredEditor}
-            terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
-            availableTerminalHeight={availableContentHeight}
-            isFocused={true}
-          />
+          {!hideToolIdentity && (
+            <Box>
+              <ToolStatusIndicator status={tool.status} name={tool.name} />
+              <ToolInfo
+                name={tool.name}
+                status={tool.status}
+                description={tool.description}
+                emphasis="high"
+              />
+            </Box>
+          )}
         </Box>
-        <Box
-          height={1}
-          width={mainAreaWidth}
-          borderLeft={true}
-          borderRight={true}
-          borderTop={false}
-          borderBottom={true}
-          borderColor={borderColor}
-          borderStyle="round"
+      </StickyHeader>
+
+      <Box
+        width={mainAreaWidth}
+        borderStyle="round"
+        borderColor={borderColor}
+        borderTop={false}
+        borderBottom={false}
+        borderLeft={true}
+        borderRight={true}
+        paddingX={1}
+        flexDirection="column"
+      >
+        {/* Interactive Area */}
+        {/*
+          Note: We force isFocused={true} because if this component is rendered,
+          it effectively acts as a modal over the shell/composer.
+        */}
+        <ToolConfirmationMessage
+          callId={tool.callId}
+          confirmationDetails={tool.confirmationDetails}
+          config={config}
+          getPreferredEditor={getPreferredEditor}
+          terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
+          availableTerminalHeight={availableContentHeight}
+          isFocused={true}
         />
       </Box>
-      <ShowMoreLines constrainHeight={constrainHeight} />
-    </>
+      <Box
+        height={1}
+        width={mainAreaWidth}
+        borderLeft={true}
+        borderRight={true}
+        borderTop={false}
+        borderBottom={true}
+        borderColor={borderColor}
+        borderStyle="round"
+      />
+    </Box>
   );
 
-  return <OverflowProvider>{content}</OverflowProvider>;
+  return content;
 };
