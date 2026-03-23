@@ -99,6 +99,10 @@ describe('formatMcpToolName', () => {
     expect(formatMcpToolName('github', '*')).toBe('mcp_github_*');
   });
 
+  it('should handle both server and tool wildcards', () => {
+    expect(formatMcpToolName('*', '*')).toBe('mcp_*');
+  });
+
   it('should handle undefined toolName as a tool-level wildcard', () => {
     expect(formatMcpToolName('github')).toBe('mcp_github_*');
   });
