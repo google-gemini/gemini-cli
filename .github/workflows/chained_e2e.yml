@@ -330,7 +330,7 @@ jobs:
           echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
 
       - name: 'Run Evals (Required to pass)'
-        if: "false"
+        if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:always_passing_evals'
