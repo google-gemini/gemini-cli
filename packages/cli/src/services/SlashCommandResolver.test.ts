@@ -218,6 +218,19 @@ describe('SlashCommandResolver', () => {
       expect(names).toContain('google-workspace:chat1');
     });
 
+    it('should NOT double-prefix when a skill name is already prefixed', () => {
+      const skill = {
+        ...createMockCommand('google-workspace:chat', CommandKind.SKILL),
+        extensionName: 'google-workspace',
+      };
+
+      const { finalCommands } = SlashCommandResolver.resolve([skill]);
+
+      const names = finalCommands.map((c) => c.name);
+      expect(names).toContain('google-workspace:chat');
+      expect(names).not.toContain('google-workspace:google-workspace:chat');
+    });
+
     it('should NOT prefix skills with "skill" when extension name is missing', () => {
       const builtin = createMockCommand('chat', CommandKind.BUILT_IN);
       const skill = createMockCommand('chat', CommandKind.SKILL);
