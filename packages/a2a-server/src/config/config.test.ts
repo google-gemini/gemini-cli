@@ -19,6 +19,8 @@ import {
   AuthType,
   isHeadlessMode,
   FatalAuthenticationError,
+  PolicyDecision,
+  PRIORITY_YOLO_ALLOW_ALL,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -89,6 +91,15 @@ describe('loadConfig', () => {
     it('should not fetch admin controls if experiment is disabled', async () => {
       await loadConfig(mockSettings, mockExtensionLoader, taskId);
       expect(fetchAdminControlsOnce).not.toHaveBeenCalled();
+    });
+
+    it('should pass clientName as a2a-server to Config', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientName: 'a2a-server',
+        }),
+      );
     });
 
     describe('when admin controls experiment is enabled', () => {
@@ -316,6 +327,29 @@ describe('loadConfig', () => {
       );
     });
 
+    it('should pass enableAgents to Config constructor', async () => {
+      const settings: Settings = {
+        experimental: {
+          enableAgents: false,
+        },
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: false,
+        }),
+      );
+    });
+
+    it('should default enableAgents to true when not provided', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: true,
+        }),
+      );
+    });
+
     describe('interactivity', () => {
       it('should set interactive true when not headless', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(false);
@@ -335,6 +369,41 @@ describe('loadConfig', () => {
           expect.objectContaining({
             interactive: false,
             enableInteractiveShell: false,
+          }),
+        );
+      });
+    });
+
+    describe('YOLO mode', () => {
+      it('should enable YOLO mode and add policy rule when GEMINI_YOLO_MODE is true', async () => {
+        vi.stubEnv('GEMINI_YOLO_MODE', 'true');
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            approvalMode: 'yolo',
+            policyEngineConfig: expect.objectContaining({
+              rules: expect.arrayContaining([
+                expect.objectContaining({
+                  decision: PolicyDecision.ALLOW,
+                  priority: PRIORITY_YOLO_ALLOW_ALL,
+                  modes: ['yolo'],
+                  allowRedirection: true,
+                }),
+              ]),
+            }),
+          }),
+        );
+      });
+
+      it('should use default approval mode and empty rules when GEMINI_YOLO_MODE is not true', async () => {
+        vi.stubEnv('GEMINI_YOLO_MODE', 'false');
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            approvalMode: 'default',
+            policyEngineConfig: expect.objectContaining({
+              rules: [],
+            }),
           }),
         );
       });

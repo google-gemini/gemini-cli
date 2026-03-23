@@ -524,16 +524,19 @@ describe('Settings Loading and Merging', () => {
       const userSettingsContent = {
         security: {
           disableYoloMode: false,
+          disableAlwaysAllow: false,
         },
       };
       const workspaceSettingsContent = {
         security: {
           disableYoloMode: false, // This should be ignored
+          disableAlwaysAllow: false, // This should be ignored
         },
       };
       const systemSettingsContent = {
         security: {
           disableYoloMode: true,
+          disableAlwaysAllow: true,
         },
       };
 
@@ -551,6 +554,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+      expect(settings.merged.security?.disableAlwaysAllow).toBe(true); // System setting should be used
     });
 
     it.each([
@@ -2594,7 +2598,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
-        'There was an error saving your latest settings changes.',
+        'Failed to save settings: Write failed',
         error,
       );
     });
@@ -2745,6 +2749,28 @@ describe('Settings Loading and Merging', () => {
       });
 
       expect(loadedSettings.merged.admin?.mcp?.config).toEqual(mcpServers);
+    });
+
+    it('should map requiredMcpConfig from remote settings', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const requiredMcpConfig = {
+        'corp-tool': {
+          url: 'https://mcp.corp/tool',
+          type: 'http' as const,
+          trust: true,
+        },
+      };
+
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {
+          mcpEnabled: true,
+          requiredMcpConfig,
+        },
+      });
+
+      expect(loadedSettings.merged.admin?.mcp?.requiredConfig).toEqual(
+        requiredMcpConfig,
+      );
     });
 
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {

@@ -11,11 +11,11 @@ import type {
   ConfirmationRequest,
 } from '../types.js';
 import type {
-  Config,
   GitService,
   Logger,
   CommandActionReturn,
   AgentDefinition,
+  AgentLoopContext,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -39,7 +39,7 @@ export interface CommandContext {
   // Core services and configuration
   services: {
     // TODO(abhipatel12): Ensure that config is never null.
-    config: Config | null;
+    agentContext: AgentLoopContext | null;
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;
@@ -206,6 +206,11 @@ export interface SlashCommand {
    * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
    */
   autoExecute?: boolean;
+
+  /**
+   * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
+   */
+  isSafeConcurrent?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;

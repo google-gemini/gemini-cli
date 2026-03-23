@@ -87,6 +87,7 @@ export const DialogManager = ({
           !!uiState.quota.proQuotaRequest.isModelNotFoundError
         }
         authType={uiState.quota.proQuotaRequest.authType}
+        tierName={config?.getUserTierName()}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );

@@ -8,7 +8,6 @@ import type React from 'react';
 import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
-
 import {
   SearchableList,
   type GenericListItem,
@@ -30,6 +29,10 @@ export interface ExtensionRegistryViewProps {
     extension: RegistryExtension,
     requestConsentOverride?: (consent: string) => Promise<boolean>,
   ) => void | Promise<void>;
+  onLink?: (
+    extension: RegistryExtension,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
+  ) => void | Promise<void>;
   onClose?: () => void;
   extensionManager: ExtensionManager;
 }
@@ -40,6 +43,7 @@ interface ExtensionItem extends GenericListItem {
 
 export function ExtensionRegistryView({
   onSelect,
+  onLink,
   onClose,
   extensionManager,
 }: ExtensionRegistryViewProps): React.JSX.Element {
@@ -95,6 +99,22 @@ export function ExtensionRegistryView({
       setSelectedExtension(null);
     },
     [onSelect, extensionManager],
+  );
+
+  const handleLink = useCallback(
+    async (
+      extension: RegistryExtension,
+      requestConsentOverride?: (consent: string) => Promise<boolean>,
+    ) => {
+      await onLink?.(extension, requestConsentOverride);
+
+      // Refresh installed extensions list
+      setInstalledExtensions(extensionManager.getExtensions());
+
+      // Go back to the search page (list view)
+      setSelectedExtension(null);
+    },
+    [onLink, extensionManager],
   );
 
   const renderItem = useCallback(
@@ -260,6 +280,9 @@ export function ExtensionRegistryView({
           onBack={handleBack}
           onInstall={async (requestConsentOverride) => {
             await handleInstall(selectedExtension, requestConsentOverride);
+          }}
+          onLink={async (requestConsentOverride) => {
+            await handleLink(selectedExtension, requestConsentOverride);
           }}
           isInstalled={installedExtensions.some(
             (e) => e.name === selectedExtension.extensionName,

@@ -14,6 +14,31 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Show version info. Share this information when filing issues.
 
+### `/agents`
+
+- **Description:** Manage local and remote subagents.
+- **Note:** This command is experimental and requires
+  `experimental.enableAgents: true` in your `settings.json`.
+- **Sub-commands:**
+  - **`list`**:
+    - **Description:** Lists all discovered agents, including built-in, local,
+      and remote agents.
+    - **Usage:** `/agents list`
+  - **`reload`** (alias: `refresh`):
+    - **Description:** Rescans agent directories (`~/.gemini/agents` and
+      `.gemini/agents`) and reloads the registry.
+    - **Usage:** `/agents reload`
+  - **`enable`**:
+    - **Description:** Enables a specific subagent.
+    - **Usage:** `/agents enable <agent-name>`
+  - **`disable`**:
+    - **Description:** Disables a specific subagent.
+    - **Usage:** `/agents disable <agent-name>`
+  - **`config`**:
+    - **Description:** Opens a configuration dialog for the specified agent to
+      adjust its model, temperature, or execution limits.
+    - **Usage:** `/agents config <agent-name>`
+
 ### `/auth`
 
 - **Description:** Open a dialog that lets you change the authentication method.
@@ -35,8 +60,8 @@ Slash commands provide meta-level control over the CLI itself.
     - `list` (selecting this opens the auto-saved session browser)
   - `-- checkpoints --`
     - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
-  - **Note:** Unique prefixes (for example `/cha` or `/resum`) resolve to the
-    same grouped menu.
+  - Unique prefixes (for example `/cha` or `/resu`) resolve to the same grouped
+    menu.
 - **Sub-commands:**
   - **`debug`**
     - **Description:** Export the most recent API request as a JSON payload.

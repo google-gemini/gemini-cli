@@ -96,6 +96,12 @@ Compatibility aliases:
 - `/chat ...` works for the same commands.
 - `/resume checkpoints ...` also remains supported during migration.
 
+## Parallel sessions with Git worktrees
+
+When working on multiple tasks at once, you can use
+[Git worktrees](./git-worktrees.md) to give each Gemini session its own copy of
+the codebase. This prevents changes in one session from colliding with another.
+
 ## Managing sessions
 
 You can list and delete sessions to keep your history organized and manage disk

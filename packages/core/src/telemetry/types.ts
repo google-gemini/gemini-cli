@@ -44,6 +44,7 @@ import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 import { LlmRole } from './llmRole.js';
 export { LlmRole };
 import type { HookType } from '../hooks/types.js';
+import type { UserTierId } from '../code_assist/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -77,6 +78,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   extensions: string;
   extension_ids: string;
   auth_type?: string;
+  worktree_active: boolean;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -114,6 +116,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
     this.auth_type = generatorConfig?.authType;
+    this.worktree_active = !!config.getWorktreeSettings();
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -147,6 +150,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
       auth_type: this.auth_type,
+      worktree_active: this.worktree_active,
     };
   }
 
@@ -1341,6 +1345,51 @@ export class ContentRetryEvent implements BaseTelemetryEvent {
 
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
+
+export const EVENT_NETWORK_RETRY_ATTEMPT = 'gemini_cli.network_retry_attempt';
+export class NetworkRetryAttemptEvent implements BaseTelemetryEvent {
+  'event.name': 'network_retry_attempt';
+  'event.timestamp': string;
+  attempt: number;
+  max_attempts: number;
+  error_type: string;
+  delay_ms: number;
+  model: string;
+
+  constructor(
+    attempt: number,
+    max_attempts: number,
+    error_type: string,
+    delay_ms: number,
+    model: string,
+  ) {
+    this['event.name'] = 'network_retry_attempt';
+    this['event.timestamp'] = new Date().toISOString();
+    this.attempt = attempt;
+    this.max_attempts = max_attempts;
+    this.error_type = error_type;
+    this.delay_ms = delay_ms;
+    this.model = model;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_NETWORK_RETRY_ATTEMPT,
+      'event.timestamp': this['event.timestamp'],
+      attempt: this.attempt,
+      max_attempts: this.max_attempts,
+      error_type: this.error_type,
+      delay_ms: this.delay_ms,
+      model: this.model,
+    };
+  }
+
+  toLogBody(): string {
+    return `Network retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error type: ${this.error_type}`;
+  }
+}
+
 export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   'event.name': 'content_retry_failure';
   'event.timestamp': string;
@@ -2084,12 +2133,17 @@ export class RecoveryAttemptEvent extends BaseAgentEvent {
 
 export const EVENT_WEB_FETCH_FALLBACK_ATTEMPT =
   'gemini_cli.web_fetch_fallback_attempt';
+export type WebFetchFallbackReason =
+  | 'private_ip'
+  | 'primary_failed'
+  | 'private_ip_skipped';
+
 export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
   'event.name': 'web_fetch_fallback_attempt';
   'event.timestamp': string;
-  reason: 'private_ip' | 'primary_failed';
+  reason: WebFetchFallbackReason;
 
-  constructor(reason: 'private_ip' | 'primary_failed') {
+  constructor(reason: WebFetchFallbackReason) {
     this['event.name'] = 'web_fetch_fallback_attempt';
     this['event.timestamp'] = new Date().toISOString();
     this.reason = reason;
@@ -2304,6 +2358,55 @@ export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Keychain availability: ${this.available}`;
+  }
+}
+
+export const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+export class OnboardingStartEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_start';
+  'event.timestamp': string;
+
+  constructor() {
+    this['event.name'] = 'onboarding_start';
+    this['event.timestamp'] = new Date().toISOString();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ONBOARDING_START,
+      'event.timestamp': this['event.timestamp'],
+    };
+  }
+
+  toLogBody(): string {
+    return 'Onboarding started.';
+  }
+}
+
+export const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+export class OnboardingSuccessEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_success';
+  'event.timestamp': string;
+  userTier?: UserTierId;
+
+  constructor(userTier?: UserTierId) {
+    this['event.name'] = 'onboarding_success';
+    this['event.timestamp'] = new Date().toISOString();
+    this.userTier = userTier;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ONBOARDING_SUCCESS,
+      'event.timestamp': this['event.timestamp'],
+      user_tier: this.userTier ?? '',
+    };
+  }
+
+  toLogBody(): string {
+    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}`;
   }
 }
 

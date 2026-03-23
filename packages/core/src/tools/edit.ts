@@ -29,7 +29,6 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
@@ -57,6 +56,7 @@ import levenshtein from 'fast-levenshtein';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -453,7 +453,16 @@ class EditToolInvocation
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
     if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
@@ -731,10 +740,6 @@ class EditToolInvocation
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, abortSignal);
@@ -937,8 +942,18 @@ ${snippet}`);
         );
       }
 
+      // Discover JIT subdirectory context for the edited file path
+      const jitContext = await discoverJitContext(
+        this.config,
+        this.resolvedPath,
+      );
+      let llmContent = llmSuccessMessageParts.join(' ');
+      if (jitContext) {
+        llmContent = appendJitContext(llmContent, jitContext);
+      }
+
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {

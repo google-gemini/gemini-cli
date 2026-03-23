@@ -46,7 +46,10 @@ export {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   logWebFetchFallbackAttempt,
+  logNetworkRetryAttempt,
   logRewind,
+  logOnboardingStart,
+  logOnboardingSuccess,
 } from './loggers.js';
 export {
   logConsecaPolicyGeneration,
@@ -66,8 +69,11 @@ export {
   ConversationFinishedEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
+  NetworkRetryAttemptEvent,
   ToolCallDecision,
   RewindEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
   ConsecaPolicyGenerationEvent,
   ConsecaVerdictEvent,
 } from './types.js';
@@ -111,6 +117,7 @@ export {
   recordApiErrorMetrics,
   recordFileOperationMetric,
   recordInvalidChunk,
+  recordRetryAttemptMetrics,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,

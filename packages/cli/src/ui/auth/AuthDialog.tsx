@@ -9,11 +9,11 @@ import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
+import {
+  SettingScope,
+  type LoadableSettingScope,
+  type LoadedSettings,
 } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
 import {
   AuthType,
   clearCachedCredentialFile,
