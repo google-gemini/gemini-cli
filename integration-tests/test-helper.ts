@@ -6,3 +6,5 @@
 
 export * from '@google/gemini-cli-test-utils';
 export { normalizePath } from '@google/gemini-cli-test-utils';
+
+export const skipFlaky = !process.env['RUN_FLAKY_INTEGRATION'];
