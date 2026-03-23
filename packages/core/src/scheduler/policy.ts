@@ -78,11 +78,7 @@ export async function checkPolicy(
   if (
     decision === PolicyDecision.ASK_USER &&
     toolCall.request.isClientInitiated &&
-    !(
-      toolCall.request.args &&
-      'additional_permissions' in toolCall.request.args &&
-      toolCall.request.args['additional_permissions']
-    )
+    !toolCall.request.args?.['additional_permissions']
   ) {
     return {
       decision: PolicyDecision.ALLOW,

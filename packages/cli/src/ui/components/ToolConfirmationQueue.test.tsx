@@ -44,6 +44,7 @@ describe('ToolConfirmationQueue', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getApprovalMode: () => 'default',
     getDisableAlwaysAllow: () => false,
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,

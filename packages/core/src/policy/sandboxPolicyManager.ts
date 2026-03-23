@@ -8,56 +8,65 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import toml from '@iarna/toml';
+import { z } from 'zod';
+import { fileURLToPath } from 'node:url';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
+import { sanitizePaths } from '../services/sandboxManager.js';
 
-export interface SandboxModeConfig {
-  network: boolean;
-  readonly: boolean;
-  approvedTools: string[];
-  allowOverrides?: boolean;
-}
+export const SandboxModeConfigSchema = z.object({
+  network: z.boolean(),
+  readonly: z.boolean(),
+  approvedTools: z.array(z.string()),
+  allowOverrides: z.boolean().optional(),
+});
 
-export interface PersistentCommandConfig {
-  allowed_paths?: string[];
-  allow_network?: boolean;
-}
+export const PersistentCommandConfigSchema = z.object({
+  allowed_paths: z.array(z.string()).optional(),
+  allow_network: z.boolean().optional(),
+});
 
-export interface SandboxTomlSchema {
-  modes: {
-    plan: SandboxModeConfig;
-    default: SandboxModeConfig;
-    accepting_edits: SandboxModeConfig;
-  };
-  commands: Record<string, PersistentCommandConfig>;
-}
+export const SandboxTomlSchema = z.object({
+  modes: z.object({
+    plan: SandboxModeConfigSchema,
+    default: SandboxModeConfigSchema,
+    accepting_edits: SandboxModeConfigSchema,
+  }),
+  commands: z.record(z.string(), PersistentCommandConfigSchema).default({}),
+});
+
+export type SandboxModeConfig = z.infer<typeof SandboxModeConfigSchema>;
+export type PersistentCommandConfig = z.infer<
+  typeof PersistentCommandConfigSchema
+>;
+export type SandboxTomlSchemaType = z.infer<typeof SandboxTomlSchema>;
 
 export class SandboxPolicyManager {
-  private static readonly DEFAULT_CONFIG: SandboxTomlSchema = {
-    modes: {
-      plan: {
-        network: false,
-        readonly: true,
-        approvedTools: [],
-        allowOverrides: false,
-      },
-      default: {
-        network: false,
-        readonly: true,
-        approvedTools: [],
-        allowOverrides: true,
-      },
-      accepting_edits: {
-        network: false,
-        readonly: false,
-        approvedTools: ['sed', 'grep', 'awk', 'perl', 'cat', 'echo'],
-        allowOverrides: true,
-      },
-    },
-    commands: {},
-  };
+  private static _DEFAULT_CONFIG: SandboxTomlSchemaType | null = null;
 
-  private config: SandboxTomlSchema;
+  private static get DEFAULT_CONFIG(): SandboxTomlSchemaType {
+    if (!SandboxPolicyManager._DEFAULT_CONFIG) {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const defaultPath = path.join(
+        __dirname,
+        'policies',
+        'sandbox-default.toml',
+      );
+      try {
+        const content = fs.readFileSync(defaultPath, 'utf8');
+        SandboxPolicyManager._DEFAULT_CONFIG = SandboxTomlSchema.parse(
+          toml.parse(content),
+        );
+      } catch (e) {
+        debugLogger.error(`Failed to parse default sandbox policy: ${e}`);
+        throw new Error(`Failed to parse default sandbox policy: ${e}`);
+      }
+    }
+    return SandboxPolicyManager._DEFAULT_CONFIG;
+  }
+
+  private config: SandboxTomlSchemaType;
   private readonly configPath: string;
   private sessionApprovals: Record<string, SandboxPermissions> = {};
 
@@ -68,15 +77,14 @@ export class SandboxPolicyManager {
     this.config = this.loadConfig();
   }
 
-  private loadConfig(): SandboxTomlSchema {
+  private loadConfig(): SandboxTomlSchemaType {
     if (!fs.existsSync(this.configPath)) {
       return SandboxPolicyManager.DEFAULT_CONFIG;
     }
 
     try {
       const content = fs.readFileSync(this.configPath, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return toml.parse(content) as unknown as SandboxTomlSchema;
+      return SandboxTomlSchema.parse(toml.parse(content));
     } catch (e) {
       debugLogger.error(`Failed to parse sandbox.toml: ${e}`);
       return SandboxPolicyManager.DEFAULT_CONFIG;
@@ -165,11 +173,12 @@ export class SandboxPolicyManager {
       allow_network: false,
     };
 
-    const newPaths = new Set([
+    const newPathsArray: string[] = [
       ...(existing.allowed_paths ?? []),
       ...(permissions.fileSystem?.read ?? []),
       ...(permissions.fileSystem?.write ?? []),
-    ]);
+    ];
+    const newPaths = new Set(sanitizePaths(newPathsArray));
 
     this.config.commands[commandName] = {
       allowed_paths: Array.from(newPaths),

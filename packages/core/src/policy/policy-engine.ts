@@ -526,7 +526,7 @@ export class PolicyEngine {
         if (
           isShellCommand &&
           command &&
-          !(rule as PolicyRule & { commandPrefix?: unknown }).commandPrefix &&
+          !('commandPrefix' in rule) &&
           !rule.argsPattern
         ) {
           ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
@@ -653,9 +653,7 @@ export class PolicyEngine {
     // even if the base command is otherwise ALLOWED by the policy engine.
     if (
       decision === PolicyDecision.ALLOW &&
-      toolCall.args &&
-      'additional_permissions' in toolCall.args &&
-      toolCall.args['additional_permissions']
+      toolCall.args?.['additional_permissions']
     ) {
       decision = PolicyDecision.ASK_USER;
     }

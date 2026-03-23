@@ -73,10 +73,10 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     args.push('-D', 'WORKSPACE_WRITE=1');
   }
 
-  // Auto-detect and support git worktrees by granting access to the underlying git directory
+  // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
   try {
     const gitPath = path.join(workspacePath, '.git');
-    const gitStat = fs.statSync(gitPath);
+    const gitStat = fs.lstatSync(gitPath);
     if (gitStat.isFile()) {
       const gitContent = fs.readFileSync(gitPath, 'utf8');
       const match = gitContent.match(/^gitdir:\s*(.+)$/m);

@@ -15,6 +15,7 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
   type EditorType,
+  ApprovalMode,
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -624,7 +625,8 @@ export const ToolConfirmationMessage: React.FC<
           bodyContentHeight -= 2; // Account for padding;
         }
 
-        if (containsRedirection) {
+        const isAutoEdit = config.getApprovalMode() === ApprovalMode.AUTO_EDIT;
+        if (containsRedirection && !isAutoEdit) {
           // Calculate lines needed for Note and Tip
           const safeWidth = Math.max(terminalWidth, 1);
           const noteLength =
@@ -774,6 +776,7 @@ export const ToolConfirmationMessage: React.FC<
       isTrustedFolder,
       allowPermanentApproval,
       settings,
+      config,
     ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =

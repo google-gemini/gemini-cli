@@ -1263,7 +1263,6 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxPolicyManager = new SandboxPolicyManager();
     this.a2aClientManager = new A2AClientManager(this);
     this.modelRouterService = new ModelRouterService(this);
   }

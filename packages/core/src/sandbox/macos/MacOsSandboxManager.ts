@@ -59,7 +59,6 @@ export class MacOsSandboxManager implements SandboxManager {
     const fullCmd = [req.command, ...req.args].join(' ');
     const stripped = stripShellWrapper(fullCmd);
 
-    // 1. Check roots against explicitly approved tools from config
     const roots = getCommandRoots(stripped);
     if (roots.length === 0) return false;
 
@@ -98,6 +97,7 @@ export class MacOsSandboxManager implements SandboxManager {
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+    await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );

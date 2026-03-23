@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { parse as shellParse } from 'shell-quote';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
 
 /**
  * Checks if a command with its arguments is known to be safe to execute.
