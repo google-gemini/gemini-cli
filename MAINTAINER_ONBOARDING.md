@@ -58,11 +58,11 @@ _When you see "ALL SYSTEMS GO!", your workspace is ready._
 Once initialized, you can launch tasks directly through `npm` or the entry
 point:
 
-- **Review a PR**: `npm run workspace <PR_NUMBER> review`
-- **Launch a Shell**: `npm run workspace:shell <ID>`
-- **Check Status**: `npm run workspace:status`
-- **Cleanup All**: `npm run workspace:clean-all`
-- **Kill Task**: `npm run workspace:kill <PR> <action>`
+- **Review a PR**: `workspace <PR_NUMBER> review`
+- **Launch a Shell**: `workspace:shell <ID>`
+- **Check Status**: `workspace:status`
+- **Cleanup All**: `workspace:clean-all`
+- **Kill Task**: `workspace:kill <PR> <action>`
 - **Stop Worker**: `npx tsx scripts/workspaces.ts fleet stop` (Recommended when
   finished to save cost).
 
