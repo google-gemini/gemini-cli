@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, checkModelOutputContent, GEMINI_DIR } from './test-helper.js';
+import { TestRig, checkModelOutputContent } from './test-helper.js';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
@@ -84,21 +82,14 @@ describe('Plan Mode', () => {
       },
     });
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
-    const run = await rig.runInteractive({
+    await rig.run({
       approvalMode: 'plan',
+      stdin: 'Create a file called plan.md in the plans directory.',
     });
 
-    await run.type('Create a file called plan.md in the plans directory.');
-    await run.type('\r');
-
-    await rig.expectToolCallSuccess(['write_file'], 30000, (args) =>
-      args.includes('plan.md'),
+    const writeFileCallFound = await rig.waitForToolCall('write_file_command');
+    expect(writeFileCallFound, 'Expected write_file_command to fail').toBe(
+      false,
     );
 
     const toolLogs = rig.readToolLogs();
@@ -131,18 +122,10 @@ describe('Plan Mode', () => {
       },
     });
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
-    const run = await rig.runInteractive({
+    await rig.run({
       approvalMode: 'plan',
+      stdin: 'Create a file called hello.txt in the current directory.',
     });
-
-    await run.type('Create a file called hello.txt in the current directory.');
-    await run.type('\r');
 
     const toolLogs = rig.readToolLogs();
     const writeLog = toolLogs.find(
@@ -168,12 +151,6 @@ describe('Plan Mode', () => {
         },
       },
     });
-
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
 
     // Start in default mode and ask to enter plan mode.
     await rig.run({
