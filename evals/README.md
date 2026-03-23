@@ -140,6 +140,34 @@ describe('my_feature', () => {
 });
 ```
 
+### `appEvalTest`
+
+For evals that need to test UI interactions or use breakpoints, use
+`appEvalTest` from `evals/app-test-helper.ts`. It runs the CLI in-process using
+`AppRig` instead of as a subprocess, which allows pausing execution at specific
+tool calls.
+
+|             | `evalTest`               | `appEvalTest`                                  |
+| ----------- | ------------------------ | ---------------------------------------------- |
+| Rig         | `TestRig` (subprocess)   | `AppRig` (in-process)                          |
+| Import      | `./test-helper.js`       | `./app-test-helper.js`                         |
+| Breakpoints | No                       | Yes (`rig.setBreakpoint()`)                    |
+| Setup hook  | No                       | Yes (`setup: async (rig) => {}`)               |
+| Use when    | Standard workspace tests | UI/interaction tests, tool confirmation checks |
+
+#### `AppEvalCase` Properties
+
+- `name`: The name of the evaluation case.
+- `prompt`: The prompt to send to the model.
+- `files`: Same as `EvalCase` — optional file map for workspace setup.
+- `configOverrides`: An optional object for configuration overrides. Restricting
+  tools (`excludeTools`, `coreTools`, `allowedTools`) is forbidden.
+- `timeout`: An optional timeout in milliseconds. Defaults to 60 seconds.
+- `setup`: An optional async function that runs after file creation but before
+  the prompt is sent. Use this to set breakpoints.
+- `assert`: An async function that takes the rig and output string and asserts
+  correctness.
+
 ## Running Evaluations
 
 First, build the bundled Gemini CLI. You must do this after every code change.
