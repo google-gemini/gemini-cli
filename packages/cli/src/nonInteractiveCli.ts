@@ -523,7 +523,20 @@ export async function runNonInteractive({
             if (event.reason === 'aborted') {
               runTerminalExitHandler(() => handleCancellationError(config));
             } else if (event.reason === 'max_turns') {
-              runTerminalExitHandler(() => handleMaxTurnsExceededError(config));
+              const isConfiguredTurnLimit =
+                typeof event.data?.['maxTurns'] === 'number' ||
+                typeof event.data?.['turnCount'] === 'number';
+
+              if (isConfiguredTurnLimit) {
+                runTerminalExitHandler(() => handleMaxTurnsExceededError(config));
+              } else if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: 'Maximum session turns exceeded',
+                });
+              }
             }
 
             const stopMessage =
