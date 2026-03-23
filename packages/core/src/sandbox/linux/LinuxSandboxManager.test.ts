@@ -43,7 +43,6 @@ describe('LinuxSandboxManager', () => {
     });
 
     expect(bwrapArgs).toEqual([
-      '--unshare-all',
       '--new-session',
       '--die-with-parent',
       '--ro-bind',
@@ -58,12 +57,31 @@ describe('LinuxSandboxManager', () => {
       '--bind',
       workspace,
       workspace,
+      '--unshare-all',
       '--seccomp',
       '9',
       '--',
       'ls',
       '-la',
     ]);
+  });
+
+  it('configures network access when requested', async () => {
+    const bwrapArgs = await getBwrapArgs({
+      command: 'curl',
+      args: ['http://example.com'],
+      cwd: workspace,
+      env: {},
+      policy: { networkAccess: true },
+    });
+
+    expect(bwrapArgs).toContain('--unshare-user');
+    expect(bwrapArgs).toContain('--unshare-ipc');
+    expect(bwrapArgs).toContain('--unshare-pid');
+    expect(bwrapArgs).toContain('--unshare-uts');
+    expect(bwrapArgs).toContain('--unshare-cgroup');
+    expect(bwrapArgs).not.toContain('--unshare-all');
+    expect(bwrapArgs).not.toContain('--unshare-net');
   });
 
   it('maps allowedPaths to bwrap binds', async () => {
@@ -78,20 +96,22 @@ describe('LinuxSandboxManager', () => {
     });
 
     // Verify the specific bindings were added correctly
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+    const seccompIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(0, seccompIndex);
 
-    expect(binds).toEqual([
-      '--bind',
-      workspace,
-      workspace,
-      '--bind-try',
-      '/tmp/cache',
-      '/tmp/cache',
-      '--bind-try',
-      '/opt/tools',
-      '/opt/tools',
-    ]);
+    expect(binds).toEqual(
+      expect.arrayContaining([
+        '--bind',
+        workspace,
+        workspace,
+        '--bind-try',
+        '/tmp/cache',
+        '/tmp/cache',
+        '--bind-try',
+        '/opt/tools',
+        '/opt/tools',
+      ]),
+    );
   });
 
   it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
@@ -105,14 +125,15 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+    const seccompIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(0, seccompIndex);
 
     // Should only contain the primary workspace bind, not the second one with a trailing slash
-    expect(binds).toEqual(['--bind', workspace, workspace]);
+    expect(binds.filter((x) => x === workspace)).toHaveLength(2); // One for src, one for dest in --bind
+    expect(binds).not.toContain('--bind-try');
   });
 
-  it('maps forbidden directory paths to bwrap tmpfs', async () => {
+  it('maps forbidden directory paths to bwrap tmpfs with remount-ro', async () => {
     vi.spyOn(fs, 'stat').mockImplementation((p) => {
       if (p === '/test/forbidden_dir')
         return Promise.resolve({ isDirectory: () => true } as Stats);
@@ -131,11 +152,13 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
-    expect(binds).toEqual(
-      expect.arrayContaining(['--tmpfs', '/test/forbidden_dir']),
+    expect(bwrapArgs).toEqual(
+      expect.arrayContaining([
+        '--tmpfs',
+        '/test/forbidden_dir',
+        '--remount-ro',
+        '/test/forbidden_dir',
+      ]),
     );
   });
 
@@ -158,8 +181,8 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+    const seccompIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(0, seccompIndex);
 
     expect(binds).toEqual(
       expect.arrayContaining([
@@ -187,8 +210,8 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+    const seccompIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(0, seccompIndex);
 
     expect(binds).not.toContain('/test/missing');
   });
@@ -232,16 +255,12 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
-    // Verify both are present
-    expect(binds).toContain('--bind-try');
-    expect(binds).toContain('--tmpfs');
-
-    // The tmpfs mount MUST appear after the bind-try mount to override it
-    const bindIndex = binds.indexOf('--bind-try');
-    const tmpfsIndex = binds.indexOf('--tmpfs');
+    // The forbiddenPath (tmpfs) MUST appear after the allowedPath (bind-try) to override it
+    // We use lastIndexOf for tmpfs because getBaseBwrapArgs already adds a --tmpfs for /tmp
+    const bindIndex = bwrapArgs.indexOf('--bind-try');
+    const tmpfsIndex = bwrapArgs.lastIndexOf('--tmpfs');
+    expect(bindIndex).toBeGreaterThan(-1);
+    expect(tmpfsIndex).toBeGreaterThan(-1);
     expect(tmpfsIndex).toBeGreaterThan(bindIndex);
   });
 
@@ -268,8 +287,8 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+    const seccompIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(0, seccompIndex);
 
     // Verify both the symlink and the target are masked
     expect(binds).toContain('/test/symlink');

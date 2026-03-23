@@ -13,6 +13,7 @@ import {
   type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
+  type ExecutionPolicy,
   sanitizePaths,
   tryRealpath,
 } from '../../services/sandboxManager.js';
@@ -52,6 +53,10 @@ function getSeccompBpfPath(): string {
   const SECCOMP_RET_ERRNO = 0x00050000;
   const SECCOMP_RET_ALLOW = 0x7fff0000;
 
+  // Seccomp BPF filter to:
+  // 1. Enforce native architecture (prevents syscall-aliasing).
+  // 2. Block 'ptrace' (prevents sandbox escapes via process control).
+  // 3. Allow all other syscalls (namespaces handle the rest).
   const instructions = [
     { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
     { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
@@ -94,62 +99,10 @@ export class LinuxSandboxManager implements SandboxManager {
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
     const bwrapArgs: string[] = [
-      '--unshare-all',
-      '--new-session', // Isolate session
-      '--die-with-parent', // Prevent orphaned runaway processes
-      '--ro-bind',
-      '/',
-      '/',
-      '--dev', // Creates a safe, minimal /dev (replaces --dev-bind)
-      '/dev',
-      '--proc', // Creates a fresh procfs for the unshared PID namespace
-      '/proc',
-      '--tmpfs', // Provides an isolated, writable /tmp directory
-      '/tmp',
-      // Note: --dev /dev sets up /dev/pts automatically
-      '--bind',
-      this.options.workspace,
-      this.options.workspace,
+      ...this.getBaseBwrapArgs(),
+      ...this.getNetworkArgs(req.policy?.networkAccess),
+      ...(await this.getPermissionsArgs(req.policy)),
     ];
-
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(this.options.workspace).replace(
-      /\/$/,
-      '',
-    );
-    for (const allowedPath of allowedPaths) {
-      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
-      }
-    }
-
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
-    for (const forbiddenPath of forbiddenPaths) {
-      try {
-        const resolvedPath = await tryRealpath(forbiddenPath);
-        const stats = await fs.stat(resolvedPath);
-        if (stats.isDirectory()) {
-          bwrapArgs.push('--tmpfs', resolvedPath);
-        } else {
-          bwrapArgs.push('--ro-bind-try', '/dev/null', resolvedPath);
-        }
-
-        // If the path was a symlink, also mask the symlink itself if it's different
-        if (resolvedPath !== normalize(forbiddenPath)) {
-          bwrapArgs.push('--ro-bind-try', '/dev/null', forbiddenPath);
-        }
-      } catch (e) {
-        if (isNodeError(e) && e.code === 'ENOENT') {
-          continue;
-        }
-        throw new Error(
-          `Failed to deny access to forbidden path: ${forbiddenPath}. ${
-            e instanceof Error ? e.message : String(e)
-          }`,
-        );
-      }
-    }
 
     const bpfPath = getSeccompBpfPath();
 
@@ -169,5 +122,97 @@ export class LinuxSandboxManager implements SandboxManager {
       args: shArgs,
       env: sanitizedEnv,
     };
+  }
+
+  /**
+   * Returns the core isolation flags for Bubblewrap.
+   */
+  private getBaseBwrapArgs(): string[] {
+    return [
+      '--new-session', // Isolate session
+      '--die-with-parent', // Prevent orphaned runaway processes
+      '--ro-bind',
+      '/',
+      '/',
+      '--dev', // Creates a safe, minimal /dev (replaces --dev-bind)
+      '/dev',
+      '--proc', // Creates a fresh procfs for the unshared PID namespace
+      '/proc',
+      '--tmpfs', // Provides an isolated, writable /tmp directory
+      '/tmp',
+      // Note: --dev /dev sets up /dev/pts automatically
+      '--bind',
+      this.options.workspace,
+      this.options.workspace,
+    ];
+  }
+
+  /**
+   * Configures network isolation based on policy.
+   */
+  private getNetworkArgs(networkAccess?: boolean): string[] {
+    if (networkAccess) {
+      // Unshare everything EXCEPT the network namespace.
+      // bwrap --unshare-all includes --unshare-net, which we want to avoid.
+      return [
+        '--unshare-user',
+        '--unshare-ipc',
+        '--unshare-pid',
+        '--unshare-uts',
+        '--unshare-cgroup',
+      ];
+    }
+    return ['--unshare-all'];
+  }
+
+  /**
+   * Translates execution policy into filesystem binding arguments.
+   */
+  private async getPermissionsArgs(
+    policy?: ExecutionPolicy,
+  ): Promise<string[]> {
+    const args: string[] = [];
+    const normalizedWorkspace = this.normalizePath(this.options.workspace);
+
+    const allowedPaths = sanitizePaths(policy?.allowedPaths) || [];
+    for (const p of allowedPaths) {
+      if (this.normalizePath(p) !== normalizedWorkspace) {
+        args.push('--bind-try', p, p);
+      }
+    }
+
+    const forbiddenPaths = sanitizePaths(policy?.forbiddenPaths) || [];
+    for (const p of forbiddenPaths) {
+      try {
+        const resolvedPath = await tryRealpath(p);
+        const stats = await fs.stat(resolvedPath);
+
+        if (stats.isDirectory()) {
+          // Directories are masked by an empty, read-only tmpfs.
+          args.push('--tmpfs', resolvedPath, '--remount-ro', resolvedPath);
+        } else {
+          // Files are masked by binding them to /dev/null.
+          args.push('--ro-bind-try', '/dev/null', resolvedPath);
+        }
+
+        // Ensure the original path (if it was a symlink) is also masked.
+        if (resolvedPath !== normalize(p)) {
+          args.push('--ro-bind-try', '/dev/null', p);
+        }
+      } catch (e) {
+        if (isNodeError(e) && e.code === 'ENOENT') continue;
+        throw new Error(
+          `Failed to deny access to forbidden path: ${p}. ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
+
+    return args;
+  }
+
+  private normalizePath(p: string): string {
+    return normalize(p).replace(/\/$/, '');
   }
 }
