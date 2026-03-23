@@ -6,6 +6,10 @@ for changes to system prompts, tool definitions, and other model-steering
 mechanisms, and as a tool for assessing feature reliability by model, and
 preventing regressions.
 
+> [!TIP] **Agent Automation**: If you are pair-programming with Gemini CLI, you
+> can leverage the **behavioral-evals skill** to automate fixing failing tests
+> or promoting incubation candidates.
+
 ## Why Behavioral Evals?
 
 Unlike traditional **integration tests** which verify that the system functions
@@ -121,7 +125,7 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('my_feature', () => {
-  // New tests MUST start as USUALLY_PASSES and be promoted via /promote-behavioral-eval
+  // New tests MUST start as USUALLY_PASSES and be promoted based on consistency metrics
   evalTest('USUALLY_PASSES', {
     name: 'should do something',
     prompt: 'do it',
@@ -183,12 +187,10 @@ mandatory deflaking process.
 
 1. **Incubation**: You must create all new tests with the `USUALLY_PASSES`
    policy. This lets them be monitored in the nightly runs without blocking PRs.
-2. **Monitoring**: The test must complete at least 10 nightly runs across all
+2. **Monitoring**: The test must complete at least 7 nightly runs across all
    supported models.
-3. **Promotion**: Promotion to `ALWAYS_PASSES` happens exclusively through the
-   `/promote-behavioral-eval` slash command. This command verifies the 100%
-   success rate requirement is met across many runs before updating the test
-   policy.
+3. **Promotion**: Promotion to `ALWAYS_PASSES` is conducted by the agent after
+   verifying the 100% success rate requirement is met across many runs.
 
 This promotion process is essential for preventing the introduction of flaky
 evaluations into the CI.
@@ -225,42 +227,21 @@ tool definition has made the model's behavior less reliable.
 
 ## Fixing Evaluations
 
-If an evaluation is failing or has a regressed pass rate, you can use the
-`/fix-behavioral-eval` command within Gemini CLI to help investigate and fix the
-issue.
-
-### `/fix-behavioral-eval`
-
-This command is designed to automate the investigation and fixing process for
-failing evaluations. It will:
+If an evaluation is failing or has a regressed pass rate, ask the agent to
+investigate and fix the issue using the **behavioral-evals skill**. The agent
+will automate the following process:
 
 1.  **Investigate**: Fetch the latest results from the nightly workflow using
     the `gh` CLI, identify the failing test, and review test trajectory logs in
     `evals/logs`.
 2.  **Fix**: Suggest and apply targeted fixes to the prompt or tool definitions.
-    It prioritizes minimal changes to `prompt.ts`, tool instructions, and
-    modules that contribute to the prompt. It generally tries to avoid changing
-    the test itself.
-3.  **Verify**: Re-run the test 3 times across multiple models (e.g., Gemini
-    3.0, Gemini 3 Flash, Gemini 2.5 Pro) to ensure stability and calculate a
-    success rate.
-4.  **Report**: Provide a summary of the success rate for each model and details
-    on the applied fixes.
+    It prioritizes minimal changes to `prompt.ts` and tool instructions,
+    avoiding changing the test itself unless necessary.
+3.  **Verify**: Re-run the test locally across multiple models to ensure
+    stability.
+4.  **Report**: Provide a summary of the success rate.
 
-To use it, run:
-
-```bash
-gemini /fix-behavioral-eval
-```
-
-You can also provide a link to a specific GitHub Action run or the name of a
-specific test to focus the investigation:
-
-```bash
-gemini /fix-behavioral-eval https://github.com/google-gemini/gemini-cli/actions/runs/123456789
-```
-
-When investigating failures manually, you can also enable verbose agent logs by
+When investigating failures manually, you can enable verbose agent logs by
 setting the `GEMINI_DEBUG_LOG_FILE` environment variable.
 
 ### Best practices
@@ -273,25 +254,14 @@ instrospecting on its prompt when asked the right questions.
 
 ## Promoting evaluations
 
-Evaluations must be promoted from `USUALLY_PASSES` to `ALWAYS_PASSES`
-exclusively using the `/promote-behavioral-eval` slash command. Manual promotion
-is not allowed to ensure that the 100% success rate requirement is empirically
-met.
+Evaluations must be promoted from `USUALLY_PASSES` to `ALWAYS_PASSES` by the
+agent to ensure that the 100% success rate requirement is empirically met.
 
-### `/promote-behavioral-eval`
-
-This command automates the promotion of stable tests by:
+The agent automates the promotion by:
 
 1.  **Investigating**: Analyzing the results of the last 7 nightly runs on the
-    `main` branch using the `gh` CLI.
-2.  **Criteria Check**: Identifying tests that have passed 100% of the time for
-    ALL enabled models across the entire 7-run history.
-3.  **Promotion**: Updating the test file's policy from `USUALLY_PASSES` to
-    `ALWAYS_PASSES`.
+    `main` branch.
+2.  **Criteria Check**: Ensuring tests passed 100% of the time for ALL enabled
+    models.
+3.  **Promotion**: Updating the test file's policy to `ALWAYS_PASSES`.
 4.  **Verification**: Running the promoted test locally to ensure correctness.
-
-To run it:
-
-```bash
-gemini /promote-behavioral-eval
-```
