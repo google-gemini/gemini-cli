@@ -20,7 +20,7 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
 - **Environment Isolation**: When you need a clean, high-performance environment to verify a fix without polluting the user's local machine.
 
 ### How to use Workspaces
-1. **Setup**: If the user hasn't initialized their environment, instruct them to run the setup script:
+1. **Setup**: If the user hasn't initialized their environment, you MUST run the setup script using npx tsx and the absolute path. Do NOT use npm scripts.
    ```bash
    npx tsx ${extensionPath}/extensions/workspaces/scripts/setup.ts
    ```
@@ -50,9 +50,13 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
    ```bash
    npx tsx ${extensionPath}/extensions/workspaces/scripts/fleet.ts [stop|provision|list]
    ```
+6. **Attach/Logs**: 
+   ```bash
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/attach.ts <PR_NUMBER>
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/logs.ts <PR_NUMBER>
+   ```
 
 ## ⚠️ Important Constraints
+- **NO NPM**: Do NOT attempt to use `npm run` or `npm workspace`. Those commands are deprecated in favor of running the extension scripts directly.
+- **npx tsx**: Always use `npx tsx` followed by the absolute path provided in `${extensionPath}`.
 - **Absolute Paths**: Always use absolute paths (e.g., `/mnt/disks/data/...`) when orchestrating remote commands.
-- **npx tsx**: When running scripts manually from the skill directory, always prefix with `npx tsx` to ensure dependencies are available.
-- **Be Behavioral**: Prioritize results from live execution (behavioral proofs) over static reading.
-- **Multi-tasking**: Remind the user they can continue chatting in the main window while the heavy workspace task runs in the separate terminal window.

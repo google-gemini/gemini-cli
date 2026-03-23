@@ -1,12 +1,12 @@
 /**
- * Workspace Fleet Manager
- * 
- * Manages dynamic GCP workers for workspaces tasks.
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
-import { spawnSync } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,7 +22,9 @@ function getProjectId(): string {
     try {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
       return settings.workspace?.projectId;
-    } catch (e) {}
+    } catch {
+      // Ignore
+    }
   }
   return process.env.GOOGLE_CLOUD_PROJECT || '';
 }
@@ -30,36 +32,47 @@ function getProjectId(): string {
 async function listWorkers() {
   const projectId = getProjectId();
   if (!projectId) {
-    console.error('❌ Project ID not found. Run "npm run workspace:setup" first.');
+    console.error('❌ Project ID not found. Run "workspace setup" first.');
     return;
   }
-  
+
   console.log(`🔍 Listing Workspace Workers for ${USER} in ${projectId}...`);
-  
-  spawnSync('gcloud', [
-    'compute', 'instances', 'list',
-    '--project', projectId,
-    '--filter', `name~^${INSTANCE_PREFIX}`,
-    '--format', 'table(name,zone,status,networkInterfaces[0].networkIP:label=INTERNAL_IP,creationTimestamp)'
-  ], { stdio: 'inherit' });
+
+  spawnSync(
+    'gcloud',
+    [
+      'compute',
+      'instances',
+      'list',
+      '--project',
+      projectId,
+      '--filter',
+      `name~^${INSTANCE_PREFIX}`,
+      '--format',
+      'table(name,zone,status,networkInterfaces[0].networkIP:label=INTERNAL_IP,creationTimestamp)',
+    ],
+    { stdio: 'inherit' },
+  );
 }
 
 async function provisionWorker() {
   const projectId = getProjectId();
   if (!projectId) {
-    console.error('❌ Project ID not found. Run "npm run workspace:setup" first.');
+    console.error('❌ Project ID not found. Run "workspace setup" first.');
     return;
   }
 
-  const provider = ProviderFactory.getProvider({ 
-    projectId: projectId, 
-    zone: DEFAULT_ZONE, 
-    instanceName: INSTANCE_PREFIX 
+  const provider = ProviderFactory.getProvider({
+    projectId: projectId,
+    zone: DEFAULT_ZONE,
+    instanceName: INSTANCE_PREFIX,
   });
 
   const status = await provider.getStatus();
   if (status.status !== 'UNKNOWN' && status.status !== 'ERROR') {
-    console.log(`✅ Worker ${INSTANCE_PREFIX} already exists and is ${status.status}.`);
+    console.log(
+      `✅ Worker ${INSTANCE_PREFIX} already exists and is ${status.status}.`,
+    );
     return;
   }
 
@@ -68,12 +81,12 @@ async function provisionWorker() {
 
 async function stopWorker() {
   const projectId = getProjectId();
-  const provider = ProviderFactory.getProvider({ 
-    projectId: projectId, 
-    zone: DEFAULT_ZONE, 
-    instanceName: INSTANCE_PREFIX 
+  const provider = ProviderFactory.getProvider({
+    projectId: projectId,
+    zone: DEFAULT_ZONE,
+    instanceName: INSTANCE_PREFIX,
   });
-  
+
   console.log(`🛑 Stopping workspace worker: ${INSTANCE_PREFIX}...`);
   await provider.stop();
 }
@@ -81,14 +94,28 @@ async function stopWorker() {
 async function rebuildWorker() {
   const projectId = getProjectId();
   console.log(`🔥 Rebuilding worker ${INSTANCE_PREFIX}...`);
-  
+
   const knownHostsPath = path.join(REPO_ROOT, '.gemini/workspaces_known_hosts');
   if (fs.existsSync(knownHostsPath)) {
-      console.log(`   - Clearing isolated known_hosts...`);
-      fs.unlinkSync(knownHostsPath);
+    console.log(`   - Clearing isolated known_hosts...`);
+    fs.unlinkSync(knownHostsPath);
   }
 
-  spawnSync('gcloud', ['compute', 'instances', 'delete', INSTANCE_PREFIX, '--project', projectId, '--zone', DEFAULT_ZONE, '--quiet'], { stdio: 'inherit' });
+  spawnSync(
+    'gcloud',
+    [
+      'compute',
+      'instances',
+      'delete',
+      INSTANCE_PREFIX,
+      '--project',
+      projectId,
+      '--zone',
+      DEFAULT_ZONE,
+      '--quiet',
+    ],
+    { stdio: 'inherit' },
+  );
   await provisionWorker();
 }
 

@@ -1,12 +1,12 @@
 /**
- * Workspace Attach Utility (Local)
- * 
- * Re-attaches to a running tmux session inside the container on the worker.
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
-import path from 'path';
-import fs from 'fs';
-import { spawnSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -14,19 +14,22 @@ const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 const q = (str: string) => `'${str.replace(/'/g, "'\\''")}'`;
 
-export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process.env) {
+export async function runAttach(
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+) {
   const prNumber = args[0];
   const action = args[1] || 'review';
   const isLocal = args.includes('--local');
-  
+
   if (!prNumber) {
-    console.error('Usage: npm run workspace:attach <PR_NUMBER> [action] [--local]');
+    console.error('Usage: workspace attach <PR_NUMBER> [action] [--local]');
     return 1;
   }
 
   const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
+    console.error('❌ Settings not found. Run "workspace setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
@@ -38,18 +41,30 @@ export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process
 
   const { projectId, zone } = config;
   const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
-  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
+  const provider = ProviderFactory.getProvider({
+    projectId,
+    zone,
+    instanceName: targetVM,
+  });
 
   const sessionName = `workspace-${prNumber}-${action}`;
   const containerAttach = `sudo docker exec -it maintainer-worker sh -c ${q(`tmux attach-session -t ${sessionName}`)}`;
-  const finalSSH = provider.getRunCommand(containerAttach, { interactive: true });
+  const finalSSH = provider.getRunCommand(containerAttach, {
+    interactive: true,
+  });
 
   console.log(`🔗 Attaching to session: ${sessionName}...`);
 
-  const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
+  const isWithinGemini =
+    !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
   if (isWithinGemini && !isLocal) {
-    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `workspace-attach-${prNumber}.sh`);
-    fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
+    const tempCmdPath = path.join(
+      process.env.TMPDIR || '/tmp',
+      `workspace-attach-${prNumber}.sh`,
+    );
+    fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, {
+      mode: 0o755,
+    });
 
     const appleScript = `
       on run argv

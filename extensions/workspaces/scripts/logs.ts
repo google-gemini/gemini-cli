@@ -1,12 +1,12 @@
 /**
- * Workspace Log Tailer (Local)
- * 
- * Tails the latest remote logs for a specific job.
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
-import { spawnSync } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
@@ -14,9 +14,9 @@ const REPO_ROOT = path.resolve(__dirname, '../../../..');
 export async function runLogs(args: string[]) {
   const prNumber = args[0];
   const action = args[1] || 'review';
-  
+
   if (!prNumber) {
-    console.error('Usage: npm run workspace:logs <PR_NUMBER> [action]');
+    console.error('Usage: workspace logs <PR_NUMBER> [action]');
     return 1;
   }
 
@@ -42,7 +42,10 @@ export async function runLogs(args: string[]) {
     tail -f "$latest_log"
   `;
 
-  spawnSync(`ssh -F ${sshConfigPath} ${remoteHost} ${JSON.stringify(tailCmd)}`, { stdio: 'inherit', shell: true });
+  spawnSync(
+    `ssh -F ${sshConfigPath} ${remoteHost} ${JSON.stringify(tailCmd)}`,
+    { stdio: 'inherit', shell: true },
+  );
   return 0;
 }
 

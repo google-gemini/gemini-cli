@@ -5,10 +5,10 @@
  */
 
 /**
- * WorkspaceProvider interface defines the contract for different remote
+ * WorkerProvider interface defines the contract for different remote
  * execution environments (GCE, Workstations, etc.).
  */
-export interface WorkspaceProvider {
+export interface WorkerProvider {
   /**
    * Provisions the underlying infrastructure.
    */
@@ -37,12 +37,19 @@ export interface WorkspaceProvider {
   /**
    * Executes a command on the workspace and returns the output.
    */
-  getExecOutput(command: string, options?: ExecOptions): Promise<{ status: number; stdout: string; stderr: string }>;
+  getExecOutput(
+    command: string,
+    options?: ExecOptions,
+  ): Promise<{ status: number; stdout: string; stderr: string }>;
 
   /**
    * Synchronizes local files to the workspace.
    */
-  sync(localPath: string, remotePath: string, options?: SyncOptions): Promise<number>;
+  sync(
+    localPath: string,
+    remotePath: string,
+    options?: SyncOptions,
+  ): Promise<number>;
 
   /**
    * Returns the status of the workspace.

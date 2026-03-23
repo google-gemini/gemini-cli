@@ -64,16 +64,6 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "workspace": "tsx ./scripts/workspaces.ts",
-    "workspace:setup": "tsx ./scripts/workspaces.ts setup",
-    "workspace:shell": "tsx ./scripts/workspaces.ts shell",
-    "workspace:check": "tsx ./scripts/workspaces.ts check",
-    "workspace:clean-all": "tsx ./scripts/workspaces.ts clean-all",
-    "workspace:kill": "tsx ./scripts/workspaces.ts kill",
-    "workspace:fleet": "tsx ./scripts/workspaces.ts fleet",
-    "workspace:status": "tsx ./scripts/workspaces.ts status",
-    "workspace:attach": "tsx ./scripts/workspaces.ts attach",
-    "workspace:logs": "tsx ./scripts/workspaces.ts logs",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
