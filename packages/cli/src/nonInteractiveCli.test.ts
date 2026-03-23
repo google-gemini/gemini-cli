@@ -2388,7 +2388,7 @@ describe('runNonInteractive', () => {
       );
     });
 
-    it('should emit warning event for loop_detected custom event in streaming JSON mode', async () => {
+    it('should emit warning event for loop_detected in streaming JSON mode', async () => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
