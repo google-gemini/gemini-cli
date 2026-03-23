@@ -57,7 +57,7 @@ export class AgentRegistry {
   }
 
   private onModelChanged = () => {
-    this.refreshAgents().catch((e) => {
+    this.refreshAgents('local').catch((e) => {
       debugLogger.error(
         '[AgentRegistry] Failed to refresh agents on model change:',
         e,
@@ -270,12 +270,16 @@ export class AgentRegistry {
     }
   }
 
-  private async refreshAgents(): Promise<void> {
+  private async refreshAgents(
+    scope: AgentDefinition['kind'] | 'all' = 'all',
+  ): Promise<void> {
     this.loadBuiltInAgents();
     await Promise.allSettled(
-      Array.from(this.agents.values()).map((agent) =>
-        this.registerAgent(agent),
-      ),
+      Array.from(this.agents.values()).map(async (agent) => {
+        if (scope === 'all' || agent.kind === scope) {
+          await this.registerAgent(agent);
+        }
+      }),
     );
   }
 

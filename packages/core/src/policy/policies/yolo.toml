@@ -53,4 +53,4 @@ toolName = "*"
 decision = "allow"
 priority = 998
 modes = ["yolo"]
-allow_redirection = true
+allowRedirection = true

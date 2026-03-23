@@ -11,9 +11,10 @@ export type Unsubscribe = () => void;
 export interface AgentProtocol extends Trajectory {
   /**
    * Send data to the agent. Promise resolves when action is acknowledged.
-   * Returns the `streamId` of the stream the message was correlated to --
-   * this may be a new stream if idle, an existing stream, or null if no
-   * stream was triggered.
+   * Returns the agent-activity `streamId` affected by the send. This may be a
+   * new stream if idle, an existing stream, or null if the send was
+   * acknowledged without starting agent activity. Emitted events should still
+   * remain correlated to a stream via their `streamId`.
    *
    * When a new stream is created by a send, the streamId MUST be returned
    * before the `agent_start` event is emitted for the stream.
@@ -36,7 +37,7 @@ export interface AgentProtocol extends Trajectory {
   /**
    * AgentProtocol implements the Trajectory interface and can retrieve existing events.
    */
-  readonly events: AgentEvent[];
+  readonly events: readonly AgentEvent[];
 }
 
 type RequireExactlyOne<T> = {
@@ -54,7 +55,7 @@ interface AgentSendPayloads {
 export type AgentSend = RequireExactlyOne<AgentSendPayloads> & WithMeta;
 
 export interface Trajectory {
-  readonly events: AgentEvent[];
+  readonly events: readonly AgentEvent[];
 }
 
 export interface AgentEventCommon {
@@ -62,8 +63,8 @@ export interface AgentEventCommon {
   id: string;
   /** Identifies the subagent thread, omitted for "main thread" events. */
   threadId?: string;
-  /** Identifies a particular stream of a particular thread. */
-  streamId?: string | null;
+  /** Identifies the stream this event belongs to. */
+  streamId: string;
   /** ISO Timestamp for the time at which the event occurred. */
   timestamp: string;
   /** The concrete type of the event. */
@@ -81,9 +82,18 @@ export type AgentEventData<
   EventType extends keyof AgentEvents = keyof AgentEvents,
 > = AgentEvents[EventType] & { type: EventType };
 
+/**
+ * Mapped type that produces a proper discriminated union when `EventType` is
+ * the default (all keys), enabling `switch (event.type)` narrowing.
+ * When a specific EventType is provided, resolves to a single variant.
+ */
 export type AgentEvent<
   EventType extends keyof AgentEvents = keyof AgentEvents,
-> = AgentEventCommon & AgentEventData<EventType>;
+> = {
+  [K in EventType]: AgentEventCommon & AgentEvents[K] & { type: K };
+}[EventType];
+
+export type AgentEventType = keyof AgentEvents;
 
 export interface AgentEvents {
   /** MUST be the first event emitted in a session. */
@@ -263,7 +273,7 @@ export interface AgentStart {
   streamId: string;
 }
 
-type StreamEndReason =
+export type StreamEndReason =
   | 'completed'
   | 'failed'
   | 'aborted'
