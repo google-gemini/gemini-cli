@@ -129,11 +129,10 @@ describe('ExtensionManager - Open Plugin Support', () => {
     expect(plugin?.description).toBe(`Uses root: ${pluginDir}`);
   });
 
-  it('should NOT load skills or context files for Open Plugins in v1', async () => {
+  it('should load skills for Open Plugins', async () => {
     const pluginDir = path.join(userExtensionsDir, 'feature-plugin');
-    const hiddenDir = path.join(pluginDir, '.plugin');
-    fs.mkdirSync(hiddenDir, { recursive: true });
-    const skillsDir = path.join(pluginDir, 'skills', 'test');
+    fs.mkdirSync(pluginDir, { recursive: true });
+    const skillsDir = path.join(pluginDir, 'skills', 'test-skill');
     fs.mkdirSync(skillsDir, { recursive: true });
 
     fs.writeFileSync(
@@ -147,20 +146,19 @@ describe('ExtensionManager - Open Plugin Support', () => {
     fs.writeFileSync(
       path.join(skillsDir, 'SKILL.md'),
       `---
-  name: test-skill
-  description: "Test"
-  ---
-  Body`,
+name: my-skill
+description: "Test description"
+---
+Body`,
     );
-
-    fs.writeFileSync(path.join(pluginDir, 'GEMINI.md'), '# Context');
 
     const extensions = await extensionManager.loadExtensions();
     const plugin = extensions.find((ext) => ext.name === 'feature-plugin');
 
     expect(plugin).toBeDefined();
-    expect(plugin?.skills).toBeUndefined();
-    expect(plugin?.contextFiles).toEqual([]);
+    expect(plugin?.skills).toBeDefined();
+    expect(plugin?.skills?.[0].name).toBe('feature-plugin:my-skill');
+    expect(plugin?.skills?.[0].extensionName).toBe('feature-plugin');
   });
 
   it('should prioritize gemini-extension.json over plugin.json', async () => {

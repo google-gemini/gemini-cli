@@ -7,9 +7,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { z } from 'zod';
-import type {
-  ExtensionInstallMetadata,
-  GeminiCLIExtension,
+import {
+  loadSkillsFromDir,
+  type ExtensionInstallMetadata,
+  type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import {
   EXTENSIONS_CONFIG_FILENAME,
@@ -156,7 +157,6 @@ export async function loadOpenPluginConfig(
 
 /**
  * Creates a GeminiCLIExtension from an Open Plugin directory.
- * v1: Does not enable skills, mcp servers, context files, or settings.
  */
 export async function createOpenPlugin(
   pluginDir: string,
@@ -171,6 +171,20 @@ export async function createOpenPlugin(
     manifestPath,
     pluginDir,
     workspaceDir,
+  );
+
+  const hydrationContext = {
+    extensionPath: pluginDir,
+    PLUGIN_ROOT: pluginDir,
+    workspacePath: workspaceDir,
+    '/': path.sep,
+    pathSeparator: path.sep,
+  };
+
+  const skills = await resolvePluginSkills(
+    pluginDir,
+    config.name,
+    hydrationContext,
   );
 
   return {
@@ -193,8 +207,30 @@ export async function createOpenPlugin(
     excludeTools: undefined,
     settings: undefined,
     resolvedSettings: undefined,
-    skills: undefined,
+    skills,
     agents: undefined,
     themes: undefined,
   };
+}
+
+/**
+ * Discovers and namespaces skills for an Open Plugin.
+ */
+async function resolvePluginSkills(
+  pluginDir: string,
+  pluginName: string,
+  hydrationContext: Record<string, string>,
+): Promise<GeminiCLIExtension['skills']> {
+  const skillsDir = path.join(pluginDir, 'skills');
+  const discoveredSkills = await loadSkillsFromDir(skillsDir);
+
+  if (discoveredSkills.length === 0) {
+    return undefined;
+  }
+
+  return discoveredSkills.map((skill) => ({
+    ...recursivelyHydrateStrings(skill, hydrationContext),
+    name: `${pluginName}:${skill.name}`,
+    extensionName: pluginName,
+  }));
 }
