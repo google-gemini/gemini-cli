@@ -94,14 +94,13 @@ export class MockAgentProtocol implements AgentProtocol {
       options?.close &&
       !events.some((eventData) => eventData.type === 'agent_end')
     ) {
-      const endEvent = {
-        id: `e-${this._nextEventId++}`,
-        timestamp: now,
-        streamId,
-        type: 'agent_end',
-        reason: 'completed',
-      } satisfies AgentEvent<'agent_end'>;
-      this._emit(endEvent);
+      this._emit(
+        this._normalizeEvent(
+          { type: 'agent_end', reason: 'completed' },
+          now,
+          streamId,
+        ),
+      );
     }
   }
 
@@ -113,19 +112,24 @@ export class MockAgentProtocol implements AgentProtocol {
 
     // If there were queued responses (even if empty array), we trigger a stream.
     const hasResponseEvents = responseData !== undefined;
-    let correlationStreamId: string | undefined;
-    const getCorrelationStreamId = (): string =>
-      (correlationStreamId ??=
-        response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`);
-    const streamId = hasResponseEvents ? getCorrelationStreamId() : null;
+    const streamId = hasResponseEvents
+      ? (response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`)
+      : null;
 
     const now = new Date().toISOString();
     const eventsToEmit: AgentEvent[] = [];
+    let fallbackStreamId: string | undefined;
 
     // All emitted events stay correlated to a stream even if this send does not
     // start agent activity and therefore returns `streamId: null`.
     const normalize = (eventData: MockAgentEvent): AgentEvent =>
-      this._normalizeEvent(eventData, now, getCorrelationStreamId());
+      this._normalizeEvent(
+        eventData,
+        now,
+        eventData.streamId ??
+          streamId ??
+          (fallbackStreamId ??= `mock-stream-${this._nextStreamId++}`),
+      );
 
     // 1. User/Update event (BEFORE agent_start)
     if ('message' in payload && payload.message) {
@@ -236,14 +240,13 @@ export class MockAgentProtocol implements AgentProtocol {
   async abort(): Promise<void> {
     if (this._lastStreamId && this._activeStreamIds.has(this._lastStreamId)) {
       const streamId = this._lastStreamId;
-      const endEvent = {
-        id: `e-${this._nextEventId++}`,
-        timestamp: new Date().toISOString(),
-        streamId,
-        type: 'agent_end',
-        reason: 'aborted',
-      } satisfies AgentEvent<'agent_end'>;
-      this._emit(endEvent);
+      this._emit(
+        this._normalizeEvent(
+          { type: 'agent_end', reason: 'aborted' },
+          new Date().toISOString(),
+          streamId,
+        ),
+      );
     }
   }
 }
