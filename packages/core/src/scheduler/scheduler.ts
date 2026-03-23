@@ -167,11 +167,22 @@ export class Scheduler {
       return;
     }
 
-    // TODO: Optimize policy checks. Currently, tools check policy via
-    // MessageBus even though the Scheduler already checked it.
+    // ADD THIS LINE
+    Scheduler.subscribedMessageBuses.add(messageBus);
+
     messageBus.subscribe(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
       async (request: ToolConfirmationRequest) => {
+        const activeCalls = this.state.allActiveCalls;
+
+        const needsConfirmation = activeCalls.some(
+          (call) => call.status === CoreToolCallStatus.AwaitingApproval,
+        );
+
+        if (!needsConfirmation) {
+          return;
+        }
+
         await messageBus.publish({
           type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           correlationId: request.correlationId,
@@ -180,8 +191,6 @@ export class Scheduler {
         });
       },
     );
-
-    Scheduler.subscribedMessageBuses.add(messageBus);
   }
 
   /**
