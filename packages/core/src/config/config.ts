@@ -330,6 +330,10 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Whether to confirm sensitive actions (e.g., fill_form, evaluate_script). */
+  confirmSensitiveActions?: boolean;
+  /** Whether to block file uploads. */
+  blockFileUploads?: boolean;
 }
 
 /**
@@ -528,6 +532,12 @@ export interface PolicyUpdateConfirmationRequest {
   newHash: string;
 }
 
+export interface WorktreeSettings {
+  name: string;
+  path: string;
+  baseSha: string;
+}
+
 export interface ConfigParameters {
   sessionId: string;
   clientName?: string;
@@ -651,6 +661,7 @@ export interface ConfigParameters {
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
+  worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
@@ -696,6 +707,7 @@ export class Config implements McpContext, AgentLoopContext {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  private readonly worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
@@ -927,6 +939,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.worktreeSettings = params.worktreeSettings;
 
     this.coreTools = params.coreTools;
     this.mainAgentTools = params.mainAgentTools;
@@ -1556,6 +1569,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSessionId(): string {
     return this.promptId;
+  }
+
+  getWorktreeSettings(): WorktreeSettings | undefined {
+    return this.worktreeSettings;
   }
 
   getClientName(): string | undefined {
@@ -3129,6 +3146,8 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        confirmSensitiveActions: customConfig.confirmSensitiveActions,
+        blockFileUploads: customConfig.blockFileUploads,
       },
     };
   }
@@ -3289,9 +3308,28 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    const definitions = this.agentRegistry.getAllDefinitions();
+    const discoveredDefinitions =
+      this.agentRegistry.getAllDiscoveredAgentNames();
 
-    for (const definition of definitions) {
+    // First, unregister any agents that are now disabled
+    for (const agentName of discoveredDefinitions) {
+      if (
+        !this.isAgentsEnabled() ||
+        agentsOverrides[agentName]?.enabled === false
+      ) {
+        const tool = registry.getTool(agentName);
+        if (tool instanceof SubagentTool) {
+          registry.unregisterTool(agentName);
+        }
+      }
+    }
+
+    const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
+    for (const agentName of discoveredNames) {
+      const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
+      if (!definition) {
+        continue;
+      }
       try {
         if (
           !this.isAgentsEnabled() ||

@@ -238,6 +238,7 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+export * from './services/worktreeService.js';
 
 // Export voice utilities
 export * from './voice/responseFormatter.js';

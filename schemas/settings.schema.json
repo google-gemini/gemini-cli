@@ -2061,7 +2061,7 @@
           },
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ModelPolicy"
+            "$ref": "#/$defs/ModelPolicyChain"
           }
         }
       },
@@ -2133,6 +2133,20 @@
               "description": "Disable user input on browser window during automation.",
               "markdownDescription": "Disable user input on browser window during automation.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
+              "type": "boolean"
+            },
+            "confirmSensitiveActions": {
+              "title": "Confirm Sensitive Actions",
+              "description": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).",
+              "markdownDescription": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "blockFileUploads": {
+              "title": "Block File Uploads",
+              "description": "Hard-block file upload requests from the browser agent.",
+              "markdownDescription": "Hard-block file upload requests from the browser agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
               "type": "boolean"
             }
           },
@@ -2661,6 +2675,13 @@
           "description": "Enable local and remote subagents.",
           "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
+          "type": "boolean"
+        },
+        "worktrees": {
+          "title": "Enable Git Worktrees",
+          "description": "Enable automated Git worktree management for parallel work.",
+          "markdownDescription": "Enable automated Git worktree management for parallel work.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "extensionManagement": {
@@ -3677,6 +3698,14 @@
             }
           }
         }
+      }
+    },
+    "ModelPolicyChain": {
+      "type": "array",
+      "description": "A chain of model policies for fallback behavior.",
+      "items": {
+        "type": "object",
+        "ref": "ModelPolicy"
       }
     },
     "ModelPolicy": {
