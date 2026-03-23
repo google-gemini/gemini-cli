@@ -214,6 +214,7 @@ describe('listSessions', () => {
     // Get all the session log calls (skip the header)
     const sessionCalls = mocks.writeToStdout.mock.calls.filter(
       (call): call is [string] =>
+        // eslint-disable-next-line no-restricted-syntax
         typeof call[0] === 'string' &&
         call[0].includes('[session-') &&
         !call[0].includes('Available sessions'),
