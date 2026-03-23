@@ -286,6 +286,11 @@ async function exploreAction(
             await installAction(context, extension.url, requestConsentOverride);
             context.ui.removeComponent();
           },
+          onLink: async (extension, requestConsentOverride) => {
+            debugLogger.log(`Linking extension: ${extension.extensionName}`);
+            await linkAction(context, extension.url, requestConsentOverride);
+            context.ui.removeComponent();
+          },
           onClose: () => context.ui.removeComponent(),
           extensionManager,
         }),
@@ -533,7 +538,11 @@ async function installAction(
   }
 }
 
-async function linkAction(context: CommandContext, args: string) {
+async function linkAction(
+  context: CommandContext,
+  args: string,
+  requestConsentOverride?: (consent: string) => Promise<boolean>,
+) {
   const extensionLoader =
     context.services.agentContext?.config.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
@@ -582,8 +591,11 @@ async function linkAction(context: CommandContext, args: string) {
       source: sourceFilepath,
       type: 'link',
     };
-    const extension =
-      await extensionLoader.installOrUpdateExtension(installMetadata);
+    const extension = await extensionLoader.installOrUpdateExtension(
+      installMetadata,
+      undefined,
+      requestConsentOverride,
+    );
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" linked successfully.`,

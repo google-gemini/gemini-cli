@@ -59,8 +59,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 async function expectConsentSnapshot(consentString: string) {
-  const renderResult = render(React.createElement(Text, null, consentString));
-  await renderResult.waitUntilReady();
+  const renderResult = await render(
+    React.createElement(Text, null, consentString),
+  );
   await expect(renderResult).toMatchSvgSnapshot();
 }
 
