@@ -127,7 +127,7 @@ export async function loadConfig(
     interactive: !isHeadlessMode(),
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
-    enableAgents: settings.experimental?.enableAgents ?? true,
+    enableAgents: settings.experimental?.enableAgents ?? false,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {
