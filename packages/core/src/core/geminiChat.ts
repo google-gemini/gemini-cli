@@ -346,6 +346,7 @@ export class GeminiChat {
     }
 
     // Add user content to history ONCE before any attempts.
+    const historyLengthBeforeUserPush = this.history.length;
     this.history.push(userContent);
     const requestContents = this.getHistory(true);
 
@@ -484,6 +485,9 @@ export class GeminiChat {
           }
         }
       } finally {
+        if (this.history.length === historyLengthBeforeUserPush + 1) {
+          this.history.pop();
+        }
         streamDoneResolver!();
       }
     };
