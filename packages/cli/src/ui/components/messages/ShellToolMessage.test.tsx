@@ -61,7 +61,7 @@ describe('<ShellToolMessage />', () => {
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
       const { lastFrame, simulateClick, unmount } = await renderWithProviders(
         <ShellToolMessage {...baseProps} name={name} />,
-        { uiActions, mouseEventsEnabled: true },
+        { uiActions },
       );
 
       await waitFor(() => {

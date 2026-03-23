@@ -10,16 +10,15 @@ import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import { cleanupTerminalOnExit } from './ui/utils/terminalCapabilityManager.js';
 import {
   type StartupWarning,
   type Config,
   type ResumedSessionData,
   coreEvents,
   createWorkingStdio,
-  disableMouseEvents,
   enableMouseEvents,
   disableLineWrapping,
-  enableLineWrapping,
   shouldEnterAlternateScreen,
   recordSlowRender,
   writeToStdout,
@@ -65,12 +64,8 @@ export async function startInteractiveUI(
     isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = useAlternateBuffer;
-  if (mouseEventsEnabled) {
+  if (useAlternateBuffer) {
     enableMouseEvents();
-    registerCleanup(() => {
-      disableMouseEvents();
-    });
   }
 
   const { matchers, errors } = await loadKeyMatchers();
@@ -102,7 +97,7 @@ export async function startInteractiveUI(
       <SettingsContext.Provider value={settings}>
         <KeyMatchersProvider value={matchers}>
           <KeypressProvider config={config}>
-            <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+            <MouseProvider>
               <TerminalProvider>
                 <ScrollProvider>
                   <OverflowProvider>
@@ -163,9 +158,6 @@ export async function startInteractiveUI(
 
   if (useAlternateBuffer) {
     disableLineWrapping();
-    registerCleanup(() => {
-      enableLineWrapping();
-    });
   }
 
   checkForUpdates(settings)
@@ -182,6 +174,7 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 
   registerCleanup(setupTtyCheck());
+  registerCleanup(cleanupTerminalOnExit);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {

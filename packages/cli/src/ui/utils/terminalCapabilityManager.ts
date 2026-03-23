@@ -13,7 +13,10 @@ import {
   disableModifyOtherKeys,
   enableBracketedPasteMode,
   disableBracketedPasteMode,
+  writeToStdout,
+  exitAlternateScreen,
   disableMouseEvents,
+  enableLineWrapping,
 } from '@google/gemini-cli-core';
 import { parseColor } from '../themes/color-utils.js';
 
@@ -22,20 +25,28 @@ export type TerminalBackgroundColor = string | undefined;
 const TERMINAL_CLEANUP_SEQUENCE =
   '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
 
+export function clearTerminalScreen(): void {
+  writeToStdout('\x1b[2J\x1b[H');
+}
+
 export function cleanupTerminalOnExit() {
   try {
     if (process.stdout?.fd !== undefined) {
+      // Use fs.writeSync as the authoritative exit handler for restored modes because
+      // it guarantees the sequence is flushed synchronously before the process terminates.
       fs.writeSync(process.stdout.fd, TERMINAL_CLEANUP_SEQUENCE);
-      return;
     }
   } catch (e) {
     debugLogger.warn('Failed to synchronously cleanup terminal modes:', e);
   }
 
+  // Fallback cleanup using explicit helper functions.
   disableKittyKeyboardProtocol();
   disableModifyOtherKeys();
   disableBracketedPasteMode();
+  exitAlternateScreen();
   disableMouseEvents();
+  enableLineWrapping();
 }
 
 export class TerminalCapabilityManager {

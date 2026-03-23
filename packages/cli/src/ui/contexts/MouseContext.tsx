@@ -60,13 +60,7 @@ export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
   }, [isActive, handler, subscribe, unsubscribe]);
 }
 
-export function MouseProvider({
-  children,
-  mouseEventsEnabled,
-}: {
-  children: React.ReactNode;
-  mouseEventsEnabled?: boolean;
-}) {
+export function MouseProvider({ children }: { children: React.ReactNode }) {
   const { settings } = useSettingsStore();
   const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
 
@@ -93,10 +87,6 @@ export function MouseProvider({
   );
 
   useEffect(() => {
-    if (!mouseEventsEnabled) {
-      return;
-    }
-
     let mouseBuffer = '';
 
     const broadcast = (event: MouseEvent) => {
@@ -146,6 +136,10 @@ export function MouseProvider({
     };
 
     const handleData = (data: Buffer | string) => {
+      // It is safe and desirable to leave this listener always-on because it allows us
+      // to robustly detect and process valid mouse sequences if they occur, while
+      // efficiently discarding normal typing and unrelated escape sequences below.
+      // This guarantees the buffer does not grow unbounded outside of mouse modes.
       mouseBuffer += typeof data === 'string' ? data : data.toString('utf-8');
 
       // Safety cap to prevent infinite buffer growth on garbage
@@ -190,7 +184,7 @@ export function MouseProvider({
     return () => {
       stdin.removeListener('data', handleData);
     };
-  }, [stdin, mouseEventsEnabled, subscribers, debugKeystrokeLogging]);
+  }, [stdin, subscribers, debugKeystrokeLogging]);
 
   const contextValue = useMemo(
     () => ({ subscribe, unsubscribe }),

@@ -70,8 +70,10 @@ import {
   writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
+  exitAlternateScreen,
   enableMouseEvents,
   disableLineWrapping,
+  enableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   SessionStartSource,
@@ -149,7 +151,10 @@ import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useSettings } from './contexts/SettingsContext.js';
-import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
+import {
+  terminalCapabilityManager,
+  clearTerminalScreen,
+} from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
@@ -234,7 +239,16 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = config.getUseAlternateBuffer();
+  const [isAlternateBuffer, setIsAlternateBuffer] = useState(
+    shouldEnterAlternateScreen(
+      config.getUseAlternateBuffer(),
+      config.getScreenReader(),
+    ),
+  );
+  const isAlternateBufferRef = useRef(isAlternateBuffer);
+  useEffect(() => {
+    isAlternateBufferRef.current = isAlternateBuffer;
+  }, [isAlternateBuffer]);
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -554,7 +568,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const { errorCount, clearErrorCount } = useErrorCount();
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
+  const mainAreaWidth = calculateMainAreaWidth(
+    terminalWidth,
+    isAlternateBuffer,
+  );
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
@@ -1612,7 +1629,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setRawMode,
     refreshStatic,
     setForceRerenderKey,
-    shouldUseAlternateScreen,
+    isAlternateBufferRef,
+    config,
   });
 
   useEffect(() => {
@@ -1682,13 +1700,52 @@ Logging in with Google... Restarting Gemini CLI to continue.
     errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
+  const applyAlternateBufferMode = useCallback(
+    (next: boolean) => {
+      if (next) {
+        enterAlternateScreen();
+        disableLineWrapping();
+        enableMouseEvents();
+        // Clear the alternate buffer after entering to avoid artifacts;
+        clearTerminalScreen();
+      } else {
+        // Clear the alternate buffer before exiting to avoid artifacts;
+        // do not clear normal buffer to preserve scrollback.
+        clearTerminalScreen();
+        exitAlternateScreen();
+        enableLineWrapping();
+        disableMouseEvents();
+        setCopyModeEnabled(false);
+      }
+    },
+    [setCopyModeEnabled],
+  );
+
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
 
-      if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
+      if (keyMatchers[Command.TOGGLE_ALTERNATE_BUFFER](key)) {
+        if (config.getScreenReader()) {
+          return true;
+        }
+
+        const next = !isAlternateBufferRef.current;
+        isAlternateBufferRef.current = next;
+
+        applyAlternateBufferMode(next);
+        setIsAlternateBuffer(next);
+
+        setHistoryRemountKey((prev) => prev + 1);
+        return true;
+      }
+
+      if (
+        isAlternateBufferRef.current &&
+        keyMatchers[Command.TOGGLE_COPY_MODE](key)
+      ) {
         setCopyModeEnabled(true);
         disableMouseEvents();
         return true;
@@ -1708,7 +1765,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         handleSuspend();
       } else if (
         keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
-        !isAlternateBuffer
+        !isAlternateBufferRef.current
       ) {
         showTransientMessage({
           text: 'Use Ctrl+O to expand and collapse blocks of content.',
@@ -1725,7 +1782,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           // If the user manually collapses the view, show the hint and reset the x-second timer.
           triggerExpandHint(true);
         }
-        if (!isAlternateBuffer) {
+        if (!isAlternateBufferRef.current) {
           refreshStatic();
         }
       }
@@ -1773,7 +1830,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setConstrainHeight(false);
         // If the user manually expands the view, show the hint and reset the x-second timer.
         triggerExpandHint(true);
-        if (!isAlternateBuffer) {
+        if (!isAlternateBufferRef.current) {
           refreshStatic();
         }
         return true;
@@ -1865,8 +1922,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       setCopyModeEnabled,
       tabFocusTimeoutRef,
-      isAlternateBuffer,
       shortcutsHelpVisible,
+      applyAlternateBufferMode,
       backgroundCurrentShell,
       toggleBackgroundShell,
       backgroundShells,
@@ -1882,7 +1939,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+  useKeypress(handleGlobalKeypress, {
+    isActive: true,
+    priority: KeypressPriority.Critical,
+  });
 
   useKeypress(
     (key: Key) => {
@@ -2170,6 +2230,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => ({
       history: historyManager.history,
       historyManager,
+      isAlternateBuffer,
       isThemeDialogOpen,
 
       themeError,
@@ -2417,6 +2478,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      isAlternateBuffer,
     ],
   );
 
