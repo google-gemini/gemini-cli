@@ -38,6 +38,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
   const baseConfig = {
     getSessionId: () => 'test-session-id',
     getUsageStatisticsEnabled: () => true,
+    getTelemetryLogPromptsEnabled: () => false,
     getDebugMode: () => false,
     isInteractive: () => true,
     getApprovalMode: () => ApprovalMode.DEFAULT,
