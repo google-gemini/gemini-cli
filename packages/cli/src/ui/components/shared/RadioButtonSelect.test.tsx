@@ -70,7 +70,7 @@ describe('RadioButtonSelect', () => {
     { label: 'Option 3', value: 'three', disabled: true, key: 'three' },
   ];
 
-  const renderComponent = (
+  const renderComponent = async (
     props: Partial<RadioButtonSelectProps<string>> = {},
   ) => {
     const defaultProps: RadioButtonSelectProps<string> = {
@@ -86,7 +86,7 @@ describe('RadioButtonSelect', () => {
   });
 
   describe('Prop forwarding to BaseSelectionList', () => {
-    it('should forward all props correctly when provided', () => {
+    it('should forward all props correctly when provided', async () => {
       const props = {
         items: ITEMS,
         initialIndex: 1,
@@ -98,7 +98,7 @@ describe('RadioButtonSelect', () => {
         showNumbers: false,
       };
 
-      renderComponent(props);
+      await renderComponent(props);
 
       expect(BaseSelectionList).toHaveBeenCalledTimes(1);
       expect(BaseSelectionList).toHaveBeenCalledWith(
@@ -110,8 +110,8 @@ describe('RadioButtonSelect', () => {
       );
     });
 
-    it('should use default props if not provided', () => {
-      renderComponent({
+    it('should use default props if not provided', async () => {
+      await renderComponent({
         items: ITEMS,
         onSelect: mockOnSelect,
       });
@@ -137,8 +137,8 @@ describe('RadioButtonSelect', () => {
       numberColor: 'MOCK_NUMBER_COLOR',
     };
 
-    beforeEach(() => {
-      renderComponent();
+    beforeEach(async () => {
+      await renderComponent();
       renderItem = extractRenderItem();
     });
 

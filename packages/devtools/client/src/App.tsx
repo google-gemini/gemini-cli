@@ -20,7 +20,9 @@ interface ThemeColors {
   consoleBg: string;
   rowBorder: string;
   errorBg: string;
+  errorText: string;
   warnBg: string;
+  warnText: string;
 }
 
 export default function App() {
@@ -69,7 +71,9 @@ export default function App() {
       consoleBg: isDark ? '#1e1e1e' : '#fff',
       rowBorder: isDark ? '#303134' : '#f0f0f0',
       errorBg: isDark ? '#3c1e1e' : '#fff0f0',
+      errorText: isDark ? '#f28b82' : '#a80000',
       warnBg: isDark ? '#302a10' : '#fff3cd',
+      warnText: isDark ? '#fdd663' : '#7a5d00',
     }),
     [isDark],
   );
@@ -539,7 +543,7 @@ function ConsoleLogEntry({ log, t }: { log: ConsoleLog; t: ThemeColors }) {
   const isError = log.type === 'error';
   const isWarn = log.type === 'warn';
   const bg = isError ? t.errorBg : isWarn ? t.warnBg : 'transparent';
-  const color = isError ? '#f28b82' : isWarn ? '#fdd663' : t.text;
+  const color = isError ? t.errorText : isWarn ? t.warnText : t.text;
   const icon = isError ? '❌' : isWarn ? '⚠️' : ' ';
 
   let displayContent = content;
