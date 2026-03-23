@@ -341,11 +341,11 @@ describe('loadConfig', () => {
       );
     });
 
-    it('should default enableAgents to true when not provided', async () => {
+    it('should default enableAgents to false when not provided', async () => {
       await loadConfig(mockSettings, mockExtensionLoader, taskId);
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
-          enableAgents: true,
+          enableAgents: false,
         }),
       );
     });
