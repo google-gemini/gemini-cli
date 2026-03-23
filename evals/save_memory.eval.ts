@@ -11,9 +11,23 @@ import {
   checkModelOutputContent,
 } from '../integration-tests/test-helper.js';
 
+/**
+ * Compile-time guard to prevent tool restriction usage in eval configs
+ */
+type ForbiddenToolKeys =
+  | 'excludeTools'
+  | 'coreTools'
+  | 'allowedTools'
+  | 'mainAgentTools';
+
+type NoToolRestrictions<T> = T & {
+  [K in ForbiddenToolKeys]?: never;
+};
+
 describe('save_memory', () => {
   const TEST_PREFIX = 'Save memory test: ';
   const rememberingFavoriteColor = "Agent remembers user's favorite color";
+
   evalTest('ALWAYS_PASSES', {
     name: rememberingFavoriteColor,
 
@@ -33,7 +47,9 @@ describe('save_memory', () => {
       });
     },
   });
+
   const rememberingCommandRestrictions = 'Agent remembers command restrictions';
+
   evalTest('USUALLY_PASSES', {
     name: rememberingCommandRestrictions,
 
@@ -53,6 +69,7 @@ describe('save_memory', () => {
   });
 
   const rememberingWorkflow = 'Agent remembers workflow preferences';
+
   evalTest('USUALLY_PASSES', {
     name: rememberingWorkflow,
 
@@ -73,6 +90,7 @@ describe('save_memory', () => {
 
   const ignoringTemporaryInformation =
     'Agent ignores temporary conversation details';
+
   evalTest('ALWAYS_PASSES', {
     name: ignoringTemporaryInformation,
 
@@ -82,6 +100,7 @@ describe('save_memory', () => {
       const wasToolCalled = rig
         .readToolLogs()
         .some((log) => log.toolRequest.name === 'save_memory');
+
       expect(
         wasToolCalled,
         'save_memory should not be called for temporary information',
@@ -96,6 +115,7 @@ describe('save_memory', () => {
   });
 
   const rememberingPetName = "Agent remembers user's pet's name";
+
   evalTest('ALWAYS_PASSES', {
     name: rememberingPetName,
 
@@ -115,6 +135,7 @@ describe('save_memory', () => {
   });
 
   const rememberingCommandAlias = 'Agent remembers custom command aliases';
+
   evalTest('ALWAYS_PASSES', {
     name: rememberingCommandAlias,
 
@@ -135,6 +156,7 @@ describe('save_memory', () => {
 
   const ignoringDbSchemaLocation =
     "Agent ignores workspace's database schema location";
+
   evalTest('USUALLY_PASSES', {
     name: ignoringDbSchemaLocation,
     prompt: `The database schema for this workspace is located in \`db/schema.sql\`.`,
@@ -143,6 +165,7 @@ describe('save_memory', () => {
       const wasToolCalled = rig
         .readToolLogs()
         .some((log) => log.toolRequest.name === 'save_memory');
+
       expect(
         wasToolCalled,
         'save_memory should not be called for workspace-specific information',
@@ -154,6 +177,7 @@ describe('save_memory', () => {
 
   const rememberingCodingStyle =
     "Agent remembers user's coding style preference";
+
   evalTest('ALWAYS_PASSES', {
     name: rememberingCodingStyle,
 
@@ -174,6 +198,7 @@ describe('save_memory', () => {
 
   const ignoringBuildArtifactLocation =
     'Agent ignores workspace build artifact location';
+
   evalTest('USUALLY_PASSES', {
     name: ignoringBuildArtifactLocation,
     prompt: `In this workspace, build artifacts are stored in the \`dist/artifacts\` directory.`,
@@ -182,6 +207,7 @@ describe('save_memory', () => {
       const wasToolCalled = rig
         .readToolLogs()
         .some((log) => log.toolRequest.name === 'save_memory');
+
       expect(
         wasToolCalled,
         'save_memory should not be called for workspace-specific information',
@@ -191,7 +217,9 @@ describe('save_memory', () => {
     },
   });
 
-  const ignoringMainEntryPoint = "Agent ignores workspace's main entry point";
+  const ignoringMainEntryPoint =
+    "Agent ignores workspace's main entry point";
+
   evalTest('USUALLY_PASSES', {
     name: ignoringMainEntryPoint,
     prompt: `The main entry point for this workspace is \`src/index.js\`.`,
@@ -200,6 +228,7 @@ describe('save_memory', () => {
       const wasToolCalled = rig
         .readToolLogs()
         .some((log) => log.toolRequest.name === 'save_memory');
+
       expect(
         wasToolCalled,
         'save_memory should not be called for workspace-specific information',
@@ -210,6 +239,7 @@ describe('save_memory', () => {
   });
 
   const rememberingBirthday = "Agent remembers user's birthday";
+
   evalTest('ALWAYS_PASSES', {
     name: rememberingBirthday,
 
