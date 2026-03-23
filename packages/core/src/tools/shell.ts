@@ -100,10 +100,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
     ) {
       const command = stripShellWrapper(this.params.command);
       const rootCommands = [...new Set(getCommandRoots(command))];
+      const allowRedirection = hasRedirection(command) ? true : undefined;
+
       if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands };
+        return { commandPrefix: rootCommands, allowRedirection };
       }
-      return { commandPrefix: this.params.command };
+      return { commandPrefix: this.params.command, allowRedirection };
     }
     return undefined;
   }

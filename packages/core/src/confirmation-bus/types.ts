@@ -136,6 +136,7 @@ export interface UpdatePolicy {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  allowRedirection?: boolean;
 }
 
 export interface ToolPolicyRejection {

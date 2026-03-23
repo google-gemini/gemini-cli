@@ -138,6 +138,7 @@ export interface PolicyUpdateOptions {
   commandPrefix?: string | string[];
   mcpName?: string;
   toolName?: string;
+  allowRedirection?: boolean;
 }
 
 /**

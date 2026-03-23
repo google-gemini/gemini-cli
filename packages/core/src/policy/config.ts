@@ -537,6 +537,7 @@ interface TomlRule {
   priority?: number;
   commandPrefix?: string | string[];
   argsPattern?: string;
+  allowRedirection?: boolean;
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
 }
@@ -581,6 +582,7 @@ export function createPolicyUpdater(
               argsPattern: new RegExp(pattern),
               mcpName: message.mcpName,
               source: 'Dynamic (Confirmed)',
+              allowRedirection: message.allowRedirection,
             });
           }
         }
@@ -617,6 +619,7 @@ export function createPolicyUpdater(
           argsPattern,
           mcpName: message.mcpName,
           source: 'Dynamic (Confirmed)',
+          allowRedirection: message.allowRedirection,
         });
       }
 
@@ -679,6 +682,10 @@ export function createPolicyUpdater(
             } else if (message.argsPattern) {
               // message.argsPattern was already validated above
               newRule.argsPattern = message.argsPattern;
+            }
+
+            if (message.allowRedirection !== undefined) {
+              newRule.allowRedirection = message.allowRedirection;
             }
 
             // Add to rules

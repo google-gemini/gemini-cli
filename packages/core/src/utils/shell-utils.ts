@@ -663,7 +663,10 @@ export function splitCommands(command: string): string[] {
     return [];
   }
 
-  return parsed.details.map((detail) => detail.text).filter(Boolean);
+  return parsed.details
+    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+    .map((detail) => detail.text)
+    .filter(Boolean);
 }
 
 /**

@@ -63,8 +63,10 @@ const PolicyRuleSchema = z.object({
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   interactive: z.boolean().optional(),
   toolAnnotations: z.record(z.any()).optional(),
-  allow_redirection: z.boolean().optional(),
-  deny_message: z.string().optional(),
+  allowRedirection: z.boolean().optional(),
+  allow_redirection: z.boolean().optional(), // deprecated snake_case for backward compatibility
+  denyMessage: z.string().optional(),
+  deny_message: z.string().optional(), // deprecated snake_case for backward compatibility
 });
 
 /**
@@ -478,9 +480,10 @@ export async function loadPoliciesFromToml(
                   modes: rule.modes,
                   interactive: rule.interactive,
                   toolAnnotations: rule.toolAnnotations,
-                  allowRedirection: rule.allow_redirection,
+                  allowRedirection:
+                    rule.allowRedirection ?? rule.allow_redirection,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
-                  denyMessage: rule.deny_message,
+                  denyMessage: rule.denyMessage ?? rule.deny_message,
                 };
 
                 // Compile regex pattern
