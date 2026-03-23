@@ -73,8 +73,10 @@ describe('useVoiceInput', () => {
     capturedWhisperOptions = null;
   });
 
-  it('initializes with default state', () => {
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+  it('initializes with default state', async () => {
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
     expect(result.current.state).toEqual({
       isRecording: false,
       isTranscribing: false,
@@ -82,14 +84,14 @@ describe('useVoiceInput', () => {
     });
   });
 
-  it('uses GeminiRestBackend by default', () => {
-    renderHook(() => useVoiceInput({ config: mockConfig }));
+  it('uses GeminiRestBackend by default', async () => {
+    await renderHook(() => useVoiceInput({ config: mockConfig }));
     expect(capturedGeminiOptions).not.toBeNull();
     expect(capturedWhisperOptions).toBeNull();
   });
 
-  it('uses LocalWhisperBackend when provider is "whisper"', () => {
-    renderHook(() =>
+  it('uses LocalWhisperBackend when provider is "whisper"', async () => {
+    await renderHook(() =>
       useVoiceInput({ provider: 'whisper', config: mockConfig }),
     );
     expect(capturedWhisperOptions).not.toBeNull();
@@ -98,7 +100,9 @@ describe('useVoiceInput', () => {
 
   it('delegates startRecording to the active backend', async () => {
     mockGeminiStart.mockResolvedValue(undefined);
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
     await act(async () => {
       await result.current.startRecording();
     });
@@ -107,7 +111,9 @@ describe('useVoiceInput', () => {
 
   it('delegates stopRecording to the active backend', async () => {
     mockGeminiStop.mockResolvedValue(undefined);
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
     await act(async () => {
       await result.current.stopRecording();
     });
@@ -123,7 +129,9 @@ describe('useVoiceInput', () => {
       });
     });
 
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     await act(async () => {
       await result.current.startRecording();
@@ -146,7 +154,9 @@ describe('useVoiceInput', () => {
     const transcripts: string[] = [];
     const unsubscribe = onVoiceTranscript((t) => transcripts.push(t));
 
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     await act(async () => {
       await result.current.stopRecording();
@@ -171,7 +181,9 @@ describe('useVoiceInput', () => {
       });
     });
 
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     await act(async () => {
       await result.current.startRecording();
@@ -193,7 +205,9 @@ describe('useVoiceInput', () => {
       throw new Error('Recorder startup failed');
     });
 
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     await act(async () => {
       await result.current.startRecording();
@@ -208,7 +222,9 @@ describe('useVoiceInput', () => {
 
   it('delegates cancelRecording to the active backend', async () => {
     mockGeminiCancel.mockResolvedValue(undefined);
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
     await act(async () => {
       await result.current.cancelRecording();
     });
@@ -216,7 +232,7 @@ describe('useVoiceInput', () => {
   });
 
   it('cancelRecording is a no-op when no backend is initialized', async () => {
-    const { result } = renderHook(() => useVoiceInput());
+    const { result } = await renderHook(() => useVoiceInput());
     await act(async () => {
       await result.current.cancelRecording();
     });
@@ -227,7 +243,9 @@ describe('useVoiceInput', () => {
   it('cancelRecording immediately clears stuck recording state', async () => {
     mockGeminiCancel.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     await act(async () => {
       void capturedGeminiOptions?.onStateChange({

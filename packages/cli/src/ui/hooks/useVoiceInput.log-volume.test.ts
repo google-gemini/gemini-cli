@@ -67,7 +67,9 @@ describe('useVoiceInput Log Volume', () => {
   });
 
   it('should remain SILENT (no visible logs) during normal recording start/stop', async () => {
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     // --- Action 1: Start Recording ---
     await act(async () => {
@@ -91,7 +93,9 @@ describe('useVoiceInput Log Volume', () => {
   });
 
   it('should remain SILENT even when the backend emits rapid state changes', async () => {
-    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+    const { result } = await renderHook(() =>
+      useVoiceInput({ config: mockConfig }),
+    );
 
     await act(async () => {
       await result.current.startRecording();

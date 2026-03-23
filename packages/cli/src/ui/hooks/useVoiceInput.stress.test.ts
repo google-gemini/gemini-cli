@@ -54,7 +54,7 @@ describe('useVoiceInput Stress Tests', () => {
 
   it('should not cause excessive re-renders when receiving rapid state notifications', async () => {
     let renderCount = 0;
-    const { result } = renderHook(() => {
+    const { result } = await renderHook(() => {
       renderCount++;
       return useVoiceInput({ config: mockConfig });
     });
@@ -86,7 +86,7 @@ describe('useVoiceInput Stress Tests', () => {
 
   it('should not cause excessive re-renders when rapid toggleRecording calls are ignored', async () => {
     let renderCount = 0;
-    const { result } = renderHook(() => {
+    const { result } = await renderHook(() => {
       renderCount++;
       return useVoiceInput({ config: mockConfig });
     });

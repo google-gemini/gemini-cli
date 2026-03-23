@@ -11,7 +11,7 @@ import type { VoiceInputReturn } from '../hooks/useVoiceInput.js';
 import type React from 'react';
 
 describe('VoiceContext', () => {
-  it('should provide voice input state', () => {
+  it('should provide voice input state', async () => {
     const mockVoiceInput: VoiceInputReturn = {
       isEnabled: true,
       state: {
@@ -31,7 +31,7 @@ describe('VoiceContext', () => {
       </VoiceContext.Provider>
     );
 
-    const { result } = renderHook(() => useVoiceContext(), { wrapper });
+    const { result } = await renderHook(() => useVoiceContext(), { wrapper });
 
     expect(result.current).toBe(mockVoiceInput);
   });

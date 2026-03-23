@@ -79,12 +79,12 @@ describe('Voice Input Full Cycle Replication', () => {
     let transcriptReceived: string | null = null;
 
     // Provider: useVoiceInput hook
-    const { result: providerResult } = renderHook(() =>
+    const { result: providerResult } = await renderHook(() =>
       useVoiceInput({ config: mockConfig }),
     );
 
     // Consumer: simulates InputPrompt's event-based transcript handling
-    renderHook(
+    await renderHook(
       () => {
         consumerRenders++;
         useContext(VoiceContext);
