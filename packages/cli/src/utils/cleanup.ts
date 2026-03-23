@@ -58,6 +58,11 @@ export function registerTelemetryConfig(config: Config) {
 }
 
 export async function runExitCleanup() {
+  // drain stdin to prevent printing garbage on exit
+  // https://github.com/google-gemini/gemini-cli/issues/16801
+  await drainStdin();
+
+  runSyncCleanup();
   for (const fn of cleanupFunctions) {
     try {
       await fn();
@@ -66,12 +71,6 @@ export async function runExitCleanup() {
     }
   }
   cleanupFunctions.length = 0; // Clear the array
-
-  // drain stdin to prevent printing garbage on exit
-  // https://github.com/google-gemini/gemini-cli/issues/1681
-  await drainStdin();
-
-  runSyncCleanup();
 
   if (configForTelemetry) {
     try {
@@ -101,7 +100,7 @@ async function drainStdin() {
     .removeAllListeners('data')
     .on('data', () => {});
   // Give it a moment to flush the OS buffer.
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 /**
