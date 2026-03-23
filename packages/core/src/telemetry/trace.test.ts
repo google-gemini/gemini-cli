@@ -50,11 +50,11 @@ describe('truncateForTelemetry', () => {
     // 5 emojis, each is multiple bytes in UTF-16
     const emojis = '👋🌍🚀🔥🎉';
 
-    // Truncating to 3 "characters"
-    const result = truncateForTelemetry(emojis, 3);
+    // Truncating to length 5 (which is 2.5 emojis in UTF-16 length terms)
+    // truncateString will stop after the full grapheme clusters that fit within 5
+    const result = truncateForTelemetry(emojis, 5);
 
-    // Array.from splits correctly on code points
-    expect(result).toBe('👋🌍🚀...[TRUNCATED: original length 10]');
+    expect(result).toBe('👋🌍...[TRUNCATED: original length 10]');
   });
 
   it('should stringify and truncate objects if exceeding maxLength', () => {

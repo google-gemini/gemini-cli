@@ -25,38 +25,29 @@ import {
 } from './constants.js';
 import { sessionId } from '../utils/session.js';
 
+import { truncateString } from '../utils/textUtils.js';
+
 const TRACER_NAME = 'gemini-cli';
 const TRACER_VERSION = 'v1';
-
-function graphemeSafeTruncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) {
-    return str;
-  }
-  let byteIndex = 0;
-  let codePointCount = 0;
-  for (const char of str) {
-    if (codePointCount >= maxLength) {
-      return (
-        str.slice(0, byteIndex) +
-        `...[TRUNCATED: original length ${str.length}]`
-      );
-    }
-    byteIndex += char.length;
-    codePointCount++;
-  }
-  return str;
-}
 
 export function truncateForTelemetry(
   value: unknown,
   maxLength: number = 10000,
 ): AttributeValue | undefined {
   if (typeof value === 'string') {
-    return graphemeSafeTruncate(value, maxLength);
+    return truncateString(
+      value,
+      maxLength,
+      `...[TRUNCATED: original length ${value.length}]`,
+    );
   }
   if (typeof value === 'object' && value !== null) {
     const stringified = safeJsonStringify(value);
-    return graphemeSafeTruncate(stringified, maxLength);
+    return truncateString(
+      stringified,
+      maxLength,
+      `...[TRUNCATED: original length ${stringified.length}]`,
+    );
   }
   if (typeof value === 'number' || typeof value === 'boolean') {
     return value;
