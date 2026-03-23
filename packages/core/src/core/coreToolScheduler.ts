@@ -15,7 +15,11 @@ import {
 import type { EditorType } from '../utils/editor.js';
 import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
-import { ToolErrorType } from '../tools/tool-error.js';
+import {
+  ToolErrorType,
+  isFatalToolError,
+  getRecoveryHint,
+} from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
@@ -75,22 +79,30 @@ const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
   errorType: ToolErrorType | undefined,
-): ToolCallResponseInfo => ({
-  callId: request.callId,
-  error,
-  responseParts: [
-    {
-      functionResponse: {
-        id: request.callId,
-        name: request.name,
-        response: { error: error.message },
+): ToolCallResponseInfo => {
+  const response: Record<string, unknown> = { error: error.message };
+  if (errorType) {
+    response['error_type'] = errorType;
+    response['recoverable'] = !isFatalToolError(errorType);
+    response['hint'] = getRecoveryHint(errorType);
+  }
+  return {
+    callId: request.callId,
+    error,
+    responseParts: [
+      {
+        functionResponse: {
+          id: request.callId,
+          name: request.name,
+          response,
+        },
       },
-    },
-  ],
-  resultDisplay: error.message,
-  errorType,
-  contentLength: error.message.length,
-});
+    ],
+    resultDisplay: error.message,
+    errorType,
+    contentLength: JSON.stringify(response).length,
+  };
+};
 
 interface CoreToolSchedulerOptions {
   context: AgentLoopContext;

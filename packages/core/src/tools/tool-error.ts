@@ -105,3 +105,42 @@ export function isFatalToolError(errorType?: string): boolean {
 
   return fatalErrors.has(errorType);
 }
+
+const RECOVERY_HINTS: Partial<Record<ToolErrorType, string>> = {
+  [ToolErrorType.FILE_NOT_FOUND]:
+    'Verify the file path exists. Use glob or list_directory to find the correct path.',
+  [ToolErrorType.PERMISSION_DENIED]:
+    'The path is not accessible. Try a different path within the workspace.',
+  [ToolErrorType.PATH_NOT_IN_WORKSPACE]:
+    'The path is outside the allowed workspace. Use a path within the project directory.',
+  [ToolErrorType.INVALID_TOOL_PARAMS]:
+    'Check the parameter types and required fields against the tool schema.',
+  [ToolErrorType.EDIT_NO_OCCURRENCE_FOUND]:
+    'The old_string was not found. Use read_file to verify the exact content, including whitespace and indentation.',
+  [ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH]:
+    'Multiple occurrences found. Set allow_multiple to true, or use a more specific old_string.',
+  [ToolErrorType.SHELL_EXECUTE_ERROR]:
+    'The command failed. Check the error output and adjust the command.',
+  [ToolErrorType.NO_SPACE_LEFT]:
+    'The disk is full. Cannot write files until space is freed.',
+  [ToolErrorType.GREP_EXECUTION_ERROR]:
+    'The search failed. Check the pattern syntax and search path.',
+  [ToolErrorType.GLOB_EXECUTION_ERROR]:
+    'The glob pattern failed. Check the pattern syntax.',
+};
+
+const DEFAULT_RECOVERY_HINT =
+  'Review the error message and adjust your approach.';
+
+/**
+ * Returns a recovery hint for a given tool error type.
+ *
+ * Recovery hints provide actionable guidance to help the LLM recover from
+ * tool errors by suggesting specific corrective actions.
+ *
+ * @param errorType - The tool error type to get a hint for
+ * @returns A short, actionable recovery hint string
+ */
+export function getRecoveryHint(errorType: ToolErrorType): string {
+  return RECOVERY_HINTS[errorType] ?? DEFAULT_RECOVERY_HINT;
+}

@@ -25,7 +25,11 @@ import {
   CoreToolCallStatus,
   type ScheduledToolCall,
 } from './types.js';
-import { ToolErrorType } from '../tools/tool-error.js';
+import {
+  ToolErrorType,
+  isFatalToolError,
+  getRecoveryHint,
+} from '../tools/tool-error.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -70,22 +74,30 @@ const createErrorResponse = (
   request: ToolCallRequestInfo,
   error: Error,
   errorType: ToolErrorType | undefined,
-): ToolCallResponseInfo => ({
-  callId: request.callId,
-  error,
-  responseParts: [
-    {
-      functionResponse: {
-        id: request.callId,
-        name: request.name,
-        response: { error: error.message },
+): ToolCallResponseInfo => {
+  const response: Record<string, unknown> = { error: error.message };
+  if (errorType) {
+    response['error_type'] = errorType;
+    response['recoverable'] = !isFatalToolError(errorType);
+    response['hint'] = getRecoveryHint(errorType);
+  }
+  return {
+    callId: request.callId,
+    error,
+    responseParts: [
+      {
+        functionResponse: {
+          id: request.callId,
+          name: request.name,
+          response,
+        },
       },
-    },
-  ],
-  resultDisplay: error.message,
-  errorType,
-  contentLength: error.message.length,
-});
+    ],
+    resultDisplay: error.message,
+    errorType,
+    contentLength: JSON.stringify(response).length,
+  };
+};
 
 /**
  * Event-Driven Orchestrator for Tool Execution.
