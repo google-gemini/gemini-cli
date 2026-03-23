@@ -24,9 +24,14 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
+import { extractFakeResponses } from './scriptUtils.js';
 import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
-import { getVersion, resolveModel } from '../../index.js';
+import {
+  FallbackContentGenerator,
+  getVersion,
+  resolveModel,
+} from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 
 /**
@@ -48,6 +53,8 @@ export interface ContentGenerator {
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;
 
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
+
+  getSentRequests?(): GenerateContentParameters[];
 
   userTier?: UserTierId;
 
@@ -168,11 +175,15 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const generator = await (async () => {
+    let fakeGenerator: FakeContentGenerator | undefined;
     if (gcConfig.fakeResponses) {
-      const fakeGenerator = await FakeContentGenerator.fromFile(
-        gcConfig.fakeResponses,
-      );
-      return new LoggingContentGenerator(fakeGenerator, gcConfig);
+      fakeGenerator = Array.isArray(gcConfig.fakeResponses)
+        ? new FakeContentGenerator(extractFakeResponses(gcConfig.fakeResponses))
+        : await FakeContentGenerator.fromFile(gcConfig.fakeResponses);
+
+      if (!gcConfig.fakeModelConfig?.hybridHandoff) {
+        return new LoggingContentGenerator(fakeGenerator, gcConfig);
+      }
     }
     const version = await getVersion();
     const model = resolveModel(
@@ -237,23 +248,21 @@ export async function createContentGenerator(
     ) {
       baseHeaders['Authorization'] = `Bearer ${config.apiKey}`;
     }
+
+    let realGenerator: ContentGenerator;
+
     if (
       config.authType === AuthType.LOGIN_WITH_GOOGLE ||
       config.authType === AuthType.COMPUTE_ADC
     ) {
       const httpOptions = { headers: baseHeaders };
-      return new LoggingContentGenerator(
-        await createCodeAssistContentGenerator(
-          httpOptions,
-          config.authType,
-          gcConfig,
-          sessionId,
-        ),
+      realGenerator = await createCodeAssistContentGenerator(
+        httpOptions,
+        config.authType,
         gcConfig,
+        sessionId,
       );
-    }
-
-    if (
+    } else if (
       config.authType === AuthType.USE_GEMINI ||
       config.authType === AuthType.USE_VERTEX_AI ||
       config.authType === AuthType.GATEWAY
@@ -297,11 +306,21 @@ export async function createContentGenerator(
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
-      return new LoggingContentGenerator(googleGenAI.models, gcConfig);
+      realGenerator = googleGenAI.models;
+    } else {
+      throw new Error(
+        `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
+      );
     }
-    throw new Error(
-      `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
-    );
+
+    if (fakeGenerator && gcConfig.fakeModelConfig?.hybridHandoff) {
+      realGenerator = new FallbackContentGenerator(
+        fakeGenerator,
+        realGenerator,
+      );
+    }
+
+    return new LoggingContentGenerator(realGenerator, gcConfig);
   })();
 
   if (gcConfig.recordResponses) {

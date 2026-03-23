@@ -13,7 +13,12 @@ import {
 } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
+import {
+  DEFAULT_GEMINI_MODEL,
+  type ScriptItem,
+  extractFakeResponses,
+  extractUserPrompts,
+} from '@google/gemini-cli-core';
 
 /**
  * Config overrides for evals, with tool-restriction fields explicitly
@@ -40,6 +45,12 @@ export interface AppEvalCase {
   files?: Record<string, string>;
   setup?: (rig: AppRig) => Promise<void>;
   assert: (rig: AppRig, output: string) => Promise<void>;
+  /**
+   * Optional script to "prime the pump" before the main prompt.
+   * A sequential array interleaving MockUserTurn (e.g., userText('hello'))
+   * and FakeResponse (e.g., mockGenerateContentStreamText('hi')).
+   */
+  script?: ScriptItem[];
 }
 
 /**
@@ -48,11 +59,25 @@ export interface AppEvalCase {
  */
 export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
   const fn = async () => {
+    const configOverrides = {
+      model: DEFAULT_GEMINI_MODEL,
+      ...evalCase.configOverrides,
+    };
+
+    let userPrompts: string[] = [];
+
+    if (evalCase.script) {
+      configOverrides.fakeModelConfig = {
+        responses: extractFakeResponses(evalCase.script),
+        hybridHandoff: true,
+      };
+
+      // Extract the sequence of user prompts for the Mock User driver
+      userPrompts = extractUserPrompts(evalCase.script);
+    }
+
     const rig = new AppRig({
-      configOverrides: {
-        model: DEFAULT_GEMINI_MODEL,
-        ...evalCase.configOverrides,
-      },
+      configOverrides,
     });
 
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
@@ -79,10 +104,15 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
       }
 
       // Render the app!
-      rig.render();
+      await rig.render();
 
       // Wait for initial ready state
       await rig.waitForIdle();
+
+      // Execute priming script if requested
+      if (userPrompts.length > 0) {
+        await rig.driveMockUser(userPrompts, evalCase.timeout);
+      }
 
       // Send the initial prompt
       await rig.sendMessage(evalCase.prompt);

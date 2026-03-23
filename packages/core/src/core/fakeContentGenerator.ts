@@ -18,6 +18,16 @@ import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { LlmRole } from '../telemetry/types.js';
 
+export class MockExhaustedError extends Error {
+  constructor(method: string, request?: unknown) {
+    super(
+      `No more mock responses for ${method}, got request:\n` +
+        safeJsonStringify(request),
+    );
+    this.name = 'MockExhaustedError';
+  }
+}
+
 export type FakeResponse =
   | {
       method: 'generateContent';
@@ -42,11 +52,16 @@ export type FakeResponse =
 // CLI argument.
 export class FakeContentGenerator implements ContentGenerator {
   private callCounter = 0;
+  private sentRequests: GenerateContentParameters[] = [];
   userTier?: UserTierId;
   userTierName?: string;
   paidTier?: GeminiUserTier;
 
   constructor(private readonly responses: FakeResponse[]) {}
+
+  getSentRequests(): GenerateContentParameters[] {
+    return this.sentRequests;
+  }
 
   static async fromFile(filePath: string): Promise<FakeContentGenerator> {
     const fileContent = await promises.readFile(filePath, 'utf-8');
@@ -62,13 +77,14 @@ export class FakeContentGenerator implements ContentGenerator {
     M extends FakeResponse['method'],
     R = Extract<FakeResponse, { method: M }>['response'],
   >(method: M, request: unknown): R {
-    const response = this.responses[this.callCounter++];
+    const response = this.responses[this.callCounter];
     if (!response) {
-      throw new Error(
-        `No more mock responses for ${method}, got request:\n` +
-          safeJsonStringify(request),
-      );
+      throw new MockExhaustedError(method, request);
     }
+
+    // We only increment the counter if we actually consume a mock response
+    this.callCounter++;
+
     if (response.method !== method) {
       throw new Error(
         `Unexpected response type, next response was for ${response.method} but expected ${method}`,
@@ -81,24 +97,27 @@ export class FakeContentGenerator implements ContentGenerator {
   async generateContent(
     request: GenerateContentParameters,
     _userPromptId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    role: LlmRole,
+    _role: LlmRole,
   ): Promise<GenerateContentResponse> {
+    this.sentRequests.push(request);
+    const next = this.getNextResponse('generateContent', request);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return Object.setPrototypeOf(
-      this.getNextResponse('generateContent', request),
-      GenerateContentResponse.prototype,
-    );
+    return Object.setPrototypeOf(next, GenerateContentResponse.prototype);
   }
 
   async generateContentStream(
     request: GenerateContentParameters,
     _userPromptId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    role: LlmRole,
+    _role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    this.sentRequests.push(request);
     const responses = this.getNextResponse('generateContentStream', request);
+
     async function* stream() {
+      // Add a tiny delay to ensure React has time to render the 'Responding'
+      // state. If the mock stream finishes synchronously, AppRig's
+      // awaitingResponse flag may never be cleared, causing the rig to hang.
+      await new Promise((resolve) => setTimeout(resolve, 5));
       for (const response of responses) {
         yield Object.setPrototypeOf(
           response,
@@ -112,16 +131,15 @@ export class FakeContentGenerator implements ContentGenerator {
   async countTokens(
     request: CountTokensParameters,
   ): Promise<CountTokensResponse> {
-    return this.getNextResponse('countTokens', request);
+    const next = this.getNextResponse('countTokens', request);
+    return next;
   }
 
   async embedContent(
     request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
+    const next = this.getNextResponse('embedContent', request);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return Object.setPrototypeOf(
-      this.getNextResponse('embedContent', request),
-      EmbedContentResponse.prototype,
-    );
+    return Object.setPrototypeOf(next, EmbedContentResponse.prototype);
   }
 }

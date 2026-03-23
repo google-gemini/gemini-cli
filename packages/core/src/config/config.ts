@@ -16,6 +16,7 @@ import {
   type ContentGenerator,
   type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { ScriptItem } from '../core/scriptUtils.js';
 import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -532,6 +533,11 @@ export interface PolicyUpdateConfirmationRequest {
   newHash: string;
 }
 
+export interface FakeModelConfig {
+  responses: string | ScriptItem[];
+  hybridHandoff?: boolean;
+}
+
 export interface WorktreeSettings {
   name: string;
   path: string;
@@ -562,6 +568,7 @@ export interface ConfigParameters {
   mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
+  contentGenerator?: ContentGenerator;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
@@ -633,7 +640,8 @@ export interface ConfigParameters {
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
-  fakeResponses?: string;
+  fakeModelConfig?: FakeModelConfig;
+  fakeResponses?: string | ScriptItem[];
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
@@ -841,7 +849,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
-  readonly fakeResponses?: string;
+  readonly fakeModelConfig?: FakeModelConfig;
+  private readonly hasCustomContentGenerator: boolean;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
   private readonly disableAlwaysAllow: boolean;
@@ -937,6 +946,10 @@ export class Config implements McpContext, AgentLoopContext {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.hasCustomContentGenerator = !!params.contentGenerator;
+    if (params.contentGenerator) {
+      this.contentGenerator = params.contentGenerator;
+    }
     this.worktreeSettings = params.worktreeSettings;
 
     this.coreTools = params.coreTools;
@@ -1141,7 +1154,14 @@ export class Config implements McpContext, AgentLoopContext {
     this.storage = new Storage(this.targetDir, this._sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
-    this.fakeResponses = params.fakeResponses;
+    if (params.fakeModelConfig) {
+      this.fakeModelConfig = params.fakeModelConfig;
+    } else if (params.fakeResponses) {
+      this.fakeModelConfig = {
+        responses: params.fakeResponses,
+      };
+    }
+
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
@@ -1239,6 +1259,10 @@ export class Config implements McpContext, AgentLoopContext {
     this._geminiClient = new GeminiClient(this);
     this.a2aClientManager = new A2AClientManager(this);
     this.modelRouterService = new ModelRouterService(this);
+  }
+
+  get fakeResponses(): string | ScriptItem[] | undefined {
+    return this.fakeModelConfig?.responses;
   }
 
   get config(): Config {
@@ -1402,11 +1426,13 @@ export class Config implements McpContext, AgentLoopContext {
       baseUrl,
       customHeaders,
     );
-    this.contentGenerator = await createContentGenerator(
-      newContentGeneratorConfig,
-      this,
-      this.getSessionId(),
-    );
+    if (!this.hasCustomContentGenerator) {
+      this.contentGenerator = await createContentGenerator(
+        newContentGeneratorConfig,
+        this,
+        this.getSessionId(),
+      );
+    }
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
 
