@@ -87,3 +87,51 @@ export const parseSlashCommand = (
 
   return { commandToExecute, args, canonicalPath };
 };
+
+/**
+ * Counts the number of whitespace-separated arguments in a string.
+ */
+export const countArgs = (args: string): number => {
+  const trimmed = args.trim();
+  return trimmed === '' ? 0 : trimmed.split(/\s+/).length;
+};
+
+/**
+ * Validates argument count against a command's argsSpec.
+ * Returns an error string if invalid, undefined if valid.
+ * Appends usage hint from the command description when available.
+ */
+export const validateArgs = (
+  args: string,
+  argsSpec: SlashCommand['argsSpec'],
+  commandPath: string[],
+  description?: string,
+): string | undefined => {
+  if (!argsSpec) return undefined;
+
+  const count = countArgs(args);
+  const min = argsSpec.min ?? 0;
+  const max = argsSpec.max;
+  const cmd = `/${commandPath.join(' ')}`;
+
+  const usageHint = (() => {
+    const match = description?.match(/Usage:\s*(\S.*)/i);
+    return match ? ` Usage: ${match[1]}` : '';
+  })();
+
+  if (count < min) {
+    if (count === 0 && min === 1) {
+      return `${cmd} requires at least 1 argument.${usageHint}`;
+    }
+    return `${cmd} requires at least ${min} argument${min === 1 ? '' : 's'}, but got ${count}.${usageHint}`;
+  }
+
+  if (max !== undefined && count > max) {
+    if (max === 0) {
+      return `${cmd} does not accept any arguments.`;
+    }
+    return `${cmd} accepts at most ${max} argument${max === 1 ? '' : 's'}, but got ${count}.${usageHint}`;
+  }
+
+  return undefined;
+};

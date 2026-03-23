@@ -27,6 +27,7 @@ export const permissionsCommand: SlashCommand = {
         'Manage folder trust settings. Usage: /permissions trust [<directory-path>]',
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
+      argsSpec: { max: 1 },
       action: (context, input): SlashCommandActionReturn => {
         const dirPath = input.trim();
         let targetDirectory: string;

@@ -46,6 +46,7 @@ const listSubCommand: SlashCommand = {
   description: 'List available Gemini CLI tools.',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext): Promise<void> =>
     listTools(context, false),
 };
@@ -56,6 +57,7 @@ const descSubCommand: SlashCommand = {
   description: 'List available Gemini CLI tools with descriptions.',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext): Promise<void> =>
     listTools(context, true),
 };

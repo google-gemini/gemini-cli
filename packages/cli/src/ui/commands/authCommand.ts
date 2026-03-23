@@ -19,6 +19,7 @@ const authLoginCommand: SlashCommand = {
   description: 'Sign in or change the authentication method',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: (_context, _args): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'auth',
@@ -30,6 +31,7 @@ const authLogoutCommand: SlashCommand = {
   altNames: ['logout'],
   description: 'Sign out and clear all cached credentials',
   kind: CommandKind.BUILT_IN,
+  argsSpec: { max: 0 },
   action: async (context, _args): Promise<LogoutActionReturn> => {
     await clearCachedCredentialFile();
     // Clear the selected auth type so user sees the auth selection menu

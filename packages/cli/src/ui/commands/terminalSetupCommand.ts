@@ -20,6 +20,7 @@ export const terminalSetupCommand: SlashCommand = {
     'Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (): Promise<MessageActionReturn> => {
     try {
       const result = await terminalSetup();

@@ -17,6 +17,7 @@ export const resumeCommand: SlashCommand = {
   description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (
     _context: CommandContext,
     _args: string,
