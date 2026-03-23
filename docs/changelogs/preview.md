@@ -33,6 +33,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick daf3691 to release/v0.35.0-preview.2-pr-23558 to patch
+  version v0.35.0-preview.2 and create version 0.35.0-preview.3 by
+  @gemini-cli-robot in
+  [#23565](https://github.com/google-gemini/gemini-cli/pull/23565)
 - fix(patch): cherry-pick 4e5dfd0 to release/v0.35.0-preview.1-pr-23074 to patch
   version v0.35.0-preview.1 and create version 0.35.0-preview.2 by
   @gemini-cli-robot in
