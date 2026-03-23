@@ -216,7 +216,9 @@ export async function main() {
   const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
   let worktreeInfo: WorktreeInfo | undefined;
   if (requestedWorktree !== undefined) {
+    const worktreeHandle = startupProfiler.start('setup_worktree');
     worktreeInfo = await setupWorktree(requestedWorktree || undefined);
+    worktreeHandle?.end();
   }
 
   // Report settings errors once during startup
@@ -232,11 +234,13 @@ export async function main() {
     );
   });
 
+  const cleanupOpsHandle = startupProfiler.start('cleanup_ops');
   await Promise.all([
     cleanupCheckpoints(),
     cleanupToolOutputFiles(settings.merged),
     cleanupBackgroundLogs(),
   ]);
+  cleanupOpsHandle?.end();
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
@@ -524,7 +528,9 @@ export async function main() {
       });
     }
 
+    const terminalHandle = startupProfiler.start('setup_terminal');
     await setupTerminalAndTheme(config, settings);
+    terminalHandle?.end();
 
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
