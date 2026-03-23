@@ -25,6 +25,7 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
+import { LspQueryTool } from '../tools/lsp-query.js';
 import { ActivateSkillTool } from '../tools/activate-skill.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
@@ -655,6 +656,9 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   experimentalMemoryManager?: boolean;
+  lspEnabled?: boolean;
+  lspDiagnosticTimeout?: number;
+  lspServers?: Record<string, import('../lsp/types.js').LspServerUserConfig>;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -882,6 +886,12 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly lspEnabled: boolean;
+  private readonly lspDiagnosticTimeout: number;
+  private readonly lspServers?: Record<
+    string,
+    import('../lsp/types.js').LspServerUserConfig
+  >;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -889,6 +899,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
+  private lspManager?: import('../lsp/manager.js').LspManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
@@ -1063,6 +1074,9 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.lspEnabled = params.lspEnabled ?? false;
+    this.lspDiagnosticTimeout = params.lspDiagnosticTimeout ?? 5000;
+    this.lspServers = params.lspServers;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2211,6 +2225,45 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalMemoryManager;
   }
 
+  isLspEnabled(): boolean {
+    return this.lspEnabled;
+  }
+
+  getLspDiagnosticTimeout(): number {
+    return this.lspDiagnosticTimeout;
+  }
+
+  async getLspManager(): Promise<
+    import('../lsp/manager.js').LspManager | undefined
+  > {
+    if (!this.lspEnabled) return undefined;
+    if (!this.lspManager) {
+      const { LspManager } = await import('../lsp/manager.js');
+      const workspaceDirs = [...this.getWorkspaceContext().getDirectories()];
+      this.lspManager = new LspManager(
+        {
+          enabled: this.lspEnabled,
+          diagnosticTimeout: this.lspDiagnosticTimeout,
+          servers: this.lspServers,
+        },
+        workspaceDirs,
+      );
+      // Re-sync workspace folders when directories change.
+      this.getWorkspaceContext().onDirectoriesChanged(() => {
+        const dirs = [...this.getWorkspaceContext().getDirectories()];
+        void this.lspManager?.updateWorkspaceFolders(dirs);
+      });
+    }
+    return this.lspManager;
+  }
+
+  async shutdownLsp(): Promise<void> {
+    if (this.lspManager) {
+      await this.lspManager.shutdown();
+      this.lspManager = undefined;
+    }
+  }
+
   isTopicUpdateNarrationEnabled(): boolean {
     return this.topicUpdateNarration;
   }
@@ -3225,6 +3278,11 @@ export class Config implements McpContext, AgentLoopContext {
     maybeRegister(GlobTool, () =>
       registry.registerTool(new GlobTool(this, this.messageBus)),
     );
+    if (this.isLspEnabled()) {
+      maybeRegister(LspQueryTool, () =>
+        registry.registerTool(new LspQueryTool(this, this.messageBus)),
+      );
+    }
     maybeRegister(ActivateSkillTool, () =>
       registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
     );
