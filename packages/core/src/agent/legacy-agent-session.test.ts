@@ -7,7 +7,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { FinishReason } from '@google/genai';
 import { LegacyAgentSession } from './legacy-agent-session.js';
-import type { LegacySessionDeps } from './legacy-agent-session.js';
+import type { LegacyAgentSessionDeps } from './legacy-agent-session.js';
 import { GeminiEventType } from '../core/turn.js';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import type { AgentEvent } from './types.js';
@@ -23,8 +23,8 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 // ---------------------------------------------------------------------------
 
 function createMockDeps(
-  overrides?: Partial<LegacySessionDeps>,
-): LegacySessionDeps {
+  overrides?: Partial<LegacyAgentSessionDeps>,
+): LegacyAgentSessionDeps {
   const mockClient = {
     sendMessageStream: vi.fn(),
     getChat: vi.fn().mockReturnValue({
@@ -43,11 +43,11 @@ function createMockDeps(
   };
 
   return {
-    client: mockClient as unknown as LegacySessionDeps['client'],
+    client: mockClient as unknown as LegacyAgentSessionDeps['client'],
 
-    scheduler: mockScheduler as unknown as LegacySessionDeps['scheduler'],
+    scheduler: mockScheduler as unknown as LegacyAgentSessionDeps['scheduler'],
 
-    config: mockConfig as unknown as LegacySessionDeps['config'],
+    config: mockConfig as unknown as LegacyAgentSessionDeps['config'],
     promptId: 'test-prompt',
     streamId: 'test-stream',
     ...overrides,
@@ -117,7 +117,7 @@ async function collectEvents(
 // ---------------------------------------------------------------------------
 
 describe('LegacyAgentSession', () => {
-  let deps: LegacySessionDeps;
+  let deps: LegacyAgentSessionDeps;
 
   beforeEach(() => {
     deps = createMockDeps();

@@ -44,7 +44,7 @@ function isAbortLikeError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
 }
 
-export interface LegacySessionDeps {
+export interface LegacyAgentSessionDeps {
   client: GeminiClient;
   scheduler: Scheduler;
   config: Config;
@@ -66,7 +66,7 @@ class LegacyAgentProtocol implements AgentProtocol {
   private readonly _config: Config;
   private readonly _promptId: string;
 
-  constructor(deps: LegacySessionDeps) {
+  constructor(deps: LegacyAgentSessionDeps) {
     this._translationState = createTranslationState(deps.streamId);
     this._nextStreamIdOverride = deps.streamId;
     this._client = deps.client;
@@ -120,6 +120,8 @@ class LegacyAgentProtocol implements AgentProtocol {
   }
 
   private _scheduleRunLoop(initialParts: Part[]): void {
+    // Use a macrotask so send() resolves with the streamId before agent_start
+    // is emitted and consumers can attach to the stream without racing startup.
     setTimeout(() => {
       void this._runLoopInBackground(initialParts);
     }, 0);
@@ -135,7 +137,7 @@ class LegacyAgentProtocol implements AgentProtocol {
       } else {
         this._emitErrorAndAgentEnd(err);
       }
-      this._markStreamDone();
+      this._clearActiveStream();
     }
   }
 
@@ -174,34 +176,25 @@ class LegacyAgentProtocol implements AgentProtocol {
 
         this._emit(translateEvent(event, this._translationState));
 
-        if (event.type === GeminiEventType.Error) {
-          this._finishStream('failed');
-          return;
-        }
-
-        if (
-          event.type === GeminiEventType.InvalidStream ||
-          event.type === GeminiEventType.ContextWindowWillOverflow
-        ) {
-          this._finishStream('failed');
-          return;
-        }
-
-        if (event.type === GeminiEventType.Finished) {
-          if (toolCallRequests.length === 0) {
-            this._finishStream(mapFinishReason(event.value.reason));
+        switch (event.type) {
+          case GeminiEventType.Error:
+          case GeminiEventType.InvalidStream:
+          case GeminiEventType.ContextWindowWillOverflow:
+            this._finishStream('failed');
             return;
-          }
-          continue;
-        }
-
-        if (
-          event.type === GeminiEventType.AgentExecutionStopped ||
-          event.type === GeminiEventType.UserCancelled ||
-          event.type === GeminiEventType.MaxSessionTurns
-        ) {
-          this._markStreamDone();
-          return;
+          case GeminiEventType.Finished:
+            if (toolCallRequests.length === 0) {
+              this._finishStream(mapFinishReason(event.value.reason));
+              return;
+            }
+            break;
+          case GeminiEventType.AgentExecutionStopped:
+          case GeminiEventType.UserCancelled:
+          case GeminiEventType.MaxSessionTurns:
+            this._clearActiveStream();
+            return;
+          default:
+            break;
         }
       }
 
@@ -307,7 +300,7 @@ class LegacyAgentProtocol implements AgentProtocol {
     }
   }
 
-  private _markStreamDone(): void {
+  private _clearActiveStream(): void {
     this._activeStreamId = undefined;
   }
 
@@ -342,7 +335,7 @@ class LegacyAgentProtocol implements AgentProtocol {
     } else {
       this._ensureAgentEnd(reason);
     }
-    this._markStreamDone();
+    this._clearActiveStream();
   }
 
   /**
@@ -453,7 +446,7 @@ class LegacyAgentProtocol implements AgentProtocol {
 }
 
 export class LegacyAgentSession extends AgentSession {
-  constructor(deps: LegacySessionDeps) {
+  constructor(deps: LegacyAgentSessionDeps) {
     super(new LegacyAgentProtocol(deps));
   }
 }
