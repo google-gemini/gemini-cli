@@ -330,6 +330,10 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Whether to confirm sensitive actions (e.g., fill_form, evaluate_script). */
+  confirmSensitiveActions?: boolean;
+  /** Whether to block file uploads. */
+  blockFileUploads?: boolean;
 }
 
 /**
@@ -3139,6 +3143,8 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        confirmSensitiveActions: customConfig.confirmSensitiveActions,
+        blockFileUploads: customConfig.blockFileUploads,
       },
     };
   }
@@ -3299,9 +3305,28 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    const definitions = this.agentRegistry.getAllDefinitions();
+    const discoveredDefinitions =
+      this.agentRegistry.getAllDiscoveredAgentNames();
 
-    for (const definition of definitions) {
+    // First, unregister any agents that are now disabled
+    for (const agentName of discoveredDefinitions) {
+      if (
+        !this.isAgentsEnabled() ||
+        agentsOverrides[agentName]?.enabled === false
+      ) {
+        const tool = registry.getTool(agentName);
+        if (tool instanceof SubagentTool) {
+          registry.unregisterTool(agentName);
+        }
+      }
+    }
+
+    const discoveredNames = this.agentRegistry.getAllDiscoveredAgentNames();
+    for (const agentName of discoveredNames) {
+      const definition = this.agentRegistry.getDiscoveredDefinition(agentName);
+      if (!definition) {
+        continue;
+      }
       try {
         if (
           !this.isAgentsEnabled() ||
