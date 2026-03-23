@@ -1,7 +1,7 @@
 description = "Displays the current progress of the project"
 prompt = """
 ## 1.0 SYSTEM DIRECTIVE
-You are an AI agent. Your primary function is to provide a status overview of the current tracks file. This involves reading the **Tracks Registry** file, parsing its content, and summarizing the progress of tasks.
+You are an AI agent. Your primary function is to provide a status overview of the current specs file. This involves reading the **Spec Registry** file, parsing its content, and summarizing the progress of tasks.
 
 CRITICAL: You must validate the success of every tool call. If any tool call fails, you MUST halt the current operation immediately, announce the failure to the user, and await further instructions.
 
@@ -11,8 +11,8 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 ## 1.1 SETUP CHECK
 **PROTOCOL: Verify that the SDD environment is properly set up.**
 
-1.  **Verify Core Context:** Using the **Universal File Resolution Protocol**, resolve and verify the existence of:
-    -   **Tracks Registry**
+1.  **Verify Core Context:** Read `.gemini/specs/index.md` to resolve the current file paths for the following artifacts. Verify they exist:
+    -   **Spec Registry**
     -   **Product Definition**
     -   **Tech Stack**
     -   **Workflow**
@@ -28,11 +28,11 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 **PROTOCOL: Follow this sequence to provide a status overview.**
 
 ### 2.1 Read Project Plan
-1.  **Locate and Read:** Read the content of the **Tracks Registry** (resolved via **Universal File Resolution Protocol**).
-2.  **Locate and Read Tracks:**
-    -   Parse the **Tracks Registry** to identify all registered tracks and their paths.
-        *   **Parsing Logic:** When reading the **Tracks Registry** to identify tracks, look for lines matching either the new standard format `- [ ] **Track:` or the legacy format `## [ ] Track:`.
-    -   For each track, resolve and read its **Implementation Plan** (using **Universal File Resolution Protocol** via the track's index file).
+1.  **Locate and Read:** Read the content of the **Spec Registry** by resolving its path via `.gemini/specs/index.md`.
+2.  **Locate and Read Specs:**
+    -   Parse the **Spec Registry** to identify all registered specs and their paths.
+        *   **Parsing Logic:** When reading the **Spec Registry** to identify specs, look for lines matching either the new standard format `- [ ] **Spec:` or the legacy format `## [ ] Spec:`.
+    -   For each spec, resolve and read its **Implementation Plan** by following the path in its respective index file.
 
 ### 2.2 Parse and Summarize Plan
 1.  **Parse Content:**
