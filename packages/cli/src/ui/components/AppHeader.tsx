@@ -44,6 +44,18 @@ const MAC_TERMINAL_ICON = `▝▜▄
   ▗▟▀
 ▗▟▀  `;
 
+/**
+ * The horizontal padding (in columns) required for metadata (version, identity, etc.)
+ * when rendered alongside the ASCII logo.
+ */
+const LOGO_METADATA_PADDING = 20;
+
+/**
+ * The terminal width below which we switch to a narrow/column layout to prevent
+ * UI elements from wrapping or overlapping.
+ */
+const NARROW_TERMINAL_BREAKPOINT = 60;
+
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
@@ -63,7 +75,8 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
 
   let logoTextArt = '';
   if (loggedOut) {
-    const widthOfLongLogo = getAsciiArtWidth(longAsciiLogoCompactText) + 20;
+    const widthOfLongLogo =
+      getAsciiArtWidth(longAsciiLogoCompactText) + LOGO_METADATA_PADDING;
 
     if (terminalWidth >= widthOfLongLogo) {
       logoTextArt = longAsciiLogoCompactText.trim();
@@ -72,7 +85,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
 
   // If the terminal is too narrow to fit the icon and metadata (especially long nightly versions)
   // side-by-side, we switch to column mode to prevent wrapping.
-  const isNarrow = terminalWidth < 60;
+  const isNarrow = terminalWidth < NARROW_TERMINAL_BREAKPOINT;
 
   const renderLogo = () => (
     <Box flexDirection="row">
