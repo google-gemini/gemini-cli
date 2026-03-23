@@ -77,51 +77,59 @@ test('handles empty array', () => {
     timeout: 600000,
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
-      const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'run_shell_command',
-      );
 
-      // 1. Agent should have run the tests at least once to observe the failure
-      const testRuns = shellCalls.filter((log) => {
+      const isTestRun = (log: any): boolean => {
+        if (log.toolRequest.name !== 'run_shell_command') {
+          return false;
+        }
         const cmd = getCommand(log);
         return (
-          cmd &&
+          cmd != null &&
           (cmd.includes('vitest') ||
             cmd.includes('npm test') ||
             cmd.includes('npm run test'))
         );
-      });
+      };
 
+      const isFileEdit = (log: any): boolean => {
+        if (!EDIT_TOOL_NAMES.has(log.toolRequest.name)) {
+          return false;
+        }
+        try {
+          const args =
+            typeof log.toolRequest.args === 'string'
+              ? JSON.parse(log.toolRequest.args)
+              : log.toolRequest.args;
+          const filePath: string =
+            args.file_path || args.path || args.target_file || '';
+          return filePath.includes('filter.ts') && !filePath.includes('.test.');
+        } catch {
+          return false;
+        }
+      };
+
+      // 1. Agent should have run the tests at least once to observe the failure
+      const firstTestRunIndex = toolLogs.findIndex(isTestRun);
       expect(
-        testRuns.length,
+        firstTestRunIndex,
         'Expected the agent to run the test suite at least once to observe the failure',
-      ).toBeGreaterThanOrEqual(1);
+      ).not.toBe(-1);
 
       // 2. Agent should have edited the source file to fix the bug
-      const editCalls = toolLogs.filter((log) =>
-        EDIT_TOOL_NAMES.has(log.toolRequest.name),
-      );
-
-      const editedFilterFile = editCalls.some((log) => {
-        const args =
-          typeof log.toolRequest.args === 'string'
-            ? JSON.parse(log.toolRequest.args)
-            : log.toolRequest.args;
-        const filePath: string =
-          args.file_path || args.path || args.target_file || '';
-        return filePath.includes('filter.ts') && !filePath.includes('.test.');
-      });
-
+      const firstEditIndex = toolLogs.findIndex(isFileEdit);
       expect(
-        editedFilterFile,
+        firstEditIndex,
         'Expected the agent to edit src/filter.ts to fix the bug',
-      ).toBe(true);
+      ).not.toBe(-1);
 
-      // 3. Agent should have re-run the tests after making the fix
+      // 3. Agent should have re-run the tests AFTER making the fix
+      const hasTestRunAfterEdit = toolLogs
+        .slice(firstEditIndex + 1)
+        .some(isTestRun);
       expect(
-        testRuns.length,
+        hasTestRunAfterEdit,
         'Expected the agent to re-run the tests after fixing the bug to verify the fix',
-      ).toBeGreaterThanOrEqual(2);
+      ).toBe(true);
 
       // 4. The fix should be correct: >= should become >
       const fixedContent = fs.readFileSync(
