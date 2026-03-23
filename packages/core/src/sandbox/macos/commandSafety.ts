@@ -19,39 +19,43 @@ export function isKnownSafeCommand(args: string[]): boolean {
   }
 
   // Normalize zsh to bash
-  const normalizedArgs = args.map(a => a === 'zsh' ? 'bash' : a);
+  const normalizedArgs = args.map((a) => (a === 'zsh' ? 'bash' : a));
 
   if (isSafeToCallWithExec(normalizedArgs)) {
     return true;
   }
 
   // Support `bash -lc "..."`
-  if (normalizedArgs.length === 3 && normalizedArgs[0] === 'bash' && (normalizedArgs[1] === '-lc' || normalizedArgs[1] === '-c')) {
+  if (
+    normalizedArgs.length === 3 &&
+    normalizedArgs[0] === 'bash' &&
+    (normalizedArgs[1] === '-lc' || normalizedArgs[1] === '-c')
+  ) {
     try {
       const script = normalizedArgs[2];
-      
+
       // Basic check for dangerous operators that could spawn subshells or redirect output
       // We allow &&, ||, |, ; but explicitly block subshells () and redirection >, >>, <
       if (/[()<>]/g.test(script)) {
         return false;
       }
-      
+
       const commands = script.split(/&&|\|\||\||;/);
-      
+
       let allSafe = true;
       for (const cmd of commands) {
         const trimmed = cmd.trim();
         if (!trimmed) continue;
-        
+
         const parsed = shellParse(trimmed).map(String);
         if (parsed.length === 0) continue;
-        
+
         if (!isSafeToCallWithExec(parsed)) {
           allSafe = false;
           break;
         }
       }
-      
+
       if (allSafe && commands.length > 0) {
         return true;
       }
@@ -67,12 +71,33 @@ function isSafeToCallWithExec(args: string[]): boolean {
   if (!args || args.length === 0) return false;
   const cmd = args[0];
 
-
   const safeCommands = new Set([
-    'cat', 'cd', 'cut', 'echo', 'expr', 'false', 'grep', 'head', 'id', 'ls',
-    'nl', 'paste', 'pwd', 'rev', 'seq', 'stat', 'tail', 'tr', 'true', 'uname',
-    'uniq', 'wc', 'which', 'whoami',
-    'numfmt', 'tac'
+    'cat',
+    'cd',
+    'cut',
+    'echo',
+    'expr',
+    'false',
+    'grep',
+    'head',
+    'id',
+    'ls',
+    'nl',
+    'paste',
+    'pwd',
+    'rev',
+    'seq',
+    'stat',
+    'tail',
+    'tr',
+    'true',
+    'uname',
+    'uniq',
+    'wc',
+    'which',
+    'whoami',
+    'numfmt',
+    'tac',
   ]);
 
   if (safeCommands.has(cmd)) {
@@ -81,16 +106,27 @@ function isSafeToCallWithExec(args: string[]): boolean {
 
   if (cmd === 'base64') {
     const unsafeOptions = new Set(['-o', '--output']);
-    return !args.slice(1).some((arg) =>
-      unsafeOptions.has(arg) || arg.startsWith('--output=') || (arg.startsWith('-o') && arg !== '-o')
-    );
+    return !args
+      .slice(1)
+      .some(
+        (arg) =>
+          unsafeOptions.has(arg) ||
+          arg.startsWith('--output=') ||
+          (arg.startsWith('-o') && arg !== '-o'),
+      );
   }
 
   if (cmd === 'find') {
     const unsafeOptions = new Set([
-      '-exec', '-execdir', '-ok', '-okdir',
+      '-exec',
+      '-execdir',
+      '-ok',
+      '-okdir',
       '-delete',
-      '-fls', '-fprint', '-fprint0', '-fprintf',
+      '-fls',
+      '-fprint',
+      '-fprint0',
+      '-fprintf',
     ]);
     return !args.some((arg) => unsafeOptions.has(arg));
   }
@@ -113,7 +149,13 @@ function isSafeToCallWithExec(args: string[]): boolean {
       return false;
     }
 
-    const { idx, subcommand } = findGitSubcommand(args, ['status', 'log', 'diff', 'show', 'branch']);
+    const { idx, subcommand } = findGitSubcommand(args, [
+      'status',
+      'log',
+      'diff',
+      'show',
+      'branch',
+    ]);
     if (!subcommand) {
       return false;
     }
@@ -123,9 +165,12 @@ function isSafeToCallWithExec(args: string[]): boolean {
     if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
       return gitSubcommandArgsAreReadOnly(subcommandArgs);
     }
-    
+
     if (subcommand === 'branch') {
-      return gitSubcommandArgsAreReadOnly(subcommandArgs) && gitBranchIsReadOnly(subcommandArgs);
+      return (
+        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+        gitBranchIsReadOnly(subcommandArgs)
+      );
     }
 
     return false;
@@ -142,9 +187,12 @@ function isSafeToCallWithExec(args: string[]): boolean {
   return false;
 }
 
-function findGitSubcommand(args: string[], subcommands: string[]): { idx: number, subcommand: string | null } {
+function findGitSubcommand(
+  args: string[],
+  subcommands: string[],
+): { idx: number; subcommand: string | null } {
   let skipNext = false;
-  
+
   for (let idx = 1; idx < args.length; idx++) {
     if (skipNext) {
       skipNext = false;
@@ -166,7 +214,8 @@ function findGitSubcommand(args: string[], subcommands: string[]): { idx: number
     }
 
     if (
-      arg === '-C' || arg === '-c' ||
+      arg === '-C' ||
+      arg === '-c' ||
       arg === '--config-env' ||
       arg === '--exec-path' ||
       arg === '--git-dir' ||
@@ -193,20 +242,29 @@ function findGitSubcommand(args: string[], subcommands: string[]): { idx: number
 }
 
 function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
-  return args.some((arg) => 
-    arg === '-c' || arg === '--config-env' ||
-    (arg.startsWith('-c') && arg.length > 2) ||
-    arg.startsWith('--config-env=')
+  return args.some(
+    (arg) =>
+      arg === '-c' ||
+      arg === '--config-env' ||
+      (arg.startsWith('-c') && arg.length > 2) ||
+      arg.startsWith('--config-env='),
   );
 }
 
 function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
   const unsafeFlags = new Set([
-    '--output', '--ext-diff', '--textconv', '--exec', '--paginate'
+    '--output',
+    '--ext-diff',
+    '--textconv',
+    '--exec',
+    '--paginate',
   ]);
 
-  return !args.some((arg) => 
-    unsafeFlags.has(arg) || arg.startsWith('--output=') || arg.startsWith('--exec=')
+  return !args.some(
+    (arg) =>
+      unsafeFlags.has(arg) ||
+      arg.startsWith('--output=') ||
+      arg.startsWith('--exec='),
   );
 }
 
@@ -215,7 +273,20 @@ function gitBranchIsReadOnly(args: string[]): boolean {
 
   let sawReadOnlyFlag = false;
   for (const arg of args) {
-    if (['--list', '-l', '--show-current', '-a', '--all', '-r', '--remotes', '-v', '-vv', '--verbose'].includes(arg)) {
+    if (
+      [
+        '--list',
+        '-l',
+        '--show-current',
+        '-a',
+        '--all',
+        '-r',
+        '--remotes',
+        '-v',
+        '-vv',
+        '--verbose',
+      ].includes(arg)
+    ) {
       sawReadOnlyFlag = true;
     } else if (arg.startsWith('--format=')) {
       sawReadOnlyFlag = true;
@@ -228,10 +299,10 @@ function gitBranchIsReadOnly(args: string[]): boolean {
 
 function isValidSedNArg(arg: string | undefined): boolean {
   if (!arg) return false;
-  
+
   if (!arg.endsWith('p')) return false;
   const core = arg.slice(0, -1);
-  
+
   const parts = core.split(',');
   if (parts.length === 1) {
     const num = parts[0];
@@ -241,7 +312,7 @@ function isValidSedNArg(arg: string | undefined): boolean {
     const b = parts[1];
     return a.length > 0 && b.length > 0 && /^\d+$/.test(a) && /^\d+$/.test(b);
   }
-  
+
   return false;
 }
 
@@ -262,16 +333,22 @@ export function isDangerousCommand(args: string[]): boolean {
   if (cmd === 'sudo') {
     return isDangerousCommand(args.slice(1));
   }
-  
+
   if (cmd === 'find') {
     const unsafeOptions = new Set([
-      '-exec', '-execdir', '-ok', '-okdir',
+      '-exec',
+      '-execdir',
+      '-ok',
+      '-okdir',
       '-delete',
-      '-fls', '-fprint', '-fprint0', '-fprintf',
+      '-fls',
+      '-fprint',
+      '-fprint0',
+      '-fprintf',
     ]);
     return args.some((arg) => unsafeOptions.has(arg));
   }
-  
+
   if (cmd === 'rg') {
     const unsafeWithArgs = new Set(['--pre', '--hostname-bin']);
     const unsafeWithoutArgs = new Set(['--search-zip', '-z']);
@@ -290,9 +367,15 @@ export function isDangerousCommand(args: string[]): boolean {
       return true;
     }
 
-    const { idx, subcommand } = findGitSubcommand(args, ['status', 'log', 'diff', 'show', 'branch']);
+    const { idx, subcommand } = findGitSubcommand(args, [
+      'status',
+      'log',
+      'diff',
+      'show',
+      'branch',
+    ]);
     if (!subcommand) {
-      // It's a git command we don't recognize as explicitly safe. 
+      // It's a git command we don't recognize as explicitly safe.
       return false;
     }
 
@@ -301,19 +384,27 @@ export function isDangerousCommand(args: string[]): boolean {
     if (['status', 'log', 'diff', 'show'].includes(subcommand)) {
       return !gitSubcommandArgsAreReadOnly(subcommandArgs);
     }
-    
+
     if (subcommand === 'branch') {
-      return !(gitSubcommandArgsAreReadOnly(subcommandArgs) && gitBranchIsReadOnly(subcommandArgs));
+      return !(
+        gitSubcommandArgsAreReadOnly(subcommandArgs) &&
+        gitBranchIsReadOnly(subcommandArgs)
+      );
     }
 
     return false;
   }
-  
+
   if (cmd === 'base64') {
     const unsafeOptions = new Set(['-o', '--output']);
-    return args.slice(1).some((arg) =>
-      unsafeOptions.has(arg) || arg.startsWith('--output=') || (arg.startsWith('-o') && arg !== '-o')
-    );
+    return args
+      .slice(1)
+      .some(
+        (arg) =>
+          unsafeOptions.has(arg) ||
+          arg.startsWith('--output=') ||
+          (arg.startsWith('-o') && arg !== '-o'),
+      );
   }
 
   return false;

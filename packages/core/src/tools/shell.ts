@@ -479,9 +479,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
         'could not resolve host',
         'connection refused',
         'no address associated with hostname',
-        'no such host',
-        'network access denied',
-        'check your internet connection',
       ].some((keyword) => lowerOutput.includes(keyword));
 
       // Only trigger heuristic if the command actually failed (exit code != 0 or aborted)

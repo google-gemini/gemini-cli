@@ -11,7 +11,10 @@ import {
   BASE_SEATBELT_PROFILE,
   NETWORK_SEATBELT_PROFILE,
 } from './baseProfile.js';
-import { type SandboxPermissions } from '../../services/sandboxManager.js';
+import {
+  type SandboxPermissions,
+  sanitizePaths,
+} from '../../services/sandboxManager.js';
 
 /**
  * Options for building macOS Seatbelt arguments.
@@ -142,13 +145,12 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     }
   }
 
-  // legacy allowedPaths (defaults to read/write)
-  if (options.allowedPaths) {
-    for (let i = 0; i < options.allowedPaths.length; i++) {
-      const allowedPath = tryRealpath(options.allowedPaths[i]);
-      args.push('-D', `ALLOWED_PATH_${i}=${allowedPath}`);
-      profile += `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))\n`;
-    }
+  // Handle allowedPaths
+  const allowedPaths = sanitizePaths(options.allowedPaths) || [];
+  for (let i = 0; i < allowedPaths.length; i++) {
+    const allowedPath = tryRealpath(allowedPaths[i]);
+    args.push('-D', `ALLOWED_PATH_${i}=${allowedPath}`);
+    profile += `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))\n`;
   }
 
   // Handle granular additional permissions
@@ -192,12 +194,12 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     }
   }
 
-  const forbiddenPaths = options.forbiddenPaths || [];
+  // Handle forbiddenPaths
+  const forbiddenPaths = sanitizePaths(options.forbiddenPaths) || [];
   for (let i = 0; i < forbiddenPaths.length; i++) {
     const forbiddenPath = tryRealpath(forbiddenPaths[i]);
     args.push('-D', `FORBIDDEN_PATH_${i}=${forbiddenPath}`);
-    profile += `(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_${i}")))
-`;
+    profile += `(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_${i}")))\n`;
   }
 
   if (options.networkAccess || options.additionalPermissions?.network) {

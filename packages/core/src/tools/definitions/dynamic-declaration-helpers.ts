@@ -112,11 +112,13 @@ export function getShellDeclaration(
         },
         [PARAM_ADDITIONAL_PERMISSIONS]: {
           type: 'object',
-          description: 'Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".',
+          description:
+            'Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".',
           properties: {
             network: {
               type: 'boolean',
-              description: 'Set to true to enable network access for this command.'
+              description:
+                'Set to true to enable network access for this command.',
             },
             fileSystem: {
               type: 'object',
@@ -124,16 +126,18 @@ export function getShellDeclaration(
                 read: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'List of additional absolute paths to allow reading.'
+                  description:
+                    'List of additional absolute paths to allow reading.',
                 },
                 write: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'List of additional absolute paths to allow writing.'
-                }
-              }
-            }
-          }
+                  description:
+                    'List of additional absolute paths to allow writing.',
+                },
+              },
+            },
+          },
         },
       },
       required: [SHELL_PARAM_COMMAND],
