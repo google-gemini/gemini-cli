@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { loadPoliciesFromToml } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 import { ApprovalMode, PolicyDecision } from './types.js';
-import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 
 describe('Topic Tool Policy', () => {
   async function loadDefaultPolicies() {
@@ -20,7 +20,7 @@ describe('Topic Tool Policy', () => {
     return result.rules;
   }
 
-  it('should allow create_new_topic in DEFAULT mode', async () => {
+  it('should allow update_topic in DEFAULT mode', async () => {
     const rules = await loadDefaultPolicies();
     const engine = new PolicyEngine({
       rules,
@@ -28,13 +28,13 @@ describe('Topic Tool Policy', () => {
     });
 
     const result = await engine.check(
-      { name: CREATE_NEW_TOPIC_TOOL_NAME },
+      { name: UPDATE_TOPIC_TOOL_NAME },
       undefined,
     );
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should allow create_new_topic in PLAN mode', async () => {
+  it('should allow update_topic in PLAN mode', async () => {
     const rules = await loadDefaultPolicies();
     const engine = new PolicyEngine({
       rules,
@@ -42,13 +42,13 @@ describe('Topic Tool Policy', () => {
     });
 
     const result = await engine.check(
-      { name: CREATE_NEW_TOPIC_TOOL_NAME },
+      { name: UPDATE_TOPIC_TOOL_NAME },
       undefined,
     );
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should allow create_new_topic in YOLO mode', async () => {
+  it('should allow update_topic in YOLO mode', async () => {
     const rules = await loadDefaultPolicies();
     const engine = new PolicyEngine({
       rules,
@@ -56,7 +56,7 @@ describe('Topic Tool Policy', () => {
     });
 
     const result = await engine.check(
-      { name: CREATE_NEW_TOPIC_TOOL_NAME },
+      { name: UPDATE_TOPIC_TOOL_NAME },
       undefined,
     );
     expect(result.decision).toBe(PolicyDecision.ALLOW);

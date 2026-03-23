@@ -15,7 +15,7 @@ import {
   EDIT_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
-  CREATE_NEW_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
   ApprovalMode,
@@ -1091,7 +1091,7 @@ describe('mergeExcludeTools', () => {
         'tool3',
         'tool4',
         'tool5',
-        CREATE_NEW_TOPIC_TOOL_NAME,
+        UPDATE_TOPIC_TOOL_NAME,
       ]),
     );
     expect(config.getExcludeTools()).toHaveLength(6);
@@ -1116,7 +1116,7 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      new Set(['tool1', 'tool2', 'tool3', CREATE_NEW_TOPIC_TOOL_NAME]),
+      new Set(['tool1', 'tool2', 'tool3', UPDATE_TOPIC_TOOL_NAME]),
     );
     expect(config.getExcludeTools()).toHaveLength(4);
   });
@@ -1149,7 +1149,7 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      new Set(['tool1', 'tool2', 'tool3', 'tool4', CREATE_NEW_TOPIC_TOOL_NAME]),
+      new Set(['tool1', 'tool2', 'tool3', 'tool4', UPDATE_TOPIC_TOOL_NAME]),
     );
     expect(config.getExcludeTools()).toHaveLength(5);
   });
@@ -1160,9 +1160,7 @@ describe('mergeExcludeTools', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getExcludeTools()).toEqual(
-      new Set([CREATE_NEW_TOPIC_TOOL_NAME]),
-    );
+    expect(config.getExcludeTools()).toEqual(new Set([UPDATE_TOPIC_TOOL_NAME]));
   });
 
   it('should return default excludes when no excludeTools are specified and it is not interactive', async () => {
@@ -1172,7 +1170,7 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      new Set([ASK_USER_TOOL_NAME, CREATE_NEW_TOPIC_TOOL_NAME]),
+      new Set([ASK_USER_TOOL_NAME, UPDATE_TOPIC_TOOL_NAME]),
     );
   });
 
@@ -1185,7 +1183,7 @@ describe('mergeExcludeTools', () => {
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      new Set(['tool1', 'tool2', CREATE_NEW_TOPIC_TOOL_NAME]),
+      new Set(['tool1', 'tool2', UPDATE_TOPIC_TOOL_NAME]),
     );
     expect(config.getExcludeTools()).toHaveLength(3);
   });
@@ -1207,7 +1205,7 @@ describe('mergeExcludeTools', () => {
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
-      new Set(['tool1', 'tool2', CREATE_NEW_TOPIC_TOOL_NAME]),
+      new Set(['tool1', 'tool2', UPDATE_TOPIC_TOOL_NAME]),
     );
     expect(config.getExcludeTools()).toHaveLength(3);
   });
