@@ -55,6 +55,32 @@ export class SandboxPolicyManager {
       );
       try {
         const content = fs.readFileSync(defaultPath, 'utf8');
+        if (typeof content !== 'string') {
+          SandboxPolicyManager._DEFAULT_CONFIG = {
+            modes: {
+              plan: {
+                network: false,
+                readonly: true,
+                approvedTools: [],
+                allowOverrides: false,
+              },
+              default: {
+                network: false,
+                readonly: true,
+                approvedTools: [],
+                allowOverrides: true,
+              },
+              accepting_edits: {
+                network: false,
+                readonly: false,
+                approvedTools: ['sed', 'grep', 'awk', 'perl', 'cat', 'echo'],
+                allowOverrides: true,
+              },
+            },
+            commands: {},
+          };
+          return SandboxPolicyManager._DEFAULT_CONFIG;
+        }
         SandboxPolicyManager._DEFAULT_CONFIG = SandboxTomlSchema.parse(
           toml.parse(content),
         );
