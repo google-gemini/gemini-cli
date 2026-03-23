@@ -86,11 +86,13 @@ export async function* readStdinLines(
   // Flush remaining buffer after EOF
   const remaining = buffer.trim();
   if (remaining) {
-    const remainingBytes = Buffer.byteLength(remaining, 'utf8');
-    if (totalSize + remainingBytes <= MAX_TOTAL_SIZE) {
-      yield remainingBytes > MAX_LINE_SIZE
+    const lineToYield =
+      Buffer.byteLength(remaining, 'utf8') > MAX_LINE_SIZE
         ? truncateUtf8Bytes(remaining, MAX_LINE_SIZE)
         : remaining;
+    const yieldBytes = Buffer.byteLength(lineToYield, 'utf8');
+    if (totalSize + yieldBytes <= MAX_TOTAL_SIZE) {
+      yield lineToYield;
     }
   }
 }
