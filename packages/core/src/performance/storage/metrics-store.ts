@@ -8,6 +8,24 @@ import path from 'node:path';
 import os from 'node:os';
 import type { PerformanceData, RegressionReport } from '../types.js';
 
+// ----- Escaping utilities for safe output -----
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeCsv(str: string): string {
+  // If the string contains commas, quotes, or newlines, wrap in quotes and escape internal quotes
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 export class MetricsStore {
   private storageDir: string;
 
@@ -17,9 +35,16 @@ export class MetricsStore {
 
   async init(): Promise<void> {
     try {
-      await fs.mkdir(this.storageDir, { recursive: true });
+      await fs.mkdir(this.storageDir, { recursive: true, mode: 0o700 });
+
+      // Enforce permissions if directory already exists
+      try {
+        await fs.chmod(this.storageDir, 0o700);
+      } catch {
+        // Ignore chmod errors (e.g., Windows)
+      }
     } catch (_error) {
-      // Ignore if directory exists
+      // Ignore if directory exists or cannot be created
     }
   }
 
@@ -27,7 +52,9 @@ export class MetricsStore {
     await this.init();
     const filename = `metrics-${metrics.version}-${Date.now()}.json`;
     const filepath = path.join(this.storageDir, filename);
-    await fs.writeFile(filepath, JSON.stringify(metrics, null, 2));
+    await fs.writeFile(filepath, JSON.stringify(metrics, null, 2), {
+      mode: 0o600,
+    });
     return filepath;
   }
 
@@ -38,7 +65,9 @@ export class MetricsStore {
     await this.init();
     const filename = customPath || `regression-report-${Date.now()}.json`;
     const filepath = path.join(this.storageDir, filename);
-    await fs.writeFile(filepath, JSON.stringify(report, null, 2));
+    await fs.writeFile(filepath, JSON.stringify(report, null, 2), {
+      mode: 0o600,
+    });
     return filepath;
   }
 
@@ -95,7 +124,8 @@ export class MetricsStore {
     }
 
     const filepath = path.join(this.storageDir, filename);
-    await fs.writeFile(filepath, content);
+    // Secure file permissions: only owner can read/write
+    await fs.writeFile(filepath, content, { mode: 0o600 });
     return filepath;
   }
 
@@ -114,19 +144,24 @@ export class MetricsStore {
 
     // Startup phases
     metrics.startup.phases.forEach((phase) => {
+      // phase.name is user-controlled (could contain commas, quotes)
+      const escapedName = escapeCsv(phase.name);
       rows.push(
-        `${timestamp},startup_${phase.name},startup,${phase.duration},ms`,
+        `${timestamp},startup_${escapedName},startup,${phase.duration},ms`,
       );
     });
 
     // Tool stats
     Object.entries(metrics.tools.stats).forEach(([tool, stats]) => {
+      const escapedTool = escapeCsv(tool);
       rows.push(
-        `${timestamp},tool_${tool}_calls,tool,${stats.callCount},count`,
+        `${timestamp},tool_${escapedTool}_calls,tool,${stats.callCount},count`,
       );
-      rows.push(`${timestamp},tool_${tool}_avg_time,tool,${stats.avgTime},ms`);
       rows.push(
-        `${timestamp},tool_${tool}_success_rate,tool,${stats.successRate},percent`,
+        `${timestamp},tool_${escapedTool}_avg_time,tool,${stats.avgTime},ms`,
+      );
+      rows.push(
+        `${timestamp},tool_${escapedTool}_success_rate,tool,${stats.successRate},percent`,
       );
     });
 
@@ -150,23 +185,50 @@ export class MetricsStore {
       return mb.toFixed(2) + ' MB';
     };
 
+    // Tool rows: escape tool names and numeric values (numbers are safe, but we escape anyway)
     const toolRows = Object.entries(metrics.tools.stats)
       .map(
         ([tool, stats]) => `
-        <tr>
-          <td>${tool}</td>
-          <td>${stats.callCount}</td>
-          <td>${stats.avgTime.toFixed(0)} ms</td>
-          <td>${stats.successRate.toFixed(1)}%</td>
-        </tr>
+         <tr>
+           <td>${escapeHtml(tool)}</td>
+           <td>${stats.callCount}</td>
+           <td>${stats.avgTime.toFixed(0)} ms</td>
+           <td>${stats.successRate.toFixed(1)}%</td>
+         </tr>
       `,
       )
       .join('');
+
+    // Startup phases rows
+    const phaseRows = metrics.startup.phases
+      .map(
+        (phase) => `
+         <tr>
+           <td>${escapeHtml(phase.name)}</td>
+           <td>${phase.duration}ms</td>
+           <td>${phase.percentage.toFixed(1)}%</td>
+         </tr>
+      `,
+      )
+      .join('');
+
+    // Suggestions list
+    const suggestionsHtml =
+      metrics.startup.suggestions.length > 0
+        ? `
+        <h3>💡 Optimization Suggestions</h3>
+        <ul>
+          ${metrics.startup.suggestions.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}
+        </ul>
+      `
+        : '';
 
     return `
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none';">
   <title>Gemini CLI Performance Report</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 30px; background: #f5f5f5; }
@@ -189,26 +251,26 @@ export class MetricsStore {
 <body>
   <div class="container">
     <h1>🚀 Gemini CLI Performance Report</h1>
-    <p>Generated: ${new Date(metrics.timestamp).toLocaleString()}</p>
-    <p>Version: ${metrics.version}</p>
+    <p>Generated: ${escapeHtml(new Date(metrics.timestamp).toLocaleString())}</p>
+    <p>Version: ${escapeHtml(metrics.version)}</p>
 
     <div class="section">
       <h2>📊 System Information</h2>
       <div class="metric-grid">
         <div class="metric-card">
-          <div class="metric-value">${process.version}</div>
+          <div class="metric-value">${escapeHtml(process.version)}</div>
           <div class="metric-label">Node Version</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${process.platform}</div>
+          <div class="metric-value">${escapeHtml(process.platform)}</div>
           <div class="metric-label">Platform</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${process.pid}</div>
+          <div class="metric-value">${escapeHtml(String(process.pid))}</div>
           <div class="metric-label">Process ID</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${Math.floor(process.uptime() / 60)}m</div>
+          <div class="metric-value">${escapeHtml(String(Math.floor(process.uptime() / 60)))}m</div>
           <div class="metric-label">Uptime</div>
         </div>
       </div>
@@ -218,20 +280,20 @@ export class MetricsStore {
       <h2>💾 Memory Usage</h2>
       <div class="metric-grid">
         <div class="metric-card">
-          <div class="metric-value">${formatBytes(metrics.memory.current.heapUsed)}</div>
+          <div class="metric-value">${escapeHtml(formatBytes(metrics.memory.current.heapUsed))}</div>
           <div class="metric-label">Heap Used</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${formatBytes(metrics.memory.current.heapTotal)}</div>
+          <div class="metric-value">${escapeHtml(formatBytes(metrics.memory.current.heapTotal))}</div>
           <div class="metric-label">Heap Total</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${((metrics.memory.current.heapUsed / metrics.memory.current.heapTotal) * 100).toFixed(1)}%</div>
+          <div class="metric-value">${escapeHtml(((metrics.memory.current.heapUsed / metrics.memory.current.heapTotal) * 100).toFixed(1))}%</div>
           <div class="metric-label">Heap Usage</div>
         </div>
         <div class="metric-card">
           <div class="metric-value ${metrics.memory.trend.direction === 'increasing' ? 'warning' : 'success'}">
-            ${metrics.memory.trend.direction}
+            ${escapeHtml(metrics.memory.trend.direction)}
           </div>
           <div class="metric-label">Trend</div>
         </div>
@@ -257,30 +319,11 @@ export class MetricsStore {
           </tr>
         </thead>
         <tbody>
-          ${metrics.startup.phases
-            .map(
-              (phase) => `
-            <tr>
-              <td>${phase.name}</td>
-              <td>${phase.duration}ms</td>
-              <td>${phase.percentage.toFixed(1)}%</td>
-            </tr>
-          `,
-            )
-            .join('')}
+          ${phaseRows}
         </tbody>
       </table>
 
-      ${
-        metrics.startup.suggestions.length > 0
-          ? `
-        <h3>💡 Optimization Suggestions</h3>
-        <ul>
-          ${metrics.startup.suggestions.map((s) => `<li>${s}</li>`).join('')}
-        </ul>
-      `
-          : ''
-      }
+      ${suggestionsHtml}
     </div>
 
     <div class="section">
@@ -291,8 +334,6 @@ export class MetricsStore {
             <th>Tool</th>
             <th>Calls</th>
             <th>Avg Time</th>
-            <th>Min Time</th>
-            <th>Max Time</th>
             <th>Success Rate</th>
           </tr>
         </thead>

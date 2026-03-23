@@ -7,6 +7,7 @@ import { DevTools } from '@google/gemini-cli-devtools';
 import { ModelLatencyCollector } from '../performance/collectors/model-latency-collector.js';
 import { ToolExecutionCollector } from '../performance/collectors/tool-execution-collector.js';
 import { SessionCollector } from '../performance/collectors/session-collector.js';
+
 interface NetworkLog {
   url?: string;
   timestamp: number;
@@ -26,6 +27,35 @@ interface ConsoleLog {
   payload?: {
     message?: string;
   };
+}
+
+// Type guard for expected response body shape
+interface GeminiApiResponse {
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+  };
+}
+
+function isGeminiApiResponse(obj: unknown): obj is GeminiApiResponse {
+  if (typeof obj !== 'object' || obj === null) return false;
+  if (!('usageMetadata' in obj)) return true;
+
+  // Safely check usageMetadata without type assertions
+  const withUsage = obj as { usageMetadata: unknown };
+  return (
+    typeof withUsage.usageMetadata === 'object' &&
+    withUsage.usageMetadata !== null
+  );
+}
+
+// Type guard for request body shape (if needed)
+interface GeminiApiRequest {
+  contents?: unknown;
+}
+
+function isGeminiApiRequest(obj: unknown): obj is GeminiApiRequest {
+  return typeof obj === 'object' && obj !== null;
 }
 
 export class DevToolsPerformanceBridge {
@@ -88,39 +118,37 @@ export class DevToolsPerformanceBridge {
     let promptTokens = 0;
     let completionTokens = 0;
 
-    try {
-      if (log.response?.body) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unnecessary-type-assertion
-        const responseBody = JSON.parse(log.response.body!) as {
-          usageMetadata?: {
-            promptTokenCount?: number;
-            candidatesTokenCount?: number;
-          };
-        };
-        if (responseBody.usageMetadata) {
-          promptTokens = responseBody.usageMetadata.promptTokenCount || 0;
-          completionTokens =
-            responseBody.usageMetadata.candidatesTokenCount || 0;
+    // Safely parse response body
+    if (log.response?.body) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(log.response.body);
+        if (isGeminiApiResponse(parsed) && parsed.usageMetadata) {
+          promptTokens = parsed.usageMetadata.promptTokenCount || 0;
+          completionTokens = parsed.usageMetadata.candidatesTokenCount || 0;
         }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[PERF] Failed to parse response body for model call: ${error}`,
+        );
       }
-    } catch (_e) {
-      // Ignore parsing errors
     }
 
     // Try to extract from request as fallback
     if (!promptTokens && log.request?.body) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unnecessary-type-assertion
-        const requestBody = JSON.parse(log.request.body!) as {
-          contents?: unknown;
-        };
-        if (requestBody.contents) {
-          promptTokens = this.estimateTokens(
-            JSON.stringify(requestBody.contents),
-          );
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(log.request.body);
+        if (isGeminiApiRequest(parsed) && parsed.contents) {
+          promptTokens = this.estimateTokens(JSON.stringify(parsed.contents));
         }
-      } catch (_e) {
-        // Ignore
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[PERF] Failed to parse response body for model call:`,
+          error instanceof Error ? error.message : error,
+        );
       }
     }
 

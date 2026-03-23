@@ -13,11 +13,13 @@ import {
   type PerformanceData,
   MetricsStore,
   PersistenceManager,
+  getVersion,
 } from '@google/gemini-cli-core';
 
 // NOTE: DevToolsPerformanceBridge is NOT imported here.
 // Its underlying @google/gemini-cli-devtools package executes blocking I/O
 // at static import time, freezing the Node.js event loop before any UI renders.
+
 export class PerformanceService {
   private static initialized = false;
   private static metricsStore = new MetricsStore();
@@ -52,16 +54,24 @@ export class PerformanceService {
     const model = ModelLatencyCollector.getInstance();
     const session = SessionCollector.getInstance();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if (!(memory as unknown as { interval: unknown }).interval) {
+    // HACK: Check internal `interval` property to see if monitoring is active.
+    // MemoryCollector does not expose a public API for this,
+    // so we safely check without unsafe assertions.
+    const hasInterval = (obj: unknown): obj is { interval: unknown } => typeof obj === 'object' && obj !== null && 'interval' in obj;
+
+    const memUnknown = memory as unknown;
+    const maybeInterval = hasInterval(memUnknown)
+      ? memUnknown.interval
+      : undefined;
+
+    if (!maybeInterval) {
       memory.startMonitoring(5000);
     }
-
     const currentMemory = memory.getCurrent();
 
     const data: PerformanceData = {
       timestamp: Date.now(),
-      version: '0.33.0',
+      version: await getVersion(),
 
       startup: {
         total: startup.getTotalTime(),

@@ -5,6 +5,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os'; // Added for secure home directory
 import type {
   BaselineMetrics,
   PerformanceData,
@@ -23,14 +24,22 @@ export class RegressionDetector {
   };
 
   constructor() {
-    this.baselineDir = path.join(process.cwd(), '.baselines');
+    // Use a secure, user‑specific directory instead of process.cwd()
+    this.baselineDir = path.join(os.homedir(), '.gemini', 'baselines');
   }
 
   async init(): Promise<void> {
     try {
-      await fs.mkdir(this.baselineDir, { recursive: true });
+      // Create directory with owner‑only permissions (0o700)
+      await fs.mkdir(this.baselineDir, { recursive: true, mode: 0o700 });
+      // Enforce permissions if directory already exists
+      try {
+        await fs.chmod(this.baselineDir, 0o700);
+      } catch {
+        // Ignore chmod errors (e.g., Windows)
+      }
     } catch (_error) {
-      // Directory might already exist
+      // Directory might already exist or permissions issue – let it fail later if needed
     }
   }
 
@@ -80,7 +89,10 @@ export class RegressionDetector {
 
     const filename = `baseline-${version}-${Date.now()}.json`;
     const filepath = path.join(this.baselineDir, filename);
-    await fs.writeFile(filepath, JSON.stringify(baseline, null, 2));
+    // Write file with owner‑only permissions (0o600)
+    await fs.writeFile(filepath, JSON.stringify(baseline, null, 2), {
+      mode: 0o600,
+    });
 
     return filepath;
   }
@@ -88,7 +100,18 @@ export class RegressionDetector {
   async loadBaseline(version?: string): Promise<BaselineMetrics | null> {
     await this.init();
 
-    const files = await fs.readdir(this.baselineDir);
+    let files: string[];
+    try {
+      files = await fs.readdir(this.baselineDir);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[PERF] Failed to read baseline directory:`,
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    }
+
     const baselineFiles = files
       .filter((f) => f.startsWith('baseline-'))
       .map((f) => ({
@@ -110,9 +133,30 @@ export class RegressionDetector {
     if (!target) {
       return null;
     }
-    const content = await fs.readFile(target.path, 'utf-8');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return JSON.parse(content);
+
+    let content: string;
+    try {
+      content = await fs.readFile(target.path, 'utf-8');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[PERF] Failed to read baseline file ${target.path}:`,
+        error,
+      );
+      return null;
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return JSON.parse(content) as BaselineMetrics;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[PERF] Failed to parse baseline file ${target.path}:`,
+        error,
+      );
+      return null;
+    }
   }
 
   async detectRegressions(
@@ -299,12 +343,17 @@ export class RegressionDetector {
     );
 
     // Print report to console
+     
     console.log('\n🔍 Performance Regression Check');
+     
     console.log('===============================');
+     
     console.log(`Version: ${report.version} vs ${report.baselineVersion}`);
+     
     console.log(`Status: ${report.passed ? '✅ PASSED' : '❌ FAILED'}`);
 
     if (report.regressions.length > 0) {
+       
       console.log('\n⚠️  Regressions Found:');
       report.regressions.forEach((r) => {
         const color =
@@ -313,27 +362,35 @@ export class RegressionDetector {
             : r.severity === 'HIGH'
               ? '\x1b[33m'
               : '\x1b[0m';
+         
         console.log(
           `${color}  • ${r.metric}: ${r.change.toFixed(1)}% increase ` +
             `(${this.formatValue(r.baseline)} → ${this.formatValue(r.current)}) [${r.severity}]\x1b[0m`,
         );
         if (r.recommendation) {
+           
           console.log(`    💡 ${r.recommendation}`);
         }
       });
     }
 
     if (report.improvements.length > 0) {
+       
       console.log('\n✅ Improvements:');
       report.improvements.forEach((i) => {
+         
         console.log(`  • ${i.metric}: ${i.change.toFixed(1)}% improvement`);
       });
     }
-
+     
     console.log('\n📊 Summary:');
+     
     console.log(`  Total Checks: ${report.summary.totalChecks}`);
+     
     console.log(`  Passed: ${report.summary.passed}`);
+     
     console.log(`  Failed: ${report.summary.failed}`);
+     
     console.log(`  Critical: ${report.summary.critical}`);
 
     if (options?.exitOnFailure && !report.passed) {

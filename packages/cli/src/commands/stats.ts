@@ -15,6 +15,40 @@ import { PerformanceService } from '../services/performance-service.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 import { RegressionDetector } from '@google/gemini-cli-core';
 
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Prevent CSV injection
+ */
+function sanitizeCsv(value: string | number): string {
+  const str = String(value);
+  return /^[=+\-@]/.test(str) ? `'${str}` : str;
+}
+
+function isExportFormat(value: unknown): value is ExportFormat {
+  return value === 'json' || value === 'csv' || value === 'html';
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
+}
+
+type ExportFormat = 'json' | 'csv' | 'html';
+
 export const perfCommand: CommandModule = {
   command: 'perf',
   aliases: ['dashboard', 'stats'],
@@ -50,47 +84,66 @@ export const perfCommand: CommandModule = {
         initializeOutputListenersAndFlush();
         argv['isCommand'] = true;
       }),
+
   handler: async (argv) => {
     try {
       // Setup performance monitoring
       PerformanceService.setupHooks();
 
       if (argv['export']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const format = argv['export'] as string;
+        const formatVal = argv['export'];
+        if (!isExportFormat(formatVal)) {
+          throw new Error('Invalid export format');
+        }
+        const format = formatVal;
+
         // eslint-disable-next-line no-console
         console.log(
           chalk.blue(`📊 Exporting performance report as ${format}...`),
         );
+
         const data = await PerformanceService.getCurrentMetrics();
 
         let content = '';
+
         if (format === 'json') {
           content = JSON.stringify(data, null, 2);
         } else if (format === 'csv') {
-          // Simple CSV for tools
           content = 'Tool,Calls,AvgDuration,SuccessRate\n';
+
           Object.entries(data.tools.stats).forEach(([tool, s]) => {
-            content += `${tool},${s.callCount},${s.avgTime},${s.successRate}\n`;
+            content += `${sanitizeCsv(tool)},${s.callCount},${s.avgTime},${s.successRate}\n`;
           });
-        } else {
-          content = `<html><body><h1>Performance Report</h1><pre>${JSON.stringify(
-            data,
-            null,
-            2,
-          )}</pre></body></html>`;
+        } else if (format === 'html') {
+          const safeData = escapeHtml(JSON.stringify(data, null, 2));
+
+          content = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Performance Report</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none';">
+</head>
+<body>
+  <h1>Performance Report</h1>
+  <pre>${safeData}</pre>
+</body>
+</html>`;
         }
 
-        const fileName =
-          typeof argv['output'] === 'string'
-            ? argv['output']
-            : `perf-report-${Date.now()}.${format}`;
-        fs.writeFileSync(fileName, content);
+        const outputVal = argv['output'];
+        const fileName = isString(outputVal)
+          ? outputVal
+          : `perf-report-${Date.now()}.${format}`;
+
+        // Secure file permissions
+        fs.writeFileSync(fileName, content, { mode: 0o600 });
 
         // eslint-disable-next-line no-console
         console.log(
           chalk.green(`✅ Report exported to: ${path.resolve(fileName)}`),
         );
+
         PerformanceService.cleanup();
         return;
       }
@@ -100,10 +153,13 @@ export const perfCommand: CommandModule = {
       if (argv['save-baseline']) {
         // eslint-disable-next-line no-console
         console.log(chalk.blue('📊 Saving baseline metrics...'));
+
         const data = await PerformanceService.getCurrentMetrics();
         const filepath = await detector.saveBaseline(data.version, data);
+
         // eslint-disable-next-line no-console
         console.log(chalk.green(`✅ Baseline saved to ${filepath}`));
+
         PerformanceService.cleanup();
         return;
       }
@@ -111,6 +167,7 @@ export const perfCommand: CommandModule = {
       if (argv['ci']) {
         // eslint-disable-next-line no-console
         console.log(chalk.blue('🔍 Running performance regression check...'));
+
         const data = await PerformanceService.getCurrentMetrics();
         const report = await detector.runCICheck(data, {
           exitOnFailure: true,
@@ -123,15 +180,16 @@ export const perfCommand: CommandModule = {
           // eslint-disable-next-line no-console
           console.log(chalk.red('❌ Performance regressions detected.'));
         }
+
         PerformanceService.cleanup();
         return;
       }
 
       // Show the React dashboard
+      const liveVal = argv['live'];
       const { waitUntilExit } = render(
         React.createElement(Dashboard, {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          live: (argv['live'] as boolean) || false,
+          live: isBoolean(liveVal) ? liveVal : false,
           onExit: () => {
             PerformanceService.cleanup();
             process.exit(0);
@@ -147,7 +205,11 @@ export const perfCommand: CommandModule = {
       await waitUntilExit();
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error(chalk.red('Error:'), error);
+      console.error(
+        chalk.red('Error:'),
+        error instanceof Error ? error.message : error,
+      );
+
       PerformanceService.cleanup();
       process.exit(1);
     }

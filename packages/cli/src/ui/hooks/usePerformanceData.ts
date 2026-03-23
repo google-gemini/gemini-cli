@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PerformanceService } from '../../services/performance-service.js';
-import { type PerformanceData } from '@google/gemini-cli-core';
+import { type PerformanceData, getVersion } from '@google/gemini-cli-core';
 
 export function usePerformanceData(
   live: boolean = false,
@@ -47,7 +47,7 @@ export function usePerformanceData(
             // Create empty but valid structure
             setData({
               timestamp: Date.now(),
-              version: '0.33.0',
+              version: await getVersion(),
               startup: { total: 0, phases: [], suggestions: [] },
               memory: {
                 current: process.memoryUsage(),
