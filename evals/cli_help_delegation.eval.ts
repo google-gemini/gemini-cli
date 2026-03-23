@@ -11,7 +11,8 @@ describe('CliHelpAgent Delegation', () => {
         },
       },
     },
-    prompt: 'Help me create a subagent in this project',
+    //  Refined prompt for clearer delegation intent
+    prompt: 'How do I create and configure a subagent using the CLI in this project?',
     timeout: 60000,
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs();
