@@ -8,11 +8,16 @@ to stable suites.
 ## 1. 🔍 Investigate candidates
 
 1.  **Audit Nightly Logs**: Use the `gh` CLI to fetch results from
-    `evals-nightly.yml`.
+    `evals-nightly.yml` (Direct URL:
+    `https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml`).
+    - **Tip**: The aggregate summary from the most recent run integrates the
+      last 7 runs of history automatically.
+    - **Safety**: DO NOT push changes or start remote runs. All verification is
+      local.
 2.  **Assess Stability**: Identify tests that pass **100% of the time** across
     ALL enabled models over the **last 7 nightly runs** in a row.
-    - _100% means a test pass 3/3 times for a model on a specific run._
-3.  **Promotion Targets**: Any test meeting this criteria is a candidate for
+    - _100% means the test passed 3/3 times for every model and run._
+3.  **Promotion Targets**: Tests meeting this criteria are candidates for
     promotion from `USUALLY_PASSES` to `ALWAYS_PASSES`.
 
 ---
@@ -26,6 +31,8 @@ to stable suites.
     ```
 3.  **Targeting**: Follow guidelines in `evals/README.md` regarding stable suite
     organization.
+4.  **Constraint**: Your final change must be **minimal and targeted** strictly
+    to promoting the test status. Do not refactor the test or setup fixtures.
 
 ---
 

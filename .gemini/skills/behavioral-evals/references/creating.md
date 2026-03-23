@@ -9,6 +9,33 @@
 
 ---
 
+## 🏗️ Scenario Design
+
+Evals must simulate realistic agent environments to effectively test
+decision-making.
+
+- **Workspace State**: Seed with standard project anchors if testing general
+  capabilities:
+  - `package.json` for NodeJS environments.
+  - Minimal configuration files (`tsconfig.json`, `GEMINI.md`).
+- **Structural Complexity**: Provide enough files to force the agent to _search_
+  or _navigate_, rather than giving the answer directly. Avoid trivial one-file
+  tests unless testing exact prompt steering.
+
+---
+
+## ❌ Fail First Principle
+
+Before asserting a new capability or locking in a fix, **verify that the test
+fails first**.
+
+- It is easy to accidentally write an eval that asserts behaviors that are
+  already met or pass by default.
+- **Process**: reproduce failure with test -> apply fix (prompt/tool) -> verify
+  test passes.
+
+---
+
 ## ✋ Testing Patterns
 
 ### 1. Breakpoints
@@ -64,7 +91,8 @@ assert: async (rig, result) => {
 
 ### 4. Mock MCP Facades
 
-To evaluate tools connected via MCP without hitting live endpoints, load a mock server configuration in the `setup` hook.
+To evaluate tools connected via MCP without hitting live endpoints, load a mock
+server configuration in the `setup` hook.
 
 ```typescript
 setup: async (rig) => {
@@ -79,7 +107,6 @@ assert: async (rig) => {
   expect(workspaceCall).toBeDefined();
 };
 ```
-
 
 ---
 

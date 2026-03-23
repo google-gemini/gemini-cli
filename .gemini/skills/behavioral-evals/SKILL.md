@@ -7,7 +7,10 @@ description: Guidance for creating, running, fixing, and promoting behavioral ev
 
 ## Overview
 
-Behavioral evaluations (evals) are tests that validate the agent's decision-making (e.g., tool choice) rather than pure functionality. They are critical for testing prompt changes and preventing regressions.
+Behavioral evaluations (evals) are tests that validate the **agent's decision-making** (e.g., tool choice) rather than pure functionality. They are critical for verifying prompt changes, debugging steerability, and preventing regressions.
+
+> [!NOTE]
+> **Single Source of Truth**: For core concepts, policies, running tests, and general best practices, always refer to **[evals/README.md](file:///Users/abhipatel/code/gemini-cli/docs/evals/README.md)**.
 
 ---
 
@@ -17,46 +20,37 @@ Behavioral evaluations (evals) are tests that validate the agent's decision-maki
     *   *No* -> Normal integration tests.
     *   *Yes* -> Continue below.
 2.  **Is it UI/Interaction heavy?**
-    *   *Yes* -> Use `appEvalTest` (`AppRig`). See [creating.md](references/creating.md).
-    *   *No* -> Use `evalTest` (`TestRig`). See [creating.md](references/creating.md).
+    *   *Yes* -> Use `appEvalTest` (`AppRig`). See **[creating.md](references/creating.md)**.
+    *   *No* -> Use `evalTest` (`TestRig`). See **[creating.md](references/creating.md)**.
 3.  **Is it a new test?**
     *   *Yes* -> Set policy to `USUALLY_PASSES`.
     *   *No* -> `ALWAYS_PASSES` (locks in regression).
 4.  **Are you fixing a failure or promoting a test?**
-    *   *Fixing* -> See [fixing.md](references/fixing.md).
-    *   *Promoting* -> See [promoting.md](references/promoting.md).
+    *   *Fixing* -> See **[fixing.md](references/fixing.md)**.
+    *   *Promoting* -> See **[promoting.md](references/promoting.md)**.
 
 ---
 
-## 📋 Step-by-Step Checklist
+## 📋 Quick Checklist
 
 ### 1. Setup Workspace
-Seed the workspace with necessary files using the `files` object in your eval case to simulate a realistic scenario.
+Seed the workspace with necessary files using the `files` object to simulate a realistic scenario (e.g., NodeJS project with `package.json`).
+*   *Details in **[creating.md](references/creating.md)***
 
 ### 2. Write Assertions
-Use assertions that audit agent decisions:
-*   **Breakpoints**: Pause *before* tools using `rig.setBreakpoint(['tool_name'])`.
-*   **Tool Tracing**: Audit history via `rig.readToolLogs()`.
-*   **Mock MCP Facades**: Simulate offline cloud endpoints safely using `rig.addMockMcpServer()`.
+Audit agent decisions using `rig.setBreakpoint()` (AppRig only) or index verification on `rig.readToolLogs()`.
+*   *Details in **[creating.md](references/creating.md)***
 
-> Detailed patterns in [creating.md](references/creating.md)
-
-### 3. Verify Pass Rate
-Before pushing, run the test multiple times locally to assess flakiness.
-
-> CLI commands in [running.md](references/running.md)
+### 3. Verify
+Run single tests locally with Vitest. Confirm stability locally before relying on CI workflows.
+*   *See **[evals/README.md](file:///Users/abhipatel/code/gemini-cli/docs/evals/README.md)** for running commands.*
 
 ---
 
 ## 📦 Bundled Resources
 
-### references/
-*   **[creating.md](references/creating.md)**: Detailed guide on `TestRig` vs `AppRig`, assertions, and breakpoints.
-*   **[running.md](references/running.md)**: CLI commands for running evals and explanation of promotion lifecycle.
-*   **[fixing.md](references/fixing.md)**: Troubleshooting workflows for debugging test regressions.
-*   **[promoting.md](references/promoting.md)**: Criteria and steps for promoting incubated tests.
-
-### assets/
-*   **`standard_eval.ts.txt`**: Boilerplate for standard workspace/CLI tests (uses `evalTest` and trajectory auditing).
-*   **`interactive_eval.ts.txt`**: Boilerplate for UI/Interaction tests (uses `appEvalTest` and breakpoints).
+Detailed procedural guides:
+*   **[creating.md](references/creating.md)**: Assertion strategies, Rig selection, Mock MCPs.
+*   **[fixing.md](references/fixing.md)**: Step-by-step automated investigation, architecture diagnosis guidelines.
+*   **[promoting.md](references/promoting.md)**: Candidate identification criteria and threshold guidelines.
 
