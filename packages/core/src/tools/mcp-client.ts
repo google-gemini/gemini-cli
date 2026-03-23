@@ -501,11 +501,23 @@ export class McpClient implements McpProgressReporter {
             `📨 Channel message from '${this.serverName}': ${content.slice(0, 100)}...`,
           );
 
-          // Format as a channel block for the model
+          // Format as a channel block for the model.
+          // Sanitize untrusted input to prevent prompt injection via
+          // crafted metadata values or content that breaks out of the XML block.
+          const escapeAttr = (s: string) =>
+            s
+              .replace(/&/g, '&amp;')
+              .replace(/"/g, '&quot;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
           const metaAttrs = Object.entries(meta)
-            .map(([k, v]) => `${k}="${v}"`)
+            .map(([k, v]) => `${escapeAttr(k)}="${escapeAttr(v)}"`)
             .join(' ');
-          const formatted = `<channel source="${this.serverName}" ${metaAttrs}>\n${content}\n</channel>`;
+          const safeContent = content.replace(
+            /<\/channel>/gi,
+            '&lt;/channel&gt;',
+          );
+          const formatted = `<channel source="${escapeAttr(this.serverName)}" ${metaAttrs}>\n${safeContent}\n</channel>`;
 
           coreEvents.emitChannelMessage({
             serverName: this.serverName,
