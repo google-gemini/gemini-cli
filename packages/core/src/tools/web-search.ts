@@ -243,7 +243,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
-      this.context.config,
+      this.context,
       params,
       messageBus ?? this.messageBus,
       _toolName,

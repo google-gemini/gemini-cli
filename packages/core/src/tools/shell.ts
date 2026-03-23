@@ -480,8 +480,8 @@ export class ShellTool extends BaseDeclarativeTool<
       Kind.Execute,
       definition.base.parametersJsonSchema,
       messageBus,
-      false, // output is not markdown
-      true, // output can be updated
+      false, // isOutputMarkdown
+      true, // canUpdateOutput
     );
   }
 
@@ -509,7 +509,7 @@ export class ShellTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
-      this.context.config,
+      this.context,
       params,
       messageBus,
       _toolName,

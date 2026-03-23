@@ -3329,4 +3329,38 @@ describe('ConfigSchema validation', () => {
       expect(result.data.sandbox?.networkAccess).toBe(false);
     }
   });
+
+  describe('AgentLoopContext Spread Safety', () => {
+    it('should preserve AgentLoopContext properties when Config is spread', async () => {
+      const config = new Config({
+        targetDir: '/tmp/test',
+        sessionId: 'test-session',
+        debugMode: false,
+        cwd: '/tmp/test',
+        model: 'auto',
+      });
+      await config.initialize();
+
+      // Spread the config instance into a new object
+      const context: AgentLoopContext = { ...config };
+
+      // Verify all AgentLoopContext properties are present
+      expect(context.promptId).toBe('test-session');
+      expect(context.config).toBe(config);
+      expect(context.toolRegistry).toBeDefined();
+      expect(context.promptRegistry).toBeDefined();
+      expect(context.resourceRegistry).toBeDefined();
+      expect(context.messageBus).toBeDefined();
+      expect(context.geminiClient).toBeDefined();
+      expect(context.sandboxManager).toBeDefined();
+
+      // Verify they are the same instances
+      expect(context.toolRegistry).toBe(config.toolRegistry);
+      expect(context.promptRegistry).toBe(config.promptRegistry);
+      expect(context.resourceRegistry).toBe(config.resourceRegistry);
+      expect(context.messageBus).toBe(config.messageBus);
+      expect(context.geminiClient).toBe(config.geminiClient);
+      expect(context.sandboxManager).toBe(config.sandboxManager);
+    });
+  });
 });

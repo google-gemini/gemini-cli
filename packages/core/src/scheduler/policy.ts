@@ -128,7 +128,6 @@ export async function updatePolicy(
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
     // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
     if (
-      context.config &&
       context.config.isTrustedFolder() &&
       context.config.getWorkspacePoliciesDir() !== undefined
     ) {

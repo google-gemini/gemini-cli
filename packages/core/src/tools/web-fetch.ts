@@ -315,7 +315,6 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         signal,
       },
     );
-
     const bodyBuffer = await this.readResponseWithLimit(
       response,
       MAX_EXPERIMENTAL_FETCH_SIZE,
