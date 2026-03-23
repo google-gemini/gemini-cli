@@ -5,31 +5,36 @@
  */
 
 import type React from 'react';
+import { escapeShellArg, getShellConfiguration } from '@google/gemini-cli-core';
 import { StatsDisplay } from './StatsDisplay.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import { escapeShellArg, getShellConfiguration } from '@google/gemini-cli-core';
 
 interface SessionSummaryDisplayProps {
   duration: string;
+  sessionId?: string;
 }
 
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
+  sessionId,
 }) => {
   const { stats } = useSessionStats();
   const config = useConfig();
   const { shell } = getShellConfiguration();
-
   const worktreeSettings = config.getWorktreeSettings();
 
-  const escapedSessionId = escapeShellArg(stats.sessionId, shell);
-  let footer = `To resume this session: gemini --resume ${escapedSessionId}`;
+  const sessionIdForFooter = sessionId ?? stats.sessionId ?? '<session-id>';
+  const escapedSessionId = escapeShellArg(sessionIdForFooter, shell);
+
+  let footer = `Tip: Resume from any folder using gemini --resume ${escapedSessionId} or /resume`;
 
   if (worktreeSettings) {
+    const escapedWorktreePath = escapeShellArg(worktreeSettings.path, shell);
     footer =
-      `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${escapedSessionId}\n` +
-      `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+      `Tip: Resume from any folder using gemini --resume ${escapedSessionId}\n` +
+      `To resume work in this worktree: cd ${escapedWorktreePath} && gemini --resume ${escapedSessionId}\n` +
+      `To remove manually: git worktree remove ${escapedWorktreePath}`;
   }
 
   return (

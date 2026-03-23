@@ -117,6 +117,11 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getIdeMode: vi.fn().mockReturnValue(false),
     getFolderTrust: vi.fn().mockReturnValue(true),
     isTrustedFolder: vi.fn().mockReturnValue(true),
+    getPendingIncludeDirectories: vi.fn().mockReturnValue([]),
+    clearPendingIncludeDirectories: vi.fn(),
+    getWorkspaceContext: vi.fn().mockReturnValue({
+      addDirectories: vi.fn(),
+    }),
     getCompressionThreshold: vi.fn().mockResolvedValue(undefined),
     getUserCaching: vi.fn().mockResolvedValue(false),
     getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),

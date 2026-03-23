@@ -25,6 +25,13 @@ describe('quitCommand', () => {
 
   it('returns a QuitActionReturn object with the correct messages', () => {
     const mockContext = createMockCommandContext({
+      services: {
+        agentContext: {
+          config: {
+            getSessionId: () => 'test-session-id',
+          },
+        },
+      },
       session: {
         stats: {
           sessionStartTime: new Date('2025-01-01T00:00:00Z'),
@@ -47,6 +54,7 @@ describe('quitCommand', () => {
         {
           type: 'quit',
           duration: '1h 0m 0s',
+          sessionId: 'test-session-id',
           id: expect.any(Number),
         },
       ],

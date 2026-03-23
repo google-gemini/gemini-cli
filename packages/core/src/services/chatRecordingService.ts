@@ -96,6 +96,8 @@ export type MessageRecord = BaseMessageRecord & ConversationRecordExtra;
 export interface ConversationRecord {
   sessionId: string;
   projectHash: string;
+  /** Original project root where this session was first created */
+  originProjectPath?: string;
   startTime: string;
   lastUpdated: string;
   messages: MessageRecord[];
@@ -112,6 +114,7 @@ export interface ConversationRecord {
 export interface ResumedSessionData {
   conversation: ConversationRecord;
   filePath: string;
+  originProjectPath?: string;
 }
 
 /**
@@ -164,6 +167,10 @@ export class ChatRecordingService {
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
+          conversation.originProjectPath =
+            conversation.originProjectPath ??
+            resumedSessionData.originProjectPath ??
+            this.context.config.getProjectRoot();
         });
 
         // Clear any cached data to force fresh reads
@@ -191,6 +198,7 @@ export class ChatRecordingService {
         this.writeConversation({
           sessionId: this.sessionId,
           projectHash: this.projectHash,
+          originProjectPath: this.context.config.getProjectRoot(),
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
@@ -603,19 +611,24 @@ export class ChatRecordingService {
 
       const shortId = this.deriveShortId(sessionIdOrBasename);
 
-      if (!fs.existsSync(chatsDir)) {
-        return; // Nothing to delete
-      }
-
-      const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
-
-      for (const file of matchingFiles) {
-        this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
-      }
+      this.deleteMatchingSessionFiles(chatsDir, tempDir, shortId);
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;
     }
+  }
+
+  /**
+   * Deletes a session file by absolute path.
+   */
+  deleteSessionByPath(sessionPath: string, sessionId?: string): void {
+    const tempDir = path.dirname(path.dirname(sessionPath));
+    const chatsDir = path.dirname(sessionPath);
+    const shortId = this.deriveShortId(
+      sessionId ?? path.basename(sessionPath, '.json'),
+    );
+
+    this.deleteMatchingSessionFiles(chatsDir, tempDir, shortId);
   }
 
   /**
@@ -638,6 +651,24 @@ export class ChatRecordingService {
     }
 
     return shortId;
+  }
+
+  /**
+   * Deletes every session file and artifact that matches the provided shortId.
+   */
+  private deleteMatchingSessionFiles(
+    chatsDir: string,
+    tempDir: string,
+    shortId: string,
+  ): void {
+    if (!fs.existsSync(chatsDir)) {
+      return;
+    }
+
+    const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
+    for (const file of matchingFiles) {
+      this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+    }
   }
 
   /**

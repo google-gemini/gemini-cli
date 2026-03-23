@@ -69,9 +69,7 @@ export const DefaultAppLayout: React.FC = () => {
         <Notifications />
         <CopyModeWarning />
 
-        {uiState.customDialog ? (
-          uiState.customDialog
-        ) : uiState.dialogsVisible ? (
+        {uiState.dialogsVisible ? (
           <DialogManager
             terminalWidth={uiState.terminalWidth}
             addItem={uiState.historyManager.addItem}

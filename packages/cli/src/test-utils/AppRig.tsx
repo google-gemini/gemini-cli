@@ -99,6 +99,20 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
   return {
     ...original,
+    createCache:
+      original.createCache ??
+      ((<K, V>() => {
+        const cache = new Map<K, V>();
+        return {
+          clear: () => cache.clear(),
+          getOrCreate: (key: K, factory: () => V) => {
+            if (!cache.has(key)) {
+              cache.set(key, factory());
+            }
+            return cache.get(key)!;
+          },
+        };
+      }) as typeof original.createCache),
     ShellExecutionService: MockService,
   };
 });

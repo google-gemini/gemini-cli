@@ -226,6 +226,7 @@ export type HistoryItemModel = HistoryItemBase & {
 export type HistoryItemQuit = HistoryItemBase & {
   type: 'quit';
   duration: string;
+  sessionId?: string;
 };
 
 export type HistoryItemToolGroup = HistoryItemBase & {
@@ -493,6 +494,15 @@ export type SlashCommandProcessorResult =
 export interface ConfirmationRequest {
   prompt: ReactNode;
   onConfirm: (confirm: boolean) => void;
+}
+
+export interface ResumeContextSwitchConfirmationRequest {
+  prompt: ReactNode;
+  onConfirm: () => void;
+  onDecline: () => void;
+  exitOnDecline?: boolean;
+  declineExitMessage?: ReactNode;
+  exitCode?: number;
 }
 
 export interface LoopDetectionConfirmationRequest {

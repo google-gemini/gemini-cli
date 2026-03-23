@@ -125,6 +125,7 @@ const createSession = (overrides: Partial<SessionInfo>): SessionInfo => ({
   id: 'session-id',
   file: 'session-id',
   fileName: 'session-id.json',
+  sessionPath: '/tmp/test/chats/session-id.json',
   startTime: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
   messageCount: 1,

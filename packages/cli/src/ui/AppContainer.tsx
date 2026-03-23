@@ -36,6 +36,7 @@ import {
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
   type QuotaStats,
+  type ResumeContextSwitchConfirmationRequest,
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
@@ -77,6 +78,8 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
+  escapeShellArg,
+  getShellConfiguration,
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
@@ -251,6 +254,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const [customDialog, setCustomDialog] = useState<React.ReactNode | null>(
     null,
   );
+  const [
+    resumeContextSwitchConfirmationRequest,
+    setResumeContextSwitchConfirmationRequest,
+  ] = useState<ResumeContextSwitchConfirmationRequest | null>(null);
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
   const toggleBackgroundShellRef = useRef<() => void>(() => {});
@@ -273,6 +280,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
     QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
+  const canResumeOnStartupRef = useRef(true);
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
@@ -725,6 +733,46 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
+  const confirmResumeContextSwitch = useCallback(
+    async ({
+      source,
+      sessionId,
+      currentProjectPath,
+      originProjectPath,
+    }: {
+      source: 'startup' | 'browser';
+      sessionId: string;
+      currentProjectPath: string;
+      originProjectPath: string;
+    }) =>
+      new Promise<boolean>((resolve) => {
+        const { shell } = getShellConfiguration();
+        const rerunCommand = `cd ${escapeShellArg(originProjectPath, shell)}\ngemini --resume ${escapeShellArg(sessionId, shell)}`;
+        const prompt =
+          source === 'startup'
+            ? `Session ${sessionId} was created in:\n\n${originProjectPath}\n\nYou are currently in:\n\n${currentProjectPath}\n\nDo you want to resume it here instead? Choose "No" to exit and rerun from the original folder:\n\n${rerunCommand}`
+            : `Session ${sessionId} was created in:\n\n${originProjectPath}\n\nYou are currently in:\n\n${currentProjectPath}\n\nDo you want to resume it here instead?`;
+
+        setResumeContextSwitchConfirmationRequest({
+          prompt,
+          onConfirm: () => {
+            setResumeContextSwitchConfirmationRequest(null);
+            resolve(true);
+          },
+          onDecline: () => {
+            if (source !== 'startup') {
+              setResumeContextSwitchConfirmationRequest(null);
+            }
+            resolve(false);
+          },
+          exitOnDecline: source === 'startup',
+          declineExitMessage:
+            'Session resume was canceled. Exiting so you can switch to the original folder and rerun the resume command.',
+          exitCode: 0,
+        });
+      }),
+    [],
+  );
 
   const { loadHistoryForResume, isResuming } = useSessionResume({
     config,
@@ -734,6 +782,8 @@ export const AppContainer = (props: AppContainerProps) => {
     setQuittingMessages,
     resumedSessionData,
     isAuthenticating,
+    canResumeOnStartup: () => canResumeOnStartupRef.current,
+    confirmResumeContextSwitch,
   });
   const {
     isSessionBrowserOpen,
@@ -1456,31 +1506,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const geminiClient = config.getGeminiClient();
 
   useEffect(() => {
-    if (
-      initialPrompt &&
-      isConfigInitialized &&
-      !initialPromptSubmitted.current &&
-      !isAuthenticating &&
-      !isAuthDialogOpen &&
-      !isThemeDialogOpen &&
-      !isEditorDialogOpen &&
-      !showPrivacyNotice &&
-      geminiClient?.isInitialized?.()
-    ) {
-      void handleFinalSubmit(initialPrompt);
-      initialPromptSubmitted.current = true;
+    if (activePtyId) {
+      try {
+        ShellExecutionService.resizePty(
+          activePtyId,
+          Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
+          Math.max(
+            Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+            1,
+          ),
+        );
+      } catch (e) {
+        // This can happen in a race condition where the pty exits
+        // right before we try to resize it.
+        if (
+          !(
+            e instanceof Error &&
+            e.message.includes('Cannot resize a pty that has already exited')
+          )
+        ) {
+          throw e;
+        }
+      }
     }
-  }, [
-    initialPrompt,
-    isConfigInitialized,
-    handleFinalSubmit,
-    isAuthenticating,
-    isAuthDialogOpen,
-    isThemeDialogOpen,
-    isEditorDialogOpen,
-    showPrivacyNotice,
-    geminiClient,
-  ]);
+  }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const [currentIDE, setCurrentIDE] = useState<IdeInfo | null>(null);
@@ -1991,10 +2040,74 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [historyManager]);
 
   const nightly = props.version.includes('nightly');
+  const hasPendingIncludeDirectories =
+    config.getPendingIncludeDirectories().length > 0;
+  const hasStartupBlockingDialog =
+    adminSettingsChanged ||
+    showIdeRestartPrompt ||
+    !!proQuotaRequest ||
+    !!validationRequest ||
+    isPolicyUpdateDialogOpen ||
+    isFolderTrustDialogOpen ||
+    !!resumeContextSwitchConfirmationRequest ||
+    isAuthenticating ||
+    authState === AuthState.AwaitingApiKeyInput ||
+    isAuthDialogOpen ||
+    showPrivacyNotice;
+  const visibleShouldShowIdePrompt =
+    !initialPrompt &&
+    !isResuming &&
+    !hasStartupBlockingDialog &&
+    shouldShowIdePrompt;
+  const visibleNewAgents =
+    !initialPrompt && !isResuming && !hasStartupBlockingDialog
+      ? newAgents
+      : null;
+
+  canResumeOnStartupRef.current = !hasStartupBlockingDialog;
+
+  const hasConfirmUpdateExtensionRequests =
+    confirmUpdateExtensionRequests.length > 0;
+  const hasLoopDetectionConfirmationRequest =
+    !!loopDetectionConfirmationRequest;
+  const hasBlockingUiForInitialPrompt =
+    hasStartupBlockingDialog ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
+    !!permissionConfirmationRequest ||
+    !!customDialog ||
+    hasConfirmUpdateExtensionRequests ||
+    hasLoopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isModelDialogOpen ||
+    isAgentConfigDialogOpen ||
+    isPermissionsDialogOpen ||
+    isEditorDialogOpen ||
+    isSessionBrowserOpen ||
+    hasPendingIncludeDirectories;
+
+  useEffect(() => {
+    if (
+      initialPrompt &&
+      isConfigInitialized &&
+      !initialPromptSubmitted.current &&
+      !hasBlockingUiForInitialPrompt &&
+      geminiClient?.isInitialized?.()
+    ) {
+      void handleFinalSubmit(initialPrompt);
+      initialPromptSubmitted.current = true;
+    }
+  }, [
+    initialPrompt,
+    isConfigInitialized,
+    handleFinalSubmit,
+    hasBlockingUiForInitialPrompt,
+    geminiClient,
+  ]);
 
   const dialogsVisible =
-    shouldShowIdePrompt ||
-    shouldShowIdePrompt ||
+    visibleShouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     isPolicyUpdateDialogOpen ||
     adminSettingsChanged ||
@@ -2002,6 +2115,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!authConsentRequest ||
     !!permissionConfirmationRequest ||
     !!customDialog ||
+    !!resumeContextSwitchConfirmationRequest ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
@@ -2020,7 +2134,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
-    !!newAgents;
+    !!visibleNewAgents;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -2032,15 +2146,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [pendingHistoryItems],
   );
 
-  const hasConfirmUpdateExtensionRequests =
-    confirmUpdateExtensionRequests.length > 0;
-  const hasLoopDetectionConfirmationRequest =
-    !!loopDetectionConfirmationRequest;
-
   const hasPendingActionRequired =
     hasPendingToolConfirmation ||
     !!commandConfirmationRequest ||
     !!authConsentRequest ||
+    !!resumeContextSwitchConfirmationRequest ||
     hasConfirmUpdateExtensionRequests ||
     hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
@@ -2215,11 +2325,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       suggestionsWidth,
       isInputActive,
       isResuming,
-      shouldShowIdePrompt,
+      shouldShowIdePrompt: visibleShouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
       folderDiscoveryResults,
       isPolicyUpdateDialogOpen,
       policyUpdateConfirmationRequest,
+      resumeContextSwitchConfirmationRequest,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -2288,7 +2399,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShellHeight,
       isBackgroundShellListOpen,
       adminSettingsChanged,
-      newAgents,
+      newAgents: visibleNewAgents,
       showIsExpandableHint,
       hintMode:
         config.isModelSteeringEnabled() &&
@@ -2342,11 +2453,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       suggestionsWidth,
       isInputActive,
       isResuming,
-      shouldShowIdePrompt,
+      visibleShouldShowIdePrompt,
       isFolderTrustDialogOpen,
       folderDiscoveryResults,
       isPolicyUpdateDialogOpen,
       policyUpdateConfirmationRequest,
+      resumeContextSwitchConfirmationRequest,
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
@@ -2415,7 +2527,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeBackgroundShellPid,
       backgroundShells,
       adminSettingsChanged,
-      newAgents,
+      visibleNewAgents,
       showIsExpandableHint,
     ],
   );

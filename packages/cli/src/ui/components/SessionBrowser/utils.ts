@@ -111,6 +111,8 @@ export const filterSessions = (
     const titleMatch =
       session.displayName.toLowerCase().includes(lowerQuery) ||
       session.id.toLowerCase().includes(lowerQuery) ||
+      session.originProjectPath?.toLowerCase().includes(lowerQuery) ||
+      session.projectSlug?.toLowerCase().includes(lowerQuery) ||
       session.firstUserMessage.toLowerCase().includes(lowerQuery);
 
     const contentMatch = session.fullContent

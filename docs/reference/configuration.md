@@ -2176,18 +2176,25 @@ for that specific session.
   - Lists all available extensions and exits.
 - **`--resume [session_id]`** (**`-r [session_id]`**):
   - Resume a previous chat session. Use "latest" for the most recent session,
-    provide a session index number, or provide a full session UUID.
+    provide a session index number from `--list-sessions`, or provide a full
+    session UUID.
   - If no session_id is provided, defaults to "latest".
+  - Session discovery is global, so you can resume a session from any folder.
+  - If the current folder does not match the session's original folder,
+    interactive mode asks for confirmation before resuming there. In
+    non-interactive mode, the CLI exits with guidance to rerun from the original
+    folder instead.
   - Example: `gemini --resume 5` or `gemini --resume latest` or
     `gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890` or `gemini --resume`
   - See [Session Management](../cli/session-management.md) for more details.
 - **`--list-sessions`**:
-  - List all available chat sessions for the current project and exit.
+  - List all available chat sessions across all folders and exit.
   - Shows session indices, dates, message counts, and preview of first user
-    message.
+    message, along with each session's original folder path when available.
   - Example: `gemini --list-sessions`
 - **`--delete-session <identifier>`**:
-  - Delete a specific chat session by its index number or full session UUID.
+  - Delete a specific chat session globally by its index number or full session
+    UUID.
   - Use `--list-sessions` first to see available sessions, their indices, and
     UUIDs.
   - Example: `gemini --delete-session 3` or

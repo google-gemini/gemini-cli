@@ -12,8 +12,7 @@ import {
   convertSessionToHistoryFormats,
 } from './useSessionBrowser.js';
 import * as fs from 'node:fs/promises';
-import path from 'node:path';
-import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
+import { type SessionInfo } from '../../utils/sessionUtils.js';
 import {
   type Config,
   type ConversationRecord,
@@ -42,6 +41,20 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    createCache:
+      actual.createCache ??
+      ((<K, V>() => {
+        const cache = new Map<K, V>();
+        return {
+          clear: () => cache.clear(),
+          getOrCreate: (key: K, factory: () => V) => {
+            if (!cache.has(key)) {
+              cache.set(key, factory());
+            }
+            return cache.get(key)!;
+          },
+        };
+      }) as typeof actual.createCache),
     uiTelemetryService: {
       clear: vi.fn(),
       hydrate: vi.fn(),
@@ -49,45 +62,36 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
-const MOCKED_CHATS_DIR = '/test/project/temp/chats';
 const MOCKED_SESSION_ID = 'test-session-123';
 const MOCKED_CURRENT_SESSION_ID = 'current-session-id';
+const MOCKED_SESSION_PATH =
+  '/test/project/temp/chats/session-2025-01-01-test-session-123.json';
 
 describe('useSessionBrowser', () => {
   const mockedFs = vi.mocked(fs);
-  const mockedPath = vi.mocked(path);
-  const mockedGetSessionFiles = vi.mocked(getSessionFiles);
 
   const mockConfig = {
-    storage: {
-      getProjectTempDir: vi.fn(),
-    },
     setSessionId: vi.fn(),
     getSessionId: vi.fn(),
     getGeminiClient: vi.fn().mockReturnValue({
       getChatRecordingService: vi.fn().mockReturnValue({
-        deleteSession: vi.fn(),
+        deleteSessionByPath: vi.fn(),
       }),
     }),
   } as unknown as Config;
 
-  const mockOnLoadHistory = vi.fn();
+  const mockOnLoadHistory = vi.fn().mockResolvedValue(true);
 
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
-    mockedPath.join.mockImplementation((...args) => args.join('/'));
-    vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
-      MOCKED_PROJECT_TEMP_DIR,
-    );
     vi.mocked(mockConfig.getSessionId).mockReturnValue(
       MOCKED_CURRENT_SESSION_ID,
     );
+    mockOnLoadHistory.mockResolvedValue(true);
   });
 
   it('should successfully resume a session', async () => {
-    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.json';
     const mockConversation: ConversationRecord = {
       sessionId: 'existing-session-456',
       messages: [{ type: 'user', content: 'Hello' } as MessageRecord],
@@ -95,9 +99,8 @@ describe('useSessionBrowser', () => {
 
     const mockSession = {
       id: MOCKED_SESSION_ID,
-      fileName: MOCKED_FILENAME,
+      sessionPath: MOCKED_SESSION_PATH,
     } as SessionInfo;
-    mockedGetSessionFiles.mockResolvedValue([mockSession]);
     mockedFs.readFile.mockResolvedValue(JSON.stringify(mockConversation));
 
     const { result } = await renderHook(() =>
@@ -107,10 +110,7 @@ describe('useSessionBrowser', () => {
     await act(async () => {
       await result.current.handleResumeSession(mockSession);
     });
-    expect(mockedFs.readFile).toHaveBeenCalledWith(
-      `${MOCKED_CHATS_DIR}/${MOCKED_FILENAME}`,
-      'utf8',
-    );
+    expect(mockedFs.readFile).toHaveBeenCalledWith(MOCKED_SESSION_PATH, 'utf8');
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
       'existing-session-456',
     );
@@ -120,10 +120,9 @@ describe('useSessionBrowser', () => {
   });
 
   it('should handle file read error', async () => {
-    const MOCKED_FILENAME = 'session-2025-01-01-test-session-123.json';
     const mockSession = {
       id: MOCKED_SESSION_ID,
-      fileName: MOCKED_FILENAME,
+      sessionPath: MOCKED_SESSION_PATH,
     } as SessionInfo;
     mockedFs.readFile.mockRejectedValue(new Error('File not found'));
 
@@ -144,10 +143,9 @@ describe('useSessionBrowser', () => {
   });
 
   it('should handle JSON parse error', async () => {
-    const MOCKED_FILENAME = 'invalid.json';
     const mockSession = {
       id: MOCKED_SESSION_ID,
-      fileName: MOCKED_FILENAME,
+      sessionPath: MOCKED_SESSION_PATH,
     } as SessionInfo;
     mockedFs.readFile.mockResolvedValue('invalid json');
 

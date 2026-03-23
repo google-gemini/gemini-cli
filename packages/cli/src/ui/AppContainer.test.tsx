@@ -65,6 +65,20 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    createCache:
+      actual.createCache ??
+      ((<K, V>() => {
+        const cache = new Map<K, V>();
+        return {
+          clear: () => cache.clear(),
+          getOrCreate: (key: K, factory: () => V) => {
+            if (!cache.has(key)) {
+              cache.set(key, factory());
+            }
+            return cache.get(key)!;
+          },
+        };
+      }) as typeof actual.createCache),
     coreEvents: mockCoreEvents,
     IdeClient: mockIdeClient,
     writeToStdout: vi.fn((...args) =>

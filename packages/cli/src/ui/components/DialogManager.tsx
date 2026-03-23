@@ -37,6 +37,7 @@ import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
+import { ResumeContextSwitchDialog } from './ResumeContextSwitchDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -65,14 +66,6 @@ export const DialogManager = ({
   }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
-  }
-  if (uiState.newAgents) {
-    return (
-      <NewAgentsNotification
-        agents={uiState.newAgents}
-        onSelect={uiActions.handleNewAgentsSelect}
-      />
-    );
   }
   if (uiState.quota.proQuotaRequest) {
     return (
@@ -126,11 +119,12 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.shouldShowIdePrompt) {
+  if (uiState.isPolicyUpdateDialogOpen) {
     return (
-      <IdeIntegrationNudge
-        ide={uiState.currentIDE!}
-        onComplete={uiActions.handleIdePromptComplete}
+      <PolicyUpdateDialog
+        config={config}
+        request={uiState.policyUpdateConfirmationRequest!}
+        onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
       />
     );
   }
@@ -143,12 +137,44 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.isPolicyUpdateDialogOpen) {
+  if (uiState.resumeContextSwitchConfirmationRequest) {
     return (
-      <PolicyUpdateDialog
+      <ResumeContextSwitchDialog
+        prompt={uiState.resumeContextSwitchConfirmationRequest.prompt}
+        onConfirm={uiState.resumeContextSwitchConfirmationRequest.onConfirm}
+        onDecline={uiState.resumeContextSwitchConfirmationRequest.onDecline}
+        exitOnDecline={
+          uiState.resumeContextSwitchConfirmationRequest.exitOnDecline
+        }
+        declineExitMessage={
+          uiState.resumeContextSwitchConfirmationRequest.declineExitMessage
+        }
+        exitCode={uiState.resumeContextSwitchConfirmationRequest.exitCode}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.showPrivacyNotice) {
+    return (
+      <PrivacyNotice
+        onExit={() => uiActions.exitPrivacyNotice()}
         config={config}
-        request={uiState.policyUpdateConfirmationRequest!}
-        onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
+      />
+    );
+  }
+  if (uiState.shouldShowIdePrompt) {
+    return (
+      <IdeIntegrationNudge
+        ide={uiState.currentIDE!}
+        onComplete={uiActions.handleIdePromptComplete}
+      />
+    );
+  }
+  if (uiState.newAgents) {
+    return (
+      <NewAgentsNotification
+        agents={uiState.newAgents}
+        onSelect={uiActions.handleNewAgentsSelect}
       />
     );
   }
@@ -334,14 +360,6 @@ export const DialogManager = ({
       </Box>
     );
   }
-  if (uiState.showPrivacyNotice) {
-    return (
-      <PrivacyNotice
-        onExit={() => uiActions.exitPrivacyNotice()}
-        config={config}
-      />
-    );
-  }
   if (uiState.isSessionBrowserOpen) {
     return (
       <SessionBrowser
@@ -361,6 +379,9 @@ export const DialogManager = ({
         targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
       />
     );
+  }
+  if (uiState.customDialog) {
+    return uiState.customDialog;
   }
 
   return null;
