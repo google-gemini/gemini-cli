@@ -213,16 +213,14 @@ export async function main() {
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
+  // This must be awaited before any other async tasks that depend on CWD (like loadCliConfig)
+  // because setupWorktree calls process.chdir().
   const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
-  let worktreeInfoPromise: Promise<WorktreeInfo | undefined> =
-    Promise.resolve(undefined);
+  let worktreeInfo: WorktreeInfo | undefined;
   if (requestedWorktree !== undefined) {
     const worktreeHandle = startupProfiler.start('setup_worktree');
-    worktreeInfoPromise = setupWorktree(requestedWorktree || undefined).finally(
-      () => {
-        worktreeHandle?.end();
-      },
-    );
+    worktreeInfo = await setupWorktree(requestedWorktree || undefined);
+    worktreeHandle?.end();
   }
 
   const cleanupOpsHandle = startupProfiler.start('cleanup_ops');
@@ -450,7 +448,6 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    const worktreeInfo = await worktreeInfoPromise;
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
