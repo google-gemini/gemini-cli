@@ -96,6 +96,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
@@ -229,6 +230,19 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain('- **User Hints:**');
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).toContain('# Final Reminder');
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should include the TASK MANAGEMENT PROTOCOL in legacy prompt when task tracker is enabled', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    );
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(
+      '**PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the `tracker_create_task` tool',
+    );
     expect(prompt).toMatchSnapshot();
   });
 
@@ -410,6 +424,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
         isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+        isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
         isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),

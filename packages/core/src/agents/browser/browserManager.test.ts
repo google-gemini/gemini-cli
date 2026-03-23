@@ -9,6 +9,7 @@ import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { coreEvents } from '../../utils/events.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -39,16 +40,37 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
     log: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock browser consent to always grant consent by default
+vi.mock('../../utils/browserConsent.js', () => ({
+  getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn((p: string) => {
+      if (p.endsWith('bundled/chrome-devtools-mcp.mjs')) {
+        return false; // Default
+      }
+      return actual.existsSync(p);
+    }),
+  };
+});
+
+import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 
 describe('BrowserManager', () => {
   let mockConfig: Config;
@@ -56,6 +78,10 @@ describe('BrowserManager', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(injectAutomationOverlay).mockClear();
+    vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
+
+    // Re-establish consent mock after resetAllMocks
+    vi.mocked(getBrowserConsentIfNeeded).mockResolvedValue(true);
 
     // Setup mock config
     mockConfig = makeFakeConfig({
@@ -94,6 +120,40 @@ describe('BrowserManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('MCP bundled path resolution', () => {
+    it('should use bundled path if it exists (handles bundled CLI)', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'node',
+          args: expect.arrayContaining([
+            expect.stringMatching(/bundled\/chrome-devtools-mcp\.mjs$/),
+          ]),
+        }),
+      );
+    });
+
+    it('should fall back to development path if bundled path does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'node',
+          args: expect.arrayContaining([
+            expect.stringMatching(
+              /(dist\/)?bundled\/chrome-devtools-mcp\.mjs$/,
+            ),
+          ]),
+        }),
+      );
+    });
   });
 
   describe('getRawMcpClient', () => {
@@ -222,10 +282,9 @@ describe('BrowserManager', () => {
       // Verify StdioClientTransport was created with correct args
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining([
-            '-y',
-            expect.stringMatching(/chrome-devtools-mcp@/),
+            expect.stringMatching(/chrome-devtools-mcp\.mjs$/),
             '--experimental-vision',
           ]),
         }),
@@ -235,6 +294,7 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).not.toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
+      expect(args).not.toContain('-y');
       // Persistent mode should set the default --userDataDir under ~/.gemini
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
@@ -294,7 +354,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining(['--headless']),
         }),
       );
@@ -319,7 +379,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
         }),
       );
@@ -369,6 +429,11 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).toContain('--autoConnect');
       expect(args).not.toContain('--isolated');
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('saved logins will be visible'),
+      );
     });
 
     it('should throw actionable error when existing mode connection fails', async () => {
@@ -477,6 +542,41 @@ describe('BrowserManager', () => {
       await expect(manager.ensureConnection()).rejects.toThrow(
         /sessionMode: persistent/,
       );
+    });
+
+    it('should pass --no-usage-statistics and --no-performance-crux when privacy is disabled', async () => {
+      const privacyDisabledConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+          },
+        },
+        usageStatisticsEnabled: false,
+      });
+
+      const manager = new BrowserManager(privacyDisabledConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--no-usage-statistics');
+      expect(args).toContain('--no-performance-crux');
+    });
+
+    it('should NOT pass privacy flags when usage statistics are enabled', async () => {
+      // Default config has usageStatisticsEnabled: true (or undefined)
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).not.toContain('--no-usage-statistics');
+      expect(args).not.toContain('--no-performance-crux');
     });
   });
 

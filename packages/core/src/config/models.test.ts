@@ -27,6 +27,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isActiveModel,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
@@ -58,6 +59,94 @@ describe('Dynamic Configuration Parity', () => {
     DEFAULT_GEMINI_MODEL,
     'custom-model',
   ];
+
+  const flagCombos = [
+    { useGemini3_1: false, useCustomToolModel: false },
+    { useGemini3_1: true, useCustomToolModel: false },
+    { useGemini3_1: true, useCustomToolModel: true },
+  ];
+
+  it('resolveModel should match legacy behavior when dynamicModelConfiguration flag enabled.', () => {
+    for (const model of modelsToTest) {
+      for (const flags of flagCombos) {
+        for (const hasAccess of [true, false]) {
+          const mockLegacyConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-misused-spread
+            ...legacyConfig,
+            getHasAccessToPreviewModel: () => hasAccess,
+          } as unknown as Config;
+          const mockDynamicConfig = {
+            // eslint-disable-next-line @typescript-eslint/no-misused-spread
+            ...dynamicConfig,
+            getHasAccessToPreviewModel: () => hasAccess,
+          } as unknown as Config;
+
+          const legacy = resolveModel(
+            model,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockLegacyConfig,
+          );
+          const dynamic = resolveModel(
+            model,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockDynamicConfig,
+          );
+          expect(dynamic).toBe(legacy);
+        }
+      }
+    }
+  });
+
+  it('resolveClassifierModel should match legacy behavior.', () => {
+    const classifierTiers = [GEMINI_MODEL_ALIAS_PRO, GEMINI_MODEL_ALIAS_FLASH];
+    const anchorModels = [
+      PREVIEW_GEMINI_MODEL_AUTO,
+      DEFAULT_GEMINI_MODEL_AUTO,
+      PREVIEW_GEMINI_MODEL,
+      DEFAULT_GEMINI_MODEL,
+    ];
+
+    for (const hasAccess of [true, false]) {
+      const mockLegacyConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        ...legacyConfig,
+        getHasAccessToPreviewModel: () => hasAccess,
+      } as unknown as Config;
+      const mockDynamicConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        ...dynamicConfig,
+        getHasAccessToPreviewModel: () => hasAccess,
+      } as unknown as Config;
+
+      for (const tier of classifierTiers) {
+        for (const anchor of anchorModels) {
+          for (const flags of flagCombos) {
+            const legacy = resolveClassifierModel(
+              anchor,
+              tier,
+              flags.useGemini3_1,
+              flags.useCustomToolModel,
+              hasAccess,
+              mockLegacyConfig,
+            );
+            const dynamic = resolveClassifierModel(
+              anchor,
+              tier,
+              flags.useGemini3_1,
+              flags.useCustomToolModel,
+              hasAccess,
+              mockDynamicConfig,
+            );
+            expect(dynamic).toBe(legacy);
+          }
+        }
+      }
+    }
+  });
 
   it('getDisplayString should match legacy behavior', () => {
     for (const model of modelsToTest) {
@@ -101,14 +190,6 @@ describe('Dynamic Configuration Parity', () => {
     for (const model of modelsToTest) {
       const legacy = isCustomModel(model, legacyConfig);
       const dynamic = isCustomModel(model, dynamicConfig);
-      expect(dynamic).toBe(legacy);
-    }
-  });
-
-  it('supportsModernFeatures should match legacy behavior', () => {
-    for (const model of modelsToTest) {
-      const legacy = supportsModernFeatures(model);
-      const dynamic = supportsModernFeatures(model);
       expect(dynamic).toBe(legacy);
     }
   });
@@ -245,6 +326,12 @@ describe('getDisplayString', () => {
     );
   });
 
+  it('should return PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL for PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL', () => {
+    expect(getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(
+      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+    );
+  });
+
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
@@ -319,6 +406,12 @@ describe('resolveModel', () => {
       expect(
         resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
       ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should return default flash lite model when access to preview is false and preview flash lite model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     });
 
     it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
@@ -439,6 +532,7 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
   });
 
   it('should return true for unknown models and aliases', () => {
@@ -452,6 +546,7 @@ describe('isActiveModel', () => {
 
   it('should return true for other valid models when useGemini3_1 is true', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL, true)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, true)).toBe(true);
   });
 
   it('should correctly filter Gemini 3.1 models based on useCustomToolModel when useGemini3_1 is true', () => {

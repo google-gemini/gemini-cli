@@ -52,7 +52,7 @@ You tell Gemini about new servers by editing your `settings.json`.
         "--rm",
         "-e",
         "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/modelcontextprotocol/servers/github:latest"
+        "ghcr.io/github/github-mcp-server:latest"
       ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
@@ -62,8 +62,10 @@ You tell Gemini about new servers by editing your `settings.json`.
 }
 ```
 
-> **Note:** The `command` is `docker`, and the rest are arguments passed to it.
-> We map the local environment variable into the container so your secret isn't
+<!-- prettier-ignore -->
+> [!NOTE]
+> The `command` is `docker`, and the rest are arguments passed to it. We
+> map the local environment variable into the container so your secret isn't
 > hardcoded in the config file.
 
 ## How to verify the connection

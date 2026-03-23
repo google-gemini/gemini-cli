@@ -5,20 +5,18 @@
  */
 
 import {
+  type ToolConfirmationOutcome,
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
-  type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
@@ -40,7 +38,7 @@ import { LRUCache } from 'mnemonist';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
-const MAX_CONTENT_LENGTH = 100000;
+const MAX_CONTENT_LENGTH = 250000;
 const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
 const USER_AGENT =
   'Mozilla/5.0 (compatible; Google-Gemini-CLI/1.0; +https://github.com/google-gemini/gemini-cli)';
@@ -191,6 +189,18 @@ function isGroundingSupportItem(item: unknown): item is GroundingSupportItem {
 }
 
 /**
+ * Sanitizes text for safe embedding in XML tags.
+ */
+function sanitizeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
  * Parameters for the WebFetch tool
  */
 export interface WebFetchToolParams {
@@ -219,7 +229,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      true,
+      () => this.context.config.getApprovalMode(),
+    );
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
@@ -263,69 +282,65 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   private async executeFallbackForUrl(
     urlStr: string,
     signal: AbortSignal,
-    contentBudget: number,
   ): Promise<string> {
     const url = convertGithubUrlToRaw(urlStr);
     if (this.isBlockedHost(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
-      return `Error fetching ${url}: Access to blocked or private host is not allowed.`;
+      throw new Error(
+        `Access to blocked or private host ${url} is not allowed.`,
+      );
     }
 
-    try {
-      const response = await retryWithBackoff(
-        async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              'User-Agent': USER_AGENT,
-            },
-          });
-          if (!res.ok) {
-            const error = new Error(
-              `Request failed with status code ${res.status} ${res.statusText}`,
-            );
-            (error as ErrorWithStatus).status = res.status;
-            throw error;
-          }
-          return res;
-        },
-        {
-          retryFetchErrors: this.context.config.getRetryFetchErrors(),
-          onRetry: (attempt, error, delayMs) =>
-            this.handleRetry(attempt, error, delayMs),
+    const response = await retryWithBackoff(
+      async () => {
+        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
           signal,
-        },
-      );
-
-      const bodyBuffer = await this.readResponseWithLimit(
-        response,
-        MAX_EXPERIMENTAL_FETCH_SIZE,
-      );
-      const rawContent = bodyBuffer.toString('utf8');
-      const contentType = response.headers.get('content-type') || '';
-      let textContent: string;
-
-      // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
-      if (
-        contentType.toLowerCase().includes('text/html') ||
-        contentType === ''
-      ) {
-        textContent = convert(rawContent, {
-          wordwrap: false,
-          selectors: [
-            { selector: 'a', options: { ignoreHref: true } },
-            { selector: 'img', format: 'skip' },
-          ],
+          headers: {
+            'User-Agent': USER_AGENT,
+          },
         });
-      } else {
-        // For other content types (text/plain, application/json, etc.), use raw text
-        textContent = rawContent;
-      }
+        if (!res.ok) {
+          const error = new Error(
+            `Request failed with status code ${res.status} ${res.statusText}`,
+          );
+          (error as ErrorWithStatus).status = res.status;
+          throw error;
+        }
+        return res;
+      },
+      {
+        retryFetchErrors: this.context.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) =>
+          this.handleRetry(attempt, error, delayMs),
+        signal,
+      },
+    );
 
-      return truncateString(textContent, contentBudget, TRUNCATION_WARNING);
-    } catch (e) {
-      return `Error fetching ${url}: ${getErrorMessage(e)}`;
+    const bodyBuffer = await this.readResponseWithLimit(
+      response,
+      MAX_EXPERIMENTAL_FETCH_SIZE,
+    );
+    const rawContent = bodyBuffer.toString('utf8');
+    const contentType = response.headers.get('content-type') || '';
+    let textContent: string;
+
+    // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
+    if (contentType.toLowerCase().includes('text/html') || contentType === '') {
+      textContent = convert(rawContent, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
+    } else {
+      // For other content types (text/plain, application/json, etc.), use raw text
+      textContent = rawContent;
     }
+
+    // Cap at MAX_CONTENT_LENGTH initially to avoid excessive memory usage
+    // before the global budget allocation.
+    return truncateString(textContent, MAX_CONTENT_LENGTH, '');
   }
 
   private filterAndValidateUrls(urls: string[]): {
@@ -363,30 +378,82 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<ToolResult> {
     const uniqueUrls = [...new Set(urls)];
-    const contentBudget = Math.floor(
-      MAX_CONTENT_LENGTH / (uniqueUrls.length || 1),
-    );
-    const results: string[] = [];
+    const successes: Array<{ url: string; content: string }> = [];
+    const errors: Array<{ url: string; message: string }> = [];
 
     for (const url of uniqueUrls) {
-      results.push(
-        await this.executeFallbackForUrl(url, signal, contentBudget),
-      );
+      try {
+        const content = await this.executeFallbackForUrl(url, signal);
+        successes.push({ url, content });
+      } catch (e) {
+        errors.push({ url, message: getErrorMessage(e) });
+      }
     }
 
-    const aggregatedContent = results
-      .map((content, i) => `URL: ${uniqueUrls[i]}\nContent:\n${content}`)
-      .join('\n\n---\n\n');
+    // Change 2: Short-circuit on total failure
+    if (successes.length === 0) {
+      const errorMessage = `All fallback fetch attempts failed: ${errors
+        .map((e) => `${e.url}: ${e.message}`)
+        .join(', ')}`;
+      debugLogger.error(`[WebFetchTool] ${errorMessage}`);
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
+      };
+    }
+
+    // Smart Budget Allocation (Water-filling algorithm) for successes
+    const sortedSuccesses = [...successes].sort(
+      (a, b) => a.content.length - b.content.length,
+    );
+
+    let remainingBudget = MAX_CONTENT_LENGTH;
+    let remainingUrls = sortedSuccesses.length;
+    const finalContentsByUrl = new Map<string, string>();
+
+    for (const success of sortedSuccesses) {
+      const fairShare = Math.floor(remainingBudget / remainingUrls);
+      const allocated = Math.min(success.content.length, fairShare);
+
+      const truncated = truncateString(
+        success.content,
+        allocated,
+        TRUNCATION_WARNING,
+      );
+
+      finalContentsByUrl.set(success.url, truncated);
+      remainingBudget -= truncated.length;
+      remainingUrls--;
+    }
+
+    const aggregatedContent = uniqueUrls
+      .map((url) => {
+        const content = finalContentsByUrl.get(url);
+        if (content !== undefined) {
+          return `<source url="${sanitizeXml(url)}">\n${sanitizeXml(content)}\n</source>`;
+        }
+        const error = errors.find((e) => e.url === url);
+        return `<source url="${sanitizeXml(url)}">\nError: ${sanitizeXml(error?.message || 'Unknown error')}\n</source>`;
+      })
+      .join('\n');
 
     try {
       const geminiClient = this.context.geminiClient;
-      const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
+      const fallbackPrompt = `Follow the user's instructions below using the provided webpage content.
+
+<user_instructions>
+${sanitizeXml(this.params.prompt ?? '')}
+</user_instructions>
 
 I was unable to access the URL(s) directly using the primary fetch tool. Instead, I have fetched the raw content of the page(s). Please use the following content to answer the request. Do not attempt to access the URL(s) again.
 
----
+<content>
 ${aggregatedContent}
----
+</content>
 `;
       const result = await geminiClient.generateContent(
         { model: 'web-fetch-fallback' },
@@ -441,27 +508,12 @@ ${aggregatedContent}
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (this.params.url) {
-      return {
-        argsPattern: buildParamArgsPattern('url', this.params.url),
-      };
-    } else if (this.params.prompt) {
-      return {
-        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
-      };
-    }
-    return undefined;
+    return {};
   }
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Check for AUTO_EDIT approval mode. This tool has a specific behavior
-    // where ProceedAlways switches the entire session to AUTO_EDIT.
-    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     let urls: string[] = [];
     let prompt = this.params.prompt || '';
 
@@ -716,9 +768,19 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
 
     try {
       const geminiClient = this.context.geminiClient;
+      const sanitizedPrompt = `Follow the user's instructions to process the authorized URLs.
+
+<user_instructions>
+${sanitizeXml(userPrompt)}
+</user_instructions>
+
+<authorized_urls>
+${toFetch.join('\n')}
+</authorized_urls>
+`;
       const response = await geminiClient.generateContent(
         { model: 'web-fetch' },
-        [{ role: 'user', parts: [{ text: userPrompt }] }],
+        [{ role: 'user', parts: [{ text: sanitizedPrompt }] }],
         signal,
         LlmRole.UTILITY_TOOL,
       );
@@ -870,7 +932,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
     return new WebFetchToolInvocation(
-      this.context.config,
+      this.context,
       params,
       messageBus,
       _toolName,

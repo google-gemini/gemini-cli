@@ -112,13 +112,27 @@ export class ToolExecutor {
             signal,
             tool,
             liveOutputCallback,
-            shellExecutionConfig,
-            setExecutionIdCallback,
+            { shellExecutionConfig, setExecutionIdCallback },
             this.config,
             request.originalRequestName,
+            true, // skipBeforeHook
           );
 
           const toolResult: ToolResult = await promise;
+
+          if (call.request.inputModifiedByHook) {
+            const modificationMsg = `\n\n[System] Tool input parameters were modified by a hook before execution.`;
+            if (typeof toolResult.llmContent === 'string') {
+              toolResult.llmContent += modificationMsg;
+            } else if (Array.isArray(toolResult.llmContent)) {
+              toolResult.llmContent.push({ text: modificationMsg });
+            } else if (toolResult.llmContent) {
+              toolResult.llmContent = [
+                toolResult.llmContent,
+                { text: modificationMsg },
+              ];
+            }
+          }
 
           if (signal.aborted) {
             completedToolCall = await this.createCancelledResult(
