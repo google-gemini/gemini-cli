@@ -10,7 +10,7 @@ on:
       test_filter:
         description: 'Test name pattern to run (passed to vitest -t)'
         required: false
-        default: 'should allow write_file only in the plans directory in plan mode'
+        default: 'Plan Mode'
         type: 'string'
       runs:
         description: 'The number of runs'
@@ -71,9 +71,9 @@ jobs:
         run: |
           # Construct the inner command
           if [[ "${IS_DOCKER}" == "true" ]]; then
-            INNER_CMD="npm run test:integration:sandbox:docker -- --retry=0"
+            INNER_CMD="npm run test:integration:sandbox:docker -- --retry=0 plan-mode.test.ts"
           else
-            INNER_CMD="npm run test:integration:sandbox:none -- --retry=0"
+            INNER_CMD="npm run test:integration:sandbox:none -- --retry=0 plan-mode.test.ts"
           fi
 
           # Append test filter if provided
@@ -120,7 +120,7 @@ jobs:
           TEST_FILTER: '${{ github.event.inputs.test_filter }}'
           VERBOSE: 'true'
         run: |
-          INNER_CMD="npm run test:integration:sandbox:none -- --retry=0"
+          INNER_CMD="npm run test:integration:sandbox:none -- --retry=0 plan-mode.test.ts"
           if [[ -n "${TEST_FILTER}" ]]; then
             INNER_CMD="${INNER_CMD} -t \"${TEST_FILTER}\""
           fi
@@ -183,7 +183,7 @@ jobs:
           TEST_FILTER: '${{ github.event.inputs.test_filter }}'
         shell: 'pwsh'
         run: |
-          $InnerCmd = "npm run test:integration:sandbox:none -- --retry=0"
+          $InnerCmd = "npm run test:integration:sandbox:none -- --retry=0 plan-mode.test.ts"
           if ($env:TEST_FILTER) {
             $InnerCmd = "$InnerCmd -t `"$env:TEST_FILTER`""
           }
