@@ -59,7 +59,6 @@ interactive = true
 toolName = "exit_plan_mode"
 decision = "allow"
 priority = 70
-modes = ["plan"]
 interactive = false
 
 [[rule]]
