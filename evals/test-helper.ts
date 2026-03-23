@@ -187,26 +187,22 @@ export async function prepareLogDir(name: string) {
  */
 export function symlinkNodeModules(testDir: string) {
   const rootNodeModules = path.resolve(process.cwd(), 'node_modules');
-  const testNodeModules = path.join(testDir, 'node_modules');
+  const testNodeModules = path.resolve(testDir, 'node_modules');
   if (
     testDir &&
     fs.existsSync(rootNodeModules) &&
     !fs.existsSync(testNodeModules)
   ) {
     try {
-      // Windows: 'dir' symlinks often require Developer Mode or admin. Junctions
-      // work without elevation when the target path is absolute (Node.js docs).
-      if (process.platform === 'win32') {
-        fs.symlinkSync(rootNodeModules, testNodeModules, 'junction');
-      }
-      else {
-        fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
-      }
+      // On Windows, directory symlinks require Developer Mode or elevation.
+      // Junctions work without either, but require an absolute target path.
+      const type = process.platform === 'win32' ? 'junction' : 'dir';
+      fs.symlinkSync(rootNodeModules, testNodeModules, type);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'EPERM' || code === 'EACCES') {
         console.warn(
-          `[evals] Could not link node_modules into test dir (${code}); continuing without symlink:`, err
+          `[evals] Could not link node_modules into test dir (${code}); continuing without symlink.`,
         );
         return;
       }
