@@ -538,19 +538,6 @@ export async function runNonInteractive({
             streamEnded = true;
             break;
           }
-          case 'custom': {
-            if (event.kind === 'loop_detected') {
-              if (streamFormatter) {
-                streamFormatter.emitEvent({
-                  type: JsonStreamEventType.ERROR,
-                  timestamp: new Date().toISOString(),
-                  severity: 'warning',
-                  message: 'Loop detected, stopping execution',
-                });
-              }
-            }
-            break;
-          }
           default:
             break;
         }
