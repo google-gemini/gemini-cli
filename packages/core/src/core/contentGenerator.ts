@@ -17,10 +17,40 @@ import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { getEffectiveModel } from './modelCheck.js';
 
+const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
+
+function isOfficialOpenRouterBaseUrl(baseUrl: string): boolean {
+  try {
+    const parsed = new URL(baseUrl);
+    return (
+      parsed.hostname === 'openrouter.ai' ||
+      parsed.hostname.endsWith('.openrouter.ai')
+    );
+  } catch {
+    return /(^|\/\/)([^/]*\.)?openrouter\.ai(?=\/|$)/i.test(baseUrl);
+  }
+}
+
+function isGeminiAliasModel(model: string): boolean {
+  return (
+    model === 'gemini-pro' ||
+    model === 'gemini-pro-vision' ||
+    model.startsWith('gemini-')
+  );
+}
+
 /**
  * Maps Gemini model names to OpenRouter model IDs
  */
-function mapGeminiModelToOpenRouter(model: string): string {
+function mapGeminiModelToOpenRouter(model: string, baseUrl: string): string {
+  if (model.includes('/')) {
+    return model;
+  }
+
+  if (!isOfficialOpenRouterBaseUrl(baseUrl)) {
+    return model;
+  }
+
   const modelMap: Record<string, string> = {
     'gemini-2.5-pro': 'google/gemini-2.5-pro',
     'gemini-2.5-flash': 'google/gemini-2.5-flash',
@@ -35,7 +65,16 @@ function mapGeminiModelToOpenRouter(model: string): string {
     'gemini-1.5-flash': 'google/gemini-flash-1.5',
   };
 
-  return modelMap[model] || `google/${model}`;
+  const mappedModel = modelMap[model];
+  if (mappedModel) {
+    return mappedModel;
+  }
+
+  if (isGeminiAliasModel(model)) {
+    return `google/${model}`;
+  }
+
+  return model;
 }
 
 /**
@@ -123,12 +162,14 @@ export async function createContentGeneratorConfig(
   }
 
   if (authType === AuthType.USE_OPENROUTER && openRouterApiKey) {
+    const resolvedOpenRouterBaseUrl =
+      openRouterBaseUrl || OPENROUTER_DEFAULT_BASE_URL;
     contentGeneratorConfig.apiKey = openRouterApiKey;
-    contentGeneratorConfig.openRouterBaseUrl =
-      openRouterBaseUrl || 'https://openrouter.ai/api/v1';
+    contentGeneratorConfig.openRouterBaseUrl = resolvedOpenRouterBaseUrl;
     // Map Gemini model names to OpenRouter format
     contentGeneratorConfig.model = mapGeminiModelToOpenRouter(
       contentGeneratorConfig.model,
+      resolvedOpenRouterBaseUrl,
     );
 
     return contentGeneratorConfig;

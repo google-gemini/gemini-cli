@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createOpenRouterContentGenerator } from './openRouterContentGenerator.js';
 import { ContentGeneratorConfig, AuthType } from './contentGenerator.js';
 
@@ -89,22 +89,75 @@ describe('OpenRouter Content Generator', () => {
 });
 
 describe('Model mapping', () => {
-  it('should map Gemini models to OpenRouter format', async () => {
-    // Set the environment variable for the test
-    process.env.OPENROUTER_API_KEY = 'test-key';
+  const originalApiKey = process.env.OPENROUTER_API_KEY;
+  const originalBaseUrl = process.env.OPENROUTER_BASE_URL;
 
+  beforeEach(() => {
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    delete process.env.OPENROUTER_BASE_URL;
+  });
+
+  afterEach(() => {
+    if (originalApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalApiKey;
+    }
+
+    if (originalBaseUrl === undefined) {
+      delete process.env.OPENROUTER_BASE_URL;
+    } else {
+      process.env.OPENROUTER_BASE_URL = originalBaseUrl;
+    }
+  });
+
+  it('maps Gemini aliases to OpenRouter format for the official endpoint', async () => {
     const { createContentGeneratorConfig } = await import(
       './contentGenerator.js'
     );
-
     const config = await createContentGeneratorConfig(
       'gemini-2.5-flash',
       AuthType.USE_OPENROUTER,
     );
 
     expect(config.model).toBe('google/gemini-2.5-flash');
+  });
 
-    // Clean up
-    delete process.env.OPENROUTER_API_KEY;
+  it('keeps fully-qualified model IDs unchanged', async () => {
+    const { createContentGeneratorConfig } = await import(
+      './contentGenerator.js'
+    );
+    const config = await createContentGeneratorConfig(
+      'google/gemini-2.5-flash',
+      AuthType.USE_OPENROUTER,
+    );
+
+    expect(config.model).toBe('google/gemini-2.5-flash');
+  });
+
+  it('does not force non-Gemini models onto google/ for the official endpoint', async () => {
+    const { createContentGeneratorConfig } = await import(
+      './contentGenerator.js'
+    );
+    const config = await createContentGeneratorConfig(
+      'glm-4.7',
+      AuthType.USE_OPENROUTER,
+    );
+
+    expect(config.model).toBe('glm-4.7');
+  });
+
+  it('passes model IDs through unchanged for custom OpenRouter-compatible endpoints', async () => {
+    process.env.OPENROUTER_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4';
+
+    const { createContentGeneratorConfig } = await import(
+      './contentGenerator.js'
+    );
+    const config = await createContentGeneratorConfig(
+      'glm-4.7',
+      AuthType.USE_OPENROUTER,
+    );
+
+    expect(config.model).toBe('glm-4.7');
   });
 });

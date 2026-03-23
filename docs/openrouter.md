@@ -24,6 +24,12 @@ OpenRouter support allows you to use Gemini models through the OpenRouter API ga
    export OPENROUTER_BASE_URL="https://your-custom-endpoint.com/api/v1"
    ```
 
+4. **Set model explicitly for custom endpoints**
+   For OpenRouter-compatible gateways (not `openrouter.ai`), set the provider-native model ID:
+   ```bash
+   export GEMINI_MODEL="glm-4.7"
+   ```
+
 ## Usage
 
 ### Interactive Mode
@@ -46,7 +52,8 @@ echo "What is the capital of France?" | gemini
 
 ## Supported Models
 
-The following Gemini models are available through OpenRouter:
+When `OPENROUTER_BASE_URL` is the official `openrouter.ai` endpoint, the CLI
+maps these Gemini aliases automatically:
 
 - `gemini-2.5-pro` → `google/gemini-2.5-pro`
 - `gemini-2.5-flash` → `google/gemini-2.5-flash`
@@ -58,6 +65,9 @@ The following Gemini models are available through OpenRouter:
 - `gemini-pro-vision` → `google/gemini-pro-vision`
 - `gemini-1.5-pro` → `google/gemini-pro-1.5`
 - `gemini-1.5-flash` → `google/gemini-flash-1.5`
+
+For custom OpenRouter-compatible endpoints, the CLI sends the model as-is. Use
+the exact model ID expected by your provider.
 
 ## Features
 
