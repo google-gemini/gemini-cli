@@ -44,7 +44,13 @@ export class WindowsSandboxManager implements SandboxManager {
    * Ensures a file or directory exists.
    */
   private touch(filePath: string, isDirectory: boolean): void {
-    if (fs.existsSync(filePath)) return;
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      if (fs.lstatSync(filePath)) return;
+    } catch {
+      // Ignore ENOENT
+    }
+
     if (isDirectory) {
       fs.mkdirSync(filePath, { recursive: true });
     } else {
@@ -186,9 +192,8 @@ export class WindowsSandboxManager implements SandboxManager {
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(this.options.workspace, file);
-      const isDirectory = file === '.git';
-      this.touch(filePath, isDirectory);
+      const filePath = path.join(this.options.workspace, file.path);
+      this.touch(filePath, file.isDirectory);
 
       // We resolve real paths to ensure protection for both the symlink and its target.
       try {

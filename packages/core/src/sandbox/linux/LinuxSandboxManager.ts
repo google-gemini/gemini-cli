@@ -82,7 +82,13 @@ function getSeccompBpfPath(): string {
  * Ensures a file or directory exists.
  */
 function touch(filePath: string, isDirectory: boolean) {
-  if (fs.existsSync(filePath)) return;
+  try {
+    // If it exists (even as a broken symlink), do nothing
+    if (fs.lstatSync(filePath)) return;
+  } catch {
+    // Ignore ENOENT
+  }
+
   if (isDirectory) {
     fs.mkdirSync(filePath, { recursive: true });
   } else {
@@ -127,9 +133,8 @@ export class LinuxSandboxManager implements SandboxManager {
     // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
     // In bwrap, later binds override earlier ones for the same path.
     for (const file of GOVERNANCE_FILES) {
-      const filePath = join(this.options.workspace, file);
-      const isDirectory = file === '.git';
-      touch(filePath, isDirectory);
+      const filePath = join(this.options.workspace, file.path);
+      touch(filePath, file.isDirectory);
 
       const realPath = fs.realpathSync(filePath);
 

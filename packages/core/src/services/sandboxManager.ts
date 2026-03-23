@@ -81,9 +81,9 @@ export interface SandboxManager {
  * and should be write-protected in any sandbox.
  */
 export const GOVERNANCE_FILES = [
-  '.gitignore',
-  '.geminiignore',
-  '.git',
+  { path: '.gitignore', isDirectory: false },
+  { path: '.geminiignore', isDirectory: false },
+  { path: '.git', isDirectory: true },
 ] as const;
 
 /**

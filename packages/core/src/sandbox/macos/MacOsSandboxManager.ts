@@ -70,17 +70,16 @@ export class MacOsSandboxManager implements SandboxManager {
     // These are added after the workspace allow rule (which is in BASE_SEATBELT_PROFILE)
     // to ensure they take precedence (Seatbelt evaluates rules in order, later rules win for same path).
     for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
-      const governanceFile = path.join(workspacePath, GOVERNANCE_FILES[i]);
+      const governanceFile = path.join(workspacePath, GOVERNANCE_FILES[i].path);
 
       // Ensure the file/directory exists so Seatbelt rules are reliably applied.
-      const isDirectory = GOVERNANCE_FILES[i] === '.git';
-      this.touch(governanceFile, isDirectory);
+      this.touch(governanceFile, GOVERNANCE_FILES[i].isDirectory);
 
       const realGovernanceFile = this.tryRealpath(governanceFile);
 
       // Determine if it should be treated as a directory (subpath) or a file (literal).
       // .git is generally a directory, while ignore files are literals.
-      let isActuallyDirectory = isDirectory;
+      let isActuallyDirectory = GOVERNANCE_FILES[i].isDirectory;
       try {
         if (fs.existsSync(realGovernanceFile)) {
           isActuallyDirectory = fs.lstatSync(realGovernanceFile).isDirectory();
@@ -131,7 +130,13 @@ export class MacOsSandboxManager implements SandboxManager {
    * Ensures a file or directory exists.
    */
   private touch(filePath: string, isDirectory: boolean) {
-    if (fs.existsSync(filePath)) return;
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      if (fs.lstatSync(filePath)) return;
+    } catch {
+      // Ignore ENOENT
+    }
+
     if (isDirectory) {
       fs.mkdirSync(filePath, { recursive: true });
     } else {
