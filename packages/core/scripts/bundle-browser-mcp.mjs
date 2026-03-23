@@ -83,18 +83,55 @@ async function bundle() {
       }
       fs.cpSync(srcThirdParty, destThirdParty, {
         recursive: true,
-        filter: (src) => {
-          // Skip large/unnecessary bundles that are either explicitly excluded
-          // or not required for the browser agent functionality.
-          return (
-            !src.includes('lighthouse-devtools-mcp-bundle.js') &&
-            !src.includes('devtools-formatter-worker.js')
-          );
-        },
       });
     } else {
       console.warn(`Warning: third_party assets not found at ${srcThirdParty}`);
     }
+
+    // Copy watchdog scripts and dependencies
+    const srcTelemetry = path.resolve(
+      __dirname,
+      '../../../node_modules/chrome-devtools-mcp/build/src/telemetry',
+    );
+    const destWatchdog = path.resolve(
+      __dirname,
+      '../dist/bundled/watchdog',
+    );
+    if (fs.existsSync(srcTelemetry)) {
+      fs.mkdirSync(destWatchdog, { recursive: true });
+      // Copy main watchdog directory
+      fs.cpSync(path.join(srcTelemetry, 'watchdog'), destWatchdog, { recursive: true });
+      // Copy shared types needed by watchdog
+      fs.copyFileSync(
+        path.join(srcTelemetry, 'types.js'),
+        path.resolve(__dirname, '../dist/bundled/types.js')
+      );
+      // Copy logger needed by watchdog
+      fs.copyFileSync(
+        path.join(srcTelemetry, '../logger.js'),
+        path.resolve(__dirname, '../dist/bundled/logger.js')
+      );
+
+      // Patch imports in watchdog files to reflect the flattened structure in dist/bundled/
+      const watchdogFiles = fs.readdirSync(destWatchdog);
+      for (const file of watchdogFiles) {
+        if (file.endsWith('.js')) {
+          const filePath = path.join(destWatchdog, file);
+          let content = fs.readFileSync(filePath, 'utf-8');
+          content = content.replace(/\.\.\/\.\.\/logger\.js/g, '../logger.js');
+          content = content.replace(/\.\.\/types\.js/g, '../types.js');
+          fs.writeFileSync(filePath, content);
+        }
+      }
+    } else {
+      console.warn(`Warning: telemetry directory not found at ${srcTelemetry}`);
+    }
+
+    // Patch the bundled file to point to the correct watchdog path
+    // The original code uses new URL("./watchdog/main.js", import.meta.url)
+    // which resolves relative to the bundled file.
+    // Our bundling script copies the watchdog to ./watchdog/main.js relative to the bundle.
+    // So the original code should work IF esbuild doesn't mangle import.meta.url.
   } catch (error) {
     console.error('Error bundling chrome-devtools-mcp:', error);
     process.exit(1);

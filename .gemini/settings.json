@@ -7,5 +7,15 @@
   },
   "general": {
     "devtools": true
+  },
+  "agents": {
+    "overrides": {
+      "browser_agent": { "enabled": true }
+    },
+    "browser": {
+      "headless": true,
+      "sessionMode": "isolated",
+      "allowedDomains": ["*.com"]
+    }
   }
 }

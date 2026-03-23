@@ -386,7 +386,7 @@ export class BrowserManager {
         })
         .join(', ');
       mcpArgs.push(
-        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+        `--chromeArg=--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1`,
       );
     }
 
@@ -427,10 +427,12 @@ export class BrowserManager {
     }
 
     this.mcpTransport.onclose = () => {
-      debugLogger.error(
-        'chrome-devtools-mcp transport closed unexpectedly. ' +
-          'The MCP server process may have crashed.',
-      );
+      if (this.rawMcpClient) {
+        debugLogger.error(
+          'chrome-devtools-mcp transport closed unexpectedly. ' +
+            'The MCP server process may have crashed.',
+        );
+      }
       this.rawMcpClient = undefined;
     };
     this.mcpTransport.onerror = (error: Error) => {
