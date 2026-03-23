@@ -220,11 +220,35 @@ export async function main() {
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
+  // This must be awaited before any other async tasks that depend on CWD (like loadCliConfig)
+  // because setupWorktree calls process.chdir().
   const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
   let worktreeInfo: WorktreeInfo | undefined;
   if (requestedWorktree !== undefined) {
+    const worktreeHandle = startupProfiler.start('setup_worktree');
     worktreeInfo = await setupWorktree(requestedWorktree || undefined);
+    worktreeHandle?.end();
   }
+
+  const cleanupOpsHandle = startupProfiler.start('cleanup_ops');
+  Promise.all([
+    cleanupCheckpoints(),
+    cleanupToolOutputFiles(settings.merged),
+    cleanupBackgroundLogs(),
+  ])
+    .catch((e) => {
+      debugLogger.error('Early cleanup failed:', e);
+    })
+    .finally(() => {
+      cleanupOpsHandle?.end();
+    });
+
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
+  const argvPromise = parseArguments(settings.merged).finally(() => {
+    parseArgsHandle?.end();
+  });
+
+  const rawStartupWarningsPromise = getStartupWarnings();
 
   // Report settings errors once during startup
   settings.errors.forEach((error) => {
@@ -481,12 +505,10 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
-    // Cleanup sessions after config initialization
-    try {
-      await cleanupExpiredSessions(config, settings.merged);
-    } catch (e) {
+    // Launch cleanup expired sessions as a background task
+    cleanupExpiredSessions(config, settings.merged).catch((e) => {
       debugLogger.error('Failed to cleanup expired sessions:', e);
-    }
+    });
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');
@@ -538,7 +560,9 @@ export async function main() {
       });
     }
 
+    const terminalHandle = startupProfiler.start('setup_terminal');
     await setupTerminalAndTheme(config, settings);
+    terminalHandle?.end();
 
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
@@ -562,7 +586,7 @@ export async function main() {
       isAlternateBufferEnabled(config),
       config.getScreenReader(),
     );
-    const rawStartupWarnings = await getStartupWarnings();
+    const rawStartupWarnings = await rawStartupWarningsPromise;
     const startupWarnings: StartupWarning[] = [
       ...rawStartupWarnings.map((message) => ({
         id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
