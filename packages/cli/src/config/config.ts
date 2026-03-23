@@ -153,7 +153,7 @@ export function getRequestedWorktreeName(
 }
 
 export async function parseArguments(
-  _settings: MergedSettings,
+  settings: MergedSettings,
 ): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
   const startupMessages: string[] = [];
@@ -175,15 +175,41 @@ export async function parseArguments(
       default: false,
     })
     .middleware((argv) => {
-      const subcommands = [
-        'mcp',
-        'extensions',
-        'extension',
-        'skills',
-        'skill',
-        'hooks',
-        'hook',
+      const commandModules = [
+        mcpCommand,
+        extensionsCommand,
+        skillsCommand,
+        hooksCommand,
       ];
+
+      const subcommands = commandModules.flatMap((mod) => {
+        const names: string[] = [];
+
+        const cmd = mod.command;
+        if (cmd) {
+          if (Array.isArray(cmd)) {
+            for (const c of cmd) {
+              names.push(String(c).split(' ')[0]);
+            }
+          } else {
+            names.push(String(cmd).split(' ')[0]);
+          }
+        }
+
+        const aliases = mod.aliases;
+        if (aliases) {
+          if (Array.isArray(aliases)) {
+            for (const a of aliases) {
+              names.push(String(a).split(' ')[0]);
+            }
+          } else {
+            names.push(String(aliases).split(' ')[0]);
+          }
+        }
+
+        return names;
+      });
+
       const firstArg = argv._[0];
       if (typeof firstArg === 'string' && subcommands.includes(firstArg)) {
         argv['isCommand'] = true;
@@ -197,8 +223,11 @@ export async function parseArguments(
     .check((argv) => {
       // The 'query' positional can be a string (for one arg) or string[] (for multiple).
       // This guard safely checks if any positional argument was provided.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const query = argv['query'] as string | string[] | undefined;
+      const queryArg = argv['query'];
+      const query =
+        typeof queryArg === 'string' || Array.isArray(queryArg)
+          ? queryArg
+          : undefined;
       const hasPositionalQuery = Array.isArray(query)
         ? query.length > 0
         : !!query;
@@ -212,16 +241,15 @@ export async function parseArguments(
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
       }
+
+      const outputFormat = argv['outputFormat'];
       if (
-        argv['outputFormat'] &&
-        !['text', 'json', 'stream-json'].includes(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['outputFormat'] as string,
-        )
+        typeof outputFormat === 'string' &&
+        !['text', 'json', 'stream-json'].includes(outputFormat)
       ) {
-        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+        return `Invalid values:\n  Argument: output-format, Given: "${outputFormat}", Choices: "text", "json", "stream-json"`;
       }
-      if (argv['worktree'] && !_settings.experimental?.worktrees) {
+      if (argv['worktree'] && !settings.experimental?.worktrees) {
         return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
       }
       return true;
