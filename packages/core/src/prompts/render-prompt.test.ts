@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
-import { renderPrompt, p } from './render-prompt.js';
+import { describe, expect, it, vi } from 'vitest';
+import { renderPrompt, p, memoize, parseSlots } from './render-prompt.js';
 import type { PromptContent } from './render-prompt.js';
 
 type TestContext = { name?: string; shouldRender?: boolean };
@@ -338,6 +338,55 @@ const tests: TestCase[] = [
     context: {},
     expect: 'Visible start\n\nVisible end',
   },
+  {
+    desc: 'renders explicit level overriding depth and resetting children',
+    content: {
+      heading: 'Top Level',
+      content: {
+        heading: 'Nested',
+        level: 4,
+        content: {
+          heading: 'Deep',
+          content: 'Text',
+        },
+      },
+    },
+    context: {},
+    expect: '# Top Level\n\n#### Nested\n\n##### Deep\n\nText',
+  },
+  {
+    desc: 'renders level 0 as # and children as level 1 (#)',
+    content: {
+      heading: 'Level 0',
+      level: 0,
+      content: {
+        heading: 'Level 1',
+        content: 'Text',
+      },
+    },
+    context: {},
+    expect: '# Level 0\n\n# Level 1\n\nText',
+  },
+  {
+    desc: 'resolves dynamic attributes synchronously',
+    content: {
+      tag: 'dynamic',
+      attrs: { static: 'val', dyn: (ctx) => `hello-${ctx.name}` },
+      content: 'Inside',
+    },
+    context: { name: 'Alice' },
+    expect: '<dynamic static="val" dyn="hello-Alice">\nInside\n</dynamic>',
+  },
+  {
+    desc: 'resolves dynamic attributes asynchronously',
+    content: {
+      tag: 'async-dynamic',
+      attrs: { dyn: async (ctx) => `async-${ctx.name}` },
+      content: 'Inside',
+    },
+    context: { name: 'Bob' },
+    expect: '<async-dynamic dyn="async-Bob">\nInside\n</async-dynamic>',
+  },
 ];
 
 describe('renderPrompt', () => {
@@ -348,5 +397,58 @@ describe('renderPrompt', () => {
       context: test.context,
     });
     expect(result).toBe(test.expect);
+  });
+});
+
+describe('memoize', () => {
+  it('should cache result per context instance', () => {
+    const resolver = vi.fn((ctx: TestContext) => ctx.name);
+    const memoized = memoize(resolver);
+
+    const ctx1 = { name: 'Alice' };
+    const ctx2 = { name: 'Bob' };
+
+    expect(memoized(ctx1)).toBe('Alice');
+    expect(memoized(ctx1)).toBe('Alice');
+    expect(resolver).toHaveBeenCalledTimes(1);
+
+    expect(memoized(ctx2)).toBe('Bob');
+    expect(memoized(ctx2)).toBe('Bob');
+    expect(resolver).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle async resolvers', async () => {
+    const resolver = vi.fn(async (ctx: TestContext) => ctx.name);
+    const memoized = memoize(resolver);
+
+    const ctx = { name: 'Async' };
+
+    expect(await memoized(ctx)).toBe('Async');
+    expect(await memoized(ctx)).toBe('Async');
+    expect(resolver).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('parseSlots', () => {
+  it('should return empty array for empty string', () => {
+    expect(parseSlots('')).toEqual([]);
+  });
+
+  it('should return string array for no slots', () => {
+    expect(parseSlots('Hello World')).toEqual(['Hello World']);
+  });
+
+  it('should parse a single slot', () => {
+    expect(parseSlots('${slot1}')).toEqual([{ slot: 'slot1' }]);
+  });
+
+  it('should parse slots at the start, middle, and end', () => {
+    expect(parseSlots('${first} middle ${second} end ${third}')).toEqual([
+      { slot: 'first' },
+      ' middle ',
+      { slot: 'second' },
+      ' end ',
+      { slot: 'third' },
+    ]);
   });
 });

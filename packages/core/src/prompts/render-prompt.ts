@@ -13,10 +13,13 @@ export type PromptSlot = { slot: string; content?: never };
 export type PromptSection<C> = {
   /** Add a Markdown heading of appropriate level to this section. */
   heading?: string;
+  /** Explicitly set the markdown heading depth (1 = #, 2 = ##), overriding tree depth.
+   * 0 is valid and will render as # while setting children to level 1. */
+  level?: number;
   /** If supplied, wrap this section in an XML tag. */
   tag?: string;
   /** If supplied, add attributes to the XML section tag. */
-  attrs?: Record<string, string>;
+  attrs?: Record<string, ContextResolver<C, string>>;
   /** Formatting of the content inside this section. Defaults to 'block'. */
   format?:
     | 'inline'
@@ -47,7 +50,11 @@ export type PromptContent<C> = ContextResolver<
 >;
 
 type BaseContent = string | StaticSection | PromptSlot | BaseContent[];
-type StaticSection = Omit<PromptSection<unknown>, 'condition' | 'content'> & {
+type StaticSection = Omit<
+  PromptSection<unknown>,
+  'condition' | 'content' | 'attrs'
+> & {
+  attrs?: Record<string, string>;
   content: BaseContent;
 };
 
@@ -124,10 +131,11 @@ const formatBasic = (
   }
 
   const section = c;
+  const currentDepth = section.level ?? depth;
   const sectionFormat = section.format || 'block';
   const innerContent = formatBasic(
     section.content,
-    depth + 1,
+    currentDepth + 1,
     sectionFormat,
     resolvedContributions,
   ).trim();
@@ -141,7 +149,7 @@ const formatBasic = (
   }
 
   if (section.heading) {
-    const headingLevel = Math.min(depth, 6);
+    const headingLevel = Math.max(1, Math.min(currentDepth, 6));
     result = `\n\n${'#'.repeat(headingLevel)} ${section.heading}\n\n${result.trim()}`;
   }
 
@@ -224,10 +232,20 @@ export async function renderPrompt<C = SystemPromptOptions>({
       ) {
         return null;
       }
+      let resolvedAttrs: Record<string, string> | undefined = undefined;
+      if (section.attrs) {
+        resolvedAttrs = {};
+        for (const [key, value] of Object.entries(section.attrs)) {
+          resolvedAttrs[key] =
+            typeof value === 'function' ? await value(context) : value;
+        }
+      }
+
       return {
         heading: section.heading,
+        level: section.level,
         tag: section.tag,
-        attrs: section.attrs,
+        attrs: resolvedAttrs,
         format: section.format,
         content: resolvedInner,
       };
@@ -263,4 +281,52 @@ export function prompt<C = SystemPromptOptions>(
   ...content: Array<PromptContent<C>>
 ): PromptContent<C> {
   return content.length === 1 ? content[0] : content;
+}
+
+type Resolver<C, T> = (ctx: C) => T | Promise<T>;
+
+/**
+ * Creates a memoized selector that caches its result per context instance.
+ * Ideal for efficiently sharing derived state across a prompt tree.
+ */
+export function memoize<C extends object, T>(
+  resolver: Resolver<C, T>,
+): (ctx: C) => T | Promise<T> {
+  const cache = new WeakMap<C, T | Promise<T>>();
+
+  return (ctx: C) => {
+    if (cache.has(ctx)) {
+      return cache.get(ctx)!;
+    }
+    const result = resolver(ctx);
+    cache.set(ctx, result);
+    return result;
+  };
+}
+
+/**
+ * Parses a string containing placeholders like `${slotName}` into a PromptContent array.
+ * Interleaves literal string segments with `{ slot: 'slotName' }` objects.
+ */
+export function parseSlots<C>(template: string): Array<PromptContent<C>> {
+  if (!template) return [];
+
+  const regex = /\$\{([^}]+)\}/g;
+  const parts: Array<PromptContent<C>> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(template)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(template.slice(lastIndex, match.index));
+    }
+    parts.push({ slot: match[1] });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < template.length) {
+    parts.push(template.slice(lastIndex));
+  }
+
+  return parts;
 }
