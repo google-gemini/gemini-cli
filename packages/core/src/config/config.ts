@@ -1288,27 +1288,18 @@ export class Config implements McpContext, AgentLoopContext {
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
-
-    const discoveryPromises: Array<Promise<unknown>> = [];
-
     if (this.getCheckpointingEnabled()) {
-      discoveryPromises.push(this.getGitService());
+      await this.getGitService();
     }
-
     this._promptRegistry = new PromptRegistry();
     this._resourceRegistry = new ResourceRegistry();
 
     this.agentRegistry = new AgentRegistry(this);
-    discoveryPromises.push(this.agentRegistry.initialize());
+    await this.agentRegistry.initialize();
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
 
-    const toolRegistryPromise = this.createToolRegistry().then((registry) => {
-      this._toolRegistry = registry;
-    });
-    discoveryPromises.push(toolRegistryPromise);
-
-    await Promise.all(discoveryPromises);
+    this._toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
