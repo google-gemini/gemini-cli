@@ -5,19 +5,14 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, safeParseArgs } from './test-helper.js';
 
 describe('Shell Efficiency', () => {
-  const getCommand = (call: any): string | undefined => {
-    let args = call.toolRequest.args;
-    if (typeof args === 'string') {
-      try {
-        args = JSON.parse(args);
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-    return typeof args === 'string' ? args : (args as any)['command'];
+  const getCommand = (call: {
+    toolRequest: { args: string };
+  }): string | undefined => {
+    const args = safeParseArgs<{ command?: string }>(call.toolRequest.args);
+    return args?.command;
   };
 
   evalTest('USUALLY_PASSES', {

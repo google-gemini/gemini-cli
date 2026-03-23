@@ -5,7 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, safeParseArgs } from './test-helper.js';
 
 describe('Edits location eval', () => {
   /**
@@ -88,14 +88,9 @@ test('capitalize capitalizes the first letter', () => {
       ).toBe(false);
 
       const targetFiles = replaceCalls.map((t) => {
-        try {
-          return JSON.parse(t.toolRequest.args).file_path;
-        } catch {
-          return null;
-        }
+        const args = safeParseArgs<{ file_path: string }>(t.toolRequest.args);
+        return args?.file_path ?? null;
       });
-
-      console.log('DEBUG: targetFiles', targetFiles);
 
       expect(
         new Set(targetFiles).size,

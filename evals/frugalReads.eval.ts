@@ -5,7 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, safeParseArgs } from './test-helper.js';
 import { READ_FILE_TOOL_NAME, EDIT_TOOL_NAME } from '@google/gemini-cli-core';
 
 describe('Frugal reads eval', () => {
@@ -53,8 +53,10 @@ describe('Frugal reads eval', () => {
       );
 
       const targetFileReads = readCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('linter_mess.ts');
+        const args = safeParseArgs<{ file_path: string }>(
+          call.toolRequest.args,
+        );
+        return args?.file_path?.includes('linter_mess.ts');
       });
 
       expect(
@@ -81,15 +83,18 @@ describe('Frugal reads eval', () => {
       const readRanges: { start_line: number; end_line: number }[] = [];
 
       for (const call of targetFileReads) {
-        const args = JSON.parse(call.toolRequest.args);
+        const args = safeParseArgs<{
+          end_line?: number;
+          start_line?: number;
+        }>(call.toolRequest.args);
 
         expect(
-          args.end_line,
+          args?.end_line,
           'Agent read the entire file (missing end_line) instead of using ranged read',
         ).toBeDefined();
 
-        const end_line = args.end_line;
-        const start_line = args.start_line ?? 1;
+        const end_line = args!.end_line!;
+        const start_line = args!.start_line ?? 1;
         const linesRead = end_line - start_line + 1;
         totalLinesRead += linesRead;
         readRanges.push({ start_line, end_line });
@@ -120,8 +125,10 @@ describe('Frugal reads eval', () => {
         (log) => log.toolRequest?.name === EDIT_TOOL_NAME,
       );
       const targetEditCalls = editCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('linter_mess.ts');
+        const args = safeParseArgs<{ file_path: string }>(
+          call.toolRequest.args,
+        );
+        return args?.file_path?.includes('linter_mess.ts');
       });
       expect(
         targetEditCalls.length,
@@ -172,8 +179,10 @@ describe('Frugal reads eval', () => {
       );
 
       const targetFileReads = readCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('far_mess.ts');
+        const args = safeParseArgs<{ file_path: string }>(
+          call.toolRequest.args,
+        );
+        return args?.file_path?.includes('far_mess.ts');
       });
 
       // The agent should use ranged reads to be frugal with context tokens,
@@ -190,9 +199,11 @@ describe('Frugal reads eval', () => {
       ).toBeLessThanOrEqual(4);
 
       for (const call of targetFileReads) {
-        const args = JSON.parse(call.toolRequest.args);
+        const args = safeParseArgs<{ end_line?: number }>(
+          call.toolRequest.args,
+        );
         expect(
-          args.end_line,
+          args?.end_line,
           'Agent should have used ranged read (end_line) to save tokens',
         ).toBeDefined();
       }
@@ -241,8 +252,10 @@ describe('Frugal reads eval', () => {
       );
 
       const targetFileReads = readCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('many_mess.ts');
+        const args = safeParseArgs<{ file_path: string }>(
+          call.toolRequest.args,
+        );
+        return args?.file_path?.includes('many_mess.ts');
       });
 
       expect(
@@ -253,8 +266,10 @@ describe('Frugal reads eval', () => {
       // In this case, we expect the agent to realize there are many scattered errors
       // and just read the whole file to be efficient with tool calls.
       const readEntireFile = targetFileReads.some((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.end_line === undefined;
+        const args = safeParseArgs<{ end_line?: number }>(
+          call.toolRequest.args,
+        );
+        return args?.end_line === undefined;
       });
 
       expect(
@@ -267,8 +282,10 @@ describe('Frugal reads eval', () => {
         (log) => log.toolRequest?.name === EDIT_TOOL_NAME,
       );
       const targetEditCalls = editCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('many_mess.ts');
+        const args = safeParseArgs<{ file_path: string }>(
+          call.toolRequest.args,
+        );
+        return args?.file_path?.includes('many_mess.ts');
       });
       expect(
         targetEditCalls.length,
