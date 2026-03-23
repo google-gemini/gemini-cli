@@ -1206,6 +1206,37 @@ describe('AgentRegistry', () => {
   });
 
   describe('inheritance and refresh', () => {
+    it('should skip remote agents when refreshing on model change', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const loadAgentSpy = vi.fn().mockResolvedValue({ name: 'RemoteAgent' });
+      vi.spyOn(mockConfig, 'getA2AClientManager').mockReturnValue({
+        loadAgent: loadAgentSpy,
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      // Initial registration calls loadAgent once
+      expect(loadAgentSpy).toHaveBeenCalledTimes(1);
+
+      // Trigger the model change event
+      coreEvents.emitModelChanged('new-model');
+
+      // The onModelChanged handler is synchronous but calls the async refreshAgents.
+      // We wait a tick for the promises to settle.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // loadAgent should NOT have been called again!
+      expect(loadAgentSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('should resolve "inherit" to the current model from configuration', async () => {
       const config = makeMockedConfig({ model: 'current-model' });
       const registry = new TestableAgentRegistry(config);
