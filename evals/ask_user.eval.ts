@@ -13,12 +13,7 @@ function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
     ...evalCase,
     configOverrides: {
       ...evalCase.configOverrides,
-      general: {
-        ...evalCase.configOverrides?.general,
-        approvalMode: 'default',
-        enableAutoUpdate: false,
-        enableAutoUpdateNotification: false,
-      },
+      approvalMode: 'default',
     },
     files: {
       ...evalCase.files,
