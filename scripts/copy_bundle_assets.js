@@ -103,4 +103,35 @@ if (existsSync(bundleMcpSrc)) {
   console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
 }
 
+// 7. Copy better-sqlite3 native module (JS entry + native binding)
+const sqliteSrc = join(root, 'node_modules', 'better-sqlite3');
+const sqliteDest = join(bundleDir, 'node_modules', 'better-sqlite3');
+const sqliteNodeFile = join(
+  sqliteSrc,
+  'build',
+  'Release',
+  'better_sqlite3.node',
+);
+if (existsSync(sqliteNodeFile)) {
+  // Copy lib/ (JS entry point)
+  cpSync(join(sqliteSrc, 'lib'), join(sqliteDest, 'lib'), {
+    recursive: true,
+    dereference: true,
+  });
+  // Copy native binding
+  const nativeDest = join(sqliteDest, 'build', 'Release');
+  mkdirSync(nativeDest, { recursive: true });
+  copyFileSync(sqliteNodeFile, join(nativeDest, 'better_sqlite3.node'));
+  // Copy package.json
+  copyFileSync(
+    join(sqliteSrc, 'package.json'),
+    join(sqliteDest, 'package.json'),
+  );
+  console.log('Copied better-sqlite3 native module to bundle/node_modules/');
+} else {
+  console.warn(
+    'WARNING: better_sqlite3.node not found — graph_init may not work.',
+  );
+}
+
 console.log('Assets copied to bundle/');

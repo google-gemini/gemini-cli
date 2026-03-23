@@ -48,7 +48,23 @@ class GraphInitToolInvocation implements ToolInvocation<object, ToolResult> {
 
     const text = `Indexed ${stats.files_indexed} file(s) (${stats.files_skipped} unchanged), ${stats.functions} functions, ${stats.classes} classes, ${stats.edges} call edges.
 Graph: ${stats.db_path}
-Summary: ${cwd}/.gemini/GEMINI.md`;
+Summary: ${cwd}/GEMINI.md  ← auto-loaded by gemini-cli on every session
+
+IMPORTANT — GEMINI.md is loaded in your context but it shows LOCATION ONLY (file + line).
+It does NOT contain callers or callees. You must call graph_search to get those.
+
+CODING WORKFLOW — follow this every time you modify a function or class:
+1. graph_search("<name>") — get args, callers, callees before touching the symbol
+2. graph_query("<name>") — if you need to trace the full call chain
+3. read_file — only after you know exactly which file and line to open
+4. grep_search — only for non-symbol searches (strings, comments, config values)
+
+NEVER skip step 1. Editing without knowing callers risks silent breakage.
+
+Tool routing:
+- "Where is X defined?" → graph_search("X")
+- "What calls X? What does X call?" → graph_query("X")
+- "Find text/string/comment" → grep_search("X")`;
 
     return {
       llmContent: [{ text }],
@@ -153,7 +169,7 @@ export class GraphQueryTool extends BaseDeclarativeTool<
     super(
       'graph_query',
       'Graph Query',
-      'Query the code graph for a function or class by name. Returns structured JSON with file, line, args, callees, and callers.',
+      'Use this when you need to trace the full call chain: what calls X, or what X calls. Returns the complete caller/callee graph — grep_search and read_file cannot provide this. Call this before refactoring any function that may have multiple call sites.',
       Kind.Search,
       {
         type: 'object',
@@ -178,5 +194,105 @@ export class GraphQueryTool extends BaseDeclarativeTool<
     toolName?: string,
   ): ToolInvocation<GraphQueryParams, ToolResult> {
     return new GraphQueryToolInvocation(params, this.config, toolName);
+  }
+}
+
+export interface GraphSearchParams {
+  keyword: string;
+}
+
+class GraphSearchToolInvocation
+  implements ToolInvocation<GraphSearchParams, ToolResult>
+{
+  constructor(
+    readonly params: GraphSearchParams,
+    _config: Config,
+    _toolName?: string,
+  ) {}
+
+  getDescription(): string {
+    return `Searching code index for "${this.params.keyword}"`;
+  }
+
+  toolLocations(): any[] {
+    return [];
+  }
+
+  async shouldConfirmExecute(): Promise<false> {
+    return false;
+  }
+
+  async execute(): Promise<ToolResult> {
+    const cwd = process.cwd();
+    const service = new GraphService(cwd);
+    let results: any[];
+
+    try {
+      results = service.queryGraph(this.params.keyword);
+    } catch (e: any) {
+      if (e.message && e.message.includes('no such table')) {
+        return {
+          llmContent: [
+            {
+              text: 'Error: Graph database not found. Please run graph_init first.',
+            },
+          ],
+          returnDisplay:
+            'Error: Graph database not found. Please run graph_init first.',
+        };
+      }
+      throw e;
+    } finally {
+      service.close();
+    }
+
+    const text =
+      results.length > 0
+        ? JSON.stringify(results, null, 2)
+        : `No symbols found matching '${this.params.keyword}'. Run graph_init first if you haven't already.`;
+
+    return {
+      llmContent: [{ text }],
+      returnDisplay: text,
+    };
+  }
+}
+
+export class GraphSearchTool extends BaseDeclarativeTool<
+  GraphSearchParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    messageBus: MessageBus,
+  ) {
+    super(
+      'graph_search',
+      'Graph Search',
+      'ALWAYS call this before editing any function or class. Returns file, line, arguments, callers (who calls it), and callees (what it calls) — information GEMINI.md does NOT contain. Use this instead of grep_search for any symbol lookup. Partial keyword matching supported.',
+      Kind.Search,
+      {
+        type: 'object',
+        properties: {
+          keyword: {
+            type: 'string',
+            description:
+              'Keyword to search for in function/class names (partial match supported)',
+          },
+        },
+        required: ['keyword'],
+      },
+      messageBus,
+      false,
+      false,
+    );
+  }
+
+  protected createInvocation(
+    params: GraphSearchParams,
+    _messageBus: MessageBus,
+    toolName?: string,
+  ): ToolInvocation<GraphSearchParams, ToolResult> {
+    return new GraphSearchToolInvocation(params, this.config, toolName);
   }
 }

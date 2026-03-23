@@ -1,5 +1,5 @@
 {
-  "name": "@google/gemini-cli",
+  "name": "@google/gemini-cli-experimental",
   "version": "0.36.0-experimental",
   "engines": {
     "node": ">=20.0.0"
@@ -79,7 +79,6 @@
     "minimatch": "^10.2.2"
   },
   "bin": {
-    "gemini": "bundle/gemini.js",
     "gemini_experimental": "bundle/gemini.js"
   },
   "files": [

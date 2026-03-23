@@ -240,4 +240,13 @@ describe('<AppHeader />', () => {
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();
   });
+  it('should render "Experimental" prefix when version contains "experimental"', async () => {
+    const { lastFrame, unmount } = await renderWithProviders(
+      <AppHeader version="0.36.0-experimental" />,
+      {},
+    );
+
+    expect(lastFrame()).toContain('Gemini Experimental CLI');
+    unmount();
+  });
 });

@@ -35,7 +35,11 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
-import { GraphInitTool, GraphQueryTool } from '../tools/graphTools.js';
+import {
+  GraphInitTool,
+  GraphQueryTool,
+  GraphSearchTool,
+} from '../tools/graphTools.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
@@ -3259,6 +3263,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(GraphQueryTool, () =>
       registry.registerTool(new GraphQueryTool(this, this.messageBus)),
+    );
+    maybeRegister(GraphSearchTool, () =>
+      registry.registerTool(new GraphSearchTool(this, this.messageBus)),
     );
 
     if (this.getUseWriteTodos()) {

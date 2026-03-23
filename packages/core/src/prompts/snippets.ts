@@ -651,7 +651,9 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 
   if (options.hasGraphQuery) {
     suggestion +=
-      ' **Always prioritize using `mcp_gemini_idx_graph_query` for initial discovery** as it provides semantic mapping of the codebase which is more efficient than manual text search.';
+      ' A code graph index is available — use the right tool: `graph_search("<keyword>")` to find where a function/class is defined (faster than grep_search, no file scanning);' +
+      ' `graph_query("<name>")` to get the full caller/callee graph for a symbol (grep_search cannot do this);' +
+      ' `grep_search` only for non-symbol searches like comments, strings, or config values.';
   }
 
   const searchTools: string[] = [];
@@ -673,7 +675,7 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
       subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
     }
 
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) or semantic search tools (e.g., \`mcp_gemini_idx_graph_query\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) or the code graph (e.g., \`graph_query\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
 
   return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;

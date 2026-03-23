@@ -41,6 +41,12 @@ const MAC_TERMINAL_ICON = `▝▜▄
   ▗▟▀
 ▗▟▀  `;
 
+const EXPERIMENTAL_ICON = `  ★  
+ ★★★ 
+★★★★★
+ ★★★ 
+  ★  `;
+
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
@@ -53,7 +59,15 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
     settings.merged.ui.hideBanner || config.getScreenReader()
   );
 
-  const ICON = isAppleTerminal() ? MAC_TERMINAL_ICON : DEFAULT_ICON;
+  let ICON = isAppleTerminal() ? MAC_TERMINAL_ICON : DEFAULT_ICON;
+  if (version.includes('experimental')) {
+    ICON = EXPERIMENTAL_ICON;
+  }
+  const iconElement = version.includes('experimental') ? (
+    <Text color="yellow">{ICON}</Text>
+  ) : (
+    <ThemedGradient>{ICON}</ThemedGradient>
+  );
 
   if (!showDetails) {
     return (
@@ -65,9 +79,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
             marginBottom={1}
             paddingLeft={2}
           >
-            <Box flexShrink={0}>
-              <ThemedGradient>{ICON}</ThemedGradient>
-            </Box>
+            <Box flexShrink={0}>{iconElement}</Box>
             <Box marginLeft={2} flexDirection="column">
               <Box>
                 <Text bold color={theme.text.primary}>
@@ -86,14 +98,20 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
     <Box flexDirection="column">
       {showHeader && (
         <Box flexDirection="row" marginTop={1} marginBottom={1} paddingLeft={2}>
-          <Box flexShrink={0}>
-            <ThemedGradient>{ICON}</ThemedGradient>
-          </Box>
+          <Box flexShrink={0}>{iconElement}</Box>
           <Box marginLeft={2} flexDirection="column">
             {/* Line 1: Gemini CLI vVersion [Updating] */}
             <Box>
-              <Text bold color={theme.text.primary}>
-                Gemini CLI
+              <Text
+                bold
+                color={
+                  version.includes('experimental')
+                    ? theme.status.warning
+                    : theme.text.primary
+                }
+              >
+                Gemini {version.includes('experimental') ? 'Experimental ' : ''}
+                CLI
               </Text>
               <Text color={theme.text.secondary}> v{version}</Text>
               {updateInfo && (
