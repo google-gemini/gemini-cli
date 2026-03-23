@@ -798,6 +798,7 @@ Would you like to attempt to install via "git clone" instead?`,
             this.workspaceDir,
           ),
           extensionId,
+          this.workspaceDir,
           installMetadata,
         );
       }
