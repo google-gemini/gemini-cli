@@ -679,21 +679,6 @@ describe('runNonInteractive', () => {
     ).rejects.toThrow('process.exit(53) called');
   });
 
-  it('should exit when the session reports max turns through agent_end', async () => {
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents([{ type: GeminiEventType.MaxSessionTurns }]),
-    );
-
-    await expect(
-      runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'Trigger max turns event',
-        prompt_id: 'prompt-id-max-turns-event',
-      }),
-    ).rejects.toThrow('process.exit(53) called');
-  });
-
   it('should preprocess @include commands before sending to the model', async () => {
     // 1. Mock the imported atCommandProcessor
     const { handleAtCommand } = await import(
@@ -1855,9 +1840,17 @@ describe('runNonInteractive', () => {
       input: 'Loop test',
       promptId: 'prompt-id-loop',
     },
+    {
+      name: 'max session turns',
+      events: [
+        { type: GeminiEventType.MaxSessionTurns },
+      ] as ServerGeminiStreamEvent[],
+      input: 'Max turns test',
+      promptId: 'prompt-id-max-turns',
+    },
   ])(
     'should emit appropriate error event in streaming JSON mode: $name',
-    async ({ name, events, input, promptId }) => {
+    async ({ events, input, promptId }) => {
       vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
         OutputFormat.STREAM_JSON,
       );
@@ -1894,52 +1887,6 @@ describe('runNonInteractive', () => {
       expect(sanitizedOutput).toMatchSnapshot();
     },
   );
-
-  it('should emit a terminal max-turns error event in streaming JSON mode', async () => {
-    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
-      OutputFormat.STREAM_JSON,
-    );
-    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
-      MOCK_SESSION_METRICS,
-    );
-
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents([
-        { type: GeminiEventType.MaxSessionTurns },
-        {
-          type: GeminiEventType.Finished,
-          value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
-        },
-      ]),
-    );
-
-    try {
-      await runNonInteractive({
-        config: mockConfig,
-        settings: mockSettings,
-        input: 'Max turns test',
-        prompt_id: 'prompt-id-max-turns',
-      });
-    } catch (_error) {
-      // Expected exit
-    }
-
-    const streamEvents = getWrittenOutput()
-      .trim()
-      .split('\n')
-      .map((line) => JSON.parse(line) as Record<string, unknown>);
-
-    expect(streamEvents).toHaveLength(3);
-    expect(streamEvents[2]).toMatchObject({
-      type: 'result',
-      status: 'error',
-      error: {
-        type: 'FatalTurnLimitedError',
-        message:
-          'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
-      },
-    });
-  });
 
   it('should log error when tool recording fails', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
