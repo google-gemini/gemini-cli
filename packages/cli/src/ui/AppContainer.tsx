@@ -1939,7 +1939,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+  useKeypress(handleGlobalKeypress, {
+    isActive: true,
+    priority: KeypressPriority.Critical,
+  });
 
   useKeypress(
     (key: Key) => {
