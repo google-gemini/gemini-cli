@@ -142,6 +142,7 @@ export async function initializeShellParsers(): Promise<void> {
 
 export interface ParsedCommandDetail {
   name: string;
+  rawName: string;
   text: string;
   startIndex: number;
 }
@@ -256,29 +257,32 @@ function parseCommandTree(
   }
 }
 
-function normalizeCommandName(raw: string): string {
-  if (raw.length >= 2) {
-    const first = raw[0];
-    const last = raw[raw.length - 1];
+function unquoteCommandName(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
     if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-      return raw.slice(1, -1);
+      return trimmed.slice(1, -1);
     }
   }
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  return trimmed.split(/[\\/]/).pop() ?? trimmed;
+  return trimmed;
 }
 
-function extractNameFromNode(node: Node): string | null {
+function normalizeCommandName(raw: string): string {
+  const unquoted = unquoteCommandName(raw);
+  if (!unquoted) return unquoted;
+  return unquoted.split(/[\\/]/).pop() ?? unquoted;
+}
+
+function extractRawCommandNameFromNode(node: Node): string | null {
   switch (node.type) {
     case 'command': {
       const nameNode = node.childForFieldName('name');
       if (!nameNode) {
         return null;
       }
-      return normalizeCommandName(nameNode.text);
+      return unquoteCommandName(nameNode.text);
     }
     case 'declaration_command':
     case 'unset_command':
@@ -287,7 +291,7 @@ function extractNameFromNode(node: Node): string | null {
       if (!firstChild) {
         return null;
       }
-      return normalizeCommandName(firstChild.text);
+      return unquoteCommandName(firstChild.text);
     }
     case 'file_redirect': {
       // The first child might be a file descriptor (e.g., '2>').
@@ -322,10 +326,12 @@ function collectCommandDetails(
   while (stack.length > 0) {
     const current = stack.pop()!;
 
-    const name = extractNameFromNode(current);
-    if (name) {
+    const rawName = extractRawCommandNameFromNode(current);
+    if (rawName) {
+      const isRedirection = REDIRECTION_NAMES.has(rawName);
       details.push({
-        name,
+        name: isRedirection ? rawName : normalizeCommandName(rawName),
+        rawName,
         text: source.slice(current.startIndex, current.endIndex).trim(),
         startIndex: current.startIndex,
       });
@@ -496,6 +502,7 @@ function parsePowerShellCommandDetails(
           return null;
         }
 
+        const rawName = unquoteCommandName(commandDetail.name);
         const name = normalizeCommandName(commandDetail.name);
         const text =
           typeof commandDetail.text === 'string'
@@ -504,6 +511,7 @@ function parsePowerShellCommandDetails(
 
         return {
           name,
+          rawName,
           text,
           startIndex: 0,
         };
@@ -684,7 +692,7 @@ export function getCommandRoot(command: string): string | undefined {
     return undefined;
   }
 
-  return parsed.details[0]?.name;
+  return parsed.details[0]?.rawName;
 }
 
 export function getCommandRoots(command: string): string[] {
@@ -698,8 +706,8 @@ export function getCommandRoots(command: string): string[] {
   }
 
   return parsed.details
-    .map((detail) => detail.name)
-    .filter((name) => !REDIRECTION_NAMES.has(name))
+    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+    .map((detail) => detail.rawName)
     .filter(Boolean);
 }
 
