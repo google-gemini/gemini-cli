@@ -33,20 +33,22 @@ export function truncateForTelemetry(
   maxLength: number = 10000,
 ): AttributeValue | undefined {
   if (typeof value === 'string') {
-    if (value.length > maxLength) {
+    const chars = Array.from(value);
+    if (chars.length > maxLength) {
       return (
-        value.substring(0, maxLength) +
-        `...[TRUNCATED: original length ${value.length}]`
+        chars.slice(0, maxLength).join('') +
+        `...[TRUNCATED: original length ${chars.length}]`
       );
     }
     return value;
   }
   if (typeof value === 'object' && value !== null) {
     const stringified = safeJsonStringify(value);
-    if (stringified.length > maxLength) {
+    const chars = Array.from(stringified);
+    if (chars.length > maxLength) {
       return (
-        stringified.substring(0, maxLength) +
-        `...[TRUNCATED: original length ${stringified.length}]`
+        chars.slice(0, maxLength).join('') +
+        `...[TRUNCATED: original length ${chars.length}]`
       );
     }
     return stringified;

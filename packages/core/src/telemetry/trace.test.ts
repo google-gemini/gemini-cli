@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { trace, SpanStatusCode, diag, type Tracer } from '@opentelemetry/api';
-import { runInDevTraceSpan } from './trace.js';
+import { runInDevTraceSpan, truncateForTelemetry } from './trace.js';
 import {
   GeminiCliOperation,
   GEN_AI_CONVERSATION_ID,
@@ -35,6 +35,55 @@ vi.mock('@opentelemetry/api', async (importOriginal) => {
 vi.mock('../utils/session.js', () => ({
   sessionId: 'test-session-id',
 }));
+
+describe('truncateForTelemetry', () => {
+  it('should return string unchanged if within maxLength', () => {
+    expect(truncateForTelemetry('hello', 10)).toBe('hello');
+  });
+
+  it('should truncate string if exceeding maxLength', () => {
+    const result = truncateForTelemetry('hello world', 5);
+    expect(result).toBe('hello...[TRUNCATED: original length 11]');
+  });
+
+  it('should correctly truncate strings with multi-byte unicode characters (emojis)', () => {
+    // 5 emojis, each is multiple bytes in UTF-16
+    const emojis = '👋🌍🚀🔥🎉';
+
+    // Truncating to 3 "characters"
+    const result = truncateForTelemetry(emojis, 3);
+
+    // Array.from splits correctly on code points
+    expect(result).toBe('👋🌍🚀...[TRUNCATED: original length 5]');
+  });
+
+  it('should stringify and truncate objects if exceeding maxLength', () => {
+    const obj = { message: 'hello world', nested: { a: 1 } };
+    const stringified = JSON.stringify(obj);
+    const result = truncateForTelemetry(obj, 10);
+    expect(result).toBe(
+      stringified.substring(0, 10) +
+        `...[TRUNCATED: original length ${stringified.length}]`,
+    );
+  });
+
+  it('should stringify objects unchanged if within maxLength', () => {
+    const obj = { a: 1 };
+    expect(truncateForTelemetry(obj, 100)).toBe(JSON.stringify(obj));
+  });
+
+  it('should return booleans and numbers unchanged', () => {
+    expect(truncateForTelemetry(100)).toBe(100);
+    expect(truncateForTelemetry(true)).toBe(true);
+    expect(truncateForTelemetry(false)).toBe(false);
+  });
+
+  it('should return undefined for unsupported types', () => {
+    expect(truncateForTelemetry(undefined)).toBeUndefined();
+    expect(truncateForTelemetry(() => {})).toBeUndefined();
+    expect(truncateForTelemetry(Symbol('test'))).toBeUndefined();
+  });
+});
 
 describe('runInDevTraceSpan', () => {
   const mockSpan = {
