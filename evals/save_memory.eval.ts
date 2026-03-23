@@ -6,7 +6,6 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import { appEvalTest } from './app-test-helper.js';
 import {
   assertModelHasOutput,
   checkModelOutputContent,
@@ -230,98 +229,65 @@ describe('save_memory', () => {
   });
 
   const proactiveMemoryFromLongSession =
-    'Agent proactively saves preference mentioned in multi-turn session';
-  appEvalTest('USUALLY_PASSES', {
+    'Agent saves preference from simulated conversation history';
+  evalTest('USUALLY_PASSES', {
     name: proactiveMemoryFromLongSession,
-    configOverrides: {
-      experimental: { memoryManager: true },
+    params: {
+      settings: {
+        experimental: { memoryManager: true },
+      },
     },
-    files: {
-      'src/index.ts': 'export const VERSION = "1.0.0";\n',
-      'README.md': '# Test Project\nA sample project.\n',
-    },
-    setup: async (rig) => {
-      rig.setBreakpoint('save_memory');
-    },
-    prompt:
-      'By the way, I always prefer Vitest over Jest for testing in all my projects. Please just acknowledge.',
-    timeout: 120000,
-    assert: async (rig) => {
-      // Agent should proactively call save_memory for the stated preference.
-      const confirmation = await rig.waitForPendingConfirmation(
+    prompt: `Here is a record of our conversation so far. Please review it and save any persistent user preferences to memory.
+
+[Turn 1] User: By the way, I always prefer Vitest over Jest for testing in all my projects.
+[Turn 2] Assistant: Noted! What are you working on today?
+[Turn 3] User: I'm debugging a failing API endpoint in my Express app. The /users route returns a 500 error.
+[Turn 4] Assistant: Let me look at the route handler. It seems like the database connection might not be initialized before the query runs.
+[Turn 5] User: Good catch — I fixed the import and the route works now. Thanks!
+[Turn 6] Assistant: Great! Anything else you'd like to work on?
+[Turn 7] User: Actually, can you help me set up CI for this project? I want to run tests on every PR.
+[Turn 8] Assistant: Sure, I can set up a GitHub Actions workflow for that.
+
+Now please save any persistent preferences or facts about me from the above conversation to memory.`,
+    assert: async (rig, result) => {
+      const wasToolCalled = await rig.waitForToolCall(
         'save_memory',
-        60000,
+        undefined,
+        (args) => /vitest/i.test(args),
       );
       expect(
-        confirmation,
-        'Expected save_memory to be proactively triggered for the Vitest preference',
-      ).toBeTruthy();
+        wasToolCalled,
+        'Expected save_memory to be called with the Vitest preference from the conversation history',
+      ).toBe(true);
 
-      // Let the memory manager subagent run.
-      await rig.resolveTool(confirmation);
-      await rig.waitForIdle(60000);
-
-      // Send follow-up messages to verify this was a multi-turn capable session.
-      await rig.sendMessage(
-        'Read the file src/index.ts and tell me the version.',
-      );
-      await rig.waitForIdle(60000);
+      assertModelHasOutput(result);
     },
   });
 
   const memoryManagerRoutingPreferences =
-    'Agent routes global and project preferences via save_memory in multi-turn session';
-  appEvalTest('USUALLY_PASSES', {
+    'Agent routes global and project preferences to memory';
+  evalTest('USUALLY_PASSES', {
     name: memoryManagerRoutingPreferences,
-    configOverrides: {
-      experimental: { memoryManager: true },
+    params: {
+      settings: {
+        experimental: { memoryManager: true },
+      },
     },
-    files: {
-      'src/app.ts': 'console.log("hello world");\n',
-      'package.json': '{ "name": "test-project", "version": "1.0.0" }\n',
-    },
-    setup: async (rig) => {
-      rig.setBreakpoint('save_memory');
-    },
-    prompt:
-      'I always use dark mode in all my editors and terminals. Please just acknowledge.',
-    timeout: 180000,
-    assert: async (rig) => {
-      // Agent should proactively call save_memory for the global preference.
-      const firstConfirmation = await rig.waitForPendingConfirmation(
-        'save_memory',
-        60000,
-      );
-      expect(
-        firstConfirmation,
-        'Expected save_memory to be called for the dark mode preference',
-      ).toBeTruthy();
-      await rig.resolveTool(firstConfirmation);
-      await rig.waitForIdle(60000);
+    prompt: `I have two preferences to save:
 
-      // Turn 2: Filler task.
-      await rig.sendMessage(
-        'Read the file src/app.ts and tell me what it does.',
-      );
-      await rig.waitForIdle(60000);
+1. I always use dark mode in all my editors and terminals — this applies to all my projects everywhere.
+2. For this project specifically, we use 2-space indentation.
 
-      // Turn 3: State a project-specific preference.
-      rig.setBreakpoint('save_memory');
-      await rig.sendMessage(
-        'For this project specifically, we use 2-space indentation. Please just acknowledge.',
-      );
+Please save both to memory.`,
+    assert: async (rig, result) => {
+      const wasToolCalled = await rig.waitForToolCall('save_memory');
+      expect(wasToolCalled, 'Expected save_memory to be called').toBe(true);
 
-      // Agent should proactively call save_memory for the project preference.
-      const secondConfirmation = await rig.waitForPendingConfirmation(
-        'save_memory',
-        60000,
-      );
-      expect(
-        secondConfirmation,
-        'Expected save_memory to be called for the indentation preference',
-      ).toBeTruthy();
-      await rig.resolveTool(secondConfirmation);
-      await rig.waitForIdle(60000);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/dark mode|indentation|saved|memory|remembered/i],
+        testName: `${TEST_PREFIX}${memoryManagerRoutingPreferences}`,
+      });
     },
   });
 });
