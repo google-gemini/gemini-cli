@@ -43,7 +43,7 @@ describe('SlashCommandResolver', () => {
       ]);
 
       expect(finalCommands.map((c) => c.name)).toContain('deploy');
-      expect(finalCommands.map((c) => c.name)).toContain('firebase.deploy');
+      expect(finalCommands.map((c) => c.name)).toContain('firebase:deploy');
       expect(conflicts).toHaveLength(1);
     });
 
@@ -159,7 +159,7 @@ describe('SlashCommandResolver', () => {
 
     it('should apply numeric suffixes when renames also conflict', () => {
       const user1 = createMockCommand('deploy', CommandKind.USER_FILE);
-      const user2 = createMockCommand('gcp.deploy', CommandKind.USER_FILE);
+      const user2 = createMockCommand('gcp:deploy', CommandKind.USER_FILE);
       const extension = {
         ...createMockCommand('deploy', CommandKind.EXTENSION_FILE),
         extensionName: 'gcp',
@@ -171,7 +171,7 @@ describe('SlashCommandResolver', () => {
         extension,
       ]);
 
-      expect(finalCommands.find((c) => c.name === 'gcp.deploy1')).toBeDefined();
+      expect(finalCommands.find((c) => c.name === 'gcp:deploy1')).toBeDefined();
     });
 
     it('should prefix skills with extension name when they conflict with built-in', () => {
@@ -185,7 +185,37 @@ describe('SlashCommandResolver', () => {
 
       const names = finalCommands.map((c) => c.name);
       expect(names).toContain('chat');
-      expect(names).toContain('google-workspace.chat');
+      expect(names).toContain('google-workspace:chat');
+    });
+
+    it('should ALWAYS prefix extension skills even if no conflict exists', () => {
+      const skill = {
+        ...createMockCommand('chat', CommandKind.SKILL),
+        extensionName: 'google-workspace',
+      };
+
+      const { finalCommands } = SlashCommandResolver.resolve([skill]);
+
+      const names = finalCommands.map((c) => c.name);
+      expect(names).toContain('google-workspace:chat');
+      expect(names).not.toContain('chat');
+    });
+
+    it('should use numeric suffixes if prefixed skill names collide', () => {
+      const skill1 = {
+        ...createMockCommand('chat', CommandKind.SKILL),
+        extensionName: 'google-workspace',
+      };
+      const skill2 = {
+        ...createMockCommand('chat', CommandKind.SKILL),
+        extensionName: 'google-workspace',
+      };
+
+      const { finalCommands } = SlashCommandResolver.resolve([skill1, skill2]);
+
+      const names = finalCommands.map((c) => c.name);
+      expect(names).toContain('google-workspace:chat');
+      expect(names).toContain('google-workspace:chat1');
     });
 
     it('should NOT prefix skills with "skill" when extension name is missing', () => {
