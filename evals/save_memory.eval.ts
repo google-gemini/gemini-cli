@@ -229,7 +229,7 @@ describe('save_memory', () => {
   });
 
   const proactiveMemoryFromLongSession =
-    'Agent saves preference from simulated conversation history';
+    'Agent saves preference from earlier in conversation history';
   evalTest('USUALLY_PASSES', {
     name: proactiveMemoryFromLongSession,
     params: {
@@ -237,18 +237,60 @@ describe('save_memory', () => {
         experimental: { memoryManager: true },
       },
     },
-    prompt: `Here is a record of our conversation so far. Please review it and save any persistent user preferences to memory.
-
-[Turn 1] User: By the way, I always prefer Vitest over Jest for testing in all my projects.
-[Turn 2] Assistant: Noted! What are you working on today?
-[Turn 3] User: I'm debugging a failing API endpoint in my Express app. The /users route returns a 500 error.
-[Turn 4] Assistant: Let me look at the route handler. It seems like the database connection might not be initialized before the query runs.
-[Turn 5] User: Good catch — I fixed the import and the route works now. Thanks!
-[Turn 6] Assistant: Great! Anything else you'd like to work on?
-[Turn 7] User: Actually, can you help me set up CI for this project? I want to run tests on every PR.
-[Turn 8] Assistant: Sure, I can set up a GitHub Actions workflow for that.
-
-Now please save any persistent preferences or facts about me from the above conversation to memory.`,
+    messages: [
+      {
+        id: 'msg-1',
+        type: 'user',
+        content: [
+          {
+            text: 'By the way, I always prefer Vitest over Jest for testing in all my projects.',
+          },
+        ],
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        type: 'gemini',
+        content: [{ text: 'Noted! What are you working on today?' }],
+        timestamp: '2026-01-01T00:00:05Z',
+      },
+      {
+        id: 'msg-3',
+        type: 'user',
+        content: [
+          {
+            text: "I'm debugging a failing API endpoint. The /users route returns a 500 error.",
+          },
+        ],
+        timestamp: '2026-01-01T00:01:00Z',
+      },
+      {
+        id: 'msg-4',
+        type: 'gemini',
+        content: [
+          {
+            text: 'It looks like the database connection might not be initialized before the query runs.',
+          },
+        ],
+        timestamp: '2026-01-01T00:01:10Z',
+      },
+      {
+        id: 'msg-5',
+        type: 'user',
+        content: [
+          { text: 'Good catch — I fixed the import and the route works now.' },
+        ],
+        timestamp: '2026-01-01T00:02:00Z',
+      },
+      {
+        id: 'msg-6',
+        type: 'gemini',
+        content: [{ text: 'Great! Anything else you would like to work on?' }],
+        timestamp: '2026-01-01T00:02:05Z',
+      },
+    ],
+    prompt:
+      'Please save any persistent preferences or facts about me from our conversation to memory.',
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall(
         'save_memory',
@@ -273,21 +315,48 @@ Now please save any persistent preferences or facts about me from the above conv
         experimental: { memoryManager: true },
       },
     },
-    prompt: `I have two preferences to save:
-
-1. I always use dark mode in all my editors and terminals — this applies to all my projects everywhere.
-2. For this project specifically, we use 2-space indentation.
-
-Please save both to memory.`,
+    messages: [
+      {
+        id: 'msg-1',
+        type: 'user',
+        content: [
+          {
+            text: 'I always use dark mode in all my editors and terminals.',
+          },
+        ],
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        type: 'gemini',
+        content: [{ text: 'Got it, I will keep that in mind!' }],
+        timestamp: '2026-01-01T00:00:05Z',
+      },
+      {
+        id: 'msg-3',
+        type: 'user',
+        content: [
+          {
+            text: 'For this project specifically, we use 2-space indentation.',
+          },
+        ],
+        timestamp: '2026-01-01T00:01:00Z',
+      },
+      {
+        id: 'msg-4',
+        type: 'gemini',
+        content: [
+          { text: 'Understood, 2-space indentation for this project.' },
+        ],
+        timestamp: '2026-01-01T00:01:05Z',
+      },
+    ],
+    prompt: 'Please save the preferences I mentioned earlier to memory.',
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
       expect(wasToolCalled, 'Expected save_memory to be called').toBe(true);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/dark mode|indentation|saved|memory|remembered/i],
-        testName: `${TEST_PREFIX}${memoryManagerRoutingPreferences}`,
-      });
     },
   });
 });

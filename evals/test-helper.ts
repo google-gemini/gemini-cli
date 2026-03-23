@@ -13,6 +13,9 @@ import { TestRig } from '@google/gemini-cli-test-utils';
 import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
+  Storage,
+  getProjectHash,
+  SESSION_FILE_PREFIX,
 } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
@@ -117,8 +120,46 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
+      // If messages are provided, write a session file so --resume can load it.
+      let sessionId: string | undefined;
+      if (evalCase.messages) {
+        sessionId =
+          evalCase.sessionId ||
+          `test-session-${crypto.randomUUID().slice(0, 8)}`;
+        const storage = new Storage(fs.realpathSync(rig.testDir!));
+
+        try {
+          await storage.initialize();
+          const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
+          fs.mkdirSync(chatsDir, { recursive: true });
+
+          const conversation = {
+            sessionId,
+            projectHash: getProjectHash(fs.realpathSync(rig.testDir!)),
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: evalCase.messages,
+          };
+
+          const timestamp = new Date()
+            .toISOString()
+            .slice(0, 16)
+            .replace(/:/g, '-');
+          const filename = `${SESSION_FILE_PREFIX}${timestamp}-${sessionId.slice(0, 8)}.json`;
+          fs.writeFileSync(
+            path.join(chatsDir, filename),
+            JSON.stringify(conversation, null, 2),
+          );
+        } catch (e) {
+          // Storage initialization may fail in some environments; log and continue.
+          console.warn('Failed to write session history:', e);
+        }
+      }
+
       const result = await rig.run({
-        args: evalCase.prompt,
+        args: sessionId
+          ? ['--resume', sessionId, evalCase.prompt]
+          : evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
         timeout: evalCase.timeout,
         env: {
@@ -219,6 +260,10 @@ export interface EvalCase {
   prompt: string;
   timeout?: number;
   files?: Record<string, string>;
+  /** Conversation history to pre-load via --resume. Each entry is a message object with type, content, etc. */
+  messages?: Record<string, unknown>[];
+  /** Session ID for the resumed session. Auto-generated if not provided. */
+  sessionId?: string;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
 }
