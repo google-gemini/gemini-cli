@@ -1702,8 +1702,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         handleCtrlCPress();
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
-        handleCtrlDPress();
-        return true;
+        // Only treat Ctrl+D as exit when input is empty (standard shell behavior).
+        // When there is input text, let it fall through to DELETE_CHAR_RIGHT.
+        if (bufferRef.current.text === '') {
+          handleCtrlDPress();
+          return true;
+        }
+        return false;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
       } else if (
