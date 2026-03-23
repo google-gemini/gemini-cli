@@ -38,6 +38,7 @@ export const AlternateBufferQuittingDisplay = () => {
       {uiState.history.map((h) => (
         <HistoryItemDisplay
           terminalWidth={uiState.mainAreaWidth}
+          context={uiState.commandContext}
           availableTerminalHeight={undefined}
           availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
           key={h.id}
@@ -49,6 +50,7 @@ export const AlternateBufferQuittingDisplay = () => {
       {uiState.pendingHistoryItems.map((item, i) => (
         <HistoryItemDisplay
           key={i}
+          context={uiState.commandContext}
           availableTerminalHeight={undefined}
           terminalWidth={uiState.mainAreaWidth}
           item={{ ...item, id: 0 }}

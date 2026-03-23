@@ -1,0 +1,19 @@
+﻿
+D:\Gemini Performance Dashboard\gemini-cli\packages\core\src\integration\devtools-bridge.ts
+    1:1   error    Header does not include expected content                                                                                                                                                                                                                                                                            headers/header-format
+    1:1   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any', '@typescript-eslint/no-unsafe-assignment', '@typescript-eslint/no-unsafe-return', '@typescript-eslint/no-unsafe-member-access', '@typescript-eslint/no-unsafe-call', or '@typescript-eslint/no-unused-vars')
+   89:30  error    Unsafe assertion from `any` detected: consider using type guards or a safer assertion                                                                                                                                                                                                                               @typescript-eslint/no-unsafe-type-assertion
+   89:41  error    This assertion is unnecessary since it does not change the type of the expression                                                                                                                                                                                                                                   @typescript-eslint/no-unnecessary-type-assertion
+  103:29  error    Unsafe assertion from `any` detected: consider using type guards or a safer assertion                                                                                                                                                                                                                               @typescript-eslint/no-unsafe-type-assertion
+  103:40  error    This assertion is unnecessary since it does not change the type of the expression                                                                                                                                                                                                                                   @typescript-eslint/no-unnecessary-type-assertion
+
+D:\Gemini Performance Dashboard\gemini-cli\packages\core\src\performance\persistence-manager.ts
+   1:1  error    Header does not include expected content                                       headers/header-format
+  31:5  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  43:9  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  46:9  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  50:7  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+Γ£û 11 problems (6 errors, 5 warnings)
+  4 errors and 5 warnings potentially fixable with the `--fix` option.
+

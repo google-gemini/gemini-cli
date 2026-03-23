@@ -52,6 +52,11 @@ import {
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
 import type { LlmRole } from '../telemetry/types.js';
+import {
+  ModelLatencyCollector,
+  SessionCollector,
+  PersistenceManager,
+} from '../performance/index.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -815,11 +820,14 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
+    const startTime = Date.now();
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
@@ -853,6 +861,10 @@ export class GeminiChat {
         this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
         if (chunk.usageMetadata.promptTokenCount !== undefined) {
           this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
+          totalPromptTokens = chunk.usageMetadata.promptTokenCount;
+        }
+        if (chunk.usageMetadata.candidatesTokenCount !== undefined) {
+          totalCompletionTokens = chunk.usageMetadata.candidatesTokenCount;
         }
       }
 
@@ -881,6 +893,29 @@ export class GeminiChat {
         yield chunk;
       }
     }
+
+    // Record performance metrics
+    const duration = Date.now() - startTime;
+    ModelLatencyCollector.getInstance().recordCall({
+      model,
+      operation: hasToolCall ? 'tool_call' : 'generate',
+      duration,
+      tokens: {
+        prompt: totalPromptTokens,
+        completion: totalCompletionTokens,
+        total: totalPromptTokens + totalCompletionTokens,
+      },
+      success: true,
+      cached: false, // We don't have easy access to cache status here yet
+    });
+
+    SessionCollector.getInstance().trackTokens(
+      totalPromptTokens,
+      totalCompletionTokens,
+    );
+
+    // Persist metrics to disk so dashboard can see them in real-time
+    PersistenceManager.persist().catch(() => {});
 
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];

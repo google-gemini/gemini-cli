@@ -68,6 +68,7 @@ export const MainContent = () => {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
+            context={uiState.commandContext}
             availableTerminalHeight={
               uiState.constrainHeight || !isExpandable
                 ? staticAreaMaxItemHeight
@@ -82,14 +83,7 @@ export const MainContent = () => {
           />
         );
       }),
-    [
-      uiState.history,
-      mainAreaWidth,
-      staticAreaMaxItemHeight,
-      uiState.slashCommands,
-      uiState.constrainHeight,
-      lastUserPromptIndex,
-    ],
+    [uiState, mainAreaWidth, staticAreaMaxItemHeight, lastUserPromptIndex],
   );
 
   const staticHistoryItems = useMemo(
@@ -108,6 +102,7 @@ export const MainContent = () => {
         {pendingHistoryItems.map((item, i) => (
           <HistoryItemDisplay
             key={i}
+            context={uiState.commandContext}
             availableTerminalHeight={
               uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
             }
@@ -123,8 +118,8 @@ export const MainContent = () => {
       </Box>
     ),
     [
+      uiState,
       pendingHistoryItems,
-      uiState.constrainHeight,
       staticAreaMaxItemHeight,
       mainAreaWidth,
       showConfirmationQueue,
@@ -142,7 +137,7 @@ export const MainContent = () => {
       })),
       { type: 'pending' as const },
     ],
-    [uiState.history, lastUserPromptIndex],
+    [uiState, lastUserPromptIndex],
   );
 
   const renderItem = useCallback(
@@ -159,6 +154,7 @@ export const MainContent = () => {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
+            context={uiState.commandContext}
             availableTerminalHeight={
               uiState.constrainHeight || !item.isExpandable
                 ? staticAreaMaxItemHeight
@@ -177,12 +173,11 @@ export const MainContent = () => {
       }
     },
     [
+      uiState,
       showHeaderDetails,
       version,
       mainAreaWidth,
-      uiState.slashCommands,
       pendingItems,
-      uiState.constrainHeight,
       staticAreaMaxItemHeight,
     ],
   );

@@ -62,3 +62,7 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# GSoC Prototype Test Scripts
+run-dashboard.ts
+run-real-dashboard.ts

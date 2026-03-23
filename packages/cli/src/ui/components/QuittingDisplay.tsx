@@ -24,6 +24,7 @@ export const QuittingDisplay = () => {
       {uiState.quittingMessages.map((item) => (
         <HistoryItemDisplay
           key={item.id}
+          context={uiState.commandContext}
           availableTerminalHeight={
             uiState.constrainHeight ? availableTerminalHeight : undefined
           }

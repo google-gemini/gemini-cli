@@ -247,6 +247,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [customDialog, setCustomDialog] = useState<React.ReactNode | null>(
     null,
   );
+  const [hideMainContentForDialog, setHideMainContentForDialog] =
+    useState(false);
   const [copyModeEnabled, setCopyModeEnabled] = useState(false);
   const [pendingRestorePrompt, setPendingRestorePrompt] = useState(false);
   const toggleBackgroundShellRef = useRef<() => void>(() => {});
@@ -964,7 +966,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     extensionsUpdateStateInternal,
     isConfigInitialized,
     setBannerVisible,
-    setCustomDialog,
+    useCallback((dialog: React.ReactNode | null, hideMainContent?: boolean) => {
+      setCustomDialog(dialog);
+      setHideMainContentForDialog(!!hideMainContent);
+    }, []),
   );
 
   const [authConsentRequest, setAuthConsentRequest] =
@@ -2311,6 +2316,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       embeddedShellFocused,
       showDebugProfiler,
       customDialog,
+      hideMainContentForDialog,
       copyModeEnabled,
       transientMessage,
       bannerData,
@@ -2333,6 +2339,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       hintBuffer: '',
     }),
     [
+      hideMainContentForDialog,
       isThemeDialogOpen,
       shouldShowRetentionWarning,
       retentionCheckComplete,
