@@ -107,12 +107,20 @@ policy.** A subset that prove to be highly stable over time may be promoted to
 
 - `name`: The name of the evaluation case.
 - `prompt`: The prompt to send to the model.
+- `files`: An optional object mapping relative file paths to their contents
+  (e.g., `{ 'src/app.ts': 'const x = 1;' }`). When provided, the test helper
+  creates these files in a temporary directory and initializes a git repository
+  with an initial commit.
 - `params`: An optional object with parameters to pass to the test rig (e.g.,
-  settings).
+  settings). Note: restricting core tools via `tools.core` is forbidden and
+  enforced at compile time.
+- `timeout`: An optional timeout in milliseconds. Overrides the default 5-minute
+  timeout from the vitest config.
+- `approvalMode`: An optional string controlling how tool calls are approved
+  during the eval. One of `'default'`, `'auto_edit'`, `'yolo'`, or `'plan'`.
+  Defaults to `'yolo'` (all tools auto-approved).
 - `assert`: An async function that takes the test rig and the result of the run
   and asserts that the result is correct.
-- `log`: An optional boolean that, if set to `true`, will log the tool calls to
-  a file in the `evals/logs` directory.
 
 ### Example
 
