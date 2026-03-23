@@ -8,6 +8,14 @@ exports[`runNonInteractive > should emit appropriate error event in streaming JS
 "
 `;
 
+exports[`runNonInteractive > should emit appropriate error event in streaming JSON mode: 'max session turns' 1`] = `
+"{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
+{"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Max turns test"}
+{"type":"error","timestamp":"<TIMESTAMP>","severity":"error","message":"Maximum session turns exceeded"}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"success","stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0,"models":{}}}
+"
+`;
+
 exports[`runNonInteractive > should emit appropriate events for streaming JSON output 1`] = `
 "{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
 {"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Stream test"}
