@@ -116,7 +116,6 @@ describe.skipIf(os.platform() !== 'darwin')(
         try {
           const manager = new MacOsSandboxManager({
             workspace: process.cwd(),
-            allowedPaths: [allowedDir],
           });
           const testFile = path.join(allowedDir, 'test.txt');
 
@@ -125,6 +124,9 @@ describe.skipIf(os.platform() !== 'darwin')(
             args: [testFile],
             cwd: process.cwd(),
             env: process.env,
+            policy: {
+              allowedPaths: [allowedDir],
+            },
           });
 
           const execResult = await runCommand(command);
@@ -183,13 +185,15 @@ describe.skipIf(os.platform() !== 'darwin')(
       it('should grant network access when explicitly allowed', async () => {
         const manager = new MacOsSandboxManager({
           workspace: process.cwd(),
-          networkAccess: true,
         });
         const command = await manager.prepareCommand({
           command: 'curl',
           args: ['-s', '--connect-timeout', '1', testServerUrl],
           cwd: process.cwd(),
           env: process.env,
+          policy: {
+            networkAccess: true,
+          },
         });
 
         const execResult = await runCommand(command);

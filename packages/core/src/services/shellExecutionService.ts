@@ -437,7 +437,7 @@ export class ShellExecutionService {
       args: spawnArgs,
       env: baseEnv,
       cwd,
-      config: {
+      policy: {
         ...shellExecutionConfig,
         ...(shellExecutionConfig.sandboxConfig || {}),
         sanitizationConfig,
