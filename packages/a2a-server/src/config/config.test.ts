@@ -325,8 +325,6 @@ describe('loadConfig', () => {
       );
     });
 
-<<<<<<< HEAD
-=======
     it('should pass enableAgents to Config constructor', async () => {
       const settings: Settings = {
         experimental: {
@@ -349,8 +347,6 @@ describe('loadConfig', () => {
         }),
       );
     });
-
->>>>>>> b2d6dc4e3 (chore(config): disable agents by default (#23546))
     describe('interactivity', () => {
       it('should set interactive true when not headless', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(false);
