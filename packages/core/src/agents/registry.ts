@@ -44,6 +44,7 @@ export class AgentRegistry {
   private readonly agents = new Map<string, AgentDefinition<any>>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly allDefinitions = new Map<string, AgentDefinition<any>>();
+  private readonly builtInAgents = new Set<string>();
 
   constructor(private readonly config: Config) {}
 
@@ -54,6 +55,13 @@ export class AgentRegistry {
     coreEvents.on(CoreEvent.ModelChanged, this.onModelChanged);
 
     await this.loadAgents();
+  }
+
+  /**
+   * Returns true if the agent is a built-in agent.
+   */
+  isBuiltIn(name: string): boolean {
+    return this.builtInAgents.has(name);
   }
 
   private onModelChanged = () => {
@@ -240,15 +248,25 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
-    this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
-    this.registerLocalAgent(CliHelpAgent(this.config));
-    this.registerLocalAgent(GeneralistAgent(this.config));
+    const codebaseAgent = CodebaseInvestigatorAgent(this.config);
+    this.builtInAgents.add(codebaseAgent.name);
+    this.registerLocalAgent(codebaseAgent);
+
+    const helpAgent = CliHelpAgent(this.config);
+    this.builtInAgents.add(helpAgent.name);
+    this.registerLocalAgent(helpAgent);
+
+    const generalistAgent = GeneralistAgent(this.config);
+    this.builtInAgents.add(generalistAgent.name);
+    this.registerLocalAgent(generalistAgent);
 
     // Register the browser agent if enabled in settings.
     // Tools are configured dynamically at invocation time via browserAgentFactory.
     const browserConfig = this.config.getBrowserAgentConfig();
     if (browserConfig.enabled) {
-      this.registerLocalAgent(BrowserAgentDefinition(this.config));
+      const browserAgent = BrowserAgentDefinition(this.config);
+      this.builtInAgents.add(browserAgent.name);
+      this.registerLocalAgent(browserAgent);
     }
   }
 

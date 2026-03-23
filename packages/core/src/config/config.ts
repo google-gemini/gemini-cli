@@ -951,7 +951,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? true;
+    this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -3196,7 +3196,8 @@ export class Config implements McpContext, AgentLoopContext {
     for (const definition of definitions) {
       try {
         if (
-          !this.isAgentsEnabled() ||
+          (!this.isAgentsEnabled() &&
+            !this.agentRegistry.isBuiltIn(definition.name)) ||
           agentsOverrides[definition.name]?.enabled === false
         ) {
           continue;

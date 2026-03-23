@@ -325,6 +325,28 @@ describe('loadConfig', () => {
       );
     });
 
+    it('should pass enableAgents to Config constructor', async () => {
+      const settings: Settings = {
+        experimental: {
+          enableAgents: false,
+        },
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: false,
+        }),
+      );
+    });
+
+    it('should default enableAgents to false when not provided', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: false,
+        }),
+      );
+    });
     describe('interactivity', () => {
       it('should set interactive true when not headless', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(false);
