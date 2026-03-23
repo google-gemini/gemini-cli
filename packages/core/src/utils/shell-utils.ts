@@ -264,11 +264,7 @@ function normalizeCommandName(raw: string): string {
       return raw.slice(1, -1);
     }
   }
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  return trimmed.split(/[\\/]/).pop() ?? trimmed;
+  return raw.trim();
 }
 
 function extractNameFromNode(node: Node): string | null {
