@@ -11,12 +11,25 @@ import fs from 'node:fs';
 import { appEvalTest } from './app-test-helper.js';
 import { PolicyDecision } from '@google/gemini-cli-core';
 
+/**
+ * Compile-time guard to prevent tool restriction usage in eval configs
+ */
+type ForbiddenToolKeys =
+  | 'excludeTools'
+  | 'coreTools'
+  | 'allowedTools'
+  | 'mainAgentTools';
+
+type NoToolRestrictions<T> = T & {
+  [K in ForbiddenToolKeys]?: never;
+};
+
 describe('Model Steering Behavioral Evals', () => {
   appEvalTest('USUALLY_PASSES', {
     name: 'Corrective Hint: Model switches task based on hint during tool turn',
     configOverrides: {
       modelSteering: true,
-    },
+    } as NoToolRestrictions<Record<string, unknown>>,
     files: {
       'README.md':
         '# Gemini CLI\nThis is a tool for developers.\nLicense: Apache-2.0\nLine 4\nLine 5\nLine 6',
@@ -55,7 +68,7 @@ describe('Model Steering Behavioral Evals', () => {
     name: 'Suggestive Hint: Model incorporates user guidance mid-stream',
     configOverrides: {
       modelSteering: true,
-    },
+    } as NoToolRestrictions<Record<string, unknown>>,
     files: {},
     prompt: 'Create a file called "hw.js" with a JS hello world.',
     setup: async (rig) => {
