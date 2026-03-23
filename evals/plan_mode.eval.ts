@@ -141,24 +141,26 @@ describe('plan_mode', () => {
       const exitPlanCall = toolLogs.find(
         (log) => log.toolRequest.name === 'exit_plan_mode',
       );
-      if (exitPlanCall) {
-        const args = JSON.parse(exitPlanCall.toolRequest.args);
-        expect(
-          args.plan_filename,
-          'plan_filename should be a string',
-        ).toBeTypeOf('string');
-        expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
-          /\.md$/,
-        );
-        expect(
-          args.plan_filename,
-          'plan_filename should not be a path',
-        ).not.toContain('/');
-        expect(
-          args.plan_filename,
-          'plan_filename should not be a path',
-        ).not.toContain('\\');
-      }
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const args = JSON.parse(exitPlanCall!.toolRequest.args);
+      expect(args.plan_filename, 'plan_filename should be a string').toBeTypeOf(
+        'string',
+      );
+      expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
+        /\.md$/,
+      );
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('/');
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('\\');
 
       assertModelHasOutput(result);
     },
@@ -226,24 +228,26 @@ describe('plan_mode', () => {
       const exitPlanCall = toolLogs.find(
         (log) => log.toolRequest.name === 'exit_plan_mode',
       );
-      if (exitPlanCall) {
-        const args = JSON.parse(exitPlanCall.toolRequest.args);
-        expect(
-          args.plan_filename,
-          'plan_filename should be a string',
-        ).toBeTypeOf('string');
-        expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
-          /\.md$/,
-        );
-        expect(
-          args.plan_filename,
-          'plan_filename should not be a path',
-        ).not.toContain('/');
-        expect(
-          args.plan_filename,
-          'plan_filename should not be a path',
-        ).not.toContain('\\');
-      }
+      expect(
+        exitPlanCall,
+        'Expected to find exit_plan_mode in tool logs',
+      ).toBeDefined();
+
+      const args = JSON.parse(exitPlanCall!.toolRequest.args);
+      expect(args.plan_filename, 'plan_filename should be a string').toBeTypeOf(
+        'string',
+      );
+      expect(args.plan_filename, 'plan_filename should end with .md').toMatch(
+        /\.md$/,
+      );
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('/');
+      expect(
+        args.plan_filename,
+        'plan_filename should not be a path',
+      ).not.toContain('\\');
 
       // Check if plan was written
       const planWrite = toolLogs.find(
