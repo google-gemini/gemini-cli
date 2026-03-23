@@ -53,11 +53,56 @@ export function resolvePolicyChain(
     useGemini31,
     useCustomToolModel,
     hasAccessToPreview,
+    config,
   );
   const isAutoPreferred = preferredModel
     ? isAutoModel(preferredModel, config)
     : false;
   const isAutoConfigured = isAutoModel(configuredModel, config);
+
+  // --- DYNAMIC PATH ---
+  if (config.getExperimentalDynamicModelConfiguration?.() === true) {
+    const context = {
+      useGemini3_1: useGemini31,
+      useCustomTools: useCustomToolModel,
+    };
+
+    if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+      chain = config.modelConfigService.resolveChain('lite', context);
+    } else if (
+      isGemini3Model(resolvedModel, config) ||
+      isAutoModel(preferredModel ?? '', config) ||
+      isAutoModel(configuredModel, config)
+    ) {
+      // 1. Try to find a chain specifically for the current configured alias
+      if (
+        isAutoModel(configuredModel, config) &&
+        config.modelConfigService.getModelChain(configuredModel)
+      ) {
+        chain = config.modelConfigService.resolveChain(
+          configuredModel,
+          context,
+        );
+      }
+      // 2. Fallback to family-based auto-routing
+      if (!chain) {
+        const previewEnabled =
+          hasAccessToPreview &&
+          (isGemini3Model(resolvedModel, config) ||
+            preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+            configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
+        const chainKey = previewEnabled ? 'preview' : 'default';
+        chain = config.modelConfigService.resolveChain(chainKey, context);
+      }
+    }
+    if (!chain) {
+      // No matching modelChains found, default to single model chain
+      chain = createSingleModelChain(modelFromConfig);
+    }
+    return applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+  }
+
+  // --- LEGACY PATH ---
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
@@ -90,7 +135,17 @@ export function resolvePolicyChain(
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
+  return applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+}
 
+/**
+ * Applies active-index slicing and wrap-around logic to a chain template.
+ */
+function applyDynamicSlicing(
+  chain: ModelPolicy[],
+  resolvedModel: string,
+  wrapsAround: boolean,
+): ModelPolicyChain {
   const activeIndex = chain.findIndex(
     (policy) => policy.model === resolvedModel,
   );

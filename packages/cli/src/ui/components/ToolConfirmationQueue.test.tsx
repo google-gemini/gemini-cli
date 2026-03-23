@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act } from 'react';
+import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
@@ -82,7 +84,7 @@ describe('ToolConfirmationQueue', () => {
       total: 3,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -93,7 +95,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Action Required');
@@ -120,7 +121,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -131,9 +132,61 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
+  });
+
+  it('renders expansion hint when content is long and constrained', async () => {
+    const longDiff = '@@ -1,1 +1,50 @@\n' + '+line\n'.repeat(50);
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'replace',
+        description: 'edit file',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'edit' as const,
+          title: 'Confirm edit',
+          fileName: 'test.ts',
+          filePath: '/test.ts',
+          fileDiff: longDiff,
+          originalContent: 'old',
+          newContent: 'new',
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(
+      <Box flexDirection="column" height={30}>
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />
+      </Box>,
+      {
+        config: {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
+          ...mockConfig,
+          getUseAlternateBuffer: () => true,
+        } as unknown as Config,
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 20,
+          constrainHeight: true,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+
+    await waitFor(() =>
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      ),
+    );
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -160,7 +213,7 @@ describe('ToolConfirmationQueue', () => {
     };
 
     // Use a small availableTerminalHeight to force truncation
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -176,7 +229,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     // With availableTerminalHeight = 10:
     // maxHeight = Math.max(10 - 1, 4) = 9
@@ -211,11 +263,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const {
-      lastFrame,
-      waitUntilReady,
-      unmount = vi.fn(),
-    } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -230,7 +278,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     // Calculation:
     // availableTerminalHeight: 20 -> maxHeight: 19 (20-1)
@@ -271,7 +318,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -285,7 +332,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).not.toContain('Press CTRL-O to show more lines');
@@ -310,7 +356,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -321,7 +367,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -348,16 +393,18 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = await renderWithProviders(
-      <ToolConfirmationQueue
-        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-      />,
-      {
-        config: mockConfig,
-        uiState: {
-          terminalWidth: 80,
+    const { lastFrame, unmount } = await act(async () =>
+      renderWithProviders(
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />,
+        {
+          config: mockConfig,
+          uiState: {
+            terminalWidth: 80,
+          },
         },
-      },
+      ),
     );
 
     await waitFor(() => {

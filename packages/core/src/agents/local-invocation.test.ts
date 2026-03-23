@@ -271,6 +271,39 @@ describe('LocalSubagentInvocation', () => {
       );
     });
 
+    it('should overwrite the thought content with new THOUGHT_CHUNK activity', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'I am thinking.' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Now I will act.' },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      const calls = updateOutput.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Now I will act.',
+        }),
+      );
+    });
+
     it('should stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
