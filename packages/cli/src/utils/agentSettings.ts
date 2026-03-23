@@ -40,8 +40,8 @@ const agentStrategy: FeatureToggleStrategy = {
 };
 
 /**
- * Enables an agent by ensuring it is enabled in any writable scope (User and Workspace).
- * It sets `agents.overrides.<agentName>.enabled` to `true`.
+ * Enables an agent by setting `agents.overrides.<agentName>.enabled` to `true`
+ * in available writable scopes (User and Workspace).
  */
 export function enableAgent(
   settings: LoadedSettings,
@@ -59,7 +59,8 @@ export function enableAgent(
 }
 
 /**
- * Disables an agent by setting `agents.overrides.<agentName>.enabled` to `false` in the specified scope.
+ * Disables an agent by setting `agents.overrides.<agentName>.enabled` to `false`
+ * in the specified scope.
  */
 export function disableAgent(
   settings: LoadedSettings,
