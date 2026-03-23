@@ -108,7 +108,7 @@ export function toCountTokenRequest(
   return {
     request: {
       model: 'models/' + req.model,
-      contents: toContents(req.contents),
+      contents: toContents(req.contents, { isCountToken: true }),
     },
   };
 }
@@ -177,13 +177,16 @@ function toVertexGenerateContentRequest(
   };
 }
 
-export function toContents(contents: ContentListUnion): Content[] {
+export function toContents(
+  contents: ContentListUnion,
+  options?: { isCountToken?: boolean },
+): Content[] {
   if (Array.isArray(contents)) {
     // it's a Content[] or a PartsUnion[]
-    return contents.map(toContent);
+    return contents.map((c) => toContent(c, options));
   }
   // it's a Content or a PartsUnion
-  return [toContent(contents)];
+  return [toContent(contents, options)];
 }
 
 function maybeToContent(content?: ContentUnion): Content | undefined {
@@ -203,12 +206,15 @@ function isPart(c: ContentUnion): c is PartUnion {
   );
 }
 
-function toContent(content: ContentUnion): Content {
+function toContent(
+  content: ContentUnion,
+  options?: { isCountToken?: boolean },
+): Content {
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
     return {
       role: 'user',
-      parts: toParts(content),
+      parts: toParts(content, options),
     };
   }
   if (typeof content === 'string') {
@@ -223,22 +229,28 @@ function toContent(content: ContentUnion): Content {
     return {
       ...content,
       parts: content.parts
-        ? toParts(content.parts.filter((p) => p != null))
+        ? toParts(
+            content.parts.filter((p) => p != null),
+            options,
+          )
         : [],
     };
   }
   // it's a Part
   return {
     role: 'user',
-    parts: [toPart(content)],
+    parts: [toPart(content, options)],
   };
 }
 
-export function toParts(parts: PartUnion[]): Part[] {
-  return parts.map(toPart);
+export function toParts(
+  parts: PartUnion[],
+  options?: { isCountToken?: boolean },
+): Part[] {
+  return parts.map((p) => toPart(p, options));
 }
 
-function toPart(part: PartUnion): Part {
+function toPart(part: PartUnion, options?: { isCountToken?: boolean }): Part {
   if (typeof part === 'string') {
     // it's a string
     return { text: part };
@@ -247,7 +259,7 @@ function toPart(part: PartUnion): Part {
   // Handle thought parts for CountToken API compatibility
   // The CountToken API expects parts to have certain required "oneof" fields initialized,
   // but thought parts don't conform to this schema and cause API failures
-  if ('thought' in part && part.thought) {
+  if (options?.isCountToken && 'thought' in part && part.thought) {
     const thoughtText = `[Thought: ${part.thought}]`;
 
     const newPart = { ...part };
