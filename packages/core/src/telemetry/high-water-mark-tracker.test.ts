@@ -194,5 +194,178 @@ describe('HighWaterMarkTracker', () => {
 
       vi.useRealTimers();
     });
+
+    it('should preserve fresh entries while removing stale ones', () => {
+      vi.useFakeTimers();
+
+      tracker.shouldRecordMetric('heap_used', 1000000);
+
+      // Advance time so first entry becomes stale
+      vi.advanceTimersByTime(15000);
+
+      // Add a fresh entry after the time advance
+      tracker.shouldRecordMetric('rss', 2000000);
+
+      // Cleanup with 10s max age — heap_used is stale, rss is fresh
+      tracker.cleanup(10000);
+
+      expect(tracker.getHighWaterMark('heap_used')).toBe(0);
+      expect(tracker.getHighWaterMark('rss')).toBe(2000000);
+
+      vi.useRealTimers();
+    });
+
+    it('should be a no-op when no entries are stale', () => {
+      tracker.shouldRecordMetric('heap_used', 1000000);
+      tracker.shouldRecordMetric('rss', 2000000);
+
+      // Cleanup with 1 hour max age — nothing is stale
+      tracker.cleanup(3600000);
+
+      expect(tracker.getHighWaterMark('heap_used')).toBe(1000000);
+      expect(tracker.getHighWaterMark('rss')).toBe(2000000);
+    });
+
+    it('should be a no-op on an empty tracker', () => {
+      // Should not throw when cleaning up with no entries
+      expect(() => tracker.cleanup(10000)).not.toThrow();
+      expect(tracker.getAllHighWaterMarks()).toEqual({});
+    });
+  });
+
+  describe('boundary conditions', () => {
+    it('should not trigger at exactly the threshold boundary', () => {
+      // With 5% threshold: 1000000 * 1.05 = 1050000
+      // The check is strictly greater-than, so exactly 1050000 should NOT trigger
+      tracker.shouldRecordMetric('heap_used', 1000000);
+
+      const result = tracker.shouldRecordMetric('heap_used', 1050000);
+      expect(result).toBe(false);
+    });
+
+    it('should trigger just above the threshold boundary', () => {
+      tracker.shouldRecordMetric('heap_used', 1000000);
+
+      // 1050001 is just above the 5% threshold of 1050000
+      const result = tracker.shouldRecordMetric('heap_used', 1050001);
+      expect(result).toBe(true);
+    });
+
+    it('should trigger on every increase with a zero threshold', () => {
+      const zeroTracker = new HighWaterMarkTracker(0);
+
+      zeroTracker.shouldRecordMetric('heap_used', 1000000);
+
+      // Any increase above current mark should trigger with 0% threshold
+      // threshold = 1000000 * (1 + 0/100) = 1000000, so >1000000 triggers
+      expect(zeroTracker.shouldRecordMetric('heap_used', 1000001)).toBe(true);
+      expect(zeroTracker.shouldRecordMetric('heap_used', 1000002)).toBe(true);
+    });
+
+    it('should not trigger for equal value with zero threshold', () => {
+      const zeroTracker = new HighWaterMarkTracker(0);
+
+      zeroTracker.shouldRecordMetric('heap_used', 1000000);
+
+      // Exactly the same value should not trigger (> not >=)
+      expect(zeroTracker.shouldRecordMetric('heap_used', 1000000)).toBe(false);
+    });
+
+    it('should handle the high-water mark only ratcheting upward', () => {
+      tracker.shouldRecordMetric('heap_used', 1000000);
+
+      // Large increase updates the mark
+      tracker.shouldRecordMetric('heap_used', 2000000);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
+
+      // Drop back down — mark stays at 2000000
+      tracker.shouldRecordMetric('heap_used', 500000);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
+
+      // A value above the OLD mark but below the CURRENT mark should not trigger
+      const result = tracker.shouldRecordMetric('heap_used', 1500000);
+      expect(result).toBe(false);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(2000000);
+    });
+
+    it('should treat first measurement as always recording regardless of value', () => {
+      // Even a very small first value should be recorded
+      expect(tracker.shouldRecordMetric('tiny', 1)).toBe(true);
+      expect(tracker.getHighWaterMark('tiny')).toBe(1);
+    });
+
+    it('should handle large values without overflow', () => {
+      // Values near V8 heap limit (~4GB in 64-bit)
+      const largeValue = 4 * 1024 * 1024 * 1024; // 4GB in bytes
+      tracker.shouldRecordMetric('heap_used', largeValue);
+
+      // 5% growth above 4GB
+      const grownValue = largeValue * 1.06;
+      const result = tracker.shouldRecordMetric('heap_used', grownValue);
+      expect(result).toBe(true);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(grownValue);
+    });
+  });
+
+  describe('reset and re-record behavior', () => {
+    it('should treat next measurement as first after reset', () => {
+      tracker.shouldRecordMetric('heap_used', 1000000);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(1000000);
+
+      tracker.resetHighWaterMark('heap_used');
+
+      // After reset, next measurement should be treated as first (always records)
+      const result = tracker.shouldRecordMetric('heap_used', 500);
+      expect(result).toBe(true);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(500);
+    });
+
+    it('should treat all metrics as first after resetAll', () => {
+      tracker.shouldRecordMetric('heap_used', 1000000);
+      tracker.shouldRecordMetric('rss', 2000000);
+
+      tracker.resetAllHighWaterMarks();
+
+      // Both should record as first measurements
+      expect(tracker.shouldRecordMetric('heap_used', 100)).toBe(true);
+      expect(tracker.shouldRecordMetric('rss', 200)).toBe(true);
+    });
+
+    it('should not affect other metrics when resetting one', () => {
+      tracker.shouldRecordMetric('heap_used', 1000000);
+      tracker.shouldRecordMetric('rss', 2000000);
+
+      tracker.resetHighWaterMark('heap_used');
+
+      // rss should still have its mark and require 5% growth to trigger
+      expect(tracker.getHighWaterMark('rss')).toBe(2000000);
+      expect(tracker.shouldRecordMetric('rss', 2030000)).toBe(false); // 1.5% — no trigger
+    });
+
+    it('should handle resetting a non-existent metric gracefully', () => {
+      // Should not throw
+      expect(() => tracker.resetHighWaterMark('nonexistent')).not.toThrow();
+    });
+  });
+
+  describe('lastUpdateTimes tracking', () => {
+    it('should update lastUpdateTime even when metric does not trigger recording', () => {
+      vi.useFakeTimers();
+
+      tracker.shouldRecordMetric('heap_used', 1000000);
+
+      vi.advanceTimersByTime(5000);
+
+      // This does not trigger (3% < 5%) but should still update lastUpdateTime
+      tracker.shouldRecordMetric('heap_used', 1030000);
+
+      vi.advanceTimersByTime(8000);
+
+      // Cleanup with 10s max age: the entry was touched 8s ago, so it's fresh
+      tracker.cleanup(10000);
+      expect(tracker.getHighWaterMark('heap_used')).toBe(1000000);
+
+      vi.useRealTimers();
+    });
   });
 });
