@@ -1411,6 +1411,40 @@ describe('AskUserDialog', () => {
     });
   });
 
+  it('aligns wrapped description lines consistently (regression #21590)', async () => {
+    // Before the fix, a {' '} prefix on the description caused the first line
+    // to be indented one extra space compared to continuation lines when text
+    // wrapped. This snapshot captures correct, consistent alignment.
+    const questions: Question[] = [
+      {
+        question: 'Pick one:',
+        header: 'Wrap',
+        type: QuestionType.CHOICE,
+        options: [
+          {
+            label: 'Alpha',
+            description:
+              'This is a long description that should wrap to multiple lines to verify alignment',
+          },
+        ],
+        multiSelect: false,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={40}
+      />,
+      { width: 40 },
+    );
+
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('expands paste placeholders in multi-select custom option via Done', async () => {
     const questions: Question[] = [
       {

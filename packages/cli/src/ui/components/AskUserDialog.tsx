@@ -977,7 +977,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               </Box>
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
-                  {' '}
                   <RenderInline
                     text={optionItem.description}
                     defaultColor={theme.text.secondary}
