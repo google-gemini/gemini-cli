@@ -70,6 +70,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => true,
     getExperiments: () => {},
+    getTelemetryLogPromptsEnabled: () => false,
     getPolicyEngine: () =>
       ({
         check: async () => ({ decision: 'allow' }),

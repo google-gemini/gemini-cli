@@ -82,6 +82,7 @@ export class ToolExecutor {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.ToolCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_TOOL_NAME]: toolName,
           [GEN_AI_TOOL_CALL_ID]: callId,
