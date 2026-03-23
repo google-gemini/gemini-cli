@@ -232,7 +232,7 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
-  it('should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot)', async () => {
+  it('should render multiline shell scripts with correct newlines and syntax highlighting', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Multiline Script',
@@ -626,6 +626,83 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('(press Ctrl+O to expand MCP tool details)');
     expect(output).not.toContain('Invocation Arguments:');
     unmount();
+  });
+
+  describe('height allocation and layout', () => {
+    it('should expand to available height for large exec commands', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo'],
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationMessage
+            callId="test-call-id"
+            confirmationDetails={confirmationDetails}
+            config={mockConfig}
+            getPreferredEditor={vi.fn()}
+            availableTerminalHeight={40}
+            terminalWidth={80}
+          />,
+        );
+      await waitUntilReady();
+
+      const outputLines = lastFrame().split('\n');
+      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
+      expect(outputLines.length).toBe(39);
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
+
+    it('should expand to available height for large edit diffs', async () => {
+      // Create a large diff string
+      let largeDiff = '--- a/file.ts\n+++ b/file.ts\n@@ -1,10 +1,15 @@\n';
+      for (let i = 1; i <= 20; i++) {
+        largeDiff += `-const oldLine${i} = true;\n`;
+        largeDiff += `+const newLine${i} = true;\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Confirm Edit',
+        fileName: 'file.ts',
+        filePath: '/file.ts',
+        fileDiff: largeDiff,
+        originalContent: 'old',
+        newContent: 'new',
+        isModifying: false,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationMessage
+            callId="test-call-id"
+            confirmationDetails={confirmationDetails}
+            config={mockConfig}
+            getPreferredEditor={vi.fn()}
+            availableTerminalHeight={40}
+            terminalWidth={80}
+          />,
+        );
+      await waitUntilReady();
+
+      const outputLines = lastFrame().split('\n');
+      // Should use the entire terminal height minus 1 line for the "Press Ctrl+O to show more lines" hint
+      expect(outputLines.length).toBe(39);
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
   });
 
   describe('ESCAPE key behavior', () => {
