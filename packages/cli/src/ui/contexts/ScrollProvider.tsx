@@ -132,24 +132,6 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       scrollablesRef.current,
     );
 
-    // Fallback: If mouse is not over any scrollable (e.g. over the input prompt),
-    // find the largest scrollable area to scroll instead.
-    if (candidates.length === 0) {
-      let largestCandidate: (ScrollableEntry & { area: number }) | null = null;
-      for (const entry of scrollablesRef.current.values()) {
-        if (!entry.ref.current) continue;
-        const boundingBox = getBoundingBox(entry.ref.current);
-        if (!boundingBox) continue;
-        const area = boundingBox.width * boundingBox.height;
-        if (!largestCandidate || area > largestCandidate.area) {
-          largestCandidate = { ...entry, area };
-        }
-      }
-      if (largestCandidate) {
-        candidates.push(largestCandidate);
-      }
-    }
-
     for (const candidate of candidates) {
       const { scrollTop, scrollHeight, innerHeight } =
         candidate.getScrollState();
