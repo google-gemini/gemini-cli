@@ -211,7 +211,7 @@ gemini extensions config <name> [setting] [--scope <scope>]
 
 #### Environment Variable Sanitization
 
-For security reasons, the host's `process.env` is aggressively stripped before the extension or its MCP servers are spawned. 
+For security reasons, sensitive environment variables are filtered out and not passed to extensions or MCP servers by default. 
 
 Extensions **will not** inherit the user's full shell environment variables. They will only have access to:
 1. Standard safe variables (e.g., `HOME`, `PATH`, `TMPDIR`).

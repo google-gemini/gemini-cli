@@ -243,16 +243,16 @@ specific data with that server.
 > Instead, use environment variable expansion (e.g., `"MY_KEY": "$MY_KEY"`) to
 > securely pull the value from your host environment at runtime.
 
-**Example: Passing a GitHub Token securely via `mcp_config.json`**
+**Example: Passing a GitHub Token securely to the [official GitHub MCP server](https://github.com/github/github-mcp-server) via `mcp_config.json`**
 
 ```json
 {
   "mcpServers": {
     "github": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "args": ["-y", "@github/github-mcp-server"],
       "env": {
-        "GITHUB_TOKEN": "$GITHUB_TOKEN"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "$GITHUB_PERSONAL_ACCESS_TOKEN"
       }
     }
   }
