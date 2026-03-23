@@ -79,9 +79,11 @@ function estimateToolResponseArrayTokens(responseArray: unknown[]): number {
     if (
       item &&
       typeof item === 'object' &&
-      (item as any).type === 'image' &&
-      typeof (item as any).data === 'string' &&
-      (item as any).data.length > 1024
+      'type' in item &&
+      (item as { type?: unknown }).type === 'image' &&
+      'data' in item &&
+      typeof (item as { data?: unknown }).data === 'string' &&
+      String((item as { data?: unknown }).data).length > 1024
     ) {
       // Image block with large data (e.g. MCP Base64): use fixed estimate
       tokens += IMAGE_TOKEN_ESTIMATE;

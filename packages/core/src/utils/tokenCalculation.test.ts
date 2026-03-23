@@ -215,10 +215,13 @@ describe('tokenCalculation', () => {
           functionResponse: {
             name: 'mcp_tool',
             id: '123',
-            response: [
-              { type: 'text', text: 'Here is the plot:' },
-              { type: 'image', data: massiveBase64, mimeType: 'image/png' },
-            ],
+            response: {
+              type: 'array',
+              items: [
+                { type: 'text', text: 'Here is the plot:' },
+                { type: 'image', data: massiveBase64, mimeType: 'image/png' },
+              ]
+            } as Record<string, unknown>,
           },
         },
       ];
