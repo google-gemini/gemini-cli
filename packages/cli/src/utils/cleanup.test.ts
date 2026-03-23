@@ -109,7 +109,7 @@ describe('cleanup', () => {
       });
     }
 
-    expect(callOrder).toEqual(['cleanup', 'drain', 'sync']);
+    expect(callOrder).toEqual(['drain', 'drain', 'sync', 'cleanup']);
   });
 
   it('should continue running cleanup functions even if one throws an error', async () => {
