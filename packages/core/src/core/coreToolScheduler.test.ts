@@ -207,36 +207,24 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
 async function waitForStatus(
   onToolCallsUpdate: Mock,
   status: CoreToolCallStatus,
-  timeout = 5000,
 ): Promise<ToolCall> {
-  return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-    const check = () => {
-      if (Date.now() - startTime > timeout) {
-        const seenStatuses = onToolCallsUpdate.mock.calls
-          .flatMap((call) => call[0])
-          .map((toolCall: ToolCall) => toolCall.status);
-        reject(
-          new Error(
-            `Timed out waiting for status "${status}". Seen statuses: ${seenStatuses.join(
-              ', ',
-            )}`,
-          ),
-        );
-        return;
-      }
-
-      const foundCall = onToolCallsUpdate.mock.calls
+  let foundCall: ToolCall | undefined;
+  await vi.waitFor(() => {
+    foundCall = onToolCallsUpdate.mock.calls
+      .flatMap((call) => call[0])
+      .find((toolCall: ToolCall) => toolCall.status === status);
+    if (!foundCall) {
+      const seenStatuses = onToolCallsUpdate.mock.calls
         .flatMap((call) => call[0])
-        .find((toolCall: ToolCall) => toolCall.status === status);
-      if (foundCall) {
-        resolve(foundCall);
-      } else {
-        setTimeout(check, 10); // Check again in 10ms
-      }
-    };
-    check();
+        .map((toolCall: ToolCall) => toolCall.status);
+      throw new Error(
+        `Waiting for status "${status}". Seen statuses: ${seenStatuses.join(
+          ', ',
+        )}`,
+      );
+    }
   });
+  return foundCall!;
 }
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
@@ -2363,6 +2351,159 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(result.response.error.message).toBe(
         `Tool execution denied by policy. ${customDenyMessage}`,
       );
+    });
+  });
+
+  describe('Error handling for floating promises', () => {
+    it('should not produce unhandled rejection when messageBus.publish rejects in ASK_USER handler', async () => {
+      (
+        CoreToolScheduler as unknown as {
+          subscribedMessageBuses: WeakSet<MessageBus>;
+        }
+      ).subscribedMessageBuses = new WeakSet();
+
+      const executeFn = vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed',
+        returnDisplay: 'Tool executed',
+      });
+      const mockTool = new MockTool({
+        name: 'mockTool',
+        execute: executeFn,
+        shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+      });
+
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['mockTool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+      const onToolCallsUpdate = vi.fn();
+
+      const mockMessageBus = createMockMessageBus();
+      mockMessageBus.publish = vi
+        .fn()
+        .mockRejectedValue(
+          new Error('publish failed'),
+        ) as typeof mockMessageBus.publish;
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+      });
+      mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+      const unhandledRejections: unknown[] = [];
+      const handler = (reason: unknown) => {
+        unhandledRejections.push(reason);
+      };
+      process.on('unhandledRejection', handler);
+
+      try {
+        new CoreToolScheduler({
+          config: mockConfig,
+          onAllToolCallsComplete,
+          onToolCallsUpdate,
+          getPreferredEditor: () => undefined,
+        });
+
+        const subscribeCalls = (
+          mockMessageBus.subscribe as ReturnType<typeof vi.fn>
+        ).mock.calls;
+        const subscribeCall = subscribeCalls.find(
+          (call: unknown[]) => call[0] === 'tool-confirmation-request',
+        );
+        expect(subscribeCall).toBeDefined();
+        const subscribedHandler = subscribeCall![1] as (request: {
+          correlationId: string;
+        }) => void;
+
+        subscribedHandler({ correlationId: 'test-id' });
+
+        await vi.waitFor(() => {
+          expect(mockMessageBus.publish).toHaveBeenCalled();
+        });
+
+        expect(unhandledRejections).toHaveLength(0);
+      } finally {
+        process.off('unhandledRejection', handler);
+      }
+    });
+
+    it('should call cancelAll when handleConfirmationResponse rejects during IDE confirmation', async () => {
+      const mockTool = new MockTool({
+        name: 'mockTool',
+        execute: vi.fn().mockResolvedValue({
+          llmContent: 'Tool executed',
+          returnDisplay: 'Tool executed',
+        }),
+        shouldConfirmExecute: async () => {
+          const ideConfirmationPromise = Promise.resolve({
+            status: 'accepted' as const,
+          });
+          return {
+            type: 'edit' as const,
+            title: 'Confirm mockTool',
+            fileName: 'test.txt',
+            filePath: '/test.txt',
+            fileDiff: 'diff',
+            originalContent: 'old',
+            newContent: 'new',
+            ideConfirmation: ideConfirmationPromise,
+            onConfirm: async () => {
+              throw new Error('onConfirm failed');
+            },
+          };
+        },
+      });
+
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['mockTool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+      const onToolCallsUpdate = vi.fn();
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({ decision: PolicyDecision.ASK_USER }),
+          }) as unknown as PolicyEngine,
+      });
+      const mockMessageBus = createMockMessageBus();
+      mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        onToolCallsUpdate,
+        getPreferredEditor: () => undefined,
+      });
+
+      const cancelAllSpy = vi.spyOn(scheduler, 'cancelAll');
+
+      const abortController = new AbortController();
+      const request = {
+        callId: '1',
+        name: 'mockTool',
+        args: { param: 'value' },
+        isClientInitiated: false,
+        prompt_id: 'test-prompt',
+      };
+
+      const schedulePromise = scheduler.schedule(
+        request,
+        abortController.signal,
+      );
+
+      await vi.waitFor(() => {
+        expect(cancelAllSpy).toHaveBeenCalled();
+      });
+
+      await schedulePromise.catch(() => {});
     });
   });
 

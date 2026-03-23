@@ -342,9 +342,7 @@ export abstract class BaseToolInvocation<
         );
       };
 
-      try {
-        void this.messageBus.publish(request);
-      } catch (_error) {
+      void this.messageBus.publish(request).catch(() => {
         cleanup();
         resolve('allow');
       }

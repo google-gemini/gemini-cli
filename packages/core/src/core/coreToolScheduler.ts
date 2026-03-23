@@ -51,6 +51,7 @@ import { getPolicyDenialError } from '../scheduler/policy.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import { evaluateBeforeToolHook } from '../scheduler/hook-utils.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type {
   ToolCall,
@@ -101,12 +102,9 @@ interface CoreToolSchedulerOptions {
 }
 
 export class CoreToolScheduler {
-  // Static WeakMap to track which MessageBus instances already have a handler subscribed
+  // Static WeakSet to track which MessageBus instances already have a handler subscribed
   // This prevents duplicate subscriptions when multiple CoreToolScheduler instances are created
-  private static subscribedMessageBuses = new WeakMap<
-    MessageBus,
-    (request: ToolConfirmationRequest) => void
-  >();
+  private static subscribedMessageBuses = new WeakSet<MessageBus>();
 
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
@@ -149,13 +147,19 @@ export class CoreToolScheduler {
       const sharedHandler = (request: ToolConfirmationRequest) => {
         // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true
         // to tell tools to use their legacy confirmation flow
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        messageBus.publish({
-          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          correlationId: request.correlationId,
-          confirmed: false,
-          requiresUserConfirmation: true,
-        });
+        void messageBus
+          .publish({
+            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            correlationId: request.correlationId,
+            confirmed: false,
+            requiresUserConfirmation: true,
+          })
+          .catch((error: unknown) => {
+            debugLogger.error(
+              '[CoreToolScheduler] Failed to publish confirmation response:',
+              error,
+            );
+          });
       };
 
       messageBus.subscribe(
@@ -163,8 +167,8 @@ export class CoreToolScheduler {
         sharedHandler,
       );
 
-      // Store the handler in the WeakMap so we don't subscribe again
-      CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
+      // Store in the WeakSet so we don't subscribe again
+      CoreToolScheduler.subscribedMessageBuses.add(messageBus);
     }
   }
 
@@ -766,26 +770,31 @@ export class CoreToolScheduler {
               confirmationDetails.type === 'edit' &&
               confirmationDetails.ideConfirmation
             ) {
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              confirmationDetails.ideConfirmation.then((resolution) => {
-                if (resolution.status === 'accepted') {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.ProceedOnce,
-                    signal,
+              void confirmationDetails.ideConfirmation
+                .then(async (resolution) => {
+                  if (resolution.status === 'accepted') {
+                    await this.handleConfirmationResponse(
+                      reqInfo.callId,
+                      confirmationDetails.onConfirm,
+                      ToolConfirmationOutcome.ProceedOnce,
+                      signal,
+                    );
+                  } else {
+                    await this.handleConfirmationResponse(
+                      reqInfo.callId,
+                      confirmationDetails.onConfirm,
+                      ToolConfirmationOutcome.Cancel,
+                      signal,
+                    );
+                  }
+                })
+                .catch((error: unknown) => {
+                  debugLogger.error(
+                    '[CoreToolScheduler] IDE confirmation handling failed:',
+                    error,
                   );
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.Cancel,
-                    signal,
-                  );
-                }
-              });
+                  this.cancelAll(signal);
+                });
             }
 
             const originalOnConfirm = confirmationDetails.onConfirm;

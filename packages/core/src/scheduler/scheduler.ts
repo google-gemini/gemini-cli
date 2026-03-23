@@ -48,6 +48,7 @@ import {
   type McpProgressPayload,
 } from '../utils/events.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -171,13 +172,20 @@ export class Scheduler {
     // MessageBus even though the Scheduler already checked it.
     messageBus.subscribe(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
-      async (request: ToolConfirmationRequest) => {
-        await messageBus.publish({
-          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          correlationId: request.correlationId,
-          confirmed: false,
-          requiresUserConfirmation: true,
-        });
+      (request: ToolConfirmationRequest) => {
+        void messageBus
+          .publish({
+            type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            correlationId: request.correlationId,
+            confirmed: false,
+            requiresUserConfirmation: true,
+          })
+          .catch((error: unknown) => {
+            debugLogger.error(
+              '[Scheduler] Failed to publish confirmation response:',
+              error,
+            );
+          });
       },
     );
 
