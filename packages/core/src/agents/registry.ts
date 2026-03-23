@@ -271,7 +271,7 @@ export class AgentRegistry {
   }
 
   private async refreshAgents(
-    scope: 'local' | 'remote' | 'all' = 'all',
+    scope: AgentDefinition['kind'] | 'all' = 'all',
   ): Promise<void> {
     this.loadBuiltInAgents();
     await Promise.allSettled(

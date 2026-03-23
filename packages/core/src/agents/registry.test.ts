@@ -1223,17 +1223,12 @@ describe('AgentRegistry', () => {
 
       await registry.testRegisterAgent(remoteAgent);
 
-      // Initial registration calls loadAgent once
       expect(loadAgentSpy).toHaveBeenCalledTimes(1);
 
-      // Trigger the model change event
       coreEvents.emitModelChanged('new-model');
 
-      // The onModelChanged handler is synchronous but calls the async refreshAgents.
-      // We wait a tick for the promises to settle.
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // loadAgent should NOT have been called again!
       expect(loadAgentSpy).toHaveBeenCalledTimes(1);
     });
 
