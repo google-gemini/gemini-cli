@@ -3196,7 +3196,8 @@ export class Config implements McpContext, AgentLoopContext {
     for (const definition of definitions) {
       try {
         if (
-          !this.isAgentsEnabled() ||
+          (!this.isAgentsEnabled() &&
+            !this.agentRegistry.isBuiltIn(definition.name)) ||
           agentsOverrides[definition.name]?.enabled === false
         ) {
           continue;

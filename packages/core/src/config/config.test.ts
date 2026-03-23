@@ -185,6 +185,7 @@ vi.mock('../agents/registry.js', () => {
   AgentRegistryMock.prototype.initialize = vi.fn();
   AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
   AgentRegistryMock.prototype.getDefinition = vi.fn();
+  AgentRegistryMock.prototype.isBuiltIn = vi.fn();
   return { AgentRegistry: AgentRegistryMock };
 });
 
@@ -1262,6 +1263,9 @@ describe('Server Config (config.ts)', () => {
       AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
         mockAgentDefinition,
       ]);
+      AgentRegistryMock.prototype.isBuiltIn.mockImplementation(
+        (name: string) => name === 'codebase_investigator',
+      );
 
       const SubAgentToolMock = (
         (await vi.importMock('../agents/subagent-tool.js')) as {
@@ -1317,6 +1321,9 @@ describe('Server Config (config.ts)', () => {
       AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
         mockAgentDefinition,
       ]);
+      AgentRegistryMock.prototype.isBuiltIn.mockImplementation(
+        (name: string) => name === 'codebase_investigator',
+      );
 
       const SubAgentToolMock = (
         (await vi.importMock('../agents/subagent-tool.js')) as {
