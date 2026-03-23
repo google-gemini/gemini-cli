@@ -131,32 +131,36 @@ export class AgentSession implements AgentProtocol {
         }
 
         const resumeEvent = currentEvents[index];
-        replayStartIndex = index + 1;
         trackedStreamId = resumeEvent.streamId;
-        const streamHasStarted =
-          resumeEvent.type === 'agent_start' ||
-          currentEvents
-            .slice(0, index)
-            .some(
-              (event) =>
-                event.type === 'agent_start' &&
-                event.streamId === trackedStreamId,
-            );
+        const firstAgentStartIndex = currentEvents.findIndex(
+          (event) =>
+            event.type === 'agent_start' && event.streamId === trackedStreamId,
+        );
 
         if (resumeEvent.type === 'agent_end') {
+          replayStartIndex = index + 1;
           agentActivityStarted = true;
           done = true;
-        } else if (streamHasStarted) {
+        } else if (
+          firstAgentStartIndex !== -1 &&
+          firstAgentStartIndex <= index
+        ) {
+          replayStartIndex = index + 1;
           agentActivityStarted = true;
+        } else if (firstAgentStartIndex !== -1) {
+          // A pre-agent_start cursor can be resumed once the corresponding
+          // agent activity is already present in history. Because stream()
+          // yields only agent_start -> agent_end, replay begins at agent_start
+          // rather than at the original pre-start event.
+          replayStartIndex = firstAgentStartIndex;
         } else {
-          // Consumers can only resume by eventId once the stream has entered the
-          // agent_start -> agent_end lifecycle. For pre-start events, use
-          // stream({ streamId }) instead because this wrapper cannot
-          // distinguish "agent activity will start later" from "this send was
-          // acknowledged without agent activity" without risking an infinite
-          // wait.
+          // Consumers can only resume by eventId once the corresponding stream
+          // has entered the agent_start -> agent_end lifecycle in history.
+          // Without a recorded agent_start, this wrapper cannot distinguish
+          // "agent activity may start later" from "this send was acknowledged
+          // without agent activity" without risking an infinite wait.
           throw new Error(
-            `Cannot resume from eventId ${options.eventId} before agent_start; use stream({ streamId }) instead`,
+            `Cannot resume from eventId ${options.eventId} before agent_start for stream ${trackedStreamId}`,
           );
         }
       } else if (options.streamId) {
