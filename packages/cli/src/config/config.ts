@@ -371,6 +371,9 @@ export async function parseArguments(
       if (argv['prompt'] && hasPositionalQuery) {
         return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
       }
+      if (argv['promptInteractive'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt-interactive (-i) flag together';
+      }
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
       }
