@@ -48,6 +48,11 @@
             "slug": "docs/cli/tutorials/task-planning"
           },
           {
+            "label": "Use Plan Mode with model steering",
+            "badge": "🔬",
+            "slug": "docs/cli/tutorials/plan-mode-steering"
+          },
+          {
             "label": "Web search and fetch",
             "slug": "docs/cli/tutorials/web-tools"
           },
@@ -94,12 +99,34 @@
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
-          { "label": "Hooks", "slug": "docs/hooks" },
+          {
+            "label": "Git worktrees",
+            "badge": "🔬",
+            "slug": "docs/cli/git-worktrees"
+          },
+          {
+            "label": "Hooks",
+            "collapsed": true,
+            "items": [
+              { "label": "Overview", "slug": "docs/hooks" },
+              { "label": "Reference", "slug": "docs/hooks/reference" }
+            ]
+          },
           { "label": "IDE integration", "slug": "docs/ide-integration" },
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
-          { "label": "Plan mode", "badge": "🔬", "slug": "docs/cli/plan-mode" },
+          {
+            "label": "Model steering",
+            "badge": "🔬",
+            "slug": "docs/cli/model-steering"
+          },
+          {
+            "label": "Notifications",
+            "badge": "🔬",
+            "slug": "docs/cli/notifications"
+          },
+          { "label": "Plan mode", "slug": "docs/cli/plan-mode" },
           {
             "label": "Subagents",
             "badge": "🔬",
@@ -181,7 +208,7 @@
             "slug": "docs/reference/memport"
           },
           { "label": "Policy engine", "slug": "docs/reference/policy-engine" },
-          { "label": "Tools API", "slug": "docs/reference/tools-api" }
+          { "label": "Tools reference", "slug": "docs/reference/tools" }
         ]
       }
     ]

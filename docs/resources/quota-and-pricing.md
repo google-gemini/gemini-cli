@@ -1,14 +1,13 @@
 # Gemini CLI: Quotas and pricing
 
 Gemini CLI offers a generous free tier that covers many individual developers'
-use cases. For enterprise or professional usage, or if you need higher limits,
+use cases. For enterprise or professional usage, or if you need increased quota,
 several options are available depending on your authentication account type.
 
-See [privacy and terms](./tos-privacy.md) for details on the Privacy Policy and
-Terms of Service.
+For a high-level comparison of available subscriptions and to select the right
+quota for your needs, see the [Plans page](https://geminicli.com/plans/).
 
-> **Note:** Published prices are list price; additional negotiated commercial
-> discounting may apply.
+## Overview
 
 This article outlines the specific quotas and pricing applicable to Gemini CLI
 when using different authentication methods.
@@ -23,10 +22,11 @@ Generally, there are three categories to choose from:
 
 ## Free usage
 
-Your journey begins with a generous free tier, perfect for experimentation and
-light use.
+Access to Gemini CLI begins with a generous free tier, perfect for
+experimentation and light use.
 
-Your free usage limits depend on your authorization type.
+Your free usage is governed by the following limits, which depend on your
+authorization type.
 
 ### Log in with Google (Gemini Code Assist for individuals)
 
@@ -69,6 +69,19 @@ Learn more at
 If you use up your initial number of requests, you can continue to benefit from
 Gemini CLI by upgrading to one of the following subscriptions:
 
+### Individuals
+
+These tiers apply when you sign in with a personal account. To verify whether
+you're on a personal account, visit
+[Google One](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0):
+
+- If you are on a personal account, you will see your personal dashboard.
+- If you are not on a personal account, you will see: "You're currently signed
+  in to your Google Workspace Account."
+
+**Supported tiers:** _- Tiers not listed above, including Google AI Plus, are
+not supported._
+
 - [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). This is
   recommended for individual developers. Quotas and pricing are based on a fixed
   price subscription.
@@ -78,14 +91,26 @@ Gemini CLI by upgrading to one of the following subscriptions:
   Learn more at
   [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
 
-- [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview)
-  by signing up in the Google Cloud console. Learn more at
-  [Set up Gemini Code Assist](https://cloud.google.com/gemini/docs/discover/set-up-gemini).
+### Through your organization
+
+These tiers are applicable when you are signing in with a Google Workspace
+account.
+
+- To verify your account type, visit
+  [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0).
+- You are on a workspace account if you see the message "You're currently signed
+  in to your Google Workspace Account".
+
+**Supported tiers:** _- Tiers not listed above, including Workspace AI
+Standard/Plus and AI Expanded, are not supported._
+
+- [Workspace AI Ultra Access](https://workspace.google.com/products/ai-ultra/).
+- [Purchase a Gemini Code Assist Subscription through Google Cloud](https://cloud.google.com/gemini/docs/codeassist/overview).
 
   Quotas and pricing are based on a fixed price subscription with assigned
   license seats. For predictable costs, you can sign in with Google.
 
-  This includes:
+  This includes the following request limits:
   - Gemini Code Assist Standard edition:
     - 1500 model requests / user / day
     - 120 model requests / user / minute
@@ -95,7 +120,7 @@ Gemini CLI by upgrading to one of the following subscriptions:
   - Model requests will be made across the Gemini model family as determined by
     Gemini CLI.
 
-  [Learn more about Gemini Code Assist Standard and Enterprise license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
+  [Learn more about Gemini Code Assist license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
 ## Pay as you go
 
@@ -106,18 +131,27 @@ recommended path for uninterrupted access.
 
 To do this, log in using a Gemini API key or Vertex AI.
 
-- Vertex AI (Regular Mode):
-  - Quota: Governed by a dynamic shared quota system or pre-purchased
-    provisioned throughput.
-  - Cost: Based on model and token usage.
+### Vertex AI (regular mode)
+
+An enterprise-grade platform for building, deploying, and managing AI models,
+including Gemini. It offers enhanced security, data governance, and integration
+with other Google Cloud services.
+
+- Quota: Governed by a dynamic shared quota system or pre-purchased provisioned
+  throughput.
+- Cost: Based on model and token usage.
 
 Learn more at
 [Vertex AI Dynamic Shared Quota](https://cloud.google.com/vertex-ai/generative-ai/docs/resources/dynamic-shared-quota)
 and [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing).
 
-- Gemini API key:
-  - Quota: Varies by pricing tier.
-  - Cost: Varies by pricing tier and model/token usage.
+### Gemini API key
+
+Ideal for developers who want to quickly build applications with the Gemini
+models. This is the most direct way to use the models.
+
+- Quota: Varies by pricing tier.
+- Cost: Varies by pricing tier and model/token usage.
 
 Learn more at
 [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits),
@@ -125,7 +159,8 @@ Learn more at
 
 It’s important to highlight that when using an API key, you pay per token/call.
 This can be more expensive for many small calls with few tokens, but it's the
-only way to ensure your workflow isn't interrupted by quota limits.
+only way to ensure your workflow isn't interrupted by reaching a limit on your
+quota.
 
 ## Gemini for workspace plans
 
@@ -135,31 +170,30 @@ Flow video editor). These plans do not apply to the API usage which powers the
 Gemini CLI. Supporting these plans is under active consideration for future
 support.
 
-## Check usage and quota
+## Check usage and limits
 
-You can check your current token usage and quota information using the
+You can check your current token usage and applicable limits using the
 `/stats model` command. This command provides a snapshot of your current
-session's token usage, as well as your overall quota and usage for the supported
-models.
+session's token usage, as well as information about the limits associated with
+your current quota.
 
 For more information on the `/stats` command and its subcommands, see the
-[Command Reference](../../reference/commands.md#stats).
+[Command Reference](../reference/commands.md#stats).
 
 A summary of model usage is also presented on exit at the end of a session.
 
 ## Tips to avoid high costs
 
-When using a Pay as you Go API key, be mindful of your usage to avoid unexpected
+When using a pay-as-you-go plan, be mindful of your usage to avoid unexpected
 costs.
 
-- Don't blindly accept every suggestion, especially for computationally
-  intensive tasks like refactoring large codebases.
-- Be intentional with your prompts and commands. You are paying per call, so
-  think about the most efficient way to get the job done.
-
-## Gemini API vs. Vertex
-
-- Gemini API (gemini developer api): This is the fastest way to use the Gemini
-  models directly.
-- Vertex AI: This is the enterprise-grade platform for building, deploying, and
-  managing Gemini models with specific security and control requirements.
+- **Be selective with suggestions**: Before accepting a suggestion, especially
+  for a computationally intensive task like refactoring a large codebase,
+  consider if it's the most cost-effective approach.
+- **Use precise prompts**: You are paying per call, so think about the most
+  efficient way to get your desired result. A well-crafted prompt can often get
+  you the answer you need in a single call, rather than multiple back-and-forth
+  interactions.
+- **Monitor your usage**: Use the `/stats model` command to track your token
+  usage during a session. This can help you stay aware of your spending in real
+  time.

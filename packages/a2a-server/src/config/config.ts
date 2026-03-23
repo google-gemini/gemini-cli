@@ -8,11 +8,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type {
-  TelemetryTarget,
-  ConfigParameters,
-  ExtensionLoader,
-} from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
@@ -28,6 +23,14 @@ import {
   fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
+  isHeadlessMode,
+  FatalAuthenticationError,
+  isCloudShell,
+  PolicyDecision,
+  PRIORITY_YOLO_ALLOW_ALL,
+  type TelemetryTarget,
+  type ConfigParameters,
+  type ExtensionLoader,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -59,8 +62,14 @@ export async function loadConfig(
     }
   }
 
+  const approvalMode =
+    process.env['GEMINI_YOLO_MODE'] === 'true'
+      ? ApprovalMode.YOLO
+      : ApprovalMode.DEFAULT;
+
   const configParams: ConfigParameters = {
     sessionId: taskId,
+    clientName: 'a2a-server',
     model: PREVIEW_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
@@ -72,10 +81,21 @@ export async function loadConfig(
     excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
     allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
-    approvalMode:
-      process.env['GEMINI_YOLO_MODE'] === 'true'
-        ? ApprovalMode.YOLO
-        : ApprovalMode.DEFAULT,
+    approvalMode,
+    policyEngineConfig: {
+      rules:
+        approvalMode === ApprovalMode.YOLO
+          ? [
+              {
+                toolName: '*',
+                decision: PolicyDecision.ALLOW,
+                priority: PRIORITY_YOLO_ALLOW_ALL,
+                modes: [ApprovalMode.YOLO],
+                allowRedirection: true,
+              },
+            ]
+          : [],
+    },
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
@@ -105,9 +125,10 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    interactive: true,
-    enableInteractiveShell: true,
+    interactive: !isHeadlessMode(),
+    enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
+    enableAgents: settings.experimental?.enableAgents ?? false,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {
@@ -119,7 +140,6 @@ export async function loadConfig(
     await loadServerHierarchicalMemory(
       workspaceDir,
       [workspaceDir],
-      false,
       fileService,
       extensionLoader,
       folderTrust,
@@ -168,6 +188,8 @@ export async function loadConfig(
 
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+
+  await config.waitForMcpInit();
   startupProfiler.flush(config);
 
   await refreshAuthentication(config, adcFilePath, 'Config');
@@ -255,7 +277,61 @@ async function refreshAuthentication(
         `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
       );
     }
-    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+    const useComputeAdc = process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
+    const isHeadless = isHeadlessMode();
+    const shouldSkipOauth = isHeadless || useComputeAdc;
+
+    if (shouldSkipOauth) {
+      if (isCloudShell() || useComputeAdc) {
+        logger.info(
+          `[${logPrefix}] Skipping LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'}. Attempting COMPUTE_ADC.`,
+        );
+        try {
+          await config.refreshAuth(AuthType.COMPUTE_ADC);
+          logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
+        } catch (adcError) {
+          const adcMessage =
+            adcError instanceof Error ? adcError.message : String(adcError);
+          throw new FatalAuthenticationError(
+            `COMPUTE_ADC failed: ${adcMessage}. (Skipped LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'})`,
+          );
+        }
+      } else {
+        throw new FatalAuthenticationError(
+          `Interactive terminal required for LOGIN_WITH_GOOGLE. Run in an interactive terminal or set GEMINI_CLI_USE_COMPUTE_ADC=true to use Application Default Credentials.`,
+        );
+      }
+    } else {
+      try {
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      } catch (e) {
+        if (
+          e instanceof FatalAuthenticationError &&
+          (isCloudShell() || useComputeAdc)
+        ) {
+          logger.warn(
+            `[${logPrefix}] LOGIN_WITH_GOOGLE failed. Attempting COMPUTE_ADC fallback.`,
+          );
+          try {
+            await config.refreshAuth(AuthType.COMPUTE_ADC);
+            logger.info(`[${logPrefix}] COMPUTE_ADC fallback successful.`);
+          } catch (adcError) {
+            logger.error(
+              `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
+            );
+            const originalMessage = e instanceof Error ? e.message : String(e);
+            const adcMessage =
+              adcError instanceof Error ? adcError.message : String(adcError);
+            throw new FatalAuthenticationError(
+              `${originalMessage}. Fallback to COMPUTE_ADC also failed: ${adcMessage}`,
+            );
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
     logger.info(
       `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
     );

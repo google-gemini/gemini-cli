@@ -183,7 +183,6 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,
-    filteredConsoleMessages: [],
     history: [],
     sessionStats: {
       sessionId: 'test-session',
@@ -231,7 +230,7 @@ const createMockConfig = (overrides = {}): Config =>
     getDebugMode: vi.fn(() => false),
     getAccessibility: vi.fn(() => ({})),
     getMcpServers: vi.fn(() => ({})),
-    isPlanEnabled: vi.fn(() => false),
+    isPlanEnabled: vi.fn(() => true),
     getToolRegistry: () => ({
       getTool: vi.fn(),
     }),
@@ -252,7 +251,7 @@ const renderComposer = async (
   config = createMockConfig(),
   uiActions = createMockUIActions(),
 ) => {
-  const result = render(
+  const result = await render(
     <ConfigContext.Provider value={config as unknown as Config}>
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
@@ -263,7 +262,6 @@ const renderComposer = async (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-  await result.waitUntilReady();
 
   // Wait for shortcuts hint debounce if using fake timers
   if (vi.isFakeTimers()) {
@@ -374,7 +372,7 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: {
-          subject: 'Detailed in-history thought',
+          subject: 'Thinking about code',
           description: 'Full text is already in history',
         },
       });
@@ -385,7 +383,7 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator: Thinking ...');
+      expect(output).toContain('LoadingIndicator: Thinking...');
     });
 
     it('hides shortcuts hint while loading', async () => {
@@ -408,7 +406,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        merged: { ui: { loadingPhrases: 'off' } },
+        ui: { loadingPhrases: 'off' },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -757,13 +755,6 @@ describe('Composer', () => {
     it('shows DetailedMessagesDisplay when showErrorDetails is true', async () => {
       const uiState = createMockUIState({
         showErrorDetails: true,
-        filteredConsoleMessages: [
-          {
-            type: 'error',
-            content: 'Test error',
-            count: 1,
-          },
-        ],
       });
 
       const { lastFrame } = await renderComposer(uiState);
@@ -831,7 +822,7 @@ describe('Composer', () => {
       expect(lastFrame({ allowEmpty: true })).toContain('ShortcutsHint');
     });
 
-    it('does not show shortcuts hint immediately when buffer has text', async () => {
+    it('hides shortcuts hint when text is typed in buffer', async () => {
       const uiState = createMockUIState({
         buffer: { text: 'hello' } as unknown as TextBuffer,
         cleanUiDetailsVisible: false,
@@ -894,16 +885,6 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: true,
         streamingState: StreamingState.Responding,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).not.toContain('ShortcutsHint');
-    });
-
-    it('hides shortcuts hint when text is typed in buffer', async () => {
-      const uiState = createMockUIState({
-        buffer: { text: 'hello' } as unknown as TextBuffer,
       });
 
       const { lastFrame } = await renderComposer(uiState);

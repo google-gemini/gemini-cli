@@ -6,7 +6,6 @@
 
 import type { GenerateContentConfig } from '@google/genai';
 import type { Config } from '../config/config.js';
-import { AuthType } from '../core/contentGenerator.js';
 import type {
   FailureKind,
   FallbackAction,
@@ -46,29 +45,75 @@ export function resolvePolicyChain(
 
   let chain;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useCustomToolModel =
-    useGemini31 &&
-    config.getContentGeneratorConfig?.()?.authType === AuthType.USE_GEMINI;
+  const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   const resolvedModel = resolveModel(
     modelFromConfig,
     useGemini31,
     useCustomToolModel,
+    hasAccessToPreview,
+    config,
   );
-  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
-  const isAutoConfigured = isAutoModel(configuredModel);
-  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
+  const isAutoPreferred = preferredModel
+    ? isAutoModel(preferredModel, config)
+    : false;
+  const isAutoConfigured = isAutoModel(configuredModel, config);
+
+  // --- DYNAMIC PATH ---
+  if (config.getExperimentalDynamicModelConfiguration?.() === true) {
+    const context = {
+      useGemini3_1: useGemini31,
+      useCustomTools: useCustomToolModel,
+    };
+
+    if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+      chain = config.modelConfigService.resolveChain('lite', context);
+    } else if (
+      isGemini3Model(resolvedModel, config) ||
+      isAutoModel(preferredModel ?? '', config) ||
+      isAutoModel(configuredModel, config)
+    ) {
+      // 1. Try to find a chain specifically for the current configured alias
+      if (
+        isAutoModel(configuredModel, config) &&
+        config.modelConfigService.getModelChain(configuredModel)
+      ) {
+        chain = config.modelConfigService.resolveChain(
+          configuredModel,
+          context,
+        );
+      }
+      // 2. Fallback to family-based auto-routing
+      if (!chain) {
+        const previewEnabled =
+          hasAccessToPreview &&
+          (isGemini3Model(resolvedModel, config) ||
+            preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+            configuredModel === PREVIEW_GEMINI_MODEL_AUTO);
+        const chainKey = previewEnabled ? 'preview' : 'default';
+        chain = config.modelConfigService.resolveChain(chainKey, context);
+      }
+    }
+    if (!chain) {
+      // No matching modelChains found, default to single model chain
+      chain = createSingleModelChain(modelFromConfig);
+    }
+    return applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+  }
+
+  // --- LEGACY PATH ---
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
   } else if (
-    isGemini3Model(resolvedModel) ||
+    isGemini3Model(resolvedModel, config) ||
     isAutoPreferred ||
     isAutoConfigured
   ) {
     if (hasAccessToPreview) {
       const previewEnabled =
-        isGemini3Model(resolvedModel) ||
+        isGemini3Model(resolvedModel, config) ||
         preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
       chain = getModelPolicyChain({
@@ -80,7 +125,7 @@ export function resolvePolicyChain(
     } else {
       // User requested Gemini 3 but has no access. Proactively downgrade
       // to the stable Gemini 2.5 chain.
-      return getModelPolicyChain({
+      chain = getModelPolicyChain({
         previewEnabled: false,
         userTier: config.getUserTier(),
         useGemini31,
@@ -90,7 +135,17 @@ export function resolvePolicyChain(
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
+  return applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+}
 
+/**
+ * Applies active-index slicing and wrap-around logic to a chain template.
+ */
+function applyDynamicSlicing(
+  chain: ModelPolicy[],
+  resolvedModel: string,
+  wrapsAround: boolean,
+): ModelPolicyChain {
   const activeIndex = chain.findIndex(
     (policy) => policy.model === resolvedModel,
   );

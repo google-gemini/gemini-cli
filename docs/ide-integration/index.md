@@ -66,9 +66,11 @@ You can also install the extension directly from a marketplace.
   Follow your editor's instructions for installing extensions from this
   registry.
 
-> NOTE: The "Gemini CLI Companion" extension may appear towards the bottom of
-> search results. If you don't see it immediately, try scrolling down or sorting
-> by "Newly Published".
+<!-- prettier-ignore -->
+> [!NOTE]
+> The "Gemini CLI Companion" extension may appear towards the bottom of
+> search results. If you don't see it immediately, try scrolling down or
+> sorting by "Newly Published".
 >
 > After manually installing the extension, you must run `/ide enable` in the CLI
 > to activate the integration.
@@ -103,7 +105,9 @@ IDE, run:
 If connected, this command will show the IDE it's connected to and a list of
 recently opened files it is aware of.
 
-> [!NOTE] The file list is limited to 10 recently accessed files within your
+<!-- prettier-ignore -->
+> [!NOTE]
+> The file list is limited to 10 recently accessed files within your
 > workspace and only includes local files on disk.)
 
 ### Working with diffs
@@ -177,8 +181,16 @@ standalone terminal and want to manually associate it with a specific IDE
 instance, you can set the `GEMINI_CLI_IDE_PID` environment variable to the
 process ID (PID) of your IDE.
 
+**macOS/Linux**
+
 ```bash
 export GEMINI_CLI_IDE_PID=12345
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_CLI_IDE_PID=12345
 ```
 
 When this variable is set, Gemini CLI will skip automatic detection and attempt

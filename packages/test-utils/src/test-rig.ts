@@ -6,16 +6,17 @@
 
 import { expect } from 'vitest';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import fs, { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
-import fs from 'node:fs';
+export { GEMINI_DIR };
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
+import type { TestMcpConfig } from './test-mcp-server.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE_PATH = join(__dirname, '..', '..', '..', 'bundle/gemini.js');
@@ -353,6 +354,7 @@ export class TestRig {
     testName: string,
     options: {
       settings?: Record<string, unknown>;
+      state?: Record<string, unknown>;
       fakeResponsesPath?: string;
     } = {},
   ) {
@@ -382,6 +384,9 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+
+    // Create persistent state file
+    this._createStateFile(options.state);
   }
 
   private _cleanDir(dir: string) {
@@ -473,6 +478,24 @@ export class TestRig {
     );
   }
 
+  private _createStateFile(overrideState?: Record<string, unknown>) {
+    if (!this.homeDir) throw new Error('TestRig homeDir is not initialized');
+    const userGeminiDir = join(this.homeDir, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
+    const state = deepMerge(
+      {
+        terminalSetupPromptShown: true, // Default to true in tests to avoid blocking prompts
+      },
+      overrideState ?? {},
+    );
+
+    writeFileSync(
+      join(userGeminiDir, 'state.json'),
+      JSON.stringify(state, null, 2),
+    );
+  }
+
   createFile(fileName: string, content: string) {
     const filePath = join(this.testDir!, fileName);
     writeFileSync(filePath, content);
@@ -498,13 +521,19 @@ export class TestRig {
     command: string;
     initialArgs: string[];
   } {
+    const binaryPath = env['INTEGRATION_TEST_GEMINI_BINARY_PATH'];
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
     const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
-    const command = isNpmReleaseTest ? geminiCommand : 'node';
-    const initialArgs = isNpmReleaseTest
-      ? extraInitialArgs
-      : [BUNDLE_PATH, ...extraInitialArgs];
+    let command = 'node';
+    let initialArgs = [BUNDLE_PATH, ...extraInitialArgs];
+    if (binaryPath) {
+      command = binaryPath;
+      initialArgs = extraInitialArgs;
+    } else if (isNpmReleaseTest) {
+      command = geminiCommand;
+      initialArgs = extraInitialArgs;
+    }
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
@@ -523,7 +552,95 @@ export class TestRig {
     }
     const scriptPath = join(this.testDir, fileName);
     writeFileSync(scriptPath, content);
-    return normalizePath(scriptPath);
+    return normalizePath(scriptPath)!;
+  }
+
+  /**
+   * Adds a test MCP server to the test workspace.
+   * @param name The name of the server
+   * @param config Configuration object or name of predefined config (e.g. 'github')
+   */
+  addTestMcpServer(name: string, config: TestMcpConfig | string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before adding test servers',
+      );
+    }
+
+    let testConfig: TestMcpConfig;
+    if (typeof config === 'string') {
+      const assetsDir = join(__dirname, '..', 'assets', 'test-servers');
+      const configPath = join(assetsDir, `${config}.json`);
+      if (!fs.existsSync(configPath)) {
+        throw new Error(
+          `Predefined test server config not found: ${configPath}`,
+        );
+      }
+      testConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      testConfig.name = name; // Override name
+    } else {
+      testConfig = config;
+    }
+
+    const configFileName = `test-mcp-${name}.json`;
+    const scriptFileName = `test-mcp-${name}.mjs`;
+
+    const configFilePath = join(this.testDir, configFileName);
+    const scriptFilePath = join(this.testDir, scriptFileName);
+
+    // Write config
+    fs.writeFileSync(configFilePath, JSON.stringify(testConfig, null, 2));
+
+    // Copy template script
+    const templatePath = join(__dirname, 'test-mcp-server-template.mjs');
+    if (!fs.existsSync(templatePath)) {
+      throw new Error(`Test template not found at ${templatePath}`);
+    }
+
+    fs.copyFileSync(templatePath, scriptFilePath);
+
+    // Calculate path to monorepo node_modules
+    const monorepoNodeModules = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'node_modules',
+    );
+
+    // Create symlink to node_modules in testDir for ESM resolution
+    const testNodeModules = join(this.testDir, 'node_modules');
+    if (!fs.existsSync(testNodeModules)) {
+      fs.symlinkSync(monorepoNodeModules, testNodeModules, 'dir');
+    }
+
+    // Update settings in workspace and home
+    const updateSettings = (dir: string) => {
+      const settingsPath = join(dir, GEMINI_DIR, 'settings.json');
+      let settings: any = {};
+      if (fs.existsSync(settingsPath)) {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      } else {
+        fs.mkdirSync(join(dir, GEMINI_DIR), { recursive: true });
+      }
+
+      if (!settings.mcpServers) {
+        settings.mcpServers = {};
+      }
+
+      settings.mcpServers[name] = {
+        command: 'node',
+        args: [scriptFilePath, configFilePath],
+        // Removed env.NODE_PATH as it is ignored in ESM
+      };
+
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    };
+
+    updateSettings(this.testDir);
+    if (this.homeDir) {
+      updateSettings(this.homeDir);
+    }
   }
 
   private _getCleanEnv(

@@ -13,12 +13,18 @@ import type { ToolRegistry } from './tool-registry.js';
 import {
   McpClient,
   MCPDiscoveryState,
+  MCPServerStatus,
   populateMcpServerCommand,
 } from './mcp-client.js';
 import { getErrorMessage, isAuthenticationError } from '../utils/errors.js';
 import type { EventEmitter } from 'node:events';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+
+import { createHash } from 'node:crypto';
+import { stableStringify } from '../policy/stable-stringify.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
@@ -30,7 +36,6 @@ export class McpClientManager {
   // Track all configured servers (including disabled ones) for UI display
   private allServerConfigs: Map<string, MCPServerConfig> = new Map();
   private readonly clientVersion: string;
-  private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
   // If we have ongoing MCP client discovery, this completes once that is done.
   private discoveryPromise: Promise<void> | undefined;
@@ -42,16 +47,113 @@ export class McpClientManager {
     extensionName: string;
   }> = [];
 
+  private mainToolRegistry: ToolRegistry | undefined;
+  private mainPromptRegistry: PromptRegistry | undefined;
+  private mainResourceRegistry: ResourceRegistry | undefined;
+
+  /**
+   * Track whether the user has explicitly interacted with MCP in this session
+   * (e.g. by running an /mcp command).
+   */
+  private userInteractedWithMcp: boolean = false;
+
+  /**
+   * Track which MCP diagnostics have already been shown to the user this session
+   * and at what verbosity level.
+   */
+  private shownDiagnostics: Map<string, 'silent' | 'verbose'> = new Map();
+
+  /**
+   * Track whether the MCP "hint" has been shown.
+   */
+  private hintShown: boolean = false;
+
+  /**
+   * Track the last error message for each server.
+   */
+  private lastErrors: Map<string, string> = new Map();
+
   constructor(
     clientVersion: string,
-    toolRegistry: ToolRegistry,
     cliConfig: Config,
     eventEmitter?: EventEmitter,
   ) {
     this.clientVersion = clientVersion;
-    this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
+  }
+
+  setMainRegistries(registries: {
+    toolRegistry: ToolRegistry;
+    promptRegistry: PromptRegistry;
+    resourceRegistry: ResourceRegistry;
+  }) {
+    this.mainToolRegistry = registries.toolRegistry;
+    this.mainPromptRegistry = registries.promptRegistry;
+    this.mainResourceRegistry = registries.resourceRegistry;
+  }
+
+  setUserInteractedWithMcp() {
+    this.userInteractedWithMcp = true;
+  }
+
+  getLastError(serverName: string): string | undefined {
+    return this.lastErrors.get(serverName);
+  }
+
+  /**
+   * Emit an MCP diagnostic message, adhering to the user's intent and
+   * deduplication rules.
+   */
+  emitDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ) {
+    // Capture error for later display if it's an error/warning
+    if (severity === 'error' || severity === 'warning') {
+      if (serverName) {
+        this.lastErrors.set(serverName, message);
+      }
+    }
+
+    // Deduplicate
+    const diagnosticKey = `${severity}:${message}`;
+    const previousStatus = this.shownDiagnostics.get(diagnosticKey);
+
+    // If user has interacted, show verbosely unless already shown verbosely
+    if (this.userInteractedWithMcp) {
+      if (previousStatus === 'verbose') {
+        debugLogger.debug(
+          `Deduplicated verbose MCP diagnostic: ${diagnosticKey}`,
+        );
+        return;
+      }
+      this.shownDiagnostics.set(diagnosticKey, 'verbose');
+      coreEvents.emitFeedback(severity, message, error);
+      return;
+    }
+
+    // In silent mode, if it has been shown at all, skip
+    if (previousStatus) {
+      debugLogger.debug(`Deduplicated silent MCP diagnostic: ${diagnosticKey}`);
+      return;
+    }
+    this.shownDiagnostics.set(diagnosticKey, 'silent');
+
+    // Otherwise, be less annoying
+    debugLogger.log(`[MCP ${severity}] ${message}`, error);
+
+    if (severity === 'error' || severity === 'warning') {
+      if (!this.hintShown) {
+        this.hintShown = true;
+        coreEvents.emitFeedback(
+          'info',
+          'MCP issues detected. Run /mcp list for status.',
+        );
+      }
+    }
   }
 
   getBlockedMcpServers() {
@@ -60,6 +162,16 @@ export class McpClientManager {
 
   getClient(serverName: string): McpClient | undefined {
     return this.clients.get(serverName);
+  }
+
+  removeRegistries(registries: {
+    toolRegistry: ToolRegistry;
+    promptRegistry: PromptRegistry;
+    resourceRegistry: ResourceRegistry;
+  }): void {
+    for (const client of this.clients.values()) {
+      client.removeRegistries(registries);
+    }
   }
 
   /**
@@ -88,7 +200,7 @@ export class McpClientManager {
         return Promise.resolve();
       }),
     );
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -103,12 +215,13 @@ export class McpClientManager {
     await Promise.all(
       Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
         this.maybeDiscoverMcpServer(name, {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...config,
           extension,
         }),
       ),
     );
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -151,35 +264,99 @@ export class McpClientManager {
     return false;
   }
 
-  private async disconnectClient(name: string, skipRefresh = false) {
-    const existing = this.clients.get(name);
+  private async disconnectClient(clientKey: string, skipRefresh = false) {
+    const existing = this.clients.get(clientKey);
     if (existing) {
+      const serverName = existing.getServerName();
       try {
-        this.clients.delete(name);
+        this.clients.delete(clientKey);
         this.eventEmitter?.emit('mcp-client-update', this.clients);
         await existing.disconnect();
       } catch (error) {
         debugLogger.warn(
-          `Error stopping client '${name}': ${getErrorMessage(error)}`,
+          `Error stopping client '${serverName}': ${getErrorMessage(error)}`,
         );
       } finally {
         if (!skipRefresh) {
           // This is required to update the content generator configuration with the
           // new tool configuration and system instructions.
-          await this.cliConfig.refreshMcpContext();
+          await this.scheduleMcpContextRefresh();
         }
       }
     }
   }
 
+  private getClientKey(name: string, config: MCPServerConfig): string {
+    const { extension, ...rest } = config;
+    const keyData = {
+      name,
+      config: rest,
+      extensionId: extension?.id,
+    };
+    return createHash('sha256').update(stableStringify(keyData)).digest('hex');
+  }
+
+  /**
+   * Merges two MCP configurations. The second configuration (override)
+   * takes precedence for scalar properties, but array properties are
+   * merged securely (exclude = union, include = intersection) and
+   * environment objects are merged.
+   */
+  private mergeMcpConfigs(
+    base: MCPServerConfig,
+    override: MCPServerConfig,
+  ): MCPServerConfig {
+    // For allowlists (includeTools), use intersection to ensure the most
+    // restrictive policy wins. A tool must be allowed by BOTH parties.
+    let includeTools: string[] | undefined;
+    if (base.includeTools && override.includeTools) {
+      includeTools = base.includeTools.filter((t) =>
+        override.includeTools!.includes(t),
+      );
+      // If the intersection is empty, we must keep an empty array to indicate
+      // that NO tools are allowed (undefined would allow everything).
+    } else {
+      // If only one provides an allowlist, use that.
+      includeTools = override.includeTools ?? base.includeTools;
+    }
+
+    // For blocklists (excludeTools), use union so if ANY party blocks it,
+    // it stays blocked.
+    const excludeTools = [
+      ...new Set([
+        ...(base.excludeTools ?? []),
+        ...(override.excludeTools ?? []),
+      ]),
+    ];
+
+    const env = { ...(base.env ?? {}), ...(override.env ?? {}) };
+
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      ...base,
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
+      ...override,
+      includeTools,
+      excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
+      env: Object.keys(env).length > 0 ? env : undefined,
+      extension: override.extension ?? base.extension,
+    };
+  }
+
   async maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
+    registries?: {
+      toolRegistry: ToolRegistry;
+      promptRegistry: PromptRegistry;
+      resourceRegistry: ResourceRegistry;
+    },
   ): Promise<void> {
-    const existing = this.clients.get(name);
+    const existingConfig = this.allServerConfigs.get(name);
     if (
-      existing &&
-      existing.getServerConfig().extension?.id !== config.extension?.id
+      existingConfig?.extension?.id &&
+      config.extension?.id &&
+      existingConfig.extension.id !== config.extension.id
     ) {
       const extensionText = config.extension
         ? ` from extension "${config.extension.name}"`
@@ -190,15 +367,57 @@ export class McpClientManager {
       return;
     }
 
+    let finalConfig = config;
+    if (existingConfig) {
+      // If we're merging an extension config into a user config,
+      // the user config should be the override.
+      if (config.extension && !existingConfig.extension) {
+        finalConfig = this.mergeMcpConfigs(config, existingConfig);
+      } else {
+        // Otherwise (User over Extension, or User over User),
+        // the incoming config is the override.
+        finalConfig = this.mergeMcpConfigs(existingConfig, config);
+      }
+    }
+
     // Always track server config for UI display
-    this.allServerConfigs.set(name, config);
+    this.allServerConfigs.set(name, finalConfig);
+
+    const clientKey = this.getClientKey(name, finalConfig);
+
+    // If no registries are provided (main agent) and a server with this name already exists
+    // but with a different configuration, handle potential conflicts.
+    if (!registries) {
+      const existingSameName = Array.from(this.clients.values()).find(
+        (c) => c.getServerName() === name,
+      );
+      if (existingSameName) {
+        const existingConfigFromClient = existingSameName.getServerConfig();
+        const existingKey = this.getClientKey(name, existingConfigFromClient);
+
+        if (existingKey !== clientKey) {
+          // This is a configuration update (hot-reload).
+          // We should stop the old client before starting the new one.
+          await this.disconnectClient(existingKey, true);
+        }
+      }
+    }
+
+    const existing = this.clients.get(clientKey);
+
+    // If no connection details are provided, we can't discover this server.
+    // This often happens when a user provides only overrides (like excludeTools)
+    // for a server that is actually provided by an extension.
+    if (!finalConfig.command && !finalConfig.url && !finalConfig.httpUrl) {
+      return;
+    }
 
     // Check if blocked by admin settings (allowlist/excludelist)
     if (this.isBlockedBySettings(name)) {
       if (!this.blockedMcpServers.find((s) => s.name === name)) {
         this.blockedMcpServers?.push({
           name,
-          extensionName: config.extension?.name ?? '',
+          extensionName: finalConfig.extension?.name ?? '',
         });
       }
       return;
@@ -206,45 +425,59 @@ export class McpClientManager {
     // User-disabled servers: disconnect if running, don't start
     if (await this.isDisabledByUser(name)) {
       if (existing) {
-        await this.disconnectClient(name);
+        await this.disconnectClient(clientKey);
       }
       return;
     }
     if (!this.cliConfig.isTrustedFolder()) {
       return;
     }
-    if (config.extension && !config.extension.isActive) {
+    if (finalConfig.extension && !finalConfig.extension.isActive) {
       return;
     }
 
-    const currentDiscoveryPromise = new Promise<void>((resolve, reject) => {
-      (async () => {
+    const currentDiscoveryPromise = new Promise<void>((resolve) => {
+      void (async () => {
         try {
-          if (existing) {
-            this.clients.delete(name);
-            await existing.disconnect();
+          let client = existing;
+          if (!client) {
+            client = new McpClient(
+              name,
+              finalConfig,
+              this.cliConfig.getWorkspaceContext(),
+              this.cliConfig,
+              this.cliConfig.getDebugMode(),
+              this.clientVersion,
+              async () => {
+                debugLogger.log(
+                  `🔔 Refreshing context for server '${name}'...`,
+                );
+                await this.scheduleMcpContextRefresh();
+              },
+            );
+            this.clients.set(clientKey, client);
+            this.eventEmitter?.emit('mcp-client-update', this.clients);
           }
 
-          const client = new McpClient(
-            name,
-            config,
-            this.toolRegistry,
-            this.cliConfig.getPromptRegistry(),
-            this.cliConfig.getResourceRegistry(),
-            this.cliConfig.getWorkspaceContext(),
-            this.cliConfig,
-            this.cliConfig.getDebugMode(),
-            this.clientVersion,
-            async () => {
-              debugLogger.log('Tools changed, updating Gemini context...');
-              await this.scheduleMcpContextRefresh();
-            },
-          );
-          this.clients.set(name, client);
-          this.eventEmitter?.emit('mcp-client-update', this.clients);
+          const targetRegistries =
+            registries ??
+            (this.mainToolRegistry &&
+            this.mainPromptRegistry &&
+            this.mainResourceRegistry
+              ? {
+                  toolRegistry: this.mainToolRegistry,
+                  promptRegistry: this.mainPromptRegistry,
+                  resourceRegistry: this.mainResourceRegistry,
+                }
+              : undefined);
+
           try {
-            await client.connect();
-            await client.discover(this.cliConfig);
+            if (client.getStatus() === MCPServerStatus.DISCONNECTED) {
+              await client.connect();
+            }
+            if (targetRegistries) {
+              await client.discoverInto(this.cliConfig, targetRegistries);
+            }
             this.eventEmitter?.emit('mcp-client-update', this.clients);
           } catch (error) {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
@@ -253,7 +486,7 @@ export class McpClientManager {
             if (!isAuthenticationError(error)) {
               // Log the error but don't let a single failed server stop the others
               const errorMessage = getErrorMessage(error);
-              coreEvents.emitFeedback(
+              this.emitDiagnostic(
                 'error',
                 `Error during discovery for MCP server '${name}': ${errorMessage}`,
                 error,
@@ -262,15 +495,15 @@ export class McpClientManager {
           }
         } catch (error) {
           const errorMessage = getErrorMessage(error);
-          coreEvents.emitFeedback(
+          this.emitDiagnostic(
             'error',
-            `Error initializing MCP server '${name}': ${errorMessage}`,
+            `Fatal error ensuring MCP server '${name}' is connected: ${errorMessage}`,
             error,
           );
         } finally {
           resolve();
         }
-      })().catch(reject);
+      })();
     });
 
     if (this.discoveryPromise) {
@@ -346,13 +579,18 @@ export class McpClientManager {
       this.eventEmitter?.emit('mcp-client-update', this.clients);
     }
 
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
    * Restarts all MCP servers (including newly enabled ones).
    */
   async restart(): Promise<void> {
+    const disconnectionPromises = Array.from(this.clients.keys()).map((key) =>
+      this.disconnectClient(key, true),
+    );
+    await Promise.all(disconnectionPromises);
+
     await Promise.all(
       Array.from(this.allServerConfigs.entries()).map(
         async ([name, config]) => {
@@ -366,7 +604,7 @@ export class McpClientManager {
         },
       ),
     );
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -377,8 +615,10 @@ export class McpClientManager {
     if (!config) {
       throw new Error(`No MCP server registered with the name "${name}"`);
     }
+    const clientKey = this.getClientKey(name, config);
+    await this.disconnectClient(clientKey, true);
     await this.maybeDiscoverMcpServer(name, config);
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -391,7 +631,7 @@ export class McpClientManager {
         try {
           await client.disconnect();
         } catch (error) {
-          coreEvents.emitFeedback(
+          this.emitDiagnostic(
             'error',
             `Error stopping client '${name}':`,
             error,
@@ -421,32 +661,63 @@ export class McpClientManager {
 
   getMcpInstructions(): string {
     const instructions: string[] = [];
-    for (const [name, client] of this.clients) {
+    for (const client of this.clients.values()) {
+      const serverName = client.getServerName();
       const clientInstructions = client.getInstructions();
       if (clientInstructions) {
         instructions.push(
-          `The following are instructions provided by the tool server '${name}':\n---[start of server instructions]---\n${clientInstructions}\n---[end of server instructions]---`,
+          `The following are instructions provided by the tool server '${serverName}':\n---[start of server instructions]---\n${clientInstructions}\n---[end of server instructions]---`,
         );
       }
     }
     return instructions.join('\n\n');
   }
 
+  private isRefreshingMcpContext: boolean = false;
+  private pendingMcpContextRefresh: boolean = false;
+
   private async scheduleMcpContextRefresh(): Promise<void> {
+    this.pendingMcpContextRefresh = true;
+
+    if (this.isRefreshingMcpContext) {
+      debugLogger.log(
+        'MCP context refresh already in progress, queuing trailing execution.',
+      );
+      return this.pendingRefreshPromise ?? Promise.resolve();
+    }
+
     if (this.pendingRefreshPromise) {
+      debugLogger.log(
+        'MCP context refresh already scheduled, coalescing with existing request.',
+      );
       return this.pendingRefreshPromise;
     }
 
+    debugLogger.log('Scheduling MCP context refresh...');
     this.pendingRefreshPromise = (async () => {
-      // Debounce to coalesce multiple rapid updates
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      this.isRefreshingMcpContext = true;
       try {
-        await this.cliConfig.refreshMcpContext();
+        do {
+          this.pendingMcpContextRefresh = false;
+          debugLogger.log('Executing MCP context refresh...');
+          await this.cliConfig.refreshMcpContext();
+          debugLogger.log('MCP context refresh complete.');
+
+          // If more refresh requests came in during the execution, wait a bit
+          // to coalesce them before the next iteration.
+          if (this.pendingMcpContextRefresh) {
+            debugLogger.log(
+              'Coalescing burst refresh requests (300ms delay)...',
+            );
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+        } while (this.pendingMcpContextRefresh);
       } catch (error) {
         debugLogger.error(
           `Error refreshing MCP context: ${getErrorMessage(error)}`,
         );
       } finally {
+        this.isRefreshingMcpContext = false;
         this.pendingRefreshPromise = null;
       }
     })();
