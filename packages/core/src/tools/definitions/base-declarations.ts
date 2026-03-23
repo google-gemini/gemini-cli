@@ -126,8 +126,8 @@ export const PLAN_MODE_PARAM_REASON = 'reason';
 // -- sandbox --
 export const PARAM_ADDITIONAL_PERMISSIONS = 'additional_permissions';
 
-// -- create_new_topic --
-export const CREATE_NEW_TOPIC_TOOL_NAME = 'create_new_topic';
+// -- update_topic --
+export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';
 export const TOPIC_PARAM_TITLE = 'title';
-export const TOPIC_PARAM_PREVIOUS_SUMMARY = 'previous_topic_summary';
-export const TOPIC_PARAM_CURRENT_SUMMARY = 'current_topic_summary';
+export const TOPIC_PARAM_SUMMARY = 'summary';
+export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';

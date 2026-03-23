@@ -26,7 +26,7 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
-  CREATE_NEW_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -60,7 +60,7 @@ export class PromptProvider {
     const enabledToolNames = new Set(toolNames);
 
     if (!context.config.isTopicUpdateNarrationEnabled()) {
-      enabledToolNames.delete(CREATE_NEW_TOPIC_TOOL_NAME);
+      enabledToolNames.delete(UPDATE_TOPIC_TOOL_NAME);
     }
     const approvedPlanPath = context.config.getApprovedPlanPath();
 
@@ -82,7 +82,7 @@ export class PromptProvider {
       const allTools = context.toolRegistry.getAllTools().filter((t) => {
         if (
           !context.config.isTopicUpdateNarrationEnabled() &&
-          t.name === CREATE_NEW_TOPIC_TOOL_NAME
+          t.name === UPDATE_TOPIC_TOOL_NAME
         ) {
           return false;
         }

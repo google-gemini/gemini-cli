@@ -17,6 +17,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
+  getUpdateTopicDeclaration,
 } from './dynamic-declaration-helpers.js';
 
 import {
@@ -90,10 +91,10 @@ import {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
-  CREATE_NEW_TOPIC_TOOL_NAME as CREATE_NEW_TOPIC_TOOL_NAME_BASE,
+  UPDATE_TOPIC_TOOL_NAME as UPDATE_TOPIC_TOOL_NAME_BASE,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_PREVIOUS_SUMMARY,
-  TOPIC_PARAM_CURRENT_SUMMARY,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 export {
@@ -114,7 +115,7 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
-  CREATE_NEW_TOPIC_TOOL_NAME_BASE as CREATE_NEW_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME_BASE as UPDATE_TOPIC_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -169,8 +170,8 @@ export {
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_PREVIOUS_SUMMARY,
-  TOPIC_PARAM_CURRENT_SUMMARY,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 };
 
 // Re-export sets for compatibility
@@ -301,16 +302,11 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
 };
 
-export const CREATE_NEW_TOPIC_DEFINITION: ToolDefinition = {
+export const UPDATE_TOPIC_DEFINITION: ToolDefinition = {
   get base() {
-    // This tool is only supported on Gemini 3.
-    // For other models, we provide a placeholder that won't be used if gated correctly.
-    return {
-      name: CREATE_NEW_TOPIC_TOOL_NAME_BASE,
-      description: 'NOT SUPPORTED',
-    };
+    return getUpdateTopicDeclaration();
   },
-  overrides: (modelId) => getToolSet(modelId).create_new_topic,
+  overrides: (modelId) => getToolSet(modelId).update_topic,
 };
 
 // ============================================================================

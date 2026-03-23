@@ -50,5 +50,5 @@ export interface CoreToolSet {
   enter_plan_mode: FunctionDeclaration;
   exit_plan_mode: () => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
-  create_new_topic?: FunctionDeclaration;
+  update_topic?: FunctionDeclaration;
 }

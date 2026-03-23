@@ -10,9 +10,7 @@ import {
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
-  CREATE_NEW_TOPIC_TOOL_NAME,
-  TOPIC_PARAM_PREVIOUS_SUMMARY,
-  TOPIC_PARAM_CURRENT_SUMMARY,
+  UPDATE_TOPIC_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -618,32 +616,34 @@ function mandateConfirm(interactive: boolean): string {
 function mandateTopicUpdateModel(): string {
   return `
 - **Protocol: Topic Model**
-  You are an agentic system. You must organize your work into logical "Chapters" using the \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool.
+  You are an agentic system. You must organize your work into logical "Chapters" and tactical "Intents" using the \`${UPDATE_TOPIC_TOOL_NAME}\` tool.
 
-- **1. Chapter Initialization:**
-  - **The Trigger:** You MUST call \`${CREATE_NEW_TOPIC_TOOL_NAME}\` ONLY when beginning a new task or when the broad logical nature of your work changes (e.g., transitioning from Research to Strategy, or from Strategy to Implementation).
-  - **Granularity:** You MUST NOT combine topics (e.g., do NOT use "Researching and Implementing"). Use granular, single-focus titles like "Researching [Task]", "Strategy for [Task]", or "Implementing [Specific Idea]". 
-  - **Deviations:** If your work deviates from the current topic's stated goal, you MUST call \`${CREATE_NEW_TOPIC_TOOL_NAME}\` again with a new title (e.g., "Implementing [New Idea]") to reflect the shift.
-  - **The Format:** Provide a concise, high-level title for the chapter. You MUST also provide a detailed explanation (5-10 sentences) of what the new topic intends to achieve in the \`${TOPIC_PARAM_CURRENT_SUMMARY}\` parameter. When shifting topics, you MUST additionally provide a detailed summary (5-10 sentences) of the work completed in the previous topic in the \`${TOPIC_PARAM_PREVIOUS_SUMMARY}\` parameter.
-  - **Example:** \`create_new_topic(title="Implementing Auth", ${TOPIC_PARAM_CURRENT_SUMMARY}="Implement the OAuth2 flow and link it to the existing user session. This involves creating new routes for the callback and state management for the token. We will also need to update the middleware to handle authenticated sessions correctly. This will ensure that all subsequent API calls are properly authorized and user-specific. The implementation will follow the project's security standards and include unit tests for each new component.", ${TOPIC_PARAM_PREVIOUS_SUMMARY}="Completed research on OAuth2 and mapped endpoints. We identified the necessary client libraries and configured the initial developer credentials for the authentication provider. A prototype script was written to verify the handshake process with the API. The existing user database schema was reviewed and found to be compatible with the new OAuth IDs. We also finalized the design of the new login UI and obtained user feedback on the mockups.")\`
-  - **Start of Task:** Your very first tool execution in a new session must be \`${CREATE_NEW_TOPIC_TOOL_NAME}\`. For the first topic, leave \`${TOPIC_PARAM_PREVIOUS_SUMMARY}\` empty but you MUST still provide \`${TOPIC_PARAM_CURRENT_SUMMARY}\`.
+- **1. Chapter Initialization & First Call:**
+  - **Start of Task:** Your very first tool execution in a new session MUST be \`${UPDATE_TOPIC_TOOL_NAME}\`.
+  - **Single Idea Scope:** Every Chapter MUST be scoped to exactly ONE logical idea or phase. You are strictly FORBIDDEN from clubbing multiple distinct phases into a single topic.
+  - **Granularity:** Use granular, single-focus titles. 
+    - **CORRECT:** "Researching Parser", "Strategy for Fix", "Implementing Buffer Logic".
+    - **INCORRECT:** "Researching and implementing parser fix", "Planning and coding the update".
+  - **Mandatory Transitions:** When transitioning from one logical phase to another (e.g., from Research to Implementation), you MUST create a new Chapter. Research and Implementation must ALWAYS be separate topics.
+  - **The Format:** For a new chapter, you MUST provide a concise, high-level \`title\`. You MUST also provide a detailed summary (5-10 sentences) in the \`summary\` parameter. This summary MUST cover both the work completed in the previous topic and the strategic intent of the new topic to ensure narrative continuity.
+  - **Example (First Call):** \`update_topic(title="Researching Parser", summary="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.", strategic_intent="Listing files in the parser directory.")\`
+  - **Example (Transition):** \`update_topic(title="Implementing Buffer Fix", summary="I have completed the research phase and identified a race condition in the tokenizer's buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.", strategic_intent="Opening tokenizer.ts to apply the fix.")\`
 
-- **2. Strategic Narration:**
-  - **Intent:** At the start of each chapter, or before a significant sequence of tools, you SHOULD provide a concise, one-sentence statement of your intent or strategy.
-  - **No Text Headers:** You are FORBIDDEN from printing "Topic: <Phase>" or any similar text-based headers in your response. The tool handles all UI narration.
-  - **Minimal Noise:** Avoid conversational filler and apologies. While executing tools within a chapter, maintain a high signal-to-noise ratio; brief explanations are encouraged if they provide essential context or clarify your strategy.
+- **2. Tactical Heartbeat (Every Turn):**
+  - **The Mandate:** For EVERY response that contains functional tools (e.g., \`read_file\`, \`grep_search\`), your FIRST tool call in that turn MUST be \`update_topic\`.
+  - **The Intent:** You MUST provide a one-sentence statement of your immediate goal in the \`strategic_intent\` parameter. This replaces the raw text "Explain Before Acting" preamble.
+  - **Example (Tactical):** \`update_topic(strategic_intent="Reading the parser index file to check the main loop.")\`
 
-- **3. Internal Reasoning:**
-  - You MUST reason about your plan, track tool calls, and strategize internally before executing tools.
-  - While your deep reasoning should remain internal, you are encouraged to share your high-level strategy and key findings in your text responses to maintain alignment and improve task performance.
+- **3. Strategic Transitions:**
+  - **The Trigger:** Call \`update_topic\` with a new \`title\` and \`current_summary\` ONLY when the broad logical nature of your work changes (e.g., transitioning from Research to Strategy, or from Strategy to Implementation).
 
-- **4. Completion:**
-  - Only when the entire task is finalized do you provide a **Final Summary**.
+- **4. Constraints:**
+  - **No Raw Text:** You are FORBIDDEN from writing raw text preambles or explanations before tool calls. All reasoning about "what I am doing next" MUST be captured in the \`strategic_intent\` parameter.
+  - **No Text Headers:** Do NOT print "Topic: <Phase>" or any similar text-based headers in your response. The tool handles all UI narration.
+  - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 
 **IMPORTANT: Tool Usage vs. Text**
-The \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool MUST be called as a proper tool. Do NOT simply write the tool name in your text response.
-
-- **Constraint Enforcement:** If you provide a manual "Topic:" text header, or if you call the tool for every single tool execution without a fundamental shift in work, you have failed the system integrity protocol.`;
+The \`update_topic\` tool MUST be called as a proper tool. Do NOT simply write the tool name in your text response.`;
 }
 
 function mandateExplainBeforeActing(): string {

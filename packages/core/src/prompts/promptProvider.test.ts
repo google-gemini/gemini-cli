@@ -15,7 +15,7 @@ import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
-import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { TopicState } from '../tools/topicTool.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -245,10 +245,10 @@ describe('PromptProvider', () => {
       mockConfig.topicState.reset();
       vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
       (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
-        getAllToolNames: vi.fn().mockReturnValue([CREATE_NEW_TOPIC_TOOL_NAME]),
+        getAllToolNames: vi.fn().mockReturnValue([UPDATE_TOPIC_TOOL_NAME]),
         getAllTools: vi.fn().mockReturnValue([
           new MockTool({
-            name: CREATE_NEW_TOPIC_TOOL_NAME,
+            name: UPDATE_TOPIC_TOOL_NAME,
             displayName: 'Topic',
           }),
         ]),
@@ -276,7 +276,7 @@ describe('PromptProvider', () => {
       expect(prompt).not.toContain('[Active Topic: Active Chapter]');
     });
 
-    it('should filter out create_new_topic tool when narration is disabled', () => {
+    it('should filter out update_topic tool when narration is disabled', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
         false,
@@ -284,18 +284,16 @@ describe('PromptProvider', () => {
       const provider = new PromptProvider();
 
       const prompt = provider.getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain(CREATE_NEW_TOPIC_TOOL_NAME);
+      expect(prompt).not.toContain(UPDATE_TOPIC_TOOL_NAME);
     });
 
-    it('should NOT filter out create_new_topic tool when narration is enabled', () => {
+    it('should NOT filter out update_topic tool when narration is enabled', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).toContain(
-        `<tool>\`${CREATE_NEW_TOPIC_TOOL_NAME}\`</tool>`,
-      );
+      expect(prompt).toContain(`<tool>\`${UPDATE_TOPIC_TOOL_NAME}\`</tool>`);
     });
   });
 });

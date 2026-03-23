@@ -78,7 +78,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
-  getCreateNewTopicDeclaration,
+  getUpdateTopicDeclaration,
 } from '../dynamic-declaration-helpers.js';
 import {
   DEFAULT_MAX_LINES_TEXT_FILE,
@@ -725,5 +725,5 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
-  create_new_topic: getCreateNewTopicDeclaration(),
+  update_topic: getUpdateTopicDeclaration(),
 };

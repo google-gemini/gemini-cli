@@ -59,7 +59,7 @@ import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
-  CREATE_NEW_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
@@ -1574,7 +1574,7 @@ describe('Server Config (config.ts)', () => {
         topicUpdateNarration: true,
       });
       const excluded = config.getExcludeTools();
-      expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(false);
+      expect(excluded!.has(UPDATE_TOPIC_TOOL_NAME)).toBe(false);
     });
 
     it('should exclude topic tool when narration is disabled', () => {
@@ -1584,14 +1584,14 @@ describe('Server Config (config.ts)', () => {
       });
       const excluded = config.getExcludeTools();
       expect(excluded).toBeDefined();
-      expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(true);
+      expect(excluded!.has(UPDATE_TOPIC_TOOL_NAME)).toBe(true);
     });
 
     it('should default to disabled and exclude topic tool', () => {
       const config = new Config(baseParams);
       expect(config.isTopicUpdateNarrationEnabled()).toBe(false);
       const excluded = config.getExcludeTools();
-      expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(true);
+      expect(excluded!.has(UPDATE_TOPIC_TOOL_NAME)).toBe(true);
     });
 
     it('should have independent TopicState across instances', () => {

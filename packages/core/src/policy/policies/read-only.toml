@@ -59,6 +59,6 @@ priority = 50
 
 # Topic grouping tool is innocuous and used for UI organization.
 [[rule]]
-toolName = "create_new_topic"
+toolName = "update_topic"
 decision = "allow"
 priority = 50

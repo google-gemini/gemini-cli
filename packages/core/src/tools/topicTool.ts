@@ -5,10 +5,10 @@
  */
 
 import {
-  CREATE_NEW_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_PREVIOUS_SUMMARY,
-  TOPIC_PARAM_CURRENT_SUMMARY,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './definitions/coreTools.js';
 import {
   BaseDeclarativeTool,
@@ -16,38 +16,37 @@ import {
   Kind,
   type ToolResult,
 } from './tools.js';
-import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { getCreateNewTopicDeclaration } from './definitions/dynamic-declaration-helpers.js';
+import { getUpdateTopicDeclaration } from './definitions/dynamic-declaration-helpers.js';
 import type { Config } from '../config/config.js';
 
 /**
- * Manages the current active topic title for a session.
+ * Manages the current active topic title and tactical intent for a session.
  * Hosted within the Config instance for session-scoping.
  */
 export class TopicState {
   private activeTopicTitle?: string;
+  private activeIntent?: string;
 
   /**
-   * Sanitizes and sets the topic title.
-   * @returns true if the title was valid and set, false otherwise.
+   * Sanitizes and sets the topic title and/or intent.
+   * @returns true if the input was valid and set, false otherwise.
    */
-  setTopic(title: string): boolean {
-    if (!title) return false;
+  setTopic(title?: string, intent?: string): boolean {
+    const sanitizedTitle = title?.trim().replace(/[\r\n]+/g, ' ');
+    const sanitizedIntent = intent?.trim().replace(/[\r\n]+/g, ' ');
 
-    // 1. Trim whitespace
-    let sanitized = title.trim();
+    if (!sanitizedTitle && !sanitizedIntent) return false;
 
-    // 2. Security: Strip newlines and carriage returns to prevent prompt injection/breakout
-    sanitized = sanitized.replace(/[\r\n]+/g, ' ');
-
-    // 3. Robustness check: Ensure it's not empty after sanitization
-    if (sanitized.length === 0) {
-      return false;
+    if (sanitizedTitle) {
+      this.activeTopicTitle = sanitizedTitle;
     }
 
-    this.activeTopicTitle = sanitized;
+    if (sanitizedIntent) {
+      this.activeIntent = sanitizedIntent;
+    }
+
     return true;
   }
 
@@ -55,23 +54,28 @@ export class TopicState {
     return this.activeTopicTitle;
   }
 
+  getIntent(): string | undefined {
+    return this.activeIntent;
+  }
+
   reset(): void {
     this.activeTopicTitle = undefined;
+    this.activeIntent = undefined;
   }
 }
 
-interface CreateNewTopicParams {
-  [TOPIC_PARAM_TITLE]: string;
-  [TOPIC_PARAM_PREVIOUS_SUMMARY]?: string;
-  [TOPIC_PARAM_CURRENT_SUMMARY]: string;
+interface UpdateTopicParams {
+  [TOPIC_PARAM_TITLE]?: string;
+  [TOPIC_PARAM_SUMMARY]?: string;
+  [TOPIC_PARAM_STRATEGIC_INTENT]?: string;
 }
 
-class CreateNewTopicInvocation extends BaseToolInvocation<
-  CreateNewTopicParams,
+class UpdateTopicInvocation extends BaseToolInvocation<
+  UpdateTopicParams,
   ToolResult
 > {
   constructor(
-    params: CreateNewTopicParams,
+    params: UpdateTopicParams,
     messageBus: MessageBus,
     toolName: string,
     private readonly config: Config,
@@ -81,39 +85,51 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     const title = this.params[TOPIC_PARAM_TITLE];
-    return `Create new topic: "${title}"`;
+    const intent = this.params[TOPIC_PARAM_STRATEGIC_INTENT];
+    if (title) {
+      return `Update topic to: "${title}"`;
+    }
+    return `Update tactical intent: "${intent || '...'}"`;
   }
 
   async execute(): Promise<ToolResult> {
     const title = this.params[TOPIC_PARAM_TITLE];
-    const previousSummary = this.params[TOPIC_PARAM_PREVIOUS_SUMMARY];
-    const currentSummary = this.params[TOPIC_PARAM_CURRENT_SUMMARY];
+    const summary = this.params[TOPIC_PARAM_SUMMARY];
+    const strategicIntent = this.params[TOPIC_PARAM_STRATEGIC_INTENT];
 
-    const success = this.config.topicState.setTopic(title);
+    const activeTopic = this.config.topicState.getTopic();
+    const isNewTopic = !!(
+      title &&
+      title.trim() !== '' &&
+      title.trim() !== activeTopic
+    );
 
-    if (!success) {
-      return {
-        llmContent: 'Error: A valid, non-empty topic title is required.',
-        returnDisplay: 'Error: A valid, non-empty topic title is required.',
-        error: {
-          message: 'A valid topic title is required.',
-          type: ToolErrorType.INVALID_TOOL_PARAMS,
-        },
-      };
-    }
+    this.config.topicState.setTopic(title, strategicIntent);
 
-    const setTopic = this.config.topicState.getTopic()!;
-    debugLogger.log(`[TopicTool] Changing topic to: "${setTopic}"`);
+    const currentTopic = this.config.topicState.getTopic() || '...';
+    const currentIntent =
+      strategicIntent || this.config.topicState.getIntent() || '...';
 
-    let llmContent = `Current topic: "${setTopic}"\nTopic goal: ${currentSummary}`;
-    let returnDisplay = `Current topic: **${setTopic}**\n\n**Topic Goal:**\n${currentSummary}`;
+    debugLogger.log(
+      `[TopicTool] Update: Topic="${currentTopic}", Intent="${currentIntent}", isNew=${isNewTopic}`,
+    );
 
-    if (previousSummary) {
-      llmContent =
-        `Previous topic summary: ${previousSummary}\n\n` + llmContent;
-      returnDisplay =
-        `**Previous Topic Summary:**\n${previousSummary}\n\n---\n\n` +
-        returnDisplay;
+    let llmContent = '';
+    let returnDisplay = '';
+
+    if (isNewTopic) {
+      // Handle New Topic Header & Summary
+      llmContent = `Current topic: "${currentTopic}"\nTopic summary: ${summary || '...'}`;
+      returnDisplay = `## 📂 Topic: **${currentTopic}**\n\n**Summary:**\n${summary || '...'}`;
+
+      if (strategicIntent && strategicIntent.trim()) {
+        llmContent += `\n\nStrategic Intent: ${strategicIntent.trim()}`;
+        returnDisplay += `\n\n> [!STRATEGY]\n> **Intent:** ${strategicIntent.trim()}`;
+      }
+    } else {
+      // Tactical update only
+      llmContent = `Strategic Intent: ${currentIntent}`;
+      returnDisplay = `> [!STRATEGY]\n> **Intent:** ${currentIntent}`;
     }
 
     return {
@@ -124,20 +140,20 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
 }
 
 /**
- * Tool to create a new semantic topic (chapter) for UI grouping.
+ * Tool to update semantic topic context and tactical intent for UI grouping and model focus.
  */
-export class CreateNewTopicTool extends BaseDeclarativeTool<
-  CreateNewTopicParams,
+export class UpdateTopicTool extends BaseDeclarativeTool<
+  UpdateTopicParams,
   ToolResult
 > {
   constructor(
     private readonly config: Config,
     messageBus: MessageBus,
   ) {
-    const declaration = getCreateNewTopicDeclaration();
+    const declaration = getUpdateTopicDeclaration();
     super(
-      CREATE_NEW_TOPIC_TOOL_NAME,
-      'Create New Topic',
+      UPDATE_TOPIC_TOOL_NAME,
+      'Update Topic Context',
       declaration.description ?? '',
       Kind.Think,
       declaration.parametersJsonSchema,
@@ -146,10 +162,10 @@ export class CreateNewTopicTool extends BaseDeclarativeTool<
   }
 
   protected createInvocation(
-    params: CreateNewTopicParams,
+    params: UpdateTopicParams,
     messageBus: MessageBus,
-  ): CreateNewTopicInvocation {
-    return new CreateNewTopicInvocation(
+  ): UpdateTopicInvocation {
+    return new UpdateTopicInvocation(
       params,
       messageBus,
       this.name,

@@ -26,7 +26,7 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -305,8 +305,8 @@ export class Scheduler {
 
     // Sort requests to ensure Topic changes happen before actions in the same batch.
     const sortedRequests = [...requests].sort((a, b) => {
-      if (a.name === CREATE_NEW_TOPIC_TOOL_NAME) return -1;
-      if (b.name === CREATE_NEW_TOPIC_TOOL_NAME) return 1;
+      if (a.name === UPDATE_TOPIC_TOOL_NAME) return -1;
+      if (b.name === UPDATE_TOPIC_TOOL_NAME) return 1;
       return 0;
     });
 

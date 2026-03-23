@@ -74,7 +74,7 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
-import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
+import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import {
   CoreToolCallStatus,
   ROOT_SCHEDULER_ID,
@@ -443,10 +443,10 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
-    it('should sort CREATE_NEW_TOPIC_TOOL_NAME to the front of the batch', async () => {
+    it('should sort UPDATE_TOPIC_TOOL_NAME to the front of the batch', async () => {
       const topicReq: ToolCallRequestInfo = {
         callId: 'call-topic',
-        name: CREATE_NEW_TOPIC_TOOL_NAME,
+        name: UPDATE_TOPIC_TOOL_NAME,
         args: { title: 'New Chapter' },
         prompt_id: 'p1',
         isClientInitiated: false,
@@ -459,11 +459,11 @@ describe('Scheduler (Orchestrator)', () => {
         isClientInitiated: false,
       };
 
-      // Mock tool registry to return a tool for create_new_topic
+      // Mock tool registry to return a tool for update_topic
       vi.mocked(mockToolRegistry.getTool).mockImplementation((name) => {
-        if (name === CREATE_NEW_TOPIC_TOOL_NAME) {
+        if (name === UPDATE_TOPIC_TOOL_NAME) {
           return {
-            name: CREATE_NEW_TOPIC_TOOL_NAME,
+            name: UPDATE_TOPIC_TOOL_NAME,
             build: vi.fn().mockReturnValue({}),
           } as unknown as AnyDeclarativeTool;
         }

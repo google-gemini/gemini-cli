@@ -24,10 +24,10 @@ import {
   EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
-  CREATE_NEW_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_PREVIOUS_SUMMARY,
-  TOPIC_PARAM_CURRENT_SUMMARY,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 /**
@@ -210,13 +210,13 @@ export function getActivateSkillDeclaration(
 }
 
 /**
- * Returns the FunctionDeclaration for creating a new topic.
+ * Returns the FunctionDeclaration for updating the topic context.
  */
-export function getCreateNewTopicDeclaration(): FunctionDeclaration {
+export function getUpdateTopicDeclaration(): FunctionDeclaration {
   return {
-    name: CREATE_NEW_TOPIC_TOOL_NAME,
+    name: UPDATE_TOPIC_TOOL_NAME,
     description:
-      'Organizes work into a granular, single-focus "Chapter" or "Topic". You MUST NOT combine distinct phases (e.g., do NOT use "Researching and Implementing"). Use specific, singular titles like "Researching", "Planning", or "Implementing [Specific Idea]". If your work deviates from the current topic\'s stated goal, you MUST create a new topic to reflect the shift (e.g., "Implementing [New Idea]"). When shifting topics, you MUST provide a detailed summary (5-10 sentences) of the work completed in the previous topic and a clear statement of what the new topic aims to achieve.',
+      'Manages your narrative flow. You MUST call this in EVERY turn to state your `strategic_intent`. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -224,18 +224,18 @@ export function getCreateNewTopicDeclaration(): FunctionDeclaration {
           type: 'string',
           description: 'The title of the new topic or chapter.',
         },
-        [TOPIC_PARAM_PREVIOUS_SUMMARY]: {
+        [TOPIC_PARAM_SUMMARY]: {
           type: 'string',
           description:
-            '(OPTIONAL) A detailed summary (5-10 sentences) of the work completed in the previous topic. This is required when transitioning between topics to maintain continuity.',
+            '(OPTIONAL) A detailed summary (5-10 sentences) covering both the work completed in the previous topic and the strategic intent of the new topic. This is required when transitioning between topics to maintain continuity.',
         },
-        [TOPIC_PARAM_CURRENT_SUMMARY]: {
+        [TOPIC_PARAM_STRATEGIC_INTENT]: {
           type: 'string',
           description:
-            'A detailed explanation (5-10 sentences) of what the new topic intends to achieve. This is mandatory for all new topics to provide clear strategic intent.',
+            'A mandatory one-sentence statement of your immediate intent. You MUST provide this for every tool-use turn to maintain strategic alignment. This replaces the raw text preamble.',
         },
       },
-      required: [TOPIC_PARAM_TITLE, TOPIC_PARAM_CURRENT_SUMMARY],
+      required: [TOPIC_PARAM_STRATEGIC_INTENT],
     },
   };
 }
