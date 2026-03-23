@@ -108,7 +108,7 @@ export function isMcpToolAnnotation(
   return (
     typeof annotation === 'object' &&
     annotation !== null &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, no-restricted-syntax
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
   );
 }
@@ -329,7 +329,23 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return safeJsonStringify(this.params);
+    const params = this.params as Record<string, unknown>;
+    const entries = Object.entries(params);
+    if (entries.length === 0) {
+      return this.serverToolName;
+    }
+    const paramStr = entries
+      .map(([k, v]) => {
+        if (typeof v === 'string') {
+          const display = v.length > 80 ? `${v.slice(0, 77)}...` : v;
+          return `${k}: ${display}`;
+        }
+        const s = safeJsonStringify(v) ?? String(v);
+        const display = s.length > 40 ? `${s.slice(0, 37)}...` : s;
+        return `${k}: ${display}`;
+      })
+      .join(', ');
+    return `${this.serverToolName}(${paramStr})`;
   }
 }
 

@@ -856,6 +856,90 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
+  it('should trigger early LLM check when the same tool name is called >= 8 times with varying args', async () => {
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.1 });
+
+    // Simulate write_todos being called 8 times with different args (varying self-correction text)
+    for (let i = 0; i < 8; i++) {
+      service.addAndCheck({
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          name: 'write_todos',
+          args: { todos: [`self-correction attempt ${i}`] },
+          callId: `call-${i}`,
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+      });
+    }
+
+    // LLM check should fire on the next turn even though we are well before turn 30
+    await service.turnStarted(abortController.signal);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not trigger early LLM check when the same tool name is called fewer than 8 times', async () => {
+    // Call write_todos 7 times (below threshold)
+    for (let i = 0; i < 7; i++) {
+      service.addAndCheck({
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          name: 'write_todos',
+          args: { todos: [`attempt ${i}`] },
+          callId: `call-${i}`,
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+      });
+    }
+
+    // Only 5 turns — below LLM_CHECK_AFTER_TURNS=30 and no early-check flag set
+    await advanceTurns(5);
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should reset early-check flag after it fires so normal interval-based checks resume', async () => {
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.1 });
+
+    // Trigger early check
+    for (let i = 0; i < 8; i++) {
+      service.addAndCheck({
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          name: 'write_todos',
+          args: { todos: [`attempt ${i}`] },
+          callId: `call-${i}`,
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+      });
+    }
+    await service.turnStarted(abortController.signal); // fires early check (call #1)
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+
+    // Calling the same tool even more times (counts 9, 10, ...) must NOT re-arm the flag
+    for (let i = 8; i < 12; i++) {
+      service.addAndCheck({
+        type: GeminiEventType.ToolCallRequest,
+        value: {
+          name: 'write_todos',
+          args: { todos: [`attempt ${i}`] },
+          callId: `call-${i}`,
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+      });
+    }
+
+    // A subsequent turn should NOT re-fire immediately (flag was reset and not re-armed)
+    await service.turnStarted(abortController.signal);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+  });
+
   it('should trigger LLM check on the 30th turn', async () => {
     mockBaseLlmClient.generateJson = vi
       .fn()

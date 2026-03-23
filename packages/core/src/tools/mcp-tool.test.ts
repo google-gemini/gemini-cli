@@ -971,11 +971,23 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('DiscoveredMCPToolInvocation', () => {
-    it('should return the stringified params from getDescription', () => {
+    it('should return a human-readable description from getDescription', () => {
       const params = { param: 'testValue', param2: 'anotherOne' };
       const invocation = tool.build(params);
       const description = invocation.getDescription();
-      expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+      expect(description).toBe(
+        'actual-server-tool-name(param: testValue, param2: anotherOne)',
+      );
+    });
+
+    it('should truncate long string param values', () => {
+      const longValue = 'a'.repeat(100);
+      const invocation = tool.build({ param: longValue });
+      const description = invocation.getDescription();
+      expect(description).toContain('...');
+      expect(description.length).toBeLessThan(
+        'actual-server-tool-name(param: '.length + 85,
+      );
     });
   });
 });
