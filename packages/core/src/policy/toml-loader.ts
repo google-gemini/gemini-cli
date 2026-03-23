@@ -37,7 +37,7 @@ const MAX_TYPO_DISTANCE = 3;
  * Schema for a single policy rule in the TOML file (before transformation).
  */
 const PolicyRuleSchema = z.object({
-  toolName: z.union([z.string(), z.array(z.string())]).optional(),
+  toolName: z.union([z.string(), z.array(z.string())]),
   subagent: z.string().optional(),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
@@ -73,7 +73,7 @@ const PolicyRuleSchema = z.object({
  * Schema for a single safety checker rule in the TOML file.
  */
 const SafetyCheckerRuleSchema = z.object({
-  toolName: z.union([z.string(), z.array(z.string())]).optional(),
+  toolName: z.union([z.string(), z.array(z.string())]),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
@@ -411,14 +411,28 @@ export async function loadPoliciesFromToml(
         // Validate tool names in rules
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
+
+          const toolNamesRaw: string[] = Array.isArray(rule.toolName)
+            ? rule.toolName
+            : [rule.toolName];
+
+          if (toolNamesRaw.some((name) => name === '')) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message: 'Invalid policy rule: toolName cannot be empty string',
+              details: `Rule #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
+            });
+            continue;
+          }
+
           // We no longer skip MCP-scoped rules because we need to specifically
           // warn users if they use deprecated "__" syntax for MCP tool names
 
-          const toolNames: string[] = rule.toolName
-            ? Array.isArray(rule.toolName)
-              ? rule.toolName
-              : [rule.toolName]
-            : [];
+          const toolNames: string[] = toolNamesRaw;
 
           for (const name of toolNames) {
             const warning = validateToolName(name, i);
@@ -448,15 +462,13 @@ export async function loadPoliciesFromToml(
 
             // For each argsPattern, expand toolName arrays
             return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: Array<string | undefined> = rule.toolName
-                ? Array.isArray(rule.toolName)
-                  ? rule.toolName
-                  : [rule.toolName]
-                : [undefined];
+              const toolNames: string[] = Array.isArray(rule.toolName)
+                ? rule.toolName
+                : [rule.toolName];
 
               // Create a policy rule for each tool name
               return toolNames.map((toolName) => {
-                let effectiveToolName: string | undefined = toolName;
+                let effectiveToolName: string = toolName;
                 const mcpName = rule.mcpName;
 
                 if (mcpName) {
@@ -535,13 +547,28 @@ export async function loadPoliciesFromToml(
         const tomlCheckerRules = validationResult.data.safety_checker ?? [];
         for (let i = 0; i < tomlCheckerRules.length; i++) {
           const checker = tomlCheckerRules[i];
+
+          const checkerToolNamesRaw: string[] = Array.isArray(checker.toolName)
+            ? checker.toolName
+            : [checker.toolName];
+
+          if (checkerToolNamesRaw.some((name) => name === '')) {
+            errors.push({
+              filePath,
+              fileName: file,
+              tier: tierName,
+              ruleIndex: i,
+              errorType: 'rule_validation',
+              message:
+                'Invalid safety checker rule: toolName cannot be empty string',
+              details: `Checker #${i + 1} contains an empty toolName string. Use "*" to match all tools.`,
+            });
+            continue;
+          }
+
           if (checker.mcpName) continue;
 
-          const checkerToolNames: string[] = checker.toolName
-            ? Array.isArray(checker.toolName)
-              ? checker.toolName
-              : [checker.toolName]
-            : [];
+          const checkerToolNames: string[] = checkerToolNamesRaw;
 
           for (const name of checkerToolNames) {
             const warning = validateToolName(name, i);
@@ -572,15 +599,13 @@ export async function loadPoliciesFromToml(
             );
 
             return argsPatterns.flatMap((argsPattern) => {
-              const toolNames: Array<string | undefined> = checker.toolName
-                ? Array.isArray(checker.toolName)
-                  ? checker.toolName
-                  : [checker.toolName]
-                : [undefined];
+              const toolNames: string[] = Array.isArray(checker.toolName)
+                ? checker.toolName
+                : [checker.toolName];
 
               return toolNames.map((toolName) => {
-                let effectiveToolName: string | undefined;
-                if (checker.mcpName && toolName) {
+                let effectiveToolName: string;
+                if (checker.mcpName && toolName !== '*') {
                   effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_${toolName}`;
                 } else if (checker.mcpName) {
                   effectiveToolName = `${MCP_TOOL_PREFIX}${checker.mcpName}_*`;
@@ -675,7 +700,7 @@ export function validateMcpPolicyToolNames(
   serverName: string,
   discoveredToolNames: string[],
   policyRules: ReadonlyArray<{
-    toolName?: string;
+    toolName: string;
     mcpName?: string;
     source?: string;
   }>,

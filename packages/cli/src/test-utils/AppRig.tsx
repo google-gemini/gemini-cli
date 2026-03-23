@@ -166,7 +166,7 @@ export class AppRig {
   private sessionId: string;
 
   private pendingConfirmations = new Map<string, PendingConfirmation>();
-  private breakpointTools = new Set<string | undefined>();
+  private breakpointTools = new Set<string>();
   private lastAwaitedConfirmation: PendingConfirmation | undefined;
 
   /**
@@ -436,11 +436,7 @@ export class AppRig {
     MockShellExecutionService.setMockCommands(commands);
   }
 
-  setToolPolicy(
-    toolName: string | undefined,
-    decision: PolicyDecision,
-    priority = 10,
-  ) {
+  setToolPolicy(toolName: string, decision: PolicyDecision, priority = 10) {
     if (!this.config) throw new Error('AppRig not initialized');
     this.config.getPolicyEngine().addRule({
       toolName,
@@ -450,27 +446,20 @@ export class AppRig {
     });
   }
 
-  setBreakpoint(toolName: string | string[] | undefined) {
+  setBreakpoint(toolName: string | string[]) {
     if (Array.isArray(toolName)) {
       for (const name of toolName) {
         this.setBreakpoint(name);
       }
     } else {
-      // Use undefined toolName to create a global rule if '*' is provided
-      const actualToolName = toolName === '*' ? undefined : toolName;
-      this.setToolPolicy(actualToolName, PolicyDecision.ASK_USER, 100);
+      this.setToolPolicy(toolName, PolicyDecision.ASK_USER, 100);
       this.breakpointTools.add(toolName);
     }
   }
 
-  removeToolPolicy(toolName?: string, source = 'AppRig Override') {
+  removeToolPolicy(toolName: string, source = 'AppRig Override') {
     if (!this.config) throw new Error('AppRig not initialized');
-    // Map '*' back to undefined for policy removal
-    const actualToolName = toolName === '*' ? undefined : toolName;
-    this.config
-      .getPolicyEngine()
-
-      .removeRulesForTool(actualToolName as string, source);
+    this.config.getPolicyEngine().removeRulesForTool(toolName, source);
     this.breakpointTools.delete(toolName);
   }
 
