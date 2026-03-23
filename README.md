@@ -322,7 +322,6 @@ gemini
 - [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
 - [**Local development**](./docs/local-development.md) - Local development
   tooling.
 

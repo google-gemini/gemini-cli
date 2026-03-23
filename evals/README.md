@@ -134,6 +134,9 @@ describe('my_feature', () => {
 
 ## Running Evaluations
 
+> **Note:** If you have just cloned the repository, first run `npm install` to
+> install all dependencies before building.
+
 First, build the bundled Gemini CLI. You must do this after every code change.
 
 ```bash
@@ -233,6 +236,10 @@ issue.
 
 This command is designed to automate the investigation and fixing process for
 failing evaluations. It will:
+
+> **Note:** This command requires the [GitHub CLI (gh)](https://cli.github.com/)
+> to be installed and authenticated. Run `gh auth login` if you have not set it
+> up yet.
 
 1.  **Investigate**: Fetch the latest results from the nightly workflow using
     the `gh` CLI, identify the failing test, and review test trajectory logs in
