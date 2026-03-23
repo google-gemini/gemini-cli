@@ -163,12 +163,104 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
+    .option('isCommand', {
+      type: 'boolean',
+      hidden: true,
+      description: 'Internal flag to indicate if a subcommand is being run',
+    })
     .option('debug', {
       alias: 'd',
       type: 'boolean',
       description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
+    .middleware((argv) => {
+      const commandModules = [
+        mcpCommand,
+        extensionsCommand,
+        skillsCommand,
+        hooksCommand,
+      ];
+
+      const subcommands = commandModules.flatMap((mod) => {
+        const names: string[] = [];
+
+        const cmd = mod.command;
+        if (cmd) {
+          if (Array.isArray(cmd)) {
+            for (const c of cmd) {
+              names.push(String(c).split(' ')[0]);
+            }
+          } else {
+            names.push(String(cmd).split(' ')[0]);
+          }
+        }
+
+        const aliases = mod.aliases;
+        if (aliases) {
+          if (Array.isArray(aliases)) {
+            for (const a of aliases) {
+              names.push(String(a).split(' ')[0]);
+            }
+          } else {
+            names.push(String(aliases).split(' ')[0]);
+          }
+        }
+
+        return names;
+      });
+
+      const firstArg = argv._[0];
+      if (typeof firstArg === 'string' && subcommands.includes(firstArg)) {
+        argv['isCommand'] = true;
+      }
+    }, true)
+    // Ensure validation flows through .fail() for clean UX
+    .fail((msg, err) => {
+      if (err) throw err;
+      throw new Error(msg);
+    })
+    .check((argv) => {
+      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+      // This guard safely checks if any positional argument was provided.
+      const queryArg = argv['query'];
+      const query =
+        typeof queryArg === 'string' || Array.isArray(queryArg)
+          ? queryArg
+          : undefined;
+      const hasPositionalQuery = Array.isArray(query)
+        ? query.length > 0
+        : !!query;
+
+      if (argv['prompt'] && hasPositionalQuery) {
+        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
+      }
+      if (argv['prompt'] && argv['promptInteractive']) {
+        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['yolo'] && argv['approvalMode']) {
+        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
+      }
+
+      const outputFormat = argv['outputFormat'];
+      if (
+        typeof outputFormat === 'string' &&
+        !['text', 'json', 'stream-json'].includes(outputFormat)
+      ) {
+        return `Invalid values:\n  Argument: output-format, Given: "${outputFormat}", Choices: "text", "json", "stream-json"`;
+      }
+      if (argv['worktree'] && !settings.experimental?.worktrees) {
+        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
+      }
+      return true;
+    });
+
+  yargsInstance.command(mcpCommand);
+  yargsInstance.command(extensionsCommand);
+  yargsInstance.command(skillsCommand);
+  yargsInstance.command(hooksCommand);
+
+  yargsInstance
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
@@ -352,59 +444,6 @@ export async function parseArguments(
           description: 'Suppress the security warning when using --raw-output.',
         }),
     )
-    // Register MCP subcommands
-    .command(mcpCommand)
-    // Ensure validation flows through .fail() for clean UX
-    .fail((msg, err) => {
-      if (err) throw err;
-      throw new Error(msg);
-    })
-    .check((argv) => {
-      // The 'query' positional can be a string (for one arg) or string[] (for multiple).
-      // This guard safely checks if any positional argument was provided.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const query = argv['query'] as string | string[] | undefined;
-      const hasPositionalQuery = Array.isArray(query)
-        ? query.length > 0
-        : !!query;
-
-      if (argv['prompt'] && hasPositionalQuery) {
-        return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
-      }
-      if (argv['prompt'] && argv['promptInteractive']) {
-        return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
-      }
-      if (argv['yolo'] && argv['approvalMode']) {
-        return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
-      }
-      if (
-        argv['outputFormat'] &&
-        !['text', 'json', 'stream-json'].includes(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['outputFormat'] as string,
-        )
-      ) {
-        return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
-      }
-      if (argv['worktree'] && !settings.experimental?.worktrees) {
-        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
-      }
-      return true;
-    });
-
-  if (settings.experimental?.extensionManagement) {
-    yargsInstance.command(extensionsCommand);
-  }
-
-  if (settings.skills?.enabled ?? true) {
-    yargsInstance.command(skillsCommand);
-  }
-  // Register hooks command if hooks are enabled
-  if (settings.hooksConfig.enabled) {
-    yargsInstance.command(hooksCommand);
-  }
-
-  yargsInstance
     .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
