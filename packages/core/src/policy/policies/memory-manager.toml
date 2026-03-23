@@ -7,4 +7,4 @@ toolName = ["read_file", "write_file", "replace", "list_directory", "glob", "gre
 decision = "allow"
 priority = 100
 argsPattern = "(^|.*/)\\.gemini/.*"
-deny_message = "Memory Manager is only allowed to access the .gemini folder."
+denyMessage = "Memory Manager is only allowed to access the .gemini folder."

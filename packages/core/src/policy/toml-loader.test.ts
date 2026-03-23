@@ -263,6 +263,20 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse and transform allowRedirection property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allowRedirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
     it('should parse deny_message property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -273,7 +287,21 @@ deny_message = "Deletion is permanent"
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should parse denyMessage property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+denyMessage = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
       expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
       expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
       expect(getErrors(result)).toHaveLength(0);

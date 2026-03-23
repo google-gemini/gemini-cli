@@ -71,6 +71,26 @@ describe('createPolicyUpdater', () => {
     expect(content).toContain(`priority = ${expectedPriority}`);
   });
 
+  it('should include allowRedirection when persisting policy', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+      allowRedirection: true,
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const content = memfs.readFileSync(policyFile, 'utf-8') as string;
+    expect(content).toContain('toolName = "test_tool"');
+    expect(content).toContain('allowRedirection = true');
+  });
+
   it('should not persist policy when persist flag is false or undefined', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
