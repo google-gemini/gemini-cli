@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
 import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
 import type { SettingEnumOption } from '../../../config/settingsSchema.js';

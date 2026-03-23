@@ -63,6 +63,10 @@ gemini-debug.log
 .eslintcache
 evals/logs/
 
+<<<<<<< HEAD
 # GSoC Prototype Test Scripts
 run-dashboard.ts
 run-real-dashboard.ts
+=======
+temp_agents/
+>>>>>>> upstream/main

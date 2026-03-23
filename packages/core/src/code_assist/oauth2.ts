@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials, AuthClient, JWTInput } from 'google-auth-library';
 import {
   OAuth2Client,
   Compute,
   CodeChallengeMethod,
   GoogleAuth,
+  type Credentials,
+  type AuthClient,
+  type JWTInput,
 } from 'google-auth-library';
 import * as http from 'node:http';
 import url from 'node:url';
@@ -224,6 +226,13 @@ async function initOauthClient(
   }
 
   if (config.isBrowserLaunchSuppressed()) {
+    if (!config.isInteractive()) {
+      throw new FatalAuthenticationError(
+        'Manual authorization is required but the current session is non-interactive. ' +
+          'Please run the Gemini CLI in an interactive terminal to log in, ' +
+          'provide a GEMINI_API_KEY, or ensure Application Default Credentials are configured.',
+      );
+    }
     let success = false;
     const maxRetries = 2;
     // Enter alternate buffer
@@ -271,8 +280,8 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
-    // In Zed integration, we skip the interactive consent and directly open the browser
-    if (!config.getExperimentalZedIntegration()) {
+    // In ACP mode, we skip the interactive consent and directly open the browser
+    if (!config.getAcpMode()) {
       const userConsent = await getConsentForOauth('');
       if (!userConsent) {
         throw new FatalCancellationError('Authentication cancelled by user.');
@@ -410,14 +419,24 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
-    const code = await new Promise<string>((resolve, _) => {
+    const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
         output: createWorkingStdio().stdout,
         terminal: true,
       });
 
+      const timeout = setTimeout(() => {
+        rl.close();
+        reject(
+          new FatalAuthenticationError(
+            'Authorization timed out after 5 minutes.',
+          ),
+        );
+      }, 300000); // 5 minute timeout
+
       rl.question('Enter the authorization code: ', (code) => {
+        clearTimeout(timeout);
         rl.close();
         resolve(code.trim());
       });

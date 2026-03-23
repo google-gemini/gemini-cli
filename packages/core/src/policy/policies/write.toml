@@ -5,20 +5,21 @@
 #
 # Priority bands (tiers):
 # - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-# - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
-# - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
-# - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+# - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+# - User policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+# - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 → 5.100)
 #
-# This ensures Admin > User > Workspace > Default hierarchy is always preserved,
+# This ensures Admin > User > Workspace > Extension > Default hierarchy is always preserved,
 # while allowing user-specified priorities to work within each tier.
 #
-# Settings-based and dynamic rules (all in user tier 3.x):
-#   3.95: Tools that the user has selected as "Always Allow" in the interactive UI
-#   3.9:  MCP servers excluded list (security: persistent server blocks)
-#   3.4:  Command line flag --exclude-tools (explicit temporary blocks)
-#   3.3:  Command line flag --allowed-tools (explicit temporary allows)
-#   3.2:  MCP servers with trust=true (persistent trusted servers)
-#   3.1:  MCP servers allowed list (persistent general server allows)
+# Settings-based and dynamic rules (all in user tier 4.x):
+#   4.95: Tools that the user has selected as "Always Allow" in the interactive UI
+#   4.9:  MCP servers excluded list (security: persistent server blocks)
+#   4.4:  Command line flag --exclude-tools (explicit temporary blocks)
+#   4.3:  Command line flag --allowed-tools (explicit temporary allows)
+#   4.2:  MCP servers with trust=true (persistent trusted servers)
+#   4.1:  MCP servers allowed list (persistent general server allows)
 #
 # TOML policy priorities (before transformation):
 #   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
@@ -72,6 +73,12 @@ modes = ["autoEdit"]
 type = "in-process"
 name = "allowed-path"
 required_context = ["environment"]
+
+[[rule]]
+toolName = "web_fetch"
+decision = "allow"
+priority = 15
+modes = ["autoEdit"]
 
 [[rule]]
 toolName = "web_fetch"

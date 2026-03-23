@@ -39,9 +39,17 @@ export interface ToolConfirmationRequest {
    */
   toolAnnotations?: Record<string, unknown>;
   /**
+   * Optional subagent name, if this tool call was initiated by a subagent.
+   */
+  subagent?: string;
+  /**
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;
+  /**
+   * Optional decision to force for this tool call, bypassing the policy engine.
+   */
+  forcedDecision?: 'allow' | 'deny' | 'ask_user';
 }
 
 export interface ToolConfirmationResponse {
@@ -72,12 +80,14 @@ export type SerializableConfirmationDetails =
   | {
       type: 'info';
       title: string;
+      systemMessage?: string;
       prompt: string;
       urls?: string[];
     }
   | {
       type: 'edit';
       title: string;
+      systemMessage?: string;
       fileName: string;
       filePath: string;
       fileDiff: string;
@@ -88,6 +98,7 @@ export type SerializableConfirmationDetails =
   | {
       type: 'exec';
       title: string;
+      systemMessage?: string;
       command: string;
       rootCommand: string;
       rootCommands: string[];
@@ -96,6 +107,7 @@ export type SerializableConfirmationDetails =
   | {
       type: 'mcp';
       title: string;
+      systemMessage?: string;
       serverName: string;
       toolName: string;
       toolDisplayName: string;
@@ -106,11 +118,13 @@ export type SerializableConfirmationDetails =
   | {
       type: 'ask_user';
       title: string;
+      systemMessage?: string;
       questions: Question[];
     }
   | {
       type: 'exit_plan_mode';
       title: string;
+      systemMessage?: string;
       planPath: string;
     };
 
@@ -118,6 +132,7 @@ export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;
   toolName: string;
   persist?: boolean;
+  persistScope?: 'workspace' | 'user';
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
@@ -162,6 +177,8 @@ export interface Question {
   multiSelect?: boolean;
   /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
+  /** Allow the question to consume more vertical space instead of being strictly capped. */
+  unconstrainedHeight?: boolean;
 }
 
 export interface AskUserRequest {

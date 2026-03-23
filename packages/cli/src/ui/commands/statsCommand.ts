@@ -31,8 +31,8 @@ function getUserIdentity(context: CommandContext) {
   const cachedAccount = userAccountManager.getCachedGoogleAccount();
   const userEmail = cachedAccount ?? undefined;
 
-  const tier = context.services.config?.getUserTierName();
-  const paidTier = context.services.config?.getUserPaidTier();
+  const tier = context.services.agentContext?.config.getUserTierName();
+  const paidTier = context.services.agentContext?.config.getUserPaidTier();
   const creditBalance = getG1CreditBalance(paidTier) ?? undefined;
 
   return { selectedAuthType, userEmail, tier, creditBalance };
@@ -52,7 +52,7 @@ async function defaultSessionView(context: CommandContext) {
 
   const { selectedAuthType, userEmail, tier, creditBalance } =
     getUserIdentity(context);
-  const currentModel = context.services.config?.getModel();
+  const currentModel = context.services.agentContext?.config.getModel();
 
   const statsItem: HistoryItemStats = {
     type: MessageType.STATS,
@@ -64,16 +64,19 @@ async function defaultSessionView(context: CommandContext) {
     creditBalance,
   };
 
-  if (context.services.config) {
+  if (context.services.agentContext?.config) {
     const [quota] = await Promise.all([
-      context.services.config.refreshUserQuota(),
-      context.services.config.refreshAvailableCredits(),
+      context.services.agentContext.config.refreshUserQuota(),
+      context.services.agentContext.config.refreshAvailableCredits(),
     ]);
     if (quota) {
       statsItem.quotas = quota;
-      statsItem.pooledRemaining = context.services.config.getQuotaRemaining();
-      statsItem.pooledLimit = context.services.config.getQuotaLimit();
-      statsItem.pooledResetTime = context.services.config.getQuotaResetTime();
+      statsItem.pooledRemaining =
+        context.services.agentContext.config.getQuotaRemaining();
+      statsItem.pooledLimit =
+        context.services.agentContext.config.getQuotaLimit();
+      statsItem.pooledResetTime =
+        context.services.agentContext.config.getQuotaResetTime();
     }
   }
 
@@ -86,6 +89,7 @@ export const statsCommand: SlashCommand = {
   description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  isSafeConcurrent: true,
   action: async (context: CommandContext) => {
     await defaultSessionView(context);
   },
@@ -95,6 +99,7 @@ export const statsCommand: SlashCommand = {
       description: 'Show session-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      isSafeConcurrent: true,
       action: async (context: CommandContext) => {
         await defaultSessionView(context);
       },
@@ -104,12 +109,16 @@ export const statsCommand: SlashCommand = {
       description: 'Show model-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      isSafeConcurrent: true,
       action: (context: CommandContext) => {
         const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
-        const currentModel = context.services.config?.getModel();
-        const pooledRemaining = context.services.config?.getQuotaRemaining();
-        const pooledLimit = context.services.config?.getQuotaLimit();
-        const pooledResetTime = context.services.config?.getQuotaResetTime();
+        const currentModel = context.services.agentContext?.config.getModel();
+        const pooledRemaining =
+          context.services.agentContext?.config.getQuotaRemaining();
+        const pooledLimit =
+          context.services.agentContext?.config.getQuotaLimit();
+        const pooledResetTime =
+          context.services.agentContext?.config.getQuotaResetTime();
         context.ui.addItem({
           type: MessageType.MODEL_STATS,
           selectedAuthType,
@@ -127,6 +136,7 @@ export const statsCommand: SlashCommand = {
       description: 'Show tool-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      isSafeConcurrent: true,
       action: (context: CommandContext) => {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,

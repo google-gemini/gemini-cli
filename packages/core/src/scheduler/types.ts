@@ -11,8 +11,8 @@ import type {
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolResultDisplay,
+  ToolLiveOutput,
 } from '../tools/tools.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
@@ -47,6 +47,8 @@ export interface ToolCallRequestInfo {
   traceId?: string;
   parentCallId?: string;
   schedulerId?: string;
+  inputModifiedByHook?: boolean;
+  forcedAsk?: boolean;
 }
 
 export interface ToolCallResponseInfo {
@@ -125,7 +127,7 @@ export type ExecutingToolCall = {
   request: ToolCallRequestInfo;
   tool: AnyDeclarativeTool;
   invocation: AnyToolInvocation;
-  liveOutput?: string | AnsiOutput;
+  liveOutput?: ToolLiveOutput;
   progressMessage?: string;
   progressPercent?: number;
   progress?: number;
@@ -197,7 +199,7 @@ export type ConfirmHandler = (
 
 export type OutputUpdateHandler = (
   toolCallId: string,
-  outputChunk: string | AnsiOutput,
+  outputChunk: ToolLiveOutput,
 ) => void;
 
 export type AllToolCallsCompleteHandler = (

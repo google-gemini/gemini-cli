@@ -5,10 +5,12 @@
  */
 
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
+import { evaluateBeforeToolHook } from './hook-utils.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
 import {
@@ -24,12 +26,10 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import type { ApprovalMode } from '../policy/types.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
-  Kind,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -57,10 +57,11 @@ interface SchedulerQueueItem {
 }
 
 export interface SchedulerOptions {
-  config: Config;
-  messageBus: MessageBus;
+  context: AgentLoopContext;
+  messageBus?: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
+  subagent?: string;
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
 }
@@ -98,9 +99,11 @@ export class Scheduler {
   private readonly executor: ToolExecutor;
   private readonly modifier: ToolModificationHandler;
   private readonly config: Config;
+  private readonly context: AgentLoopContext;
   private readonly messageBus: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
+  private readonly subagent?: string;
   private readonly parentCallId?: string;
   private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
 
@@ -109,10 +112,12 @@ export class Scheduler {
   private readonly requestQueue: SchedulerQueueItem[] = [];
 
   constructor(options: SchedulerOptions) {
-    this.config = options.config;
-    this.messageBus = options.messageBus;
+    this.context = options.context;
+    this.config = this.context.config;
+    this.messageBus = options.messageBus ?? this.context.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
+    this.subagent = options.subagent;
     this.parentCallId = options.parentCallId;
     this.onWaitingForConfirmation = options.onWaitingForConfirmation;
     this.state = new SchedulerStateManager(
@@ -120,7 +125,7 @@ export class Scheduler {
       this.schedulerId,
       (call) => logToolCall(this.config, new ToolCallEvent(call)),
     );
-    this.executor = new ToolExecutor(this.config);
+    this.executor = new ToolExecutor(this.context);
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
@@ -295,7 +300,7 @@ export class Scheduler {
     const currentApprovalMode = this.config.getApprovalMode();
 
     try {
-      const toolRegistry = this.config.getToolRegistry();
+      const toolRegistry = this.context.toolRegistry;
       const newCalls: ToolCall[] = requests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
@@ -359,6 +364,7 @@ export class Scheduler {
         callId: request.callId,
         schedulerId: this.schedulerId,
         parentCallId: this.parentCallId,
+        subagent: this.subagent,
       },
       () => {
         try {
@@ -429,10 +435,10 @@ export class Scheduler {
       }
 
       // If the first tool is parallelizable, batch all contiguous parallelizable tools.
-      if (this._isParallelizable(next.tool)) {
+      if (this._isParallelizable(next.request)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
-          if (peeked && this._isParallelizable(peeked.tool)) {
+          if (peeked && this._isParallelizable(peeked.request)) {
             this.state.dequeue();
           } else {
             break;
@@ -517,9 +523,16 @@ export class Scheduler {
     return false;
   }
 
-  private _isParallelizable(tool?: AnyDeclarativeTool): boolean {
-    if (!tool) return false;
-    return tool.isReadOnly || tool.kind === Kind.Agent;
+  private _isParallelizable(request: ToolCallRequestInfo): boolean {
+    if (request.args) {
+      const wait = request.args['wait_for_previous'];
+      if (typeof wait === 'boolean') {
+        return !wait;
+      }
+    }
+
+    // Default to parallel if the flag is omitted.
+    return true;
   }
 
   private async _processValidatingCall(
@@ -560,8 +573,46 @@ export class Scheduler {
   ): Promise<void> {
     const callId = toolCall.request.callId;
 
-    // Policy & Security
-    const { decision, rule } = await checkPolicy(toolCall, this.config);
+    // 1. Hook Check (BeforeTool)
+    const hookResult = await evaluateBeforeToolHook(
+      this.config,
+      toolCall.tool,
+      toolCall.request,
+      toolCall.invocation,
+    );
+
+    if (hookResult.status === 'error') {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Error,
+        createErrorResponse(
+          toolCall.request,
+          hookResult.error,
+          hookResult.errorType,
+        ),
+      );
+      return;
+    }
+
+    const { hookDecision, hookSystemMessage, modifiedArgs, newInvocation } =
+      hookResult;
+
+    if (modifiedArgs && newInvocation) {
+      toolCall.request.args = modifiedArgs;
+      toolCall.request.inputModifiedByHook = true;
+      toolCall.invocation = newInvocation;
+    }
+
+    // 2. Policy & Security
+    const { decision: policyDecision, rule } = await checkPolicy(
+      toolCall,
+      this.config,
+      this.subagent,
+    );
+    let decision = policyDecision;
+    if (hookDecision === 'ask') {
+      decision = PolicyDecision.ASK_USER;
+    }
 
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(
@@ -594,6 +645,8 @@ export class Scheduler {
         getPreferredEditor: this.getPreferredEditor,
         schedulerId: this.schedulerId,
         onWaitingForConfirmation: this.onWaitingForConfirmation,
+        systemMessage: hookSystemMessage,
+        forcedDecision: hookDecision === 'ask' ? 'ask_user' : undefined,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
@@ -603,10 +656,14 @@ export class Scheduler {
 
     // Handle Policy Updates
     if (decision === PolicyDecision.ASK_USER && outcome) {
-      await updatePolicy(toolCall.tool, outcome, lastDetails, {
-        config: this.config,
-        messageBus: this.messageBus,
-      });
+      await updatePolicy(
+        toolCall.tool,
+        outcome,
+        lastDetails,
+        this.context,
+        this.messageBus,
+        toolCall.invocation,
+      );
     }
 
     // Handle cancellation (cascades to entire batch)
@@ -651,6 +708,7 @@ export class Scheduler {
         callId: activeCall.request.callId,
         schedulerId: this.schedulerId,
         parentCallId: this.parentCallId,
+        subagent: this.subagent,
       },
       () =>
         this.executor.execute({
@@ -698,7 +756,7 @@ export class Scheduler {
       const originalRequestName =
         result.request.originalRequestName || result.request.name;
 
-      const newTool = this.config.getToolRegistry().getTool(tailRequest.name);
+      const newTool = this.context.toolRegistry.getTool(tailRequest.name);
 
       const newRequest: ToolCallRequestInfo = {
         callId: originalCallId,
@@ -714,7 +772,7 @@ export class Scheduler {
         // Enqueue an errored tool call
         const errorCall = this._createToolNotFoundErroredToolCall(
           newRequest,
-          this.config.getToolRegistry().getAllToolNames(),
+          this.context.toolRegistry.getAllToolNames(),
         );
         this.state.replaceActiveCallWithTailCall(callId, errorCall);
       } else {
@@ -741,7 +799,7 @@ export class Scheduler {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        result.response,
       );
     } else {
       this.state.updateStatus(

@@ -4,59 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolConfirmationOutcome,
-  ToolResult,
-  ToolCallConfirmationDetails,
+import {
+  BaseToolInvocation,
+  type ToolConfirmationOutcome,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import { BaseToolInvocation } from '../tools/tools.js';
-import { DEFAULT_QUERY_STRING } from './types.js';
-import type {
-  RemoteAgentInputs,
-  RemoteAgentDefinition,
-  AgentInputs,
+import {
+  DEFAULT_QUERY_STRING,
+  type RemoteAgentInputs,
+  type RemoteAgentDefinition,
+  type AgentInputs,
 } from './types.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { A2AClientManager } from './a2a-client-manager.js';
+import type {
+  A2AClientManager,
+  SendMessageResult,
+} from './a2a-client-manager.js';
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
-import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import type { SendMessageResult } from './a2a-client-manager.js';
-
-/**
- * Authentication handler implementation using Google Application Default Credentials (ADC).
- */
-export class ADCHandler implements AuthenticationHandler {
-  private auth = new GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-
-  async headers(): Promise<Record<string, string>> {
-    try {
-      const client = await this.auth.getClient();
-      const token = await client.getAccessToken();
-      if (token.token) {
-        return { Authorization: `Bearer ${token.token}` };
-      }
-      throw new Error('Failed to retrieve ADC access token.');
-    } catch (e) {
-      const errorMessage = `Failed to get ADC token: ${
-        e instanceof Error ? e.message : String(e)
-      }`;
-      debugLogger.log('ERROR', errorMessage);
-      throw new Error(errorMessage);
-    }
-  }
-
-  async shouldRetryWithHeaders(
-    _response: unknown,
-  ): Promise<Record<string, string> | undefined> {
-    // For ADC, we usually just re-fetch the token if needed.
-    return this.headers();
-  }
-}
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import { A2AAgentError } from './a2a-errors.js';
 
 /**
  * A tool invocation that proxies to a remote A2A agent.
@@ -76,13 +48,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   // State for the ongoing conversation with the remote agent
   private contextId: string | undefined;
   private taskId: string | undefined;
-  // TODO: See if we can reuse the singleton from AppContainer or similar, but for now use getInstance directly
-  // as per the current pattern in the codebase.
-  private readonly clientManager = A2AClientManager.getInstance();
-  private readonly authHandler = new ADCHandler();
+
+  private readonly clientManager: A2AClientManager;
+  private authHandler: AuthenticationHandler | undefined;
 
   constructor(
     private readonly definition: RemoteAgentDefinition,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -101,10 +73,40 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
     );
+    const clientManager = this.context.config.getA2AClientManager();
+    if (!clientManager) {
+      throw new Error(
+        `Failed to initialize RemoteAgentInvocation for '${definition.name}': A2AClientManager is not available.`,
+      );
+    }
+    this.clientManager = clientManager;
   }
 
   getDescription(): string {
     return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
+  }
+
+  private async getAuthHandler(): Promise<AuthenticationHandler | undefined> {
+    if (this.authHandler) {
+      return this.authHandler;
+    }
+
+    if (this.definition.auth) {
+      const provider = await A2AAuthProviderFactory.create({
+        authConfig: this.definition.auth,
+        agentName: this.definition.name,
+        targetUrl: this.definition.agentCardUrl,
+        agentCardUrl: this.definition.agentCardUrl,
+      });
+      if (!provider) {
+        throw new Error(
+          `Failed to create auth provider for agent '${this.definition.name}'`,
+        );
+      }
+      this.authHandler = provider;
+    }
+
+    return this.authHandler;
   }
 
   protected override async getConfirmationDetails(
@@ -138,11 +140,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         this.taskId = priorState.taskId;
       }
 
+      const authHandler = await this.getAuthHandler();
+
       if (!this.clientManager.getClient(this.definition.name)) {
         await this.clientManager.loadAgent(
           this.definition.name,
           this.definition.agentCardUrl,
-          this.authHandler,
+          authHandler,
         );
       }
 
@@ -196,11 +200,12 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
       return {
         llmContent: [{ text: finalOutput }],
-        returnDisplay: finalOutput,
+        returnDisplay: safeJsonToMarkdown(finalOutput),
       };
     } catch (error: unknown) {
       const partialOutput = reassembler.toString();
-      const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
+      // Surface structured, user-friendly error messages.
+      const errorMessage = this.formatExecutionError(error);
       const fullDisplay = partialOutput
         ? `${partialOutput}\n\n${errorMessage}`
         : errorMessage;
@@ -216,5 +221,23 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         taskId: this.taskId,
       });
     }
+  }
+
+  /**
+   * Formats an execution error into a user-friendly message.
+   * Recognizes typed A2AAgentError subclasses and falls back to
+   * a generic message for unknown errors.
+   */
+  private formatExecutionError(error: unknown): string {
+    // All A2A-specific errors include a human-friendly `userMessage` on the
+    // A2AAgentError base class. Rely on that to avoid duplicating messages
+    // for specific subclasses, which improves maintainability.
+    if (error instanceof A2AAgentError) {
+      return error.userMessage;
+    }
+
+    return `Error calling remote agent: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
   }
 }

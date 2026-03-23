@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/agent-loop-context.js';
 export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
@@ -18,6 +19,8 @@ export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
 export * from './policy/integrity.js';
+export * from './config/extensions/integrity.js';
+export * from './config/extensions/integrityTypes.js';
 export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
@@ -47,6 +50,7 @@ export * from './scheduler/tool-executor.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
+export * from './fallback/handler.js';
 
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
@@ -66,6 +70,7 @@ export * from './utils/checks.js';
 export * from './utils/headless.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
+export * from './utils/fsErrorMessages.js';
 export * from './utils/exitCodes.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
@@ -112,6 +117,8 @@ export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
+export * from './utils/cache.js';
+export * from './utils/markdownUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -119,8 +126,14 @@ export * from './services/gitService.js';
 export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
+export * from './services/sandboxedFileSystemService.js';
+export * from './services/windowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/trackerService.js';
+export * from './services/trackerTypes.js';
+export * from './services/keychainService.js';
+export * from './services/keychainTypes.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
@@ -128,12 +141,29 @@ export * from './skills/skillLoader.js';
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
-export { IDE_DEFINITIONS, type IdeInfo } from './ide/detect-ide.js';
+export {
+  IDE_DEFINITIONS,
+  type IdeInfo,
+  isCloudShell,
+} from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
+export * from './services/sandboxManager.js';
+
+// Export Execution Lifecycle Service
+export * from './services/executionLifecycleService.js';
+
+// Export Injection Service
+export * from './config/injectionService.js';
+
+// Export Execution Lifecycle Service
+export * from './services/executionLifecycleService.js';
+
+// Export Injection Service
+export * from './config/injectionService.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
@@ -167,6 +197,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/trackerTools.js';
 export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 
@@ -206,6 +237,10 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+export * from './services/worktreeService.js';
+
+// Export voice utilities
+export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';

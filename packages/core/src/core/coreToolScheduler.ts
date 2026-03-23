@@ -13,18 +13,21 @@ import {
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
-import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
-import { getToolSuggestion } from '../utils/tool-utils.js';
+import {
+  getToolSuggestion,
+  isToolCallResponseInfo,
+} from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
+  CoreToolCallStatus,
   type ToolCall,
   type ValidatingToolCall,
   type ScheduledToolCall,
@@ -42,11 +45,12 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import { evaluateBeforeToolHook } from '../scheduler/hook-utils.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export type {
   ToolCall,
@@ -89,7 +93,7 @@ const createErrorResponse = (
 });
 
 interface CoreToolSchedulerOptions {
-  config: Config;
+  context: AgentLoopContext;
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
@@ -109,7 +113,7 @@ export class CoreToolScheduler {
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
-  private config: Config;
+  private context: AgentLoopContext;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -125,19 +129,19 @@ export class CoreToolScheduler {
   private toolModifier: ToolModificationHandler;
 
   constructor(options: CoreToolSchedulerOptions) {
-    this.config = options.config;
+    this.context = options.context;
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.toolExecutor = new ToolExecutor(this.config);
+    this.toolExecutor = new ToolExecutor(this.context);
     this.toolModifier = new ToolModificationHandler();
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
     // This prevents memory leaks when multiple CoreToolScheduler instances are created
     // (e.g., on every React render, or for each non-interactive tool call)
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context.messageBus;
 
     // Check if we've already subscribed a handler to this message bus
     if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
@@ -225,32 +229,36 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          return {
-            request: currentCall.request,
-            tool: toolInstance,
-            invocation,
-            status: CoreToolCallStatus.Success,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: auxiliaryData as ToolCallResponseInfo,
-            durationMs,
-            outcome,
-            approvalMode,
-          } as SuccessfulToolCall;
+          if (isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              tool: toolInstance,
+              invocation,
+              status: CoreToolCallStatus.Success,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as SuccessfulToolCall;
+          }
+          throw new Error('Invalid response data for tool success');
         }
         case CoreToolCallStatus.Error: {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          return {
-            request: currentCall.request,
-            status: CoreToolCallStatus.Error,
-            tool: toolInstance,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: auxiliaryData as ToolCallResponseInfo,
-            durationMs,
-            outcome,
-            approvalMode,
-          } as ErroredToolCall;
+          if (isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              status: CoreToolCallStatus.Error,
+              tool: toolInstance,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as ErroredToolCall;
+          }
+          throw new Error('Invalid response data for tool error');
         }
         case CoreToolCallStatus.AwaitingApproval:
           return {
@@ -279,6 +287,19 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
+
+          if (isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              tool: toolInstance,
+              invocation,
+              status: CoreToolCallStatus.Cancelled,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as CancelledToolCall;
+          }
 
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
@@ -506,18 +527,16 @@ export class CoreToolScheduler {
         );
       }
       const requestsToProcess = Array.isArray(request) ? request : [request];
-      const currentApprovalMode = this.config.getApprovalMode();
+      const currentApprovalMode = this.context.config.getApprovalMode();
       this.completedToolCallsForBatch = [];
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {
-          const toolInstance = this.config
-            .getToolRegistry()
-            .getTool(reqInfo.name);
+          const toolInstance = this.context.toolRegistry.getTool(reqInfo.name);
           if (!toolInstance) {
             const suggestion = getToolSuggestion(
               reqInfo.name,
-              this.config.getToolRegistry().getAllToolNames(),
+              this.context.toolRegistry.getAllToolNames(),
             );
             const errorMessage = `Tool "${reqInfo.name}" not found in registry. Tools must use the exact names that are registered.${suggestion}`;
             return {
@@ -584,7 +603,7 @@ export class CoreToolScheduler {
       return;
     }
 
-    const toolCall = this.toolCallQueue.shift()!;
+    let toolCall = this.toolCallQueue.shift()!;
 
     // This is now the single active tool call.
     this.toolCalls = [toolCall];
@@ -600,7 +619,7 @@ export class CoreToolScheduler {
 
     // This logic is moved from the old `for` loop in `_schedule`.
     if (toolCall.status === CoreToolCallStatus.Validating) {
-      const { request: reqInfo, invocation } = toolCall;
+      let { request: reqInfo } = toolCall;
 
       try {
         if (signal.aborted) {
@@ -615,7 +634,49 @@ export class CoreToolScheduler {
           return;
         }
 
-        // Policy Check using PolicyEngine
+        // 1. Hook Check (BeforeTool)
+        const hookResult = await evaluateBeforeToolHook(
+          this.context.config,
+          toolCall.tool,
+          toolCall.request,
+          toolCall.invocation,
+        );
+
+        if (hookResult.status === 'error') {
+          this.setStatusInternal(
+            reqInfo.callId,
+            CoreToolCallStatus.Error,
+            signal,
+            createErrorResponse(
+              toolCall.request,
+              hookResult.error,
+              hookResult.errorType,
+            ),
+          );
+          await this.checkAndNotifyCompletion(signal);
+          return;
+        }
+
+        const { hookDecision, hookSystemMessage, modifiedArgs, newInvocation } =
+          hookResult;
+
+        if (modifiedArgs && newInvocation) {
+          this.setArgsInternal(reqInfo.callId, modifiedArgs);
+          // Re-retrieve toolCall as it was updated in the array by setArgsInternal
+          const updatedCall = this.toolCalls.find(
+            (c) => c.request.callId === reqInfo.callId,
+          );
+          if (
+            updatedCall &&
+            updatedCall.status === CoreToolCallStatus.Validating
+          ) {
+            toolCall = updatedCall;
+          }
+          toolCall.request.inputModifiedByHook = true;
+          reqInfo = toolCall.request;
+        }
+
+        // 2. Policy Check using PolicyEngine
         // We must reconstruct the FunctionCall format expected by PolicyEngine
         const toolCallForPolicy = {
           name: toolCall.request.name,
@@ -627,13 +688,18 @@ export class CoreToolScheduler {
             : undefined;
         const toolAnnotations = toolCall.tool.toolAnnotations;
 
-        const { decision, rule } = await this.config
+        const { decision: policyDecision, rule } = await this.context.config
           .getPolicyEngine()
           .check(toolCallForPolicy, serverName, toolAnnotations);
 
-        if (decision === PolicyDecision.DENY) {
+        let finalDecision = policyDecision;
+        if (hookDecision === 'ask') {
+          finalDecision = PolicyDecision.ASK_USER;
+        }
+
+        if (finalDecision === PolicyDecision.DENY) {
           const { errorMessage, errorType } = getPolicyDenialError(
-            this.config,
+            this.context.config,
             rule,
           );
           this.setStatusInternal(
@@ -646,7 +712,7 @@ export class CoreToolScheduler {
           return;
         }
 
-        if (decision === PolicyDecision.ALLOW) {
+        if (finalDecision === PolicyDecision.ALLOW) {
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
@@ -661,7 +727,10 @@ export class CoreToolScheduler {
 
           // We need confirmation details to show to the user
           const confirmationDetails =
-            await invocation.shouldConfirmExecute(signal);
+            await toolCall.invocation.shouldConfirmExecute(
+              signal,
+              hookDecision === 'ask' ? 'ask_user' : undefined,
+            );
 
           if (!confirmationDetails) {
             this.setToolCallOutcome(
@@ -674,7 +743,7 @@ export class CoreToolScheduler {
               signal,
             );
           } else {
-            if (!this.config.isInteractive()) {
+            if (!this.context.config.isInteractive()) {
               throw new Error(
                 `Tool execution for "${
                   toolCall.tool.displayName || toolCall.tool.name
@@ -682,8 +751,12 @@ export class CoreToolScheduler {
               );
             }
 
+            if (hookSystemMessage) {
+              confirmationDetails.systemMessage = hookSystemMessage;
+            }
+
             // Fire Notification hook before showing confirmation to user
-            const hookSystem = this.config.getHookSystem();
+            const hookSystem = this.context.config.getHookSystem();
             if (hookSystem) {
               await hookSystem.fireToolNotificationEvent(confirmationDetails);
             }
@@ -968,7 +1041,7 @@ export class CoreToolScheduler {
       // The active tool is finished. Move it to the completed batch.
       const completedCall = activeCall as CompletedToolCall;
       this.completedToolCallsForBatch.push(completedCall);
-      logToolCall(this.config, new ToolCallEvent(completedCall));
+      logToolCall(this.context.config, new ToolCallEvent(completedCall));
 
       // Clear the active tool slot. This is crucial for the sequential processing.
       this.toolCalls = [];

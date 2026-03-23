@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import type { Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import {
@@ -35,6 +34,7 @@ import {
   GeminiCliOperation,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   MockModifiableTool,
   MockTool,
@@ -275,6 +275,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
         allowedEnvironmentVariables: [],
         blockedEnvironmentVariables: [],
       },
+      sandboxManager: new NoopSandboxManager(),
     }),
     storage: {
       getProjectTempDir: () => '/tmp',
@@ -286,10 +287,14 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => false,
+    getHookSystem: () => undefined,
     getExperiments: () => {},
   } as unknown as Config;
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread
   const finalConfig = { ...baseConfig, ...overrides } as Config;
+
+  (finalConfig as unknown as { config: Config }).config = finalConfig;
 
   // Patch the policy engine to use the final config if not overridden
   if (!overrides.getPolicyEngine) {
@@ -316,6 +321,16 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
         },
       }) as unknown as PolicyEngine;
   }
+
+  Object.defineProperty(finalConfig, 'toolRegistry', {
+    get: () => finalConfig.getToolRegistry?.() || defaultToolRegistry,
+  });
+  Object.defineProperty(finalConfig, 'messageBus', {
+    get: () => finalConfig.getMessageBus?.(),
+  });
+  Object.defineProperty(finalConfig, 'geminiClient', {
+    get: () => finalConfig.getGeminiClient?.(),
+  });
 
   return finalConfig;
 }
@@ -350,7 +365,7 @@ describe('CoreToolScheduler', () => {
     });
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -430,7 +445,7 @@ describe('CoreToolScheduler', () => {
     });
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -531,7 +546,7 @@ describe('CoreToolScheduler', () => {
     });
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -628,7 +643,7 @@ describe('CoreToolScheduler', () => {
     });
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -683,7 +698,7 @@ describe('CoreToolScheduler', () => {
     });
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -749,7 +764,7 @@ describe('CoreToolScheduler with payload', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -897,7 +912,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -990,7 +1005,7 @@ describe('CoreToolScheduler YOLO mode', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1015,7 +1030,12 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith(
+      { param: 'value' },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // 2. The tool call status never entered CoreToolCallStatus.AwaitingApproval.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1082,7 +1102,7 @@ describe('CoreToolScheduler request queueing', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1118,7 +1138,12 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     // Ensure the second tool call hasn't been executed yet.
-    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { a: 1 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // Complete the first tool call.
     resolveFirstCall!({
@@ -1142,7 +1167,12 @@ describe('CoreToolScheduler request queueing', () => {
       // Now the second tool call should have been executed.
       expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { b: 2 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -1200,6 +1230,7 @@ describe('CoreToolScheduler request queueing', () => {
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },
+        sandboxManager: new NoopSandboxManager(),
       }),
       isInteractive: () => false,
     });
@@ -1211,7 +1242,7 @@ describe('CoreToolScheduler request queueing', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1236,7 +1267,12 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith(
+      { param: 'value' },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // 2. The tool call status never entered CoreToolCallStatus.AwaitingApproval.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1309,6 +1345,7 @@ describe('CoreToolScheduler request queueing', () => {
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
         },
+        sandboxManager: new NoopSandboxManager(),
       }),
       getToolRegistry: () => toolRegistry,
       getHookSystem: () => undefined,
@@ -1319,7 +1356,7 @@ describe('CoreToolScheduler request queueing', () => {
     });
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1380,7 +1417,7 @@ describe('CoreToolScheduler request queueing', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1417,8 +1454,18 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure the tool was called twice with the correct arguments.
     expect(executeFn).toHaveBeenCalledTimes(2);
-    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
-    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { a: 1 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
+    expect(executeFn).toHaveBeenCalledWith(
+      { b: 2 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
@@ -1452,7 +1499,7 @@ describe('CoreToolScheduler request queueing', () => {
       getAllTools: () => [],
       getToolsByServer: () => [],
       tools: new Map(),
-      config: mockConfig,
+      context: mockConfig,
       mcpClientManager: undefined,
       getToolByName: () => testTool,
       getToolByDisplayName: () => testTool,
@@ -1470,7 +1517,7 @@ describe('CoreToolScheduler request queueing', () => {
     > = [];
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate: (toolCalls) => {
         onToolCallsUpdate(toolCalls);
@@ -1619,7 +1666,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1724,7 +1771,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1775,8 +1822,18 @@ describe('CoreToolScheduler Sequential Execution', () => {
 
     // Check that execute was called for the first two tools only
     expect(executeFn).toHaveBeenCalledTimes(2);
-    expect(executeFn).toHaveBeenCalledWith({ call: 1 });
-    expect(executeFn).toHaveBeenCalledWith({ call: 2 });
+    expect(executeFn).toHaveBeenCalledWith(
+      { call: 1 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
+    expect(executeFn).toHaveBeenCalledWith(
+      { call: 2 },
+      expect.anything(),
+      undefined,
+      expect.anything(),
+    );
 
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
@@ -1828,7 +1885,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -1893,7 +1950,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       getPreferredEditor: () => 'vscode',
     });
 
@@ -2004,7 +2061,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       getPreferredEditor: () => 'vscode',
     });
 
@@ -2068,7 +2125,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
     });
@@ -2137,7 +2194,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: mockConfig,
       onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
     });
@@ -2228,7 +2285,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
       const scheduler = new CoreToolScheduler({
-        config: mockConfig,
+        context: mockConfig,
         onAllToolCallsComplete,
         getPreferredEditor: () => 'vscode',
       });
@@ -2282,7 +2339,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
       const scheduler = new CoreToolScheduler({
-        config: mockConfig,
+        context: mockConfig,
         onAllToolCallsComplete,
         getPreferredEditor: () => 'vscode',
       });
@@ -2343,7 +2400,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
       const scheduler = new CoreToolScheduler({
-        config: mockConfig,
+        context: mockConfig,
         onAllToolCallsComplete,
         onToolCallsUpdate,
         getPreferredEditor: () => 'vscode',

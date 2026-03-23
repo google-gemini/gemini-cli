@@ -29,11 +29,13 @@ import { MessageType } from '../types.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
 import { convertToRestPayload } from '@google/gemini-cli-core';
 
+const CHECKPOINT_MENU_GROUP = 'checkpoints';
+
 const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
-  const cfg = context.services.config;
+  const cfg = context.services.agentContext?.config;
   const geminiDir = cfg?.storage?.getProjectTempDir();
   if (!geminiDir) {
     return [];
@@ -70,7 +72,7 @@ const getSavedChatTags = async (
 
 const listCommand: SlashCommand = {
   name: 'list',
-  description: 'List saved conversation checkpoints',
+  description: 'List saved manual conversation checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context): Promise<void> => {
@@ -88,7 +90,7 @@ const listCommand: SlashCommand = {
 const saveCommand: SlashCommand = {
   name: 'save',
   description:
-    'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
+    'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
@@ -97,11 +99,12 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat save <tag>',
+        content: 'Missing tag. Usage: /resume save <tag>',
       };
     }
 
-    const { logger, config } = context.services;
+    const { logger } = context.services;
+    const config = context.services.agentContext?.config;
     await logger.initialize();
 
     if (!context.overwriteConfirmed) {
@@ -117,13 +120,13 @@ const saveCommand: SlashCommand = {
             ' already exists. Do you want to overwrite it?',
           ),
           originalInvocation: {
-            raw: context.invocation?.raw || `/chat save ${tag}`,
+            raw: context.invocation?.raw || `/resume save ${tag}`,
           },
         };
       }
     }
 
-    const chat = config?.getGeminiClient()?.getChat();
+    const chat = context.services.agentContext?.geminiClient?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -153,11 +156,11 @@ const saveCommand: SlashCommand = {
   },
 };
 
-const resumeCommand: SlashCommand = {
+const resumeCheckpointCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
   description:
-    'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
+    'Resume a conversation from a checkpoint. Usage: /resume resume <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args) => {
@@ -166,11 +169,12 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
+        content: 'Missing tag. Usage: /resume resume <tag>',
       };
     }
 
-    const { logger, config } = context.services;
+    const { logger } = context.services;
+    const config = context.services.agentContext?.config;
     await logger.initialize();
     const checkpoint = await logger.loadCheckpoint(tag);
     const conversation = checkpoint.history;
@@ -235,7 +239,7 @@ const resumeCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
+  description: 'Delete a conversation checkpoint. Usage: /resume delete <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args): Promise<MessageActionReturn> => {
@@ -244,7 +248,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat delete <tag>',
+        content: 'Missing tag. Usage: /resume delete <tag>',
       };
     }
 
@@ -277,7 +281,7 @@ const deleteCommand: SlashCommand = {
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
-    'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
+    'Share the current conversation to a markdown or json file. Usage: /resume share <file>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
@@ -296,7 +300,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.agentContext?.geminiClient?.getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -342,7 +346,7 @@ export const debugCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context): Promise<MessageActionReturn> => {
-    const req = context.services.config?.getLatestApiRequest();
+    const req = context.services.agentContext?.config.getLatestApiRequest();
     if (!req) {
       return {
         type: 'message',
@@ -376,16 +380,40 @@ export const debugCommand: SlashCommand = {
   },
 };
 
+export const checkpointSubCommands: SlashCommand[] = [
+  listCommand,
+  saveCommand,
+  resumeCheckpointCommand,
+  deleteCommand,
+  shareCommand,
+];
+
+const checkpointCompatibilityCommand: SlashCommand = {
+  name: 'checkpoints',
+  altNames: ['checkpoint'],
+  description: 'Compatibility command for nested checkpoint operations',
+  kind: CommandKind.BUILT_IN,
+  hidden: true,
+  autoExecute: false,
+  subCommands: checkpointSubCommands,
+};
+
+export const chatResumeSubCommands: SlashCommand[] = [
+  ...checkpointSubCommands.map((subCommand) => ({
+    ...subCommand,
+    suggestionGroup: CHECKPOINT_MENU_GROUP,
+  })),
+  checkpointCompatibilityCommand,
+];
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
-  description: 'Manage conversation history',
+  description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
-  autoExecute: false,
-  subCommands: [
-    listCommand,
-    saveCommand,
-    resumeCommand,
-    deleteCommand,
-    shareCommand,
-  ],
+  autoExecute: true,
+  action: async () => ({
+    type: 'dialog',
+    dialog: 'sessionBrowser',
+  }),
+  subCommands: chatResumeSubCommands,
 };

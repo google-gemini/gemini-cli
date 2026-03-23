@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
@@ -65,10 +72,9 @@ describe('PermissionsModifyTrustDialog', () => {
   });
 
   it('should render the main dialog with current trust level', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
-    await waitUntilReady();
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Modify Trust Level');
@@ -89,10 +95,9 @@ describe('PermissionsModifyTrustDialog', () => {
       commitTrustLevelChange: mockCommitTrustLevelChange,
       isFolderTrustEnabled: true,
     });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
-    await waitUntilReady();
 
     await waitFor(() => {
       expect(lastFrame()).toContain(
@@ -113,10 +118,9 @@ describe('PermissionsModifyTrustDialog', () => {
       commitTrustLevelChange: mockCommitTrustLevelChange,
       isFolderTrustEnabled: true,
     });
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
-    await waitUntilReady();
 
     await waitFor(() => {
       expect(lastFrame()).toContain(
@@ -127,10 +131,9 @@ describe('PermissionsModifyTrustDialog', () => {
   });
 
   it('should render the labels with folder names', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
     );
-    await waitUntilReady();
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Trust this folder (dir)');
@@ -141,10 +144,10 @@ describe('PermissionsModifyTrustDialog', () => {
 
   it('should call onExit when escape is pressed', async () => {
     const onExit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
-    await waitUntilReady();
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
@@ -179,10 +182,10 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     const onExit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
-    await waitUntilReady();
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
@@ -213,10 +216,10 @@ describe('PermissionsModifyTrustDialog', () => {
     });
 
     const onExit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
-    );
-    await waitUntilReady();
+    const { stdin, lastFrame, waitUntilReady, unmount } =
+      await renderWithProviders(
+        <PermissionsModifyTrustDialog onExit={onExit} addItem={vi.fn()} />,
+      );
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
