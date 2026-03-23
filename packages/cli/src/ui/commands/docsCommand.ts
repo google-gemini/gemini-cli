@@ -18,6 +18,7 @@ export const docsCommand: SlashCommand = {
   description: 'Open full Gemini CLI documentation in your browser',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext): Promise<void> => {
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 

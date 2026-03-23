@@ -12,6 +12,7 @@ export const corgiCommand: SlashCommand = {
   hidden: true,
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: (context, _args) => {
     context.ui.toggleCorgiMode();
   },

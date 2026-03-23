@@ -53,7 +53,7 @@ import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import { SkillCommandLoader } from '../../services/SkillCommandLoader.js';
-import { parseSlashCommand } from '../../utils/commands.js';
+import { parseSlashCommand, validateArgs } from '../../utils/commands.js';
 import {
   type ExtensionUpdateAction,
   type ExtensionUpdateStatus,
@@ -413,6 +413,21 @@ export const useSlashCommandProcessor = (
 
       try {
         if (commandToExecute) {
+          const argsError = validateArgs(
+            args,
+            commandToExecute.argsSpec,
+            resolvedCommandPath,
+            commandToExecute.description,
+          );
+          if (argsError) {
+            addMessage({
+              type: MessageType.ERROR,
+              content: argsError,
+              timestamp: new Date(),
+            });
+            setIsProcessing(false);
+            return { type: 'handled' };
+          }
           if (commandToExecute.action) {
             const fullCommandContext: CommandContext = {
               ...commandContext,

@@ -23,6 +23,7 @@ export const aboutCommand: SlashCommand = {
   description: 'Show version info',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   isSafeConcurrent: true,
   action: async (context) => {
     const osVersion = process.platform;

@@ -19,6 +19,7 @@ export const initCommand: SlashCommand = {
   description: 'Analyzes the project and creates a tailored GEMINI.md file',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (
     context: CommandContext,
     _args: string,

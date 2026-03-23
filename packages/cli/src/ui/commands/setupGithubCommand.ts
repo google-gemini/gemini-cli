@@ -209,6 +209,7 @@ export const setupGithubCommand: SlashCommand = {
   description: 'Set up GitHub Actions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (
     context: CommandContext,
   ): Promise<SlashCommandActionReturn> => {

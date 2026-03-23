@@ -13,6 +13,7 @@ export const compressCommand: SlashCommand = {
   description: 'Compresses the context by replacing it with a summary',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context) => {
     const { ui } = context;
     if (ui.pendingItem) {

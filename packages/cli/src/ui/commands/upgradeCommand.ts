@@ -22,6 +22,7 @@ export const upgradeCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   description: 'Upgrade your Gemini Code Assist tier for higher limits',
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context) => {
     const config = context.services.agentContext?.config;
     const authType = config?.getContentGeneratorConfig()?.authType;

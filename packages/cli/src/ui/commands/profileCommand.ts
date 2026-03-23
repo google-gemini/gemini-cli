@@ -13,6 +13,7 @@ export const profileCommand: SlashCommand | null = isDevelopment
       kind: CommandKind.BUILT_IN,
       description: 'Toggle the debug profile display',
       autoExecute: true,
+      argsSpec: { max: 0 },
       action: async (context) => {
         context.ui.toggleDebugProfiler();
         return {

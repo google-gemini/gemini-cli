@@ -240,5 +240,11 @@ export interface SlashCommand {
    */
   showCompletionLoading?: boolean;
 
+  /**
+   * Optional argument count constraints for validation.
+   * min: minimum number of arguments required (default 0)
+   * max: maximum number of arguments allowed (omit for unlimited)
+   */
+  argsSpec?: { min?: number; max?: number };
   subCommands?: SlashCommand[];
 }
