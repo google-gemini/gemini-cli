@@ -30,8 +30,8 @@ describe('toolsCommand', () => {
   it('should display an error if the tool registry is unavailable', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => undefined,
+        agentContext: {
+          toolRegistry: undefined,
         },
       },
     });
@@ -48,10 +48,10 @@ describe('toolsCommand', () => {
   it('should display "No tools available" when none are found', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({
+        agentContext: {
+          toolRegistry: {
             getAllTools: () => [] as Array<ToolBuilder<object, ToolResult>>,
-          }),
+          },
         },
       },
     });
@@ -69,8 +69,8 @@ describe('toolsCommand', () => {
   it('should list tools without descriptions by default (no args)', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        agentContext: {
+          toolRegistry: { getAllTools: () => mockTools },
         },
       },
     });
@@ -90,8 +90,8 @@ describe('toolsCommand', () => {
   it('should list tools without descriptions when "list" arg is passed', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        agentContext: {
+          toolRegistry: { getAllTools: () => mockTools },
         },
       },
     });
@@ -111,8 +111,8 @@ describe('toolsCommand', () => {
   it('should list tools with descriptions when "desc" arg is passed', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        agentContext: {
+          toolRegistry: { getAllTools: () => mockTools },
         },
       },
     });
@@ -144,8 +144,8 @@ describe('toolsCommand', () => {
   it('subcommand "list" should display tools without descriptions', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        agentContext: {
+          toolRegistry: { getAllTools: () => mockTools },
         },
       },
     });
@@ -165,8 +165,8 @@ describe('toolsCommand', () => {
   it('subcommand "desc" should display tools with descriptions', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        agentContext: {
+          toolRegistry: { getAllTools: () => mockTools },
         },
       },
     });
@@ -196,8 +196,8 @@ describe('toolsCommand', () => {
 
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        agentContext: {
+          toolRegistry: { getAllTools: () => mockTools },
         },
       },
     });

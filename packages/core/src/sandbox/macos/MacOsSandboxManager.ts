@@ -9,6 +9,7 @@ import {
   type SandboxRequest,
   type SandboxedCommand,
   type SandboxPermissions,
+  type GlobalSandboxOptions,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
@@ -27,16 +28,7 @@ import { parse as shellParse } from 'shell-quote';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import path from 'node:path';
 
-/**
- * Options for configuring the MacOsSandboxManager.
- */
-export interface MacOsSandboxOptions {
-  /** The primary workspace path to allow access to within the sandbox. */
-  workspace: string;
-  /** Additional paths to allow access to within the sandbox. */
-  allowedPaths?: string[];
-  /** Whether network access is allowed. */
-  networkAccess?: boolean;
+export interface MacOsSandboxOptions extends GlobalSandboxOptions {
   /** Optional base sanitization config. */
   sanitizationConfig?: EnvironmentSanitizationConfig;
   /** The current sandbox mode behavior from config. */
@@ -107,8 +99,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const sanitizationConfig = getSecureSanitizationConfig(
-      req.config?.sanitizationConfig,
-      this.options.sanitizationConfig,
+      req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
@@ -117,8 +108,8 @@ export class MacOsSandboxManager implements SandboxManager {
     const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
     // Reject override attempts in plan mode
-    if (!allowOverrides && req.config?.additionalPermissions) {
-      const perms = req.config.additionalPermissions;
+    if (!allowOverrides && req.policy?.additionalPermissions) {
+      const perms = req.policy.additionalPermissions;
       if (
         perms.network ||
         (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
@@ -136,8 +127,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const workspaceWrite = !isReadonlyMode || isApproved;
     const networkAccess =
-      this.options.modeConfig?.network ??
-      (allowOverrides ? (this.options.networkAccess ?? false) : false);
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
 
     // Fetch persistent approvals for this command
     const commandName = await this.getCommandName(req);
@@ -150,23 +140,24 @@ export class MacOsSandboxManager implements SandboxManager {
       fileSystem: {
         read: [
           ...(persistentPermissions?.fileSystem?.read ?? []),
-          ...(req.config?.additionalPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
         ],
         write: [
           ...(persistentPermissions?.fileSystem?.write ?? []),
-          ...(req.config?.additionalPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
         ],
       },
       network:
         networkAccess ||
         persistentPermissions?.network ||
-        req.config?.additionalPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
         false,
     };
 
     const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
-      allowedPaths: this.options.allowedPaths,
+      allowedPaths: [...(req.policy?.allowedPaths || [])],
+      forbiddenPaths: req.policy?.forbiddenPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
       additionalPermissions: mergedAdditional,

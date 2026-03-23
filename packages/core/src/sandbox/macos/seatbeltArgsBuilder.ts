@@ -21,6 +21,8 @@ export interface SeatbeltArgsOptions {
   workspace: string;
   /** Additional paths to allow access to. */
   allowedPaths?: string[];
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
   /** Whether to allow network access. */
   networkAccess?: boolean;
   /** Granular additional permissions. */
@@ -188,6 +190,14 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
         }
       });
     }
+  }
+
+  const forbiddenPaths = options.forbiddenPaths || [];
+  for (let i = 0; i < forbiddenPaths.length; i++) {
+    const forbiddenPath = tryRealpath(forbiddenPaths[i]);
+    args.push('-D', `FORBIDDEN_PATH_${i}=${forbiddenPath}`);
+    profile += `(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_${i}")))
+`;
   }
 
   if (options.networkAccess || options.additionalPermissions?.network) {

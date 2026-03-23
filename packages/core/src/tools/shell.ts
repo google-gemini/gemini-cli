@@ -158,10 +158,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
         onConfirm: async (outcome: ToolConfirmationOutcome) => {
           if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
             const commandName = rootCommands[0] || 'shell';
-            this.context.config.sandboxPolicyManager.addPersistentApproval(commandName, this.params[PARAM_ADDITIONAL_PERMISSIONS]!);
+            this.context.config.sandboxPolicyManager.addPersistentApproval(
+              commandName,
+              this.params[PARAM_ADDITIONAL_PERMISSIONS]!,
+            );
           } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
             const commandName = rootCommands[0] || 'shell';
-            this.context.config.sandboxPolicyManager.addSessionApproval(commandName, this.params[PARAM_ADDITIONAL_PERMISSIONS]!);
+            this.context.config.sandboxPolicyManager.addSessionApproval(
+              commandName,
+              this.params[PARAM_ADDITIONAL_PERMISSIONS]!,
+            );
           }
         },
       };
@@ -346,7 +352,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
           const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
-              if (line.includes('sysmond service not found') || line.includes('Cannot get process list') || line.includes('sysmon request failed')) {
+              if (
+                line.includes('sysmond service not found') ||
+                line.includes('Cannot get process list') ||
+                line.includes('sysmon request failed')
+              ) {
                 continue;
               }
               debugLogger.error(`pgrep: ${line}`);
@@ -450,33 +460,48 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
 
       // Heuristic Sandbox Denial Detection
-      const lowerOutput = ((result.output || '') + ' ' + (result.error?.message || '')).toLowerCase();
+      const lowerOutput = (
+        (result.output || '') +
+        ' ' +
+        (result.error?.message || '')
+      ).toLowerCase();
       const isFileDenial = [
         'operation not permitted',
         'vim:e303',
         'should be read/write',
         'sandbox_apply',
-        'sandbox: '
-      ].some(keyword => lowerOutput.includes(keyword));
-      
+        'sandbox: ',
+      ].some((keyword) => lowerOutput.includes(keyword));
+
       const isNetworkDenial = [
         'error connecting to',
         'network is unreachable',
         'could not resolve host',
         'connection refused',
-        'no address associated with hostname'
-      ].some(keyword => lowerOutput.includes(keyword));
+        'no address associated with hostname',
+        'no such host',
+        'network access denied',
+        'check your internet connection',
+      ].some((keyword) => lowerOutput.includes(keyword));
 
       // Only trigger heuristic if the command actually failed (exit code != 0 or aborted)
-      const failed = !!result.error || !!result.signal || (result.exitCode !== undefined && result.exitCode !== 0) || result.aborted;
+      const failed =
+        !!result.error ||
+        !!result.signal ||
+        (result.exitCode !== undefined && result.exitCode !== 0) ||
+        result.aborted;
 
       if (failed && (isFileDenial || isNetworkDenial)) {
         const strippedCommand = stripShellWrapper(this.params.command);
-        const rootCommands = getCommandRoots(strippedCommand).filter((r) => r !== 'shopt');
-        const rootCommandDisplay = rootCommands.length > 0 ? rootCommands[0] : 'shell';
+        const rootCommands = getCommandRoots(strippedCommand).filter(
+          (r) => r !== 'shopt',
+        );
+        const rootCommandDisplay =
+          rootCommands.length > 0 ? rootCommands[0] : 'shell';
         // Extract denied paths
         const deniedPaths = new Set<string>();
-        const regex = /(?:^|\s)['"]?(\/[\w.-/]+)['"]?:\s*[Oo]peration not permitted/ig;
+        const regex =
+          /(?:^|\s)['"]?(\/[\w.-/]+)['"]?:\s*[Oo]peration not permitted/gi;
         let match;
         while ((match = regex.exec(result.output || '')) !== null) {
           deniedPaths.add(match[1]);
@@ -488,34 +513,46 @@ export class ShellToolInvocation extends BaseToolInvocation<
         if (isFileDenial && deniedPaths.size === 0) {
           // Fallback heuristic: look for any absolute path in the output
           // Avoid matching simple commands like /bin/sh
-          const fallbackRegex = /(?:^|[\s"'[\]])(\/[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+)(?:$|[\s"'[\]:])/ig;
+          const fallbackRegex =
+            /(?:^|[\s"'[\]])(\/[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+)(?:$|[\s"'[\]:])/gi;
           let m;
           while ((m = fallbackRegex.exec(result.output || '')) !== null) {
-             const p = m[1];
-             if (p && !p.startsWith('/bin/') && !p.startsWith('/usr/bin/')) {
-               deniedPaths.add(p);
-             }
+            const p = m[1];
+            if (p && !p.startsWith('/bin/') && !p.startsWith('/usr/bin/')) {
+              deniedPaths.add(p);
+            }
           }
-          while ((m = fallbackRegex.exec(result.error?.message || '')) !== null) {
-             const p = m[1];
-             if (p && !p.startsWith('/bin/') && !p.startsWith('/usr/bin/')) {
-               deniedPaths.add(p);
-             }
+          while (
+            (m = fallbackRegex.exec(result.error?.message || '')) !== null
+          ) {
+            const p = m[1];
+            if (p && !p.startsWith('/bin/') && !p.startsWith('/usr/bin/')) {
+              deniedPaths.add(p);
+            }
           }
         }
 
-        const readPaths = new Set(this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read || []);
-        const writePaths = new Set(this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.write || []);
+        const readPaths = new Set(
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read || [],
+        );
+        const writePaths = new Set(
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.write || [],
+        );
 
         for (const p of deniedPaths) {
           try {
             // Find an existing parent directory to add instead of a non-existent file
             let currentPath = p;
             try {
-              if (fs.existsSync(currentPath) && fs.statSync(currentPath).isFile()) {
+              if (
+                fs.existsSync(currentPath) &&
+                fs.statSync(currentPath).isFile()
+              ) {
                 currentPath = path.dirname(currentPath);
               }
-            } catch (_e) { /* ignore */ }
+            } catch (_e) {
+              /* ignore */
+            }
             while (currentPath.length > 1) {
               if (fs.existsSync(currentPath)) {
                 writePaths.add(currentPath);
@@ -530,22 +567,37 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
 
         const additionalPermissions = {
-          network: isNetworkDenial || this.params[PARAM_ADDITIONAL_PERMISSIONS]?.network || undefined,
-          fileSystem: isFileDenial || writePaths.size > 0 ? { 
-            read: Array.from(readPaths), 
-            write: Array.from(writePaths) 
-          } : undefined,
+          network:
+            isNetworkDenial ||
+            this.params[PARAM_ADDITIONAL_PERMISSIONS]?.network ||
+            undefined,
+          fileSystem:
+            isFileDenial || writePaths.size > 0
+              ? {
+                  read: Array.from(readPaths),
+                  write: Array.from(writePaths),
+                }
+              : undefined,
         };
 
-        const originalReadSize = this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read?.length || 0;
-        const originalWriteSize = this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.write?.length || 0;
-        const originalNetwork = !!this.params[PARAM_ADDITIONAL_PERMISSIONS]?.network;
-        
+        const originalReadSize =
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read?.length ||
+          0;
+        const originalWriteSize =
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.write
+            ?.length || 0;
+        const originalNetwork =
+          !!this.params[PARAM_ADDITIONAL_PERMISSIONS]?.network;
+
         const newReadSize = additionalPermissions.fileSystem?.read?.length || 0;
-        const newWriteSize = additionalPermissions.fileSystem?.write?.length || 0;
+        const newWriteSize =
+          additionalPermissions.fileSystem?.write?.length || 0;
         const newNetwork = !!additionalPermissions.network;
 
-        const hasNewPermissions = newReadSize > originalReadSize || newWriteSize > originalWriteSize || (!originalNetwork && newNetwork);
+        const hasNewPermissions =
+          newReadSize > originalReadSize ||
+          newWriteSize > originalWriteSize ||
+          (!originalNetwork && newNetwork);
 
         if (hasNewPermissions) {
           const confirmationDetails = {
@@ -561,11 +613,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
             returnDisplay: returnDisplayMessage,
             error: {
               type: ToolErrorType.SANDBOX_EXPANSION_REQUIRED,
-              message: JSON.stringify(confirmationDetails)
-            }
+              message: JSON.stringify(confirmationDetails),
+            },
           };
         }
-        // If no new permissions were found by heuristic, do not intercept. 
+        // If no new permissions were found by heuristic, do not intercept.
         // Just return the normal execution error so the LLM can try providing explicit paths itself.
       }
 

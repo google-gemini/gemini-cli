@@ -5,7 +5,10 @@
  */
 
 import { type FunctionCall } from '@google/genai';
-import { isDangerousCommand, isKnownSafeCommand } from '../sandbox/macos/commandSafety.js';
+import {
+  isDangerousCommand,
+  isKnownSafeCommand,
+} from '../sandbox/macos/commandSafety.js';
 import { parse as shellParse } from 'shell-quote';
 import {
   PolicyDecision,
@@ -32,6 +35,8 @@ import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
   parseMcpToolName,
+  formatMcpToolName,
+  isMcpToolName,
 } from '../tools/mcp-tool.js';
 
 function isWildcardPattern(name: string): boolean {
@@ -118,7 +123,28 @@ function ruleMatches(
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
-      return false;
+      // If names don't match exactly, check for MCP short/full name mismatches
+      let mcpMatch = false;
+      if (serverName && toolCall.name) {
+        // Case 1: Rule uses short name + mcpName -> match FQN tool call
+        if (rule.mcpName && !isMcpToolName(rule.toolName)) {
+          if (
+            toolCall.name === formatMcpToolName(rule.mcpName, rule.toolName)
+          ) {
+            mcpMatch = true;
+          }
+        }
+        // Case 2: Rule uses FQN -> match short tool call (qualified by serverName)
+        if (!mcpMatch && isMcpToolName(rule.toolName)) {
+          if (rule.toolName === formatMcpToolName(serverName, toolCall.name)) {
+            mcpMatch = true;
+          }
+        }
+      }
+
+      if (!mcpMatch) {
+        return false;
+      }
     }
   }
 
@@ -226,16 +252,26 @@ export class PolicyEngine {
    * Check if a shell command is allowed.
    */
 
-  private async applyShellHeuristics(command: string, decision: PolicyDecision): Promise<PolicyDecision> {
+  private async applyShellHeuristics(
+    command: string,
+    decision: PolicyDecision,
+  ): Promise<PolicyDecision> {
     await initializeShellParsers();
     try {
       const parsedArgs = shellParse(command).map(String);
       if (isDangerousCommand(parsedArgs)) {
-        debugLogger.debug(`[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`);
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
+        );
         return PolicyDecision.ASK_USER;
       }
-      if (isKnownSafeCommand(parsedArgs) && decision === PolicyDecision.ASK_USER) {
-        debugLogger.debug(`[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`);
+      if (
+        isKnownSafeCommand(parsedArgs) &&
+        decision === PolicyDecision.ASK_USER
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`,
+        );
         return PolicyDecision.ALLOW;
       }
     } catch {
@@ -487,7 +523,12 @@ export class PolicyEngine {
         );
 
         let ruleDecision = rule.decision;
-        if (isShellCommand && command && !(rule as PolicyRule & { commandPrefix?: unknown }).commandPrefix && !rule.argsPattern) {
+        if (
+          isShellCommand &&
+          command &&
+          !(rule as PolicyRule & { commandPrefix?: unknown }).commandPrefix &&
+          !rule.argsPattern
+        ) {
           ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
         }
 
@@ -533,7 +574,10 @@ export class PolicyEngine {
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
         let heuristicDecision = this.defaultDecision;
         if (command) {
-          heuristicDecision = await this.applyShellHeuristics(command, heuristicDecision);
+          heuristicDecision = await this.applyShellHeuristics(
+            command,
+            heuristicDecision,
+          );
         }
 
         const shellResult = await this.checkShellCommand(

@@ -1,0 +1,42 @@
+@@ -889,12 +917,28 @@
+           allowedPaths: [],
+           networkAccess: false,
+         };
++
++    this._sandboxManager = createSandboxManager(this.sandbox, params.targetDir);
++
++    if (
++      !(this._sandboxManager instanceof NoopSandboxManager) &&
++      this.sandbox.enabled
++    ) {
++      this.fileSystemService = new SandboxedFileSystemService(
++        this._sandboxManager,
++        params.targetDir,
++      );
++    } else {
++      this.fileSystemService = new StandardFileSystemService();
++    }
++
+     this.targetDir = path.resolve(params.targetDir);
+     this.folderTrust = params.folderTrust ?? false;
+     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+     this.pendingIncludeDirectories = params.includeDirectories ?? [];
+     this.debugMode = params.debugMode;
+     this.question = params.question;
++    this.worktreeSettings = params.worktreeSettings;
+ 
+     this.coreTools = params.coreTools;
+     this.mainAgentTools = params.mainAgentTools;
+@@ -1187,12 +1238,7 @@
+       }
+     }
+     this._geminiClient = new GeminiClient(this);
+-    this._sandboxManager = createSandboxManager(
+-      params.toolSandboxing ?? false,
+-      this.targetDir,
+-    );
+     this.a2aClientManager = new A2AClientManager(this);
+-    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+     this.modelRouterService = new ModelRouterService(this);
+   }
+ 

@@ -160,6 +160,11 @@ describe('PolicyEngine', () => {
 
       engine = new PolicyEngine({ rules });
 
+      // Match with unqualified name + serverName
+      expect((await engine.check({ name: 'tool' }, 'my-server')).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
       // Match with qualified name (standard)
       expect(
         (await engine.check({ name: 'mcp_my-server_tool' }, 'my-server'))

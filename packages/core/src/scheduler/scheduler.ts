@@ -10,6 +10,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
+import { evaluateBeforeToolHook } from './hook-utils.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
 import {
@@ -363,6 +364,7 @@ export class Scheduler {
         callId: request.callId,
         schedulerId: this.schedulerId,
         parentCallId: this.parentCallId,
+        subagent: this.subagent,
       },
       () => {
         try {
@@ -571,12 +573,46 @@ export class Scheduler {
   ): Promise<void> {
     const callId = toolCall.request.callId;
 
-    // Policy & Security
-    const { decision, rule } = await checkPolicy(
+    // 1. Hook Check (BeforeTool)
+    const hookResult = await evaluateBeforeToolHook(
+      this.config,
+      toolCall.tool,
+      toolCall.request,
+      toolCall.invocation,
+    );
+
+    if (hookResult.status === 'error') {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Error,
+        createErrorResponse(
+          toolCall.request,
+          hookResult.error,
+          hookResult.errorType,
+        ),
+      );
+      return;
+    }
+
+    const { hookDecision, hookSystemMessage, modifiedArgs, newInvocation } =
+      hookResult;
+
+    if (modifiedArgs && newInvocation) {
+      toolCall.request.args = modifiedArgs;
+      toolCall.request.inputModifiedByHook = true;
+      toolCall.invocation = newInvocation;
+    }
+
+    // 2. Policy & Security
+    const { decision: policyDecision, rule } = await checkPolicy(
       toolCall,
       this.config,
       this.subagent,
     );
+    let decision = policyDecision;
+    if (hookDecision === 'ask') {
+      decision = PolicyDecision.ASK_USER;
+    }
 
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(
@@ -609,6 +645,8 @@ export class Scheduler {
         getPreferredEditor: this.getPreferredEditor,
         schedulerId: this.schedulerId,
         onWaitingForConfirmation: this.onWaitingForConfirmation,
+        systemMessage: hookSystemMessage,
+        forcedDecision: hookDecision === 'ask' ? 'ask_user' : undefined,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
@@ -670,6 +708,7 @@ export class Scheduler {
         callId: activeCall.request.callId,
         schedulerId: this.schedulerId,
         parentCallId: this.parentCallId,
+        subagent: this.subagent,
       },
       () =>
         this.executor.execute({
