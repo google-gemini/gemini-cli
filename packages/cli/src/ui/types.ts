@@ -352,6 +352,26 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
+export interface ContextWindowData {
+  model: string;
+  tokenLimit: number;
+  tokensUsed: number;
+  systemPromptTokens: number;
+  memoryTokens: number;
+  memoryFileCount: number;
+  toolDeclarationTokens: number;
+  toolCount: number;
+  conversationTokens: number;
+  turnCount: number;
+  compressionThreshold: number;
+  estimatedTurnsRemaining: number | null;
+}
+
+export type HistoryItemContextWindow = HistoryItemBase & {
+  type: 'context_window';
+  data: ContextWindowData;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -380,7 +400,8 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint;
+  | HistoryItemHint
+  | HistoryItemContextWindow;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -405,6 +426,7 @@ export enum MessageType {
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
   HINT = 'hint',
+  CONTEXT_WINDOW = 'context_window',
 }
 
 // Simplified message structure for internal feedback

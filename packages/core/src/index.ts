@@ -119,6 +119,7 @@ export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
 export * from './utils/cache.js';
 export * from './utils/markdownUtils.js';
+export { estimateTokenCountSync } from './utils/tokenCalculation.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
