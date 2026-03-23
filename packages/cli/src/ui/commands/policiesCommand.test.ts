@@ -9,11 +9,7 @@ import { policiesCommand } from './policiesCommand.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import {
-  type Config,
-  PolicyDecision,
-  ApprovalMode,
-} from '@google/gemini-cli-core';
+import { PolicyDecision, type AgentLoopContext } from '@google/gemini-cli-core';
 
 describe('policiesCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -27,15 +23,17 @@ describe('policiesCommand', () => {
     expect(policiesCommand.description).toBe('Manage policies');
     expect(policiesCommand.kind).toBe(CommandKind.BUILT_IN);
     expect(policiesCommand.subCommands).toHaveLength(1);
-    expect(policiesCommand.subCommands![0].name).toBe('list');
+    expect(policiesCommand.subCommands?.[0].name).toBe('list');
   });
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
       mockContext.services.agentContext = null;
-      const listCommand = policiesCommand.subCommands![0];
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
 
-      await listCommand.action!(mockContext, '');
+      await listCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -50,26 +48,75 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue([]),
       };
-      mockContext.services.agentContext = {
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-        get config() {
-          return this;
-        },
-      } as unknown as Config;
+        getToolRegistry: vi.fn().mockReturnValue({
+          getTool: vi.fn().mockReturnValue(undefined),
+        }),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
-      const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
+
+      await listCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'No active policies.',
+          text: 'No custom policies configured.',
         }),
         expect.any(Number),
       );
     });
 
-    it('should list policies grouped by mode', async () => {
+    it('should show no-policies message when only default policies exist', async () => {
+      const mockRules = [
+        {
+          decision: PolicyDecision.ALLOW,
+          toolName: 'glob',
+          priority: 1.05,
+          source: 'Default: read-only.toml',
+        },
+        {
+          decision: PolicyDecision.ASK_USER,
+          toolName: 'run_shell_command',
+          priority: 1.01,
+          source: 'Default: write.toml',
+        },
+      ];
+      const mockPolicyEngine = {
+        getRules: vi.fn().mockReturnValue(mockRules),
+      };
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getToolRegistry: vi.fn().mockReturnValue({
+          getTool: vi.fn().mockReturnValue(undefined),
+        }),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
+
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
+
+      await listCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'No custom policies configured.',
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should return custom_dialog when policies exist', async () => {
       const mockRules = [
         {
           decision: PolicyDecision.DENY,
@@ -88,89 +135,125 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.agentContext = {
+      const mockToolRegistry = {
+        getTool: vi.fn().mockReturnValue(undefined),
+      };
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-        get config() {
-          return this;
-        },
-      } as unknown as Config;
+        getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
-      const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('**Active Policies**'),
-        }),
-        expect.any(Number),
-      );
+      const result = await listCommand.action(mockContext, '');
 
-      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0];
-      const content = (call[0] as { text: string }).text;
-
-      expect(content).toContain('### Normal Mode Policies');
-      expect(content).toContain(
-        '### Auto Edit Mode Policies (combined with normal mode policies)',
-      );
-      expect(content).toContain(
-        '### Yolo Mode Policies (combined with normal mode policies)',
-      );
-      expect(content).toContain(
-        '### Plan Mode Policies (combined with normal mode policies)',
-      );
-      expect(content).toContain(
-        '**DENY** tool: `dangerousTool` [Priority: 10]',
-      );
-      expect(content).toContain(
-        '**ALLOW** all tools (args match: `safe`) [Source: test.toml]',
-      );
-      expect(content).toContain('**ASK_USER** all tools');
+      expect(result).toMatchObject({
+        type: 'custom_dialog',
+      });
+      expect(result).toHaveProperty('component');
     });
 
-    it('should show plan-only rules in plan mode section', async () => {
+    it('should populate toolDisplayNames from tool registry', async () => {
       const mockRules = [
         {
           decision: PolicyDecision.ALLOW,
-          toolName: 'glob',
-          priority: 70,
-          modes: [ApprovalMode.PLAN],
-        },
-        {
-          decision: PolicyDecision.DENY,
-          priority: 60,
-          modes: [ApprovalMode.PLAN],
+          toolName: 'run_shell_command',
+          priority: 5,
         },
         {
           decision: PolicyDecision.ALLOW,
-          toolName: 'shell',
-          priority: 50,
+          toolName: 'glob',
+          priority: 3,
         },
       ];
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.agentContext = {
+      const mockToolRegistry = {
+        getTool: vi.fn().mockImplementation((name: string) => {
+          const displayNames: Record<string, string> = {
+            run_shell_command: 'Shell',
+            glob: 'FindFiles',
+          };
+          if (displayNames[name]) {
+            return { displayName: displayNames[name] };
+          }
+          return undefined;
+        }),
+      };
+      const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-        get config() {
-          return this;
-        },
-      } as unknown as Config;
+        getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
 
-      const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
 
-      const call = vi.mocked(mockContext.ui.addItem).mock.calls[0];
-      const content = (call[0] as { text: string }).text;
+      const result = await listCommand.action(mockContext, '');
 
-      // Plan-only rules appear under Plan Mode section
-      expect(content).toContain(
-        '### Plan Mode Policies (combined with normal mode policies)',
+      expect(result).toMatchObject({ type: 'custom_dialog' });
+      // Verify getTool was called for each unique toolName
+      expect(mockToolRegistry.getTool).toHaveBeenCalledWith(
+        'run_shell_command',
       );
-      // glob ALLOW is plan-only, should appear in plan section
-      expect(content).toContain('**ALLOW** tool: `glob` [Priority: 70]');
-      // shell ALLOW has no modes (applies to all), appears in normal section
-      expect(content).toContain('**ALLOW** tool: `shell` [Priority: 50]');
+      expect(mockToolRegistry.getTool).toHaveBeenCalledWith('glob');
+    });
+  });
+
+  describe('parent command', () => {
+    it('should also return custom_dialog when policies exist', async () => {
+      const mockRules = [
+        {
+          decision: PolicyDecision.ALLOW,
+          toolName: 'glob',
+          priority: 5,
+        },
+      ];
+      const mockPolicyEngine = {
+        getRules: vi.fn().mockReturnValue(mockRules),
+      };
+      const mockToolRegistry = {
+        getTool: vi.fn().mockReturnValue(undefined),
+      };
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      };
+      mockContext.services.agentContext = {
+        config: mockConfig,
+      } as unknown as AgentLoopContext;
+
+      if (!policiesCommand.action)
+        throw new Error('policiesCommand action missing');
+      const result = await policiesCommand.action(mockContext, '');
+
+      expect(result).toMatchObject({ type: 'custom_dialog' });
+      expect(result).toHaveProperty('component');
+    });
+
+    it('should show error if config is missing', async () => {
+      mockContext.services.agentContext = null;
+
+      if (!policiesCommand.action)
+        throw new Error('policiesCommand action missing');
+      await policiesCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Error: Config not available.',
+        }),
+        expect.any(Number),
+      );
     });
   });
 });
