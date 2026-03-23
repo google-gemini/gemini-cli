@@ -25,7 +25,7 @@ import {
   AuthType,
   type ContentGeneratorConfig,
 } from '../../core/contentGenerator.js';
-import type { SuccessfulToolCall } from '../../core/coreToolScheduler.js';
+import type { SuccessfulToolCall } from '../../scheduler/types.js';
 import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
