@@ -6,16 +6,19 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
   GOVERNANCE_FILES,
+  type GlobalSandboxOptions,
+  sanitizePaths,
 } from './sandboxManager.js';
 import {
   sanitizeEnvironment,
-  type EnvironmentSanitizationConfig,
+  getSecureSanitizationConfig,
 } from './environmentSanitization.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { spawnAsync } from '../utils/shell-utils.js';
@@ -30,12 +33,10 @@ const __dirname = path.dirname(__filename);
  */
 export class WindowsSandboxManager implements SandboxManager {
   private readonly helperPath: string;
-  private readonly platform: string;
   private initialized = false;
   private readonly lowIntegrityCache = new Set<string>();
 
-  constructor(platform: string = process.platform) {
-    this.platform = platform;
+  constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
   }
 
@@ -57,7 +58,7 @@ export class WindowsSandboxManager implements SandboxManager {
 
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
-    if (this.platform !== 'win32') {
+    if (os.platform() !== 'win32') {
       this.initialized = true;
       return;
     }
@@ -162,35 +163,30 @@ export class WindowsSandboxManager implements SandboxManager {
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await this.ensureInitialized();
 
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction:
-        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
-        true,
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.policy?.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
     // 1. Handle filesystem permissions for Low Integrity
-    // Grant "Low Mandatory Level" write access to the CWD.
-    await this.grantLowIntegrityAccess(req.cwd);
+    // Grant "Low Mandatory Level" write access to the workspace.
+    await this.grantLowIntegrityAccess(this.options.workspace);
 
     // Grant "Low Mandatory Level" read access to allowedPaths.
-    if (req.config?.allowedPaths) {
-      for (const allowedPath of req.config.allowedPaths) {
-        await this.grantLowIntegrityAccess(allowedPath);
-      }
+    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    for (const allowedPath of allowedPaths) {
+      await this.grantLowIntegrityAccess(allowedPath);
     }
+
+    // TODO: handle forbidden paths
 
     // 2. Protected governance files
     // These must exist on the host before running the sandbox to prevent
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
-      const filePath = path.join(req.cwd, file);
+      const filePath = path.join(this.options.workspace, file);
       const isDirectory = file === '.git';
       this.touch(filePath, isDirectory);
 
@@ -213,7 +209,7 @@ export class WindowsSandboxManager implements SandboxManager {
 
     // If the command starts with __, it's an internal command for the sandbox helper itself.
     const args = [
-      req.config?.networkAccess ? '1' : '0',
+      req.policy?.networkAccess ? '1' : '0',
       req.cwd,
       req.command,
       ...req.args,
@@ -230,7 +226,7 @@ export class WindowsSandboxManager implements SandboxManager {
    * Grants "Low Mandatory Level" access to a path using icacls.
    */
   private async grantLowIntegrityAccess(targetPath: string): Promise<void> {
-    if (this.platform !== 'win32') {
+    if (os.platform() !== 'win32') {
       return;
     }
 

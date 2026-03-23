@@ -34,24 +34,17 @@ vi.mock('node:fs', async () => {
 
 describe('LinuxSandboxManager', () => {
   const workspace = '/home/user/workspace';
+  let manager: LinuxSandboxManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
+    manager = new LinuxSandboxManager({ workspace });
   });
 
-  it('correctly outputs bwrap as the program with appropriate isolation flags', async () => {
-    const manager = new LinuxSandboxManager({ workspace });
-    const req: SandboxRequest = {
-      command: 'ls',
-      args: ['-la'],
-      cwd: workspace,
-      env: {},
-    };
-
+  const getBwrapArgs = async (req: SandboxRequest) => {
     const result = await manager.prepareCommand(req);
-
     expect(result.program).toBe('sh');
     expect(result.args[0]).toBe('-c');
     expect(result.args[1]).toBe(
@@ -59,8 +52,17 @@ describe('LinuxSandboxManager', () => {
     );
     expect(result.args[2]).toBe('_');
     expect(result.args[3]).toMatch(/gemini-cli-seccomp-.*\.bpf$/);
+    return result.args.slice(4);
+  };
 
-    const bwrapArgs = result.args.slice(4);
+  it('correctly outputs bwrap as the program with appropriate isolation flags', async () => {
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: ['-la'],
+      cwd: workspace,
+      env: {},
+    });
+
     expect(bwrapArgs).toEqual([
       '--unshare-all',
       '--new-session',
@@ -95,33 +97,21 @@ describe('LinuxSandboxManager', () => {
   });
 
   it('maps allowedPaths to bwrap binds', async () => {
-    const manager = new LinuxSandboxManager({
-      workspace,
-      allowedPaths: ['/tmp/cache', '/opt/tools', workspace],
-    });
-    const req: SandboxRequest = {
+    const bwrapArgs = await getBwrapArgs({
       command: 'node',
       args: ['script.js'],
       cwd: workspace,
       env: {},
-    };
+      policy: {
+        allowedPaths: ['/tmp/cache', '/opt/tools', workspace],
+      },
+    });
 
-    const result = await manager.prepareCommand(req);
+    // Verify the specific bindings were added correctly
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
 
-    const bwrapArgs = result.args.slice(4);
-    expect(bwrapArgs).toEqual([
-      '--unshare-all',
-      '--new-session',
-      '--die-with-parent',
-      '--ro-bind',
-      '/',
-      '/',
-      '--dev',
-      '/dev',
-      '--proc',
-      '/proc',
-      '--tmpfs',
-      '/tmp',
+    expect(binds).toEqual([
       '--bind',
       workspace,
       workspace,
@@ -134,17 +124,12 @@ describe('LinuxSandboxManager', () => {
       '--ro-bind',
       `${workspace}/.git`,
       `${workspace}/.git`,
-      '--bind',
+      '--bind-try',
       '/tmp/cache',
       '/tmp/cache',
-      '--bind',
+      '--bind-try',
       '/opt/tools',
       '/opt/tools',
-      '--seccomp',
-      '9',
-      '--',
-      'node',
-      'script.js',
     ]);
   });
 
@@ -155,16 +140,12 @@ describe('LinuxSandboxManager', () => {
       return p.toString();
     });
 
-    const manager = new LinuxSandboxManager({ workspace });
-    const req: SandboxRequest = {
+    const bwrapArgs = await getBwrapArgs({
       command: 'ls',
       args: [],
       cwd: workspace,
       env: {},
-    };
-
-    const result = await manager.prepareCommand(req);
-    const bwrapArgs = result.args.slice(4);
+    });
 
     expect(bwrapArgs).toContain('--ro-bind');
     expect(bwrapArgs).toContain(`${workspace}/.gitignore`);
@@ -183,17 +164,45 @@ describe('LinuxSandboxManager', () => {
   it('touches governance files if they do not exist', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
-    const manager = new LinuxSandboxManager({ workspace });
-    const req: SandboxRequest = {
+    await getBwrapArgs({
       command: 'ls',
       args: [],
       cwd: workspace,
       env: {},
-    };
-
-    await manager.prepareCommand(req);
+    });
 
     expect(fs.mkdirSync).toHaveBeenCalled();
     expect(fs.openSync).toHaveBeenCalled();
+  });
+
+  it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: ['-la'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        allowedPaths: [workspace + '/'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    // Should only contain the primary workspace bind and governance files, not the second workspace bind with a trailing slash
+    expect(binds).toEqual([
+      '--bind',
+      workspace,
+      workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+    ]);
   });
 });

@@ -4,22 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WindowsSandboxManager } from './windowsSandboxManager.js';
 import type { SandboxRequest } from './sandboxManager.js';
+import { spawnAsync } from '../utils/shell-utils.js';
+
+vi.mock('../utils/shell-utils.js', () => ({
+  spawnAsync: vi.fn(),
+}));
 
 describe('WindowsSandboxManager', () => {
-  const manager = new WindowsSandboxManager('win32');
+  let manager: WindowsSandboxManager;
   let testCwd: string;
 
   beforeEach(() => {
+    vi.spyOn(os, 'platform').mockReturnValue('win32');
     testCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
+    manager = new WindowsSandboxManager({ workspace: testCwd });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(testCwd, { recursive: true, force: true });
   });
 
@@ -29,7 +37,7 @@ describe('WindowsSandboxManager', () => {
       args: ['/groups'],
       cwd: testCwd,
       env: { TEST_VAR: 'test_value' },
-      config: {
+      policy: {
         networkAccess: false,
       },
     };
@@ -46,7 +54,7 @@ describe('WindowsSandboxManager', () => {
       args: [],
       cwd: testCwd,
       env: {},
-      config: {
+      policy: {
         networkAccess: true,
       },
     };
@@ -64,7 +72,7 @@ describe('WindowsSandboxManager', () => {
         API_KEY: 'secret',
         PATH: '/usr/bin',
       },
-      config: {
+      policy: {
         sanitizationConfig: {
           allowedEnvironmentVariables: ['PATH'],
           blockedEnvironmentVariables: ['API_KEY'],
@@ -92,5 +100,39 @@ describe('WindowsSandboxManager', () => {
     expect(fs.existsSync(path.join(testCwd, '.geminiignore'))).toBe(true);
     expect(fs.existsSync(path.join(testCwd, '.git'))).toBe(true);
     expect(fs.lstatSync(path.join(testCwd, '.git')).isDirectory()).toBe(true);
+  });
+
+  it('should grant Low Integrity access to the workspace and allowed paths', async () => {
+    const allowedPath = path.join(os.tmpdir(), 'gemini-cli-test-allowed');
+    if (!fs.existsSync(allowedPath)) {
+      fs.mkdirSync(allowedPath);
+    }
+    try {
+      const req: SandboxRequest = {
+        command: 'test',
+        args: [],
+        cwd: testCwd,
+        env: {},
+        policy: {
+          allowedPaths: [allowedPath],
+        },
+      };
+
+      await manager.prepareCommand(req);
+
+      expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+        path.resolve(testCwd),
+        '/setintegritylevel',
+        'Low',
+      ]);
+
+      expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+        path.resolve(allowedPath),
+        '/setintegritylevel',
+        'Low',
+      ]);
+    } finally {
+      fs.rmSync(allowedPath, { recursive: true, force: true });
+    }
   });
 });

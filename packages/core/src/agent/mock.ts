@@ -86,6 +86,7 @@ export class MockAgentProtocol implements AgentProtocol {
   ) {
     const now = new Date().toISOString();
     for (const eventData of events) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const event: AgentEvent = {
         ...eventData,
         id: eventData.id ?? `e-${this._nextEventId++}`,
@@ -126,6 +127,7 @@ export class MockAgentProtocol implements AgentProtocol {
 
     // Helper to normalize and prepare for emission
     const normalize = (eventData: MockAgentEvent): AgentEvent =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ({
         ...eventData,
         id: eventData.id ?? `e-${this._nextEventId++}`,
