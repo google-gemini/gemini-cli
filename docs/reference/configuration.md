@@ -1159,7 +1159,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionManagement`** (boolean):
