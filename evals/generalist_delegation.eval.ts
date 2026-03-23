@@ -7,6 +7,19 @@
 import { describe, expect } from 'vitest';
 import { appEvalTest } from './app-test-helper.js';
 
+/**
+ * Compile-time guard to prevent tool restriction usage in eval configs
+ */
+type ForbiddenToolKeys =
+  | 'excludeTools'
+  | 'coreTools'
+  | 'allowedTools'
+  | 'mainAgentTools';
+
+type NoToolRestrictions<T> = T & {
+  [K in ForbiddenToolKeys]?: never;
+};
+
 describe('generalist_delegation', () => {
   // --- Positive Evals (Should Delegate) ---
 
@@ -21,7 +34,7 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-    },
+    } as NoToolRestrictions<typeof Object>,
     files: {
       'file1.ts': 'console.log("no semi")',
       'file2.ts': 'console.log("no semi")',
@@ -64,7 +77,7 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-    },
+    } as NoToolRestrictions<typeof Object>,
     files: {
       'src/a.ts': 'export const a = 1;',
       'src/b.ts': 'export const b = 2;',
@@ -104,7 +117,7 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-    },
+    } as NoToolRestrictions<typeof Object>,
     files: {
       'README.md': 'This is a proyect.',
     },
@@ -138,7 +151,7 @@ describe('generalist_delegation', () => {
       experimental: {
         enableAgents: true,
       },
-    },
+    } as NoToolRestrictions<typeof Object>,
     files: {
       'src/VERSION': '1.2.3',
     },
