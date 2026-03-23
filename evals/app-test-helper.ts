@@ -20,16 +20,44 @@ import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
  * forbidden. Evals must test against the full, default tool set to ensure
  * realistic behavior.
  */
-interface EvalConfigOverrides {
-  /** Restricting tools via excludeTools in evals is forbidden. */
-  excludeTools?: never;
-  /** Restricting tools via coreTools in evals is forbidden. */
-  coreTools?: never;
-  /** Restricting tools via allowedTools in evals is forbidden. */
-  allowedTools?: never;
-  /** Restricting tools via mainAgentTools in evals is forbidden. */
-  mainAgentTools?: never;
+type ForbiddenToolKeys =
+  | 'excludeTools'
+  | 'coreTools'
+  | 'allowedTools'
+  | 'mainAgentTools';
+
+type NoToolRestrictions<T> = T & {
+  [K in ForbiddenToolKeys]?: never;
+};
+
+export type EvalConfigOverrides = NoToolRestrictions<{
   [key: string]: unknown;
+}>;
+
+/**
+ * Runtime safety: remove forbidden tool restriction keys if present.
+ */
+function sanitizeConfigOverrides(
+  overrides?: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  if (!overrides) return overrides;
+
+  const forbidden: ForbiddenToolKeys[] = [
+    'excludeTools',
+    'coreTools',
+    'allowedTools',
+    'mainAgentTools',
+  ];
+
+  const sanitized = { ...overrides };
+
+  for (const key of forbidden) {
+    if (key in sanitized) {
+      delete sanitized[key];
+    }
+  }
+
+  return sanitized;
 }
 
 export interface AppEvalCase {
@@ -51,7 +79,7 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
     const rig = new AppRig({
       configOverrides: {
         model: DEFAULT_GEMINI_MODEL,
-        ...evalCase.configOverrides,
+        ...sanitizeConfigOverrides(evalCase.configOverrides),
       },
     });
 
