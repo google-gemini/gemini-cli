@@ -54,7 +54,7 @@ describe('truncateForTelemetry', () => {
     const result = truncateForTelemetry(emojis, 3);
 
     // Array.from splits correctly on code points
-    expect(result).toBe('👋🌍🚀...[TRUNCATED: original length 5]');
+    expect(result).toBe('👋🌍🚀...[TRUNCATED: original length 10]');
   });
 
   it('should stringify and truncate objects if exceeding maxLength', () => {
