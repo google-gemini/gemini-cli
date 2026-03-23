@@ -16,7 +16,6 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
@@ -37,6 +36,130 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 │   2. Allow for this session                                                  │
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`ToolConfirmationQueue > height allocation and layout > should handle security warning height correctly 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                       3 of 3 │
+│                                                                              │
+│ ?  run_shell_command Executes a bash command with a deceptive URL            │
+│                                                                              │
+│ ... 6 hidden (Ctrl+O) ...                                                    │
+│ echo "Line 37"                                                               │
+│ echo "Line 38"                                                               │
+│ echo "Line 39"                                                               │
+│ echo "Line 40"                                                               │
+│ echo "Line 41"                                                               │
+│ echo "Line 42"                                                               │
+│ echo "Line 43"                                                               │
+│ echo "Line 44"                                                               │
+│ echo "Line 45"                                                               │
+│ echo "Line 46"                                                               │
+│ echo "Line 47"                                                               │
+│ echo "Line 48"                                                               │
+│ echo "Line 49"                                                               │
+│ echo "Line 50"                                                               │
+│ curl https://täst.com                                                        │
+│                                                                              │
+│ ⚠  Warning: Deceptive URL(s) detected:                                       │
+│                                                                              │
+│       Original: https://täst.com/                                            │
+│       Actual Host (Punycode): https://xn--tst-qla.com/                       │
+│                                                                              │
+│ Allow execution of: 'echo'?                                                  │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`ToolConfirmationQueue > height allocation and layout > should render the full queue wrapper with borders and content for large edit diffs 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                              │
+│                                                                              │
+│ ?  replace Replaces content in a file                                        │
+│                                                                              │
+│ ... 15 hidden (Ctrl+O) ...                                                   │
+│  8 + const newLine8 = true;                                                  │
+│  9 - const oldLine9 = true;                                                  │
+│  9 + const newLine9 = true;                                                  │
+│ 10 - const oldLine10 = true;                                                 │
+│ 10 + const newLine10 = true;                                                 │
+│ 11 - const oldLine11 = true;                                                 │
+│ 11 + const newLine11 = true;                                                 │
+│ 12 - const oldLine12 = true;                                                 │
+│ 12 + const newLine12 = true;                                                 │
+│ 13 - const oldLine13 = true;                                                 │
+│ 13 + const newLine13 = true;                                                 │
+│ 14 - const oldLine14 = true;                                                 │
+│ 14 + const newLine14 = true;                                                 │
+│ 15 - const oldLine15 = true;                                                 │
+│ 15 + const newLine15 = true;                                                 │
+│ 16 - const oldLine16 = true;                                                 │
+│ 16 + const newLine16 = true;                                                 │
+│ 17 - const oldLine17 = true;                                                 │
+│ 17 + const newLine17 = true;                                                 │
+│ 18 - const oldLine18 = true;                                                 │
+│ 18 + const newLine18 = true;                                                 │
+│ 19 - const oldLine19 = true;                                                 │
+│ 19 + const newLine19 = true;                                                 │
+│ 20 - const oldLine20 = true;                                                 │
+│ 20 + const newLine20 = true;                                                 │
+│ Apply this change?                                                           │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Modify with external editor                                             │
+│   4. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`ToolConfirmationQueue > height allocation and layout > should render the full queue wrapper with borders and content for large exec commands 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                       2 of 3 │
+│                                                                              │
+│ ?  run_shell_command Executes a bash command                                 │
+│                                                                              │
+│ ... 24 hidden (Ctrl+O) ...                                                   │
+│ echo "Line 25"                                                               │
+│ echo "Line 26"                                                               │
+│ echo "Line 27"                                                               │
+│ echo "Line 28"                                                               │
+│ echo "Line 29"                                                               │
+│ echo "Line 30"                                                               │
+│ echo "Line 31"                                                               │
+│ echo "Line 32"                                                               │
+│ echo "Line 33"                                                               │
+│ echo "Line 34"                                                               │
+│ echo "Line 35"                                                               │
+│ echo "Line 36"                                                               │
+│ echo "Line 37"                                                               │
+│ echo "Line 38"                                                               │
+│ echo "Line 39"                                                               │
+│ echo "Line 40"                                                               │
+│ echo "Line 41"                                                               │
+│ echo "Line 42"                                                               │
+│ echo "Line 43"                                                               │
+│ echo "Line 44"                                                               │
+│ echo "Line 45"                                                               │
+│ echo "Line 46"                                                               │
+│ echo "Line 47"                                                               │
+│ echo "Line 48"                                                               │
+│ echo "Line 49"                                                               │
+│ echo "Line 50"                                                               │
+│ Allow execution of: 'echo'?                                                  │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
@@ -88,26 +211,6 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 │                                                                              │
 │ Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-"
-`;
-
-exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                              │
-│                                                                              │
-│ ?  replace edit file                                                         │
-│                                                                              │
-│ ... 49 hidden (Ctrl+O) ...                                                   │
-│ 50 line                                                                      │
-│ Apply this change?                                                           │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. Modify with external editor                                             │
-│   4. No, suggest changes (esc)                                               │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
- Press Ctrl+O to show more lines
 "
 `;
 
