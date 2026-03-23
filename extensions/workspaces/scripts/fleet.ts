@@ -6,11 +6,11 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+const REPO_ROOT = process.cwd();
 
 const USER = process.env.USER || 'mattkorwel';
 const INSTANCE_PREFIX = `gcli-workspace-${USER}`;

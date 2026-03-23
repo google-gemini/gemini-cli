@@ -5,12 +5,12 @@
  */
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+
 import readline from 'node:readline';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+const REPO_ROOT = process.cwd();
 
 async function confirm(question: string): Promise<boolean> {
   const rl = readline.createInterface({

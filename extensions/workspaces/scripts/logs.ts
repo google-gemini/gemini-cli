@@ -6,10 +6,10 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+
+const REPO_ROOT = process.cwd();
 
 export async function runLogs(args: string[]) {
   const prNumber = args[0];

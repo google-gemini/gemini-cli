@@ -5,11 +5,11 @@
  */
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+const REPO_ROOT = process.cwd();
 
 async function runStatus(env: NodeJS.ProcessEnv = process.env) {
   const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');

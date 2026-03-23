@@ -6,11 +6,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+const REPO_ROOT = process.cwd();
 
 const q = (str: string) => `'${str.replace(/'/g, "'\\''")}'`;
 

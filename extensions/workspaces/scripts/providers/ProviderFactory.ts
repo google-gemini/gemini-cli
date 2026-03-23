@@ -6,11 +6,11 @@
 
 import { GceCosProvider } from './GceCosProvider.ts';
 import type { WorkerProvider } from './BaseProvider.ts';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../../..');
+
+
+
+const REPO_ROOT = process.cwd();
 
 export class ProviderFactory {
   static getProvider(config: {
