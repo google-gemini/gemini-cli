@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
-import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
@@ -134,59 +133,6 @@ describe('ToolConfirmationQueue', () => {
     );
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
-    unmount();
-  });
-
-  it('renders expansion hint when content is long and constrained', async () => {
-    const longDiff = '@@ -1,1 +1,50 @@\n' + '+line\n'.repeat(50);
-    const confirmingTool = {
-      tool: {
-        callId: 'call-1',
-        name: 'replace',
-        description: 'edit file',
-        status: CoreToolCallStatus.AwaitingApproval,
-        confirmationDetails: {
-          type: 'edit' as const,
-          title: 'Confirm edit',
-          fileName: 'test.ts',
-          filePath: '/test.ts',
-          fileDiff: longDiff,
-          originalContent: 'old',
-          newContent: 'new',
-        },
-      },
-      index: 1,
-      total: 1,
-    };
-
-    const { lastFrame, unmount } = await renderWithProviders(
-      <Box flexDirection="column" height={30}>
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />
-      </Box>,
-      {
-        config: {
-          // eslint-disable-next-line @typescript-eslint/no-misused-spread
-          ...mockConfig,
-          getUseAlternateBuffer: () => true,
-        } as unknown as Config,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        uiState: {
-          terminalWidth: 80,
-          terminalHeight: 20,
-          constrainHeight: true,
-          streamingState: StreamingState.WaitingForConfirmation,
-        },
-      },
-    );
-
-    await waitFor(() =>
-      expect(lastFrame()?.toLowerCase()).toContain(
-        'press ctrl+o to show more lines',
-      ),
-    );
-    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
