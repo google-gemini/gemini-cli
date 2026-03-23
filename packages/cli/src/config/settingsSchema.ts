@@ -1980,7 +1980,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Agents',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Enable local and remote subagents.',
         showInDialog: false,
       },
