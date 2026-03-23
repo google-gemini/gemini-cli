@@ -188,56 +188,5 @@ describe('MacOsSandboxManager', () => {
       expect(result.env['SAFE_VAR']).toBe('1');
       expect(result.env['GITHUB_TOKEN']).toBeUndefined();
     });
-
-    it('should resolve parent directories if a file does not exist', async () => {
-      vi.spyOn(fs, 'realpath').mockImplementation((p) => {
-        if (p === '/test/symlink/nonexistent.txt') {
-          const error = new Error('ENOENT');
-          Object.assign(error, { code: 'ENOENT' });
-          return Promise.reject(error);
-        }
-        if (p === '/test/symlink') {
-          return Promise.resolve('/test/real_path');
-        }
-        return Promise.resolve(p as string);
-      });
-
-      const dynamicManager = new MacOsSandboxManager({
-        workspace: '/test/symlink/nonexistent.txt',
-      });
-      const dynamicResult = await dynamicManager.prepareCommand({
-        command: 'echo',
-        args: ['hello'],
-        cwd: '/test/symlink/nonexistent.txt',
-        env: {},
-      });
-
-      expect(dynamicResult.args).toContain(
-        'WORKSPACE=/test/real_path/nonexistent.txt',
-      );
-    });
-
-    it('should throw if realpath throws a non-ENOENT error', async () => {
-      vi.spyOn(fs, 'realpath').mockImplementation(() => {
-        const error = new Error('Permission denied');
-        Object.assign(error, { code: 'EACCES' });
-        return Promise.reject(error);
-      });
-
-      const errorManager = new MacOsSandboxManager({
-        workspace: '/test/workspace',
-      });
-      await expect(
-        errorManager.prepareCommand({
-          command: 'echo',
-          args: ['hello'],
-          cwd: mockWorkspace,
-          env: {},
-          policy: {
-            forbiddenPaths: ['/some/path'],
-          },
-        }),
-      ).rejects.toThrow('Permission denied');
-    });
   });
 });

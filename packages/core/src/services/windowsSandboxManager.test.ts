@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
+import fs from 'node:fs';
 import { WindowsSandboxManager } from './windowsSandboxManager.js';
 import type { SandboxRequest } from './sandboxManager.js';
 import { spawnAsync } from '../utils/shell-utils.js';
@@ -20,6 +21,7 @@ describe('WindowsSandboxManager', () => {
 
   beforeEach(() => {
     vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.spyOn(fs.promises, 'stat').mockResolvedValue({} as fs.Stats);
     manager = new WindowsSandboxManager({ workspace: '/test/workspace' });
   });
 
@@ -125,7 +127,6 @@ describe('WindowsSandboxManager', () => {
       path.resolve('/test/forbidden1'),
       '/deny',
       '*S-1-16-4096:(OI)(CI)(F)',
-      '/T',
     ]);
   });
 
@@ -156,7 +157,6 @@ describe('WindowsSandboxManager', () => {
       path.resolve(conflictPath),
       '/deny',
       '*S-1-16-4096:(OI)(CI)(F)',
-      '/T',
     ]);
   });
 

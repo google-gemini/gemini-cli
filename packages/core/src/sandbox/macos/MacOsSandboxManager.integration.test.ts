@@ -153,6 +153,69 @@ describe.skipIf(os.platform() !== 'darwin')(
           fs.rmSync(workspace, { recursive: true, force: true });
         }
       });
+
+      it('gracefully ignores non-existent paths in allowedPaths and forbiddenPaths', async () => {
+        const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-'));
+        const nonExistentPath = path.join(workspace, 'does-not-exist');
+
+        try {
+          const manager = new MacOsSandboxManager({ workspace });
+          const command = await manager.prepareCommand({
+            command: 'echo',
+            args: ['survived'],
+            cwd: workspace,
+            env: process.env,
+            policy: {
+              allowedPaths: [nonExistentPath],
+              forbiddenPaths: [nonExistentPath],
+            },
+          });
+          const result = await runCommand(command);
+          expect(result.status).toBe(0);
+          expect(result.stdout.trim()).toBe('survived');
+        } finally {
+          fs.rmSync(workspace, { recursive: true, force: true });
+        }
+      });
+
+      it('blocks access to both a symlink and its target when the symlink is forbidden', async () => {
+        const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-'));
+        const targetFile = path.join(workspace, 'target.txt');
+        const symlinkFile = path.join(workspace, 'link.txt');
+
+        fs.writeFileSync(targetFile, 'secret data');
+        fs.symlinkSync(targetFile, symlinkFile);
+
+        try {
+          const manager = new MacOsSandboxManager({ workspace });
+
+          // Attempt to read the target file directly
+          const commandTarget = await manager.prepareCommand({
+            command: 'cat',
+            args: [targetFile],
+            cwd: workspace,
+            env: process.env,
+            policy: { forbiddenPaths: [symlinkFile] }, // Forbid the symlink
+          });
+          const resultTarget = await runCommand(commandTarget);
+          expect(resultTarget.status).not.toBe(0);
+          expect(resultTarget.stderr).toContain('Operation not permitted');
+
+          // Attempt to read via the symlink
+          const commandLink = await manager.prepareCommand({
+            command: 'cat',
+            args: [symlinkFile],
+            cwd: workspace,
+            env: process.env,
+            policy: { forbiddenPaths: [symlinkFile] }, // Forbid the symlink
+          });
+          const resultLink = await runCommand(commandLink);
+          expect(resultLink.status).not.toBe(0);
+          expect(resultLink.stderr).toContain('Operation not permitted');
+        } finally {
+          fs.rmSync(workspace, { recursive: true, force: true });
+        }
+      });
     });
 
     describe('Network Access', () => {

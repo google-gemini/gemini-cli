@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { type Stats } from 'node:fs';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
@@ -16,6 +16,10 @@ describe('LinuxSandboxManager', () => {
 
   beforeEach(() => {
     manager = new LinuxSandboxManager({ workspace });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const getBwrapArgs = async (req: SandboxRequest) => {
@@ -239,5 +243,54 @@ describe('LinuxSandboxManager', () => {
     const bindIndex = binds.indexOf('--bind-try');
     const tmpfsIndex = binds.indexOf('--tmpfs');
     expect(tmpfsIndex).toBeGreaterThan(bindIndex);
+  });
+
+  it('masks symlinks and their targets for forbiddenPaths', async () => {
+    vi.spyOn(fs, 'realpath').mockImplementation(async (p: unknown) => {
+      if (p === '/test/symlink') return '/test/real_path';
+      return String(p);
+    });
+
+    vi.spyOn(fs, 'stat').mockImplementation(async (p: unknown) => {
+      if (p === '/test/real_path') {
+        return { isDirectory: () => false } as Stats;
+      }
+      throw { code: 'ENOENT' };
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'echo',
+      args: [],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/test/symlink'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    // Verify both the symlink and the target are masked
+    expect(binds).toContain('/test/symlink');
+    expect(binds).toContain('/test/real_path');
+
+    // Specifically verify they are both bound as ro-bind-try to /dev/null
+    expect(
+      binds.findIndex(
+        (val, i) =>
+          val === '--ro-bind-try' &&
+          binds[i + 1] === '/dev/null' &&
+          binds[i + 2] === '/test/symlink',
+      ),
+    ).not.toBe(-1);
+    expect(
+      binds.findIndex(
+        (val, i) =>
+          val === '--ro-bind-try' &&
+          binds[i + 1] === '/dev/null' &&
+          binds[i + 2] === '/test/real_path',
+      ),
+    ).not.toBe(-1);
   });
 });

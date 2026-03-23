@@ -14,6 +14,7 @@ import {
   type SandboxRequest,
   type SandboxedCommand,
   sanitizePaths,
+  tryRealpath,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
@@ -126,10 +127,16 @@ export class LinuxSandboxManager implements SandboxManager {
     const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
       try {
-        const stats = await fs.stat(forbiddenPath);
+        const resolvedPath = await tryRealpath(forbiddenPath);
+        const stats = await fs.stat(resolvedPath);
         if (stats.isDirectory()) {
-          bwrapArgs.push('--tmpfs', forbiddenPath);
+          bwrapArgs.push('--tmpfs', resolvedPath);
         } else {
+          bwrapArgs.push('--ro-bind-try', '/dev/null', resolvedPath);
+        }
+
+        // If the path was a symlink, also mask the symlink itself if it's different
+        if (resolvedPath !== normalize(forbiddenPath)) {
           bwrapArgs.push('--ro-bind-try', '/dev/null', forbiddenPath);
         }
       } catch (e) {

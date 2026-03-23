@@ -21,6 +21,7 @@ import {
 } from './environmentSanitization.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { spawnAsync } from '../utils/shell-utils.js';
+import { isNodeError } from '../utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -246,17 +247,31 @@ export class WindowsSandboxManager implements SandboxManager {
     // (OI) - Object Inherit: Inherit to files.
     // (CI) - Container Inherit: Inherit to subfolders.
     // (F)  - Full Access: Deny all permissions (read, write, execute).
+    // We intentionally omit /T for performance reasons. Applying a Deny ACE
+    // recursively across massive directories is unacceptably slow.
+    // By using (OI)(CI), new files inherit the Deny rule. For existing files,
+    // Windows dynamically evaluates permissions up the tree.
+    // The minor security risk is that if an existing file deep inside has an
+    // *explicit* Allow ACE, it might bypass this inherited Deny rule.
+
     const DENY_ALL_INHERIT = '(OI)(CI)(F)';
 
-    // /T - Traverse: Apply the operation to all existing files and subdirectories.
-    const RECURSIVE = '/T';
+    // Verify path exists; icacls fails on non-existent paths.
+    // Skip to match Linux/macOS fail-secure behavior.
+    try {
+      await fs.promises.stat(resolvedPath);
+    } catch (e: unknown) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        return;
+      }
+      throw e;
+    }
 
     try {
       await spawnAsync('icacls', [
         resolvedPath,
         '/deny',
         `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
-        RECURSIVE,
       ]);
       this.deniedCache.add(resolvedPath);
     } catch (e) {
