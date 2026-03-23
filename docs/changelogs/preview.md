@@ -1,4 +1,4 @@
-# Preview release: v0.35.0-preview.3
+# Preview release: v0.35.0-preview.4
 
 Released: March 23, 2026
 
@@ -381,4 +381,4 @@ npm install -g @google/gemini-cli@preview
   [#22815](https://github.com/google-gemini/gemini-cli/pull/22815)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.34.0-preview.4...v0.35.0-preview.3
+https://github.com/google-gemini/gemini-cli/compare/v0.34.0-preview.4...v0.35.0-preview.4
