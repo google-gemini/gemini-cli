@@ -32,7 +32,7 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from './coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import {
   logContentRetry,
   logContentRetryFailure,
