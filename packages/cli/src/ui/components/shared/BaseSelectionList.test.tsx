@@ -447,6 +447,28 @@ describe('BaseSelectionList', () => {
       unmount();
     });
 
+    it('should correctly calculate scroll offset during the initial render phase', async () => {
+      // Verify that the component correctly calculates the scroll offset during the
+      // initial render pass when starting with a high activeIndex.
+      // List length 10, max items 3, activeIndex 9 (last item).
+      const { unmount } = await renderScrollableList(9);
+
+      const renderedItemValues = mockRenderItem.mock.calls.map(
+        (call) => call[0].value,
+      );
+
+      // Item 1 (index 0) should not be rendered if the scroll offset is correctly
+      // synchronized with the activeIndex from the start.
+      expect(renderedItemValues).not.toContain('Item 1');
+
+      // The items at the end of the list should be rendered.
+      expect(renderedItemValues).toContain('Item 8');
+      expect(renderedItemValues).toContain('Item 9');
+      expect(renderedItemValues).toContain('Item 10');
+
+      unmount();
+    });
+
     it('should handle maxItemsToShow larger than the list length', async () => {
       const { lastFrame, unmount } = await renderComponent(
         { items: longList, maxItemsToShow: 15 },
