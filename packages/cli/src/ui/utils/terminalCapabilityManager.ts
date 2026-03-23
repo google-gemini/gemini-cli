@@ -22,7 +22,8 @@ import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
-const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
+const TERMINAL_CLEANUP_SEQUENCE =
+  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
 
 export function clearTerminalScreen(): void {
   writeToStdout('\x1b[2J\x1b[H');

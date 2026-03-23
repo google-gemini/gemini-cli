@@ -1436,7 +1436,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setControlsHeight(roundedHeight);
       }
     }
-  }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
+  }, [buffer, terminalWidth, terminalHeight, controlsHeight, isInputActive]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(

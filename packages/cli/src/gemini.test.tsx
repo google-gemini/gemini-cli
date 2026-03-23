@@ -129,6 +129,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       clearInstance: vi.fn(),
     },
     coreEvents: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.coreEvents,
       emitFeedback: vi.fn(),
       emitConsoleLog: vi.fn(),
@@ -1455,9 +1456,7 @@ describe('startInteractiveUI', () => {
 
     // Verify cleanup handler is registered with unmount function
     const cleanupCalls = vi.mocked(registerCleanup).mock.calls;
-    expect(cleanupCalls.some((call) => typeof call[0] === 'function')).toBe(
-      true,
-    );
+    expect(cleanupCalls.some((call) => call[0] instanceof Function)).toBe(true);
     expect(cleanupCalls.some((call) => call[0] === cleanupTerminalOnExit)).toBe(
       true,
     );
@@ -1516,6 +1515,7 @@ describe('startInteractiveUI', () => {
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
     const mockConfigWithScreenReader = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockConfig,
       getScreenReader: () => screenReader,
     } as Config;

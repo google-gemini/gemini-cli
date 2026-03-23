@@ -28,7 +28,7 @@ export function createSandboxManager(
     isWindows &&
     (sandbox?.enabled || sandbox?.command === 'windows-native')
   ) {
-    return new WindowsSandboxManager();
+    return new WindowsSandboxManager({ workspace });
   }
 
   if (sandbox?.enabled) {

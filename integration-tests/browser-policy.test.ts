@@ -63,6 +63,9 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     rig.setup('browser-policy-skip-confirmation', {
       fakeResponsesPath: join(__dirname, 'browser-policy.responses'),
       settings: {
+        experimental: {
+          enableAgents: true,
+        },
         agents: {
           overrides: {
             browser_agent: {
@@ -174,5 +177,40 @@ priority = 200
 
     expect(output).toContain('browser_agent');
     expect(output).toContain('completed successfully');
+  });
+
+  it('should show the visible warning when browser agent starts in existing session mode', async () => {
+    rig.setup('browser-session-warning', {
+      fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
+      settings: {
+        experimental: {
+          enableAgents: true,
+        },
+        general: {
+          enableAutoUpdateNotification: false,
+        },
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            headless: true,
+          },
+        },
+      },
+    });
+
+    const stdout = await rig.runCommand(['Open https://example.com'], {
+      env: {
+        GEMINI_API_KEY: 'fake-key',
+        GEMINI_TELEMETRY_DISABLED: 'true',
+        DEV: 'true',
+      },
+    });
+
+    expect(stdout).toContain('saved logins will be visible');
   });
 });

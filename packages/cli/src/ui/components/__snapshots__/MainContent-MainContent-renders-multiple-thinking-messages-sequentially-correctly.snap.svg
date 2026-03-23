@@ -21,22 +21,22 @@
     <text x="9" y="121" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="27" y="121" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Initial analysis</text>
     <text x="9" y="138" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="138" fill="#afafaf" textLength="846" lengthAdjust="spacingAndGlyphs" font-style="italic">This is a multiple line paragraph for the first thinking message of how the model analyzes the</text>
+    <text x="27" y="138" fill="#afafaf" textLength="675" lengthAdjust="spacingAndGlyphs" font-style="italic">This is a multiple line paragraph for the first thinking message of how the</text>
     <text x="9" y="155" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="155" fill="#afafaf" textLength="72" lengthAdjust="spacingAndGlyphs" font-style="italic">problem.</text>
+    <text x="27" y="155" fill="#afafaf" textLength="243" lengthAdjust="spacingAndGlyphs" font-style="italic">model analyzes the problem.</text>
     <text x="9" y="172" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="189" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="27" y="189" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Planning execution</text>
     <text x="9" y="206" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="206" fill="#afafaf" textLength="828" lengthAdjust="spacingAndGlyphs" font-style="italic">This a second multiple line paragraph for the second thinking message explaining the plan in</text>
+    <text x="27" y="206" fill="#afafaf" textLength="621" lengthAdjust="spacingAndGlyphs" font-style="italic">This a second multiple line paragraph for the second thinking message</text>
     <text x="9" y="223" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="223" fill="#afafaf" textLength="468" lengthAdjust="spacingAndGlyphs" font-style="italic">detail so that it wraps around the terminal display.</text>
+    <text x="27" y="223" fill="#afafaf" textLength="675" lengthAdjust="spacingAndGlyphs" font-style="italic">explaining the plan in detail so that it wraps around the terminal display.</text>
     <text x="9" y="240" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="257" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="27" y="257" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Refining approach</text>
     <text x="9" y="274" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="274" fill="#afafaf" textLength="792" lengthAdjust="spacingAndGlyphs" font-style="italic">And finally a third multiple line paragraph for the third thinking message to refine the</text>
+    <text x="27" y="274" fill="#afafaf" textLength="693" lengthAdjust="spacingAndGlyphs" font-style="italic">And finally a third multiple line paragraph for the third thinking message to</text>
     <text x="9" y="291" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="27" y="291" fill="#afafaf" textLength="81" lengthAdjust="spacingAndGlyphs" font-style="italic">solution.</text>
+    <text x="27" y="291" fill="#afafaf" textLength="180" lengthAdjust="spacingAndGlyphs" font-style="italic">refine the solution.</text>
   </g>
 </svg>
