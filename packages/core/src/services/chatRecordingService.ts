@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Status } from '../core/coreToolScheduler.js';
+import { type Status } from '../scheduler/types.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';

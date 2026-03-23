@@ -14,7 +14,7 @@ import {
   type ConversationOffered,
   type StreamingLatency,
 } from './types.js';
-import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getCodeAssistServer } from './codeAssist.js';

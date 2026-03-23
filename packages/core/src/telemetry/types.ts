@@ -13,7 +13,7 @@ import type {
 import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../policy/types.js';
 
-import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { AuthType } from '../core/contentGenerator.js';
