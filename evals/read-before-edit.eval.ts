@@ -32,10 +32,10 @@ function targetsFile(toolName: string, argsJson: string): boolean {
     }
     const filePath: string = args.file_path ?? '';
     if (filePath.includes(TARGET_FILE)) return true;
-    const includePattern: string = args.include ?? '';
-    return (
-      includePattern.includes(TARGET_FILE) || includePattern.includes('*.ts')
-    );
+    const include = args.include;
+    return Array.isArray(include)
+      ? include.some((p: string) => p.includes(TARGET_FILE) || p.includes('*.ts'))
+      : false;
   } catch {
     return false;
   }
