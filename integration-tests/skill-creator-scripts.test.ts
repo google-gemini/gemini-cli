@@ -36,11 +36,15 @@ describe('skill-creator scripts e2e', () => {
     const tempDir = rig.testDir!;
 
     // 1. Initialize
-    execSync(`node "${initScript}" ${skillName} --path "${tempDir}"`, {
-      stdio: 'inherit',
-    });
+    const initOutput = execSync(
+      `node "${initScript}" ${skillName} --path "${tempDir}"`,
+      {
+        encoding: 'utf8',
+      },
+    );
     const skillDir = path.join(tempDir, skillName);
 
+    expect(initOutput).toContain(`✅ Skill '${skillName}' initialized`);
     expect(fs.existsSync(skillDir)).toBe(true);
     expect(fs.existsSync(path.join(skillDir, 'SKILL.md'))).toBe(true);
     expect(
@@ -84,10 +88,14 @@ describe('skill-creator scripts e2e', () => {
     expect(validateOutput).toContain('Skill is valid!');
 
     // 5. Package
-    execSync(`node "${packageScript}" "${skillDir}" "${tempDir}"`, {
-      stdio: 'inherit',
-    });
+    const packageOutput = execSync(
+      `node "${packageScript}" "${skillDir}" "${tempDir}"`,
+      {
+        encoding: 'utf8',
+      },
+    );
     const skillFile = path.join(tempDir, `${skillName}.skill`);
+    expect(packageOutput).toContain('✅ Successfully packaged skill to:');
     expect(fs.existsSync(skillFile)).toBe(true);
 
     // 6. Verify zip content (should NOT have nested directory)

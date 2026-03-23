@@ -558,6 +558,10 @@ export class TestRig {
     extraEnv?: Record<string, string | undefined>,
   ): Record<string, string | undefined> {
     const cleanEnv: Record<string, string | undefined> = { ...process.env };
+    const hasExplicitGeminiApiKeyOverride =
+      Object.prototype.hasOwnProperty.call(extraEnv ?? {}, 'GEMINI_API_KEY');
+    const hasExplicitGoogleApiKeyOverride =
+      Object.prototype.hasOwnProperty.call(extraEnv ?? {}, 'GOOGLE_API_KEY');
 
     // Clear all GEMINI_ environment variables that might interfere with tests
     // except for those we explicitly want to keep or set.
@@ -567,7 +571,6 @@ export class TestRig {
         key !== 'GEMINI_API_KEY' &&
         key !== 'GOOGLE_API_KEY' &&
         key !== 'GEMINI_MODEL' &&
-        key !== 'GEMINI_DEBUG' &&
         key !== 'GEMINI_CLI_TEST_VAR' &&
         key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
@@ -576,12 +579,26 @@ export class TestRig {
       }
     }
 
-    return {
+    const mergedEnv = {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
       GEMINI_PTY_INFO: 'child_process',
       ...extraEnv,
     };
+
+    // Most integration tests run against fake responses or isolated fixtures and
+    // should bypass the interactive auth flow unless a test explicitly overrides
+    // auth-related environment variables.
+    if (
+      !mergedEnv['GEMINI_API_KEY'] &&
+      !mergedEnv['GOOGLE_API_KEY'] &&
+      !hasExplicitGeminiApiKeyOverride &&
+      !hasExplicitGoogleApiKeyOverride
+    ) {
+      mergedEnv['GEMINI_API_KEY'] = 'test-api-key';
+    }
+
+    return mergedEnv;
   }
 
   run(options: {
