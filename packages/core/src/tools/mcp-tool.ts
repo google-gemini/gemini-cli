@@ -80,11 +80,11 @@ export function formatMcpToolName(
   serverName: string,
   toolName?: string,
 ): string {
-  if (serverName === '*' && !toolName) {
+  if (serverName === '*' && (toolName === undefined || toolName === '*')) {
     return `${MCP_TOOL_PREFIX}*`;
   } else if (serverName === '*') {
     return `${MCP_TOOL_PREFIX}*_${toolName}`;
-  } else if (!toolName) {
+  } else if (toolName === undefined || toolName === '*') {
     return `${MCP_TOOL_PREFIX}${serverName}_*`;
   } else {
     return `${MCP_TOOL_PREFIX}${serverName}_${toolName}`;

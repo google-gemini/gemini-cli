@@ -760,6 +760,7 @@ describe('policy.ts', () => {
 
       (mockConfig as unknown as { config: Config }).config = mockConfig;
       const rule = {
+        toolName: '*',
         decision: PolicyDecision.DENY,
         denyMessage: 'Custom Deny',
       };

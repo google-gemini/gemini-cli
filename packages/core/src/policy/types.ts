@@ -106,9 +106,9 @@ export interface PolicyRule {
 
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * The name of the subagent this rule applies to.
@@ -182,9 +182,9 @@ export interface PolicyRule {
 export interface SafetyCheckerRule {
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * Identifies the MCP server this rule applies to.
