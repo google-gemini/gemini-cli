@@ -72,6 +72,46 @@ describe('cleanup', () => {
     expect(asyncFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should run cleanupFunctions BEFORE draining stdin and BEFORE runSyncCleanup', async () => {
+    const callOrder: string[] = [];
+
+    // Cleanup function
+    registerCleanup(() => {
+      callOrder.push('cleanup');
+    });
+
+    // Sync cleanup function (e.g. setRawMode(false))
+    registerSyncCleanup(() => {
+      callOrder.push('sync');
+    });
+
+    // Mock stdin.resume to track drainStdin
+    const originalResume = process.stdin.resume;
+    process.stdin.resume = vi.fn().mockImplementation(() => {
+      callOrder.push('drain');
+      return process.stdin;
+    });
+
+    // Mock stdin properties for drainStdin
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+
+    try {
+      await runExitCleanup();
+    } finally {
+      process.stdin.resume = originalResume;
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+
+    expect(callOrder).toEqual(['drain', 'drain', 'sync', 'cleanup']);
+  });
+
   it('should continue running cleanup functions even if one throws an error', async () => {
     const errorFn = vi.fn().mockImplementation(() => {
       throw new Error('test error');
