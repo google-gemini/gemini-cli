@@ -172,13 +172,14 @@ export async function createOpenPlugin(
   manifestPath: string,
   isActive: boolean,
   id: string,
+  workspaceDir: string,
   installMetadata?: ExtensionInstallMetadata,
 ): Promise<GeminiCLIExtension> {
   // Use loadOpenPluginConfig to get standard mapping
   const config = await loadOpenPluginConfig(
     manifestPath,
     pluginDir,
-    process.cwd(),
+    workspaceDir,
   );
 
   return {
