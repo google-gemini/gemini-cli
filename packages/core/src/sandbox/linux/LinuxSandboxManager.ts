@@ -4,18 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { join } from 'node:path';
+import { join, normalize } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import os from 'node:os';
 import {
   type SandboxManager,
+  type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
+  sanitizePaths,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-  type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 
 let cachedBpfPath: string | undefined;
@@ -77,27 +78,14 @@ function getSeccompBpfPath(): string {
 }
 
 /**
- * Options for configuring the LinuxSandboxManager.
- */
-export interface LinuxSandboxOptions {
-  /** The primary workspace path to bind into the sandbox. */
-  workspace: string;
-  /** Additional paths to bind into the sandbox. */
-  allowedPaths?: string[];
-  /** Optional base sanitization config. */
-  sanitizationConfig?: EnvironmentSanitizationConfig;
-}
-
-/**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 export class LinuxSandboxManager implements SandboxManager {
-  constructor(private readonly options: LinuxSandboxOptions) {}
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const sanitizationConfig = getSecureSanitizationConfig(
-      req.config?.sanitizationConfig,
-      this.options.sanitizationConfig,
+      req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
@@ -121,12 +109,19 @@ export class LinuxSandboxManager implements SandboxManager {
       this.options.workspace,
     ];
 
-    const allowedPaths = this.options.allowedPaths ?? [];
-    for (const path of allowedPaths) {
-      if (path !== this.options.workspace) {
-        bwrapArgs.push('--bind', path, path);
+    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    const normalizedWorkspace = normalize(this.options.workspace).replace(
+      /\/$/,
+      '',
+    );
+    for (const allowedPath of allowedPaths) {
+      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
+      if (normalizedAllowedPath !== normalizedWorkspace) {
+        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
       }
     }
+
+    // TODO: handle forbidden paths
 
     const bpfPath = getSeccompBpfPath();
 
