@@ -11,7 +11,11 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppContainer } from '../ui/AppContainer.js';
-import { renderWithProviders, type RenderInstance } from './render.js';
+import {
+  renderWithProviders,
+  type RenderInstance,
+  persistentStateMock,
+} from './render.js';
 import {
   makeFakeConfig,
   type Config,
@@ -194,6 +198,11 @@ export class AppRig {
   }
 
   async initialize() {
+    persistentStateMock.setData({
+      terminalSetupPromptShown: true,
+      tipsShown: 10,
+    });
+
     this.setupEnvironment();
     resetSettingsCacheForTesting();
     this.settings = this.createRigSettings();
@@ -240,6 +249,8 @@ export class AppRig {
   private setupEnvironment() {
     // Stub environment variables to avoid interference from developer's machine
     vi.stubEnv('GEMINI_CLI_HOME', this.testDir);
+    vi.stubEnv('TERM_PROGRAM', 'other');
+    vi.stubEnv('VSCODE_GIT_IPC_HANDLE', '');
     if (this.options.fakeResponsesPath) {
       vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
       MockShellExecutionService.setPassthrough(false);
@@ -305,7 +316,6 @@ export class AppRig {
 
       const newContentGeneratorConfig = {
         authType: authMethod,
-
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
       };
