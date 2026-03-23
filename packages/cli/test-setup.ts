@@ -30,6 +30,9 @@ process.env.FORCE_COLOR = '3';
 // Force generic keybinding hints to ensure stable snapshots across different operating systems.
 process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
 
+// Force generic terminal declaration to ensure stable snapshots across different host environments.
+process.env.TERM_PROGRAM = 'generic';
+
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
