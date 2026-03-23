@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { getNextHistoryId } from '../utils/historyIdGenerator.js';
+import { debugLogger } from '@google/gemini-cli-core';
 import type { HistoryItem } from '../types.js';
 import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
@@ -42,26 +44,24 @@ export function useHistory({
   initialItems?: HistoryItem[];
 } = {}): UseHistoryManagerReturn {
   const [history, setHistory] = useState<HistoryItem[]>(initialItems);
-  const messageIdCounterRef = useRef(0);
-
-  // Generates a unique message ID based on a timestamp and a counter.
-  const getNextMessageId = useCallback((baseTimestamp: number): number => {
-    messageIdCounterRef.current += 1;
-    return baseTimestamp + messageIdCounterRef.current;
-  }, []);
 
   const loadHistory = useCallback((newHistory: HistoryItem[]) => {
-    setHistory(newHistory);
+    const historyWithIds = newHistory.map((item) =>
+      item.id !== undefined
+        ? item
+        : ({ ...item, id: getNextHistoryId() } as HistoryItem),
+    );
+    setHistory(historyWithIds.sort((a, b) => a.id - b.id));
   }, []);
 
   // Adds a new item to the history state with a unique ID.
   const addItem = useCallback(
     (
       itemData: Omit<HistoryItem, 'id'>,
-      baseTimestamp: number = Date.now(),
+      _baseTimestamp?: number, // Kept for backwards compatibility
       isResuming: boolean = false,
     ): number => {
-      const id = getNextMessageId(baseTimestamp);
+      const id = getNextHistoryId();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
@@ -77,7 +77,23 @@ export function useHistory({
             return prevHistory; // Don't add the duplicate
           }
         }
-        return [...prevHistory, newItem];
+
+        const nextHistory = [...prevHistory, newItem].sort(
+          (a, b) => a.id - b.id,
+        );
+
+        if (process.env['NODE_ENV'] === 'development') {
+          const wasOutOfOrder =
+            prevHistory.length > 0 &&
+            prevHistory[prevHistory.length - 1].id > newItem.id;
+          if (wasOutOfOrder) {
+            debugLogger.warn(
+              `[HistoryManager] Detected out-of-order history ID: ${newItem.id} added after ${prevHistory[prevHistory.length - 1].id}. Array was sorted to correct this.`,
+            );
+          }
+        }
+
+        return nextHistory;
       });
 
       // Record UI-specific messages, but don't do it if we're actually loading
@@ -119,7 +135,7 @@ export function useHistory({
 
       return id; // Return the generated ID (even if not added, to keep signature)
     },
-    [getNextMessageId, chatRecordingService],
+    [chatRecordingService],
   );
 
   /**
@@ -150,10 +166,9 @@ export function useHistory({
     [],
   );
 
-  // Clears the entire history state and resets the ID counter.
+  // Clears the entire history state. Global ID counter is NOT reset.
   const clearItems = useCallback(() => {
     setHistory([]);
-    messageIdCounterRef.current = 0;
   }, []);
 
   return useMemo(

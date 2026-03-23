@@ -35,12 +35,16 @@ describe('useHistoryManager', () => {
         id: expect.any(Number),
       }),
     );
-    // Basic check that ID incorporates timestamp
-    expect(result.current.history[0].id).toBeGreaterThanOrEqual(timestamp);
+    // Basic check that ID is a number
+    expect(result.current.history[0].id).toBeGreaterThan(0);
   });
 
+ fix/history-ordering-monotonic-id
+  it('should generate unique IDs for multiple items', () => {
+    const { result } = renderHook(() => useHistory());
   it('should generate unique IDs for items added with the same base timestamp', async () => {
     const { result } = await renderHook(() => useHistory());
+ main
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -201,6 +205,10 @@ describe('useHistoryManager', () => {
     expect(result.current.history[2].text).toBe('Message 1');
   });
 
+ fix/history-ordering-monotonic-id
+  it('should order history items by id when loading history', () => {
+    const { result } = renderHook(() => useHistory());
+
   it('should use Date.now() as default baseTimestamp if not provided', async () => {
     const { result } = await renderHook(() => useHistory());
     const before = Date.now();
@@ -208,16 +216,18 @@ describe('useHistoryManager', () => {
       type: 'user',
       text: 'Default timestamp test',
     };
+ main
 
     act(() => {
-      result.current.addItem(itemData);
+      result.current.loadHistory([
+        { id: 100, type: 'user', text: 'Second' } as HistoryItem,
+        { id: 50, type: 'user', text: 'First' } as HistoryItem,
+      ]);
     });
-    const after = Date.now();
 
-    expect(result.current.history).toHaveLength(1);
-    // ID should be >= before + 1 (since counter starts at 0 and increments to 1)
-    expect(result.current.history[0].id).toBeGreaterThanOrEqual(before + 1);
-    expect(result.current.history[0].id).toBeLessThanOrEqual(after + 1);
+    expect(result.current.history).toHaveLength(2);
+    expect(result.current.history[0].text).toBe('First');
+    expect(result.current.history[1].text).toBe('Second');
   });
 
   describe('initialItems with auth information', () => {
