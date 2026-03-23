@@ -32,9 +32,7 @@ describe('AgentSession', () => {
     await session.abort();
     expect(
       session.events.some(
-        (e) =>
-          e.type === 'agent_end' &&
-          (e as AgentEvent<'agent_end'>).reason === 'aborted',
+        (e) => e.type === 'agent_end' && e.reason === 'aborted',
       ),
     ).toBe(true);
   });
