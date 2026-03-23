@@ -3,12 +3,6 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { makeFakeConfig } from '@google/gemini-cli-core';
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
 
 import {
   renderWithProviders,
@@ -17,6 +11,7 @@ import {
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi } from 'vitest';
 import crypto from 'node:crypto';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
