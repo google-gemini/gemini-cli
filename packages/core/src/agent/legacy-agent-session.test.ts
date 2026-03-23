@@ -673,7 +673,7 @@ describe('LegacyAgentSession', () => {
       expect(events.some((e) => e.type === 'agent_end')).toBe(true);
     });
 
-    it('handles LoopDetected as non-terminal custom event', async () => {
+    it('handles LoopDetected as non-terminal warning event', async () => {
       const sendMock = deps.client.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
@@ -693,12 +693,12 @@ describe('LegacyAgentSession', () => {
       await session.send({ message: [{ type: 'text', text: 'hi' }] });
       const events = await collectEvents(session);
 
-      // Should have a custom loop_detected event
-      const custom = events.find(
-        (e): e is AgentEvent<'custom'> =>
-          e.type === 'custom' && e.kind === 'loop_detected',
+      const warning = events.find(
+        (e): e is AgentEvent<'error'> =>
+          e.type === 'error' && e._meta?.['code'] === 'LOOP_DETECTED',
       );
-      expect(custom).toBeDefined();
+      expect(warning).toBeDefined();
+      expect(warning?.fatal).toBe(false);
 
       // Stream should have continued — content after loop detected
       const messages = events.filter(
