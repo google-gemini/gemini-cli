@@ -48,6 +48,8 @@ import {
   logNetworkRetryAttempt,
   logExtensionUpdateEvent,
   logHookCall,
+  logOnboardingStart,
+  logOnboardingSuccess,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -72,6 +74,8 @@ import {
   EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
   EVENT_INVALID_CHUNK,
   EVENT_NETWORK_RETRY_ATTEMPT,
+  EVENT_ONBOARDING_START,
+  EVENT_ONBOARDING_SUCCESS,
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -98,6 +102,8 @@ import {
   EVENT_EXTENSION_UPDATE,
   HookCallEvent,
   EVENT_HOOK_CALL,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
   LlmRole,
 } from './types.js';
 import { HookType } from '../hooks/types.js';
@@ -195,48 +201,51 @@ describe('loggers', () => {
   });
 
   describe('logCliConfiguration', () => {
+    const baseMockConfig = {
+      getSessionId: () => 'test-session-id',
+      getModel: () => 'test-model',
+      getEmbeddingModel: () => 'test-embedding-model',
+      getSandbox: () => true,
+      getCoreTools: () => ['ls', 'read-file'],
+      getApprovalMode: () => 'default',
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_VERTEX_AI,
+      }),
+      getTelemetryEnabled: () => true,
+      getUsageStatisticsEnabled: () => true,
+      getTelemetryLogPromptsEnabled: () => true,
+      getFileFilteringRespectGitIgnore: () => true,
+      getFileFilteringAllowBuildArtifacts: () => false,
+      getDebugMode: () => true,
+      getMcpServers: () => {
+        throw new Error('Should not call');
+      },
+      getQuestion: () => 'test-question',
+      getTargetDir: () => 'target-dir',
+      getProxy: () => 'http://test.proxy.com:8080',
+      getOutputFormat: () => OutputFormat.JSON,
+      getExtensions: () =>
+        [
+          { name: 'ext-one', id: 'id-one' },
+          { name: 'ext-two', id: 'id-two' },
+        ] as GeminiCLIExtension[],
+      getMcpClientManager: () => ({
+        getMcpServers: () => ({
+          'test-server': {
+            command: 'test-command',
+          },
+        }),
+      }),
+      isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
+      getWorktreeSettings: () => undefined,
+    } as unknown as Config;
+
     it('should log the cli configuration', async () => {
-      const mockConfig = {
-        getSessionId: () => 'test-session-id',
-        getModel: () => 'test-model',
-        getEmbeddingModel: () => 'test-embedding-model',
-        getSandbox: () => true,
-        getCoreTools: () => ['ls', 'read-file'],
-        getApprovalMode: () => 'default',
-        getContentGeneratorConfig: () => ({
-          model: 'test-model',
-          apiKey: 'test-api-key',
-          authType: AuthType.USE_VERTEX_AI,
-        }),
-        getTelemetryEnabled: () => true,
-        getUsageStatisticsEnabled: () => true,
-        getTelemetryLogPromptsEnabled: () => true,
-        getFileFilteringRespectGitIgnore: () => true,
-        getFileFilteringAllowBuildArtifacts: () => false,
-        getDebugMode: () => true,
-        getMcpServers: () => {
-          throw new Error('Should not call');
-        },
-        getQuestion: () => 'test-question',
-        getTargetDir: () => 'target-dir',
-        getProxy: () => 'http://test.proxy.com:8080',
-        getOutputFormat: () => OutputFormat.JSON,
-        getExtensions: () =>
-          [
-            { name: 'ext-one', id: 'id-one' },
-            { name: 'ext-two', id: 'id-two' },
-          ] as GeminiCLIExtension[],
-        getMcpClientManager: () => ({
-          getMcpServers: () => ({
-            'test-server': {
-              command: 'test-command',
-            },
-          }),
-        }),
-        isInteractive: () => false,
-        getExperiments: () => undefined,
-        getExperimentsAsync: async () => undefined,
-      } as unknown as Config;
+      const mockConfig = baseMockConfig;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
       logCliConfiguration(mockConfig, startSessionEvent);
@@ -270,7 +279,31 @@ describe('loggers', () => {
           extensions_count: 2,
           extensions: 'ext-one,ext-two',
           auth_type: 'vertex-ai',
+          worktree_active: false,
         },
+      });
+    });
+
+    it('should set worktree_active to true when worktree settings are present', async () => {
+      const mockConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
+        ...baseMockConfig,
+        getWorktreeSettings: () => ({
+          name: 'test-worktree',
+          path: '/path/to/worktree',
+          baseSha: 'test-sha',
+        }),
+      } as unknown as Config;
+
+      const startSessionEvent = new StartSessionEvent(mockConfig);
+      logCliConfiguration(mockConfig, startSessionEvent);
+
+      await new Promise(process.nextTick);
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'CLI configuration loaded.',
+        attributes: expect.objectContaining({
+          worktree_active: true,
+        }),
       });
     });
   });
@@ -524,6 +557,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_API_RESPONSE,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -683,6 +717,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_API_ERROR,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1253,6 +1288,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1390,6 +1426,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1470,6 +1507,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1549,6 +1587,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1629,6 +1668,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1923,6 +1963,7 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'installation.id': 'test-installation-id',
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
           interactive: false,
@@ -1960,6 +2001,7 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'installation.id': 'test-installation-id',
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
           interactive: false,
@@ -2478,6 +2520,76 @@ describe('loggers', () => {
           model: 'test-model',
           attempt: 2,
         },
+      );
+    });
+  });
+
+  describe('logOnboardingStart', () => {
+    const mockConfig = makeFakeConfig();
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logOnboardingStartEvent');
+      vi.spyOn(metrics, 'recordOnboardingStart');
+    });
+
+    it('should log onboarding start event to Clearcut and OTEL, and record metrics', () => {
+      const event = new OnboardingStartEvent();
+
+      logOnboardingStart(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logOnboardingStartEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Onboarding started.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_ONBOARDING_START,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+        },
+      });
+
+      expect(metrics.recordOnboardingStart).toHaveBeenCalledWith(mockConfig);
+    });
+  });
+
+  describe('logOnboardingSuccess', () => {
+    const mockConfig = makeFakeConfig();
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logOnboardingSuccessEvent');
+      vi.spyOn(metrics, 'recordOnboardingSuccess');
+    });
+
+    it('should log onboarding success event to Clearcut and OTEL, and record metrics', () => {
+      const event = new OnboardingSuccessEvent('standard-tier');
+
+      logOnboardingSuccess(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logOnboardingSuccessEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Onboarding succeeded. Tier: standard-tier',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_ONBOARDING_SUCCESS,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          user_tier: 'standard-tier',
+        },
+      });
+
+      expect(metrics.recordOnboardingSuccess).toHaveBeenCalledWith(
+        mockConfig,
+        'standard-tier',
       );
     });
   });
