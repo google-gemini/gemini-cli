@@ -126,9 +126,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         sessionId =
           evalCase.sessionId ||
           `test-session-${crypto.randomUUID().slice(0, 8)}`;
-        const storage = new Storage(fs.realpathSync(rig.testDir!));
 
+        // Temporarily set GEMINI_CLI_HOME so Storage writes to the same
+        // directory the CLI subprocess will use (rig.homeDir).
+        const originalGeminiHome = process.env['GEMINI_CLI_HOME'];
+        process.env['GEMINI_CLI_HOME'] = rig.homeDir!;
         try {
+          const storage = new Storage(fs.realpathSync(rig.testDir!));
           await storage.initialize();
           const chatsDir = path.join(storage.getProjectTempDir(), 'chats');
           fs.mkdirSync(chatsDir, { recursive: true });
@@ -153,6 +157,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         } catch (e) {
           // Storage initialization may fail in some environments; log and continue.
           console.warn('Failed to write session history:', e);
+        } finally {
+          // Restore original GEMINI_CLI_HOME.
+          if (originalGeminiHome === undefined) {
+            delete process.env['GEMINI_CLI_HOME'];
+          } else {
+            process.env['GEMINI_CLI_HOME'] = originalGeminiHome;
+          }
         }
       }
 
