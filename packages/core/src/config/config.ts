@@ -93,7 +93,9 @@ import {
   DebugStepTool,
   DebugEvaluateTool,
   DebugDisconnectTool,
-} from '../tools/debugTools.js';
+  DebugAttachTool,
+  DebugSetFunctionBreakpointTool,
+} from '../tools/debug/index.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -469,7 +471,7 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-  ) { }
+  ) {}
 }
 
 export enum AuthProviderType {
@@ -872,10 +874,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{
-      disabledSkills?: string[];
-      adminSkillsEnabled?: boolean;
-      agents?: AgentSettings;
-    }>)
+        disabledSkills?: string[];
+        adminSkillsEnabled?: boolean;
+        agents?: AgentSettings;
+      }>)
     | undefined;
 
   private readonly billing: {
@@ -1974,10 +1976,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getRemainingQuotaForModel(modelId: string):
     | {
-      remainingAmount?: number;
-      remainingFraction?: number;
-      resetTime?: string;
-    }
+        remainingAmount?: number;
+        remainingFraction?: number;
+        resetTime?: string;
+      }
     | undefined {
     const bucket = this.lastRetrievedQuota?.buckets?.find(
       (b) => b.modelId === modelId,
@@ -3062,7 +3064,7 @@ export class Config implements McpContext, AgentLoopContext {
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
       4 *
-      (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
   }
@@ -3318,6 +3320,14 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(DebugDisconnectTool, () =>
       registry.registerTool(new DebugDisconnectTool(this.messageBus)),
+    );
+    maybeRegister(DebugAttachTool, () =>
+      registry.registerTool(new DebugAttachTool(this.messageBus)),
+    );
+    maybeRegister(DebugSetFunctionBreakpointTool, () =>
+      registry.registerTool(
+        new DebugSetFunctionBreakpointTool(this.messageBus),
+      ),
     );
 
     // Register Subagents as Tools

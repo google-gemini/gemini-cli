@@ -154,6 +154,11 @@ export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anyth
 
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
+// Debug tool names (declared early for use in TOOLS_REQUIRING_NARROWING)
+export const DEBUG_LAUNCH_TOOL_NAME = 'debug_launch';
+export const DEBUG_EVALUATE_TOOL_NAME = 'debug_evaluate';
+export const DEBUG_ATTACH_TOOL_NAME = 'debug_attach';
+
 /**
  * Tools that require mandatory argument narrowing (e.g., file paths, command prefixes)
  * when granting persistent or session-wide approval.
@@ -167,6 +172,9 @@ export const TOOLS_REQUIRING_NARROWING = new Set([
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   SHELL_TOOL_NAME,
+  DEBUG_LAUNCH_TOOL_NAME,
+  DEBUG_EVALUATE_TOOL_NAME,
+  DEBUG_ATTACH_TOOL_NAME,
 ]);
 
 export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
@@ -176,15 +184,13 @@ export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
 export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
 export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
-export const DEBUG_LAUNCH_TOOL_NAME = 'debug_launch';
 export const DEBUG_SET_BREAKPOINT_TOOL_NAME = 'debug_set_breakpoint';
 export const DEBUG_GET_STACKTRACE_TOOL_NAME = 'debug_get_stacktrace';
 export const DEBUG_GET_VARIABLES_TOOL_NAME = 'debug_get_variables';
 export const DEBUG_STEP_TOOL_NAME = 'debug_step';
-export const DEBUG_EVALUATE_TOOL_NAME = 'debug_evaluate';
 export const DEBUG_DISCONNECT_TOOL_NAME = 'debug_disconnect';
-export const DEBUG_ATTACH_TOOL_NAME = 'debug_attach';
-export const DEBUG_SET_FUNCTION_BREAKPOINT_TOOL_NAME = 'debug_set_function_breakpoint';
+export const DEBUG_SET_FUNCTION_BREAKPOINT_TOOL_NAME =
+  'debug_set_function_breakpoint';
 
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
