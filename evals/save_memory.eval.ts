@@ -227,4 +227,136 @@ describe('save_memory', () => {
       });
     },
   });
+
+  const proactiveMemoryFromLongSession =
+    'Agent saves preference from earlier in conversation history';
+  evalTest('USUALLY_PASSES', {
+    name: proactiveMemoryFromLongSession,
+    params: {
+      settings: {
+        experimental: { memoryManager: true },
+      },
+    },
+    messages: [
+      {
+        id: 'msg-1',
+        type: 'user',
+        content: [
+          {
+            text: 'By the way, I always prefer Vitest over Jest for testing in all my projects.',
+          },
+        ],
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        type: 'gemini',
+        content: [{ text: 'Noted! What are you working on today?' }],
+        timestamp: '2026-01-01T00:00:05Z',
+      },
+      {
+        id: 'msg-3',
+        type: 'user',
+        content: [
+          {
+            text: "I'm debugging a failing API endpoint. The /users route returns a 500 error.",
+          },
+        ],
+        timestamp: '2026-01-01T00:01:00Z',
+      },
+      {
+        id: 'msg-4',
+        type: 'gemini',
+        content: [
+          {
+            text: 'It looks like the database connection might not be initialized before the query runs.',
+          },
+        ],
+        timestamp: '2026-01-01T00:01:10Z',
+      },
+      {
+        id: 'msg-5',
+        type: 'user',
+        content: [
+          { text: 'Good catch — I fixed the import and the route works now.' },
+        ],
+        timestamp: '2026-01-01T00:02:00Z',
+      },
+      {
+        id: 'msg-6',
+        type: 'gemini',
+        content: [{ text: 'Great! Anything else you would like to work on?' }],
+        timestamp: '2026-01-01T00:02:05Z',
+      },
+    ],
+    prompt:
+      'Please save any persistent preferences or facts about me from our conversation to memory.',
+    assert: async (rig, result) => {
+      const wasToolCalled = await rig.waitForToolCall(
+        'save_memory',
+        undefined,
+        (args) => /vitest/i.test(args),
+      );
+      expect(
+        wasToolCalled,
+        'Expected save_memory to be called with the Vitest preference from the conversation history',
+      ).toBe(true);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  const memoryManagerRoutingPreferences =
+    'Agent routes global and project preferences to memory';
+  evalTest('USUALLY_PASSES', {
+    name: memoryManagerRoutingPreferences,
+    params: {
+      settings: {
+        experimental: { memoryManager: true },
+      },
+    },
+    messages: [
+      {
+        id: 'msg-1',
+        type: 'user',
+        content: [
+          {
+            text: 'I always use dark mode in all my editors and terminals.',
+          },
+        ],
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'msg-2',
+        type: 'gemini',
+        content: [{ text: 'Got it, I will keep that in mind!' }],
+        timestamp: '2026-01-01T00:00:05Z',
+      },
+      {
+        id: 'msg-3',
+        type: 'user',
+        content: [
+          {
+            text: 'For this project specifically, we use 2-space indentation.',
+          },
+        ],
+        timestamp: '2026-01-01T00:01:00Z',
+      },
+      {
+        id: 'msg-4',
+        type: 'gemini',
+        content: [
+          { text: 'Understood, 2-space indentation for this project.' },
+        ],
+        timestamp: '2026-01-01T00:01:05Z',
+      },
+    ],
+    prompt: 'Please save the preferences I mentioned earlier to memory.',
+    assert: async (rig, result) => {
+      const wasToolCalled = await rig.waitForToolCall('save_memory');
+      expect(wasToolCalled, 'Expected save_memory to be called').toBe(true);
+
+      assertModelHasOutput(result);
+    },
+  });
 });
