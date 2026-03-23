@@ -1,0 +1,458 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="740" height="683" viewBox="0 0 740 683">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="740" height="683" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#ffffaf" textLength="720" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="19" fill="#ffffaf" textLength="135" lengthAdjust="spacingAndGlyphs" font-weight="bold">Action Required</text>
+    <text x="711" y="19" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="36" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="53" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">?</text>
+    <text x="45" y="53" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">replace</text>
+    <text x="117" y="53" fill="#afafaf" textLength="234" lengthAdjust="spacingAndGlyphs">Replaces content in a file</text>
+    <text x="711" y="53" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="70" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="87" fill="#afafaf" textLength="234" lengthAdjust="spacingAndGlyphs">... 15 hidden (Ctrl+O) ...</text>
+    <text x="711" y="87" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="102" width="9" height="17" fill="#005f00" />
+    <rect x="27" y="102" width="9" height="17" fill="#005f00" />
+    <text x="27" y="104" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">8</text>
+    <rect x="36" y="102" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="102" width="9" height="17" fill="#005f00" />
+    <text x="45" y="104" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="102" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="102" width="45" height="17" fill="#005f00" />
+    <text x="63" y="104" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="102" width="108" height="17" fill="#005f00" />
+    <text x="108" y="104" fill="#e5e5e5" textLength="108" lengthAdjust="spacingAndGlyphs"> newLine8 = </text>
+    <rect x="216" y="102" width="36" height="17" fill="#005f00" />
+    <text x="216" y="104" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="252" y="102" width="9" height="17" fill="#005f00" />
+    <text x="252" y="104" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="104" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="119" width="9" height="17" fill="#5f0000" />
+    <rect x="27" y="119" width="9" height="17" fill="#5f0000" />
+    <text x="27" y="121" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">9</text>
+    <rect x="36" y="119" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="119" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="121" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="119" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="119" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="121" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="119" width="108" height="17" fill="#5f0000" />
+    <text x="108" y="121" fill="#e5e5e5" textLength="108" lengthAdjust="spacingAndGlyphs"> oldLine9 = </text>
+    <rect x="216" y="119" width="36" height="17" fill="#5f0000" />
+    <text x="216" y="121" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="252" y="119" width="9" height="17" fill="#5f0000" />
+    <text x="252" y="121" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="121" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="136" width="9" height="17" fill="#005f00" />
+    <rect x="27" y="136" width="9" height="17" fill="#005f00" />
+    <text x="27" y="138" fill="#afafaf" textLength="9" lengthAdjust="spacingAndGlyphs">9</text>
+    <rect x="36" y="136" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="136" width="9" height="17" fill="#005f00" />
+    <text x="45" y="138" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="136" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="136" width="45" height="17" fill="#005f00" />
+    <text x="63" y="138" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="136" width="108" height="17" fill="#005f00" />
+    <text x="108" y="138" fill="#e5e5e5" textLength="108" lengthAdjust="spacingAndGlyphs"> newLine9 = </text>
+    <rect x="216" y="136" width="36" height="17" fill="#005f00" />
+    <text x="216" y="138" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="252" y="136" width="9" height="17" fill="#005f00" />
+    <text x="252" y="138" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="138" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="153" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="155" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">10</text>
+    <rect x="36" y="153" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="153" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="155" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="153" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="153" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="155" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="153" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="155" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine10 = </text>
+    <rect x="225" y="153" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="155" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="153" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="155" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="155" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="170" width="18" height="17" fill="#005f00" />
+    <text x="18" y="172" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">10</text>
+    <rect x="36" y="170" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="170" width="9" height="17" fill="#005f00" />
+    <text x="45" y="172" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="170" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="170" width="45" height="17" fill="#005f00" />
+    <text x="63" y="172" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="170" width="117" height="17" fill="#005f00" />
+    <text x="108" y="172" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine10 = </text>
+    <rect x="225" y="170" width="36" height="17" fill="#005f00" />
+    <text x="225" y="172" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="170" width="9" height="17" fill="#005f00" />
+    <text x="261" y="172" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="172" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="187" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="189" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">11</text>
+    <rect x="36" y="187" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="187" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="189" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="187" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="187" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="189" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="187" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="189" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine11 = </text>
+    <rect x="225" y="187" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="189" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="187" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="189" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="189" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="204" width="18" height="17" fill="#005f00" />
+    <text x="18" y="206" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">11</text>
+    <rect x="36" y="204" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="204" width="9" height="17" fill="#005f00" />
+    <text x="45" y="206" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="204" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="204" width="45" height="17" fill="#005f00" />
+    <text x="63" y="206" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="204" width="117" height="17" fill="#005f00" />
+    <text x="108" y="206" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine11 = </text>
+    <rect x="225" y="204" width="36" height="17" fill="#005f00" />
+    <text x="225" y="206" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="204" width="9" height="17" fill="#005f00" />
+    <text x="261" y="206" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="206" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="221" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="223" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">12</text>
+    <rect x="36" y="221" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="221" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="223" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="221" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="221" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="223" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="221" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="223" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine12 = </text>
+    <rect x="225" y="221" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="223" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="221" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="223" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="223" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="238" width="18" height="17" fill="#005f00" />
+    <text x="18" y="240" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">12</text>
+    <rect x="36" y="238" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="238" width="9" height="17" fill="#005f00" />
+    <text x="45" y="240" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="238" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="238" width="45" height="17" fill="#005f00" />
+    <text x="63" y="240" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="238" width="117" height="17" fill="#005f00" />
+    <text x="108" y="240" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine12 = </text>
+    <rect x="225" y="238" width="36" height="17" fill="#005f00" />
+    <text x="225" y="240" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="238" width="9" height="17" fill="#005f00" />
+    <text x="261" y="240" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="240" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="257" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="255" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="257" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">13</text>
+    <rect x="36" y="255" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="255" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="257" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="255" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="255" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="257" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="255" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="257" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine13 = </text>
+    <rect x="225" y="255" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="257" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="255" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="257" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="257" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="274" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="272" width="18" height="17" fill="#005f00" />
+    <text x="18" y="274" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">13</text>
+    <rect x="36" y="272" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="272" width="9" height="17" fill="#005f00" />
+    <text x="45" y="274" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="272" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="272" width="45" height="17" fill="#005f00" />
+    <text x="63" y="274" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="272" width="117" height="17" fill="#005f00" />
+    <text x="108" y="274" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine13 = </text>
+    <rect x="225" y="272" width="36" height="17" fill="#005f00" />
+    <text x="225" y="274" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="272" width="9" height="17" fill="#005f00" />
+    <text x="261" y="274" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="274" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="291" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="289" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="291" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">14</text>
+    <rect x="36" y="289" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="289" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="291" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="289" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="289" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="291" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="289" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="291" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine14 = </text>
+    <rect x="225" y="289" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="291" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="289" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="291" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="291" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="308" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="306" width="18" height="17" fill="#005f00" />
+    <text x="18" y="308" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">14</text>
+    <rect x="36" y="306" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="306" width="9" height="17" fill="#005f00" />
+    <text x="45" y="308" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="306" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="306" width="45" height="17" fill="#005f00" />
+    <text x="63" y="308" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="306" width="117" height="17" fill="#005f00" />
+    <text x="108" y="308" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine14 = </text>
+    <rect x="225" y="306" width="36" height="17" fill="#005f00" />
+    <text x="225" y="308" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="306" width="9" height="17" fill="#005f00" />
+    <text x="261" y="308" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="308" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="325" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="323" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="325" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">15</text>
+    <rect x="36" y="323" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="323" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="325" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="323" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="323" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="325" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="323" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="325" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine15 = </text>
+    <rect x="225" y="323" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="325" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="323" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="325" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="325" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="342" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="340" width="18" height="17" fill="#005f00" />
+    <text x="18" y="342" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">15</text>
+    <rect x="36" y="340" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="340" width="9" height="17" fill="#005f00" />
+    <text x="45" y="342" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="340" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="340" width="45" height="17" fill="#005f00" />
+    <text x="63" y="342" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="340" width="117" height="17" fill="#005f00" />
+    <text x="108" y="342" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine15 = </text>
+    <rect x="225" y="340" width="36" height="17" fill="#005f00" />
+    <text x="225" y="342" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="340" width="9" height="17" fill="#005f00" />
+    <text x="261" y="342" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="342" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="359" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="357" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="359" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">16</text>
+    <rect x="36" y="357" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="357" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="359" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="357" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="357" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="359" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="357" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="359" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine16 = </text>
+    <rect x="225" y="357" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="359" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="357" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="359" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="359" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="376" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="374" width="18" height="17" fill="#005f00" />
+    <text x="18" y="376" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">16</text>
+    <rect x="36" y="374" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="374" width="9" height="17" fill="#005f00" />
+    <text x="45" y="376" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="374" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="374" width="45" height="17" fill="#005f00" />
+    <text x="63" y="376" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="374" width="117" height="17" fill="#005f00" />
+    <text x="108" y="376" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine16 = </text>
+    <rect x="225" y="374" width="36" height="17" fill="#005f00" />
+    <text x="225" y="376" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="374" width="9" height="17" fill="#005f00" />
+    <text x="261" y="376" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="376" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="393" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="391" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="393" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">17</text>
+    <rect x="36" y="391" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="391" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="393" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="391" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="391" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="393" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="391" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="393" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine17 = </text>
+    <rect x="225" y="391" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="393" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="391" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="393" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="393" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="410" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="408" width="18" height="17" fill="#005f00" />
+    <text x="18" y="410" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">17</text>
+    <rect x="36" y="408" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="408" width="9" height="17" fill="#005f00" />
+    <text x="45" y="410" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="408" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="408" width="45" height="17" fill="#005f00" />
+    <text x="63" y="410" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="408" width="117" height="17" fill="#005f00" />
+    <text x="108" y="410" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine17 = </text>
+    <rect x="225" y="408" width="36" height="17" fill="#005f00" />
+    <text x="225" y="410" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="408" width="9" height="17" fill="#005f00" />
+    <text x="261" y="410" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="410" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="427" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="425" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="427" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">18</text>
+    <rect x="36" y="425" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="425" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="427" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="425" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="425" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="427" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="425" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="427" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine18 = </text>
+    <rect x="225" y="425" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="427" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="425" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="427" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="427" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="444" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="442" width="18" height="17" fill="#005f00" />
+    <text x="18" y="444" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">18</text>
+    <rect x="36" y="442" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="442" width="9" height="17" fill="#005f00" />
+    <text x="45" y="444" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="442" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="442" width="45" height="17" fill="#005f00" />
+    <text x="63" y="444" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="442" width="117" height="17" fill="#005f00" />
+    <text x="108" y="444" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine18 = </text>
+    <rect x="225" y="442" width="36" height="17" fill="#005f00" />
+    <text x="225" y="444" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="442" width="9" height="17" fill="#005f00" />
+    <text x="261" y="444" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="444" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="461" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="459" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="461" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">19</text>
+    <rect x="36" y="459" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="459" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="461" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="459" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="459" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="461" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="459" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="461" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine19 = </text>
+    <rect x="225" y="459" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="461" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="459" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="461" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="461" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="478" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="476" width="18" height="17" fill="#005f00" />
+    <text x="18" y="478" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">19</text>
+    <rect x="36" y="476" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="476" width="9" height="17" fill="#005f00" />
+    <text x="45" y="478" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="476" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="476" width="45" height="17" fill="#005f00" />
+    <text x="63" y="478" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="476" width="117" height="17" fill="#005f00" />
+    <text x="108" y="478" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine19 = </text>
+    <rect x="225" y="476" width="36" height="17" fill="#005f00" />
+    <text x="225" y="478" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="476" width="9" height="17" fill="#005f00" />
+    <text x="261" y="478" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="478" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="495" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="493" width="18" height="17" fill="#5f0000" />
+    <text x="18" y="495" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">20</text>
+    <rect x="36" y="493" width="9" height="17" fill="#5f0000" />
+    <rect x="45" y="493" width="9" height="17" fill="#5f0000" />
+    <text x="45" y="495" fill="#ff87af" textLength="9" lengthAdjust="spacingAndGlyphs">-</text>
+    <rect x="54" y="493" width="9" height="17" fill="#5f0000" />
+    <rect x="63" y="493" width="45" height="17" fill="#5f0000" />
+    <text x="63" y="495" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="493" width="117" height="17" fill="#5f0000" />
+    <text x="108" y="495" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> oldLine20 = </text>
+    <rect x="225" y="493" width="36" height="17" fill="#5f0000" />
+    <text x="225" y="495" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="493" width="9" height="17" fill="#5f0000" />
+    <text x="261" y="495" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="495" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="512" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="510" width="18" height="17" fill="#005f00" />
+    <text x="18" y="512" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">20</text>
+    <rect x="36" y="510" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="510" width="9" height="17" fill="#005f00" />
+    <text x="45" y="512" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">+</text>
+    <rect x="54" y="510" width="9" height="17" fill="#005f00" />
+    <rect x="63" y="510" width="45" height="17" fill="#005f00" />
+    <text x="63" y="512" fill="#0000ee" textLength="45" lengthAdjust="spacingAndGlyphs">const</text>
+    <rect x="108" y="510" width="117" height="17" fill="#005f00" />
+    <text x="108" y="512" fill="#e5e5e5" textLength="117" lengthAdjust="spacingAndGlyphs"> newLine20 = </text>
+    <rect x="225" y="510" width="36" height="17" fill="#005f00" />
+    <text x="225" y="512" fill="#0000ee" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <rect x="261" y="510" width="9" height="17" fill="#005f00" />
+    <text x="261" y="512" fill="#e5e5e5" textLength="9" lengthAdjust="spacingAndGlyphs">;</text>
+    <text x="711" y="512" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="529" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="529" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Apply this change?</text>
+    <text x="711" y="529" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="546" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="546" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="563" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="561" width="9" height="17" fill="#001a00" />
+    <text x="18" y="563" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="27" y="561" width="9" height="17" fill="#001a00" />
+    <rect x="36" y="561" width="18" height="17" fill="#001a00" />
+    <text x="36" y="563" fill="#00cd00" textLength="18" lengthAdjust="spacingAndGlyphs">1.</text>
+    <rect x="54" y="561" width="9" height="17" fill="#001a00" />
+    <rect x="63" y="561" width="90" height="17" fill="#001a00" />
+    <text x="63" y="563" fill="#00cd00" textLength="90" lengthAdjust="spacingAndGlyphs">Allow once</text>
+    <rect x="153" y="561" width="153" height="17" fill="#001a00" />
+    <text x="711" y="563" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="580" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="36" y="580" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">2.</text>
+    <text x="63" y="580" fill="#ffffff" textLength="198" lengthAdjust="spacingAndGlyphs">Allow for this session</text>
+    <text x="711" y="580" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="597" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="36" y="597" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">3.</text>
+    <text x="63" y="597" fill="#ffffff" textLength="243" lengthAdjust="spacingAndGlyphs">Modify with external editor</text>
+    <text x="711" y="597" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="614" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="36" y="614" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">4.</text>
+    <text x="63" y="614" fill="#ffffff" textLength="225" lengthAdjust="spacingAndGlyphs">No, suggest changes (esc)</text>
+    <text x="711" y="614" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="631" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="711" y="631" fill="#ffffaf" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="648" fill="#ffffaf" textLength="720" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>
