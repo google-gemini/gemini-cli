@@ -14,6 +14,7 @@ import {
   type SandboxedCommand,
   type ExecutionPolicy,
   sanitizePaths,
+  GOVERNANCE_FILES,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
@@ -65,6 +66,44 @@ export class MacOsSandboxManager implements SandboxManager {
     const workspacePath = this.tryRealpath(options.workspace);
     args.push('-D', `WORKSPACE=${workspacePath}`);
 
+    // Add explicit deny rules for governance files in the workspace.
+    // These are added after the workspace allow rule (which is in BASE_SEATBELT_PROFILE)
+    // to ensure they take precedence (Seatbelt evaluates rules in order, later rules win for same path).
+    for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
+      const governanceFile = path.join(workspacePath, GOVERNANCE_FILES[i]);
+
+      // Ensure the file/directory exists so Seatbelt rules are reliably applied.
+      const isDirectory = GOVERNANCE_FILES[i] === '.git';
+      this.touch(governanceFile, isDirectory);
+
+      const realGovernanceFile = this.tryRealpath(governanceFile);
+
+      // Determine if it should be treated as a directory (subpath) or a file (literal).
+      // .git is generally a directory, while ignore files are literals.
+      let isActuallyDirectory = isDirectory;
+      try {
+        if (fs.existsSync(realGovernanceFile)) {
+          isActuallyDirectory = fs.lstatSync(realGovernanceFile).isDirectory();
+        }
+      } catch {
+        // Ignore errors, use default guess
+      }
+
+      const ruleType = isActuallyDirectory ? 'subpath' : 'literal';
+
+      args.push('-D', `GOVERNANCE_FILE_${i}=${governanceFile}`);
+      profileLines.push(
+        `(deny file-write* (${ruleType} (param "GOVERNANCE_FILE_${i}")))`,
+      );
+
+      if (realGovernanceFile !== governanceFile) {
+        args.push('-D', `REAL_GOVERNANCE_FILE_${i}=${realGovernanceFile}`);
+        profileLines.push(
+          `(deny file-write* (${ruleType} (param "REAL_GOVERNANCE_FILE_${i}")))`,
+        );
+      }
+    }
+
     const tmpPath = this.tryRealpath(os.tmpdir());
     args.push('-D', `TMPDIR=${tmpPath}`);
 
@@ -86,6 +125,22 @@ export class MacOsSandboxManager implements SandboxManager {
     args.unshift('-p', profileLines.join('\n'));
 
     return args;
+  }
+
+  /**
+   * Ensures a file or directory exists.
+   */
+  private touch(filePath: string, isDirectory: boolean) {
+    if (fs.existsSync(filePath)) return;
+    if (isDirectory) {
+      fs.mkdirSync(filePath, { recursive: true });
+    } else {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.closeSync(fs.openSync(filePath, 'a'));
+    }
   }
 
   /**
