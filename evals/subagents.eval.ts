@@ -40,10 +40,6 @@ function readProjectFile(
   return fs.readFileSync(path.join(rig.testDir!, relativePath), 'utf8');
 }
 
-function serializedToolLogs(rig: { readToolLogs: () => unknown }): string {
-  return JSON.stringify(rig.readToolLogs());
-}
-
 describe('subagent eval test cases', () => {
   /**
    * Checks whether the outer agent reliably utilizes an expert subagent to
@@ -101,11 +97,17 @@ describe('subagent eval test cases', () => {
     },
     assert: async (rig, _result) => {
       const updatedIndex = readProjectFile(rig, 'index.ts');
-      const toolLogs = serializedToolLogs(rig);
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
 
       expect(updatedIndex).toContain('export const sum =');
-      expect(toolLogs).not.toContain('docs-agent');
-      expect(toolLogs).not.toContain('generalist');
+      expect(toolLogs.some((l) => l.toolRequest.name === 'docs-agent')).toBe(
+        false,
+      );
+      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+        false,
+      );
     },
   });
 
@@ -144,10 +146,14 @@ describe('subagent eval test cases', () => {
       ),
     },
     assert: async (rig, _result) => {
-      const toolLogs = serializedToolLogs(rig);
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
 
       await rig.expectToolCallSuccess(['test-agent']);
-      expect(toolLogs).not.toContain('generalist');
+      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+        false,
+      );
     },
   });
 
@@ -187,12 +193,16 @@ describe('subagent eval test cases', () => {
       ),
     },
     assert: async (rig, _result) => {
-      const toolLogs = serializedToolLogs(rig);
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
       const readme = readProjectFile(rig, 'README.md');
 
       await rig.expectToolCallSuccess(['docs-agent', 'test-agent']);
       expect(readme).not.toContain('TODO: update the README.');
-      expect(toolLogs).not.toContain('generalist');
+      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+        false,
+      );
     },
   });
 });
