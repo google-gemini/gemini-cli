@@ -291,6 +291,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getExperiments: () => {},
   } as unknown as Config;
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread
   const finalConfig = { ...baseConfig, ...overrides } as Config;
 
   (finalConfig as unknown as { config: Config }).config = finalConfig;
