@@ -148,16 +148,16 @@ export class AgentSession implements AgentProtocol {
           done = true;
         } else if (streamHasStarted) {
           agentActivityStarted = true;
-        } else if (
-          !currentEvents
-            .slice(index + 1)
-            .some(
-              (event) =>
-                event.type === 'agent_start' &&
-                event.streamId === trackedStreamId,
-            )
-        ) {
-          done = true;
+        } else {
+          // Consumers can only resume by eventId once the stream has entered the
+          // agent_start -> agent_end lifecycle. For pre-start events, use
+          // stream({ streamId }) instead because this wrapper cannot
+          // distinguish "agent activity will start later" from "this send was
+          // acknowledged without agent activity" without risking an infinite
+          // wait.
+          throw new Error(
+            `Cannot resume from eventId ${options.eventId} before agent_start; use stream({ streamId }) instead`,
+          );
         }
       } else if (options.streamId) {
         const index = currentEvents.findIndex(

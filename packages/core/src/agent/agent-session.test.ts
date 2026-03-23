@@ -209,7 +209,7 @@ describe('AgentSession', () => {
       );
     });
 
-    it('should complete immediately when resuming from an event on a stream with no agent activity', async () => {
+    it('should throw when resuming from an event before agent_start on a stream with no agent activity', async () => {
       const protocol = new MockAgentProtocol();
       const session = new AgentSession(protocol);
 
@@ -225,10 +225,30 @@ describe('AgentSession', () => {
       const iterator = session.stream({ eventId: updateEvent!.id })[
         Symbol.asyncIterator
       ]();
-      await expect(iterator.next()).resolves.toEqual({
-        value: undefined,
-        done: true,
-      });
+      await expect(iterator.next()).rejects.toThrow(
+        `Cannot resume from eventId ${updateEvent!.id} before agent_start; use stream({ streamId }) instead`,
+      );
+    });
+
+    it('should throw when resuming from a pre-agent_start event even if agent activity may start later', async () => {
+      const protocol = new MockAgentProtocol([
+        {
+          id: 'e-1',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          streamId: 'stream-1',
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'text', text: 'request' }],
+        },
+      ]);
+      const session = new AgentSession(protocol);
+
+      const iterator = session.stream({ eventId: 'e-1' })[
+        Symbol.asyncIterator
+      ]();
+      await expect(iterator.next()).rejects.toThrow(
+        'Cannot resume from eventId e-1 before agent_start; use stream({ streamId }) instead',
+      );
     });
 
     it('should resume from an in-stream event within the same stream only', async () => {
