@@ -14,6 +14,7 @@ import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
 import type { A2AAuthConfig } from './auth-provider/types.js';
+import type { MCPServerConfig } from '../config/config.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -43,12 +44,12 @@ export const DEFAULT_QUERY_STRING = 'Get Started!';
 /**
  * The default maximum number of conversational turns for an agent.
  */
-export const DEFAULT_MAX_TURNS = 15;
+export const DEFAULT_MAX_TURNS = 30;
 
 /**
  * The default maximum execution time for an agent in minutes.
  */
-export const DEFAULT_MAX_TIME_MINUTES = 5;
+export const DEFAULT_MAX_TIME_MINUTES = 10;
 
 /**
  * Represents the validated input parameters passed to an agent upon invocation.
@@ -64,6 +65,18 @@ export type RemoteAgentInputs = { query: string };
 /**
  * Structured events emitted during subagent execution for user observability.
  */
+export enum SubagentActivityErrorType {
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+  GENERIC = 'GENERIC',
+}
+
+/**
+ * Standard error messages for subagent activities.
+ */
+export const SUBAGENT_REJECTED_ERROR_PREFIX = 'User rejected this operation.';
+export const SUBAGENT_CANCELLED_ERROR_MESSAGE = 'Request cancelled.';
+
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;
@@ -86,6 +99,8 @@ export interface SubagentProgress {
   agentName: string;
   recentActivity: SubagentActivityItem[];
   state?: 'running' | 'completed' | 'error' | 'cancelled';
+  result?: string;
+  terminateReason?: AgentTerminateMode;
 }
 
 export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
@@ -94,6 +109,18 @@ export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
     obj !== null &&
     'isSubagentProgress' in obj &&
     obj.isSubagentProgress === true
+  );
+}
+
+/**
+ * Checks if the tool call data indicates an error.
+ */
+export function isToolActivityError(data: unknown): boolean {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'isError' in data &&
+    data.isError === true
   );
 }
 
@@ -129,6 +156,11 @@ export interface LocalAgentDefinition<
 
   // Optional configs
   toolConfig?: ToolConfig;
+
+  /**
+   * Optional inline MCP servers for this agent.
+   */
+  mcpServers?: Record<string, MCPServerConfig>;
 
   /**
    * An optional function to process the raw output from the agent's final tool
@@ -223,12 +255,12 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
 export interface RunConfig {
   /**
    * The maximum execution time for the agent in minutes.
-   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (5).
+   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (10).
    */
   maxTimeMinutes?: number;
   /**
    * The maximum number of conversational turns.
-   * If not specified, defaults to DEFAULT_MAX_TURNS (15).
+   * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
 }

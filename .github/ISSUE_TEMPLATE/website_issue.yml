@@ -1,7 +1,9 @@
 name: 'Website issue'
 description: 'Report an issue with the Gemini CLI Website and Gemini CLI Extensions Gallery'
+title: 'GeminiCLI.com Feedback: [ISSUE]'
 labels:
   - 'area/extensions'
+  - 'area/documentation'
 body:
   - type: 'markdown'
     attributes:

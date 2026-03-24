@@ -77,6 +77,10 @@ You can run the review tool in two ways:
     ./scripts/review.sh <PR_NUMBER> [model]
     ```
 
+    **Warning:** If you run `scripts/review.sh`, you must have first verified
+    that the code for the PR being reviewed is safe to run and does not contain
+    data exfiltration attacks.
+
     **Authors are strongly encouraged to run this script on their own PRs**
     immediately after creation. This allows you to catch and fix simple issues
     locally before a maintainer performs a full review.
@@ -347,21 +351,6 @@ npm run lint
   conventions for React, comments, and Git usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
-
-### Project structure
-
-- `packages/`: Contains the individual sub-packages of the project.
-  - `a2a-server`: A2A server implementation for the Gemini CLI. (Experimental)
-  - `cli/`: The command-line interface.
-  - `core/`: The core backend logic for the Gemini CLI.
-  - `test-utils` Utilities for creating and cleaning temporary file systems for
-    testing.
-  - `vscode-ide-companion/`: The Gemini CLI Companion extension pairs with
-    Gemini CLI.
-- `docs/`: Contains all project documentation.
-- `scripts/`: Utility scripts for building, testing, and development tasks.
-
-For more detailed architecture, see `docs/architecture.md`.
 
 ### Debugging
 

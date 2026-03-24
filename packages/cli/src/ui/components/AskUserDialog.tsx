@@ -15,13 +15,12 @@ import {
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import type { Question } from '@google/gemini-cli-core';
+import { checkExhaustive, type Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
-import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import {
@@ -396,7 +395,7 @@ interface OptionItem {
   key: string;
   label: string;
   description: string;
-  type: 'option' | 'other' | 'done';
+  type: 'option' | 'other' | 'done' | 'all';
   index: number;
 }
 
@@ -408,6 +407,7 @@ interface ChoiceQuestionState {
 
 type ChoiceQuestionAction =
   | { type: 'TOGGLE_INDEX'; payload: { index: number; multiSelect: boolean } }
+  | { type: 'TOGGLE_ALL'; payload: { totalOptions: number } }
   | {
       type: 'SET_CUSTOM_SELECTED';
       payload: { selected: boolean; multiSelect: boolean };
@@ -420,6 +420,25 @@ function choiceQuestionReducer(
   action: ChoiceQuestionAction,
 ): ChoiceQuestionState {
   switch (action.type) {
+    case 'TOGGLE_ALL': {
+      const { totalOptions } = action.payload;
+      const allSelected = state.selectedIndices.size === totalOptions;
+      if (allSelected) {
+        return {
+          ...state,
+          selectedIndices: new Set(),
+        };
+      } else {
+        const newIndices = new Set<number>();
+        for (let i = 0; i < totalOptions; i++) {
+          newIndices.add(i);
+        }
+        return {
+          ...state,
+          selectedIndices: newIndices,
+        };
+      }
+    }
     case 'TOGGLE_INDEX': {
       const { index, multiSelect } = action.payload;
       const newIndices = new Set(multiSelect ? state.selectedIndices : []);
@@ -704,6 +723,18 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
+    // Add 'All of the above' for multi-select
+    if (question.multiSelect && questionOptions.length > 1) {
+      const allItem: OptionItem = {
+        key: 'all',
+        label: 'All of the above',
+        description: 'Select all options',
+        type: 'all',
+        index: list.length,
+      };
+      list.push({ key: 'all', value: allItem });
+    }
+
     // Only add custom option for choice type, not yesno
     if (question.type !== 'yesno') {
       const otherItem: OptionItem = {
@@ -756,6 +787,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
             type: 'TOGGLE_CUSTOM_SELECTED',
             payload: { multiSelect: true },
           });
+        } else if (itemValue.type === 'all') {
+          dispatch({
+            type: 'TOGGLE_ALL',
+            payload: { totalOptions: questionOptions.length },
+          });
         } else if (itemValue.type === 'done') {
           // Done just triggers navigation, selections already saved via useEffect
           onAnswer(
@@ -784,6 +820,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     },
     [
       question.multiSelect,
+      questionOptions.length,
       selectedIndices,
       isCustomOptionSelected,
       customOptionText,
@@ -807,16 +844,35 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const TITLE_MARGIN = 1;
   const FOOTER_HEIGHT = 2; // DialogFooter + margin
   const overhead = HEADER_HEIGHT + TITLE_MARGIN + FOOTER_HEIGHT;
+
   const listHeight = availableHeight
     ? Math.max(1, availableHeight - overhead)
     : undefined;
-  const questionHeight =
+
+  // Reserve space for at least 3 items if more selectionItems available.
+  const reservedListHeight = Math.min(selectionItems.length * 2, 6);
+  const questionHeightLimit =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+      ? question.unconstrainedHeight
+        ? Math.max(1, listHeight - selectionItems.length * 2)
+        : Math.min(
+            15,
+            Math.max(
+              1,
+              listHeight - Math.max(DIALOG_PADDING, reservedListHeight),
+            ),
+          )
       : undefined;
+
   const maxItemsToShow =
-    listHeight && questionHeight
-      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+    listHeight && (!isAlternateBuffer || availableHeight !== undefined)
+      ? Math.min(
+          selectionItems.length,
+          Math.max(
+            1,
+            Math.floor((listHeight - (questionHeightLimit ?? 0)) / 2),
+          ),
+        )
       : selectionItems.length;
 
   return (
@@ -824,7 +880,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       {progressHeader}
       <Box marginBottom={TITLE_MARGIN}>
         <MaxSizedBox
-          maxHeight={questionHeight}
+          maxHeight={questionHeightLimit}
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
@@ -853,11 +909,16 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         renderItem={(item, context) => {
           const optionItem = item.value;
           const isChecked =
-            selectedIndices.has(optionItem.index) ||
-            (optionItem.type === 'other' && isCustomOptionSelected);
+            (optionItem.type === 'option' &&
+              selectedIndices.has(optionItem.index)) ||
+            (optionItem.type === 'other' && isCustomOptionSelected) ||
+            (optionItem.type === 'all' &&
+              selectedIndices.size === questionOptions.length);
           const showCheck =
             question.multiSelect &&
-            (optionItem.type === 'option' || optionItem.type === 'other');
+            (optionItem.type === 'option' ||
+              optionItem.type === 'other' ||
+              optionItem.type === 'all');
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
