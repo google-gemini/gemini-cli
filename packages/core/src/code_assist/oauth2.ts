@@ -593,7 +593,6 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         }
       } finally {
         res.on?.('finish', () => {
-          // @ts-expect-error - closeAllConnections is available in Node 18.2.0+
           server.closeAllConnections?.();
         });
         server.close(); // Stop accepting new connections immediately
