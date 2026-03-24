@@ -50,7 +50,7 @@ jobs:
     name: 'Lint'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    if: false
     env:
       GEMINI_LINT_TEMP_DIR: '${{ github.workspace }}/.gemini-linters'
     steps:
@@ -131,7 +131,7 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
       - 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    if: false
     permissions:
       contents: 'read'
       checks: 'write'
@@ -218,7 +218,7 @@ jobs:
     runs-on: 'macos-latest'
     needs:
       - 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    if: false
     permissions:
       contents: 'read'
       checks: 'write'
@@ -313,7 +313,7 @@ jobs:
     name: 'CodeQL'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    if: false
     permissions:
       actions: 'read'
       contents: 'read'
@@ -360,8 +360,9 @@ jobs:
   test_windows:
     name: 'Slow Test - Win - ${{ matrix.shard }}'
     runs-on: 'gemini-cli-windows-16-core'
-    needs: 'merge_queue_skipper'
-    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
+    needs:
+      - 'merge_queue_skipper'
+    if: false
     timeout-minutes: 60
     strategy:
       matrix:

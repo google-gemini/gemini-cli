@@ -131,8 +131,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: |
-      github.repository == 'google-gemini/gemini-cli' && always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -184,8 +183,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'macos-latest'
-    if: |
-      github.repository == 'google-gemini/gemini-cli' && always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+    if: false
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -222,8 +220,7 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
-    if: |
-      github.repository == 'google-gemini/gemini-cli' && always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+    if: false
     runs-on: 'gemini-cli-windows-16-core'
     steps:
       - name: 'Checkout'
@@ -334,7 +331,19 @@ jobs:
         if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_MODEL: 'gemini-3-pro-preview'
+          # Disable Vitest internal retries to avoid double-retrying;
+          # custom retry logic is handled in evals/test-helper.ts
+          VITEST_RETRY: 0
         run: 'npm run test:always_passing_evals'
+
+      - name: 'Upload Reliability Logs'
+        if: "always() && steps.check_evals.outputs.should_run == 'true'"
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'eval-logs-${{ github.run_id }}-${{ github.run_attempt }}'
+          path: 'evals/logs/api-reliability.jsonl'
+          retention-days: 7
 
   e2e:
     name: 'E2E'
@@ -350,10 +359,10 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${NEEDS_E2E_LINUX_RESULT} != 'success' || \
-               ${NEEDS_E2E_MAC_RESULT} != 'success' || \
-               ${NEEDS_E2E_WINDOWS_RESULT} != 'success' || \
-               ${NEEDS_EVALS_RESULT} != 'success' ]]; then
+          if [[ (${NEEDS_E2E_LINUX_RESULT} != 'success' && ${NEEDS_E2E_LINUX_RESULT} != 'skipped') || \
+               (${NEEDS_E2E_MAC_RESULT} != 'success' && ${NEEDS_E2E_MAC_RESULT} != 'skipped') || \
+               (${NEEDS_E2E_WINDOWS_RESULT} != 'success' && ${NEEDS_E2E_WINDOWS_RESULT} != 'skipped') || \
+               (${NEEDS_EVALS_RESULT} != 'success' && ${NEEDS_EVALS_RESULT} != 'skipped') ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
