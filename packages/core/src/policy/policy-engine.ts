@@ -88,14 +88,14 @@ function ruleMatches(
   }
 
   // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
-  if ('subagent' in rule && rule.subagent) {
+  if ('subagent' in rule && rule.subagent !== undefined) {
     if (rule.subagent !== subagent) {
       return false;
     }
   }
 
   // Strictly enforce mcpName identity if the rule dictates it
-  if (rule.mcpName) {
+  if (rule.mcpName !== undefined) {
     if (rule.mcpName === '*') {
       // Rule requires it to be ANY MCP tool
       if (serverName === undefined) return false;
@@ -106,7 +106,7 @@ function ruleMatches(
   }
 
   // Check tool name if specified
-  if (rule.toolName) {
+  if (rule.toolName !== undefined) {
     // Support wildcard patterns: "mcp_serverName_*" matches "mcp_serverName_anyTool"
     if (rule.toolName === '*') {
       // Match all tools
@@ -203,6 +203,40 @@ export class PolicyEngine {
     this.hookCheckers = (config.hookCheckers ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
+
+    // Validate rules
+    for (const rule of this.rules) {
+      if (rule.toolName === undefined || rule.toolName === '') {
+        throw new Error(
+          `Invalid policy rule: toolName is required. Use '*' for all tools. Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+      if (rule.mcpName === '') {
+        throw new Error(
+          `Invalid policy rule: mcpName is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+      if (rule.subagent === '') {
+        throw new Error(
+          `Invalid policy rule: subagent is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+    }
+
+    // Validate checkers
+    for (const checker of this.checkers) {
+      if (checker.toolName === undefined || checker.toolName === '') {
+        throw new Error(
+          `Invalid safety checker rule: toolName is required. Use '*' for all tools. Checker source: ${checker.source || 'unknown'}`,
+        );
+      }
+      if (checker.mcpName === '') {
+        throw new Error(
+          `Invalid safety checker rule: mcpName is required if specified (cannot be empty). Checker source: ${checker.source || 'unknown'}`,
+        );
+      }
+    }
+
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
