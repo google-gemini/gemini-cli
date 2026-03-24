@@ -2680,8 +2680,8 @@
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents.",
-          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "worktrees": {
