@@ -98,6 +98,13 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 
+  it('should still highlight @ after a closed quoted literal followed by a word', () => {
+    expect(parseInputForHighlighting("say 'hello'world @file.js", 0)).toEqual([
+      { text: "say 'hello'world ", type: 'default' },
+      { text: '@file.js', type: 'file' },
+    ]);
+  });
+
   it('should not highlight command at the end of the string', () => {
     const text = 'Get help with /help';
     expect(parseInputForHighlighting(text, 0)).toEqual([

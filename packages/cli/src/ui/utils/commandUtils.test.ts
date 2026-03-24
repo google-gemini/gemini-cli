@@ -206,6 +206,10 @@ describe('commandUtils', () => {
       expect(isAtCommand("it's @README")).toBe(true);
     });
 
+    it('should return true when a closed quoted literal is followed by a word before @', () => {
+      expect(isAtCommand("say 'hello'world @file.txt")).toBe(true);
+    });
+
     it('should return false when query does not contain any @<path> pattern', () => {
       expect(isAtCommand('file')).toBe(false);
       expect(isAtCommand('hello')).toBe(false);

@@ -1860,6 +1860,32 @@ describe('handleAtCommand - email and quote scenarios', () => {
     });
   });
 
+  it('should still process @file after a closed quoted literal followed by a word', async () => {
+    const fileContent = 'Referenced file content.';
+    const filePath = await createTestFile('file.txt', fileContent);
+    const relativePath = path.relative(testRootDir, filePath);
+    const query = `say 'hello'world @${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 912,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `say 'hello'world @${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
   it('should recursively resolve extensionless filenames like Dockerfile', async () => {
     const fileContent = 'FROM node:20';
     await createTestFile(path.join('nested', 'Dockerfile'), fileContent);

@@ -356,6 +356,22 @@ describe('useCommandCompletion', () => {
         });
       });
 
+      it('should still trigger @ completion after a closed quoted literal followed by a word', async () => {
+        const { result } = await renderCommandCompletionHook(
+          "say 'hello'world @file.txt",
+        );
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.AT);
+          expect(useAtCompletion).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              enabled: true,
+              pattern: 'file.txt',
+            }),
+          );
+        });
+      });
+
       it('should not trigger @ completion when @ is escaped with a backslash', async () => {
         const { result } = await renderCommandCompletionHook('\\@file.txt');
 

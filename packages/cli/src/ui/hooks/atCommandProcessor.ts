@@ -90,15 +90,13 @@ export function isInsideQuotedRegion(text: string, position: number): boolean {
       continue;
     }
     if (char === "'" && !inBacktick) {
-      const prevChar = i > 0 ? text[i - 1] : undefined;
-      const nextChar = i + 1 < text.length ? text[i + 1] : undefined;
-
       if (inSingleQuote) {
-        if (!isWordChar(nextChar)) {
-          inSingleQuote = false;
-        }
+        inSingleQuote = false;
         continue;
       }
+
+      const prevChar = i > 0 ? text[i - 1] : undefined;
+      const nextChar = i + 1 < text.length ? text[i + 1] : undefined;
 
       // Ignore apostrophes in prose like "don't" or "students'".
       if (
