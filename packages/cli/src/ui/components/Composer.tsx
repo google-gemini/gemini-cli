@@ -588,12 +588,15 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
+          copyModeEnabled={uiState.copyModeEnabled}
         />
       )}
 
       {showUiDetails &&
         !settings.merged.ui.hideFooter &&
-        !isScreenReaderEnabled && <Footer />}
+        !isScreenReaderEnabled && (
+          <Footer copyModeEnabled={uiState.copyModeEnabled} />
+        )}
     </Box>
   );
 };

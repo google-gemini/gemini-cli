@@ -175,11 +175,17 @@ interface FooterColumn {
   isHighPriority: boolean;
 }
 
-export const Footer: React.FC = () => {
+export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
+  copyModeEnabled = false,
+}) => {
   const uiState = useUIState();
   const config = useConfig();
   const settings = useSettings();
   const { vimEnabled, vimMode } = useVimMode();
+
+  if (copyModeEnabled) {
+    return <Box height={1} />;
+  }
 
   const {
     model,
@@ -353,7 +359,17 @@ export const Footer: React.FC = () => {
         break;
       }
       case 'memory-usage': {
-        addCol(id, header, () => <MemoryUsageDisplay color={itemColor} />, 10);
+        addCol(
+          id,
+          header,
+          () => (
+            <MemoryUsageDisplay
+              color={itemColor}
+              isActive={!uiState.copyModeEnabled}
+            />
+          ),
+          10,
+        );
         break;
       }
       case 'session-id': {
