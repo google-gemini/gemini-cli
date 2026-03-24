@@ -6,12 +6,29 @@
 
 import os from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  NoopSandboxManager,
-  LocalSandboxManager,
-  createSandboxManager,
-} from './sandboxManager.js';
+import { NoopSandboxManager, sanitizePaths } from './sandboxManager.js';
+import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
+import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
+import { WindowsSandboxManager } from './windowsSandboxManager.js';
+
+describe('sanitizePaths', () => {
+  it('should return undefined if no paths are provided', () => {
+    expect(sanitizePaths(undefined)).toBeUndefined();
+  });
+
+  it('should deduplicate paths and return them', () => {
+    const paths = ['/workspace/foo', '/workspace/bar', '/workspace/foo'];
+    expect(sanitizePaths(paths)).toEqual(['/workspace/foo', '/workspace/bar']);
+  });
+
+  it('should throw an error if a path is not absolute', () => {
+    const paths = ['/workspace/foo', 'relative/path'];
+    expect(() => sanitizePaths(paths)).toThrow(
+      'Sandbox path must be absolute: relative/path',
+    );
+  });
+});
 
 describe('NoopSandboxManager', () => {
   const sandboxManager = new NoopSandboxManager();
@@ -59,7 +76,7 @@ describe('NoopSandboxManager', () => {
       env: {
         API_KEY: 'sensitive-key',
       },
-      config: {
+      policy: {
         sanitizationConfig: {
           enableEnvironmentVariableRedaction: false,
         },
@@ -81,7 +98,7 @@ describe('NoopSandboxManager', () => {
         MY_SAFE_VAR: 'safe-value',
         MY_TOKEN: 'secret-token',
       },
-      config: {
+      policy: {
         sanitizationConfig: {
           allowedEnvironmentVariables: ['MY_SAFE_VAR', 'MY_TOKEN'],
         },
@@ -104,7 +121,7 @@ describe('NoopSandboxManager', () => {
         SAFE_VAR: 'safe-value',
         BLOCKED_VAR: 'blocked-value',
       },
-      config: {
+      policy: {
         sanitizationConfig: {
           blockedEnvironmentVariables: ['BLOCKED_VAR'],
         },
@@ -120,27 +137,24 @@ describe('NoopSandboxManager', () => {
 
 describe('createSandboxManager', () => {
   it('should return NoopSandboxManager if sandboxing is disabled', () => {
-    const manager = createSandboxManager(false, '/workspace');
+    const manager = createSandboxManager({ enabled: false }, '/workspace');
     expect(manager).toBeInstanceOf(NoopSandboxManager);
   });
 
-  it('should return LinuxSandboxManager if sandboxing is enabled and platform is linux', () => {
-    const osSpy = vi.spyOn(os, 'platform').mockReturnValue('linux');
-    try {
-      const manager = createSandboxManager(true, '/workspace');
-      expect(manager).toBeInstanceOf(LinuxSandboxManager);
-    } finally {
-      osSpy.mockRestore();
-    }
-  });
-
-  it('should return LocalSandboxManager if sandboxing is enabled and platform is not linux', () => {
-    const osSpy = vi.spyOn(os, 'platform').mockReturnValue('darwin');
-    try {
-      const manager = createSandboxManager(true, '/workspace');
-      expect(manager).toBeInstanceOf(LocalSandboxManager);
-    } finally {
-      osSpy.mockRestore();
-    }
-  });
+  it.each([
+    { platform: 'linux', expected: LinuxSandboxManager },
+    { platform: 'darwin', expected: MacOsSandboxManager },
+    { platform: 'win32', expected: WindowsSandboxManager },
+  ] as const)(
+    'should return $expected.name if sandboxing is enabled and platform is $platform',
+    ({ platform, expected }) => {
+      const osSpy = vi.spyOn(os, 'platform').mockReturnValue(platform);
+      try {
+        const manager = createSandboxManager({ enabled: true }, '/workspace');
+        expect(manager).toBeInstanceOf(expected);
+      } finally {
+        osSpy.mockRestore();
+      }
+    },
+  );
 });

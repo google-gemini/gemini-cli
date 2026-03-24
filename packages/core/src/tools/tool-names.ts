@@ -150,19 +150,16 @@ export {
   SKILL_PARAM_NAME,
 };
 
-export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
-
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
 /**
- * Tools that can access local files or remote resources and should be
- * treated with extra caution when updating policies.
+ * Tools that require mandatory argument narrowing (e.g., file paths, command prefixes)
+ * when granting persistent or session-wide approval.
  */
-export const SENSITIVE_TOOLS = new Set([
+export const TOOLS_REQUIRING_NARROWING = new Set([
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
-  WEB_FETCH_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   LS_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
@@ -183,6 +180,11 @@ export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
+export const LS_DISPLAY_NAME = 'ReadFolder';
+export const GREP_DISPLAY_NAME = 'SearchText';
+export const WEB_SEARCH_DISPLAY_NAME = 'GoogleSearch';
+export const WEB_FETCH_DISPLAY_NAME = 'WebFetch';
+export const READ_MANY_FILES_DISPLAY_NAME = 'ReadManyFiles';
 
 /**
  * Mapping of legacy tool names to their current names.

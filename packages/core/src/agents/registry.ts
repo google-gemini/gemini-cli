@@ -13,6 +13,7 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
+import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -56,7 +57,7 @@ export class AgentRegistry {
   }
 
   private onModelChanged = () => {
-    this.refreshAgents().catch((e) => {
+    this.refreshAgents('local').catch((e) => {
       debugLogger.error(
         '[AgentRegistry] Failed to refresh agents on model change:',
         e,
@@ -249,14 +250,36 @@ export class AgentRegistry {
     if (browserConfig.enabled) {
       this.registerLocalAgent(BrowserAgentDefinition(this.config));
     }
+
+    // Register the memory manager agent as a replacement for the save_memory tool.
+    if (this.config.isMemoryManagerEnabled()) {
+      this.registerLocalAgent(MemoryManagerAgent(this.config));
+
+      // Ensure the global .gemini directory is accessible to tools.
+      // This allows the save_memory agent to read and write to it.
+      // Access control is enforced by the Policy Engine (memory-manager.toml).
+      try {
+        const globalDir = Storage.getGlobalGeminiDir();
+        this.config.getWorkspaceContext().addDirectory(globalDir);
+      } catch (e) {
+        debugLogger.warn(
+          `[AgentRegistry] Could not add global .gemini directory to workspace:`,
+          e,
+        );
+      }
+    }
   }
 
-  private async refreshAgents(): Promise<void> {
+  private async refreshAgents(
+    scope: AgentDefinition['kind'] | 'all' = 'all',
+  ): Promise<void> {
     this.loadBuiltInAgents();
     await Promise.allSettled(
-      Array.from(this.agents.values()).map((agent) =>
-        this.registerAgent(agent),
-      ),
+      Array.from(this.agents.values()).map(async (agent) => {
+        if (scope === 'all' || agent.kind === scope) {
+          await this.registerAgent(agent);
+        }
+      }),
     );
   }
 

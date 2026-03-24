@@ -65,6 +65,18 @@ export type RemoteAgentInputs = { query: string };
 /**
  * Structured events emitted during subagent execution for user observability.
  */
+export enum SubagentActivityErrorType {
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+  GENERIC = 'GENERIC',
+}
+
+/**
+ * Standard error messages for subagent activities.
+ */
+export const SUBAGENT_REJECTED_ERROR_PREFIX = 'User rejected this operation.';
+export const SUBAGENT_CANCELLED_ERROR_MESSAGE = 'Request cancelled.';
+
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;
@@ -97,6 +109,18 @@ export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
     obj !== null &&
     'isSubagentProgress' in obj &&
     obj.isSubagentProgress === true
+  );
+}
+
+/**
+ * Checks if the tool call data indicates an error.
+ */
+export function isToolActivityError(data: unknown): boolean {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'isError' in data &&
+    data.isError === true
   );
 }
 
