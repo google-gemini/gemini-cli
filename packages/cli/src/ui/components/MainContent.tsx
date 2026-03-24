@@ -15,7 +15,7 @@ import {
   type VirtualizedListRef,
 } from './shared/VirtualizedList.js';
 import { ScrollableList } from './shared/ScrollableList.js';
-import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
+import { useMemo, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
@@ -37,6 +37,8 @@ export const MainContent = () => {
   const confirmingToolCallId = confirmingTool?.tool.callId;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
+  const previousIsAltBuffer = useRef(isAlternateBuffer);
+  const [staticOffset, setStaticOffset] = useState(0);
 
   useEffect(() => {
     if (showConfirmationQueue) {
@@ -230,6 +232,27 @@ export const MainContent = () => {
     ],
   );
 
+  const allStaticItems = useMemo(
+    () => [
+      <AppHeader key="app-header" version={version} />,
+      ...staticHistoryItems,
+      ...lastResponseHistoryItems,
+    ],
+    [version, staticHistoryItems, lastResponseHistoryItems],
+  );
+
+  useEffect(() => {
+    if (isAlternateBuffer && !previousIsAltBuffer.current) {
+      setStaticOffset(allStaticItems.length);
+    }
+    previousIsAltBuffer.current = isAlternateBuffer;
+  }, [isAlternateBuffer, allStaticItems.length]);
+
+  const visibleStaticItems = useMemo(
+    () => allStaticItems.slice(staticOffset),
+    [allStaticItems, staticOffset],
+  );
+
   if (isAlternateBuffer) {
     return (
       <ScrollableList
@@ -252,14 +275,7 @@ export const MainContent = () => {
 
   return (
     <>
-      <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...staticHistoryItems,
-          ...lastResponseHistoryItems,
-        ]}
-      >
+      <Static key="main-history-static" items={visibleStaticItems}>
         {(item) => item}
       </Static>
       {pendingItems}

@@ -245,6 +245,8 @@ export const AppContainer = (props: AppContainerProps) => {
       config.getScreenReader(),
     ),
   );
+  const [isTransitioningAltBuffer, setIsTransitioningAltBuffer] =
+    useState(false);
   const isAlternateBufferRef = useRef(isAlternateBuffer);
   useEffect(() => {
     isAlternateBufferRef.current = isAlternateBuffer;
@@ -1721,6 +1723,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [setCopyModeEnabled],
   );
 
+  useEffect(() => {
+    if (isTransitioningAltBuffer) {
+      const timer = setTimeout(() => {
+        const next = !isAlternateBufferRef.current;
+        isAlternateBufferRef.current = next;
+
+        applyAlternateBufferMode(next);
+        setIsAlternateBuffer(next);
+        setIsTransitioningAltBuffer(false);
+      }, 15);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isTransitioningAltBuffer, applyAlternateBufferMode]);
+
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
@@ -1732,12 +1749,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           return true;
         }
 
-        const next = !isAlternateBufferRef.current;
-        isAlternateBufferRef.current = next;
-
-        applyAlternateBufferMode(next);
-        setIsAlternateBuffer(next);
-
+        setIsTransitioningAltBuffer(true);
         return true;
       }
 
@@ -1762,6 +1774,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
+        return true;
       } else if (
         keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
         !isAlternateBufferRef.current
@@ -1922,7 +1935,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCopyModeEnabled,
       tabFocusTimeoutRef,
       shortcutsHelpVisible,
-      applyAlternateBufferMode,
       backgroundCurrentShell,
       toggleBackgroundShell,
       backgroundShells,
@@ -2230,6 +2242,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       history: historyManager.history,
       historyManager,
       isAlternateBuffer,
+      isTransitioningAltBuffer,
       isThemeDialogOpen,
 
       themeError,
@@ -2478,6 +2491,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       showIsExpandableHint,
       isAlternateBuffer,
+      isTransitioningAltBuffer,
     ],
   );
 

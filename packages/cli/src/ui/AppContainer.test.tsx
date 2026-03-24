@@ -2727,9 +2727,13 @@ describe('AppContainer State Management', () => {
           sequence: '',
         } as Key);
       });
+      await act(async () => {
+        vi.advanceTimersByTime(20);
+      });
     };
 
     beforeEach(() => {
+      vi.useFakeTimers();
       mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
       mockedUseKeypress.mockImplementation(
         (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
@@ -2741,6 +2745,7 @@ describe('AppContainer State Management', () => {
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       vi.restoreAllMocks();
     });
 
