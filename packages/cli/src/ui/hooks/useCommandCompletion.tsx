@@ -159,10 +159,28 @@ export function useCommandCompletion({
         }
 
         // Check if @ is inside backtick or single-quote quoted region
+        // using a state machine that correctly handles escaped quotes.
         const textBeforeAt = currentLine.substring(0, i);
-        const backtickCount = (textBeforeAt.match(/`/g) || []).length;
-        const singleQuoteCount = (textBeforeAt.match(/'/g) || []).length;
-        if (backtickCount % 2 !== 0 || singleQuoteCount % 2 !== 0) {
+        let inSingleQuote = false;
+        let inBacktick = false;
+        let escaped = false;
+        for (const char of textBeforeAt) {
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          if (char === '\\') {
+            escaped = true;
+            continue;
+          }
+          if (char === "'" && !inBacktick) {
+            inSingleQuote = !inSingleQuote;
+          }
+          if (char === '`' && !inSingleQuote) {
+            inBacktick = !inBacktick;
+          }
+        }
+        if (inSingleQuote || inBacktick) {
           break; // Inside a quoted region — treat as literal
         }
 

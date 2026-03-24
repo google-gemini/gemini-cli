@@ -59,7 +59,7 @@ export function unescapeLiteralAt(text: string): string {
  * uses double quotes for Windows paths with spaces (e.g., @"C:\Program Files\file.txt").
  */
 export function escapeAtInQuotedRegions(text: string): string {
-  return text.replace(/`[^`]*`|'[^']*'/g, (match) =>
+  return text.replace(/`(\\.|[^`\\])*`|'(\\.|[^'\\])*'/g, (match) =>
     match.replace(/@/g, '\\@'),
   );
 }
@@ -111,10 +111,11 @@ function parseAllAtCommands(
   let lastIndex = 0;
 
   // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
-  // The lookbehind requires @ to be preceded by whitespace, start-of-string, or punctuation.
-  // This prevents email addresses (user@host) and concatenated text (hello@file) from matching.
+  // The lookbehind requires @ to NOT be preceded by a word character or backslash.
+  // This prevents email addresses (user@host), concatenated text (hello@file),
+  // and escaped @-references (\\@file) from matching.
   const atCommandRegex = new RegExp(
-    `(?<=^|[\\s,;:!?()\\[\\]{}])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `(?<![\\\\w\\\\\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 

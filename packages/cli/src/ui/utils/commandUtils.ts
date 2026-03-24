@@ -18,9 +18,9 @@ import {
 // Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
 // Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
 // parseAllAtCommands would find at least one atPath part.
-// The lookbehind requires @ to be preceded by whitespace, start-of-string, or punctuation.
+// The lookbehind requires @ to NOT be preceded by a word character or backslash.
 const AT_COMMAND_DETECT_REGEX = new RegExp(
-  `(?<=^|[\\s,;:!?()\\[\\]{}])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+  `(?<![\\w\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
 );
 
 /**
