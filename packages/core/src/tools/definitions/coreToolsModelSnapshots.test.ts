@@ -82,7 +82,7 @@ describe('coreTools snapshots for specific models', () => {
     { name: 'enter_plan_mode', definition: ENTER_PLAN_MODE_DEFINITION },
     {
       name: 'exit_plan_mode',
-      definition: getExitPlanModeDefinition('/mock/plans'),
+      definition: getExitPlanModeDefinition(),
     },
     {
       name: 'activate_skill',
