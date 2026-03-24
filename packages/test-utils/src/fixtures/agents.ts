@@ -6,15 +6,16 @@
 
 /**
  * A collection of predefined test agents for use in evaluations and tests.
- * This namespaced object provides direct, typed access to agent definitions
- * with excellent IDE discoverability.
+ * Each agent provides both its 'name' (for assertions) and its 'definition'
+ * (for file creation).
  */
 export const TEST_AGENTS = {
   /**
    * An agent with expertise in updating documentation.
-   * Tools: read_file, write_file
    */
-  DOCS_AGENT: `---
+  DOCS_AGENT: {
+    name: 'docs-agent',
+    definition: `---
 name: docs-agent
 description: An agent with expertise in updating documentation.
 tools:
@@ -23,12 +24,14 @@ tools:
 ---
 You are the docs agent. Update documentation clearly and accurately.
 `,
+  },
 
   /**
    * An agent with expertise in writing and updating tests.
-   * Tools: read_file, write_file
    */
-  TESTING_AGENT: `---
+  TESTING_AGENT: {
+    name: 'testing-agent',
+    definition: `---
 name: testing-agent
 description: An agent with expertise in writing and updating tests.
 tools:
@@ -37,4 +40,5 @@ tools:
 ---
 You are the test agent. Add or update tests.
 `,
+  },
 } as const;
