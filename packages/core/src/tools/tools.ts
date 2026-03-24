@@ -58,6 +58,19 @@ export interface ToolInvocation<
   getDescription(): string;
 
   /**
+   * Gets a clean title for display in the UI (e.g. the raw command without metadata).
+   * If not implemented, the UI may fall back to getDescription().
+   * @returns A string representing the tool call title.
+   */
+  getDisplayTitle?(): string;
+
+  /**
+   * Gets conversational explanation or secondary metadata.
+   * @returns A string representing the explanation, or undefined.
+   */
+  getExplanation?(): string;
+
+  /**
    * Determines what file system paths the tool will affect.
    * @returns A list of such paths.
    */
@@ -161,6 +174,14 @@ export abstract class BaseToolInvocation<
   ) {}
 
   abstract getDescription(): string;
+
+  getDisplayTitle(): string {
+    return this.getDescription();
+  }
+
+  getExplanation(): string {
+    return '';
+  }
 
   toolLocations(): ToolLocation[] {
     return [];
