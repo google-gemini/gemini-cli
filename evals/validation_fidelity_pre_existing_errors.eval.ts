@@ -7,6 +7,20 @@
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
+function parseToolArgs(args: unknown): Record<string, any> | null {
+  if (args && typeof args === 'object') {
+    return args as Record<string, any>;
+  }
+  if (typeof args === 'string') {
+    try {
+      return JSON.parse(args) as Record<string, any>;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 describe('validation_fidelity_pre_existing_errors', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should handle pre-existing project errors gracefully during validation',
@@ -55,9 +69,14 @@ export function multiply(a: number, b: number): number {
 
       // Verify it did the work in math.ts
       const mathRefactor = replaceCalls.some((log) => {
-        const args = JSON.parse(log.toolRequest.args);
+        const args = parseToolArgs(log.toolRequest.args);
+        if (!args) {
+          return false;
+        }
         return (
+          typeof args.file_path === 'string' &&
           args.file_path.endsWith('src/math.ts') &&
+          typeof args.new_string === 'string' &&
           args.new_string.includes('sum')
         );
       });
@@ -67,7 +86,9 @@ export function multiply(a: number, b: number): number {
         (log) => log.toolRequest.name === 'run_shell_command',
       );
       const ranValidation = shellCalls.some((log) => {
-        const cmd = JSON.parse(log.toolRequest.args).command.toLowerCase();
+        const args = parseToolArgs(log.toolRequest.args);
+        const cmd =
+          typeof args?.command === 'string' ? args.command.toLowerCase() : '';
         return cmd.includes('build') || cmd.includes('tsc');
       });
 
