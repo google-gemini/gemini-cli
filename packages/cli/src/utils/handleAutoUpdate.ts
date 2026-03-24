@@ -102,17 +102,22 @@ export function handleAutoUpdate(
     combinedMessage += `\n${installationInfo.updateMessage}`;
   }
 
-  updateEventEmitter.emit('update-received', {
-    message: combinedMessage,
-  });
-
   if (
     !installationInfo.updateCommand ||
     !settings.merged.general.enableAutoUpdate
   ) {
+    updateEventEmitter.emit('update-received', {
+      ...info,
+      message: combinedMessage,
+      isUpdating: false,
+    });
     return;
   }
-
+  updateEventEmitter.emit('update-received', {
+    ...info,
+    message: combinedMessage,
+    isUpdating: true,
+  });
   if (_updateInProgress) {
     return;
   }
