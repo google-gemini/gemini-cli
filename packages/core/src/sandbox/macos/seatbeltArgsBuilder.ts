@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs';
-import { debugLogger } from '../../utils/debugLogger.js';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -17,11 +16,7 @@ import {
   sanitizePaths,
   GOVERNANCE_FILES,
 } from '../../services/sandboxManager.js';
-import {
-  tryRealpath,
-  resolveGitWorktreePaths,
-  resolveAndValidatePath,
-} from '../utils/fsUtils.js';
+import { tryRealpath, resolveGitWorktreePaths } from '../utils/fsUtils.js';
 
 /**
  * Options for building macOS Seatbelt arguments.
@@ -154,20 +149,12 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     profile += `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))\n`;
   }
 
-  const authorizedBoundaries = [workspacePath, ...resolvedAllowedPaths];
-
   // Handle granular additional permissions
   if (options.additionalPermissions?.fileSystem) {
     const { read, write } = options.additionalPermissions.fileSystem;
     if (read) {
       read.forEach((p, i) => {
-        let resolved: string;
-        try {
-          resolved = resolveAndValidatePath(p, authorizedBoundaries);
-        } catch (e: unknown) {
-          debugLogger.warn(e instanceof Error ? e.message : String(e));
-          return;
-        }
+        const resolved = tryRealpath(p);
         const paramName = `ADDITIONAL_READ_${i}`;
         args.push('-D', `${paramName}=${resolved}`);
         let isFile = false;
@@ -185,13 +172,7 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     }
     if (write) {
       write.forEach((p, i) => {
-        let resolved: string;
-        try {
-          resolved = resolveAndValidatePath(p, authorizedBoundaries);
-        } catch (e: unknown) {
-          debugLogger.warn(e instanceof Error ? e.message : String(e));
-          return;
-        }
+        const resolved = tryRealpath(p);
         const paramName = `ADDITIONAL_WRITE_${i}`;
         args.push('-D', `${paramName}=${resolved}`);
         let isFile = false;

@@ -27,7 +27,6 @@ import { isStrictlyApproved, getCommandName } from '../utils/commandUtils.js';
 import {
   tryRealpath,
   resolveGitWorktreePaths,
-  resolveAndValidatePath,
   isErrnoException,
 } from '../utils/fsUtils.js';
 
@@ -241,16 +240,11 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const authorizedBoundaries = [workspacePath, ...resolvedAllowedPaths];
-
     const additionalReads =
       sanitizePaths(mergedAdditional.fileSystem?.read) || [];
     for (const p of additionalReads) {
       try {
-        const safeResolvedPath = resolveAndValidatePath(
-          p,
-          authorizedBoundaries,
-        );
+        const safeResolvedPath = tryRealpath(p);
         bwrapArgs.push('--ro-bind-try', safeResolvedPath, safeResolvedPath);
       } catch (e: unknown) {
         debugLogger.warn(e instanceof Error ? e.message : String(e));
@@ -261,10 +255,7 @@ export class LinuxSandboxManager implements SandboxManager {
       sanitizePaths(mergedAdditional.fileSystem?.write) || [];
     for (const p of additionalWrites) {
       try {
-        const safeResolvedPath = resolveAndValidatePath(
-          p,
-          authorizedBoundaries,
-        );
+        const safeResolvedPath = tryRealpath(p);
         bwrapArgs.push('--bind-try', safeResolvedPath, safeResolvedPath);
       } catch (e: unknown) {
         debugLogger.warn(e instanceof Error ? e.message : String(e));
