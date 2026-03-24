@@ -21,7 +21,7 @@ import {
   PARAM_DESCRIPTION,
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
   PARAM_ADDITIONAL_PERMISSIONS,
 } from './base-declarations.js';
@@ -148,20 +148,18 @@ export function getShellDeclaration(
 /**
  * Returns the FunctionDeclaration for exiting plan mode.
  */
-export function getExitPlanModeDeclaration(
-  plansDir: string,
-): FunctionDeclaration {
+export function getExitPlanModeDeclaration(): FunctionDeclaration {
   return {
     name: EXIT_PLAN_MODE_TOOL_NAME,
     description:
       'Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.',
     parametersJsonSchema: {
       type: 'object',
-      required: [EXIT_PLAN_PARAM_PLAN_PATH],
+      required: [EXIT_PLAN_PARAM_PLAN_FILENAME],
       properties: {
-        [EXIT_PLAN_PARAM_PLAN_PATH]: {
+        [EXIT_PLAN_PARAM_PLAN_FILENAME]: {
           type: 'string',
-          description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
+          description: `The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.`,
         },
       },
     },

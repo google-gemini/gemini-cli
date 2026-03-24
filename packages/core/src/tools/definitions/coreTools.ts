@@ -89,7 +89,7 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
 } from './base-declarations.js';
 
@@ -244,10 +244,10 @@ export function getShellDefinition(
   };
 }
 
-export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+export function getExitPlanModeDefinition(): ToolDefinition {
   return {
-    base: getExitPlanModeDeclaration(plansDir),
-    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(plansDir),
+    base: getExitPlanModeDeclaration(),
+    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(),
   };
 }
 

@@ -47,6 +47,6 @@ export interface CoreToolSet {
   get_internal_docs: FunctionDeclaration;
   ask_user: FunctionDeclaration;
   enter_plan_mode: FunctionDeclaration;
-  exit_plan_mode: (plansDir: string) => FunctionDeclaration;
+  exit_plan_mode: () => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
 }
