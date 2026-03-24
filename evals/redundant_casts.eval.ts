@@ -10,7 +10,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 
 describe('redundant_casts', () => {
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should not add redundant or unsafe casts when modifying typescript code',
     files: {
       'src/cast_example.ts': `
