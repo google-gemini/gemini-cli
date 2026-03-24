@@ -72,6 +72,12 @@ for WORKFLOW in "${WORKFLOWS[@]}"; do
     fi
 
     RUN_IDS=$(gh run list "${GH_ARGS[@]}")
+    exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        echo "❌ Failed to fetch runs for '$WORKFLOW' (exit code: $exit_code). Please check 'gh auth status' and permissions." >&2
+        continue
+    fi
 
     if [ -z "$RUN_IDS" ]; then
         echo "📭 No runs found for workflow '$WORKFLOW' since $SINCE."
