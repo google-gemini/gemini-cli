@@ -367,7 +367,9 @@ export async function runNonInteractive({
         return errToThrow;
       };
 
-      const runTerminalExitHandler = (handler: () => never): never => {
+      const runTerminalExitHandler = (
+        handler: () => void | never,
+      ): void | never => {
         terminalProcessExitHandled = true;
         return handler();
       };
@@ -528,7 +530,9 @@ export async function runNonInteractive({
                 typeof event.data?.['turnCount'] === 'number';
 
               if (isConfiguredTurnLimit) {
-                runTerminalExitHandler(() => handleMaxTurnsExceededError(config));
+                runTerminalExitHandler(() =>
+                  handleMaxTurnsExceededError(config),
+                );
               } else if (streamFormatter) {
                 streamFormatter.emitEvent({
                   type: JsonStreamEventType.ERROR,

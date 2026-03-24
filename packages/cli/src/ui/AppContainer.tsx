@@ -110,6 +110,7 @@ import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { useAgentStream } from './hooks/useAgentStream.js';
 import { type BackgroundShell } from './hooks/shellCommandProcessor.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
@@ -1091,6 +1092,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
+  const useAgentProtocol = config.getExperimentalUseAgentProtocol();
+
   const {
     streamingState,
     submitQuery,
@@ -1110,27 +1113,50 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
-  } = useGeminiStream(
-    config.getGeminiClient(),
-    historyManager.history,
-    historyManager.addItem,
-    config,
-    settings,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    modelSwitchedFromQuotaError,
-    setModelSwitchedFromQuotaError,
-    onCancelSubmit,
-    setEmbeddedShellFocused,
-    terminalWidth,
-    terminalHeight,
-    embeddedShellFocused,
-    consumePendingHints,
-  );
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+  } = useAgentProtocol
+    ? useAgentStream(
+        config.getGeminiClient(),
+        historyManager.history,
+        historyManager.addItem,
+        config,
+        settings,
+        setDebugMessage,
+        handleSlashCommand,
+        shellModeActive,
+        getPreferredEditor,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitchedFromQuotaError,
+        setModelSwitchedFromQuotaError,
+        onCancelSubmit,
+        setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
+        embeddedShellFocused,
+        consumePendingHints,
+      )
+    : useGeminiStream(
+        config.getGeminiClient(),
+        historyManager.history,
+        historyManager.addItem,
+        config,
+        settings,
+        setDebugMessage,
+        handleSlashCommand,
+        shellModeActive,
+        getPreferredEditor,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitchedFromQuotaError,
+        setModelSwitchedFromQuotaError,
+        onCancelSubmit,
+        setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
+        embeddedShellFocused,
+        consumePendingHints,
+      );
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
