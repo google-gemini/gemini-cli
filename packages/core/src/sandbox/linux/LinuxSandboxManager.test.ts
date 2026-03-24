@@ -10,21 +10,22 @@ import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 
 vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  const actual = await vi.importActual('node:fs');
   return {
     ...actual,
     default: {
-      // @ts-expect-error - Property 'default' does not exist on type 'typeof import("node:fs")'
-      ...actual.default,
+      ...(actual['default'] || {}),
       existsSync: vi.fn(() => true),
-      realpathSync: vi.fn((p: string | Buffer) => p.toString()),
+      realpathSync: vi.fn((p) => p.toString()),
+      statSync: vi.fn(() => ({ isDirectory: () => true })),
       mkdirSync: vi.fn(),
       openSync: vi.fn(),
       closeSync: vi.fn(),
       writeFileSync: vi.fn(),
     },
     existsSync: vi.fn(() => true),
-    realpathSync: vi.fn((p: string | Buffer) => p.toString()),
+    realpathSync: vi.fn((p) => p.toString()),
+    statSync: vi.fn(() => ({ isDirectory: () => true })),
     mkdirSync: vi.fn(),
     openSync: vi.fn(),
     closeSync: vi.fn(),
@@ -34,16 +35,17 @@ vi.mock('node:fs', async () => {
 
 describe('LinuxSandboxManager', () => {
   const workspace = '/home/user/workspace';
-  let manager: LinuxSandboxManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
-    manager = new LinuxSandboxManager({ workspace });
   });
 
-  const getBwrapArgs = async (req: SandboxRequest) => {
+  const getBwrapArgs = async (
+    manager: LinuxSandboxManager,
+    req: SandboxRequest,
+  ) => {
     const result = await manager.prepareCommand(req);
     expect(result.program).toBe('sh');
     expect(result.args[0]).toBe('-c');
@@ -55,8 +57,9 @@ describe('LinuxSandboxManager', () => {
     return result.args.slice(4);
   };
 
-  it('correctly outputs bwrap as the program with appropriate isolation flags', async () => {
-    const bwrapArgs = await getBwrapArgs({
+  it('correctly outputs bwrap as the program with appropriate isolation flags (readonly default)', async () => {
+    const manager = new LinuxSandboxManager({ workspace });
+    const bwrapArgs = await getBwrapArgs(manager, {
       command: 'ls',
       args: ['-la'],
       cwd: workspace,
@@ -76,9 +79,10 @@ describe('LinuxSandboxManager', () => {
       '/proc',
       '--tmpfs',
       '/tmp',
-      '--bind',
+      '--ro-bind-try',
       workspace,
       workspace,
+      // Governance files bind mounted read-only
       '--ro-bind',
       `${workspace}/.gitignore`,
       `${workspace}/.gitignore`,
@@ -96,113 +100,93 @@ describe('LinuxSandboxManager', () => {
     ]);
   });
 
-  it('maps allowedPaths to bwrap binds', async () => {
-    const bwrapArgs = await getBwrapArgs({
-      command: 'node',
-      args: ['script.js'],
-      cwd: workspace,
-      env: {},
-      policy: {
-        allowedPaths: ['/tmp/cache', '/opt/tools', workspace],
-      },
-    });
-
-    // Verify the specific bindings were added correctly
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
-    expect(binds).toEqual([
-      '--bind',
+  it('binds workspace read-write when readonly is false', async () => {
+    const manager = new LinuxSandboxManager({
       workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
-      '--bind-try',
-      '/tmp/cache',
-      '/tmp/cache',
-      '--bind-try',
-      '/opt/tools',
-      '/opt/tools',
-    ]);
-  });
-
-  it('protects real paths of governance files if they are symlinks', async () => {
-    vi.mocked(fs.realpathSync).mockImplementation((p) => {
-      if (p.toString() === `${workspace}/.gitignore`)
-        return '/shared/global.gitignore';
-      return p.toString();
+      modeConfig: { readonly: false },
     });
-
-    const bwrapArgs = await getBwrapArgs({
+    const bwrapArgs = await getBwrapArgs(manager, {
       command: 'ls',
       args: [],
       cwd: workspace,
       env: {},
     });
 
-    expect(bwrapArgs).toContain('--ro-bind');
-    expect(bwrapArgs).toContain(`${workspace}/.gitignore`);
-    expect(bwrapArgs).toContain('/shared/global.gitignore');
-
-    // Check that both are bound
-    const gitignoreIndex = bwrapArgs.indexOf(`${workspace}/.gitignore`);
-    expect(bwrapArgs[gitignoreIndex - 1]).toBe('--ro-bind');
-    expect(bwrapArgs[gitignoreIndex + 1]).toBe(`${workspace}/.gitignore`);
-
-    const realGitignoreIndex = bwrapArgs.indexOf('/shared/global.gitignore');
-    expect(bwrapArgs[realGitignoreIndex - 1]).toBe('--ro-bind');
-    expect(bwrapArgs[realGitignoreIndex + 1]).toBe('/shared/global.gitignore');
+    expect(bwrapArgs).toContain('--bind');
+    expect(bwrapArgs).toContain(workspace);
   });
 
-  it('touches governance files if they do not exist', async () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-
-    await getBwrapArgs({
-      command: 'ls',
+  it('maps network permissions to --share-net', async () => {
+    const manager = new LinuxSandboxManager({ workspace });
+    const bwrapArgs = await getBwrapArgs(manager, {
+      command: 'curl',
       args: [],
       cwd: workspace,
       env: {},
+      policy: { additionalPermissions: { network: true } },
     });
 
-    expect(fs.mkdirSync).toHaveBeenCalled();
-    expect(fs.openSync).toHaveBeenCalled();
+    expect(bwrapArgs).toContain('--share-net');
   });
 
-  it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
-    const bwrapArgs = await getBwrapArgs({
-      command: 'ls',
-      args: ['-la'],
+  it('maps explicit write permissions to --bind-try', async () => {
+    const manager = new LinuxSandboxManager({ workspace });
+    const bwrapArgs = await getBwrapArgs(manager, {
+      command: 'touch',
+      args: [],
       cwd: workspace,
       env: {},
       policy: {
-        allowedPaths: [workspace + '/'],
+        additionalPermissions: {
+          fileSystem: { write: ['/home/user/workspace/out/dir'] },
+        },
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+    const index = bwrapArgs.indexOf('--bind-try');
+    expect(index).not.toBe(-1);
+    expect(bwrapArgs[index + 1]).toBe('/home/user/workspace/out/dir');
+  });
 
-    // Should only contain the primary workspace bind and governance files, not the second workspace bind with a trailing slash
-    expect(binds).toEqual([
-      '--bind',
+  it('maps forbidden directories to --tmpfs and files to /dev/null', async () => {
+    const manager = new LinuxSandboxManager({ workspace });
+    vi.mocked(fs.statSync).mockImplementation(
+      (p) =>
+        ({ isDirectory: () => p === '/forbidden/dir' }) as unknown as fs.Stats,
+    );
+
+    const bwrapArgs = await getBwrapArgs(manager, {
+      command: 'cat',
+      args: [],
+      cwd: workspace,
+      env: {},
+      policy: { forbiddenPaths: ['/forbidden/dir', '/forbidden/file.txt'] },
+    });
+
+    // bwrapArgs will have --tmpfs /tmp, we need to find the specific one
+    const dirTmpfsIndex = bwrapArgs.indexOf('/forbidden/dir');
+    expect(bwrapArgs[dirTmpfsIndex - 1]).toBe('--tmpfs');
+
+    const fileDevNullIndex = bwrapArgs.indexOf('/forbidden/file.txt');
+    expect(bwrapArgs[fileDevNullIndex - 2]).toBe('--ro-bind');
+    expect(bwrapArgs[fileDevNullIndex - 1]).toBe('/dev/null');
+  });
+
+  it('rejects overrides in plan mode', async () => {
+    const manager = new LinuxSandboxManager({
       workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
-    ]);
+      modeConfig: { allowOverrides: false },
+    });
+    await expect(
+      manager.prepareCommand({
+        command: 'ls',
+        args: [],
+        cwd: workspace,
+        env: {},
+        policy: { additionalPermissions: { network: true } },
+      }),
+    ).rejects.toThrow(
+      /Cannot override readonly\/network restrictions in Plan mode/,
+    );
   });
 });

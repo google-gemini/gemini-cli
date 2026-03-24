@@ -8,7 +8,7 @@ import { type FunctionCall } from '@google/genai';
 import {
   isDangerousCommand,
   isKnownSafeCommand,
-} from '../sandbox/macos/commandSafety.js';
+} from '../sandbox/utils/commandSafety.js';
 import { parse as shellParse } from 'shell-quote';
 import {
   PolicyDecision,

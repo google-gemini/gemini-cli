@@ -40,7 +40,11 @@ export function createSandboxManager(
 
   if (sandbox?.enabled) {
     if (os.platform() === 'linux') {
-      return new LinuxSandboxManager({ workspace });
+      const modeConfig =
+        policyManager && approvalMode
+          ? policyManager.getModeConfig(approvalMode)
+          : undefined;
+      return new LinuxSandboxManager({ workspace, modeConfig, policyManager });
     }
     if (os.platform() === 'darwin') {
       const modeConfig =

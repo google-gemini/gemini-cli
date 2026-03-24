@@ -17,16 +17,9 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
-import {
-  getCommandRoots,
-  initializeShellParsers,
-  splitCommands,
-  stripShellWrapper,
-} from '../../utils/shell-utils.js';
-import { isKnownSafeCommand } from './commandSafety.js';
-import { parse as shellParse } from 'shell-quote';
+import { initializeShellParsers } from '../../utils/shell-utils.js';
+import { isStrictlyApproved, getCommandName } from '../utils/commandUtils.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
-import path from 'node:path';
 
 export interface MacOsSandboxOptions extends GlobalSandboxOptions {
   /** Optional base sanitization config. */
@@ -47,54 +40,6 @@ export interface MacOsSandboxOptions extends GlobalSandboxOptions {
  */
 export class MacOsSandboxManager implements SandboxManager {
   constructor(private readonly options: MacOsSandboxOptions) {}
-
-  private async isStrictlyApproved(req: SandboxRequest): Promise<boolean> {
-    const approvedTools = this.options.modeConfig?.approvedTools;
-    if (!approvedTools || approvedTools.length === 0) {
-      return false;
-    }
-
-    await initializeShellParsers();
-
-    const fullCmd = [req.command, ...req.args].join(' ');
-    const stripped = stripShellWrapper(fullCmd);
-
-    const roots = getCommandRoots(stripped);
-    if (roots.length === 0) return false;
-
-    const allRootsApproved = roots.every((root) =>
-      approvedTools.includes(root),
-    );
-    if (allRootsApproved) {
-      return true;
-    }
-
-    const pipelineCommands = splitCommands(stripped);
-    if (pipelineCommands.length === 0) return false;
-
-    // For safety, every command in the pipeline must be considered safe.
-    for (const cmdString of pipelineCommands) {
-      const parsedArgs = shellParse(cmdString).map(String);
-      if (!isKnownSafeCommand(parsedArgs)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  private async getCommandName(req: SandboxRequest): Promise<string> {
-    await initializeShellParsers();
-    const fullCmd = [req.command, ...req.args].join(' ');
-    const stripped = stripShellWrapper(fullCmd);
-    const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
-    );
-    if (roots.length > 0) {
-      return roots[0];
-    }
-    return path.basename(req.command);
-  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
@@ -122,7 +67,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
-      ? await this.isStrictlyApproved(req)
+      ? await isStrictlyApproved(req, this.options.modeConfig?.approvedTools)
       : false;
 
     const workspaceWrite = !isReadonlyMode || isApproved;
@@ -130,7 +75,7 @@ export class MacOsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
 
     // Fetch persistent approvals for this command
-    const commandName = await this.getCommandName(req);
+    const commandName = await getCommandName(req);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
