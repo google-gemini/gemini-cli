@@ -214,19 +214,19 @@ export const safeLightTheme: ColorsTheme = {
 export const richLightTheme: ColorsTheme = {
   type: 'light',
 
-  Foreground: '#3C4043', // grey-800
-  Gray: '#5F6368', // grey-700
-  Comment: '#80868B', // grey-600
-  DarkGray: '#9AA0A6', // grey-500
+  Foreground: '#202124', // grey-900
+  Gray: '#3C4043', // grey-800
+  Comment: '#5F6368', // grey-700
+  DarkGray: '#80868B', // grey-600
   Background: '#F8F9FA', // grey-50
 
-  LightBlue: '#E8F0FE', // blue-50
+  LightBlue: '#1A73E8', // blue-600
 
   AccentRed: '#D93025', // red-600
-  AccentYellow: '#FA7B17', // orange-500
-  AccentGreen: '#1E8E3E', // green-600
-  AccentCyan: '#12B5CB', // cyan-600
-  AccentBlue: '#1A73E8', // blue-600
+  AccentYellow: '#B06000', // orange-900
+  AccentGreen: '#188038', // green-700
+  AccentCyan: '#007B83', // cyan-900
+  AccentBlue: '#1967D2', // blue-700
   AccentPurple: '#9334E6', // purple-600
 
   DiffRemoved: '#FCE8E6', // red-50
@@ -242,9 +242,9 @@ export const richDarkTheme: ColorsTheme = {
   type: 'dark',
 
   Foreground: '#F8F9FA', // grey-50
-  Gray: '#BDC1C6', // grey-400
-  Comment: '#9AA0A6', // grey-500
-  DarkGray: '#80868B', // grey-600
+  Gray: '#DADCE0', // grey-300
+  Comment: '#BDC1C6', // grey-400
+  DarkGray: '#9AA0A6', // grey-500
   Background: '#212121', // grey-900
 
   LightBlue: '#E8F0FE', // blue-50
