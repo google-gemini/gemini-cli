@@ -162,6 +162,9 @@ class LegacyAgentProtocol implements AgentProtocol {
                 progressTotal: tc.progressTotal,
                 pid: tc.pid,
               },
+              _meta: {
+                description: tc.invocation.getDescription(),
+              },
             }),
           );
         }
@@ -205,10 +208,12 @@ class LegacyAgentProtocol implements AgentProtocol {
           for (const ev of translatedEvents) {
             if (ev.type === 'tool_request') {
               const tool = this._config.getToolRegistry().getTool(ev.name);
+              const invocation = tool?.build(ev.args);
               ev._meta = {
                 displayName: tool?.displayName ?? ev.name,
-                description: tool?.description ?? '',
+                description: invocation?.getDescription() ?? tool?.description ?? '',
                 isOutputMarkdown: tool?.isOutputMarkdown ?? false,
+                kind: tool?.kind,
               };
             }
           }
@@ -277,6 +282,10 @@ class LegacyAgentProtocol implements AgentProtocol {
               isError: response.error !== undefined,
               ...(displayContent ? { displayContent } : {}),
               ...(data ? { data } : {}),
+              _meta: {
+                resultDisplay: response.resultDisplay,
+                outputFile: response.outputFile,
+              },
             }),
           ]);
 

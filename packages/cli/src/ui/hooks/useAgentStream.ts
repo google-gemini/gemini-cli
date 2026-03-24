@@ -216,6 +216,7 @@ export const useAgentStream = (
               tool: {
                 displayName: (event._meta?.['displayName'] as string) ?? event.name,
                 isOutputMarkdown: (event._meta?.['isOutputMarkdown'] as boolean) ?? false,
+                kind: event._meta?.['kind'] as any,
               },
               invocation: {
                 getDescription: () => (event._meta?.['description'] as string) ?? '',
@@ -234,6 +235,9 @@ export const useAgentStream = (
                     progress: event.data?.['progress'] as number | undefined,
                     progressTotal: event.data?.['progressTotal'] as number | undefined,
                     pid: event.data?.['pid'] as number | undefined,
+                    invocation: {
+                      getDescription: () => (event._meta?.['description'] as string) ?? (tc as any).invocation?.getDescription(),
+                    },
                   } as unknown as TrackedToolCall)
                 : tc,
             ),
@@ -247,7 +251,8 @@ export const useAgentStream = (
                     ...tc,
                     status: event.isError ? 'error' : 'success',
                     response: {
-                      resultDisplay: event.displayContent?.[0]?.type === 'text' ? event.displayContent[0].text : undefined,
+                      resultDisplay: event._meta?.['resultDisplay'] ?? (event.displayContent?.[0]?.type === 'text' ? event.displayContent[0].text : undefined),
+                      outputFile: event._meta?.['outputFile'] as string | undefined,
                     },
                     responseSubmittedToGemini: true,
                   } as unknown as TrackedToolCall)
