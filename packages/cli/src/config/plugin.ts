@@ -257,6 +257,7 @@ export async function createOpenPlugin(
     description: config.description,
     author: config.author,
     license: config.license,
+    // Features partially enabled for Open Plugins
     contextFiles: [],
     mcpServers: config.mcpServers,
     excludeTools: undefined,

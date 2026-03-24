@@ -20,6 +20,7 @@ describe('MCP Plugin Variable Expansion', () => {
     sanitizationConfig: {
       allowedEnvironmentVariables: [],
       blockedEnvironmentVariables: [],
+      enableEnvironmentVariableRedaction: false,
     },
     isTrustedFolder: () => true,
     emitMcpDiagnostic: () => {},
