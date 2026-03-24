@@ -8,11 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
-import type { SandboxRequest } from './sandboxManager.js';
-import { spawnAsync } from '../utils/shell-utils.js';
+import { WindowsSandboxManager } from './WindowsSandboxManager.js';
+import type { SandboxRequest } from '../../services/sandboxManager.js';
+import { spawnAsync } from '../../utils/shell-utils.js';
 
-vi.mock('../utils/shell-utils.js', () => ({
+vi.mock('../../utils/shell-utils.js', () => ({
   spawnAsync: vi.fn(),
 }));
 

@@ -10,7 +10,7 @@ import { NoopSandboxManager, sanitizePaths } from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
+import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
 
 describe('sanitizePaths', () => {
   it('should return undefined if no paths are provided', () => {
