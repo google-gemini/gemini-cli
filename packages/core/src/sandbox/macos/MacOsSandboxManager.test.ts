@@ -63,7 +63,7 @@ describe('MacOsSandboxManager', () => {
       expect(profile).toContain('(deny default)');
       expect(profile).toContain('(allow process-exec)');
       expect(profile).toContain('(subpath (param "WORKSPACE"))');
-      expect(profile).not.toContain('(allow network*)');
+      expect(profile).not.toContain('(allow network-outbound)');
 
       expect(result.args).toContain('-D');
       expect(result.args).toContain(`WORKSPACE=${mockWorkspace}`);
@@ -91,7 +91,7 @@ describe('MacOsSandboxManager', () => {
       });
 
       const profile = result.args[1];
-      expect(profile).toContain('(allow network*)');
+      expect(profile).toContain('(allow network-outbound)');
     });
 
     it('should parameterize allowed paths and normalize them', async () => {

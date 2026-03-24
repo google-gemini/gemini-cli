@@ -46,7 +46,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
-  sandbox?: SandboxMode;
+  sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
 }
@@ -83,6 +83,11 @@ export interface OperationalGuidelinesOptions {
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
+
+export interface SandboxOptions {
+  mode: SandboxMode;
+  toolSandboxingEnabled: boolean;
+}
 
 export interface GitRepoOptions {
   interactive: boolean;
@@ -389,18 +394,44 @@ export function renderOperationalGuidelines(
 `.trim();
 }
 
-export function renderSandbox(mode?: SandboxMode): string {
-  if (!mode) return '';
+export function renderSandbox(options?: SandboxOptions): string {
+  if (!options || !options.mode) return '';
+  const { mode, toolSandboxingEnabled } = options;
   if (mode === 'macos-seatbelt') {
-    return `
+    if (toolSandboxingEnabled) {
+      return `
+    # macOS Seatbelt
+    
+    You are running under macos seatbelt with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. 
+    **Sandbox Failure Recovery:**
+    If an interactive command (like nvim, nano, git) fails to load plugins, crashes, or hangs waiting for user input (e.g. at a '-- More --' prompt) with errors indicating missing files or 'Operation not permitted', it is likely blocked by the sandbox.
+    If you see these errors (e.g. Vim:E303, 'should be read/write') in the command output (even if the command timed out or was cancelled by the user):
+    1.  IMMEDIATELY analyze the output to identify the required filesystem paths or network access.
+    2.  WITHOUT asking the user or explaining the failure first, AUTOMATICALLY retry the command using the 'run_shell_command' tool, explicitly providing the missing permissions in the 'additional_permissions' parameter.
+    3.  This will immediately present the user with a modal to approve the expansion for the command so they don't have to reprompt you.`.trim();
+    } else {
+      return `
     # macOS Seatbelt
     
     You are running under macos seatbelt with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to macOS Seatbelt (e.g. if a command fails with 'Operation not permitted' or similar error), as you report the error to the user, also explain why you think it could be due to macOS Seatbelt, and how the user may need to adjust their Seatbelt profile.`.trim();
+    }
   } else if (mode === 'generic') {
-    return `
+    if (toolSandboxingEnabled) {
+      return `
+      # Sandbox
+      
+      You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. 
+    **Sandbox Failure Recovery:**
+    If a command fails with 'Operation not permitted' or similar sandbox errors, do NOT ask the user to adjust settings manually. Instead:
+    1.  Analyze the command and error to identify the required filesystem paths or network access.
+    2.  Retry the command using the 'run_shell_command' tool, providing the missing permissions in the 'additional_permissions' parameter.
+    3.  The user will be presented with a modal to approve this expansion for the current command.`.trim();
+    } else {
+      return `
       # Sandbox
       
       You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
+    }
   }
   return '';
 }
