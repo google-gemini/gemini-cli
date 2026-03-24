@@ -682,6 +682,7 @@ export interface ConfigParameters {
   experimentalJitContext?: boolean;
   experimentalMemoryManager?: boolean;
 <<<<<<< HEAD
+<<<<<<< HEAD
   useAgentProtocol?: boolean;
 =======
   experimentalAgentHistoryTruncation?: boolean;
@@ -689,6 +690,9 @@ export interface ConfigParameters {
   experimentalAgentHistoryRetainedMessages?: number;
   experimentalAgentHistorySummarization?: boolean;
 >>>>>>> 320c8aba4 (feat(core): Land `AgentHistoryProvider`. (#23978))
+=======
+  useAgentProtocol?: boolean;
+>>>>>>> 792d1c88d (feat: add experimental useAgentProtocol flag)
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -917,14 +921,11 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
-<<<<<<< HEAD
   private readonly useAgentProtocol: boolean;
-=======
   private readonly experimentalAgentHistoryTruncation: boolean;
   private readonly experimentalAgentHistoryTruncationThreshold: number;
   private readonly experimentalAgentHistoryRetainedMessages: number;
   private readonly experimentalAgentHistorySummarization: boolean;
->>>>>>> 320c8aba4 (feat(core): Land `AgentHistoryProvider`. (#23978))
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -1135,6 +1136,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
 <<<<<<< HEAD
+<<<<<<< HEAD
     this.useAgentProtocol = params.useAgentProtocol ?? false;
 =======
     this.experimentalAgentHistoryTruncation =
@@ -1146,6 +1148,9 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalAgentHistorySummarization =
       params.experimentalAgentHistorySummarization ?? false;
 >>>>>>> 320c8aba4 (feat(core): Land `AgentHistoryProvider`. (#23978))
+=======
+    this.useAgentProtocol = params.useAgentProtocol ?? false;
+>>>>>>> 792d1c88d (feat: add experimental useAgentProtocol flag)
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2327,6 +2332,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getExperimentalUseAgentProtocol(): boolean {
+<<<<<<< HEAD
     return (
       this.useAgentProtocol ||
       process.env['GEMINI_CLI_USE_AGENT_PROTOCOL'] === 'true'
@@ -2347,6 +2353,9 @@ export class Config implements McpContext, AgentLoopContext {
 
   isExperimentalAgentHistorySummarizationEnabled(): boolean {
     return this.experimentalAgentHistorySummarization;
+=======
+    return this.useAgentProtocol;
+>>>>>>> 792d1c88d (feat: add experimental useAgentProtocol flag)
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
@@ -3631,6 +3640,12 @@ export class Config implements McpContext, AgentLoopContext {
     this._geminiClient?.dispose();
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
+    }
+  }
+}
+// Export model constants for use in CLI
+export { DEFAULT_GEMINI_FLASH_MODEL };
+er.stop();
     }
   }
 }
