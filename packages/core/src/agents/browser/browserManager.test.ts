@@ -706,6 +706,7 @@ describe('BrowserManager', () => {
       await manager.callTool('take_snapshot', {});
       await manager.callTool('take_snapshot', { some: 'args' });
       await manager.callTool('take_snapshot', { other: 'args' });
+      await manager.callTool('take_snapshot', { other: 'new args' });
 
       // 4th call should throw
       await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
