@@ -558,10 +558,6 @@ export class TestRig {
     extraEnv?: Record<string, string | undefined>,
   ): Record<string, string | undefined> {
     const cleanEnv: Record<string, string | undefined> = { ...process.env };
-    const hasExplicitGeminiApiKeyOverride =
-      Object.prototype.hasOwnProperty.call(extraEnv ?? {}, 'GEMINI_API_KEY');
-    const hasExplicitGoogleApiKeyOverride =
-      Object.prototype.hasOwnProperty.call(extraEnv ?? {}, 'GOOGLE_API_KEY');
 
     // Clear all GEMINI_ environment variables that might interfere with tests
     // except for those we explicitly want to keep or set.
@@ -590,10 +586,8 @@ export class TestRig {
     // should bypass the interactive auth flow unless a test explicitly overrides
     // auth-related environment variables.
     if (
-      !mergedEnv['GEMINI_API_KEY'] &&
-      !mergedEnv['GOOGLE_API_KEY'] &&
-      !hasExplicitGeminiApiKeyOverride &&
-      !hasExplicitGoogleApiKeyOverride
+      !Object.prototype.hasOwnProperty.call(mergedEnv, 'GEMINI_API_KEY') &&
+      !Object.prototype.hasOwnProperty.call(mergedEnv, 'GOOGLE_API_KEY')
     ) {
       mergedEnv['GEMINI_API_KEY'] = 'test-api-key';
     }
