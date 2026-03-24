@@ -21,8 +21,9 @@ import {
   PARAM_DESCRIPTION,
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  PARAM_ADDITIONAL_PERMISSIONS,
 } from './base-declarations.js';
 
 /**
@@ -109,6 +110,35 @@ export function getShellDeclaration(
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
         },
+        [PARAM_ADDITIONAL_PERMISSIONS]: {
+          type: 'object',
+          description:
+            'Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".',
+          properties: {
+            network: {
+              type: 'boolean',
+              description:
+                'Set to true to enable network access for this command.',
+            },
+            fileSystem: {
+              type: 'object',
+              properties: {
+                read: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description:
+                    'List of additional absolute paths to allow reading.',
+                },
+                write: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description:
+                    'List of additional absolute paths to allow writing.',
+                },
+              },
+            },
+          },
+        },
       },
       required: [SHELL_PARAM_COMMAND],
     },
@@ -118,20 +148,18 @@ export function getShellDeclaration(
 /**
  * Returns the FunctionDeclaration for exiting plan mode.
  */
-export function getExitPlanModeDeclaration(
-  plansDir: string,
-): FunctionDeclaration {
+export function getExitPlanModeDeclaration(): FunctionDeclaration {
   return {
     name: EXIT_PLAN_MODE_TOOL_NAME,
     description:
       'Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.',
     parametersJsonSchema: {
       type: 'object',
-      required: [EXIT_PLAN_PARAM_PLAN_PATH],
+      required: [EXIT_PLAN_PARAM_PLAN_FILENAME],
       properties: {
-        [EXIT_PLAN_PARAM_PLAN_PATH]: {
+        [EXIT_PLAN_PARAM_PLAN_FILENAME]: {
           type: 'string',
-          description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
+          description: `The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.`,
         },
       },
     },
