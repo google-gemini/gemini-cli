@@ -1240,6 +1240,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             id: call.request.callId,
             output: call.response.resultDisplay,
+            data: call.response.data,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
