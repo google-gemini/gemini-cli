@@ -11,7 +11,10 @@ import {
 import { LRUCache } from 'mnemonist';
 import { cpLen, cpSlice } from './textUtils.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
-import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+import {
+  AT_COMMAND_PATH_REGEX_SOURCE,
+  isInsideQuotedRegion,
+} from '../hooks/atCommandProcessor.js';
 
 export type HighlightToken = {
   text: string;
@@ -82,27 +85,7 @@ export function parseInputForHighlighting(
 
       // If this is a file reference, check if @ is inside a quoted region
       if (type === 'file') {
-        const textBefore = text.slice(0, matchIndex);
-        let inSingleQuote = false;
-        let inBacktick = false;
-        let escaped = false;
-        for (const char of textBefore) {
-          if (escaped) {
-            escaped = false;
-            continue;
-          }
-          if (char === '\\') {
-            escaped = true;
-            continue;
-          }
-          if (char === "'" && !inBacktick) {
-            inSingleQuote = !inSingleQuote;
-          }
-          if (char === '`' && !inSingleQuote) {
-            inBacktick = !inBacktick;
-          }
-        }
-        if (inSingleQuote || inBacktick) {
+        if (isInsideQuotedRegion(text, matchIndex)) {
           type = 'default';
         }
       }

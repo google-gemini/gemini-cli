@@ -314,6 +314,26 @@ describe('useCommandCompletion', () => {
         });
       });
 
+      it('should not trigger @ completion inside an unmatched single quote or backtick region', async () => {
+        const { result: singleQuoteResult } =
+          await renderCommandCompletionHook("say '@file");
+
+        await waitFor(() => {
+          expect(singleQuoteResult.current.completionMode).toBe(
+            CompletionMode.IDLE,
+          );
+        });
+
+        const { result: backtickResult } =
+          await renderCommandCompletionHook('say `@file');
+
+        await waitFor(() => {
+          expect(backtickResult.current.completionMode).toBe(
+            CompletionMode.IDLE,
+          );
+        });
+      });
+
       it.each([
         {
           shellModeActive: false,

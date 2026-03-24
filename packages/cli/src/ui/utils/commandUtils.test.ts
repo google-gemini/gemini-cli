@@ -192,6 +192,11 @@ describe('commandUtils', () => {
       expect(isAtCommand("explain '@override' in Java")).toBe(false);
     });
 
+    it('should return false when @ is inside an unmatched single quote or backtick region', () => {
+      expect(isAtCommand("say '@file")).toBe(false);
+      expect(isAtCommand('say `@file')).toBe(false);
+    });
+
     it('should return true when @ is outside quotes even if quotes exist', () => {
       expect(isAtCommand('explain `something` @file.py')).toBe(true);
     });

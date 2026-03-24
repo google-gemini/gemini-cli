@@ -1775,4 +1775,62 @@ describe('handleAtCommand - email and quote scenarios', () => {
       processedQuery: [{ text: query }],
     });
   });
+
+  it('should pass through query with unmatched single-quoted or backtick-quoted @ as plain text', async () => {
+    const singleQuoteQuery = "say '@file.txt";
+
+    const singleQuoteResult = await handleAtCommand({
+      query: singleQuoteQuery,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 907,
+      signal: abortController.signal,
+    });
+
+    expect(singleQuoteResult).toEqual({
+      processedQuery: [{ text: singleQuoteQuery }],
+    });
+
+    const backtickQuery = 'say `@file.txt';
+
+    const backtickResult = await handleAtCommand({
+      query: backtickQuery,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 908,
+      signal: abortController.signal,
+    });
+
+    expect(backtickResult).toEqual({
+      processedQuery: [{ text: backtickQuery }],
+    });
+  });
+
+  it('should preserve quoted literals while still processing a later @file', async () => {
+    const fileContent = 'Referenced file content.';
+    const filePath = await createTestFile('file.txt', fileContent);
+    const relativePath = path.relative(testRootDir, filePath);
+    const query = `explain '@override' and @${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 909,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `explain '@override' and @${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
 });

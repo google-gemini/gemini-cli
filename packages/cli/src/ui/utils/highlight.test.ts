@@ -80,6 +80,17 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 
+  it('should not highlight @ inside an unmatched single quote or backtick region', () => {
+    expect(parseInputForHighlighting("say '@file.js", 0)).toEqual([
+      { text: "say '", type: 'default' },
+      { text: '@file.js', type: 'default' },
+    ]);
+    expect(parseInputForHighlighting('say `@file.js', 0)).toEqual([
+      { text: 'say `', type: 'default' },
+      { text: '@file.js', type: 'default' },
+    ]);
+  });
+
   it('should not highlight command at the end of the string', () => {
     const text = 'Get help with /help';
     expect(parseInputForHighlighting(text, 0)).toEqual([

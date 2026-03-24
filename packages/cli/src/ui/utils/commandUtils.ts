@@ -12,16 +12,14 @@ import type { Writable } from 'node:stream';
 import type { Settings } from '../../config/settingsSchema.js';
 import {
   AT_COMMAND_PATH_REGEX_SOURCE,
-  escapeAtInQuotedRegions,
+  isInsideQuotedRegion,
 } from '../hooks/atCommandProcessor.js';
 
 // Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
 // Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
 // parseAllAtCommands would find at least one atPath part.
 // The lookbehind requires @ to NOT be preceded by a word character or backslash.
-const AT_COMMAND_DETECT_REGEX = new RegExp(
-  `(?<![\\w\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
-);
+const AT_COMMAND_DETECT_REGEX_SOURCE = `(?<![\\w\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`;
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -35,8 +33,18 @@ const AT_COMMAND_DETECT_REGEX = new RegExp(
  * @param query The input query string.
  * @returns True if the query looks like an '@' command, false otherwise.
  */
-export const isAtCommand = (query: string): boolean =>
-  AT_COMMAND_DETECT_REGEX.test(escapeAtInQuotedRegions(query));
+export const isAtCommand = (query: string): boolean => {
+  const atCommandRegex = new RegExp(AT_COMMAND_DETECT_REGEX_SOURCE, 'g');
+  let match: RegExpExecArray | null;
+
+  while ((match = atCommandRegex.exec(query)) !== null) {
+    if (!isInsideQuotedRegion(query, match.index)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 /**
  * Checks if a query string potentially represents an '/' command.

@@ -65,6 +65,39 @@ export function escapeAtInQuotedRegions(text: string): string {
 }
 
 /**
+ * Returns true when the given position is inside an open single-quote or
+ * backtick region. Double quotes are intentionally ignored because @"..."
+ * is a valid Windows-style @path.
+ */
+export function isInsideQuotedRegion(text: string, position: number): boolean {
+  let inSingleQuote = false;
+  let inBacktick = false;
+  let escaped = false;
+
+  for (let i = 0; i < position; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === "'" && !inBacktick) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+    if (char === '`' && !inSingleQuote) {
+      inBacktick = !inBacktick;
+    }
+  }
+
+  return inSingleQuote || inBacktick;
+}
+
+/**
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
@@ -104,9 +137,6 @@ function parseAllAtCommands(
   query: string,
   escapePastedAtSymbols = false,
 ): AtCommandPart[] {
-  // Pre-process: escape @ inside quoted regions so they are treated as literal text.
-  const preprocessed = escapeAtInQuotedRegions(query);
-
   const parts: AtCommandPart[] = [];
   let lastIndex = 0;
 
@@ -121,9 +151,13 @@ function parseAllAtCommands(
 
   let match: RegExpExecArray | null;
 
-  while ((match = atCommandRegex.exec(preprocessed)) !== null) {
+  while ((match = atCommandRegex.exec(query)) !== null) {
     const matchIndex = match.index;
     const fullMatch = match[0];
+
+    if (isInsideQuotedRegion(query, matchIndex)) {
+      continue;
+    }
 
     // Add text before @
     if (matchIndex > lastIndex) {

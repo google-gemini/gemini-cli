@@ -11,6 +11,7 @@ import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { logicalPosToOffset } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+import { isInsideQuotedRegion } from './atCommandProcessor.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
@@ -159,28 +160,7 @@ export function useCommandCompletion({
         }
 
         // Check if @ is inside backtick or single-quote quoted region
-        // using a state machine that correctly handles escaped quotes.
-        const textBeforeAt = currentLine.substring(0, i);
-        let inSingleQuote = false;
-        let inBacktick = false;
-        let escaped = false;
-        for (const char of textBeforeAt) {
-          if (escaped) {
-            escaped = false;
-            continue;
-          }
-          if (char === '\\') {
-            escaped = true;
-            continue;
-          }
-          if (char === "'" && !inBacktick) {
-            inSingleQuote = !inSingleQuote;
-          }
-          if (char === '`' && !inSingleQuote) {
-            inBacktick = !inBacktick;
-          }
-        }
-        if (inSingleQuote || inBacktick) {
+        if (isInsideQuotedRegion(currentLine, i)) {
           break; // Inside a quoted region — treat as literal
         }
 
