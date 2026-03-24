@@ -11,7 +11,7 @@ To start Gemini CLI in ACP mode, use the `--acp` flag:
 gemini --acp
 ```
 
-## Agent Communication Protocol (ACP)
+## Agent Client Protocol (ACP)
 
 ACP is an open protocol that standardizes how AI coding agents communicate with
 code editors and IDEs. It addresses the challenge of fragmented distribution,
