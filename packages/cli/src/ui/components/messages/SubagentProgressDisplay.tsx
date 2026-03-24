@@ -153,7 +153,7 @@ export const SubagentProgressDisplay: React.FC<
         })}
       </Box>
 
-      {progress.state === 'completed' && progress.result && (
+      {progress.result && (
         <Box flexDirection="column" marginTop={1}>
           {progress.terminateReason && progress.terminateReason !== 'GOAL' && (
             <Box marginBottom={1}>
@@ -164,7 +164,7 @@ export const SubagentProgressDisplay: React.FC<
           )}
           <MarkdownDisplay
             text={safeJsonToMarkdown(progress.result)}
-            isPending={false}
+            isPending={progress.state !== 'completed'}
             terminalWidth={terminalWidth}
           />
         </Box>

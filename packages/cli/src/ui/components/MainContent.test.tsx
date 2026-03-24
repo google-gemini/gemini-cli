@@ -97,7 +97,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 
   it('inspects only the last pending tool_group item if current has no tools', () => {
-    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const item = { type: 'tool_group' as const, tools: [], id: -1 };
     const pendingItems = [
       {
         type: 'tool_group' as const,
@@ -158,7 +158,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -187,7 +187,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -276,7 +276,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -292,7 +292,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 
   it('handles empty tools with active shell turn (isCurrentlyInShellTurn)', () => {
-    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const item = { type: 'tool_group' as const, tools: [], id: -1 };
 
     // active shell turn
     const result = getToolGroupBorderAppearance(
@@ -364,14 +364,9 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -452,14 +447,9 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -479,16 +469,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -507,16 +492,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as unknown as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as unknown as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -564,14 +544,9 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
     const output = lastFrame();
     // Verify Part 1 and Part 2 are rendered.
     expect(output).toContain('Part 1');
@@ -629,7 +604,6 @@ describe('MainContent', () => {
     const renderResult = await renderWithProviders(<MainContent />, {
       uiState: uiState as Partial<UIState>,
     });
-    await renderResult.waitUntilReady();
 
     const output = renderResult.lastFrame();
     expect(output).toContain('Initial analysis');
@@ -693,7 +667,7 @@ describe('MainContent', () => {
           pendingHistoryItems: [
             {
               type: 'tool_group',
-              id: 1,
+              id: -1,
               tools: [
                 {
                   callId: 'call_1',
@@ -732,15 +706,16 @@ describe('MainContent', () => {
           bannerVisible: false,
         };
 
-        const { lastFrame, waitUntilReady, unmount } =
-          await renderWithProviders(<MainContent />, {
+        const { lastFrame, unmount } = await renderWithProviders(
+          <MainContent />,
+          {
             uiState: uiState as Partial<UIState>,
             config: makeFakeConfig({ useAlternateBuffer: isAlternateBuffer }),
             settings: createMockSettings({
               ui: { useAlternateBuffer: isAlternateBuffer },
             }),
-          });
-        await waitUntilReady();
+          },
+        );
 
         const output = lastFrame();
 

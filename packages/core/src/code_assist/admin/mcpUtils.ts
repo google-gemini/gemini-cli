@@ -37,6 +37,7 @@ export function applyAdminAllowlist(
     const adminConfig = adminAllowlist[serverId];
     if (adminConfig) {
       const mergedConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localConfig,
         url: adminConfig.url,
         type: adminConfig.type,

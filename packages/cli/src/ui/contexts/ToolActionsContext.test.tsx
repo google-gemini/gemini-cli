@@ -7,7 +7,6 @@
 import { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
-import { waitFor } from '../../test-utils/async.js';
 import { ToolActionsProvider, useToolActions } from './ToolActionsContext.js';
 import {
   type Config,
@@ -81,7 +80,7 @@ describe('ToolActionsContext', () => {
   );
 
   it('publishes to MessageBus for tools with correlationId', async () => {
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), { wrapper });
 
     await result.current.confirm(
       'modern-call',
@@ -99,7 +98,7 @@ describe('ToolActionsContext', () => {
   });
 
   it('handles cancel by calling confirm with Cancel outcome', async () => {
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), { wrapper });
 
     await result.current.cancel('modern-call');
 
@@ -112,20 +111,26 @@ describe('ToolActionsContext', () => {
   });
 
   it('resolves IDE diffs for edit tools when in IDE mode', async () => {
+    let deferredIdeClient: { resolve: (c: IdeClient) => void };
     const mockIdeClient = {
       isDiffingEnabled: vi.fn().mockReturnValue(true),
       resolveDiffFromCli: vi.fn(),
+      addStatusChangeListener: vi.fn(),
+      removeStatusChangeListener: vi.fn(),
     } as unknown as IdeClient;
-    vi.mocked(IdeClient.getInstance).mockResolvedValue(mockIdeClient);
+
+    vi.mocked(IdeClient.getInstance).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deferredIdeClient = { resolve };
+        }),
+    );
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
 
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), { wrapper });
 
-    // Wait for IdeClient initialization in useEffect
     await act(async () => {
-      await waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
-      // Give React a chance to update state
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      deferredIdeClient.resolve(mockIdeClient);
     });
 
     await result.current.confirm(
@@ -146,6 +151,8 @@ describe('ToolActionsContext', () => {
 
   it('updates isDiffingEnabled when IdeClient status changes', async () => {
     let statusListener: () => void = () => {};
+    let deferredIdeClient: { resolve: (c: IdeClient) => void };
+
     const mockIdeClient = {
       isDiffingEnabled: vi.fn().mockReturnValue(false),
       addStatusChangeListener: vi.fn().mockImplementation((listener) => {
@@ -154,15 +161,18 @@ describe('ToolActionsContext', () => {
       removeStatusChangeListener: vi.fn(),
     } as unknown as IdeClient;
 
-    vi.mocked(IdeClient.getInstance).mockResolvedValue(mockIdeClient);
+    vi.mocked(IdeClient.getInstance).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deferredIdeClient = { resolve };
+        }),
+    );
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
 
-    const { result } = renderHook(() => useToolActions(), { wrapper });
+    const { result } = await renderHook(() => useToolActions(), { wrapper });
 
-    // Wait for initialization
     await act(async () => {
-      await waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      deferredIdeClient.resolve(mockIdeClient);
     });
 
     expect(result.current.isDiffingEnabled).toBe(false);
@@ -202,7 +212,7 @@ describe('ToolActionsContext', () => {
       } as unknown as SerializableConfirmationDetails,
     };
 
-    const { result } = renderHook(() => useToolActions(), {
+    const { result } = await renderHook(() => useToolActions(), {
       wrapper: ({ children }) => (
         <ToolActionsProvider config={mockConfig} toolCalls={[legacyTool]}>
           {children}
