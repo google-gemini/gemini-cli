@@ -492,8 +492,8 @@ describe('AppContainer State Management', () => {
     // Mock LoadedSettings
     mockSettings = createMockSettings({
       hideBanner: false,
-      hideFooter: false,
       hideTips: false,
+      hideFooter: false,
       showMemoryUsage: false,
       theme: 'default',
       ui: {
@@ -914,8 +914,8 @@ describe('AppContainer State Management', () => {
     it('handles settings with all display options disabled', async () => {
       const settingsAllHidden = createMockSettings({
         hideBanner: true,
-        hideFooter: true,
         hideTips: true,
+        hideFooter: true,
         showMemoryUsage: false,
       });
 
@@ -2160,13 +2160,8 @@ describe('AppContainer State Management', () => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         pressKey('\x04'); // Ctrl+D
-        // Now count is 2, it should quit.
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
-          '/quit',
-          undefined,
-          undefined,
-          false,
-        );
+        // It should still not quit because buffer is non-empty.
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
       });
 

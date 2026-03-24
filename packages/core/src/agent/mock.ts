@@ -8,8 +8,8 @@ import type {
   AgentEvent,
   AgentEventCommon,
   AgentEventData,
-  AgentSend,
   AgentProtocol,
+  AgentSend,
   Unsubscribe,
 } from './types.js';
 
@@ -86,12 +86,7 @@ export class MockAgentProtocol implements AgentProtocol {
   ) {
     const now = new Date().toISOString();
     for (const eventData of events) {
-      const event: AgentEvent = {
-        ...eventData,
-        id: eventData.id ?? `e-${this._nextEventId++}`,
-        timestamp: eventData.timestamp ?? now,
-        streamId: eventData.streamId ?? streamId,
-      } as AgentEvent;
+      const event = this._normalizeEvent(eventData, now, streamId);
       this._emit(event);
     }
 
@@ -99,13 +94,13 @@ export class MockAgentProtocol implements AgentProtocol {
       options?.close &&
       !events.some((eventData) => eventData.type === 'agent_end')
     ) {
-      this._emit({
-        id: `e-${this._nextEventId++}`,
-        timestamp: now,
-        streamId,
-        type: 'agent_end',
-        reason: 'completed',
-      } as AgentEvent);
+      this._emit(
+        this._normalizeEvent(
+          { type: 'agent_end', reason: 'completed' },
+          now,
+          streamId,
+        ),
+      );
     }
   }
 
@@ -123,15 +118,18 @@ export class MockAgentProtocol implements AgentProtocol {
 
     const now = new Date().toISOString();
     const eventsToEmit: AgentEvent[] = [];
+    let fallbackStreamId: string | undefined;
 
-    // Helper to normalize and prepare for emission
+    // All emitted events stay correlated to a stream even if this send does not
+    // start agent activity and therefore returns `streamId: null`.
     const normalize = (eventData: MockAgentEvent): AgentEvent =>
-      ({
-        ...eventData,
-        id: eventData.id ?? `e-${this._nextEventId++}`,
-        timestamp: eventData.timestamp ?? now,
-        streamId: eventData.streamId ?? streamId,
-      }) as AgentEvent;
+      this._normalizeEvent(
+        eventData,
+        now,
+        eventData.streamId ??
+          streamId ??
+          (fallbackStreamId ??= `mock-stream-${this._nextStreamId++}`),
+      );
 
     // 1. User/Update event (BEFORE agent_start)
     if ('message' in payload && payload.message) {
@@ -223,16 +221,32 @@ export class MockAgentProtocol implements AgentProtocol {
     return { streamId };
   }
 
+  private _normalizeEvent(
+    eventData: MockAgentEvent,
+    timestamp: string,
+    streamId: string,
+  ): AgentEvent {
+    // TypeScript loses the specific union member when we add common event
+    // fields here, so keep the narrowing local to this mock-only helper.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return {
+      ...eventData,
+      id: eventData.id ?? `e-${this._nextEventId++}`,
+      timestamp: eventData.timestamp ?? timestamp,
+      streamId: eventData.streamId ?? streamId,
+    } as AgentEvent;
+  }
+
   async abort(): Promise<void> {
     if (this._lastStreamId && this._activeStreamIds.has(this._lastStreamId)) {
       const streamId = this._lastStreamId;
-      this._emit({
-        id: `e-${this._nextEventId++}`,
-        timestamp: new Date().toISOString(),
-        streamId,
-        type: 'agent_end',
-        reason: 'aborted',
-      } as AgentEvent);
+      this._emit(
+        this._normalizeEvent(
+          { type: 'agent_end', reason: 'aborted' },
+          new Date().toISOString(),
+          streamId,
+        ),
+      );
     }
   }
 }
