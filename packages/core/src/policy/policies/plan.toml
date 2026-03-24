@@ -115,7 +115,7 @@ toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+([\\\\/]+[\\w-]+)?[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]
