@@ -48,7 +48,11 @@ describe('ExtensionDetails', () => {
     mockOnLink = vi.fn();
   });
 
-  const renderDetails = async (isInstalled = false) =>
+  const renderDetails = async (
+    isInstalled = false,
+    hasUpdate = false,
+    onUpdate = vi.fn(),
+  ) =>
     renderWithProviders(
       <ExtensionDetails
         extension={mockExtension}
@@ -56,6 +60,8 @@ describe('ExtensionDetails', () => {
         onInstall={mockOnInstall}
         onLink={mockOnLink}
         isInstalled={isInstalled}
+        hasUpdate={hasUpdate}
+        onUpdate={onUpdate}
       />,
     );
 
@@ -163,6 +169,24 @@ describe('ExtensionDetails', () => {
     );
     await waitFor(() => {
       expect(lastFrame()).toContain('[L] Link');
+    });
+  });
+
+  it('should show update button when update is available', async () => {
+    const { lastFrame } = await renderDetails(true, true);
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[I] Update');
+    });
+  });
+
+  it('should call onUpdate when "i" is pressed', async () => {
+    const mockOnUpdate = vi.fn();
+    const { stdin } = await renderDetails(true, true, mockOnUpdate);
+    await React.act(async () => {
+      stdin.write('i');
+    });
+    await waitFor(() => {
+      expect(mockOnUpdate).toHaveBeenCalled();
     });
   });
 });
