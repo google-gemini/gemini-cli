@@ -15,12 +15,14 @@ import type {
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
+import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool } from './ToolShared.js';
 import {
   shouldHideToolCall,
   CoreToolCallStatus,
+  Kind,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
@@ -125,12 +127,36 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
-    if (tool.resultDisplay !== undefined && tool.resultDisplay !== '') {
+    if (
+      tool.kind !== Kind.Agent &&
+      tool.resultDisplay !== undefined &&
+      tool.resultDisplay !== ''
+    ) {
       countToolCallsWithResults++;
     }
   }
   const countOneLineToolCalls =
-    visibleToolCalls.length - countToolCallsWithResults;
+    visibleToolCalls.filter((t) => t.kind !== Kind.Agent).length -
+    countToolCallsWithResults;
+  const groupedTools = useMemo(() => {
+    const groups: Array<
+      IndividualToolCallDisplay | IndividualToolCallDisplay[]
+    > = [];
+    for (const tool of visibleToolCalls) {
+      if (tool.kind === Kind.Agent) {
+        const lastGroup = groups[groups.length - 1];
+        if (Array.isArray(lastGroup)) {
+          lastGroup.push(tool);
+        } else {
+          groups.push([tool]);
+        }
+      } else {
+        groups.push(tool);
+      }
+    }
+    return groups;
+  }, [visibleToolCalls]);
+
   const availableTerminalHeightPerToolMessage = availableTerminalHeight
     ? Math.max(
         Math.floor(
@@ -167,8 +193,29 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
     >
-      {visibleToolCalls.map((tool, index) => {
+      {groupedTools.map((group, index) => {
         const isFirst = index === 0;
+        const resolvedIsFirst =
+          borderTopOverride !== undefined
+            ? borderTopOverride && isFirst
+            : isFirst;
+
+        if (Array.isArray(group)) {
+          return (
+            <SubagentGroupDisplay
+              key={group[0].callId}
+              toolCalls={group}
+              availableTerminalHeight={availableTerminalHeight}
+              terminalWidth={contentWidth}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              isFirst={resolvedIsFirst}
+              isExpandable={isExpandable}
+            />
+          );
+        }
+
+        const tool = group;
         const isShellToolCall = isShellTool(tool.name);
 
         const commonProps = {
@@ -176,10 +223,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           availableTerminalHeight: availableTerminalHeightPerToolMessage,
           terminalWidth: contentWidth,
           emphasis: 'medium' as const,
-          isFirst:
-            borderTopOverride !== undefined
-              ? borderTopOverride && isFirst
-              : isFirst,
+          isFirst: resolvedIsFirst,
           borderColor,
           borderDimColor,
           isExpandable,

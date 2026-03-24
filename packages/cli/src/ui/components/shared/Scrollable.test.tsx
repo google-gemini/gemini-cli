@@ -29,25 +29,23 @@ describe('<Scrollable />', () => {
   });
 
   it('renders children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Hello World</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Hello World');
     unmount();
   });
 
   it('renders multiple children', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
         <Text>Line 3</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Line 1');
     expect(lastFrame()).toContain('Line 2');
     expect(lastFrame()).toContain('Line 3');
@@ -55,14 +53,13 @@ describe('<Scrollable />', () => {
   });
 
   it('matches snapshot', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Scrollable hasFocus={false} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
         <Text>Line 3</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -77,7 +74,7 @@ describe('<Scrollable />', () => {
       },
     );
 
-    const { waitUntilReady, unmount } = renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <Scrollable hasFocus={true} height={5}>
         <Text>Line 1</Text>
         <Text>Line 2</Text>
@@ -91,7 +88,6 @@ describe('<Scrollable />', () => {
         <Text>Line 10</Text>
       </Scrollable>,
     );
-    await waitUntilReady();
 
     expect(capturedEntry).toBeDefined();
 
@@ -104,22 +100,20 @@ describe('<Scrollable />', () => {
 
     // Initial state with scrollToBottom={true}
     unmount();
-    const { waitUntilReady: waitUntilReady2, unmount: unmount2 } =
-      renderWithProviders(
-        <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
-          <Text>Line 1</Text>
-          <Text>Line 2</Text>
-          <Text>Line 3</Text>
-          <Text>Line 4</Text>
-          <Text>Line 5</Text>
-          <Text>Line 6</Text>
-          <Text>Line 7</Text>
-          <Text>Line 8</Text>
-          <Text>Line 9</Text>
-          <Text>Line 10</Text>
-        </Scrollable>,
-      );
-    await waitUntilReady2();
+    const { unmount: unmount2 } = await renderWithProviders(
+      <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+        <Text>Line 1</Text>
+        <Text>Line 2</Text>
+        <Text>Line 3</Text>
+        <Text>Line 4</Text>
+        <Text>Line 5</Text>
+        <Text>Line 6</Text>
+        <Text>Line 7</Text>
+        <Text>Line 8</Text>
+        <Text>Line 9</Text>
+        <Text>Line 10</Text>
+      </Scrollable>,
+    );
     await waitFor(() => {
       expect(capturedEntry?.getScrollState().scrollTop).toBe(5);
     });
@@ -197,14 +191,13 @@ describe('<Scrollable />', () => {
           },
         );
 
-        const { stdin, waitUntilReady, unmount } = renderWithProviders(
+        const { stdin, unmount, waitUntilReady } = await renderWithProviders(
           <Scrollable hasFocus={true} height={5}>
             <Box height={scrollHeight}>
               <Text>Content</Text>
             </Box>
           </Scrollable>,
         );
-        await waitUntilReady();
 
         // Ensure initial state using existing scrollBy method
         await act(async () => {
