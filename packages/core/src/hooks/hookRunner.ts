@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn, execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   HookEventName,
   ConfigSource,
@@ -569,12 +569,16 @@ export class HookRunner {
    * Helper to force kill a child process tree on Windows
    */
   private killProcessWindows(pid: number): void {
-    try {
-      execSync(`taskkill /pid ${pid} /f /t`, { timeout: 2000 });
-    } catch (_e) {
+    const killer = spawn('taskkill', ['/pid', String(pid), '/f', '/t'], {
+      detached: true,
+      stdio: 'ignore',
+      timeout: 2000,
+    });
+    killer.on('error', (error) => {
       // Ignore errors if process is already dead or access denied
-      debugLogger.debug(`Taskkill failed for pid ${pid}: ${_e}`);
-    }
+      debugLogger.debug(`Taskkill failed for pid ${pid}: ${error}`);
+    });
+    killer.unref();
   }
 
   /**
