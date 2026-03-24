@@ -7,10 +7,7 @@
 import { writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
-import {
-  writeToStderr,
-  type AdminControlsSettings,
-} from '@google/gemini-cli-core';
+import { type AdminControlsSettings } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
@@ -29,7 +26,6 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       // visible before process.exit() terminates. The buffered writeToStderr()
       // can lose output on macOS when stderr is piped.
       writeFileSync(2, message);
-      writeToStderr(message);
       process.exit(1);
     }
   }
