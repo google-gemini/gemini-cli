@@ -170,6 +170,15 @@ class LegacyAgentProtocol implements AgentProtocol {
       for (const tc of event.toolCalls) {
         if (tc.status === 'awaiting_approval') {
           this._emit([
+            this._makeToolResponseEvent({
+              requestId: tc.request.callId,
+              name: tc.request.name,
+              content: [
+                { type: 'text', text: 'Tool approvals not yet implemented.' },
+              ],
+              isError: true,
+              displayContent: [{ type: 'text', text: 'Approval required' }],
+            }),
             this._makeErrorEvent({
               status: 'UNIMPLEMENTED',
               message:
