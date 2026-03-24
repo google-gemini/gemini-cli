@@ -392,6 +392,13 @@
           "default": false,
           "type": "boolean"
         },
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Whether to collapse the UI drawer when a tool is awaiting confirmation.",
+          "markdownDescription": "Whether to collapse the UI drawer when a tool is awaiting confirmation.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showMemoryUsage": {
           "title": "Show Memory Usage",
           "description": "Display memory usage information in the UI",
