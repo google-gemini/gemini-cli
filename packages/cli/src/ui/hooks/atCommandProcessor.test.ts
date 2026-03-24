@@ -1581,6 +1581,13 @@ describe('handleAtCommand - email and quote scenarios', () => {
   const mockOnDebugMessage: Mock<(message: string) => void> = vi.fn();
   let abortController: AbortController;
 
+  async function createTestFile(relativePath: string, contents: string) {
+    const fullPath = path.join(testRootDir, relativePath);
+    await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
+    await fsPromises.writeFile(fullPath, contents);
+    return fullPath;
+  }
+
   beforeEach(async () => {
     vi.restoreAllMocks();
     vi.resetAllMocks();
@@ -1699,6 +1706,42 @@ describe('handleAtCommand - email and quote scenarios', () => {
     });
   });
 
+  it('should pass through query when @ is preceded by a word character', async () => {
+    await createTestFile('file.txt', 'should not be read');
+    const query = 'hello@file.txt';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 903,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query when @ is escaped with a backslash', async () => {
+    await createTestFile('file.txt', 'should not be read');
+    const query = '\\@file.txt';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 904,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
   it('should pass through query with backtick-quoted @ as plain text', async () => {
     const query = 'explain `@decorators` in Python';
 
@@ -1707,7 +1750,7 @@ describe('handleAtCommand - email and quote scenarios', () => {
       config: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
-      messageId: 901,
+      messageId: 905,
       signal: abortController.signal,
     });
 
@@ -1724,7 +1767,7 @@ describe('handleAtCommand - email and quote scenarios', () => {
       config: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
-      messageId: 902,
+      messageId: 906,
       signal: abortController.signal,
     });
 

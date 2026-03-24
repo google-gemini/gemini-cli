@@ -115,7 +115,7 @@ function parseAllAtCommands(
   // This prevents email addresses (user@host), concatenated text (hello@file),
   // and escaped @-references (\\@file) from matching.
   const atCommandRegex = new RegExp(
-    `(?<![\\\\w\\\\\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `(?<![\\w\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 
