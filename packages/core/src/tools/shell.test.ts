@@ -668,6 +668,39 @@ describe('ShellTool', () => {
     });
   });
 
+  describe('getDisplayTitle and getExplanation', () => {
+    it('should return only the command for getDisplayTitle', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+        dir_path: 'foo/bar',
+        is_background: true,
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('echo hello');
+    });
+
+    it('should return the context for getExplanation', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+        dir_path: 'foo/bar',
+        is_background: true,
+      });
+      expect(invocation.getExplanation?.()).toBe(
+        '[in foo/bar] (prints hello) [background]',
+      );
+    });
+
+    it('should construct explanation without optional parameters', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+      });
+      expect(invocation.getExplanation?.()).toBe(
+        `[current working directory ${process.cwd()}]`,
+      );
+    });
+  });
+
   describe('llmContent output format', () => {
     const mockAbortSignal = new AbortController().signal;
 
