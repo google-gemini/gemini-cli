@@ -244,14 +244,18 @@ function formatZodError(
               return null;
 
             const unionIssues = unionError.issues
-              .map((u) => `${u.path.join('.')}: ${u.message}`)
+              .map((u) => {
+                const pathStr = u.path.join('.');
+                return pathStr ? `${pathStr}: ${u.message}` : u.message;
+              })
               .join(', ');
             return `(${label}) ${unionIssues}`;
           })
           .filter(Boolean)
           .join('\n');
       }
-      return `${i.path.join('.')}: ${i.message}`;
+      const pathStr = i.path.join('.');
+      return pathStr ? `${pathStr}: ${i.message}` : i.message;
     })
     .join('\n');
   return `${context}:\n${issues}`;
