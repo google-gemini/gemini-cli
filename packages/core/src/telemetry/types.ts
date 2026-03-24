@@ -2389,11 +2389,13 @@ export class OnboardingSuccessEvent implements BaseTelemetryEvent {
   'event.name': 'onboarding_success';
   'event.timestamp': string;
   userTier?: UserTierId;
+  duration_ms?: number;
 
-  constructor(userTier?: UserTierId) {
+  constructor(userTier?: UserTierId, duration_ms?: number) {
     this['event.name'] = 'onboarding_success';
     this['event.timestamp'] = new Date().toISOString();
     this.userTier = userTier;
+    this.duration_ms = duration_ms;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -2402,11 +2404,12 @@ export class OnboardingSuccessEvent implements BaseTelemetryEvent {
       'event.name': EVENT_ONBOARDING_SUCCESS,
       'event.timestamp': this['event.timestamp'],
       user_tier: this.userTier ?? '',
+      duration_ms: this.duration_ms ?? 0,
     };
   }
 
   toLogBody(): string {
-    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}`;
+    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}${this.duration_ms !== undefined ? `. Duration: ${this.duration_ms}ms` : ''}`;
   }
 }
 
