@@ -1,0 +1,65 @@
+---
+name: review-duplication
+description: Use this skill during code reviews to proactively investigate the codebase for duplicated functionality, reinvented wheels, or failure to reuse existing project best practices and shared utilities.
+---
+
+# Review Duplication
+
+## Overview
+
+This skill provides a structured workflow for investigating a codebase during a code review to identify duplicated logic, reinvented utilities, and missed opportunities to reuse established patterns. By executing this workflow, you ensure that new code integrates seamlessly with the existing project architecture.
+
+## Workflow: Investigating for Duplication
+
+When reviewing code, perform the following steps before finalizing your review:
+
+### 1. Extract Core Logic
+Analyze the new code to identify the core algorithms, utility functions, generic data structures, or UI components being introduced. Look beyond the specific business logic to see the underlying mechanics.
+
+### 2. Hypothesize Existing Locations & Trace Dependencies
+Think about where this type of code *would* live if it already existed in the project.
+- **Utilities:** `utils/`, `helpers/`, `shared/`, `core/`
+- **UI Components:** `components/`, `ui/`, `design-system/`
+- **Data Access:** `api/`, `services/`, `repositories/`
+- **Constants:** `constants/`, `config/`, `types/`
+
+**Trace Third-Party Dependencies:** If the PR introduces a new import for a utility library (e.g., `lodash.merge`, `date-fns`), immediately run a `grep_search` for that import string across the codebase to see how and where the project currently uses that library. There is likely an existing wrapper or shared utility.
+
+**Check Package Files:** Before flagging a custom implementation of a complex algorithm, check `package.json` to see if a standard library (like `lodash` or `uuid`) is already installed that provides this functionality.
+
+### 3. Investigate the Codebase (Advanced Search)
+Use your search tools to thoroughly investigate the hypothesized locations and the broader codebase. Employ these advanced strategies:
+
+- **Targeted Directory Searches:** Always perform a targeted search first. If you hypothesize the code belongs in utilities, run `grep_search(dir_path: 'packages/core/src/utils', pattern: '...')` before falling back to a global search.
+- **Semantic/Structural Grepping:** Do not just search for the exact function name the author used. Search for the underlying APIs being used. For example:
+  - Date utility: `grep_search(pattern: 'Intl\\.DateTimeFormat|\\.getTime\\(\\)|date-fns')`
+  - Debounce function: Search for `setTimeout` combined with `clearTimeout`.
+- **Naming Conventions:** Search for similar function names, variable names, class names, or prop structures.
+- **Comments:** Search for comments or documentation describing similar behavior.
+- **Codebase Investigator:** If exact text searches fail or the scope is too broad, delegate to the `codebase_investigator` tool using queries like: "Where are date formatting utilities centralized in this project?" or "Is there an existing React hook for managing debounced state?"
+
+### 4. Evaluate Best Practices
+Check if the new code aligns with the project's established conventions.
+- **Error Handling:** Does it use the project's standard error classes or logging mechanisms?
+- **State Management:** Does it bypass established stores or contexts?
+- **Styling:** Does it hardcode colors or spacing instead of using theme variables?
+If the PR introduces a new pattern, aggressively verify if an existing pattern should have been used instead.
+
+### 5. Formulate Constructive Feedback
+If you discover that the PR duplicates existing functionality or ignores a best practice:
+- Provide a clear review comment.
+- **Identify the Source:** Explicitly mention the absolute or project-relative file path and the specific symbol (function, component, class) that should be reused.
+- **Implementation Guidance:** Provide a brief code snippet or a clear explanation showing **how** to integrate the existing code to fulfill the task's requirements.
+- **Explain the Value:** Briefly explain why reusing the existing code is beneficial (e.g., maintainability, consistency, built-in edge case handling).
+
+Example comment:
+> "It looks like this PR introduces a new `formatDate` utility. We already have a robust, tested `formatDate` function in `src/utils/dateHelpers.ts`. 
+>
+> You can replace your implementation by importing it like this:
+> ```typescript
+> import { formatDate } from '@/utils/dateHelpers';
+> 
+> // Then use it here:
+> const displayDate = formatDate(userDate, 'MMM Do, YYYY');
+> ```
+> Reusing this ensures that the date formatting remains consistent with the rest of the application and handles timezone conversions correctly."
