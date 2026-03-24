@@ -30,6 +30,8 @@ import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
   parseMcpToolName,
+  formatMcpToolName,
+  isMcpToolName,
 } from '../tools/mcp-tool.js';
 
 function isWildcardPattern(name: string): boolean {
@@ -86,14 +88,14 @@ function ruleMatches(
   }
 
   // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
-  if ('subagent' in rule && rule.subagent) {
+  if ('subagent' in rule && rule.subagent !== undefined) {
     if (rule.subagent !== subagent) {
       return false;
     }
   }
 
   // Strictly enforce mcpName identity if the rule dictates it
-  if (rule.mcpName) {
+  if (rule.mcpName !== undefined) {
     if (rule.mcpName === '*') {
       // Rule requires it to be ANY MCP tool
       if (serverName === undefined) return false;
@@ -104,7 +106,7 @@ function ruleMatches(
   }
 
   // Check tool name if specified
-  if (rule.toolName) {
+  if (rule.toolName !== undefined) {
     // Support wildcard patterns: "mcp_serverName_*" matches "mcp_serverName_anyTool"
     if (rule.toolName === '*') {
       // Match all tools
@@ -116,7 +118,28 @@ function ruleMatches(
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
-      return false;
+      // If names don't match exactly, check for MCP short/full name mismatches
+      let mcpMatch = false;
+      if (serverName && toolCall.name) {
+        // Case 1: Rule uses short name + mcpName -> match FQN tool call
+        if (rule.mcpName && !isMcpToolName(rule.toolName)) {
+          if (
+            toolCall.name === formatMcpToolName(rule.mcpName, rule.toolName)
+          ) {
+            mcpMatch = true;
+          }
+        }
+        // Case 2: Rule uses FQN -> match short tool call (qualified by serverName)
+        if (!mcpMatch && isMcpToolName(rule.toolName)) {
+          if (rule.toolName === formatMcpToolName(serverName, toolCall.name)) {
+            mcpMatch = true;
+          }
+        }
+      }
+
+      if (!mcpMatch) {
+        return false;
+      }
     }
   }
 
@@ -180,6 +203,40 @@ export class PolicyEngine {
     this.hookCheckers = (config.hookCheckers ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
+
+    // Validate rules
+    for (const rule of this.rules) {
+      if (rule.toolName === undefined || rule.toolName === '') {
+        throw new Error(
+          `Invalid policy rule: toolName is required. Use '*' for all tools. Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+      if (rule.mcpName === '') {
+        throw new Error(
+          `Invalid policy rule: mcpName is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+      if (rule.subagent === '') {
+        throw new Error(
+          `Invalid policy rule: subagent is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+    }
+
+    // Validate checkers
+    for (const checker of this.checkers) {
+      if (checker.toolName === undefined || checker.toolName === '') {
+        throw new Error(
+          `Invalid safety checker rule: toolName is required. Use '*' for all tools. Checker source: ${checker.source || 'unknown'}`,
+        );
+      }
+      if (checker.mcpName === '') {
+        throw new Error(
+          `Invalid safety checker rule: mcpName is required if specified (cannot be empty). Checker source: ${checker.source || 'unknown'}`,
+        );
+      }
+    }
+
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;

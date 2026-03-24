@@ -244,6 +244,11 @@ export const HooksDialog: React.FC<HooksDialogProps> = ({
           </Box>
         </>
       )}
+      <Box marginTop={1} flexDirection="column">
+        <Text color={theme.text.secondary} wrap="truncate">
+          (Press Esc to close)
+        </Text>
+      </Box>
     </Box>
   );
 };
