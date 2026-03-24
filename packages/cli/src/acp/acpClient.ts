@@ -300,6 +300,7 @@ export class GeminiAgent {
         sessionId,
         this.clientCapabilities.fs,
         config.getFileSystemService(),
+        cwd,
       );
       config.setFileSystemService(acpFileSystemService);
     }
@@ -356,16 +357,6 @@ export class GeminiAgent {
     const sessionSelector = new SessionSelector(config);
     const { sessionData, sessionPath } =
       await sessionSelector.resolveSession(sessionId);
-
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
-        sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-      );
-      config.setFileSystemService(acpFileSystemService);
-    }
 
     const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
@@ -440,7 +431,19 @@ export class GeminiAgent {
       throw acp.RequestError.authRequired();
     }
 
-    // 3. Now that we are authenticated, it is safe to initialize the config
+    // 3. Set the ACP FileSystemService (if supported) before config initialization
+    if (this.clientCapabilities?.fs) {
+      const acpFileSystemService = new AcpFileSystemService(
+        this.connection,
+        sessionId,
+        this.clientCapabilities.fs,
+        config.getFileSystemService(),
+        cwd,
+      );
+      config.setFileSystemService(acpFileSystemService);
+    }
+
+    // 4. Now that we are authenticated, it is safe to initialize the config
     // which starts the MCP servers and other heavy resources.
     await config.initialize();
     startupProfiler.flush(config);
