@@ -358,18 +358,18 @@ back to grep.
 
 ## Verified Results
 
-Session comparison on PyTorch codebase (~6,330 files, 61,475 functions,
-1,223,155 call edges):
+Session comparison on a medium-sized codebase (numbers to be updated with
+validated benchmarks — see beta disclaimer in README):
 
 | Metric                      | Vanilla | Experimental |
 | --------------------------- | ------- | ------------ |
-| Graph tool calls            | 0       | 13           |
-| `read_file` calls           | 5       | 0            |
-| Subagent duration           | 2m 21s  | —            |
-| Subagent tokens (pro model) | 363,956 | 0            |
-| Total tokens                | ~389k   | ~240k        |
-| Cache hit rate              | 35.8%   | 89.1%        |
-| Avg graph_query latency     | —       | 134ms        |
+| Graph tool calls            |         |              |
+| `read_file` calls           |         |              |
+| Subagent duration           |         |              |
+| Subagent tokens (pro model) |         |              |
+| Total tokens                |         |              |
+| Cache hit rate              |         |              |
+| Avg graph_query latency     |         |              |
 
 ---
 
@@ -553,16 +553,194 @@ codebase_investigator (if delegated)
 
 ---
 
+---
+
+## Phase 5 — Graph Engine Optimisations (current)
+
+### Problem
+
+With the G+ReAct routing working correctly, two new bottlenecks surfaced as
+repos grew:
+
+1. **Search was a full table scan.** `queryGraph()` used
+   `WHERE name LIKE '%keyword%'` with a leading wildcard — SQLite cannot use a
+   B-tree index on a leading wildcard, so every search scanned the entire
+   `nodes` table. On a repo with 100k+ functions this is O(n) per query.
+
+2. **N+1 SQL queries per search.** For each matched node, two more queries fired
+   (one for callees, one for callers). Ten results = 21 queries.
+
+3. **graph_query returned 1-hop only.** Despite the description saying "full
+   call chain", `queryGraph` only returned immediate neighbours. Transitive call
+   chains required the agent to call the tool repeatedly.
+
+4. **Parser missed common patterns.** Arrow functions in TypeScript
+   (`const foo = () =>`), Go receiver methods (`func (r T) Name()`), Rust `fn`,
+   and Java method modifiers were not parsed. Call coverage was incomplete for
+   any language beyond basic Python/JS function declarations.
+
+---
+
+### Fix 1 — SQL Indexes on `edges`
+
+**File:** `graphService.ts` — DDL
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_id);
+CREATE INDEX IF NOT EXISTS idx_edges_to   ON edges(to_id);
+```
+
+Every BFS hop or caller/callee lookup goes from O(edges) full scan → O(log
+edges + result_size). Without these, the BFS in Fix 3 would be unusable at
+scale.
+
+---
+
+### Fix 2 — FTS5 Trigram Index Replaces LIKE
+
+**File:** `graphService.ts` — DDL + `searchNodes()`
+
+```sql
+CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
+    name,
+    content=nodes,
+    content_rowid=rowid,
+    tokenize="trigram"
+);
+```
+
+Three auto-sync triggers keep `nodes_fts` consistent with `nodes` on every
+INSERT / UPDATE / DELETE (including `INSERT OR REPLACE` during re-indexing).
+
+A `migrateFts()` call in `connect()` runs
+`INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` to backfill the FTS5 table
+on first open of an existing database.
+
+**Why trigram tokenizer?** Standard FTS5 tokenizes by whitespace — `get_tensor`
+is a single token and `tensor` won't match. The trigram tokenizer indexes every
+3-character slice, so searching `"tensor"` correctly matches `get_tensor_size`.
+Minimum query length is 3 characters; shorter queries fall back to `LIKE`.
+
+**Search queries now use:**
+
+```sql
+SELECT id, type, name, line, args, file FROM nodes
+WHERE rowid IN (SELECT rowid FROM nodes_fts WHERE nodes_fts MATCH ?)
+ORDER BY file, line
+LIMIT 200
+```
+
+LIKE fallback is still present and activates automatically if FTS5 is
+unavailable or the search term is < 3 characters.
+
+---
+
+### Fix 3 — N+1 → 3 Queries (Batched Edge Fetch)
+
+**File:** `graphService.ts` — `queryGraph()`
+
+Old: for each of k matched nodes, fire 2 SQL queries → 2k+1 total.
+
+New: one FTS5 search + one batch callee query + one batch caller query = **3
+queries regardless of result count**.
+
+```sql
+-- All callees for all matched nodes in one shot
+SELECT DISTINCT from_id, to_id FROM edges
+WHERE from_id IN (?, ?, ...) AND type='calls' AND to_id NOT LIKE '%:_module'
+
+-- All callers for all matched nodes in one shot
+SELECT DISTINCT from_id, to_id FROM edges
+WHERE to_id IN (?, ?, ...) AND type='calls' AND from_id NOT LIKE '%:_module'
+```
+
+Results are distributed into per-node maps before building the output.
+
+---
+
+### Fix 4 — BFS Deep Traversal via Recursive CTE
+
+**File:** `graphService.ts` — new `queryGraphDeep()` method
+
+**File:** `graphTools.ts` — `GraphQueryTool` now calls `queryGraphDeep`
+
+`graph_query` now performs a true breadth-first traversal rather than returning
+only immediate neighbours.
+
+```sql
+WITH RECURSIVE call_chain(node_id, depth) AS (
+  SELECT ?, 0
+  UNION
+  SELECT e.to_id, cc.depth + 1
+  FROM edges e
+  JOIN call_chain cc ON e.from_id = cc.node_id
+  WHERE cc.depth < ? AND e.type = 'calls' AND e.to_id NOT LIKE '%:_module'
+)
+SELECT n.id, n.name, n.file, n.line, MIN(cc.depth) AS depth
+FROM call_chain cc JOIN nodes n ON n.id = cc.node_id
+WHERE cc.node_id != ?
+GROUP BY cc.node_id
+ORDER BY depth, n.file
+LIMIT ?
+```
+
+`UNION` (not `UNION ALL`) deduplicates `(node_id, depth)` pairs, providing
+natural cycle safety. Hard caps: `maxDepth = 4`, `maxNodes = 500` per direction.
+Both directions (callees and callers) are returned, each node annotated with its
+BFS depth.
+
+A `truncated: true` flag is set when the node cap is hit, so the agent knows the
+chain was cut.
+
+---
+
+### Fix 5 — Language-Aware Enhanced Parser
+
+**File:** `graphService.ts` — `getLangConfig()` + `parseFile()`
+
+The single universal regex was replaced with per-language configs:
+
+| Language        | Additions over previous parser                                                     |
+| --------------- | ---------------------------------------------------------------------------------- |
+| Python          | Indentation-safe `async def`, all class method levels; no change to call detection |
+| TypeScript / JS | Arrow functions (`const f = () =>`), full modifier set for class methods           |
+| Go              | `func (recv T) Name(args)` receiver methods; `type Foo struct/interface`           |
+| Rust            | `pub async fn`, generics `fn foo<T>(...)`, `struct / enum / trait`                 |
+| Java            | Full modifier set + `throws` clause for methods                                    |
+| C++ / default   | Original broad patterns preserved                                                  |
+
+The `KEYWORDS` filter was also extended (`new`, `delete`, `typeof`,
+`instanceof`, `const`, `let`, `var`, `require`, `describe`, `it`, `test`,
+`expect`) to reduce false-positive call edges in JavaScript test files.
+
+The `dist/` and `build/` directories are now skipped during file walking
+(previously only `node_modules`, `__pycache__`, `venv` were excluded).
+
+---
+
+### Summary of query performance changes
+
+| Operation           | Before                          | After                                   |
+| ------------------- | ------------------------------- | --------------------------------------- |
+| Name search         | `LIKE '%x%'` — O(nodes) scan    | FTS5 trigram — O(log nodes)             |
+| Callee/caller fetch | 2 queries per result node (N+1) | 2 queries total regardless of N         |
+| graph_query depth   | 1-hop only                      | BFS up to depth 4, up to 500 nodes      |
+| Cycle handling      | N/A (no traversal)              | `UNION` deduplication + depth hard cap  |
+| Edge hop cost       | O(edges) full scan per hop      | O(log edges) with `idx_edges_from/to`   |
+| Existing DB upgrade | Manual                          | `migrateFts()` auto-rebuilds on connect |
+
+---
+
 ## Files Modified
 
-| File                                                | Change                                                                                                       |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `packages/core/src/tools/tool-names.ts`             | Added `GRAPH_SEARCH_TOOL_NAME`, `GRAPH_QUERY_TOOL_NAME` constants                                            |
-| `packages/core/src/agents/codebase-investigator.ts` | Added graph tools to toolConfig + graph-first system prompt section + updated ExplorationTrace example       |
-| `packages/core/src/prompts/snippets.legacy.ts`      | Added `hasGraphQuery` to `PrimaryWorkflowsOptions`, updated `workflowStepUnderstand` with graph-first caveat |
-| `packages/core/src/prompts/promptProvider.ts`       | No change — `hasGraphQuery` was already computed and forwarded                                               |
-| `packages/core/src/services/graphService.ts`        | Graph index service (SQLite backend); `writeGeminiMd()` changed to smart write (no overwrite)                |
-| `packages/core/src/tools/graphTools.ts`             | `graph_init`, `graph_search`, `graph_query` tool definitions                                                 |
-| `packages/core/src/index.ts`                        | Added `export { GraphService }` so CLI package can import without internal path                              |
-| `packages/cli/src/core/autoIndex.ts`                | **New.** Background auto-index at session start + hourly interval with lock + unref                          |
-| `packages/cli/src/core/initializer.ts`              | Calls `startAutoIndex(config.getTargetDir())` at end of `initializeApp()`                                    |
+| File                                                | Change                                                                                                                                |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/tools/tool-names.ts`             | Added `GRAPH_SEARCH_TOOL_NAME`, `GRAPH_QUERY_TOOL_NAME` constants                                                                     |
+| `packages/core/src/agents/codebase-investigator.ts` | Added graph tools to toolConfig + graph-first system prompt section + updated ExplorationTrace example                                |
+| `packages/core/src/prompts/snippets.legacy.ts`      | Added `hasGraphQuery` to `PrimaryWorkflowsOptions`, updated `workflowStepUnderstand` with graph-first caveat                          |
+| `packages/core/src/prompts/promptProvider.ts`       | No change — `hasGraphQuery` was already computed and forwarded                                                                        |
+| `packages/core/src/services/graphService.ts`        | Graph index service; smart `writeGeminiMd()`; Phase 5: FTS5 trigram search, edge indexes, BFS `queryGraphDeep`, language-aware parser |
+| `packages/core/src/tools/graphTools.ts`             | `graph_init`, `graph_search`, `graph_query` tool definitions; `graph_query` wired to `queryGraphDeep`                                 |
+| `packages/core/src/index.ts`                        | Added `export { GraphService }` so CLI package can import without internal path                                                       |
+| `packages/cli/src/core/autoIndex.ts`                | **New.** Background auto-index at session start + hourly interval with lock + unref                                                   |
+| `packages/cli/src/core/initializer.ts`              | Calls `startAutoIndex(config.getTargetDir())` at end of `initializeApp()`                                                             |

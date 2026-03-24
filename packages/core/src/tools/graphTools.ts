@@ -12,7 +12,10 @@ import {
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { Kind } from './tools.js';
-import { GraphService } from '../services/graphService.js';
+import {
+  GraphService,
+  type DeepQueryResult,
+} from '../services/graphService.js';
 import type { Config } from '../config/config.js';
 import process from 'node:process';
 
@@ -125,10 +128,10 @@ class GraphQueryToolInvocation
   async execute(): Promise<ToolResult> {
     const cwd = process.cwd();
     const service = new GraphService(cwd);
-    let results: any[];
+    let results: DeepQueryResult[];
 
     try {
-      results = service.queryGraph(this.params.search);
+      results = service.queryGraphDeep(this.params.search);
     } catch (e: any) {
       if (e.message && e.message.includes('no such table')) {
         return {
@@ -169,7 +172,7 @@ export class GraphQueryTool extends BaseDeclarativeTool<
     super(
       'graph_query',
       'Graph Query',
-      'Use this when you need to trace the full call chain: what calls X, or what X calls. Returns the complete caller/callee graph — grep_search and read_file cannot provide this. Call this before refactoring any function that may have multiple call sites.',
+      'Traces the full call chain for a symbol using BFS (depth 4, up to 500 nodes). Returns callChain (what X transitively calls) and callerChain (what transitively calls X), each node annotated with depth. Use this before refactoring any function that may have multiple call sites. graph_search and read_file cannot provide transitive chain data.',
       Kind.Search,
       {
         type: 'object',

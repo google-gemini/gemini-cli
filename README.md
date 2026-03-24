@@ -42,16 +42,16 @@ A SQLite-backed code index (`.gemini/gemini.idx`) is built once with `/idx` and
 then **auto-refreshed every session start and every hour**. Every agent — main
 model and subagents — queries the graph before touching the filesystem.
 
-The result on a large codebase (PyTorch, ~6,330 files, 1.2M call edges):
+Early benchmark on a medium-sized codebase:
 
 | Metric                          | Standard | G+ReAct |
 | ------------------------------- | -------- | ------- |
-| `read_file` calls per nav query | 5–8      | 0       |
-| Graph tool calls                | 0        | 13      |
-| Subagent duration               | 2m 21s   | —       |
-| Total tokens                    | ~389k    | ~240k   |
-| Cache hit rate                  | 35.8%    | 89.1%   |
-| Avg lookup latency              | —        | 134ms   |
+| `read_file` calls per nav query |          |         |
+| Graph tool calls                |          |         |
+| Subagent duration               |          |         |
+| Total tokens                    |          |         |
+| Cache hit rate                  |          |         |
+| Avg lookup latency              |          |         |
 
 For the full technical breakdown of the implementation, the loop mechanics, and
 how G+ReAct differs from standard ReAct at the code level, read
@@ -82,40 +82,44 @@ This fork is in **active development and beta stage**. You should:
   build
 - Treat the graph index as a best-effort cache — it can be stale or incomplete
 
+**Large repository notice:** The current beta is **not suitable for very large
+codebases** (e.g. PyTorch, Linux kernel, or similar projects with tens of
+thousands of files). The regex-based parser has known coverage gaps on complex
+Python patterns and C extensions, and indexing time at that scale has not been
+validated. Tested and reasonable on small-to-medium repositories (up to a few
+thousand files). Large-repo support is planned for a future release.
+
 You have been warned. Now install it.
 
 ---
 
 ## Installation
 
-### From Source (GitHub)
+This fork is **source-only**. There is no npm package. Build and link it
+yourself:
 
 ```bash
-# Clone this fork
+# 1. Clone
 git clone https://github.com/[repo-coming-soon]/gemini-cli-experimental
 cd gemini-cli-experimental
 
-# Install dependencies and build
+# 2. Install dependencies
 npm install
+
+# 3. Build
 npm run build
 
-# Link globally
+# 4. Link globally — makes gemini_experimental available on your PATH
+cd packages/cli
 npm link
 ```
 
-> The npm package link will be updated here once published. For now, build from
-> source.
-
-### Using npm (once published)
+That's it. The command is `gemini_experimental`, not `gemini`. Your existing
+`gemini` installation (if any) is untouched.
 
 ```bash
-npm install -g @google/gemini-cli-experimental
-```
-
-### Run
-
-```bash
-gemini
+gemini_experimental --version
+# 0.36.0-nightly.20260317.2f90b4653-exp2
 ```
 
 ---
@@ -127,7 +131,7 @@ index:
 
 ```bash
 cd your-project/
-gemini
+gemini_experimental
 
 # Inside the CLI — run once to build the index
 /idx
@@ -159,7 +163,7 @@ work:
 Best for individual developers. Free tier: 60 req/min, 1,000 req/day.
 
 ```bash
-gemini
+gemini_experimental
 # Choose "Sign in with Google" and follow the browser flow
 ```
 
@@ -167,7 +171,7 @@ gemini
 
 ```bash
 export GEMINI_API_KEY="YOUR_API_KEY"
-gemini
+gemini_experimental
 ```
 
 Get your key at
@@ -178,7 +182,7 @@ Get your key at
 ```bash
 export GOOGLE_API_KEY="YOUR_API_KEY"
 export GOOGLE_GENAI_USE_VERTEXAI=true
-gemini
+gemini_experimental
 ```
 
 For full auth documentation see the
@@ -200,13 +204,13 @@ Standard CLI commands (`/help`, `/chat`, `/clear`, `/bug`, etc.) are unchanged.
 
 ```bash
 # Start in current directory
-gemini
+gemini_experimental
 
 # Non-interactive
-gemini -p "What calls the authenticate function?"
+gemini_experimental -p "What calls the authenticate function?"
 
 # Specific model
-gemini -m gemini-2.5-flash
+gemini_experimental -m gemini-2.5-flash
 ```
 
 ---
