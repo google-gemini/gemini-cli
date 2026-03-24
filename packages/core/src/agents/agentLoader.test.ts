@@ -343,6 +343,32 @@ Body`);
       expect(result.modelConfig.model).toBe('auto');
     });
 
+    it('should expand ${PLUGIN_ROOT} in agent definition', () => {
+      const markdown = {
+        kind: 'local' as const,
+        name: 'expansion-agent',
+        description: 'An agent in ${PLUGIN_ROOT}',
+        system_prompt: 'You are at ${PLUGIN_ROOT}',
+        mcp_servers: {
+          'test-server': {
+            command: 'node',
+            args: ['${PLUGIN_ROOT}/server.js'],
+          },
+        },
+      };
+
+      const pluginRoot = '/abs/path/to/plugin';
+      const result = markdownToAgentDefinition(markdown, {
+        pluginRoot,
+      }) as LocalAgentDefinition;
+
+      expect(result.description).toBe(`An agent in ${pluginRoot}`);
+      expect(result.promptConfig.systemPrompt).toBe(`You are at ${pluginRoot}`);
+      expect(result.mcpServers!['test-server'].args).toEqual([
+        `${pluginRoot}/server.js`,
+      ]);
+    });
+
     it('should convert remote agent definition', () => {
       const markdown = {
         kind: 'remote' as const,
