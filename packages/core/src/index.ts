@@ -88,7 +88,11 @@ export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export { PolicyDecision, ApprovalMode } from './policy/types.js';
+export {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_YOLO_ALLOW_ALL,
+} from './policy/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
