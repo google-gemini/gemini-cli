@@ -10,9 +10,13 @@ import { z } from 'zod';
 import {
   loadSkillsFromDir,
   loadAgentsFromDirectory,
+  OPEN_PLUGIN_EVENT_MAP,
+  HookType,
+  ConfigSource,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
   type MCPServerConfig,
+  type HookConfig,
 } from '@google/gemini-cli-core';
 import {
   EXTENSIONS_CONFIG_FILENAME,
@@ -21,7 +25,6 @@ import {
   OPEN_PLUGIN_MCP_CONFIG_FILENAME,
   HIDDEN_OPEN_PLUGIN_MCP_CONFIG_FILENAME,
   recursivelyHydrateStrings,
-  type JsonObject,
 } from './extensions/variables.js';
 import type { ExtensionConfig } from './extension.js';
 
@@ -116,18 +119,13 @@ export async function loadOpenPluginConfig(
   const rawConfig = result.data as OpenPluginConfig;
 
   // Hydrate metadata fields
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const hydratedConfig = recursivelyHydrateStrings(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    rawConfig as unknown as JsonObject,
-    {
-      extensionPath: extensionDir,
-      PLUGIN_ROOT: extensionDir,
-      workspacePath: workspaceDir,
-      '/': path.sep,
-      pathSeparator: path.sep,
-    },
-  ) as unknown as OpenPluginConfig;
+  const hydratedConfig = recursivelyHydrateStrings(rawConfig, {
+    extensionPath: extensionDir,
+    PLUGIN_ROOT: extensionDir,
+    workspacePath: workspaceDir,
+    '/': path.sep,
+    pathSeparator: path.sep,
+  });
 
   const mcpServers = await resolveMcpServers(hydratedConfig, extensionDir);
 
@@ -139,6 +137,8 @@ export async function loadOpenPluginConfig(
     author: hydratedConfig.author,
     license: hydratedConfig.license,
     mcpServers,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    hooks: hydratedConfig.hooks as Record<string, unknown> | undefined,
   };
 }
 
@@ -153,18 +153,18 @@ async function resolveMcpServers(
   let mcpServers: Record<string, MCPServerConfig> | undefined;
 
   // 1. Explicit mcpServers in plugin.json
-  if (hydratedConfig.mcpServers) {
-    if (typeof hydratedConfig.mcpServers === 'string') {
-      const mcpPath = path.resolve(extensionDir, hydratedConfig.mcpServers);
+  const rawMcpServers = hydratedConfig.mcpServers;
+  if (rawMcpServers) {
+    if (typeof rawMcpServers === 'string') {
+      const mcpPath = path.resolve(extensionDir, rawMcpServers);
       mcpServers = await loadMcpConfigFile(mcpPath);
-    } else if (Array.isArray(hydratedConfig.mcpServers)) {
-      const mcpServersValue = hydratedConfig.mcpServers;
-      if (mcpServersValue.length > 0) {
-        const first = mcpServersValue[0];
+    } else if (Array.isArray(rawMcpServers)) {
+      if (rawMcpServers.length > 0) {
+        const first = rawMcpServers[0];
         if (typeof first === 'string') {
           // Support array of paths
           mcpServers = {};
-          for (const p of mcpServersValue) {
+          for (const p of rawMcpServers) {
             const mcpPath = path.resolve(extensionDir, p);
             const servers = await loadMcpConfigFile(mcpPath);
             if (servers) {
@@ -176,7 +176,7 @@ async function resolveMcpServers(
     } else {
       // It's a Record<string, MCPServerConfig>
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      mcpServers = hydratedConfig.mcpServers as Record<string, MCPServerConfig>;
+      mcpServers = rawMcpServers as Record<string, MCPServerConfig>;
     }
   }
 
@@ -206,7 +206,6 @@ async function loadMcpConfigFile(
     const json = JSON.parse(content) as unknown;
     const result = openPluginMcpSchema.safeParse(json);
     if (result.success) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return result.data.mcpServers as Record<string, MCPServerConfig>;
     }
   } catch (_e) {
@@ -253,6 +252,8 @@ export async function createOpenPlugin(
     hydrationContext,
   );
 
+  const hooks = await resolvePluginHooks(pluginDir, config, hydrationContext);
+
   return {
     name: config.name,
     version: config.version,
@@ -272,6 +273,7 @@ export async function createOpenPlugin(
     resolvedSettings: undefined,
     skills,
     agents,
+    hooks,
     themes: undefined,
   };
 }
@@ -318,4 +320,130 @@ async function resolvePluginAgents(
     name: `${pluginName}:${agent.name}`,
     extensionName: pluginName,
   }));
+}
+
+/**
+ * Discovers hooks for an Open Plugin.
+ */
+async function resolvePluginHooks(
+  pluginDir: string,
+  config: ExtensionConfig,
+  hydrationContext: Record<string, string>,
+): Promise<GeminiCLIExtension['hooks']> {
+  let hooksSource: Record<string, unknown> | undefined;
+
+  // 1. Check for hooks in manifest (plugin.json)
+  const hooks = config.hooks;
+  if (hooks) {
+    if (typeof hooks === 'string') {
+      const hooksPath = path.resolve(pluginDir, hooks);
+      hooksSource = await loadHooksConfigFile(hooksPath);
+    } else if (Array.isArray(hooks)) {
+      if (hooks.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const firstHook = hooks[0];
+        if (typeof firstHook === 'string') {
+          const hooksPath = path.resolve(pluginDir, firstHook);
+          hooksSource = await loadHooksConfigFile(hooksPath);
+        }
+      }
+    } else if (hooks && typeof hooks === 'object') {
+      hooksSource = hooks;
+    }
+  }
+
+  // 2. Fallback to hooks/hooks.json at plugin root
+  if (!hooksSource) {
+    const defaultHooksPath = path.join(pluginDir, 'hooks', 'hooks.json');
+    if (fs.existsSync(defaultHooksPath)) {
+      hooksSource = await loadHooksConfigFile(defaultHooksPath);
+    }
+  }
+
+  if (!hooksSource) {
+    return undefined;
+  }
+
+  // 3. Map Open Plugin hooks to Gemini CLI hook definitions
+  const result: Record<string, Array<{ hooks: HookConfig[] }>> = {};
+
+  for (const [opEventName, hookDef] of Object.entries(hooksSource)) {
+    const geminiEventName = OPEN_PLUGIN_EVENT_MAP[opEventName];
+    if (!geminiEventName) {
+      continue;
+    }
+
+    const configs: HookConfig[] = [];
+
+    // Normalize hook definition to an array of hook configs
+    const rawHooks: unknown[] = Array.isArray(hookDef)
+      ? (hookDef as unknown[])
+      : [hookDef];
+
+    for (const rawHook of rawHooks) {
+      if (
+        rawHook !== null &&
+        typeof rawHook === 'object' &&
+        !Array.isArray(rawHook)
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const rawHookRecord = rawHook as Record<string, unknown>;
+        // Hydrate strings in hook definition
+        const hydratedHookUnknown = recursivelyHydrateStrings(
+          rawHookRecord,
+          hydrationContext,
+        );
+
+        if (
+          hydratedHookUnknown !== null &&
+          typeof hydratedHookUnknown === 'object' &&
+          !Array.isArray(hydratedHookUnknown)
+        ) {
+          const hh = hydratedHookUnknown;
+          const command = hh['command'];
+          if (typeof command === 'string') {
+            const timeout = hh['timeout'];
+            configs.push({
+              type: HookType.Command,
+              name: config.name,
+              command,
+              timeout: typeof timeout === 'number' ? timeout : undefined,
+              source: ConfigSource.Extensions,
+              manifestType: 'open-plugin',
+              pluginRoot: pluginDir,
+            });
+          }
+        }
+      }
+    }
+
+    if (configs.length > 0) {
+      if (!result[geminiEventName]) {
+        result[geminiEventName] = [];
+      }
+      result[geminiEventName].push({
+        hooks: configs,
+      });
+    }
+  }
+
+  return Object.keys(result).length > 0
+    ? (result as GeminiCLIExtension['hooks'])
+    : undefined;
+}
+
+async function loadHooksConfigFile(
+  hooksPath: string,
+): Promise<Record<string, unknown> | undefined> {
+  try {
+    const content = await fs.promises.readFile(hooksPath, 'utf-8');
+    const json = JSON.parse(content) as unknown;
+    if (json !== null && typeof json === 'object' && !Array.isArray(json)) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return json as Record<string, unknown>;
+    }
+  } catch (_e) {
+    // Ignore errors
+  }
+  return undefined;
 }

@@ -20,3 +20,6 @@ export type { HookRegistryEntry } from './hookRegistry.js';
 export { ConfigSource } from './types.js';
 export type { AggregatedHookResult } from './hookAggregator.js';
 export type { HookEventContext } from './hookPlanner.js';
+
+// Export Open Plugin support
+export { OPEN_PLUGIN_EVENT_MAP } from './openPluginTranslator.js';
