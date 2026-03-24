@@ -15,13 +15,13 @@ import {
   GOVERNANCE_FILES,
   type GlobalSandboxOptions,
   sanitizePaths,
-} from './sandboxManager.js';
+} from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-} from './environmentSanitization.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import { spawnAsync } from '../utils/shell-utils.js';
+} from '../../services/environmentSanitization.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { spawnAsync } from '../../utils/shell-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +37,7 @@ export class WindowsSandboxManager implements SandboxManager {
   private readonly lowIntegrityCache = new Set<string>();
 
   constructor(private readonly options: GlobalSandboxOptions) {
-    this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
+    this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
   }
 
   /**

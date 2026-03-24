@@ -26,15 +26,15 @@ function compileWindowsSandbox() {
 
   const srcHelperPath = path.resolve(
     __dirname,
-    '../src/services/scripts/GeminiSandbox.exe',
+    '../src/sandbox/windows/GeminiSandbox.exe',
   );
   const distHelperPath = path.resolve(
     __dirname,
-    '../dist/src/services/scripts/GeminiSandbox.exe',
+    '../dist/src/sandbox/windows/GeminiSandbox.exe',
   );
   const sourcePath = path.resolve(
     __dirname,
-    '../src/services/scripts/GeminiSandbox.cs',
+    '../src/sandbox/windows/GeminiSandbox.cs',
   );
 
   if (!fs.existsSync(sourcePath)) {
