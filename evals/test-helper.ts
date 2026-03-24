@@ -38,13 +38,33 @@ export * from '@google/gemini-cli-test-utils';
 //   This may take a really long time and is not recommended.
 export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
+export interface EvalResult {
+  name: string;
+  policy: EvalPolicy;
+  passed: boolean;
+  model: string;
+  duration_ms: number;
+  timestamp: string;
+  error?: string;
+}
+
+async function writeEvalResult(result: EvalResult): Promise<void> {
+  const resultsDir = path.resolve(process.cwd(), 'evals/logs');
+  await fs.promises.mkdir(resultsDir, { recursive: true });
+  const resultsFile = path.join(resultsDir, 'results.jsonl');
+  const line = JSON.stringify(result) + '\n';
+  await fs.promises.appendFile(resultsFile, line);
+}
+
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
+    const startTime = Date.now();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
     const logFile = path.join(logDir, `${sanitizedName}.log`);
     let isSuccess = false;
+    let evalError: string | undefined;
     try {
       rig.setup(evalCase.name, evalCase.params);
 
@@ -188,6 +208,8 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
 
       await evalCase.assert(rig, result);
       isSuccess = true;
+    } catch (err) {
+      evalError = err instanceof Error ? err.stack : String(err);
     } finally {
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
@@ -204,6 +226,18 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         logFile,
         JSON.stringify(rig.readToolLogs(), null, 2),
       );
+
+      const model = evalCase.params?.settings?.['model'] as string | undefined;
+      await writeEvalResult({
+        name: evalCase.name,
+        policy,
+        passed: isSuccess,
+        model: model ?? 'gemini-2.0-flash',
+        duration_ms: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+        error: evalError,
+      });
+
       await rig.cleanup();
     }
   };
