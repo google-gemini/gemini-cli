@@ -683,11 +683,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      // In vim mode, let escape switch from INSERT to NORMAL mode even while
+      // streaming, instead of falling through to cancel the request.
       if (
         key.name === 'escape' &&
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation)
       ) {
+        if (vimHandleInput?.(key)) return true;
         return false;
       }
 

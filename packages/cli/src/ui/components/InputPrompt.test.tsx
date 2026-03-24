@@ -2093,6 +2093,46 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('vim escape during streaming', () => {
+    it('should let vim consume escape instead of canceling the request', async () => {
+      props.streamingState = StreamingState.Responding;
+      props.vimHandleInput = vi.fn().mockReturnValue(true);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'escape' }),
+        );
+      });
+      unmount();
+    });
+
+    it('should let escape bubble to cancel when vim does not handle it', async () => {
+      props.streamingState = StreamingState.Responding;
+      props.vimHandleInput = vi.fn().mockReturnValue(false);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+      });
+      await waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'escape' }),
+        );
+      });
+      unmount();
+    });
+  });
+
   describe('unfocused paste', () => {
     it('should handle bracketed paste when not focused', async () => {
       props.focus = false;
