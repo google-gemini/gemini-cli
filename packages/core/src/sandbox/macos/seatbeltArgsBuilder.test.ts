@@ -33,7 +33,7 @@ describe('seatbeltArgsBuilder', () => {
   it('should allow network when networkAccess is true', () => {
     const args = buildSeatbeltArgs({ workspace: '/test', networkAccess: true });
     const profile = args[1];
-    expect(profile).toContain('(allow network*)');
+    expect(profile).toContain('(allow network-outbound)');
   });
 
   it('should parameterize allowed paths and normalize them', () => {
@@ -93,5 +93,68 @@ describe('seatbeltArgsBuilder', () => {
     ).toThrow('Permission denied');
 
     vi.restoreAllMocks();
+  });
+
+  describe('governance files', () => {
+    it('should inject explicit deny rules for governance files', () => {
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p.toString());
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'lstatSync').mockImplementation(
+        (p) =>
+          ({
+            isDirectory: () => p.toString().endsWith('.git'),
+            isFile: () => !p.toString().endsWith('.git'),
+          }) as unknown as fs.Stats,
+      );
+
+      const args = buildSeatbeltArgs({ workspace: '/Users/test/workspace' });
+      const profile = args[1];
+
+      // .gitignore should be a literal deny
+      expect(args).toContain('-D');
+      expect(args).toContain(
+        'GOVERNANCE_FILE_0=/Users/test/workspace/.gitignore',
+      );
+      expect(profile).toContain(
+        '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+      );
+
+      // .git should be a subpath deny
+      expect(args).toContain('GOVERNANCE_FILE_2=/Users/test/workspace/.git');
+      expect(profile).toContain(
+        '(deny file-write* (subpath (param "GOVERNANCE_FILE_2")))',
+      );
+
+      vi.restoreAllMocks();
+    });
+
+    it('should protect both the symlink and the real path if they differ', () => {
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+        if (p === '/test/workspace/.gitignore') return '/test/real/.gitignore';
+        return p.toString();
+      });
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'lstatSync').mockImplementation(
+        () =>
+          ({
+            isDirectory: () => false,
+            isFile: () => true,
+          }) as unknown as fs.Stats,
+      );
+
+      const args = buildSeatbeltArgs({ workspace: '/test/workspace' });
+      const profile = args[1];
+
+      expect(args).toContain('GOVERNANCE_FILE_0=/test/workspace/.gitignore');
+      expect(args).toContain('REAL_GOVERNANCE_FILE_0=/test/real/.gitignore');
+      expect(profile).toContain(
+        '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+      );
+      expect(profile).toContain(
+        '(deny file-write* (literal (param "REAL_GOVERNANCE_FILE_0")))',
+      );
+
+      vi.restoreAllMocks();
+    });
   });
 });
