@@ -183,7 +183,7 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
   return {
     name: UPDATE_TOPIC_TOOL_NAME,
     description:
-      'Manages your narrative flow. You MUST call this in EVERY turn to state your `strategic_intent`. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
+      'Manages your narrative flow. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -199,7 +199,7 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
         [TOPIC_PARAM_STRATEGIC_INTENT]: {
           type: 'string',
           description:
-            'A mandatory one-sentence statement of your immediate intent. You MUST provide this for every tool-use turn to maintain strategic alignment. This replaces the raw text preamble.',
+            'A mandatory one-sentence statement of your immediate intent.',
         },
       },
       required: [TOPIC_PARAM_STRATEGIC_INTENT],
