@@ -173,7 +173,15 @@ export class SlashCommandResolver {
     const isExtensionPrefix =
       kind === CommandKind.SKILL || kind === CommandKind.EXTENSION_FILE;
     const separator = isExtensionPrefix ? ':' : '.';
-    const base = prefix ? `${prefix}${separator}${name}` : name;
+
+    // Check if it's already correctly prefixed
+    const alreadyPrefixed = prefix && name.startsWith(`${prefix}${separator}`);
+    const base = alreadyPrefixed
+      ? name
+      : prefix
+        ? `${prefix}${separator}${name}`
+        : name;
+
     let renamedName = base;
     let suffix = 1;
 
