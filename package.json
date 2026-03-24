@@ -64,7 +64,7 @@
     "data:validate": "tsx scripts/validate-data.ts",
     "data:format": "prettier --write 'data/*.json' 'scripts/validate-data.ts' 'scripts/optimization/**/*.ts'",
     "data:lint": "eslint 'scripts/validate-data.ts' 'scripts/optimization/**/*.ts'",
-    "optimize": "tsx scripts/optimization/run.ts",
+    "optimize": "tsx scripts/optimization/optimize.ts",
     "optimize:extract": "tsx scripts/optimization/extract.ts",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",

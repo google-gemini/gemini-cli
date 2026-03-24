@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '../../../../../packages/core/src/utils/debugLogger.js';
+import { debugLogger } from '../../../../packages/core/src/utils/debugLogger.js';
 import { DEFAULT_EVAL_CONFIG } from '../config.js';
 import { MetricObjective } from '../types.js';
 import type { MetricResult } from '../types.js';

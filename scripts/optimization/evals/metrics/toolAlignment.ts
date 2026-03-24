@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '../../../../../packages/core/src/utils/debugLogger.js';
+import { debugLogger } from '../../../../packages/core/src/utils/debugLogger.js';
 import type { Scenario, ToolCall } from '../schema.js';
 import { DEFAULT_EVAL_CONFIG } from '../config.js';
 import { MetricObjective } from '../types.js';
@@ -12,7 +12,7 @@ import type { MetricResult } from '../types.js';
 
 /**
  * Evaluates the alignment of a model's predicted tool calls against a golden scenario.
- * Focuses on accuracy and shell avoidance.
+ * Focuses strictly on functional correctness (tool selection and argument precision).
  */
 export function evaluateToolAlignment(
   prediction: { tool_calls: ToolCall[] },
@@ -25,6 +25,7 @@ export function evaluateToolAlignment(
   debugLogger.debug(`[Eval:${scenarioId}] Evaluating tool alignment...`);
 
   // 1. Check for Hard Failures (Explicit Negatives)
+  // These are for specific "Forbidden" tool uses (e.g., using shell instead of read_file)
   for (const negative of negatives) {
     const isNegativeMatch = negative.tool_calls.every((negCall: ToolCall) =>
       predictedCalls.some(
@@ -35,26 +36,17 @@ export function evaluateToolAlignment(
     );
 
     if (isNegativeMatch && negative.tool_calls.length > 0) {
-      debugLogger.debug(
-        `[Eval:${scenarioId}] Hard Failure: Matched negative pattern.`,
-      );
       return {
         score: config.hardFailureScore,
         objective: MetricObjective.ALIGNMENT,
         reason: `Hard Failure: ${negative.reason}`,
-        metadata: {
-          matchedNegativeReason: negative.reason,
-          severity: negative.severity,
-        },
+        metadata: { matchedNegativeReason: negative.reason },
       };
     }
   }
 
   // 2. Structural Check
   if (predictedCalls.length === 0) {
-    debugLogger.debug(
-      `[Eval:${scenarioId}] Invalid Response: No tool calls found.`,
-    );
     return {
       score: config.invalidResponseScore,
       objective: MetricObjective.ALIGNMENT,
@@ -71,9 +63,6 @@ export function evaluateToolAlignment(
   );
 
   if (!namesMatch) {
-    debugLogger.debug(
-      `[Eval:${scenarioId}] Failure: Incorrect tool selection.`,
-    );
     return {
       score: config.invalidResponseScore,
       objective: MetricObjective.ALIGNMENT,
@@ -91,9 +80,6 @@ export function evaluateToolAlignment(
   );
 
   if (!argsMatch) {
-    debugLogger.debug(
-      `[Eval:${scenarioId}] Partial Success: Right tool, wrong arguments.`,
-    );
     return {
       score: config.toolNameMatchOnlyScore,
       objective: MetricObjective.ALIGNMENT,
@@ -102,14 +88,10 @@ export function evaluateToolAlignment(
   }
 
   // 4. Perfect Success
-  debugLogger.debug(
-    `[Eval:${scenarioId}] Perfect Functional Alignment achieved.`,
-  );
   return {
     score: config.functionalSuccessScore,
     objective: MetricObjective.ALIGNMENT,
-    reason:
-      'Functional Success: Tool and arguments align perfectly with golden scenario.',
+    reason: 'Functional Success: Tool and arguments align perfectly.',
   };
 }
 
