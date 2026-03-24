@@ -6,9 +6,15 @@
 
 /**
  * A collection of predefined test agents for use in evaluations and tests.
+ * This namespaced object provides direct, typed access to agent definitions
+ * with excellent IDE discoverability.
  */
 export const TEST_AGENTS = {
-  'docs-agent': `---
+  /**
+   * An agent with expertise in updating documentation.
+   * Tools: read_file, write_file
+   */
+  DOCS_AGENT: `---
 name: docs-agent
 description: An agent with expertise in updating documentation.
 tools:
@@ -17,7 +23,12 @@ tools:
 ---
 You are the docs agent. Update documentation clearly and accurately.
 `,
-  'test-agent': `---
+
+  /**
+   * An agent with expertise in writing and updating tests.
+   * Tools: read_file, write_file
+   */
+  TEST_AGENT: `---
 name: test-agent
 description: An agent with expertise in writing and updating tests.
 tools:
@@ -27,18 +38,3 @@ tools:
 You are the test agent. Add or update tests.
 `,
 } as const;
-
-/**
- * The names of the available test agents.
- */
-export type TestAgentName = keyof typeof TEST_AGENTS;
-
-/**
- * Retrieves the definition for a specific test agent.
- *
- * @param name The name of the test agent to retrieve.
- * @returns The YAML/Markdown definition of the agent.
- */
-export function getTestAgent(name: TestAgentName): string {
-  return TEST_AGENTS[name];
-}

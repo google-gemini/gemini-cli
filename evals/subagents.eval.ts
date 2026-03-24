@@ -9,7 +9,7 @@ import path from 'node:path';
 
 import { describe, expect } from 'vitest';
 
-import { evalTest, getTestAgent } from './test-helper.js';
+import { evalTest, TEST_AGENTS } from './test-helper.js';
 
 const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
 
@@ -42,7 +42,7 @@ describe('subagent eval test cases', () => {
     },
     prompt: 'Please update README.md with a description of this library.',
     files: {
-      '.gemini/agents/docs-agent.md': getTestAgent('docs-agent'),
+      '.gemini/agents/docs-agent.md': TEST_AGENTS.DOCS_AGENT,
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
     },
@@ -72,7 +72,7 @@ describe('subagent eval test cases', () => {
     prompt:
       'Rename the exported function in index.ts from add to sum and update the file directly.',
     files: {
-      '.gemini/agents/docs-agent.md': getTestAgent('docs-agent'),
+      '.gemini/agents/docs-agent.md': TEST_AGENTS.DOCS_AGENT,
       'index.ts': INDEX_TS,
     },
     assert: async (rig, _result) => {
@@ -113,7 +113,7 @@ describe('subagent eval test cases', () => {
     },
     prompt: 'Please add a small test file that verifies add(1, 2) returns 3.',
     files: {
-      '.gemini/agents/test-agent.md': getTestAgent('test-agent'),
+      '.gemini/agents/test-agent.md': TEST_AGENTS.TEST_AGENT,
       'index.ts': INDEX_TS,
       'package.json': JSON.stringify(
         {
@@ -158,8 +158,8 @@ describe('subagent eval test cases', () => {
     prompt:
       'Add a short README description for this library and also add a test file that verifies add(1, 2) returns 3.',
     files: {
-      '.gemini/agents/docs-agent.md': getTestAgent('docs-agent'),
-      '.gemini/agents/test-agent.md': getTestAgent('test-agent'),
+      '.gemini/agents/docs-agent.md': TEST_AGENTS.DOCS_AGENT,
+      '.gemini/agents/test-agent.md': TEST_AGENTS.TEST_AGENT,
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
       'package.json': JSON.stringify(
