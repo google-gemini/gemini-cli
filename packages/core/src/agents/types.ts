@@ -113,6 +113,18 @@ export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
 }
 
 /**
+ * Checks if the tool call data indicates an error.
+ */
+export function isToolActivityError(data: unknown): boolean {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'isError' in data &&
+    data.isError === true
+  );
+}
+
+/**
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
  */

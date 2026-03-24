@@ -381,6 +381,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (result.exitCode !== null && result.exitCode !== 0) {
           llmContentParts.push(`Exit Code: ${result.exitCode}`);
+          data = {
+            exitCode: result.exitCode,
+            isError: true,
+          };
         }
 
         if (result.signal) {
