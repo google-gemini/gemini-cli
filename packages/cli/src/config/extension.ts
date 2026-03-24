@@ -41,6 +41,7 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
+  hooks?: Record<string, unknown>;
   /**
    * Custom themes contributed by this extension.
    * These themes will be registered when the extension is activated.
@@ -80,6 +81,7 @@ export const geminiExtensionSchema = z.object({
   contextFileName: z.union([z.string(), z.array(z.string())]).optional(),
   excludeTools: z.array(z.string()).optional(),
   settings: z.array(z.any()).optional(),
+  hooks: z.record(z.unknown()).optional(),
   themes: z.array(z.any()).optional(),
   plan: z
     .object({

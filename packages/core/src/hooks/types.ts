@@ -93,6 +93,8 @@ export interface CommandHookConfig {
   timeout?: number;
   source?: ConfigSource;
   env?: Record<string, string>;
+  manifestType?: 'gemini' | 'open-plugin';
+  pluginRoot?: string;
 }
 
 export type HookConfig = CommandHookConfig | RuntimeHookConfig;
@@ -135,6 +137,8 @@ export interface HookInput {
   cwd: string;
   hook_event_name: string;
   timestamp: string;
+  plugin_name?: string;
+  plugin_root?: string;
 }
 
 /**

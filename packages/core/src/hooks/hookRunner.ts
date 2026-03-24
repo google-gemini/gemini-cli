@@ -22,6 +22,10 @@ import {
 } from './types.js';
 import type { Config } from '../config/config.js';
 import type { LLMRequest } from './hookTranslator.js';
+import {
+  GEMINI_TO_OPEN_PLUGIN_EVENT_MAP,
+  translateOpenPluginResponse,
+} from './openPluginTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeEnvironment } from '../services/environmentSanitization.js';
 import {
@@ -349,6 +353,7 @@ export class HookRunner {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
+        PLUGIN_ROOT: hookConfig.pluginRoot || '',
         ...hookConfig.env,
       };
 
@@ -407,7 +412,14 @@ export class HookRunner {
         // Wrap write operations in try-catch to handle synchronous EPIPE errors
         // that occur when the child process exits before we finish writing
         try {
-          child.stdin.write(JSON.stringify(input));
+          const hookInput: HookInput = { ...input };
+          if (hookConfig.manifestType === 'open-plugin') {
+            hookInput.hook_event_name =
+              GEMINI_TO_OPEN_PLUGIN_EVENT_MAP[eventName] || eventName;
+            hookInput.plugin_name = hookConfig.name;
+            hookInput.plugin_root = hookConfig.pluginRoot;
+          }
+          child.stdin.write(JSON.stringify(hookInput));
           child.stdin.end();
         } catch (err) {
           // Ignore EPIPE errors which happen when the child process closes stdin early
@@ -458,8 +470,12 @@ export class HookRunner {
               parsed = JSON.parse(parsed);
             }
             if (parsed && typeof parsed === 'object') {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              output = parsed as HookOutput;
+              if (hookConfig.manifestType === 'open-plugin') {
+                output = translateOpenPluginResponse(parsed);
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                output = parsed as HookOutput;
+              }
             }
           } catch {
             // Not JSON, convert plain text to structured output
