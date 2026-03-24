@@ -75,6 +75,7 @@ export function useToolScheduler(
   React.Dispatch<React.SetStateAction<TrackedToolCall[]>>,
   CancelAllFn,
   number,
+  Scheduler,
 ] {
   // State stores tool calls organized by their originating schedulerId
   const [toolCallsMap, setToolCallsMap] = useState<
@@ -257,6 +258,7 @@ export function useToolScheduler(
     setToolCallsForDisplay,
     cancelAll,
     lastToolOutputTime,
+    scheduler,
   ];
 }
 
