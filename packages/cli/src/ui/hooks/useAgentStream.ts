@@ -131,6 +131,17 @@ export const useAgentStream = (
     loopDetectionConfirmationRequest,
   ] = useState<LoopDetectionConfirmationRequest | null>(null);
 
+  const flushPendingText = useCallback(() => {
+    if (pendingHistoryItemRef.current) {
+      addItem(
+        pendingHistoryItemRef.current,
+        userMessageTimestampRef.current,
+      );
+      setPendingHistoryItem(null);
+      geminiMessageBufferRef.current = '';
+    }
+  }, [addItem, pendingHistoryItemRef, setPendingHistoryItem]);
+
   const cancelOngoingRequest = useCallback(async () => {
     if (sessionRef.current) {
       await sessionRef.current.abort();
@@ -156,13 +167,7 @@ export const useAgentStream = (
           break;
         case 'agent_end':
           setStreamingState(StreamingState.Idle);
-          if (pendingHistoryItemRef.current) {
-            addItem(
-              pendingHistoryItemRef.current,
-              userMessageTimestampRef.current,
-            );
-            setPendingHistoryItem(null);
-          }
+          flushPendingText();
           break;
         case 'message':
           if (event.role === 'agent') {
@@ -202,6 +207,7 @@ export const useAgentStream = (
           }
           break;
         case 'tool_request':
+          flushPendingText();
           setTrackedTools((prev) => [
             ...prev,
             {
@@ -270,7 +276,7 @@ export const useAgentStream = (
           break;
       }
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, flushPendingText, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
   useEffect(() => {
