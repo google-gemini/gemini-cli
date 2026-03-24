@@ -91,6 +91,10 @@ export {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
+  VISUALIZE_TOOL_NAME,
+  VISUALIZE_PARAM_DIAGRAM_TYPE,
+  VISUALIZE_PARAM_CONTENT,
+  VISUALIZE_PARAM_TITLE,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility

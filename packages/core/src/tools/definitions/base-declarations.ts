@@ -122,3 +122,9 @@ export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- visualize --
+export const VISUALIZE_TOOL_NAME = 'visualize';
+export const VISUALIZE_PARAM_DIAGRAM_TYPE = 'diagram_type';
+export const VISUALIZE_PARAM_CONTENT = 'content';
+export const VISUALIZE_PARAM_TITLE = 'title';
