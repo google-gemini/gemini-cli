@@ -2184,7 +2184,8 @@ export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: EVENT_APPROVAL_MODE_SWITCH,
+      'event.name': EVENT_APPROVAL_MODE_SWITCH,
+      'event.timestamp': this['event.timestamp'],
       from_mode: this.from_mode,
       to_mode: this.to_mode,
     };
@@ -2214,7 +2215,8 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: EVENT_APPROVAL_MODE_DURATION,
+      'event.name': EVENT_APPROVAL_MODE_DURATION,
+      'event.timestamp': this['event.timestamp'],
       mode: this.mode,
       duration_ms: this.duration_ms,
     };
