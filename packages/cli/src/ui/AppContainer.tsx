@@ -1386,7 +1386,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !isResuming &&
     !!slashCommands &&
     (streamingState === StreamingState.Idle ||
-      streamingState === StreamingState.Responding) &&
+      streamingState === StreamingState.Responding ||
+      streamingState === StreamingState.WaitingForConfirmation) &&
     !proQuotaRequest;
 
   const [controlsHeight, setControlsHeight] = useState(0);
@@ -1652,15 +1653,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [handleSlashCommand, settings],
   );
-
-  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator({
-    streamingState,
-    shouldShowFocusHint,
-    retryStatus,
-    loadingPhrasesMode: settings.merged.ui.loadingPhrases,
-    customWittyPhrases: settings.merged.ui.customWittyPhrases,
-    errorVerbosity: settings.merged.ui.errorVerbosity,
-  });
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
@@ -2029,6 +2021,48 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     !!customDialog;
 
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showStatusTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+  const showStatusWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
+
+  const showLoadingIndicator =
+    (!embeddedShellFocused || isBackgroundShellVisible) &&
+    streamingState === StreamingState.Responding &&
+    !hasPendingActionRequired;
+
+  let estimatedStatusLength = 0;
+  if (activeHooks.length > 0 && settings.merged.hooksConfig.notifications) {
+    const hookLabel =
+      activeHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+    const hookNames = activeHooks
+      .map(
+        (h) =>
+          h.name +
+          (h.index && h.total && h.total > 1 ? ` (${h.index}/${h.total})` : ''),
+      )
+      .join(', ');
+    estimatedStatusLength = hookLabel.length + hookNames.length + 10;
+  } else if (showLoadingIndicator) {
+    const thoughtText = thought?.subject || 'Waiting for model...';
+    estimatedStatusLength = thoughtText.length + 25;
+  } else if (hasPendingActionRequired) {
+    estimatedStatusLength = 35;
+  }
+
+  const maxLength = terminalWidth - estimatedStatusLength - 5;
+
+  const { elapsedTime, currentLoadingPhrase, currentTip, currentWittyPhrase } =
+    useLoadingIndicator({
+      streamingState,
+      shouldShowFocusHint,
+      retryStatus,
+      showTips: showStatusTips,
+      showWit: showStatusWit,
+      customWittyPhrases: settings.merged.ui.customWittyPhrases,
+      errorVerbosity: settings.merged.ui.errorVerbosity,
+      maxLength,
+    });
+
   const allowPlanMode =
     config.isPlanEnabled() &&
     streamingState === StreamingState.Idle &&
@@ -2209,6 +2243,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      currentTip,
+      currentWittyPhrase,
       historyRemountKey,
       activeHooks,
       messageQueue,
@@ -2332,6 +2368,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
+      currentTip,
+      currentWittyPhrase,
       historyRemountKey,
       activeHooks,
       messageQueue,
