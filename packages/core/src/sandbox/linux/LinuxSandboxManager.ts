@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { join, normalize } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import fs from 'node:fs';
+import { join, dirname, normalize } from 'node:path';
 import os from 'node:os';
 import {
   type SandboxManager,
   type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
+  GOVERNANCE_FILES,
   sanitizePaths,
 } from '../../services/sandboxManager.js';
 import {
@@ -72,9 +73,28 @@ function getSeccompBpfPath(): string {
   }
 
   const bpfPath = join(os.tmpdir(), `gemini-cli-seccomp-${process.pid}.bpf`);
-  writeFileSync(bpfPath, buf);
+  fs.writeFileSync(bpfPath, buf);
   cachedBpfPath = bpfPath;
   return bpfPath;
+}
+
+/**
+ * Ensures a file or directory exists.
+ */
+function touch(filePath: string, isDirectory: boolean) {
+  try {
+    // If it exists (even as a broken symlink), do nothing
+    if (fs.lstatSync(filePath)) return;
+  } catch {
+    // Ignore ENOENT
+  }
+
+  if (isDirectory) {
+    fs.mkdirSync(filePath, { recursive: true });
+  } else {
+    fs.mkdirSync(dirname(filePath), { recursive: true });
+    fs.closeSync(fs.openSync(filePath, 'a'));
+  }
 }
 
 /**
@@ -108,6 +128,21 @@ export class LinuxSandboxManager implements SandboxManager {
       this.options.workspace,
       this.options.workspace,
     ];
+
+    // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
+    // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
+    // In bwrap, later binds override earlier ones for the same path.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(this.options.workspace, file.path);
+      touch(filePath, file.isDirectory);
+
+      const realPath = fs.realpathSync(filePath);
+
+      bwrapArgs.push('--ro-bind', filePath, filePath);
+      if (realPath !== filePath) {
+        bwrapArgs.push('--ro-bind', realPath, realPath);
+      }
+    }
 
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     const normalizedWorkspace = normalize(this.options.workspace).replace(

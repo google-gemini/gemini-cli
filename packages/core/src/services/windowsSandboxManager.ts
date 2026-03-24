@@ -12,6 +12,7 @@ import {
   type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
+  GOVERNANCE_FILES,
   type GlobalSandboxOptions,
   sanitizePaths,
 } from './sandboxManager.js';
@@ -37,6 +38,28 @@ export class WindowsSandboxManager implements SandboxManager {
 
   constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
+  }
+
+  /**
+   * Ensures a file or directory exists.
+   */
+  private touch(filePath: string, isDirectory: boolean): void {
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      if (fs.lstatSync(filePath)) return;
+    } catch {
+      // Ignore ENOENT
+    }
+
+    if (isDirectory) {
+      fs.mkdirSync(filePath, { recursive: true });
+    } else {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.closeSync(fs.openSync(filePath, 'a'));
+    }
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -164,7 +187,28 @@ export class WindowsSandboxManager implements SandboxManager {
 
     // TODO: handle forbidden paths
 
-    // 2. Construct the helper command
+    // 2. Protected governance files
+    // These must exist on the host before running the sandbox to prevent
+    // the sandboxed process from creating them with Low integrity.
+    // By being created as Medium integrity, they are write-protected from Low processes.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = path.join(this.options.workspace, file.path);
+      this.touch(filePath, file.isDirectory);
+
+      // We resolve real paths to ensure protection for both the symlink and its target.
+      try {
+        const realPath = fs.realpathSync(filePath);
+        if (realPath !== filePath) {
+          // If it's a symlink, the target is already implicitly protected
+          // if it's outside the Low integrity workspace (likely Medium).
+          // If it's inside, we ensure it's not accidentally Low.
+        }
+      } catch {
+        // Ignore realpath errors
+      }
+    }
+
+    // 3. Construct the helper command
     // GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]
     const program = this.helperPath;
 

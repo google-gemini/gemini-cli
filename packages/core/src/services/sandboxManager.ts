@@ -77,6 +77,16 @@ export interface SandboxManager {
 }
 
 /**
+ * Files that represent the governance or "constitution" of the repository
+ * and should be write-protected in any sandbox.
+ */
+export const GOVERNANCE_FILES = [
+  { path: '.gitignore', isDirectory: false },
+  { path: '.geminiignore', isDirectory: false },
+  { path: '.git', isDirectory: true },
+] as const;
+
+/**
  * A no-op implementation of SandboxManager that silently passes commands
  * through while applying environment sanitization.
  */
