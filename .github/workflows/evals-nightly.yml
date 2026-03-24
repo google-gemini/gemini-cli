@@ -34,7 +34,7 @@ jobs:
           - 'gemini-2.5-pro'
           - 'gemini-2.5-flash'
           - 'gemini-2.5-flash-lite'
-        run_attempt: [1, 2, 3]
+        run_attempt: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
