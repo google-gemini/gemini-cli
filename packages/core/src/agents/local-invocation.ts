@@ -21,6 +21,7 @@ import {
   SubagentActivityErrorType,
   SUBAGENT_REJECTED_ERROR_PREFIX,
   SUBAGENT_CANCELLED_ERROR_MESSAGE,
+  isToolActivityError,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -166,14 +167,16 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           }
           case 'TOOL_CALL_END': {
             const name = String(activity.data['name']);
-            // Find the last running tool call with this name
+            const data = activity.data['data'];
+            const isError = isToolActivityError(data);
+
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
                 recentActivity[i].content === name &&
                 recentActivity[i].status === 'running'
               ) {
-                recentActivity[i].status = 'completed';
+                recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
                 break;
               }
