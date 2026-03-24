@@ -634,6 +634,28 @@ describe('retryWithBackoff', () => {
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
+  it('should throw timeout error when overallTimeoutMs is exceeded', async () => {
+    const mockFn = vi.fn(async () => {
+      // Simulate a long operation that takes 200ms
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 10,
+      overallTimeoutMs: 100, // Timeout is shorter than the operation
+    });
+
+    // We need to advance timers and await the promise
+    await vi.advanceTimersByTimeAsync(150);
+
+    await expect(promise).rejects.toThrow(
+      'Operation timed out after 100ms and 0 attempts.',
+    );
+    // Depending on when the abort happens, mockFn might have been called 1 time
+    // but the test should catch the timeout.
+  });
   it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
     const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 

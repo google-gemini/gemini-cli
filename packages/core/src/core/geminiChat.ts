@@ -521,6 +521,26 @@ export class GeminiChat {
     // Track initial active model to detect fallback changes
     const initialActiveModel = this.context.config.getActiveModel();
 
+    const requestTimeoutMs =
+      this.context.config.getRequestTimeoutMs() ?? 300_000;
+
+    const timeoutController = new AbortController();
+    const timerId = setTimeout(
+      () => timeoutController.abort(),
+      requestTimeoutMs,
+    );
+
+    let combinedSignal = abortSignal;
+    if (typeof AbortSignal.any === 'function') {
+      combinedSignal = AbortSignal.any([abortSignal, timeoutController.signal]);
+    } else {
+      // Fallback for older Node.js
+      abortSignal?.addEventListener('abort', () => timeoutController.abort(), {
+        once: true,
+      });
+      combinedSignal = timeoutController.signal;
+    }
+
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
@@ -561,7 +581,7 @@ export class GeminiChat {
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
-        abortSignal,
+        abortSignal: combinedSignal,
       };
 
       let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
@@ -667,39 +687,44 @@ export class GeminiChat {
       );
     };
 
-    const streamResponse = await retryWithBackoff(apiCall, {
-      onPersistent429: onPersistent429Callback,
-      onValidationRequired: onValidationRequiredCallback,
-      authType: this.context.config.getContentGeneratorConfig()?.authType,
-      retryFetchErrors: this.context.config.getRetryFetchErrors(),
-      signal: abortSignal,
-      maxAttempts:
-        availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
-      getAvailabilityContext,
-      onRetry: (attempt, error, delayMs) => {
-        coreEvents.emitRetryAttempt({
-          attempt,
-          maxAttempts:
-            availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
-          delayMs,
-          error: error instanceof Error ? error.message : String(error),
-          model: lastModelToUse,
-        });
-      },
-    });
+    try {
+      const streamResponse = await retryWithBackoff(apiCall, {
+        onPersistent429: onPersistent429Callback,
+        onValidationRequired: onValidationRequiredCallback,
+        authType: this.context.config.getContentGeneratorConfig()?.authType,
+        retryFetchErrors: this.context.config.getRetryFetchErrors(),
+        signal: combinedSignal,
+        overallTimeoutMs: requestTimeoutMs,
+        maxAttempts:
+          availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
+        getAvailabilityContext,
+        onRetry: (attempt, error, delayMs) => {
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts:
+              availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
+            delayMs,
+            error: error instanceof Error ? error.message : String(error),
+            model: lastModelToUse,
+          });
+        },
+      });
 
-    // Store the original request for AfterModel hooks
-    const originalRequest: GenerateContentParameters = {
-      model: lastModelToUse,
-      config: lastConfig,
-      contents: lastContentsToUse,
-    };
+      // Store the original request for AfterModel hooks
+      const originalRequest: GenerateContentParameters = {
+        model: lastModelToUse,
+        config: lastConfig,
+        contents: lastContentsToUse,
+      };
 
-    return this.processStreamResponse(
-      lastModelToUse,
-      streamResponse,
-      originalRequest,
-    );
+      return this.processStreamResponse(
+        lastModelToUse,
+        streamResponse,
+        originalRequest,
+      );
+    } finally {
+      clearTimeout(timerId);
+    }
   }
 
   /**

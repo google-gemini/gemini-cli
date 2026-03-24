@@ -601,6 +601,7 @@ export interface ConfigParameters {
   blockedEnvironmentVariables?: string[];
   enableEnvironmentVariableRedaction?: boolean;
   noBrowser?: boolean;
+  requestTimeoutMs?: number;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
@@ -757,6 +758,7 @@ export class Config implements McpContext, AgentLoopContext {
   // null = unknown (quota not fetched); true = has access; false = definitively no access
   private hasAccessToPreviewModel: boolean | null = null;
   private readonly noBrowser: boolean;
+  private readonly requestTimeoutMs: number | undefined;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
 
@@ -982,6 +984,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.blockedEnvironmentVariables = params.blockedEnvironmentVariables ?? [];
     this.enableEnvironmentVariableRedaction =
       params.enableEnvironmentVariableRedaction ?? false;
+    this.requestTimeoutMs = params.requestTimeoutMs;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
@@ -1398,6 +1401,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getContentGenerator(): ContentGenerator {
     return this.contentGenerator;
+  }
+
+  getRequestTimeoutMs(): number | undefined {
+    return this.requestTimeoutMs;
   }
 
   async refreshAuth(
