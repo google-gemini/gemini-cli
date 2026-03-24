@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { getSecureRandomInt } from '../utils/randomUtils.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
@@ -66,11 +67,11 @@ export const usePhraseCycler = (
 
     if (shouldShowFocusHint || isWaiting) {
       // These are handled by the return value directly for immediate feedback
-      return;
+      return clearTimers;
     }
 
     if (!isActive || (!showTips && !showWit)) {
-      return;
+      return clearTimers;
     }
 
     const wittyPhrasesList =
@@ -102,7 +103,7 @@ export const usePhraseCycler = (
 
       if (filteredTips.length > 0) {
         const selected =
-          filteredTips[Math.floor(Math.random() * filteredTips.length)];
+          filteredTips[getSecureRandomInt(0, filteredTips.length)];
         setCurrentTipState(selected);
         lastSelectedTipRef.current = selected;
         lastTipChangeTimeRef.current = now;
@@ -133,7 +134,7 @@ export const usePhraseCycler = (
 
       if (filteredWitty.length > 0) {
         const selected =
-          filteredWitty[Math.floor(Math.random() * filteredWitty.length)];
+          filteredWitty[getSecureRandomInt(0, filteredWitty.length)];
         setCurrentWittyPhraseState(selected);
         lastSelectedWittyPhraseRef.current = selected;
         lastWittyChangeTimeRef.current = now;
