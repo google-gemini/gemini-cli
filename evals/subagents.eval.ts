@@ -9,27 +9,7 @@ import path from 'node:path';
 
 import { describe, expect } from 'vitest';
 
-import { evalTest } from './test-helper.js';
-
-const DOCS_AGENT_DEFINITION = `---
-name: docs-agent
-description: An agent with expertise in updating documentation.
-tools:
-  - read_file
-  - write_file
----
-You are the docs agent. Update documentation clearly and accurately.
-`;
-
-const TEST_AGENT_DEFINITION = `---
-name: test-agent
-description: An agent with expertise in writing and updating tests.
-tools:
-  - read_file
-  - write_file
----
-You are the test agent. Add or update tests.
-`;
+import { evalTest, getTestAgent } from './test-helper.js';
 
 const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
 
@@ -62,7 +42,7 @@ describe('subagent eval test cases', () => {
     },
     prompt: 'Please update README.md with a description of this library.',
     files: {
-      '.gemini/agents/docs-agent.md': DOCS_AGENT_DEFINITION,
+      '.gemini/agents/docs-agent.md': getTestAgent('docs-agent'),
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
     },
@@ -92,7 +72,7 @@ describe('subagent eval test cases', () => {
     prompt:
       'Rename the exported function in index.ts from add to sum and update the file directly.',
     files: {
-      '.gemini/agents/docs-agent.md': DOCS_AGENT_DEFINITION,
+      '.gemini/agents/docs-agent.md': getTestAgent('docs-agent'),
       'index.ts': INDEX_TS,
     },
     assert: async (rig, _result) => {
@@ -133,7 +113,7 @@ describe('subagent eval test cases', () => {
     },
     prompt: 'Please add a small test file that verifies add(1, 2) returns 3.',
     files: {
-      '.gemini/agents/test-agent.md': TEST_AGENT_DEFINITION,
+      '.gemini/agents/test-agent.md': getTestAgent('test-agent'),
       'index.ts': INDEX_TS,
       'package.json': JSON.stringify(
         {
@@ -178,8 +158,8 @@ describe('subagent eval test cases', () => {
     prompt:
       'Add a short README description for this library and also add a test file that verifies add(1, 2) returns 3.',
     files: {
-      '.gemini/agents/docs-agent.md': DOCS_AGENT_DEFINITION,
-      '.gemini/agents/test-agent.md': TEST_AGENT_DEFINITION,
+      '.gemini/agents/docs-agent.md': getTestAgent('docs-agent'),
+      '.gemini/agents/test-agent.md': getTestAgent('test-agent'),
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
       'package.json': JSON.stringify(
