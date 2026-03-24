@@ -151,6 +151,19 @@ class LegacyAgentProtocol implements AgentProtocol {
     const handleToolCallsUpdate = (event: ToolCallsUpdateMessage) => {
       const toolUpdates: AgentEvent[] = [];
       for (const tc of event.toolCalls) {
+        if (tc.status === 'awaiting_approval') {
+          this._emit([
+            this._makeErrorEvent({
+              status: 'UNIMPLEMENTED',
+              message:
+                'TODO: Tool approvals not yet implemented, please switch to YOLO mode to test.',
+              fatal: true,
+            }),
+          ]);
+          void this.abort();
+          return;
+        }
+
         if (tc.status === 'executing') {
           toolUpdates.push(
             this._makeToolUpdateEvent({

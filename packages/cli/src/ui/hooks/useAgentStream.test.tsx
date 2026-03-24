@@ -292,6 +292,53 @@ describe('useAgentStream', () => {
     });
   });
 
+  it('should display error message when a tool call requires approval', async () => {
+    let eventHandler: (event: any) => void = () => {};
+    vi.spyOn(mockLegacyAgentSession, 'subscribe').mockImplementation((handler) => {
+      eventHandler = handler;
+      return () => {};
+    });
+
+    await renderHookWithProviders(() =>
+      useAgentStream(
+        {} as any,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false,
+        () => undefined,
+        mockOnAuthError,
+        mockPerformMemoryRefresh,
+        false,
+        mockSetModelSwitchedFromQuotaError,
+        mockOnCancelSubmit,
+        mockSetShellInputFocused,
+        80,
+        24,
+      ),
+    );
+
+    act(() => {
+      eventHandler({
+        type: 'error',
+        status: 'UNIMPLEMENTED',
+        message: 'TODO: Tool approvals not yet implemented, please switch to YOLO mode to test.',
+        fatal: true,
+      });
+    });
+
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.ERROR,
+        text: 'TODO: Tool approvals not yet implemented, please switch to YOLO mode to test.',
+      }),
+      expect.any(Number),
+    );
+  });
+
   it('should call session.abort when cancelOngoingRequest is called', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream(
