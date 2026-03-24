@@ -7,6 +7,20 @@
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
+function parseToolArgs(args: unknown): Record<string, any> | null {
+  if (args && typeof args === 'object') {
+    return args as Record<string, any>;
+  }
+  if (typeof args === 'string') {
+    try {
+      return JSON.parse(args) as Record<string, any>;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 describe('validation_fidelity', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should perform exhaustive validation autonomously when guided by system instructions',
@@ -67,7 +81,9 @@ test('formats log correctly', () => {
       );
 
       const hasBuildOrTsc = shellCalls.some((log) => {
-        const cmd = JSON.parse(log.toolRequest.args).command.toLowerCase();
+        const args = parseToolArgs(log.toolRequest.args);
+        const cmd =
+          typeof args?.command === 'string' ? args.command.toLowerCase() : '';
         return (
           cmd.includes('npm run build') ||
           cmd.includes('tsc') ||
