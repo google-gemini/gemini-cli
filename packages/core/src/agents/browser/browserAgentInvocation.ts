@@ -152,13 +152,6 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       const { definition } = result;
       browserManager = result.browserManager;
 
-      const terminationController = new AbortController();
-      const combinedSignal = AbortSignal.any([
-        signal,
-        terminationController.signal,
-      ]);
-      browserManager.setAbortController(terminationController);
-
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
@@ -303,7 +296,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         onActivity,
       );
 
-      const output = await executor.run(this.params, combinedSignal);
+      const output = await executor.run(this.params, signal);
 
       const displayResult = safeJsonToMarkdown(output.result);
 
