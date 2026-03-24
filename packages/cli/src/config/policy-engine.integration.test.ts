@@ -381,6 +381,7 @@ describe('Policy Engine Integration Tests', () => {
       // Add a manual rule with annotations to the config
       config.rules = config.rules || [];
       config.rules.push({
+        toolName: '*',
         toolAnnotations: { readOnlyHint: true },
         decision: PolicyDecision.ALLOW,
         priority: 10,
