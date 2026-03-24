@@ -165,16 +165,16 @@ export class LinuxSandboxManager implements SandboxManager {
     const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
     for (const p of forbiddenPaths) {
       try {
-        const normalizedPath = this.normalizePath(p);
-        const resolvedPath = await tryRealpath(normalizedPath);
-        const isDir = await this.isDirectory(resolvedPath);
+        const originalPath = this.normalizePath(p);
+        const resolvedPath = await tryRealpath(originalPath);
 
-        // Mask the fully resolved target path
-        bwrapArgs.push(...this.getMaskingArgs(resolvedPath, isDir));
+        // Mask the resolved path to prevent access to the underlying file.
+        await this.applyMasking(bwrapArgs, resolvedPath);
 
-        // Mask the original path if it was a symlink, to prevent access via the link itself
-        if (resolvedPath !== normalizedPath) {
-          bwrapArgs.push(...this.getMaskingArgs(normalizedPath, isDir));
+        // If the original path was a symlink, mask it as well to prevent access
+        // through the link itself.
+        if (resolvedPath !== originalPath) {
+          await this.applyMasking(bwrapArgs, originalPath);
         }
       } catch (e) {
         throw new Error(
@@ -206,27 +206,28 @@ export class LinuxSandboxManager implements SandboxManager {
   }
 
   /**
-   * Generates the bubblewrap arguments to securely mask a given path.
+   * Applies bubblewrap arguments to mask a forbidden path.
    */
-  private getMaskingArgs(targetPath: string, isDirectory: boolean): string[] {
-    if (isDirectory) {
-      // Directories are masked by an empty, read-only tmpfs.
-      return ['--tmpfs', targetPath, '--remount-ro', targetPath];
-    }
-    // Files and non-existent paths are masked by binding them to /dev/null.
-    // bwrap will safely create an empty file at the destination if it doesn't exist.
-    return ['--ro-bind-try', '/dev/null', targetPath];
-  }
+  private async applyMasking(args: string[], path: string) {
+    try {
+      const stats = await fs.promises.stat(path);
 
-  /**
-   * Checks if a path is a directory, returning false if it doesn't exist (ENOENT).
-   */
-  private async isDirectory(targetPath: string): Promise<boolean> {
-    const stats = await fs.promises.stat(targetPath).catch((e: unknown) => {
-      if (isNodeError(e) && e.code === 'ENOENT') return null;
+      if (stats.isDirectory()) {
+        // Directories are masked by mounting an empty, read-only tmpfs.
+        args.push('--tmpfs', path, '--remount-ro', path);
+      } else {
+        // Existing files are masked by binding them to /dev/null.
+        args.push('--ro-bind-try', '/dev/null', path);
+      }
+    } catch (e) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        // Non-existent paths are masked by a broken symlink. This prevents
+        // creation within the sandbox while avoiding host remnants.
+        args.push('--symlink', '/.forbidden', path);
+        return;
+      }
       throw e;
-    });
-    return stats?.isDirectory() ?? false;
+    }
   }
 
   private normalizePath(p: string): string {

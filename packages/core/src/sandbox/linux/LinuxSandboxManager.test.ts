@@ -278,7 +278,7 @@ describe('LinuxSandboxManager', () => {
     ]);
   });
 
-  it('protects both the symlink and the real path for forbidden paths', async () => {
+  it('protects both the resolved path and the original path for forbidden symlinks', async () => {
     vi.spyOn(fs.promises, 'stat').mockImplementation(
       async () => ({ isDirectory: () => false }) as fs.Stats,
     );
@@ -297,7 +297,7 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    // Should explicitly mask both the resolved target and the original symlink string
+    // Should explicitly mask both the resolved path and the original symlink path
     expectDynamicBinds(bwrapArgs, [
       '--ro-bind-try',
       '/dev/null',
@@ -305,6 +305,62 @@ describe('LinuxSandboxManager', () => {
       '--ro-bind-try',
       '/dev/null',
       '/tmp/forbidden-symlink',
+    ]);
+  });
+
+  it('masks non-existent forbidden paths with a broken symlink', async () => {
+    const error = new Error('File not found') as NodeJS.ErrnoException;
+    error.code = 'ENOENT';
+    vi.spyOn(fs.promises, 'stat').mockRejectedValue(error);
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) =>
+      p.toString(),
+    );
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/tmp/not-here.txt'],
+      },
+    });
+
+    expectDynamicBinds(bwrapArgs, [
+      '--symlink',
+      '/.forbidden',
+      '/tmp/not-here.txt',
+    ]);
+  });
+
+  it('masks directory symlinks with tmpfs for both paths', async () => {
+    vi.spyOn(fs.promises, 'stat').mockImplementation(
+      async () => ({ isDirectory: () => true }) as fs.Stats,
+    );
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) => {
+      if (p === '/tmp/dir-link') return '/opt/real-dir';
+      return p.toString();
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/tmp/dir-link'],
+      },
+    });
+
+    expectDynamicBinds(bwrapArgs, [
+      '--tmpfs',
+      '/opt/real-dir',
+      '--remount-ro',
+      '/opt/real-dir',
+      '--tmpfs',
+      '/tmp/dir-link',
+      '--remount-ro',
+      '/tmp/dir-link',
     ]);
   });
 });
