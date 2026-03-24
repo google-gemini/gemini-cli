@@ -1694,7 +1694,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       }
 
-      if (keyMatchers[Command.QUIT](key)) {
+      if (keyMatchers[Command.QUIT](key) && !embeddedShellFocused) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
         cancelOngoingRequest?.();
@@ -1703,7 +1703,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (
         keyMatchers[Command.EXIT](key) &&
-        bufferRef.current.text.length === 0
+        bufferRef.current.text.length === 0 &&
+        !embeddedShellFocused
       ) {
         handleCtrlDPress();
         return true;

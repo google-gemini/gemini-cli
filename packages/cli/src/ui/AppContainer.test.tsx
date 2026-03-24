@@ -2109,6 +2109,29 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
+      it('should NOT quit or cancel request if shell is focused', async () => {
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+        await setupKeypressTest();
+
+        // Focus shell
+        pressKey('\t');
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Press Ctrl+C
+        pressKey('\x03');
+        expect(mockCancelOngoingRequest).not.toHaveBeenCalled();
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Press Ctrl+C again (to test repeat)
+        pressKey('\x03');
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        unmount();
+      });
+
       it('should reset press count after a timeout', async () => {
         await setupKeypressTest();
 
@@ -2159,6 +2182,28 @@ describe('AppContainer State Management', () => {
 
         pressKey('\x04'); // Ctrl+D
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+
+      it('should NOT quit if shell is focused', async () => {
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+        await setupKeypressTest();
+
+        // Focus shell
+        pressKey('\t');
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Press Ctrl+D
+        pressKey('\x04');
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Press Ctrl+D again (to test repeat)
+        pressKey('\x04');
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
         unmount();
       });
 
