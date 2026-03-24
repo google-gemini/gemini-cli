@@ -218,22 +218,12 @@ export class LinuxSandboxManager implements SandboxManager {
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
-    for (const file of GOVERNANCE_FILES) {
-      const filePath = join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
-      const realPath = tryRealpath(filePath);
-      bwrapArgs.push('--ro-bind', filePath, filePath);
-      if (realPath !== filePath) {
-        bwrapArgs.push('--ro-bind', realPath, realPath);
-      }
-    }
+
 
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
-    const resolvedAllowedPaths: string[] = [];
     for (const allowedPath of allowedPaths) {
       const resolved = tryRealpath(allowedPath);
-      resolvedAllowedPaths.push(resolved);
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
         bwrapArgs.push('--bind-try', resolved, resolved);
@@ -262,9 +252,26 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(this.options.workspace, file.path);
+      touch(filePath, file.isDirectory);
+      const realPath = tryRealpath(filePath);
+      bwrapArgs.push('--ro-bind', filePath, filePath);
+      if (realPath !== filePath) {
+        bwrapArgs.push('--ro-bind', realPath, realPath);
+      }
+    }
+
     const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
     for (const p of forbiddenPaths) {
-      const resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
+      let resolved: string;
+      try {
+        resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
+      } catch (e: unknown) {
+        debugLogger.warn(`Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`);
+        bwrapArgs.push('--ro-bind', '/dev/null', p);
+        continue;
+      }
       try {
         const stat = fs.statSync(resolved);
         if (stat.isDirectory()) {
@@ -275,6 +282,9 @@ export class LinuxSandboxManager implements SandboxManager {
       } catch (e: unknown) {
         if (isErrnoException(e) && e.code === 'ENOENT') {
           bwrapArgs.push('--symlink', '/dev/null', resolved);
+        } else {
+          debugLogger.warn(`Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`);
+          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
         }
       }
     }
