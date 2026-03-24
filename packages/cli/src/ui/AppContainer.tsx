@@ -159,8 +159,10 @@ import {
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
+import { type LoopSchedule } from './commands/types.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { parseSlashCommand } from '../utils/commands.js';
+import { buildLoopSubmissionText } from './utils/loopCommand.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
@@ -869,6 +871,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
+  const [loopSchedule, setLoopSchedule] = useState<LoopSchedule | null>(null);
+  const [pendingLoopPrompt, setPendingLoopPrompt] = useState<string | null>(
+    null,
+  );
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
 
   const {
@@ -877,6 +883,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     toggleCleanUiDetailsVisible,
     revealCleanUiDetailsTemporarily,
   } = useVisibilityToggle();
+
+  const scheduleLoop = useCallback((schedule: LoopSchedule) => {
+    setPendingLoopPrompt(null);
+    setLoopSchedule(schedule);
+    return true;
+  }, []);
+
+  const clearLoopSchedule = useCallback(() => {
+    setLoopSchedule(null);
+    setPendingLoopPrompt(null);
+  }, []);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -914,6 +931,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      scheduleLoop,
     }),
     [
       setAuthState,
@@ -933,6 +951,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      scheduleLoop,
     ],
   );
 
@@ -1131,6 +1150,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalHeight,
     embeddedShellFocused,
     consumePendingHints,
+    clearLoopSchedule,
   );
 
   const pendingHistoryItems = useMemo(
@@ -1211,6 +1231,87 @@ Logging in with Google... Restarting Gemini CLI to continue.
     submitQuery,
     isMcpReady,
   });
+
+  const streamingStateRef = useRef(streamingState);
+  const isMcpReadyRef = useRef(isMcpReady);
+  const messageQueueLengthRef = useRef(messageQueue.length);
+
+  useEffect(() => {
+    streamingStateRef.current = streamingState;
+  }, [streamingState]);
+
+  useEffect(() => {
+    isMcpReadyRef.current = isMcpReady;
+  }, [isMcpReady]);
+
+  useEffect(() => {
+    messageQueueLengthRef.current = messageQueue.length;
+  }, [messageQueue.length]);
+
+  const submitLoopPrompt = useCallback(
+    (prompt: string) => {
+      historyManager.addItem(
+        { type: MessageType.USER, text: prompt },
+        Date.now(),
+      );
+      void submitQuery([{ text: buildLoopSubmissionText(prompt) }], {
+        displayContent: prompt,
+        isLoopGenerated: true,
+      });
+    },
+    [historyManager, submitQuery],
+  );
+
+  const queueOrSubmitLoopPrompt = useCallback(
+    (prompt: string) => {
+      if (
+        streamingStateRef.current === StreamingState.Idle &&
+        isMcpReadyRef.current &&
+        messageQueueLengthRef.current === 0
+      ) {
+        submitLoopPrompt(prompt);
+        return;
+      }
+
+      setPendingLoopPrompt((current) => current ?? prompt);
+    },
+    [submitLoopPrompt],
+  );
+
+  useEffect(() => {
+    if (!loopSchedule) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      queueOrSubmitLoopPrompt(loopSchedule.prompt);
+    }, loopSchedule.intervalMs);
+
+    return () => clearInterval(timer);
+  }, [loopSchedule, queueOrSubmitLoopPrompt]);
+
+  useEffect(() => {
+    if (
+      !pendingLoopPrompt ||
+      !isConfigInitialized ||
+      streamingState !== StreamingState.Idle ||
+      !isMcpReady ||
+      messageQueue.length > 0
+    ) {
+      return;
+    }
+
+    const prompt = pendingLoopPrompt;
+    setPendingLoopPrompt(null);
+    submitLoopPrompt(prompt);
+  }, [
+    pendingLoopPrompt,
+    isConfigInitialized,
+    streamingState,
+    isMcpReady,
+    messageQueue.length,
+    submitLoopPrompt,
+  ]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {

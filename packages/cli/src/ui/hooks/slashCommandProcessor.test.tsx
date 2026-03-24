@@ -216,6 +216,7 @@ describe('useSlashCommandProcessor', () => {
             toggleBackgroundShell: vi.fn(),
             toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
+            scheduleLoop: vi.fn(() => true),
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized

@@ -72,6 +72,12 @@ import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import {
+  consumeLoopStopMarkerDelta,
+  createActiveLoopStopMatchState,
+  createInactiveLoopStopMatchState,
+  flushLoopStopMarkerState,
+} from '../utils/loopCommand.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
@@ -221,6 +227,7 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
+  onLoopTurnCompleted?: () => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -579,6 +586,9 @@ export const useGeminiStream = (
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
+  const loopPromptIdRef = useRef<string | null>(null);
+  const loopStopMatchStateRef = useRef(createInactiveLoopStopMatchState());
+  const loopTurnCompletionNotifiedRef = useRef(false);
   const loopDetectedRef = useRef(false);
   const [
     loopDetectionConfirmationRequest,
@@ -915,18 +925,13 @@ export const useGeminiStream = (
 
   // --- Stream Event Handlers ---
 
-  const handleContentEvent = useCallback(
+  const appendGeminiContent = useCallback(
     (
-      eventValue: ContentEvent['value'],
+      visibleDelta: string,
       currentGeminiMessageBuffer: string,
       userMessageTimestamp: number,
     ): string => {
-      setRetryStatus(null);
-      if (turnCancelledRef.current) {
-        // Prevents additional output after a user initiated cancel.
-        return '';
-      }
-      let newGeminiMessageBuffer = currentGeminiMessageBuffer + eventValue;
+      let newGeminiMessageBuffer = currentGeminiMessageBuffer + visibleDelta;
       if (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
@@ -936,7 +941,7 @@ export const useGeminiStream = (
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
         setPendingHistoryItem({ type: 'gemini', text: '' });
-        newGeminiMessageBuffer = eventValue;
+        newGeminiMessageBuffer = visibleDelta;
       }
       // Split large messages for better rendering performance. Ideally,
       // we should maximize the amount of output sent to <Static />.
@@ -977,6 +982,46 @@ export const useGeminiStream = (
       return newGeminiMessageBuffer;
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
+  const handleContentEvent = useCallback(
+    (
+      eventValue: ContentEvent['value'],
+      currentGeminiMessageBuffer: string,
+      userMessageTimestamp: number,
+    ): string => {
+      setRetryStatus(null);
+      if (turnCancelledRef.current) {
+        // Prevents additional output after a user initiated cancel.
+        return '';
+      }
+
+      let visibleDelta: string | null = eventValue;
+      if (loopPromptIdRef.current !== null) {
+        const loopDelta = consumeLoopStopMarkerDelta(
+          eventValue,
+          loopStopMatchStateRef.current,
+        );
+        loopStopMatchStateRef.current = loopDelta.nextState;
+        visibleDelta = loopDelta.visibleDelta;
+
+        if (loopDelta.shouldCancel && !loopTurnCompletionNotifiedRef.current) {
+          loopTurnCompletionNotifiedRef.current = true;
+          onLoopTurnCompleted?.();
+        }
+      }
+
+      if (!visibleDelta) {
+        return currentGeminiMessageBuffer;
+      }
+
+      return appendGeminiContent(
+        visibleDelta,
+        currentGeminiMessageBuffer,
+        userMessageTimestamp,
+      );
+    },
+    [appendGeminiContent, onLoopTurnCompleted],
   );
 
   const handleThoughtEvent = useCallback(
@@ -1392,6 +1437,19 @@ export const useGeminiStream = (
           }
         }
       }
+      if (loopPromptIdRef.current !== null) {
+        const flushResult = flushLoopStopMarkerState(
+          loopStopMatchStateRef.current,
+        );
+        loopStopMatchStateRef.current = flushResult.nextState;
+        if (flushResult.visibleDelta) {
+          geminiMessageBuffer = appendGeminiContent(
+            flushResult.visibleDelta,
+            geminiMessageBuffer,
+            userMessageTimestamp,
+          );
+        }
+      }
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
@@ -1420,12 +1478,17 @@ export const useGeminiStream = (
       pendingHistoryItemRef,
       setPendingHistoryItem,
       setThought,
+      appendGeminiContent,
     ],
   );
   const submitQuery = useCallback(
     async (
       query: PartListUnion,
-      options?: { isContinuation: boolean },
+      options?: {
+        isContinuation?: boolean;
+        displayContent?: PartListUnion;
+        isLoopGenerated?: boolean;
+      },
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
@@ -1468,6 +1531,20 @@ export const useGeminiStream = (
           if (!prompt_id) {
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
+
+          if (!options?.isContinuation) {
+            if (options?.isLoopGenerated) {
+              loopPromptIdRef.current = prompt_id;
+              loopStopMatchStateRef.current = createActiveLoopStopMatchState();
+              loopTurnCompletionNotifiedRef.current = false;
+            } else {
+              loopPromptIdRef.current = null;
+              loopStopMatchStateRef.current =
+                createInactiveLoopStopMatchState();
+              loopTurnCompletionNotifiedRef.current = false;
+            }
+          }
+
           return promptIdContext.run(prompt_id, async () => {
             const { queryToSend, shouldProceed } = await prepareQueryForGemini(
               query,
@@ -1512,7 +1589,7 @@ export const useGeminiStream = (
                 prompt_id!,
                 undefined,
                 false,
-                query,
+                options?.displayContent ?? query,
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,
