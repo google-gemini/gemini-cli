@@ -58,12 +58,18 @@ function getDisallowedFileReadCommand(testFile: string): {
   const quotedPath = `"${testFile}"`;
   switch (shell) {
     case 'powershell':
-      return { command: `Get-Content ${quotedPath}`, tool: 'Get-Content' };
+      return {
+        command: `powershell -Command "Get-Content ${quotedPath}"`,
+        tool: 'powershell',
+      };
     case 'cmd':
-      return { command: `type ${quotedPath}`, tool: 'type' };
+      return { command: `cmd /c type ${quotedPath}`, tool: 'cmd' };
     case 'bash':
     default:
-      return { command: `cat ${quotedPath}`, tool: 'cat' };
+      return {
+        command: `node -e "console.log(require('fs').readFileSync('${testFile}', 'utf8'))"`,
+        tool: 'node',
+      };
   }
 }
 
