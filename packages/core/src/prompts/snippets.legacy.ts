@@ -60,6 +60,7 @@ export interface PrimaryWorkflowsOptions {
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
   taskTracker?: boolean;
+  hasGraphQuery?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -510,6 +511,9 @@ function mandateContinueWork(interactive: boolean): string {
 }
 
 function workflowStepUnderstand(options: PrimaryWorkflowsOptions): string {
+  if (options.enableCodebaseInvestigator && options.hasGraphQuery) {
+    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. For symbol lookups (finding where a function/class is defined, tracing who calls it), use \`graph_search\`/\`graph_query\` directly — these are faster than delegating to codebase_investigator for pure navigation. Delegate to \`codebase_investigator\` when the task requires deep architectural understanding across many files, not just symbol location. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use \`graph_search\` or \`graph_query\` directly — not \`${GREP_TOOL_NAME}\`.`;
+  }
   if (options.enableCodebaseInvestigator) {
     return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
   }

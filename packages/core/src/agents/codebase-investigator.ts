@@ -7,6 +7,8 @@
 import type { LocalAgentDefinition } from './types.js';
 import {
   GLOB_TOOL_NAME,
+  GRAPH_QUERY_TOOL_NAME,
+  GRAPH_SEARCH_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
@@ -56,11 +58,6 @@ export const CodebaseInvestigatorAgent = (
   const model = supportsModernFeatures(config.getModel())
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_MODEL;
-
-  const listCommand =
-    process.platform === 'win32'
-      ? '`dir /s` (CMD) or `Get-ChildItem -Recurse` (PowerShell)'
-      : '`ls -R`';
 
   return {
     name: 'codebase_investigator',
@@ -121,6 +118,8 @@ export const CodebaseInvestigatorAgent = (
         READ_FILE_TOOL_NAME,
         GLOB_TOOL_NAME,
         GREP_TOOL_NAME,
+        GRAPH_SEARCH_TOOL_NAME,
+        GRAPH_QUERY_TOOL_NAME,
       ],
     },
 
@@ -139,6 +138,14 @@ You are a sub-agent in a larger system. Your only responsibility is to provide d
 - **DO NOT:** Write the final implementation code yourself.
 - **DO NOT:** Stop at the first relevant file. Your goal is a comprehensive understanding of the entire relevant subsystem.
 You operate in a non-interactive loop and must reason based on the information provided and the output of your tools.
+---
+## Graph-First Navigation (when index available)
+If \`graph_search\` and \`graph_query\` tools are available, you MUST follow this hierarchy:
+- **\`graph_search("<name>")\`** — for any symbol lookup (function, class, method). Returns file, line, callers, callees. Faster than grep, no file scanning.
+- **\`graph_query("<name>")\`** — for full caller/callee chains. Use before \`read_file\`.
+- **\`grep_search\`** — ONLY for non-symbol searches: string literals, comments, config values.
+- After a graph result gives you file + line, read ONLY that range with \`start_line\`/\`end_line\`.
+- If \`graph_search\` returns 0 results, try a shorter keyword (strip module prefix or last 1-2 snake_case parts) before falling back to \`grep_search\`.
 ---
 ## Core Directives
 <RULES>
@@ -168,9 +175,9 @@ When you are finished, you **MUST** call the \`complete_task\` tool. The \`repor
 {
   "SummaryOfFindings": "The core issue is a race condition in the \`updateUser\` function. The function reads the user's state, performs an asynchronous operation, and then writes the state back. If another request modifies the user state during the async operation, that change will be overwritten. The fix requires implementing a transactional read-modify-write pattern, potentially using a database lock or a versioning system.",
   "ExplorationTrace": [
-    "Used \`grep\` to search for \`updateUser\` to locate the primary function.",
-    "Read the file \`src/controllers/userController.js\` to understand the function's logic.",
-    "Used ${listCommand} to look for related files, such as services or database models.",
+    "Used \`graph_search('updateUser')\` to locate the primary function — returned file, line, callers, and callees instantly.",
+    "Used \`graph_query('updateUser')\` to trace the full caller chain and identify all call sites.",
+    "Read \`src/controllers/userController.js\` lines 42-78 (from graph result) to understand the function's logic.",
     "Read \`src/services/userService.js\` and \`src/models/User.js\` to understand the data flow and how state is managed."
   ],
   "RelevantLocations": [

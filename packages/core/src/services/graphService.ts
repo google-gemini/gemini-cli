@@ -356,44 +356,14 @@ export class GraphService {
     };
   }
 
-  private writeGeminiMd(db: Database.Database) {
-    const nodes = db
-      .prepare(
-        'SELECT id,type,name,line,args,file FROM nodes ORDER BY file,line',
-      )
-      .all() as GraphNode[];
-    const byFile = new Map<string, GraphNode[]>();
-    for (const n of nodes) {
-      if (!byFile.has(n.file)) byFile.set(n.file, []);
-      byFile.get(n.file)!.push(n);
-    }
-
+  private writeGeminiMd(_db: Database.Database) {
     const projectName = path.basename(path.resolve(this.root));
     const lines = [
       `# ${projectName} — Code Index`,
       '',
       'LOCATIONS only — no callers/callees. Use graph_search(name) before editing any symbol.',
       'graph_search=definition+callers+callees | graph_query=full call chain | grep_search=strings only',
-      '',
-      '## Symbols',
-      '',
     ];
-
-    // Compact one-line-per-symbol format: file:line name(args)
-    const sortedFiles = Array.from(byFile.keys()).sort();
-    for (const file of sortedFiles) {
-      const fileNodes = byFile.get(file)!;
-      for (const n of fileNodes) {
-        if (n.name === '_module') continue;
-        const sig =
-          n.type === 'class'
-            ? `class ${n.name}`
-            : `fn ${n.name}${n.args != null ? `(${n.args})` : '()'}`;
-        lines.push(`${file}:${n.line} ${sig}`);
-      }
-    }
-
-    lines.push('', `indexed ${nowIso()}`);
 
     // Write to project root so gemini-cli auto-loads it on every session
     fs.writeFileSync(

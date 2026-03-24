@@ -190,6 +190,16 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
+## Graph-First Navigation (when code index is available):
+A code graph index is available. You MUST follow these rules for every tool call throughout the entire session — not only during research, but also during execution, verification, and follow-up:
+- **NEVER** use \`grep_search\` to locate a symbol (function, class, method). Use \`graph_search("<name>")\` instead — it is faster and does not scan files.
+- **NEVER** use \`grep_search\` or \`read_file\` to discover callers or callees of a function. Use \`graph_query("<name>")\` — it returns the full call chain instantly.
+- Use \`grep_search\` ONLY for non-symbol searches: string literals, comments, config values, or arbitrary text patterns.
+- After a \`graph_search\` result gives you a file path and line number, read ONLY that specific range via \`read_file\` with \`start_line\`/\`end_line\`. Do NOT read the whole file.
+- Do NOT fall back to \`grep_search\` or broad \`read_file\` calls mid-task just because a prior graph result was partial. Issue another \`graph_search\` or \`graph_query\` call instead.
+- If \`graph_search\` returns 0 results, try a **shorter keyword** (e.g., search \`"SubclassVar"\` instead of \`"TensorSubclassVariable"\`). Only use \`grep_search\` as a last resort after 2+ shorter-keyword \`graph_search\` attempts all return 0 results.
+- If \`graph_search\` returns only test files, the implementation is elsewhere — try a shorter partial keyword, NOT \`grep_search\`.
+
 ## Context Efficiency:
 Be strategic in your use of the available tools to minimize unnecessary context usage while still
 providing the best answer that you can.
@@ -651,9 +661,11 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 
   if (options.hasGraphQuery) {
     suggestion +=
-      ' A code graph index is available — use the right tool: `graph_search("<keyword>")` to find where a function/class is defined (faster than grep_search, no file scanning);' +
-      ' `graph_query("<name>")` to get the full caller/callee graph for a symbol (grep_search cannot do this);' +
-      ' `grep_search` only for non-symbol searches like comments, strings, or config values.';
+      ' **Code graph index is active — graph-first navigation is MANDATORY for this entire session:**' +
+      ' `graph_search("<keyword>")` for any symbol definition (do NOT use grep_search for symbols);' +
+      ' `graph_query("<name>")` for full caller/callee chains (do NOT use grep_search or read_file for call flow);' +
+      ' `grep_search` strictly for text/string/comment searches only.' +
+      ' After each graph result, read ONLY the specific line range — never the whole file.';
   }
 
   const searchTools: string[] = [];

@@ -152,6 +152,9 @@ export {
 
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
+export const GRAPH_SEARCH_TOOL_NAME = 'graph_search';
+export const GRAPH_QUERY_TOOL_NAME = 'graph_query';
+
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
 /**

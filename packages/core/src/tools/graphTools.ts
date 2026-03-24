@@ -249,7 +249,7 @@ class GraphSearchToolInvocation
     const text =
       results.length > 0
         ? JSON.stringify(results, null, 2)
-        : `No symbols found matching '${this.params.keyword}'. Run graph_init first if you haven't already.`;
+        : `No symbols found matching '${this.params.keyword}'. REQUIRED: try graph_search again with a shorter keyword BEFORE using grep_search.\n- If keyword contains dots (module path), strip the prefix — e.g. 'torch.compiler.set_stance' → try 'set_stance'\n- If keyword is long snake_case, try the last 1-2 parts — e.g. 'get_and_maybe_log_recompilation_reasons' → try 'recompilation_reasons'\nOnly fall back to grep_search after 2+ shorter graph_search attempts all return 0 results. (Run graph_init first if this project has not been indexed yet.)`;
 
     return {
       llmContent: [{ text }],
@@ -269,7 +269,7 @@ export class GraphSearchTool extends BaseDeclarativeTool<
     super(
       'graph_search',
       'Graph Search',
-      'ALWAYS call this before editing any function or class. Returns file, line, arguments, callers (who calls it), and callees (what it calls) — information GEMINI.md does NOT contain. Use this instead of grep_search for any symbol lookup. Partial keyword matching supported.',
+      'Use this for ANY symbol lookup (function, class, method) — not just before editing. Returns file, line, arguments, callers, and callees. NEVER use grep_search to find a symbol; always use graph_search first. Partial keyword matching supported — try shorter keywords if a full name returns no results.',
       Kind.Search,
       {
         type: 'object',
