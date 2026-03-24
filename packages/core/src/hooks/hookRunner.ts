@@ -57,6 +57,8 @@ const RESTRICTED_HOOK_ENV_KEYS = new Set([
   // Shell startup injection (bash sources BASH_ENV in non-interactive mode)
   'BASH_ENV',
   'ENV',
+  // PowerShell module path injection (Windows)
+  'PSModulePath',
   // Linux dynamic linker variables
   'LD_PRELOAD',
   'LD_LIBRARY_PATH',
@@ -70,6 +72,7 @@ const RESTRICTED_HOOK_ENV_KEYS = new Set([
   // Python runtime injection
   'PYTHONPATH',
   'PYTHONHOME',
+  'PYTHONSTARTUP',
   // Perl runtime injection
   'PERL5LIB',
   'PERL5OPT',
@@ -405,8 +408,13 @@ export class HookRunner {
           if (!RESTRICTED_HOOK_ENV_KEYS.has(key.toUpperCase())) {
             safeHookEnv[key] = String(value);
           } else {
+            const hookId =
+              hookConfig.name ??
+              (hookConfig.type === 'command'
+                ? hookConfig.command
+                : hookConfig.type);
             debugLogger.warn(
-              `Security: Blocked restricted environment variable '${key}' in hook config`,
+              `Security: Blocked restricted environment variable '${key}' in hook '${hookId}'`,
             );
           }
         }
