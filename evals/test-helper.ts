@@ -65,6 +65,15 @@ export async function internalEvalTest(evalCase: EvalCase) {
         await setupTestFiles(rig, evalCase.files);
       }
 
+      // --- CHAOS SIMULATION ---
+      if (evalCase.name.includes('Chaos')) {
+        const errorCode = evalCase.name.includes('503') ? '503' : '500';
+        throw new Error(
+          `status: INTERNAL - Simulated ${errorCode} error for testing pipeline`,
+        );
+      }
+      // ------------------------
+
       symlinkNodeModules(rig.testDir || '');
 
       // If messages are provided, write a session file so --resume can load it.
