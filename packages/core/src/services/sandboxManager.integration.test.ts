@@ -331,6 +331,43 @@ describe('SandboxManager Integration', () => {
         }
       });
 
+      it('prevents creation of non-existent forbidden paths', async () => {
+        // Windows icacls cannot explicitly protect paths that have not yet been created.
+        if (Platform.isWindows) return;
+
+        const tempWorkspace = fs.mkdtempSync(
+          path.join(os.tmpdir(), 'workspace-'),
+        );
+        const nonExistentFile = path.join(tempWorkspace, 'never-created.txt');
+
+        try {
+          const osManager = createSandboxManager(
+            { enabled: true },
+            tempWorkspace,
+          );
+
+          // We use touch to attempt creation of the file
+          const { command: cmdTouch, args: argsTouch } =
+            Platform.touch(nonExistentFile);
+
+          const sandboxedCmd = await osManager.prepareCommand({
+            command: cmdTouch,
+            args: argsTouch,
+            cwd: tempWorkspace,
+            env: process.env,
+            policy: { forbiddenPaths: [nonExistentFile] },
+          });
+
+          // Execute the command, we expect it to fail (permission denied or read-only file system)
+          const result = await runCommand(sandboxedCmd);
+
+          expect(result.status).not.toBe(0);
+          expect(fs.existsSync(nonExistentFile)).toBe(false);
+        } finally {
+          fs.rmSync(tempWorkspace, { recursive: true, force: true });
+        }
+      });
+
       it('blocks access to both a symlink and its target when the symlink is forbidden', async () => {
         if (Platform.isWindows) return;
 

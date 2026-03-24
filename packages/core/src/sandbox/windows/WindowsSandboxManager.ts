@@ -15,6 +15,7 @@ import {
   GOVERNANCE_FILES,
   type GlobalSandboxOptions,
   sanitizePaths,
+  tryRealpath,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
@@ -241,7 +242,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = path.resolve(targetPath);
+    const resolvedPath = await tryRealpath(targetPath);
     if (this.allowedCache.has(resolvedPath)) {
       return;
     }
@@ -280,7 +281,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = path.resolve(targetPath);
+    const resolvedPath = await tryRealpath(targetPath);
     if (this.deniedCache.has(resolvedPath)) {
       return;
     }
@@ -294,8 +295,9 @@ export class WindowsSandboxManager implements SandboxManager {
     // could potentially bypass this inherited Deny rule.
     const DENY_ALL_INHERIT = '(OI)(CI)(F)';
 
-    // Verify path exists; icacls fails on non-existent paths.
-    // Skip to match Linux/macOS fail-secure behavior.
+    // icacls fails on non-existent paths, so we cannot explicitly deny
+    // paths that do not yet exist (unlike macOS/Linux).
+    // Skip to prevent sandbox initialization failure.
     try {
       await fs.promises.stat(resolvedPath);
     } catch (e: unknown) {

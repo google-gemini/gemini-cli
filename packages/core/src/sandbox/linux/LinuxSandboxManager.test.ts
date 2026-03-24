@@ -60,6 +60,41 @@ describe('LinuxSandboxManager', () => {
     return result.args.slice(4);
   };
 
+  /**
+   * Helper to verify only the dynamic, policy-based binds (e.g. allowedPaths, forbiddenPaths).
+   * It asserts that the base workspace and governance files are present exactly once,
+   * then strips them away, leaving only the dynamic binds for a focused, non-brittle assertion.
+   */
+  const expectDynamicBinds = (
+    bwrapArgs: string[],
+    expectedDynamicBinds: string[],
+  ) => {
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const allBinds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    const baseBinds = [
+      '--bind',
+      workspace,
+      workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+    ];
+
+    // Verify the base binds are present exactly at the beginning
+    expect(allBinds.slice(0, baseBinds.length)).toEqual(baseBinds);
+
+    // Extract the remaining dynamic binds
+    const dynamicBinds = allBinds.slice(baseBinds.length);
+    expect(dynamicBinds).toEqual(expectedDynamicBinds);
+  };
+
   it('correctly outputs bwrap as the program with appropriate isolation flags', async () => {
     const bwrapArgs = await getBwrapArgs({
       command: 'ls',
@@ -113,22 +148,7 @@ describe('LinuxSandboxManager', () => {
     });
 
     // Verify the specific bindings were added correctly
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
-    expect(binds).toEqual([
-      '--bind',
-      workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
+    expectDynamicBinds(bwrapArgs, [
       '--bind-try',
       '/tmp/cache',
       '/tmp/cache',
@@ -191,24 +211,8 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
     // Should only contain the primary workspace bind and governance files, not the second workspace bind with a trailing slash
-    expect(binds).toEqual([
-      '--bind',
-      workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
-    ]);
+    expectDynamicBinds(bwrapArgs, []);
   });
 
   it('maps forbiddenPaths to empty mounts', async () => {
@@ -233,22 +237,7 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
-    expect(binds).toEqual([
-      '--bind',
-      workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
+    expectDynamicBinds(bwrapArgs, [
       '--tmpfs',
       '/tmp/cache',
       '--remount-ro',
@@ -278,22 +267,7 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
-    expect(binds).toEqual([
-      '--bind',
-      workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
+    expectDynamicBinds(bwrapArgs, [
       '--bind-try',
       '/tmp/conflict',
       '/tmp/conflict',
@@ -323,23 +297,8 @@ describe('LinuxSandboxManager', () => {
       },
     });
 
-    const bindsIndex = bwrapArgs.indexOf('--seccomp');
-    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
-
     // Should explicitly mask both the resolved target and the original symlink string
-    expect(binds).toEqual([
-      '--bind',
-      workspace,
-      workspace,
-      '--ro-bind',
-      `${workspace}/.gitignore`,
-      `${workspace}/.gitignore`,
-      '--ro-bind',
-      `${workspace}/.geminiignore`,
-      `${workspace}/.geminiignore`,
-      '--ro-bind',
-      `${workspace}/.git`,
-      `${workspace}/.git`,
+    expectDynamicBinds(bwrapArgs, [
       '--ro-bind-try',
       '/dev/null',
       '/opt/real-target.txt',

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WindowsSandboxManager } from './WindowsSandboxManager.js';
+import * as sandboxManager from '../../services/sandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 
@@ -22,6 +23,9 @@ describe('WindowsSandboxManager', () => {
 
   beforeEach(() => {
     vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) =>
+      p.toString(),
+    );
     testCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
     manager = new WindowsSandboxManager({ workspace: testCwd });
   });
@@ -134,6 +138,38 @@ describe('WindowsSandboxManager', () => {
     } finally {
       fs.rmSync(allowedPath, { recursive: true, force: true });
     }
+  });
+
+  it('skips denying access to non-existent forbidden paths to prevent icacls failure', async () => {
+    const missingPath = path.join(
+      os.tmpdir(),
+      'gemini-cli-test-missing',
+      'does-not-exist.txt',
+    );
+
+    // Ensure it definitely doesn't exist
+    if (fs.existsSync(missingPath)) {
+      fs.rmSync(missingPath, { recursive: true, force: true });
+    }
+
+    const req: SandboxRequest = {
+      command: 'test',
+      args: [],
+      cwd: testCwd,
+      env: {},
+      policy: {
+        forbiddenPaths: [missingPath],
+      },
+    };
+
+    await manager.prepareCommand(req);
+
+    // Should NOT have called icacls to deny the missing path
+    expect(spawnAsync).not.toHaveBeenCalledWith('icacls', [
+      path.resolve(missingPath),
+      '/deny',
+      '*S-1-16-4096:(OI)(CI)(F)',
+    ]);
   });
 
   it('should deny Low Integrity access to forbidden paths', async () => {

@@ -83,6 +83,25 @@ describe('seatbeltArgsBuilder', () => {
     );
   });
 
+  it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) => p);
+
+    const args = await buildSeatbeltArgs({
+      workspace: '/test',
+      forbiddenPaths: ['/test/missing-dir/missing-file.txt'],
+    });
+
+    const profile = args[1];
+
+    expect(args).toContain('-D');
+    expect(args).toContain(
+      'FORBIDDEN_PATH_0=/test/missing-dir/missing-file.txt',
+    );
+    expect(profile).toContain(
+      '(deny file-read* file-write* (subpath (param "FORBIDDEN_PATH_0")))',
+    );
+  });
+
   it('resolves forbidden symlink paths to their real paths', async () => {
     vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) => {
       if (p === '/test/symlink') return '/test/real_path';
