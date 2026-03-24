@@ -11,6 +11,20 @@ import {
   checkModelOutputContent,
 } from './test-helper.js';
 
+function parseToolArgs(args: unknown): Record<string, any> | null {
+  if (args && typeof args === 'object') {
+    return args as Record<string, any>;
+  }
+  if (typeof args === 'string') {
+    try {
+      return JSON.parse(args) as Record<string, any>;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 describe('grep_search_functionality', () => {
   const TEST_PREFIX = 'Grep Search Functionality: ';
 
@@ -44,8 +58,8 @@ describe('grep_search_functionality', () => {
         'grep_search',
         undefined,
         (args) => {
-          const params = JSON.parse(args);
-          return params.case_sensitive === true;
+          const params = parseToolArgs(args);
+          return params?.case_sensitive === true;
         },
       );
       expect(
@@ -74,8 +88,8 @@ describe('grep_search_functionality', () => {
         'grep_search',
         undefined,
         (args) => {
-          const params = JSON.parse(args);
-          return params.names_only === true;
+          const params = parseToolArgs(args);
+          return params?.names_only === true;
         },
       );
       expect(
@@ -104,8 +118,8 @@ describe('grep_search_functionality', () => {
         'grep_search',
         undefined,
         (args) => {
-          const params = JSON.parse(args);
-          return params.include_pattern === '*.js';
+          const params = parseToolArgs(args);
+          return params?.include_pattern === '*.js';
         },
       );
       expect(
@@ -134,8 +148,8 @@ describe('grep_search_functionality', () => {
         'grep_search',
         undefined,
         (args) => {
-          const params = JSON.parse(args);
-          return params.dir_path === 'src';
+          const params = parseToolArgs(args);
+          return params?.dir_path === 'src';
         },
       );
       expect(
