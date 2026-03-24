@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { BannedAccountDialog } from './BannedAccountDialog.js';
@@ -147,7 +148,9 @@ describe('BannedAccountDialog', () => {
       />,
     );
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
-    await onSelect('open_form');
+    await act(async () => {
+      await onSelect('open_form');
+    });
     expect(mockedOpenBrowser).toHaveBeenCalledWith(
       'https://example.com/appeal',
     );
@@ -165,7 +168,9 @@ describe('BannedAccountDialog', () => {
       />,
     );
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
-    onSelect('open_form');
+    await act(async () => {
+      await onSelect('open_form');
+    });
     await waitFor(() => {
       expect(lastFrame()).toContain('Please open this URL in a browser');
     });
@@ -182,7 +187,9 @@ describe('BannedAccountDialog', () => {
       />,
     );
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
-    await onSelect('exit');
+    await act(async () => {
+      await onSelect('exit');
+    });
     expect(mockedRunExitCleanup).toHaveBeenCalled();
     expect(onExit).toHaveBeenCalled();
     unmount();
@@ -197,7 +204,9 @@ describe('BannedAccountDialog', () => {
       />,
     );
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
-    onSelect('change_auth');
+    await act(async () => {
+      await onSelect('change_auth');
+    });
     expect(onChangeAuth).toHaveBeenCalled();
     expect(onExit).not.toHaveBeenCalled();
     unmount();
@@ -212,8 +221,11 @@ describe('BannedAccountDialog', () => {
       />,
     );
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
-    const result = keypressHandler({ name: 'escape' });
-    expect(result).toBe(true);
+    let result: boolean;
+    await act(async () => {
+      result = keypressHandler({ name: 'escape' });
+    });
+    expect(result!).toBe(true);
     unmount();
   });
 
