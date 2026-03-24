@@ -41,7 +41,7 @@
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^7.2.0",
     "@types/tar": "^7.0.87",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.3.1",
     "supertest": "^7.2.2",
     "typescript": "^5.3.3",
     "vitest": "^4.1.1"
