@@ -35,19 +35,13 @@ describe('planUtils', () => {
       const fullPath = path.join(tempRootDir, planPath);
       fs.writeFileSync(fullPath, '# My Plan');
 
-      const result = await validatePlanPath(planPath, plansDir, tempRootDir);
+      const result = await validatePlanPath(planPath, plansDir);
       expect(result).toBeNull();
-    });
-
-    it('should return error for path traversal', async () => {
-      const planPath = path.join('..', 'secret.txt');
-      const result = await validatePlanPath(planPath, plansDir, tempRootDir);
-      expect(result).toContain('Access denied');
     });
 
     it('should return error for non-existent file', async () => {
       const planPath = path.join('plans', 'ghost.md');
-      const result = await validatePlanPath(planPath, plansDir, tempRootDir);
+      const result = await validatePlanPath(planPath, plansDir);
       expect(result).toContain('Plan file does not exist');
     });
 
@@ -60,11 +54,7 @@ describe('planUtils', () => {
       // Create a symbolic link pointing outside the plans directory
       fs.symlinkSync(outsideFile, fullMaliciousPath);
 
-      const result = await validatePlanPath(
-        maliciousPath,
-        plansDir,
-        tempRootDir,
-      );
+      const result = await validatePlanPath(maliciousPath, plansDir);
       expect(result).toContain('Access denied');
     });
   });

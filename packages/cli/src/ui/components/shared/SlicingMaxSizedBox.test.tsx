@@ -12,21 +12,20 @@ import { describe, it, expect } from 'vitest';
 
 describe('<SlicingMaxSizedBox />', () => {
   it('renders string data without slicing when it fits', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <OverflowProvider>
         <SlicingMaxSizedBox data="Hello World" maxWidth={80}>
           {(truncatedData) => <Text>{truncatedData}</Text>}
         </SlicingMaxSizedBox>
       </OverflowProvider>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Hello World');
     unmount();
   });
 
   it('slices string data by characters when very long', async () => {
     const veryLongString = 'A'.repeat(25000);
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <OverflowProvider>
         <SlicingMaxSizedBox
           data={veryLongString}
@@ -37,7 +36,6 @@ describe('<SlicingMaxSizedBox />', () => {
         </SlicingMaxSizedBox>
       </OverflowProvider>,
     );
-    await waitUntilReady();
     // 20000 characters + 3 for '...'
     expect(lastFrame()).toContain('20003');
     unmount();
@@ -45,7 +43,7 @@ describe('<SlicingMaxSizedBox />', () => {
 
   it('slices string data by lines when maxLines is provided', async () => {
     const multilineString = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <OverflowProvider>
         <SlicingMaxSizedBox
           data={multilineString}
@@ -58,7 +56,6 @@ describe('<SlicingMaxSizedBox />', () => {
         </SlicingMaxSizedBox>
       </OverflowProvider>,
     );
-    await waitUntilReady();
     // maxLines=3, so it should keep 3-1 = 2 lines
     expect(lastFrame()).toContain('Line 1');
     expect(lastFrame()).toContain('Line 2');
@@ -71,7 +68,7 @@ describe('<SlicingMaxSizedBox />', () => {
 
   it('slices array data when maxLines is provided', async () => {
     const dataArray = ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5'];
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <OverflowProvider>
         <SlicingMaxSizedBox
           data={dataArray}
@@ -90,7 +87,6 @@ describe('<SlicingMaxSizedBox />', () => {
         </SlicingMaxSizedBox>
       </OverflowProvider>,
     );
-    await waitUntilReady();
     // maxLines=3, so it should keep 3-1 = 2 items
     expect(lastFrame()).toContain('Item 1');
     expect(lastFrame()).toContain('Item 2');
@@ -103,7 +99,7 @@ describe('<SlicingMaxSizedBox />', () => {
 
   it('does not slice when isAlternateBuffer is true', async () => {
     const multilineString = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <OverflowProvider>
         <SlicingMaxSizedBox
           data={multilineString}
@@ -115,7 +111,6 @@ describe('<SlicingMaxSizedBox />', () => {
         </SlicingMaxSizedBox>
       </OverflowProvider>,
     );
-    await waitUntilReady();
     expect(lastFrame()).toContain('Line 5');
     expect(lastFrame()).not.toContain('hidden');
     unmount();

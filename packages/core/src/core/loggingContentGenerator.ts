@@ -349,6 +349,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -438,7 +439,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
-        noAutoEnd: true,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
           [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -448,7 +449,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
         },
       },
-      async ({ metadata: spanMetadata, endSpan }) => {
+      async ({ metadata: spanMetadata }) => {
         spanMetadata.input = req.contents;
 
         const startTime = Date.now();
@@ -504,7 +505,6 @@ export class LoggingContentGenerator implements ContentGenerator {
           userPromptId,
           role,
           spanMetadata,
-          endSpan,
         );
       },
     );
@@ -517,7 +517,6 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
     role: LlmRole,
     spanMetadata: SpanMetadata,
-    endSpan: () => void,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -581,8 +580,6 @@ export class LoggingContentGenerator implements ContentGenerator {
         serverDetails,
       );
       throw error;
-    } finally {
-      endSpan();
     }
   }
 
@@ -596,6 +593,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.LLMCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_REQUEST_MODEL]: req.model,
         },

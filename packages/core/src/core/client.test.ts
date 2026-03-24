@@ -51,7 +51,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents } from '../utils/events.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock fs module to prevent actual file system operations during tests
@@ -1994,6 +1994,23 @@ ${JSON.stringify(
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
         'Legacy Memory',
+      );
+    });
+
+    it('should update system instruction when MemoryChanged event is emitted', async () => {
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Updated Memory',
+      );
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+      mockGetCoreSystemPrompt.mockClear();
+
+      coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: 2 });
+
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Updated Memory',
       );
     });
 

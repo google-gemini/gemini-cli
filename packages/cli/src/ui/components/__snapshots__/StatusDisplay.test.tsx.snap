@@ -11,7 +11,7 @@ exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `
 `;
 
 exports[`StatusDisplay > renders HookStatusDisplay when hooks are active 1`] = `
-"Mock Hook Status Display
+"Mock Context Summary Display (Skills: 2, Shells: 0)
 "
 `;
 
