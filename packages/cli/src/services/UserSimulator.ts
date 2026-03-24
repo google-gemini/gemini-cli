@@ -20,7 +20,7 @@ export class UserSimulator {
   private lastScreenContent = '';
   private isProcessing = false;
   private interactionsFile: string | null = null;
-  private actionHistory: string[] = [];
+
   private knowledgeBase = '';
 
   constructor(
@@ -116,10 +116,7 @@ export class UserSimulator {
         ? `\nThe original goal was: "${originalGoal}"\n`
         : '';
 
-      const historyInstruction =
-        this.actionHistory.length > 0
-          ? `\nYou have previously taken the following actions (in order):\n${this.actionHistory.map((a, i) => `${i + 1}. ${JSON.stringify(a)}`).join('\n')}\nPay close attention to whether you have already asked for the original goal. If you have already submitted the original goal, DO NOT repeat it verbatim. If the UI shows your typed text but hasn't submitted it yet, just output \\r to press Enter.\n`
-          : '';
+
 
       const knowledgeInstruction = this.knowledgeBase
         ? `\nUser Knowledge Base:\nUse this information to answer questions if applicable. If the answer is not here, respond as you normally would.\n${this.knowledgeBase}\n`
@@ -148,7 +145,7 @@ CRITICAL RULES:
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
 - RULE 3: Output ONLY the raw characters to send, <WAIT>, or <DONE>.
 - RULE 4: Do NOT output markdown, explanations of your thought process, or quotes.
-${goalInstruction}${historyInstruction}${knowledgeInstruction}
+${goalInstruction}${knowledgeInstruction}
 
 Here is the current terminal screen output:
 
@@ -226,8 +223,7 @@ ${strippedScreen}
 
       if (responseText) {
         const keys = responseText.replace(/\\n/g, '\r').replace(/\\r/g, '\r');
-        const readableAction = trimmedResponse.replace(/\\r/g, '[ENTER]');
-        this.actionHistory.push(readableAction);
+
 
         debugLogger.log(
           `[SIMULATOR] Sending to stdin: ${JSON.stringify(keys)}`,
