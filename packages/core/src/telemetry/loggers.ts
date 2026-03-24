@@ -909,7 +909,7 @@ export function logOnboardingSuccess(
     };
     logger.emit(logRecord);
 
-    recordOnboardingSuccess(config, event.userTier);
+    recordOnboardingSuccess(config, event.userTier, event.duration_ms);
   });
 }
 
