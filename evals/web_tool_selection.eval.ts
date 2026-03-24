@@ -62,16 +62,21 @@ describe('Web Tool Selection', () => {
         (l) => l.toolRequest.name === WEB_FETCH_TOOL_NAME,
       );
       const urlFound = fetchCalls.some((call) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch {
-            // args remains string; fall through to stringify check
-          }
+        try {
+          // Per general rules, toolRequest.args is a JSON string that should be parsed.
+          const params = JSON.parse(call.toolRequest.args) as {
+            prompt?: string;
+            url?: string;
+          };
+          // The URL can be in either the 'prompt' or 'url' argument.
+          return (
+            params.prompt?.includes('example.com') ||
+            params.url?.includes('example.com')
+          );
+        } catch {
+          // Fallback for safety, though args should be a valid JSON string.
+          return call.toolRequest.args.includes('example.com');
         }
-        const argsStr = typeof args === 'string' ? args : JSON.stringify(args);
-        return argsStr.includes('example.com');
       });
       expect(
         urlFound,
