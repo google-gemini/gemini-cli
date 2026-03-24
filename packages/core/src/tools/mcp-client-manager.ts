@@ -212,14 +212,20 @@ export class McpClientManager {
    */
   async startExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Loading extension: ${extension.name}`);
+    const mcpServers = Object.entries(extension.mcpServers ?? {});
     await Promise.all(
-      Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
-        this.maybeDiscoverMcpServer(name, {
+      mcpServers.map(([name, config]) => {
+        let serverName = name;
+        if (extension.manifestType === 'open-plugin') {
+          // Open Plugin MCP servers are prefixed with the plugin name using a colon.
+          serverName = `${extension.name}:${name}`;
+        }
+        return this.maybeDiscoverMcpServer(serverName, {
           // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...config,
           extension,
-        }),
-      ),
+        });
+      }),
     );
     await this.scheduleMcpContextRefresh();
   }
