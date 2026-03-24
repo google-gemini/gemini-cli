@@ -489,8 +489,8 @@ describe('AppContainer State Management', () => {
     // Mock LoadedSettings
     mockSettings = createMockSettings({
       hideBanner: false,
-      hideFooter: false,
       hideTips: false,
+      hideFooter: false,
       showMemoryUsage: false,
       theme: 'default',
       ui: {
@@ -911,8 +911,8 @@ describe('AppContainer State Management', () => {
     it('handles settings with all display options disabled', async () => {
       const settingsAllHidden = createMockSettings({
         hideBanner: true,
-        hideFooter: true,
         hideTips: true,
+        hideFooter: true,
         showMemoryUsage: false,
       });
 

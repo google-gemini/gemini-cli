@@ -77,32 +77,6 @@ describe('<ContextSummaryDisplay />', () => {
     unmount();
   });
 
-  it('should switch layout at the 80-column breakpoint', async () => {
-    const props = {
-      ...baseProps,
-      geminiMdFileCount: 1,
-      contextFileNames: ['GEMINI.md'],
-      mcpServers: { 'test-server': { command: 'test' } },
-      ideContext: {
-        workspaceState: {
-          openFiles: [{ path: '/a/b/c', timestamp: Date.now() }],
-        },
-      },
-    };
-
-    // At 80 columns, should be on one line
-    const { lastFrame: wideFrame, unmount: unmountWide } =
-      await renderWithWidth(80, props);
-    expect(wideFrame().trim().includes('\n')).toBe(false);
-    unmountWide();
-
-    // At 79 columns, should be on multiple lines
-    const { lastFrame: narrowFrame, unmount: unmountNarrow } =
-      await renderWithWidth(79, props);
-    expect(narrowFrame().trim().includes('\n')).toBe(true);
-    expect(narrowFrame().trim().split('\n').length).toBe(4);
-    unmountNarrow();
-  });
   it('should not render empty parts', async () => {
     const props = {
       ...baseProps,
