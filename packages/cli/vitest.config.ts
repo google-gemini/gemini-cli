@@ -20,6 +20,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
     environment: 'node',
     globals: true,
+    silent: true,
     reporters: ['default', 'junit'],
 
     outputFile: {
