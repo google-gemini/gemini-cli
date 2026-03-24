@@ -57,7 +57,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -235,7 +235,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -383,9 +383,9 @@ exports[`Core System Prompt (prompts.ts) > ApprovalMode in System Prompt > shoul
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -534,7 +534,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -712,7 +712,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -1108,9 +1108,9 @@ exports[`Core System Prompt (prompts.ts) > should handle git instructions when i
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -1223,9 +1223,9 @@ exports[`Core System Prompt (prompts.ts) > should handle git instructions when i
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -1356,9 +1356,9 @@ exports[`Core System Prompt (prompts.ts) > should include approved plan instruct
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -1462,9 +1462,9 @@ exports[`Core System Prompt (prompts.ts) > should include available_skills when 
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -1626,7 +1626,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -1797,7 +1797,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -1960,7 +1960,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -2123,7 +2123,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -2282,7 +2282,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -2441,7 +2441,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -2594,7 +2594,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -2752,7 +2752,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -2875,9 +2875,9 @@ exports[`Core System Prompt (prompts.ts) > should include the TASK MANAGEMENT PR
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -3038,7 +3038,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -3173,9 +3173,9 @@ exports[`Core System Prompt (prompts.ts) > should match snapshot on Windows 1`] 
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -3289,9 +3289,9 @@ exports[`Core System Prompt (prompts.ts) > should render hierarchical memory wit
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -3454,7 +3454,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -3613,7 +3613,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -3737,9 +3737,9 @@ exports[`Core System Prompt (prompts.ts) > should return the interactive avoidan
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 
@@ -3886,7 +3886,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -4045,7 +4045,7 @@ Use the following guidelines to optimize your search and read patterns.
 
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
@@ -4168,9 +4168,9 @@ exports[`Core System Prompt (prompts.ts) > should use legacy system prompt for n
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`invoke_agent\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 - mock-agent -> Mock Agent Description
 

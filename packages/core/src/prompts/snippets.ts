@@ -33,6 +33,7 @@ import {
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -262,7 +263,7 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
   return `
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+Sub-agents are specialized expert agents. You can invoke them using the ${formatToolName(AGENT_TOOL_NAME)} tool by passing their name to the \`agent_name\` parameter. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 ### Strategic Orchestration & Delegation
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.

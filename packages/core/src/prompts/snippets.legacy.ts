@@ -25,6 +25,7 @@ import {
   TOPIC_PARAM_SUMMARY,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  AGENT_TOOL_NAME,
 } from '../tools/tool-names.js';
 
 // --- Options Structs ---
@@ -202,9 +203,9 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
 # Available Sub-Agents
 Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
 
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+You can invoke sub-agents using the \`${AGENT_TOOL_NAME}\` tool by passing their name to the \`agent_name\` parameter. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-The following tools can be used to start sub-agents:
+The following sub-agents are available:
 
 ${subAgentsList}
 
@@ -559,7 +560,7 @@ function mandateContinueWork(interactive: boolean): string {
 
 function workflowStepUnderstand(options: PrimaryWorkflowsOptions): string {
   if (options.enableCodebaseInvestigator) {
-    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
+    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the \`${AGENT_TOOL_NAME}\` tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
   }
   return `1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
 Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.`;
