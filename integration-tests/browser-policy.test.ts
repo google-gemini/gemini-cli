@@ -63,9 +63,6 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     rig.setup('browser-policy-skip-confirmation', {
       fakeResponsesPath: join(__dirname, 'browser-policy.responses'),
       settings: {
-        experimental: {
-          enableAgents: true,
-        },
         agents: {
           overrides: {
             browser_agent: {
@@ -183,9 +180,6 @@ priority = 200
     rig.setup('browser-session-warning', {
       fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
       settings: {
-        experimental: {
-          enableAgents: true,
-        },
         general: {
           enableAutoUpdateNotification: false,
         },
