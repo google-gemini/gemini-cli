@@ -360,11 +360,9 @@ export class HookAggregator {
     }
 
     // Extract additionalContext from various hook types
-    if (
-      'additionalContext' in specific &&
-      typeof specific['additionalContext'] === 'string'
-    ) {
-      contexts.push(specific['additionalContext']);
+    const additionalContext = specific['additionalContext'];
+    if (typeof additionalContext === 'string') {
+      contexts.push(additionalContext);
     }
   }
 }

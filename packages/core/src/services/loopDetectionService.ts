@@ -583,14 +583,12 @@ export class LoopDetectionService {
       return { isLoop: false };
     }
 
+    const flashConfidenceValue = flashResult['unproductive_state_confidence'];
     const flashConfidence =
-      typeof flashResult['unproductive_state_confidence'] === 'number'
-        ? flashResult['unproductive_state_confidence']
-        : 0;
+      typeof flashConfidenceValue === 'number' ? flashConfidenceValue : 0;
+    const flashAnalysisValue = flashResult['unproductive_state_analysis'];
     const flashAnalysis =
-      typeof flashResult['unproductive_state_analysis'] === 'string'
-        ? flashResult['unproductive_state_analysis']
-        : '';
+      typeof flashAnalysisValue === 'string' ? flashAnalysisValue : '';
 
     const doubleCheckModelName =
       this.context.config.modelConfigService.getResolvedConfig({
@@ -632,15 +630,17 @@ export class LoopDetectionService {
       signal,
     );
 
+    const mainModelConfidenceValue =
+      mainModelResult?.['unproductive_state_confidence'];
     const mainModelConfidence =
-      mainModelResult &&
-      typeof mainModelResult['unproductive_state_confidence'] === 'number'
-        ? mainModelResult['unproductive_state_confidence']
+      typeof mainModelConfidenceValue === 'number'
+        ? mainModelConfidenceValue
         : 0;
+    const mainModelAnalysisValue =
+      mainModelResult?.['unproductive_state_analysis'];
     const mainModelAnalysis =
-      mainModelResult &&
-      typeof mainModelResult['unproductive_state_analysis'] === 'string'
-        ? mainModelResult['unproductive_state_analysis']
+      typeof mainModelAnalysisValue === 'string'
+        ? mainModelAnalysisValue
         : undefined;
 
     logLlmLoopCheck(
@@ -685,10 +685,8 @@ export class LoopDetectionService {
         role: LlmRole.UTILITY_LOOP_DETECTOR,
       });
 
-      if (
-        result &&
-        typeof result['unproductive_state_confidence'] === 'number'
-      ) {
+      const confidenceValue = result?.['unproductive_state_confidence'];
+      if (result && typeof confidenceValue === 'number') {
         return result;
       }
       return null;

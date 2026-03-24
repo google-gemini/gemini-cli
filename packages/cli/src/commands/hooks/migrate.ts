@@ -80,8 +80,9 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
 
     // Replace CLAUDE_PROJECT_DIR with GEMINI_PROJECT_DIR in command
 
-    if (typeof migrated['command'] === 'string') {
-      migrated['command'] = migrated['command'].replace(
+    const command = migrated['command'];
+    if (typeof command === 'string') {
+      migrated['command'] = command.replace(
         /\$CLAUDE_PROJECT_DIR/g,
         '$GEMINI_PROJECT_DIR',
       );
@@ -95,8 +96,9 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
 
   // Map timeout field (Claude uses seconds, Gemini uses seconds)
 
-  if ('timeout' in hook && typeof hook['timeout'] === 'number') {
-    migrated['timeout'] = hook['timeout'];
+  const timeout = hook['timeout'];
+  if ('timeout' in hook && typeof timeout === 'number') {
+    migrated['timeout'] = timeout;
   }
 
   return migrated;
@@ -140,11 +142,9 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
       const migratedDef: Record<string, unknown> = {};
 
       // Transform matcher
-      if (
-        'matcher' in definition &&
-        typeof definition['matcher'] === 'string'
-      ) {
-        migratedDef['matcher'] = transformMatcher(definition['matcher']);
+      const matcher = definition['matcher'];
+      if ('matcher' in definition && typeof matcher === 'string') {
+        migratedDef['matcher'] = transformMatcher(matcher);
       }
 
       // Copy sequential flag
