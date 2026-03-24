@@ -234,6 +234,8 @@ export const richLightTheme: ColorsTheme = {
   InputBackground: '#E8EAED', // grey-200
   MessageBackground: '#E8EAED', // grey-200
   FocusBackground: '#CEEAD6', // green-100
+
+  GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
 export const richDarkTheme: ColorsTheme = {
