@@ -117,7 +117,7 @@ export const ASK_USER_OPTION_PARAM_DESCRIPTION = 'description';
 
 // -- exit_plan_mode --
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
-export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
+export const EXIT_PLAN_PARAM_PLAN_FILENAME = 'plan_filename';
 
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
