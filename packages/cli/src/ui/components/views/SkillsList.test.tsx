@@ -69,13 +69,17 @@ describe('SkillsList Component', () => {
     unmount();
   });
 
-  it('should render "No skills available" when skills list is empty', async () => {
+  it('should render guidance when skills list is empty', async () => {
     const { lastFrame, unmount } = await render(
       <SkillsList skills={[]} showDescriptions={true} />,
     );
     const output = lastFrame();
 
-    expect(output).toContain('No skills available');
+    expect(output).toContain('No skills available.');
+    expect(output).toContain('Learn how to add skills:');
+    expect(output).toContain(
+      'https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md',
+    );
 
     unmount();
   });
