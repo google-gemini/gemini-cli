@@ -31,6 +31,7 @@ export const DefaultAppLayout: React.FC = () => {
       flexDirection="column"
       width={uiState.terminalWidth}
       height={isAlternateBuffer ? terminalHeight : undefined}
+      paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
       flexGrow={0}
       overflow="hidden"
@@ -62,6 +63,9 @@ export const DefaultAppLayout: React.FC = () => {
         flexShrink={0}
         flexGrow={0}
         width={uiState.terminalWidth}
+        height={
+          uiState.copyModeEnabled ? uiState.stableControlsHeight : undefined
+        }
       >
         <Notifications />
         <CopyModeWarning />

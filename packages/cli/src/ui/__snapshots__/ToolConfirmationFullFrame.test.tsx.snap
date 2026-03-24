@@ -1,9 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation box in the frame of the entire terminal 1`] = `
-"3. Ask coding questions, edit code or run commands
-4. Be specific for the best results
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > Can you edit InputPrompt.tsx for me?                                                             
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
 ╭─────────────────────────────────────────────────────────────────────────────────────────────────╮
@@ -11,9 +9,9 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 │                                                                                                 │
 │ ?  Edit packages/.../InputPrompt.tsx:   return kittyProtocolSupporte... =>   return kittyProto… │
 │                                                                                                 │
-│ ... first 44 lines hidden (Ctrl+O to show) ...                                                  │█
-│ 45   const line45 = true;                                                                       │█
-│ 46   const line46 = true;                                                                       │█
+│ ... first 44 lines hidden (Ctrl+O to show) ...                                                  │
+│ 45   const line45 = true;                                                                       │
+│ 46   const line46 = true;                                                                       │
 │ 47   const line47 = true;                                                                       │█
 │ 48   const line48 = true;                                                                       │█
 │ 49   const line49 = true;                                                                       │█
