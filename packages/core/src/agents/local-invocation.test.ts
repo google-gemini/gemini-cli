@@ -4,17 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import type {
-  LocalAgentDefinition,
-  SubagentActivityEvent,
-  AgentInputs,
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+} from 'vitest';
+import {
+  AgentTerminateMode,
+  type LocalAgentDefinition,
+  type SubagentActivityEvent,
+  type AgentInputs,
+  type SubagentProgress,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { type z } from 'zod';
@@ -29,6 +39,7 @@ let mockConfig: Config;
 const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
   kind: 'local',
   name: 'MockAgent',
+  displayName: 'Mock Agent',
   description: 'A mock agent.',
   inputConfig: {
     inputSchema: {
@@ -58,6 +69,11 @@ describe('LocalSubagentInvocation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
 
     mockExecutorInstance = {
@@ -68,6 +84,10 @@ describe('LocalSubagentInvocation', () => {
     MockLocalAgentExecutor.create.mockResolvedValue(
       mockExecutorInstance as unknown as LocalAgentExecutor<z.ZodTypeAny>,
     );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should pass the messageBus to the parent constructor', () => {
@@ -173,7 +193,12 @@ describe('LocalSubagentInvocation', () => {
         mockConfig,
         expect.any(Function),
       );
-      expect(updateOutput).toHaveBeenCalledWith('Subagent starting...\n');
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          agentName: 'MockAgent',
+        }),
+      );
 
       expect(mockExecutorInstance.run).toHaveBeenCalledWith(params, signal);
 
@@ -184,11 +209,30 @@ describe('LocalSubagentInvocation', () => {
           ),
         },
       ]);
-      expect(result.returnDisplay).toContain('Result:\nAnalysis complete.');
-      expect(result.returnDisplay).toContain('Termination Reason:\n GOAL');
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('completed');
+      expect(display.result).toBe('Analysis complete.');
+      expect(display.terminateReason).toBe(AgentTerminateMode.GOAL);
     });
 
-    it('should stream THOUGHT_CHUNK activities from the executor', async () => {
+    it('should show detailed UI for non-goal terminations (e.g., TIMEOUT)', async () => {
+      const mockOutput = {
+        result: 'Partial progress...',
+        terminate_reason: AgentTerminateMode.TIMEOUT,
+      };
+      mockExecutorInstance.run.mockResolvedValue(mockOutput);
+
+      const result = await invocation.execute(signal, updateOutput);
+
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('completed');
+      expect(display.result).toBe('Partial progress...');
+      expect(display.terminateReason).toBe(AgentTerminateMode.TIMEOUT);
+    });
+
+    it('should stream THOUGHT_CHUNK activities from the executor, replacing the last running thought', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
 
@@ -203,7 +247,7 @@ describe('LocalSubagentInvocation', () => {
             isSubagentActivityEvent: true,
             agentName: 'MockAgent',
             type: 'THOUGHT_CHUNK',
-            data: { text: ' Still thinking.' },
+            data: { text: 'Thinking about next steps.' },
           } as SubagentActivityEvent);
         }
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
@@ -211,13 +255,56 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledWith('Subagent starting...\n');
-      expect(updateOutput).toHaveBeenCalledWith('🤖💭 Analyzing...');
-      expect(updateOutput).toHaveBeenCalledWith('🤖💭  Still thinking.');
-      expect(updateOutput).toHaveBeenCalledTimes(3); // Initial message + 2 thoughts
+      expect(updateOutput).toHaveBeenCalledTimes(4); // Initial + 2 updates + Final completion
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Thinking about next steps.',
+        }),
+      );
+      expect(lastCall.recentActivity).not.toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Analyzing...',
+        }),
+      );
     });
 
-    it('should NOT stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
+    it('should overwrite the thought content with new THOUGHT_CHUNK activity', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'I am thinking.' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Now I will act.' },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      const calls = updateOutput.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Now I will act.',
+        }),
+      );
+    });
+
+    it('should stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
 
@@ -226,7 +313,7 @@ describe('LocalSubagentInvocation', () => {
             isSubagentActivityEvent: true,
             agentName: 'MockAgent',
             type: 'TOOL_CALL_START',
-            data: { name: 'ls' },
+            data: { name: 'ls', args: {} },
           } as SubagentActivityEvent);
           onActivity({
             isSubagentActivityEvent: true,
@@ -240,9 +327,93 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      // Should only contain the initial "Subagent starting..." message
-      expect(updateOutput).toHaveBeenCalledTimes(1);
-      expect(updateOutput).toHaveBeenCalledWith('Subagent starting...\n');
+      expect(updateOutput).toHaveBeenCalledTimes(4); // Initial + 2 updates + Final completion
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Error: Failed',
+          status: 'error',
+        }),
+      );
+    });
+
+    it('should mark tool call as error when TOOL_CALL_END contains isError: true', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_START',
+            data: { name: 'ls', args: {}, callId: 'call1' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_END',
+            data: { name: 'ls', id: 'call1', data: { isError: true } },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalled();
+      const lastCall = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'tool_call',
+          content: 'ls',
+          status: 'error',
+        }),
+      );
+    });
+
+    it('should reflect tool rejections in the activity stream as cancelled but not abort the agent', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_START',
+            data: { name: 'ls', args: {}, callId: 'call1' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'ERROR',
+            data: {
+              name: 'ls',
+              callId: 'call1',
+              error: `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`complete_task\` to report your findings and the blocker.`,
+              errorType: SubagentActivityErrorType.REJECTED,
+            },
+          } as SubagentActivityEvent);
+        }
+        return {
+          result: 'Rethinking...',
+          terminate_reason: AgentTerminateMode.GOAL,
+        };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledTimes(4);
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'tool_call',
+          content: 'ls',
+          status: 'cancelled',
+        }),
+      );
     });
 
     it('should run successfully without an updateOutput callback', async () => {
@@ -263,7 +434,10 @@ describe('LocalSubagentInvocation', () => {
       // Execute without the optional callback
       const result = await invocation.execute(signal);
       expect(result.error).toBeUndefined();
-      expect(result.returnDisplay).toContain('Result:\nDone');
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('completed');
+      expect(display.result).toBe('Done');
     });
 
     it('should handle executor run failure', async () => {
@@ -272,15 +446,18 @@ describe('LocalSubagentInvocation', () => {
 
       const result = await invocation.execute(signal, updateOutput);
 
-      expect(result.error).toEqual({
-        message: error.message,
-        type: ToolErrorType.EXECUTION_FAILED,
-      });
-      expect(result.returnDisplay).toBe(
-        `Subagent Failed: MockAgent\nError: ${error.message}`,
-      );
+      expect(result.error).toBeUndefined();
       expect(result.llmContent).toBe(
         `Subagent 'MockAgent' failed. Error: ${error.message}`,
+      );
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: `Error: ${error.message}`,
+          status: 'error',
+        }),
       );
     });
 
@@ -291,19 +468,21 @@ describe('LocalSubagentInvocation', () => {
       const result = await invocation.execute(signal, updateOutput);
 
       expect(mockExecutorInstance.run).not.toHaveBeenCalled();
-      expect(result.error).toEqual({
-        message: creationError.message,
-        type: ToolErrorType.EXECUTION_FAILED,
-      });
-      expect(result.returnDisplay).toContain(`Error: ${creationError.message}`);
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain(creationError.message);
+
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.recentActivity).toContainEqual(
+        expect.objectContaining({
+          content: `Error: ${creationError.message}`,
+          status: 'error',
+        }),
+      );
     });
 
-    /**
-     * This test verifies that the AbortSignal is correctly propagated and
-     * that a rejection from the executor due to abortion is handled gracefully.
-     */
     it('should handle abortion signal during execution', async () => {
       const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
       mockExecutorInstance.run.mockRejectedValue(abortError);
 
       const controller = new AbortController();
@@ -312,14 +491,24 @@ describe('LocalSubagentInvocation', () => {
         updateOutput,
       );
       controller.abort();
-      const result = await executePromise;
+      await expect(executePromise).rejects.toThrow('Aborted');
 
       expect(mockExecutorInstance.run).toHaveBeenCalledWith(
         params,
         controller.signal,
       );
-      expect(result.error?.message).toBe('Aborted');
-      expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+    });
+
+    it('should throw an error and bubble cancellation when execution returns ABORTED', async () => {
+      const mockOutput = {
+        result: 'Cancelled by user',
+        terminate_reason: AgentTerminateMode.ABORTED,
+      };
+      mockExecutorInstance.run.mockResolvedValue(mockOutput);
+
+      await expect(invocation.execute(signal, updateOutput)).rejects.toThrow(
+        'Operation cancelled by user',
+      );
     });
   });
 });

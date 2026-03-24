@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 [![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
 
 Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
@@ -77,7 +77,7 @@ See [Releases](./docs/releases.md) for more details.
 
 ### Preview
 
-New preview releases will be published each week at UTC 2359 on Tuesdays. These
+New preview releases will be published each week at UTC 23:59 on Tuesdays. These
 releases will not have been fully vetted and may contain regressions or other
 outstanding issues. Please help us test and install with `preview` tag.
 
@@ -87,7 +87,7 @@ npm install -g @google/gemini-cli@preview
 
 ### Stable
 
-- New stable releases will be published each week at UTC 2000 on Tuesdays, this
+- New stable releases will be published each week at UTC 20:00 on Tuesdays, this
   will be the full promotion of last week's `preview` release + any bug fixes
   and validations. Use `latest` tag.
 
@@ -97,7 +97,7 @@ npm install -g @google/gemini-cli@latest
 
 ### Nightly
 
-- New releases will be published each day at UTC 0000. This will be all changes
+- New releases will be published each day at UTC 00:00. This will be all changes
   from the main branch as represented at time of release. It should be assumed
   there are pending validations and issues. Use `nightly` tag.
 
@@ -147,7 +147,7 @@ Integrate Gemini CLI directly into your GitHub workflows with
 
 Choose the authentication method that best fits your needs:
 
-### Option 1: Login with Google (OAuth login using your Google Account)
+### Option 1: Sign in with Google (OAuth login using your Google Account)
 
 **✨ Best for:** Individual developers as well as anyone who has a Gemini Code
 Assist License. (see
@@ -161,7 +161,7 @@ for details)
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-#### Start Gemini CLI, then choose _Login with Google_ and follow the browser authentication flow when prompted
+#### Start Gemini CLI, then choose _Sign in with Google_ and follow the browser authentication flow when prompted
 
 ```bash
 gemini
@@ -282,14 +282,14 @@ gemini
   quickly.
 - [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
   auth configuration.
-- [**Configuration Guide**](./docs/get-started/configuration.md) - Settings and
+- [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
   customization.
-- [**Keyboard Shortcuts**](./docs/cli/keyboard-shortcuts.md) - Productivity
-  tips.
+- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
+  Productivity tips.
 
 ### Core Features
 
-- [**Commands Reference**](./docs/cli/commands.md) - All slash commands
+- [**Commands Reference**](./docs/reference/commands.md) - All slash commands
   (`/help`, `/chat`, etc).
 - [**Custom Commands**](./docs/cli/custom-commands.md) - Create your own
   reusable commands.
@@ -301,7 +301,7 @@ gemini
 
 ### Tools & Extensions
 
-- [**Built-in Tools Overview**](./docs/tools/index.md)
+- [**Built-in Tools Overview**](./docs/reference/tools.md)
   - [File System Operations](./docs/tools/file-system.md)
   - [Shell Commands](./docs/tools/shell.md)
   - [Web Fetch & Search](./docs/tools/web-fetch.md)
@@ -314,7 +314,6 @@ gemini
 
 - [**Headless Mode (Scripting)**](./docs/cli/headless.md) - Use Gemini CLI in
   automated workflows.
-- [**Architecture Overview**](./docs/architecture.md) - How Gemini CLI works.
 - [**IDE Integration**](./docs/ide-integration/index.md) - VS Code companion.
 - [**Sandboxing & Security**](./docs/cli/sandbox.md) - Safe execution
   environments.
@@ -323,15 +322,15 @@ gemini
 - [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
 - [**Local development**](./docs/local-development.md) - Local development
   tooling.
 
 ### Troubleshooting & Support
 
-- [**Troubleshooting Guide**](./docs/troubleshooting.md) - Common issues and
-  solutions.
-- [**FAQ**](./docs/faq.md) - Frequently asked questions.
+- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common
+  issues and solutions.
+- [**FAQ**](./docs/resources/faq.md) - Frequently asked questions.
 - Use `/bug` command to report issues directly from the CLI.
 
 ### Using MCP Servers
@@ -377,7 +376,8 @@ for planned features and priorities.
 
 ### Uninstall
 
-See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
+See the [Uninstall Guide](./docs/resources/uninstall.md) for removal
+instructions.
 
 ## 📄 Legal
 

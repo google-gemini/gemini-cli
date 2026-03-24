@@ -18,22 +18,34 @@ import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
+  wittyPhrase?: string;
+  showWit?: boolean;
+  showTips?: boolean;
+  errorVerbosity?: 'low' | 'full';
   elapsedTime: number;
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
+  forceRealStatusOnly?: boolean;
+  spinnerIcon?: string;
+  isHookActive?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
+  wittyPhrase,
+  showWit = false,
   elapsedTime,
   inline = false,
   rightContent,
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
+  forceRealStatusOnly = false,
+  spinnerIcon,
+  isHookActive = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -54,11 +66,10 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase;
-  const hasThoughtIndicator =
-    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
-    Boolean(thought?.subject?.trim());
-  const thinkingIndicator = hasThoughtIndicator ? '💬 ' : '';
+        : currentLoadingPhrase ||
+          (streamingState === StreamingState.Responding
+            ? 'Thinking...'
+            : undefined);
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
@@ -66,23 +77,44 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
 
+  const wittyPhraseNode =
+    !forceRealStatusOnly &&
+    showWit &&
+    wittyPhrase &&
+    primaryText === 'Thinking...' ? (
+      <Box marginLeft={1}>
+        <Text color={theme.text.secondary} dimColor italic>
+          {wittyPhrase}
+        </Text>
+      </Box>
+    ) : null;
+
   if (inline) {
     return (
       <Box>
         <Box marginRight={1}>
           <GeminiRespondingSpinner
             nonRespondingDisplay={
-              streamingState === StreamingState.WaitingForConfirmation
+              spinnerIcon ??
+              (streamingState === StreamingState.WaitingForConfirmation
                 ? '⠏'
-                : ''
+                : '')
             }
+            isHookActive={isHookActive}
           />
         </Box>
         {primaryText && (
-          <Text color={theme.text.primary} italic wrap="truncate-end">
-            {thinkingIndicator}
-            {primaryText}
-          </Text>
+          <Box flexShrink={1}>
+            <Text color={theme.text.primary} italic wrap="truncate-end">
+              {primaryText}
+            </Text>
+            {primaryText === INTERACTIVE_SHELL_WAITING_PHRASE && (
+              <Text color={theme.ui.active} italic>
+                {' '}
+                (press tab to focus)
+              </Text>
+            )}
+          </Box>
         )}
         {cancelAndTimerContent && (
           <>
@@ -90,6 +122,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
           </>
         )}
+        {wittyPhraseNode}
       </Box>
     );
   }
@@ -106,17 +139,26 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           <Box marginRight={1}>
             <GeminiRespondingSpinner
               nonRespondingDisplay={
-                streamingState === StreamingState.WaitingForConfirmation
+                spinnerIcon ??
+                (streamingState === StreamingState.WaitingForConfirmation
                   ? '⠏'
-                  : ''
+                  : '')
               }
+              isHookActive={isHookActive}
             />
           </Box>
           {primaryText && (
-            <Text color={theme.text.primary} italic wrap="truncate-end">
-              {thinkingIndicator}
-              {primaryText}
-            </Text>
+            <Box flexShrink={1}>
+              <Text color={theme.text.primary} italic wrap="truncate-end">
+                {primaryText}
+              </Text>
+              {primaryText === INTERACTIVE_SHELL_WAITING_PHRASE && (
+                <Text color={theme.ui.active} italic>
+                  {' '}
+                  (press tab to focus)
+                </Text>
+              )}
+            </Box>
           )}
           {!isNarrow && cancelAndTimerContent && (
             <>
@@ -124,6 +166,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
             </>
           )}
+          {!isNarrow && wittyPhraseNode}
         </Box>
         {!isNarrow && <Box flexGrow={1}>{/* Spacer */}</Box>}
         {!isNarrow && rightContent && <Box>{rightContent}</Box>}
@@ -133,6 +176,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
         </Box>
       )}
+      {isNarrow && wittyPhraseNode}
       {isNarrow && rightContent && <Box>{rightContent}</Box>}
     </Box>
   );

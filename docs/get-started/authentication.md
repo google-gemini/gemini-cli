@@ -4,6 +4,12 @@ To use Gemini CLI, you'll need to authenticate with Google. This guide helps you
 quickly find the best way to sign in based on your account type and how you're
 using the CLI.
 
+<!-- prettier-ignore -->
+> [!TIP]
+> Looking for a high-level comparison of all available subscriptions?
+> To compare features and find the right quota for your needs, see our
+> [Plans page](https://geminicli.com/plans/).
+
 For most users, we recommend starting Gemini CLI and logging in with your
 personal Google account.
 
@@ -13,8 +19,8 @@ Select the authentication method that matches your situation in the table below:
 
 | User Type / Scenario                                                   | Recommended Authentication Method                                | Google Cloud Project Required                               |
 | :--------------------------------------------------------------------- | :--------------------------------------------------------------- | :---------------------------------------------------------- |
-| Individual Google accounts                                             | [Login with Google](#login-google)                               | No, with exceptions                                         |
-| Organization users with a company, school, or Google Workspace account | [Login with Google](#login-google)                               | [Yes](#set-gcp)                                             |
+| Individual Google accounts                                             | [Sign in with Google](#login-google)                             | No, with exceptions                                         |
+| Organization users with a company, school, or Google Workspace account | [Sign in with Google](#login-google)                             | [Yes](#set-gcp)                                             |
 | AI Studio user with a Gemini API key                                   | [Use Gemini API Key](#gemini-api)                                | No                                                          |
 | Google Cloud Vertex AI user                                            | [Vertex AI](#vertex-ai)                                          | [Yes](#set-gcp)                                             |
 | [Headless mode](#headless)                                             | [Use Gemini API Key](#gemini-api) or<br> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br> [Yes](#set-gcp) (for Vertex AI) |
@@ -32,15 +38,15 @@ Select the authentication method that matches your situation in the table below:
   [Google AI Ultra for Business](https://support.google.com/a/answer/16345165)
   subscriptions.
 
-## (Recommended) Login with Google <a id="login-google"></a>
+## (Recommended) Sign in with Google <a id="login-google"></a>
 
 If you run Gemini CLI on your local machine, the simplest authentication method
 is logging in with your Google account. This method requires a web browser on a
-machine that can communicate with the terminal running Gemini CLI (e.g., your
-local machine).
+machine that can communicate with the terminal running Gemini CLI (for example,
+your local machine).
 
-> **Important:** If you are a **Google AI Pro** or **Google AI Ultra**
-> subscriber, use the Google account associated with your subscription.
+If you are a **Google AI Pro** or **Google AI Ultra** subscriber, use the Google
+account associated with your subscription.
 
 To authenticate and use Gemini CLI:
 
@@ -50,9 +56,9 @@ To authenticate and use Gemini CLI:
    gemini
    ```
 
-2. Select **Login with Google**. Gemini CLI opens a login prompt using your web
-   browser. Follow the on-screen instructions. Your credentials will be cached
-   locally for future sessions.
+2. Select **Sign in with Google**. Gemini CLI opens a sign in prompt using your
+   web browser. Follow the on-screen instructions. Your credentials will be
+   cached locally for future sessions.
 
 ### Do I need to set my Google Cloud project?
 
@@ -103,7 +109,9 @@ To authenticate and use Gemini CLI with a Gemini API key:
 
 4. Select **Use Gemini API key**.
 
-> **Warning:** Treat API keys, especially for services like Gemini, as sensitive
+<!-- prettier-ignore -->
+> [!WARNING]
+> Treat API keys, especially for services like Gemini, as sensitive
 > credentials. Protect them to prevent unauthorized access and potential misuse
 > of the service under your account.
 
@@ -126,7 +134,7 @@ For example:
 **macOS/Linux**
 
 ```bash
-# Replace with your project ID and desired location (e.g., us-central1)
+# Replace with your project ID and desired location (for example, us-central1)
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -134,7 +142,7 @@ export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 **Windows (PowerShell)**
 
 ```powershell
-# Replace with your project ID and desired location (e.g., us-central1)
+# Replace with your project ID and desired location (for example, us-central1)
 $env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 $env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -146,20 +154,20 @@ To make any Vertex AI environment variable settings persistent, see
 
 Consider this authentication method if you have Google Cloud CLI installed.
 
-> **Note:** If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you
-> must unset them to use ADC:
->
-> **macOS/Linux**
->
-> ```bash
-> unset GOOGLE_API_KEY GEMINI_API_KEY
-> ```
->
-> **Windows (PowerShell)**
->
-> ```powershell
-> Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
-> ```
+If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you must unset
+them to use ADC.
+
+**macOS/Linux**
+
+```bash
+unset GOOGLE_API_KEY GEMINI_API_KEY
+```
+
+**Windows (PowerShell)**
+
+```powershell
+Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
+```
 
 1. Verify you have a Google Cloud project and Vertex AI API is enabled.
 
@@ -184,20 +192,20 @@ Consider this authentication method if you have Google Cloud CLI installed.
 Consider this method of authentication in non-interactive environments, CI/CD
 pipelines, or if your organization restricts user-based ADC or API key creation.
 
-> **Note:** If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you
-> must unset them:
->
-> **macOS/Linux**
->
-> ```bash
-> unset GOOGLE_API_KEY GEMINI_API_KEY
-> ```
->
-> **Windows (PowerShell)**
->
-> ```powershell
-> Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
-> ```
+If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you must unset
+them:
+
+**macOS/Linux**
+
+```bash
+unset GOOGLE_API_KEY GEMINI_API_KEY
+```
+
+**Windows (PowerShell)**
+
+```powershell
+Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
+```
 
 1.  [Create a service account and key](https://cloud.google.com/iam/docs/keys-create-delete)
     and download the provided JSON file. Assign the "Vertex AI User" role to the
@@ -229,8 +237,11 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
     ```
 
 5.  Select **Vertex AI**.
-    > **Warning:** Protect your service account key file as it gives access to
-    > your resources.
+
+<!-- prettier-ignore -->
+> [!WARNING]
+> Protect your service account key file as it gives access to
+> your resources.
 
 #### C. Vertex AI - Google Cloud API key
 
@@ -253,10 +264,9 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
     $env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
     ```
 
-    > **Note:** If you see errors like
-    > `"API keys are not supported by this API..."`, your organization might
-    > restrict API key usage for this service. Try the other Vertex AI
-    > authentication methods instead.
+    If you see errors like `"API keys are not supported by this API..."`, your
+    organization might restrict API key usage for this service. Try the other
+    Vertex AI authentication methods instead.
 
 3.  [Configure your Google Cloud Project](#set-gcp).
 
@@ -270,7 +280,9 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
 
 ## Set your Google Cloud project <a id="set-gcp"></a>
 
-> **Important:** Most individual Google accounts (free and paid) don't require a
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> Most individual Google accounts (free and paid) don't require a
 > Google Cloud project for authentication.
 
 When you sign in using your Google account, you may need to configure a Google
@@ -321,29 +333,31 @@ persist them with the following methods:
 1.  **Add your environment variables to your shell configuration file:** Append
     the environment variable commands to your shell's startup file.
 
-    **macOS/Linux** (e.g., `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
+    **macOS/Linux** (for example, `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
 
     ```bash
     echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
     source ~/.bashrc
     ```
 
-    **Windows (PowerShell)** (e.g., `$PROFILE`):
+    **Windows (PowerShell)** (for example, `$PROFILE`):
 
     ```powershell
     Add-Content -Path $PROFILE -Value '$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"'
     . $PROFILE
     ```
 
-    > **Warning:** Be aware that when you export API keys or service account
-    > paths in your shell configuration file, any process launched from that
-    > shell can read them.
+<!-- prettier-ignore -->
+> [!WARNING]
+> Be aware that when you export API keys or service account
+> paths in your shell configuration file, any process launched from that
+> shell can read them.
 
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
     directory or home directory. Gemini CLI automatically loads variables from
     the first `.env` file it finds, searching up from the current directory,
-    then in your home directory's `.gemini/.env` (e.g., `~/.gemini/.env` or
-    `%USERPROFILE%\.gemini\.env`).
+    then in your home directory's `.gemini/.env` (for example, `~/.gemini/.env`
+    or `%USERPROFILE%\.gemini\.env`).
 
     Example for user-wide settings:
 
@@ -387,7 +401,7 @@ on this page.
 [Headless mode](../cli/headless) will use your existing authentication method,
 if an existing authentication credential is cached.
 
-If you have not already logged in with an authentication credential, you must
+If you have not already signed in with an authentication credential, you must
 configure authentication using environment variables:
 
 - [Use Gemini API Key](#gemini-api)

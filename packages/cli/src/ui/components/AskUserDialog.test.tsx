@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
@@ -46,7 +48,7 @@ describe('AskUserDialog', () => {
   ];
 
   it('renders question and options', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -56,7 +58,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -87,6 +88,31 @@ describe('AskUserDialog', () => {
         writeKey(stdin, '\r'); // Toggle TS
         writeKey(stdin, '\x1b[B'); // Down
         writeKey(stdin, '\r'); // Toggle ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\x1b[B'); // Down to Other
+        writeKey(stdin, '\x1b[B'); // Down to Done
+        writeKey(stdin, '\r'); // Done
+      },
+      expectedSubmit: { '0': 'TypeScript, ESLint' },
+    },
+    {
+      name: 'All of the above',
+      questions: [
+        {
+          question: 'Which features?',
+          header: 'Features',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'ESLint', description: '' },
+          ],
+          multiSelect: true,
+        },
+      ] as Question[],
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, '\x1b[B'); // Down to ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\r'); // Toggle All of the above
         writeKey(stdin, '\x1b[B'); // Down to Other
         writeKey(stdin, '\x1b[B'); // Down to Done
         writeKey(stdin, '\r'); // Done
@@ -113,7 +139,7 @@ describe('AskUserDialog', () => {
   ])('Submission: $name', ({ name, questions, actions, expectedSubmit }) => {
     it(`submits correct values for ${name}`, async () => {
       const onSubmit = vi.fn();
-      const { stdin } = renderWithProviders(
+      const { stdin } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={onSubmit}
@@ -131,9 +157,45 @@ describe('AskUserDialog', () => {
     });
   });
 
+  it('verifies "All of the above" visual state with snapshot', async () => {
+    const questions = [
+      {
+        question: 'Which features?',
+        header: 'Features',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'TypeScript', description: '' },
+          { label: 'ESLint', description: '' },
+        ],
+        multiSelect: true,
+      },
+    ] as Question[];
+
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Navigate to "All of the above" and toggle it
+    writeKey(stdin, '\x1b[B'); // Down to ESLint
+    writeKey(stdin, '\x1b[B'); // Down to All of the above
+    writeKey(stdin, '\r'); // Toggle All of the above
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      // Verify visual state (checkmarks on all options)
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
   it('handles custom option in single select with inline typing', async () => {
     const onSubmit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={onSubmit}
@@ -182,7 +244,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestionWithOther}
         onSubmit={onSubmit}
@@ -225,7 +287,7 @@ describe('AskUserDialog', () => {
   });
 
   describe.each([
-    { useAlternateBuffer: true, expectedArrows: false },
+    { useAlternateBuffer: true, expectedArrows: true },
     { useAlternateBuffer: false, expectedArrows: true },
   ])(
     'Scroll Arrows (useAlternateBuffer: $useAlternateBuffer)',
@@ -244,7 +306,7 @@ describe('AskUserDialog', () => {
           },
         ];
 
-        const { lastFrame, waitUntilReady } = renderWithProviders(
+        const { lastFrame, waitUntilReady } = await renderWithProviders(
           <AskUserDialog
             questions={questions}
             onSubmit={vi.fn()}
@@ -252,7 +314,10 @@ describe('AskUserDialog', () => {
             width={80}
             availableHeight={10} // Small height to force scrolling
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
 
         await waitFor(async () => {
@@ -275,7 +340,7 @@ describe('AskUserDialog', () => {
   );
 
   it('navigates to custom option when typing unbound characters (Type-to-Jump)', async () => {
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -331,7 +396,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -341,12 +406,11 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('hides progress header for single question', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -356,12 +420,11 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('shows keyboard hints', async () => {
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
@@ -371,7 +434,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -395,7 +457,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -405,7 +467,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toContain('Which testing framework?');
 
     writeKey(stdin, '\x1b[C'); // Right arrow
@@ -442,7 +503,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
@@ -516,7 +577,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -526,7 +587,6 @@ describe('AskUserDialog', () => {
       { width: 120 },
     );
 
-    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -548,7 +608,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -598,7 +658,7 @@ describe('AskUserDialog', () => {
       },
     ];
 
-    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+    const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={vi.fn()}
@@ -637,7 +697,7 @@ describe('AskUserDialog', () => {
     ];
 
     const onSubmit = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { stdin } = await renderWithProviders(
       <AskUserDialog
         questions={multiQuestions}
         onSubmit={onSubmit}
@@ -670,7 +730,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -680,7 +740,6 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -693,7 +752,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -703,7 +762,6 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -716,7 +774,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -754,7 +812,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -764,7 +822,6 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
     });
 
@@ -787,7 +844,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={mixedQuestions}
           onSubmit={vi.fn()}
@@ -837,7 +894,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onSubmit = vi.fn();
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={mixedQuestions}
           onSubmit={onSubmit}
@@ -893,7 +950,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onSubmit = vi.fn();
-      const { stdin } = renderWithProviders(
+      const { stdin } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={onSubmit}
@@ -920,7 +977,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onCancel = vi.fn();
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={textQuestion}
           onSubmit={vi.fn()}
@@ -970,7 +1027,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={multiQuestions}
           onSubmit={vi.fn()}
@@ -1036,7 +1093,7 @@ describe('AskUserDialog', () => {
       ];
 
       const onSubmit = vi.fn();
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={multiQuestions}
           onSubmit={onSubmit}
@@ -1088,7 +1145,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1118,7 +1175,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1151,7 +1208,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1182,7 +1239,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { lastFrame, waitUntilReady } = renderWithProviders(
+      const { lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1221,7 +1278,7 @@ describe('AskUserDialog', () => {
       availableTerminalHeight: 5, // Small height to force scroll arrows
     } as UIState;
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <UIStateContext.Provider value={mockUIState}>
         <AskUserDialog
           questions={questions}
@@ -1230,7 +1287,10 @@ describe('AskUserDialog', () => {
           width={80}
         />
       </UIStateContext.Provider>,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
 
     // With height 5 and alternate buffer disabled, it should show scroll arrows (▲)
@@ -1257,7 +1317,7 @@ describe('AskUserDialog', () => {
       availableTerminalHeight: 5,
     } as UIState;
 
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
       <UIStateContext.Provider value={mockUIState}>
         <AskUserDialog
           questions={questions}
@@ -1266,7 +1326,10 @@ describe('AskUserDialog', () => {
           width={40} // Small width to force wrapping
         />
       </UIStateContext.Provider>,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
 
     // Should NOT contain the truncation message
@@ -1293,7 +1356,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1327,7 +1390,7 @@ describe('AskUserDialog', () => {
         },
       ];
 
-      const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      const { stdin, lastFrame, waitUntilReady } = await renderWithProviders(
         <AskUserDialog
           questions={questions}
           onSubmit={vi.fn()}
@@ -1345,6 +1408,87 @@ describe('AskUserDialog', () => {
         await waitUntilReady();
         expect(lastFrame()).toMatchSnapshot();
       });
+    });
+  });
+
+  it('expands paste placeholders in multi-select custom option via Done', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Which features?',
+        header: 'Features',
+        type: QuestionType.CHOICE,
+        options: [{ label: 'TypeScript', description: '' }],
+        multiSelect: true,
+      },
+    ];
+
+    const onSubmit = vi.fn();
+    const { stdin } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Select TypeScript
+    writeKey(stdin, '\r');
+    // Down to Other
+    writeKey(stdin, '\x1b[B');
+
+    // Simulate bracketed paste of multi-line text into the custom option
+    const pastedText = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6';
+    const ESC = '\x1b';
+    writeKey(stdin, `${ESC}[200~${pastedText}${ESC}[201~`);
+
+    // Down to Done and submit
+    writeKey(stdin, '\x1b[B');
+    writeKey(stdin, '\r');
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        '0': `TypeScript, ${pastedText}`,
+      });
+    });
+  });
+
+  it('shows at least 3 selection options even in small terminal heights', async () => {
+    const questions: Question[] = [
+      {
+        question:
+          'A very long question that would normally take up most of the space and squeeze the list if we did not have a heuristic to prevent it. This line is just to make it longer. And another one. Imagine this is a plan.',
+        header: 'Test',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'Option 1', description: 'Description 1' },
+          { label: 'Option 2', description: 'Description 2' },
+          { label: 'Option 3', description: 'Description 3' },
+          { label: 'Option 4', description: 'Description 4' },
+        ],
+        multiSelect: false,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={80}
+        availableHeight={12} // Very small height
+      />,
+      { width: 80 },
+    );
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      const frame = lastFrame();
+      // Should show at least 3 options
+      expect(frame).toContain('1.  Option 1');
+      expect(frame).toContain('2.  Option 2');
+      expect(frame).toContain('3.  Option 3');
     });
   });
 });

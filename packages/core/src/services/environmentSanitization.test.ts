@@ -11,6 +11,7 @@ import {
   NEVER_ALLOWED_NAME_PATTERNS,
   NEVER_ALLOWED_VALUE_PATTERNS,
   sanitizeEnvironment,
+  getSecureSanitizationConfig,
 } from './environmentSanitization.js';
 
 const EMPTY_OPTIONS = {
@@ -30,6 +31,29 @@ describe('sanitizeEnvironment', () => {
     };
     const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
     expect(sanitized).toEqual(env);
+  });
+
+  it('should allow TERM and COLORTERM environment variables', () => {
+    const env = {
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual(env);
+  });
+
+  it('should preserve TERM and COLORTERM even in strict sanitization mode', () => {
+    const env = {
+      GITHUB_SHA: 'abc123',
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      SOME_OTHER_VAR: 'value',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual({
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    });
   });
 
   it('should allow variables prefixed with GEMINI_CLI_', () => {
@@ -206,6 +230,48 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
+  describe('value-first security: secret values must be caught even for allowed variable names', () => {
+    it('should redact ALWAYS_ALLOWED variables whose values contain a GitHub token', () => {
+      const env = {
+        HOME: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        PATH: '/usr/bin',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual({ PATH: '/usr/bin' });
+    });
+
+    it('should redact ALWAYS_ALLOWED variables whose values contain a certificate', () => {
+      const env = {
+        SHELL:
+          '-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----',
+        USER: 'alice',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual({ USER: 'alice' });
+    });
+
+    it('should redact user-allowlisted variables whose values contain a secret', () => {
+      const env = {
+        MY_SAFE_VAR: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        OTHER: 'fine',
+      };
+      const sanitized = sanitizeEnvironment(env, {
+        allowedEnvironmentVariables: ['MY_SAFE_VAR'],
+        blockedEnvironmentVariables: [],
+        enableEnvironmentVariableRedaction: true,
+      });
+      expect(sanitized).toEqual({ OTHER: 'fine' });
+    });
+
+    it('should NOT redact GEMINI_CLI_ variables even if their value looks like a secret (fully trusted)', () => {
+      const env = {
+        GEMINI_CLI_INTERNAL: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      };
+      const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+      expect(sanitized).toEqual(env);
+    });
+  });
+
   it('should ensure all names in the sets are capitalized', () => {
     for (const name of ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES) {
       expect(name).toBe(name.toUpperCase());
@@ -305,5 +371,82 @@ describe('sanitizeEnvironment', () => {
     };
     const sanitized = sanitizeEnvironment(env, options);
     expect(sanitized).toEqual(env);
+  });
+});
+
+describe('getSecureSanitizationConfig', () => {
+  it('should enable environment variable redaction by default', () => {
+    const config = getSecureSanitizationConfig();
+    expect(config.enableEnvironmentVariableRedaction).toBe(true);
+  });
+
+  it('should merge allowed and blocked variables from base and requested configs', () => {
+    const baseConfig = {
+      allowedEnvironmentVariables: ['SAFE_VAR_1'],
+      blockedEnvironmentVariables: ['BLOCKED_VAR_1'],
+      enableEnvironmentVariableRedaction: true,
+    };
+    const requestedConfig = {
+      allowedEnvironmentVariables: ['SAFE_VAR_2'],
+      blockedEnvironmentVariables: ['BLOCKED_VAR_2'],
+    };
+
+    const config = getSecureSanitizationConfig(requestedConfig, baseConfig);
+
+    expect(config.allowedEnvironmentVariables).toContain('SAFE_VAR_1');
+    expect(config.allowedEnvironmentVariables).toContain('SAFE_VAR_2');
+    expect(config.blockedEnvironmentVariables).toContain('BLOCKED_VAR_1');
+    expect(config.blockedEnvironmentVariables).toContain('BLOCKED_VAR_2');
+  });
+
+  it('should filter out variables from allowed list that match NEVER_ALLOWED_ENVIRONMENT_VARIABLES', () => {
+    const requestedConfig = {
+      allowedEnvironmentVariables: ['SAFE_VAR', 'GOOGLE_CLOUD_PROJECT'],
+    };
+
+    const config = getSecureSanitizationConfig(requestedConfig);
+
+    expect(config.allowedEnvironmentVariables).toContain('SAFE_VAR');
+    expect(config.allowedEnvironmentVariables).not.toContain(
+      'GOOGLE_CLOUD_PROJECT',
+    );
+  });
+
+  it('should filter out variables from allowed list that match NEVER_ALLOWED_NAME_PATTERNS', () => {
+    const requestedConfig = {
+      allowedEnvironmentVariables: ['SAFE_VAR', 'MY_SECRET_TOKEN'],
+    };
+
+    const config = getSecureSanitizationConfig(requestedConfig);
+
+    expect(config.allowedEnvironmentVariables).toContain('SAFE_VAR');
+    expect(config.allowedEnvironmentVariables).not.toContain('MY_SECRET_TOKEN');
+  });
+
+  it('should deduplicate variables in allowed and blocked lists', () => {
+    const baseConfig = {
+      allowedEnvironmentVariables: ['SAFE_VAR'],
+      blockedEnvironmentVariables: ['BLOCKED_VAR'],
+      enableEnvironmentVariableRedaction: true,
+    };
+    const requestedConfig = {
+      allowedEnvironmentVariables: ['SAFE_VAR'],
+      blockedEnvironmentVariables: ['BLOCKED_VAR'],
+    };
+
+    const config = getSecureSanitizationConfig(requestedConfig, baseConfig);
+
+    expect(config.allowedEnvironmentVariables).toEqual(['SAFE_VAR']);
+    expect(config.blockedEnvironmentVariables).toEqual(['BLOCKED_VAR']);
+  });
+
+  it('should force enableEnvironmentVariableRedaction to true even if requested false', () => {
+    const requestedConfig = {
+      enableEnvironmentVariableRedaction: false,
+    };
+
+    const config = getSecureSanitizationConfig(requestedConfig);
+
+    expect(config.enableEnvironmentVariableRedaction).toBe(true);
   });
 });

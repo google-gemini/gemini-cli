@@ -11,9 +11,13 @@ import {
 } from '../../ui/state/extensions.js';
 import { loadInstallMetadata } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
-import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  getErrorMessage,
+  type GeminiCLIExtension,
+  IntegrityDataStatus,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
-import { getErrorMessage } from '../../utils/errors.js';
 import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { ExtensionStorage } from './storage.js';
 
@@ -48,6 +52,26 @@ export async function updateExtension(
       `Extension ${extension.name} cannot be updated, type is unknown.`,
     );
   }
+
+  try {
+    const status = await extensionManager.verifyExtensionIntegrity(
+      extension.name,
+      installMetadata,
+    );
+
+    if (status === IntegrityDataStatus.INVALID) {
+      throw new Error('Extension integrity cannot be verified');
+    }
+  } catch (e) {
+    dispatchExtensionStateUpdate({
+      type: 'SET_STATE',
+      payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
+    });
+    throw new Error(
+      `Extension ${extension.name} cannot be updated. ${getErrorMessage(e)}. To fix this, reinstall the extension.`,
+    );
+  }
+
   if (installMetadata?.type === 'link') {
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
@@ -55,6 +79,24 @@ export async function updateExtension(
     });
     throw new Error(`Extension is linked so does not need to be updated`);
   }
+
+  if (extension.migratedTo) {
+    const migratedState = await checkForExtensionUpdate(
+      {
+        ...extension,
+        installMetadata: { ...installMetadata, source: extension.migratedTo },
+        migratedTo: undefined,
+      },
+      extensionManager,
+    );
+    if (
+      migratedState === ExtensionUpdateState.UPDATE_AVAILABLE ||
+      migratedState === ExtensionUpdateState.UP_TO_DATE
+    ) {
+      installMetadata.source = extension.migratedTo;
+    }
+  }
+
   const originalVersion = extension.version;
 
   const tempDir = await ExtensionStorage.createTmpDir();

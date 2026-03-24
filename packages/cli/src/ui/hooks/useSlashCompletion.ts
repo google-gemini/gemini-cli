@@ -281,12 +281,43 @@ function useCommandSuggestions(
             return 0;
           });
 
-          const finalSuggestions = sortedSuggestions.map((cmd) => ({
-            label: cmd.name,
-            value: cmd.name,
-            description: cmd.description,
-            commandKind: cmd.kind,
-          }));
+          const finalSuggestions = sortedSuggestions.map((cmd) => {
+            const suggestion: Suggestion = {
+              label: cmd.name,
+              value: cmd.name,
+              description: cmd.description,
+              commandKind: cmd.kind,
+            };
+
+            if (cmd.suggestionGroup) {
+              suggestion.sectionTitle = cmd.suggestionGroup;
+            }
+
+            return suggestion;
+          });
+
+          const isTopLevelChatOrResumeContext = !!(
+            leafCommand &&
+            (leafCommand.name === 'chat' || leafCommand.name === 'resume') &&
+            (commandPathParts.length === 0 ||
+              (commandPathParts.length === 1 &&
+                matchesCommand(leafCommand, commandPathParts[0])))
+          );
+
+          if (isTopLevelChatOrResumeContext) {
+            const canonicalParentName = leafCommand.name;
+            const autoSectionSuggestion: Suggestion = {
+              label: 'list',
+              value: 'list',
+              insertValue: canonicalParentName,
+              description: 'Browse auto-saved chats',
+              commandKind: CommandKind.BUILT_IN,
+              sectionTitle: 'auto',
+              submitValue: `/${canonicalParentName}`,
+            };
+            setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
+            return;
+          }
 
           setSuggestions(finalSuggestions);
         }

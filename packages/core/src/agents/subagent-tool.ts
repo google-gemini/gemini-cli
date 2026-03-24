@@ -12,9 +12,10 @@ import {
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
   isTool,
+  type ToolLiveOutput,
 } from '../tools/tools.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
@@ -30,7 +31,7 @@ import {
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
     private readonly definition: AgentDefinition,
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
     const inputSchema = definition.inputConfig.inputSchema;
@@ -65,20 +66,20 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
     // This is an invariant: you can't check read-only status if the system isn't initialized.
     this._memoizedIsReadOnly = SubagentTool.checkIsReadOnly(
       this.definition,
-      this.config,
+      this.context,
     );
     return this._memoizedIsReadOnly;
   }
 
   private static checkIsReadOnly(
     definition: AgentDefinition,
-    config: Config,
+    context: AgentLoopContext,
   ): boolean {
     if (definition.kind === 'remote') {
       return false;
     }
     const tools = definition.toolConfig?.tools ?? [];
-    const registry = config.getToolRegistry();
+    const registry = context.toolRegistry;
 
     if (!registry) {
       return false;
@@ -111,7 +112,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
     return new SubAgentInvocation(
       params,
       this.definition,
-      this.config,
+      this.context,
       messageBus,
       _toolName,
       _toolDisplayName,
@@ -125,7 +126,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   constructor(
     params: AgentInputs,
     private readonly definition: AgentDefinition,
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
@@ -136,7 +137,11 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName ?? definition.name,
     );
-    this.startIndex = config.userHintService.getLatestHintIndex();
+    this.startIndex = context.config.injectionService.getLatestInjectionIndex();
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   getDescription(): string {
@@ -155,7 +160,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     const validationError = SchemaValidator.validate(
       this.definition.inputConfig.inputSchema,
@@ -176,6 +181,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.AgentCall,
+        logPrompts: this.context.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_AGENT_NAME]: this.definition.name,
           [GEN_AI_AGENT_DESCRIPTION]: this.definition.description,
@@ -195,8 +201,9 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       return agentArgs;
     }
 
-    const userHints = this.config.userHintService.getUserHintsAfter(
+    const userHints = this.config.injectionService.getInjectionsAfter(
       this.startIndex,
+      'user_steering',
     );
     const formattedHints = formatUserHintsForModel(userHints);
     if (!formattedHints) {
@@ -220,7 +227,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   ): ToolInvocation<AgentInputs, ToolResult> {
     const wrapper = new SubagentToolWrapper(
       definition,
-      this.config,
+      this.context,
       this.messageBus,
     );
 

@@ -5,36 +5,17 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AnsiOutput } from '@google/gemini-cli-core';
-
-// Mock UIStateContext partially
-const mockUseUIState = vi.fn();
-vi.mock('../../contexts/UIStateContext.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../contexts/UIStateContext.js')>();
-  return {
-    ...actual,
-    useUIState: () => mockUseUIState(),
-  };
-});
-
-// Mock useAlternateBuffer
-const mockUseAlternateBuffer = vi.fn();
-vi.mock('../../hooks/useAlternateBuffer.js', () => ({
-  useAlternateBuffer: () => mockUseAlternateBuffer(),
-}));
+import { describe, it, expect, vi } from 'vitest';
+import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
 
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseUIState.mockReturnValue({ renderMarkdown: true });
-    mockUseAlternateBuffer.mockReturnValue(false);
   });
 
   it('uses ScrollableList for ANSI output in alternate buffer mode', async () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
     const content = 'ansi content';
     const ansiResult: AnsiOutput = [
       [
@@ -50,12 +31,16 @@ describe('ToolResultDisplay', () => {
         },
       ],
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         maxLines={10}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -65,13 +50,16 @@ describe('ToolResultDisplay', () => {
   });
 
   it('uses Scrollable for non-ANSI output in alternate buffer mode', async () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Markdown content**"
         terminalWidth={80}
         maxLines={10}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -82,13 +70,16 @@ describe('ToolResultDisplay', () => {
   });
 
   it('passes hasFocus prop to scrollable components', async () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay="Some result"
         terminalWidth={80}
         hasFocus={true}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
     await waitUntilReady();
 
@@ -97,8 +88,12 @@ describe('ToolResultDisplay', () => {
   });
 
   it('renders string result as markdown by default', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -108,13 +103,18 @@ describe('ToolResultDisplay', () => {
   });
 
   it('renders string result as plain text when renderOutputAsMarkdown is false', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={false}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        uiState: { constrainHeight: true },
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -125,12 +125,17 @@ describe('ToolResultDisplay', () => {
 
   it('truncates very long string results', { timeout: 20000 }, async () => {
     const longString = 'a'.repeat(1000005);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={longString}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        uiState: { constrainHeight: true },
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -144,12 +149,16 @@ describe('ToolResultDisplay', () => {
       fileDiff: 'diff content',
       fileName: 'test.ts',
     };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={diffResult}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -173,12 +182,16 @@ describe('ToolResultDisplay', () => {
         },
       ],
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult as unknown as AnsiOutput}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -191,12 +204,16 @@ describe('ToolResultDisplay', () => {
     const todoResult = {
       todos: [],
     };
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={todoResult}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame({ allowEmpty: true });
@@ -206,15 +223,19 @@ describe('ToolResultDisplay', () => {
   });
 
   it('does not fall back to plain text if availableHeight is set and not in alternate buffer', async () => {
-    mockUseAlternateBuffer.mockReturnValue(false);
     // availableHeight calculation: 20 - 1 - 5 = 14 > 3
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        uiState: { constrainHeight: true },
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -223,14 +244,17 @@ describe('ToolResultDisplay', () => {
   });
 
   it('keeps markdown if in alternate buffer even with availableHeight', async () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -302,13 +326,18 @@ describe('ToolResultDisplay', () => {
         },
       ],
     ];
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         availableTerminalHeight={20}
         maxLines={3}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        uiState: { constrainHeight: true },
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -334,13 +363,18 @@ describe('ToolResultDisplay', () => {
         inverse: false,
       },
     ]);
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         maxLines={25}
         availableTerminalHeight={undefined}
       />,
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+        uiState: { constrainHeight: true },
+      },
     );
     await waitUntilReady();
     const output = lastFrame();

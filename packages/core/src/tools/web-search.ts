@@ -5,19 +5,24 @@
  */
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
+import { WEB_SEARCH_TOOL_NAME, WEB_SEARCH_DISPLAY_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
-import { getErrorMessage } from '../utils/errors.js';
-import { type Config } from '../config/config.js';
+import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WEB_SEARCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LlmRole } from '../telemetry/llmRole.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -66,7 +71,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   WebSearchToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: WebSearchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -80,7 +85,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
-    const geminiClient = this.config.getGeminiClient();
+    const geminiClient = this.context.geminiClient;
 
     try {
       const response = await geminiClient.generateContent(
@@ -170,6 +175,12 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         sources,
       };
     } catch (error: unknown) {
+      if (isAbortError(error)) {
+        return {
+          llmContent: 'Web search was cancelled.',
+          returnDisplay: 'Search cancelled.',
+        };
+      }
       const errorMessage = `Error during web search for query "${
         this.params.query
       }": ${getErrorMessage(error)}`;
@@ -196,12 +207,12 @@ export class WebSearchTool extends BaseDeclarativeTool<
   static readonly Name = WEB_SEARCH_TOOL_NAME;
 
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
     super(
       WebSearchTool.Name,
-      'GoogleSearch',
+      WEB_SEARCH_DISPLAY_NAME,
       WEB_SEARCH_DEFINITION.base.description!,
       Kind.Search,
       WEB_SEARCH_DEFINITION.base.parametersJsonSchema,
@@ -232,7 +243,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
-      this.config,
+      this.context.config,
       params,
       messageBus ?? this.messageBus,
       _toolName,

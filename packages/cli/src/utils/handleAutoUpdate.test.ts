@@ -4,15 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import EventEmitter from 'node:events';
 import type { ChildProcess } from 'node:child_process';
-import { handleAutoUpdate, setUpdateHandler } from './handleAutoUpdate.js';
+import {
+  handleAutoUpdate,
+  setUpdateHandler,
+  isUpdateInProgress,
+  waitForUpdateCompletion,
+  _setUpdateStateForTesting,
+} from './handleAutoUpdate.js';
 import { MessageType } from '../ui/types.js';
 
 vi.mock('./installationInfo.js', async () => {
@@ -79,6 +92,7 @@ describe('handleAutoUpdate', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+    _setUpdateStateForTesting(false);
   });
 
   it('should do nothing if update info is null', () => {
@@ -86,6 +100,80 @@ describe('handleAutoUpdate', () => {
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(updateEventEmitter.emit).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('should track update progress state', async () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'This is an additional message.',
+      isGlobal: false,
+      packageManager: PackageManager.NPM,
+    });
+
+    expect(isUpdateInProgress()).toBe(false);
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(isUpdateInProgress()).toBe(true);
+
+    mockChildProcess.emit('close', 0);
+
+    expect(isUpdateInProgress()).toBe(false);
+  });
+
+  it('should track update progress state on error', async () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'This is an additional message.',
+      isGlobal: false,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(isUpdateInProgress()).toBe(true);
+
+    mockChildProcess.emit('error', new Error('fail'));
+
+    expect(isUpdateInProgress()).toBe(false);
+  });
+
+  it('should resolve waitForUpdateCompletion when update succeeds', async () => {
+    _setUpdateStateForTesting(true);
+
+    const waitPromise = waitForUpdateCompletion();
+    updateEventEmitter.emit('update-success', {});
+
+    await expect(waitPromise).resolves.toBeUndefined();
+  });
+
+  it('should resolve waitForUpdateCompletion when update fails', async () => {
+    _setUpdateStateForTesting(true);
+
+    const waitPromise = waitForUpdateCompletion();
+    updateEventEmitter.emit('update-failed', {});
+
+    await expect(waitPromise).resolves.toBeUndefined();
+  });
+
+  it('should resolve waitForUpdateCompletion immediately if not in progress', async () => {
+    _setUpdateStateForTesting(false);
+
+    const waitPromise = waitForUpdateCompletion();
+
+    await expect(waitPromise).resolves.toBeUndefined();
+  });
+
+  it('should timeout waitForUpdateCompletion', async () => {
+    vi.useFakeTimers();
+    _setUpdateStateForTesting(true);
+
+    const waitPromise = waitForUpdateCompletion(1000);
+
+    vi.advanceTimersByTime(1001);
+
+    await expect(waitPromise).resolves.toBeUndefined();
+    vi.useRealTimers();
   });
 
   it('should do nothing if update prompts are disabled', () => {
@@ -114,7 +202,12 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it.each([PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX])(
+  it.each([
+    PackageManager.NPX,
+    PackageManager.PNPX,
+    PackageManager.BUNX,
+    PackageManager.BINARY,
+  ])(
     'should suppress update notifications when running via %s',
     (packageManager) => {
       mockGetInstallationInfo.mockReturnValue({

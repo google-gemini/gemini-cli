@@ -7,7 +7,7 @@
 import { vi } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useMouse } from './useMouse.js';
-import { MouseProvider, useMouseContext } from '../contexts/MouseContext.js';
+import { useMouseContext } from '../contexts/MouseContext.js';
 
 vi.mock('../contexts/MouseContext.js', async (importOriginal) => {
   const actual =
@@ -16,10 +16,10 @@ vi.mock('../contexts/MouseContext.js', async (importOriginal) => {
   const unsubscribe = vi.fn();
   return {
     ...actual,
-    useMouseContext: () => ({
+    useMouseContext: vi.fn(() => ({
       subscribe,
       unsubscribe,
-    }),
+    })),
   };
 });
 
@@ -30,28 +30,23 @@ describe('useMouse', () => {
     vi.clearAllMocks();
   });
 
-  it('should not subscribe when isActive is false', () => {
-    renderHook(() => useMouse(mockOnMouseEvent, { isActive: false }), {
-      wrapper: MouseProvider,
-    });
+  it('should not subscribe when isActive is false', async () => {
+    await renderHook(() => useMouse(mockOnMouseEvent, { isActive: false }));
 
     const { subscribe } = useMouseContext();
     expect(subscribe).not.toHaveBeenCalled();
   });
 
-  it('should subscribe when isActive is true', () => {
-    renderHook(() => useMouse(mockOnMouseEvent, { isActive: true }), {
-      wrapper: MouseProvider,
-    });
+  it('should subscribe when isActive is true', async () => {
+    await renderHook(() => useMouse(mockOnMouseEvent, { isActive: true }));
 
     const { subscribe } = useMouseContext();
     expect(subscribe).toHaveBeenCalledWith(mockOnMouseEvent);
   });
 
-  it('should unsubscribe on unmount', () => {
-    const { unmount } = renderHook(
-      () => useMouse(mockOnMouseEvent, { isActive: true }),
-      { wrapper: MouseProvider },
+  it('should unsubscribe on unmount', async () => {
+    const { unmount } = await renderHook(() =>
+      useMouse(mockOnMouseEvent, { isActive: true }),
     );
 
     const { unsubscribe } = useMouseContext();
@@ -59,13 +54,12 @@ describe('useMouse', () => {
     expect(unsubscribe).toHaveBeenCalledWith(mockOnMouseEvent);
   });
 
-  it('should unsubscribe when isActive becomes false', () => {
-    const { rerender } = renderHook(
+  it('should unsubscribe when isActive becomes false', async () => {
+    const { rerender } = await renderHook(
       ({ isActive }: { isActive: boolean }) =>
         useMouse(mockOnMouseEvent, { isActive }),
       {
         initialProps: { isActive: true },
-        wrapper: MouseProvider,
       },
     );
 

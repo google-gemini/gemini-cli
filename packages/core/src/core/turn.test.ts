@@ -5,15 +5,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type {
-  ServerGeminiToolCallRequestEvent,
-  ServerGeminiErrorEvent,
+import {
+  Turn,
+  GeminiEventType,
+  type ServerGeminiToolCallRequestEvent,
+  type ServerGeminiErrorEvent,
 } from './turn.js';
-import { Turn, GeminiEventType } from './turn.js';
 import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
-import type { GeminiChat } from './geminiChat.js';
-import { InvalidStreamError, StreamEventType } from './geminiChat.js';
+import {
+  InvalidStreamError,
+  StreamEventType,
+  type GeminiChat,
+} from './geminiChat.js';
 import { LlmRole } from '../telemetry/types.js';
 
 const mockSendMessageStream = vi.fn();

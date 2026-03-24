@@ -89,8 +89,11 @@ export interface HookPayload {
  */
 export interface HookStartPayload extends HookPayload {
   /**
+   * The source of the hook configuration.
+   */
+  source?: string;
+  /**
    * The 1-based index of the current hook in the execution sequence.
-   * Used for progress indication (e.g. "Hook 1/3").
    */
   hookIndex?: number;
   /**
@@ -149,6 +152,10 @@ export interface SlashCommandConflict {
   renamedTo: string;
   loserExtensionName?: string;
   winnerExtensionName?: string;
+  loserMcpServerName?: string;
+  winnerMcpServerName?: string;
+  loserKind?: string;
+  winnerKind?: string;
 }
 
 export interface SlashCommandConflictsPayload {
@@ -232,6 +239,7 @@ type EventBacklogItem = {
 
 export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   private _eventBacklog: EventBacklogItem[] = [];
+  private _backlogHead = 0;
   private static readonly MAX_BACKLOG_SIZE = 10000;
 
   constructor() {
@@ -243,8 +251,17 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     ...args: CoreEvents[K]
   ): void {
     if (this.listenerCount(event) === 0) {
-      if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
-        this._eventBacklog.shift();
+      const backlogSize = this._eventBacklog.length - this._backlogHead;
+      if (backlogSize >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
+        // Evict oldest entry. Use a head pointer instead of shift() to avoid
+        // O(n) array reindexing on every eviction at capacity.
+        (this._eventBacklog as unknown[])[this._backlogHead] = undefined;
+        this._backlogHead++;
+        // Compact once dead entries exceed half capacity to bound memory
+        if (this._backlogHead >= CoreEventEmitter.MAX_BACKLOG_SIZE / 2) {
+          this._eventBacklog = this._eventBacklog.slice(this._backlogHead);
+          this._backlogHead = 0;
+        }
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this._eventBacklog.push({ event, args } as EventBacklogItem);
@@ -391,9 +408,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    * subscribes.
    */
   drainBacklogs(): void {
-    const backlog = [...this._eventBacklog];
-    this._eventBacklog.length = 0; // Clear in-place
-    for (const item of backlog) {
+    const backlog = this._eventBacklog;
+    const head = this._backlogHead;
+    this._eventBacklog = [];
+    this._backlogHead = 0;
+    for (let i = head; i < backlog.length; i++) {
+      const item = backlog[i];
+      if (item === undefined) continue;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
         item.event,

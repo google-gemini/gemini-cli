@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,6 +13,7 @@ import {
   UserAccountManager,
   AuthType,
 } from '@google/gemini-cli-core';
+import { isUltraTier } from '../../utils/tierUtils.js';
 
 interface UserIdentityProps {
   config: Config;
@@ -20,29 +21,33 @@ interface UserIdentityProps {
 
 export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   const authType = config.getContentGeneratorConfig()?.authType;
-
-  const { email, tierName } = useMemo(() => {
-    if (!authType) {
-      return { email: undefined, tierName: undefined };
+  const email = useMemo(() => {
+    if (authType) {
+      const userAccountManager = new UserAccountManager();
+      return userAccountManager.getCachedGoogleAccount() ?? undefined;
     }
-    const userAccountManager = new UserAccountManager();
-    return {
-      email: userAccountManager.getCachedGoogleAccount(),
-      tierName: config.getUserTierName(),
-    };
-  }, [config, authType]);
+    return undefined;
+  }, [authType]);
+
+  const tierName = useMemo(
+    () => (authType ? config.getUserTierName() : undefined),
+    [config, authType],
+  );
+
+  const isUltra = useMemo(() => isUltraTier(tierName), [tierName]);
 
   if (!authType) {
     return null;
   }
 
   return (
-    <Box marginTop={1} flexDirection="column">
+    <Box flexDirection="column">
+      {/* User Email /auth */}
       <Box>
-        <Text color={theme.text.primary}>
+        <Text color={theme.text.primary} wrap="truncate-end">
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (
             <Text>
-              <Text bold>Logged in with Google{email ? ':' : ''}</Text>
+              <Text bold>Signed in with Google{email ? ':' : ''}</Text>
               {email ? ` ${email}` : ''}
             </Text>
           ) : (
@@ -51,10 +56,15 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
         </Text>
         <Text color={theme.text.secondary}> /auth</Text>
       </Box>
+
+      {/* Tier Name /upgrade */}
       {tierName && (
-        <Text color={theme.text.primary}>
-          <Text bold>Plan:</Text> {tierName}
-        </Text>
+        <Box>
+          <Text color={theme.text.primary} wrap="truncate-end">
+            <Text bold>Plan:</Text> {tierName}
+          </Text>
+          {!isUltra && <Text color={theme.text.secondary}> /upgrade</Text>}
+        </Box>
       )}
     </Box>
   );

@@ -24,7 +24,7 @@ describe('useMessageQueue', () => {
     vi.clearAllMocks();
   });
 
-  const renderMessageQueueHook = (initialProps: {
+  const renderMessageQueueHook = async (initialProps: {
     isConfigInitialized: boolean;
     streamingState: StreamingState;
     submitQuery: (query: string) => void;
@@ -35,7 +35,7 @@ describe('useMessageQueue', () => {
       hookResult = useMessageQueue(props);
       return null;
     }
-    const { rerender } = render(<TestComponent {...initialProps} />);
+    const { rerender } = await render(<TestComponent {...initialProps} />);
     return {
       result: {
         get current() {
@@ -47,8 +47,8 @@ describe('useMessageQueue', () => {
     };
   };
 
-  it('should initialize with empty queue', () => {
-    const { result } = renderMessageQueueHook({
+  it('should initialize with empty queue', async () => {
+    const { result } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Idle,
       submitQuery: mockSubmitQuery,
@@ -59,8 +59,8 @@ describe('useMessageQueue', () => {
     expect(result.current.getQueuedMessagesText()).toBe('');
   });
 
-  it('should add messages to queue', () => {
-    const { result } = renderMessageQueueHook({
+  it('should add messages to queue', async () => {
+    const { result } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -78,8 +78,8 @@ describe('useMessageQueue', () => {
     ]);
   });
 
-  it('should filter out empty messages', () => {
-    const { result } = renderMessageQueueHook({
+  it('should filter out empty messages', async () => {
+    const { result } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -99,8 +99,8 @@ describe('useMessageQueue', () => {
     ]);
   });
 
-  it('should clear queue', () => {
-    const { result } = renderMessageQueueHook({
+  it('should clear queue', async () => {
+    const { result } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -120,8 +120,8 @@ describe('useMessageQueue', () => {
     expect(result.current.messageQueue).toEqual([]);
   });
 
-  it('should return queued messages as text with double newlines', () => {
-    const { result } = renderMessageQueueHook({
+  it('should return queued messages as text with double newlines', async () => {
+    const { result } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -140,7 +140,7 @@ describe('useMessageQueue', () => {
   });
 
   it('should auto-submit queued messages when transitioning to Idle and MCP is ready', async () => {
-    const { result, rerender } = renderMessageQueueHook({
+    const { result, rerender } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -165,7 +165,7 @@ describe('useMessageQueue', () => {
   });
 
   it('should wait for MCP readiness before auto-submitting', async () => {
-    const { result, rerender } = renderMessageQueueHook({
+    const { result, rerender } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Idle,
       submitQuery: mockSubmitQuery,
@@ -189,8 +189,8 @@ describe('useMessageQueue', () => {
     });
   });
 
-  it('should not auto-submit when queue is empty', () => {
-    const { rerender } = renderMessageQueueHook({
+  it('should not auto-submit when queue is empty', async () => {
+    const { rerender } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -203,8 +203,8 @@ describe('useMessageQueue', () => {
     expect(mockSubmitQuery).not.toHaveBeenCalled();
   });
 
-  it('should not auto-submit when not transitioning to Idle', () => {
-    const { result, rerender } = renderMessageQueueHook({
+  it('should not auto-submit when not transitioning to Idle', async () => {
+    const { result, rerender } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Responding,
       submitQuery: mockSubmitQuery,
@@ -224,7 +224,7 @@ describe('useMessageQueue', () => {
   });
 
   it('should handle multiple state transitions correctly', async () => {
-    const { result, rerender } = renderMessageQueueHook({
+    const { result, rerender } = await renderMessageQueueHook({
       isConfigInitialized: true,
       streamingState: StreamingState.Idle,
       submitQuery: mockSubmitQuery,
@@ -265,8 +265,8 @@ describe('useMessageQueue', () => {
   });
 
   describe('popAllMessages', () => {
-    it('should pop all messages and return them joined with double newlines', () => {
-      const { result } = renderMessageQueueHook({
+    it('should pop all messages and return them joined with double newlines', async () => {
+      const { result } = await renderMessageQueueHook({
         isConfigInitialized: true,
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
@@ -296,8 +296,8 @@ describe('useMessageQueue', () => {
       expect(result.current.messageQueue).toEqual([]);
     });
 
-    it('should return undefined when queue is empty', () => {
-      const { result } = renderMessageQueueHook({
+    it('should return undefined when queue is empty', async () => {
+      const { result } = await renderMessageQueueHook({
         isConfigInitialized: true,
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
@@ -313,8 +313,8 @@ describe('useMessageQueue', () => {
       expect(result.current.messageQueue).toEqual([]);
     });
 
-    it('should handle single message correctly', () => {
-      const { result } = renderMessageQueueHook({
+    it('should handle single message correctly', async () => {
+      const { result } = await renderMessageQueueHook({
         isConfigInitialized: true,
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
@@ -334,8 +334,8 @@ describe('useMessageQueue', () => {
       expect(result.current.messageQueue).toEqual([]);
     });
 
-    it('should clear the entire queue after popping', () => {
-      const { result } = renderMessageQueueHook({
+    it('should clear the entire queue after popping', async () => {
+      const { result } = await renderMessageQueueHook({
         isConfigInitialized: true,
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
@@ -364,8 +364,8 @@ describe('useMessageQueue', () => {
       expect(secondPop).toBeUndefined();
     });
 
-    it('should work correctly with state updates', () => {
-      const { result } = renderMessageQueueHook({
+    it('should work correctly with state updates', async () => {
+      const { result } = await renderMessageQueueHook({
         isConfigInitialized: true,
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,

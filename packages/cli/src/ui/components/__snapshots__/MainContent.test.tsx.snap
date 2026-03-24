@@ -4,7 +4,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focuse
 "ScrollableList
 AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
@@ -18,7 +18,6 @@ AppHeader(full)
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines
 "
 `;
 
@@ -26,7 +25,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocu
 "ScrollableList
 AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
@@ -40,16 +39,16 @@ AppHeader(full)
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines
 "
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
+│ ... first 10 lines hidden (Ctrl+O to show) ...                                               │
+│ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │
@@ -60,14 +59,13 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines
 "
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 1                                                                                       │
 │ Line 2                                                                                       │
@@ -90,21 +88,108 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines
 "
 `;
 
 exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
 "AppHeader(full)
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
-│ Part 1                                                                                       │
-│                                                                                              │
-│ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
-│ Part 2                                                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-ShowMoreLines
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Part 1                                                                   │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Part 2                                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
+`;
+
+exports[`MainContent > renders mixed history items (user + gemini) with single line padding between them 1`] = `
+"ScrollableList
+AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > User message                                                                                     
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+✦ Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+  Gemini response
+"
+`;
+
+exports[`MainContent > renders multiple history items with single line padding between them 1`] = `
+"ScrollableList
+AppHeader(full)
+✦ Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+  Gemini message 1
+
+✦ Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+  Gemini message 2
+"
+`;
+
+exports[`MainContent > renders multiple thinking messages sequentially correctly 1`] = `
+"ScrollableList
+AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Plan a solution                                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ Thinking... 
+ │
+ │ Initial analysis
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
+ │
+ │ Planning execution
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
+ │
+ │ Refining approach
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution.
+"
+`;
+
+exports[`MainContent > renders multiple thinking messages sequentially correctly 2`] = `
+"ScrollableList
+AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Plan a solution                                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ Thinking... 
+ │
+ │ Initial analysis
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
+ │
+ │ Planning execution
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
+ │
+ │ Refining approach
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution."
 `;
