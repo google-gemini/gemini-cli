@@ -65,11 +65,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly context: AgentLoopContext,
     params: ShellToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -462,10 +461,7 @@ export class ShellTool extends BaseDeclarativeTool<
 > {
   static readonly Name = SHELL_TOOL_NAME;
 
-  constructor(
-    private readonly context: AgentLoopContext,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
@@ -479,7 +475,7 @@ export class ShellTool extends BaseDeclarativeTool<
       definition.base.description!,
       Kind.Execute,
       definition.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       false, // isOutputMarkdown
       true, // canUpdateOutput
     );
@@ -504,14 +500,13 @@ export class ShellTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ShellToolParams,
-    messageBus: MessageBus,
+    _messageBus?: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );

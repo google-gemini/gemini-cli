@@ -18,7 +18,7 @@ import {
   type ToolConfirmationOutcome,
 } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
-import { type Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { GLOB_TOOL_NAME, GLOB_DISPLAY_NAME } from './tool-names.js';
@@ -99,23 +99,25 @@ class GlobToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private config: Config,
+    private readonly context: AgentLoopContext,
     params: GlobToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
     if (this.params.dir_path) {
       const searchDir = path.resolve(
-        this.config.getTargetDir(),
+        this.context.config.getTargetDir(),
         this.params.dir_path || '.',
       );
-      const relativePath = makeRelative(searchDir, this.config.getTargetDir());
+      const relativePath = makeRelative(
+        searchDir,
+        this.context.config.getTargetDir(),
+      );
       description += ` within ${shortenPath(relativePath)}`;
     }
     return description;
@@ -131,17 +133,17 @@ class GlobToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      const workspaceContext = this.config.getWorkspaceContext();
+      const workspaceContext = this.context.config.getWorkspaceContext();
       const workspaceDirectories = workspaceContext.getDirectories();
 
       // If a specific path is provided, resolve it and check if it's within workspace
       let searchDirectories: readonly string[];
       if (this.params.dir_path) {
         const searchDirAbsolute = path.resolve(
-          this.config.getTargetDir(),
+          this.context.config.getTargetDir(),
           this.params.dir_path,
         );
-        const validationError = this.config.validatePathAccess(
+        const validationError = this.context.config.validatePathAccess(
           searchDirAbsolute,
           'read',
         );
@@ -162,7 +164,7 @@ class GlobToolInvocation extends BaseToolInvocation<
       }
 
       // Get centralized file discovery service
-      const fileDiscovery = this.config.getFileService();
+      const fileDiscovery = this.context.config.getFileService();
 
       // Collect entries from all search directories
       const allEntries: GlobPath[] = [];
@@ -180,7 +182,7 @@ class GlobToolInvocation extends BaseToolInvocation<
           stat: true,
           nocase: !this.params.case_sensitive,
           dot: true,
-          ignore: this.config.getFileExclusions().getGlobExcludes(),
+          ignore: this.context.config.getFileExclusions().getGlobExcludes(),
           follow: false,
           signal,
         })) as GlobPath[];
@@ -189,23 +191,25 @@ class GlobToolInvocation extends BaseToolInvocation<
       }
 
       const relativePaths = allEntries.map((p) =>
-        path.relative(this.config.getTargetDir(), p.fullpath()),
+        path.relative(this.context.config.getTargetDir(), p.fullpath()),
       );
 
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params?.respect_git_ignore ??
-            this.config.getFileFilteringOptions().respectGitIgnore ??
+            this.context.config.getFileFilteringOptions().respectGitIgnore ??
             DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
           respectGeminiIgnore:
             this.params?.respect_gemini_ignore ??
-            this.config.getFileFilteringOptions().respectGeminiIgnore ??
+            this.context.config.getFileFilteringOptions().respectGeminiIgnore ??
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
       const filteredAbsolutePaths = new Set(
-        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
+        filteredPaths.map((p) =>
+          path.resolve(this.context.config.getTargetDir(), p),
+        ),
       );
 
       const filteredEntries = allEntries.filter((entry) =>
@@ -281,17 +285,14 @@ class GlobToolInvocation extends BaseToolInvocation<
  */
 export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   static readonly Name = GLOB_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       GlobTool.Name,
       GLOB_DISPLAY_NAME,
       GLOB_DEFINITION.base.description!,
       Kind.Search,
       GLOB_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
@@ -304,11 +305,11 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
     params: GlobToolParams,
   ): string | null {
     const searchDirAbsolute = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       params.dir_path || '.',
     );
 
-    const validationError = this.config.validatePathAccess(
+    const validationError = this.context.config.validatePathAccess(
       searchDirAbsolute,
       'read',
     );
@@ -316,7 +317,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       return validationError;
     }
 
-    const targetDir = searchDirAbsolute || this.config.getTargetDir();
+    const targetDir = searchDirAbsolute || this.context.config.getTargetDir();
     try {
       if (!fs.existsSync(targetDir)) {
         return `Search path does not exist ${targetDir}`;
@@ -341,14 +342,13 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
 
   protected createInvocation(
     params: GlobToolParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<GlobToolParams, ToolResult> {
     return new GlobToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );

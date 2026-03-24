@@ -22,13 +22,14 @@ import type {
 import { makeFakeConfig } from '../test-utils/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
 } from '../telemetry/constants.js';
-import type { ToolRegistry } from 'src/tools/tool-registry.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
 
@@ -72,6 +73,7 @@ const testRemoteDefinition: RemoteAgentDefinition = {
 describe('SubAgentInvocation', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
+  let mockContext: AgentLoopContext;
   let mockInnerInvocation: ToolInvocation<AgentInputs, ToolResult>;
 
   beforeEach(() => {
@@ -83,6 +85,11 @@ describe('SubAgentInvocation', () => {
       configurable: true,
     });
     mockMessageBus = createMockMessageBus();
+    mockContext = {
+      config: mockConfig,
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext;
+
     mockInnerInvocation = {
       shouldConfirmExecute: vi.fn(),
       execute: vi.fn(),
@@ -97,12 +104,12 @@ describe('SubAgentInvocation', () => {
   });
 
   it('should have Kind.Agent', () => {
-    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(testDefinition, mockContext);
     expect(tool.kind).toBe(Kind.Agent);
   });
 
   it('should delegate shouldConfirmExecute to the inner sub-invocation (local)', async () => {
-    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(testDefinition, mockContext);
     const params = {};
     // @ts-expect-error - accessing protected method for testing
     const invocation = tool.createInvocation(params, mockMessageBus);
@@ -120,13 +127,12 @@ describe('SubAgentInvocation', () => {
     );
     expect(MockSubagentToolWrapper).toHaveBeenCalledWith(
       testDefinition,
-      mockConfig,
-      mockMessageBus,
+      mockContext,
     );
   });
 
   it('should return the correct description', () => {
-    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(testDefinition, mockContext);
     const params = {};
     // @ts-expect-error - accessing protected method for testing
     const invocation = tool.createInvocation(params, mockMessageBus);
@@ -136,11 +142,7 @@ describe('SubAgentInvocation', () => {
   });
 
   it('should delegate shouldConfirmExecute to the inner sub-invocation (remote)', async () => {
-    const tool = new SubagentTool(
-      testRemoteDefinition,
-      mockConfig,
-      mockMessageBus,
-    );
+    const tool = new SubagentTool(testRemoteDefinition, mockContext);
     const params = { query: 'test' };
     // @ts-expect-error - accessing protected method for testing
     const invocation = tool.createInvocation(params, mockMessageBus);
@@ -164,13 +166,12 @@ describe('SubAgentInvocation', () => {
     );
     expect(MockSubagentToolWrapper).toHaveBeenCalledWith(
       testRemoteDefinition,
-      mockConfig,
-      mockMessageBus,
+      mockContext,
     );
   });
 
   it('should delegate execute to the inner sub-invocation', async () => {
-    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(testDefinition, mockContext);
     const params = {};
     // @ts-expect-error - accessing protected method for testing
     const invocation = tool.createInvocation(params, mockMessageBus);
@@ -216,7 +217,7 @@ describe('SubAgentInvocation', () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
       mockConfig.injectionService.addInjection('Test Hint', 'user_steering');
 
-      const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+      const tool = new SubagentTool(testDefinition, mockContext);
       const params = { query: 'original query' };
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
@@ -231,11 +232,7 @@ describe('SubAgentInvocation', () => {
       mockConfig = makeFakeConfig({ modelSteering: false });
       mockConfig.injectionService.addInjection('Test Hint', 'user_steering');
 
-      const tool = new SubagentTool(
-        testRemoteDefinition,
-        mockConfig,
-        mockMessageBus,
-      );
+      const tool = new SubagentTool(testRemoteDefinition, mockContext);
       const params = { query: 'original query' };
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
@@ -249,11 +246,7 @@ describe('SubAgentInvocation', () => {
     it('should NOT modify query for remote agents if there are no hints', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
 
-      const tool = new SubagentTool(
-        testRemoteDefinition,
-        mockConfig,
-        mockMessageBus,
-      );
+      const tool = new SubagentTool(testRemoteDefinition, mockContext);
       const params = { query: 'original query' };
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
@@ -266,12 +259,12 @@ describe('SubAgentInvocation', () => {
 
     it('should prepend hints to query for remote agents when hints exist and steering is enabled', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
+      mockContext = {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext;
 
-      const tool = new SubagentTool(
-        testRemoteDefinition,
-        mockConfig,
-        mockMessageBus,
-      );
+      const tool = new SubagentTool(testRemoteDefinition, mockContext);
       const params = { query: 'original query' };
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
@@ -289,13 +282,13 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT include legacy hints added before the invocation was created', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
+      mockContext = {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext;
       mockConfig.injectionService.addInjection('Legacy Hint', 'user_steering');
 
-      const tool = new SubagentTool(
-        testRemoteDefinition,
-        mockConfig,
-        mockMessageBus,
-      );
+      const tool = new SubagentTool(testRemoteDefinition, mockContext);
       const params = { query: 'original query' };
 
       // Creation of invocation captures the current hint state
@@ -320,11 +313,7 @@ describe('SubAgentInvocation', () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
       mockConfig.injectionService.addInjection('Hint', 'user_steering');
 
-      const tool = new SubagentTool(
-        testRemoteDefinition,
-        mockConfig,
-        mockMessageBus,
-      );
+      const tool = new SubagentTool(testRemoteDefinition, mockContext);
       const params = { other: 'param' };
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
@@ -340,6 +329,7 @@ describe('SubAgentInvocation', () => {
 describe('SubagentTool Read-Only logic', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
+  let mockContext: AgentLoopContext;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -350,14 +340,14 @@ describe('SubagentTool Read-Only logic', () => {
       configurable: true,
     });
     mockMessageBus = createMockMessageBus();
+    mockContext = {
+      config: mockConfig,
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext;
   });
 
   it('should be false for remote agents', () => {
-    const tool = new SubagentTool(
-      testRemoteDefinition,
-      mockConfig,
-      mockMessageBus,
-    );
+    const tool = new SubagentTool(testRemoteDefinition, mockContext);
     expect(tool.isReadOnly).toBe(false);
   });
 
@@ -369,15 +359,16 @@ describe('SubagentTool Read-Only logic', () => {
     const registry = {
       getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
     };
-    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
-      registry as unknown as ToolRegistry,
-    );
+    mockContext = {
+      ...mockContext,
+      toolRegistry: registry as unknown as ToolRegistry,
+    } as unknown as AgentLoopContext;
 
     const defWithTools: LocalAgentDefinition = {
       ...testDefinition,
       toolConfig: { tools: ['read'] },
     };
-    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(defWithTools, mockContext);
     expect(tool.isReadOnly).toBe(true);
   });
 
@@ -397,29 +388,31 @@ describe('SubagentTool Read-Only logic', () => {
         return undefined;
       },
     };
-    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
-      registry as unknown as ToolRegistry,
-    );
+    mockContext = {
+      ...mockContext,
+      toolRegistry: registry as unknown as ToolRegistry,
+    } as unknown as AgentLoopContext;
 
     const defWithTools: LocalAgentDefinition = {
       ...testDefinition,
       toolConfig: { tools: ['read', 'write'] },
     };
-    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(defWithTools, mockContext);
     expect(tool.isReadOnly).toBe(false);
   });
 
   it('should be true for local agent with no tools', () => {
     const registry = { getTool: () => undefined };
-    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
-      registry as unknown as ToolRegistry,
-    );
+    mockContext = {
+      ...mockContext,
+      toolRegistry: registry as unknown as ToolRegistry,
+    } as unknown as AgentLoopContext;
 
     const defNoTools: LocalAgentDefinition = {
       ...testDefinition,
       toolConfig: { tools: [] },
     };
-    const tool = new SubagentTool(defNoTools, mockConfig, mockMessageBus);
+    const tool = new SubagentTool(defNoTools, mockContext);
     expect(tool.isReadOnly).toBe(true);
   });
 });

@@ -23,7 +23,6 @@ import {
   SUBAGENT_CANCELLED_ERROR_MESSAGE,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -53,13 +52,12 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     private readonly definition: LocalAgentDefinition,
     private readonly context: AgentLoopContext,
     params: AgentInputs,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     super(
       params,
-      messageBus,
+      context.messageBus,
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
     );

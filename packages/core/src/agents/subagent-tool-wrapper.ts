@@ -35,12 +35,10 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    *
    * @param definition The `AgentDefinition` of the subagent to wrap.
    * @param context The execution context.
-   * @param messageBus Optional message bus for policy enforcement.
    */
   constructor(
     private readonly definition: AgentDefinition,
     private readonly context: AgentLoopContext,
-    messageBus: MessageBus,
   ) {
     super(
       definition.name,
@@ -48,7 +46,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       definition.description,
       Kind.Agent,
       definition.inputConfig.inputSchema,
-      messageBus,
+      context.messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
     );
@@ -65,19 +63,17 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    */
   protected createInvocation(
     params: AgentInputs,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<AgentInputs, ToolResult> {
     const definition = this.definition;
-    const effectiveMessageBus = messageBus;
 
     if (definition.kind === 'remote') {
       return new RemoteAgentInvocation(
         definition,
         this.context,
         params,
-        effectiveMessageBus,
         _toolName,
         _toolDisplayName,
       );
@@ -88,19 +84,11 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       return new BrowserAgentInvocation(
         this.context,
         params,
-        effectiveMessageBus,
         _toolName,
         _toolDisplayName,
       );
     }
 
-    return new LocalSubagentInvocation(
-      definition,
-      this.context,
-      params,
-      effectiveMessageBus,
-      _toolName,
-      _toolDisplayName,
-    );
+    return new LocalSubagentInvocation(definition, this.context, params);
   }
 }

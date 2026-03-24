@@ -17,7 +17,6 @@ import {
   type AgentInputs,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type {
   A2AClientManager,
   SendMessageResult,
@@ -56,7 +55,6 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     private readonly definition: RemoteAgentDefinition,
     private readonly context: AgentLoopContext,
     params: AgentInputs,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -69,7 +67,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // Safe to pass strict object to super
     super(
       { query },
-      messageBus,
+      context.messageBus,
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
     );

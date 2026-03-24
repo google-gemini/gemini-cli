@@ -14,6 +14,7 @@ import { Storage } from '../config/storage.js';
 import toml from '@iarna/toml';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { type Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   ToolConfirmationOutcome,
   type PolicyUpdateOptions,
@@ -244,9 +245,11 @@ describe('ShellToolInvocation Policy Update', () => {
     vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['git', 'npm']);
 
     const invocation = new ShellToolInvocation(
-      mockConfig,
+      {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext,
       { command: 'git status && npm test' },
-      mockMessageBus,
       'run_shell_command',
       'Shell',
     );
@@ -265,9 +268,11 @@ describe('ShellToolInvocation Policy Update', () => {
     vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['ls']);
 
     const invocation = new ShellToolInvocation(
-      mockConfig,
+      {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext,
       { command: 'ls -la /tmp' },
-      mockMessageBus,
       'run_shell_command',
       'Shell',
     );

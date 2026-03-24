@@ -7,9 +7,12 @@
 import { describe, expect, it } from 'vitest';
 import { WriteTodosTool, type WriteTodosToolParams } from './write-todos.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 describe('WriteTodosTool', () => {
-  const tool = new WriteTodosTool(createMockMessageBus());
+  const tool = new WriteTodosTool({
+    messageBus: createMockMessageBus(),
+  } as unknown as AgentLoopContext);
   const signal = new AbortController().signal;
 
   describe('validation', () => {

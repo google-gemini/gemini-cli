@@ -24,6 +24,7 @@ import {
 } from './tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
@@ -448,20 +449,19 @@ class EditToolInvocation
   private readonly resolvedPath: string;
 
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: EditToolParams,
-    messageBus: MessageBus,
-    toolName?: string,
-    displayName?: string,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
     if (!path.isAbsolute(this.params.file_path)) {
-      const result = correctPath(this.params.file_path, this.config);
+      const result = correctPath(this.params.file_path, this.context.config);
       if (result.success) {
         this.resolvedPath = result.correctedPath;
       } else {
         this.resolvedPath = path.resolve(
-          this.config.getTargetDir(),
+          this.context.config.getTargetDir(),
           this.params.file_path,
         );
       }
@@ -495,7 +495,7 @@ class EditToolInvocation
     let contentForLlmEditFixer = currentContent;
 
     const initialContentHash = hashContent(currentContent);
-    const onDiskContent = await this.config
+    const onDiskContent = await this.context.config
       .getFileSystemService()
       .readTextFile(this.resolvedPath);
     const onDiskContentHash = hashContent(onDiskContent.replace(/\r\n/g, '\n'));
@@ -513,7 +513,7 @@ class EditToolInvocation
       params.new_string,
       errorForLlmEditFixer,
       contentForLlmEditFixer,
-      this.config.getBaseLlmClient(),
+      this.context.config.getBaseLlmClient(),
       abortSignal,
     );
 
@@ -544,15 +544,18 @@ class EditToolInvocation
       };
     }
 
-    const secondAttemptResult = await calculateReplacement(this.config, {
-      params: {
-        ...params,
-        old_string: fixedEdit.search,
-        new_string: fixedEdit.replace,
+    const secondAttemptResult = await calculateReplacement(
+      this.context.config,
+      {
+        params: {
+          ...params,
+          old_string: fixedEdit.search,
+          new_string: fixedEdit.replace,
+        },
+        currentContent: contentForLlmEditFixer,
+        abortSignal,
       },
-      currentContent: contentForLlmEditFixer,
-      abortSignal,
-    });
+    );
 
     const secondError = getErrorReplaceResult(
       params,
@@ -564,7 +567,7 @@ class EditToolInvocation
     if (secondError) {
       // The fix failed, log failure and return the original error
       const event = new EditCorrectionEvent('failure');
-      logEditCorrectionEvent(this.config, event);
+      logEditCorrectionEvent(this.context.config, event);
 
       return {
         currentContent: contentForLlmEditFixer,
@@ -577,7 +580,7 @@ class EditToolInvocation
     }
 
     const event = new EditCorrectionEvent(CoreToolCallStatus.Success);
-    logEditCorrectionEvent(this.config, event);
+    logEditCorrectionEvent(this.context.config, event);
 
     return {
       currentContent: contentForLlmEditFixer,
@@ -606,7 +609,7 @@ class EditToolInvocation
     let originalLineEnding: '\r\n' | '\n' = '\n'; // Default for new files
 
     try {
-      currentContent = await this.config
+      currentContent = await this.context.config
         .getFileSystemService()
         .readTextFile(this.resolvedPath);
       originalLineEnding = detectLineEnding(currentContent);
@@ -678,7 +681,7 @@ class EditToolInvocation
       };
     }
 
-    const replacementResult = await calculateReplacement(this.config, {
+    const replacementResult = await calculateReplacement(this.context.config, {
       params,
       currentContent,
       abortSignal,
@@ -704,7 +707,7 @@ class EditToolInvocation
       };
     }
 
-    if (this.config.getDisableLLMCorrection()) {
+    if (this.context.config.getDisableLLMCorrection()) {
       return {
         currentContent,
         newContent: currentContent,
@@ -732,7 +735,7 @@ class EditToolInvocation
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
@@ -764,13 +767,13 @@ class EditToolInvocation
     );
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
-      this.config.getIdeMode() && ideClient.isDiffingEnabled()
+      this.context.config.getIdeMode() && ideClient.isDiffingEnabled()
         ? ideClient.openDiff(this.resolvedPath, editData.newContent)
         : undefined;
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`,
+      title: `Confirm Edit: ${shortenPath(makeRelative(this.resolvedPath, this.context.config.getTargetDir()))}`,
       fileName,
       filePath: this.resolvedPath,
       fileDiff,
@@ -798,7 +801,7 @@ class EditToolInvocation
   getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
     );
     if (this.params.old_string === '') {
       return `Create ${shortenPath(relativePath)}`;
@@ -823,7 +826,9 @@ class EditToolInvocation
    * @returns Result of the edit operation
    */
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    const validationError = this.config.validatePathAccess(this.resolvedPath);
+    const validationError = this.context.config.validatePathAccess(
+      this.resolvedPath,
+    );
     if (validationError) {
       return {
         llmContent: validationError,
@@ -876,13 +881,13 @@ class EditToolInvocation
       if (useCRLF) {
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
-      await this.config
+      await this.context.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`;
+        displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.context.config.getTargetDir()))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
@@ -940,7 +945,7 @@ ${snippet}`);
 
       // Discover JIT subdirectory context for the edited file path
       const jitContext = await discoverJitContext(
-        this.config,
+        this.context.config,
         this.resolvedPath,
       );
       let llmContent = llmSuccessMessageParts.join(' ');
@@ -989,17 +994,14 @@ export class EditTool
 {
   static readonly Name = EDIT_TOOL_NAME;
 
-  constructor(
-    private readonly config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       EditTool.Name,
       EDIT_DISPLAY_NAME,
       EDIT_DEFINITION.base.description!,
       Kind.Edit,
       EDIT_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -1019,12 +1021,12 @@ export class EditTool
 
     let resolvedPath: string;
     if (!path.isAbsolute(params.file_path)) {
-      const result = correctPath(params.file_path, this.config);
+      const result = correctPath(params.file_path, this.context.config);
       if (result.success) {
         resolvedPath = result.correctedPath;
       } else {
         resolvedPath = path.resolve(
-          this.config.getTargetDir(),
+          this.context.config.getTargetDir(),
           params.file_path,
         );
       }
@@ -1045,17 +1047,16 @@ export class EditTool
       }
     }
 
-    return this.config.validatePathAccess(resolvedPath);
+    return this.context.config.validatePathAccess(resolvedPath);
   }
 
   protected createInvocation(
     params: EditToolParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus,
       this.name,
       this.displayName,
     );
@@ -1070,7 +1071,7 @@ export class EditTool
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
         try {
-          return await this.config
+          return await this.context.config
             .getFileSystemService()
             .readTextFile(params.file_path);
         } catch (err) {
@@ -1080,7 +1081,7 @@ export class EditTool
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         try {
-          const currentContent = await this.config
+          const currentContent = await this.context.config
             .getFileSystemService()
             .readTextFile(params.file_path);
           return applyReplacement(

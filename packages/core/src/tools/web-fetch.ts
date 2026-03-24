@@ -227,11 +227,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly context: AgentLoopContext,
     params: WebFetchToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
@@ -884,17 +883,14 @@ export class WebFetchTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WEB_FETCH_TOOL_NAME;
 
-  constructor(
-    private readonly context: AgentLoopContext,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       WebFetchTool.Name,
       'WebFetch',
       WEB_FETCH_DEFINITION.base.description!,
       Kind.Fetch,
       WEB_FETCH_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -934,14 +930,13 @@ export class WebFetchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebFetchToolParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
     return new WebFetchToolInvocation(
       this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );

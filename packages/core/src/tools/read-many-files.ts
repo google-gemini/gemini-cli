@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -39,6 +39,7 @@ import { ToolErrorType } from './tool-error.js';
 import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
 import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 import { REFERENCE_CONTENT_END } from '../utils/constants.js';
 import {
@@ -122,20 +123,19 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: ReadManyFilesParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
     const pathDesc = `using patterns: 
 ${this.params.include.join('`, `')}
  (within target directory: 
-${this.config.getTargetDir()}
+${this.context.config.getTargetDir()}
 ) `;
 
     // Determine the final list of exclusion patterns exactly as in execute method
@@ -143,7 +143,7 @@ ${this.config.getTargetDir()}
     const paramUseDefaultExcludes = this.params.useDefaultExcludes !== false;
     const finalExclusionPatternsForDescription: string[] =
       paramUseDefaultExcludes
-        ? [...getDefaultExcludes(this.config), ...paramExcludes]
+        ? [...getDefaultExcludes(this.context.config), ...paramExcludes]
         : [...paramExcludes];
 
     const excludeDesc = `Excluding: ${
@@ -180,12 +180,14 @@ ${finalExclusionPatternsForDescription
     const contentParts: PartListUnion = [];
 
     const effectiveExcludes = useDefaultExcludes
-      ? [...getDefaultExcludes(this.config), ...exclude]
+      ? [...getDefaultExcludes(this.context.config), ...exclude]
       : [...exclude];
 
     try {
       const allEntries = new Set<string>();
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+      const workspaceDirs = this.context.config
+        .getWorkspaceContext()
+        .getDirectories();
 
       for (const dir of workspaceDirs) {
         const processedPatterns = [];
@@ -222,29 +224,32 @@ ${finalExclusionPatternsForDescription
         }
       }
       const relativeEntries = Array.from(allEntries).map((p) =>
-        path.relative(this.config.getTargetDir(), p),
+        path.relative(this.context.config.getTargetDir(), p),
       );
 
-      const fileDiscovery = this.config.getFileService();
+      const fileDiscovery = this.context.config.getFileService();
 
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
-            this.config.getFileFilteringOptions().respectGitIgnore ??
+            this.context.config.getFileFilteringOptions().respectGitIgnore ??
             DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
           respectGeminiIgnore:
             this.params.file_filtering_options?.respect_gemini_ignore ??
-            this.config.getFileFilteringOptions().respectGeminiIgnore ??
+            this.context.config.getFileFilteringOptions().respectGeminiIgnore ??
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
       for (const relativePath of filteredPaths) {
         // Security check: ensure the glob library didn't return something outside the workspace.
 
-        const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
+        const fullPath = path.resolve(
+          this.context.config.getTargetDir(),
+          relativePath,
+        );
 
-        const validationError = this.config.validatePathAccess(
+        const validationError = this.context.config.validatePathAccess(
           fullPath,
           'read',
         );
@@ -283,7 +288,7 @@ ${finalExclusionPatternsForDescription
       async (filePath): Promise<FileProcessingResult> => {
         try {
           const relativePathForDisplay = path
-            .relative(this.config.getTargetDir(), filePath)
+            .relative(this.context.config.getTargetDir(), filePath)
             .replace(/\\/g, '/');
 
           const fileType = await detectFileType(filePath);
@@ -318,8 +323,8 @@ ${finalExclusionPatternsForDescription
           // Use processSingleFileContent for all file types now
           const fileReadResult = await processSingleFileContent(
             filePath,
-            this.config.getTargetDir(),
-            this.config.getFileSystemService(),
+            this.context.config.getTargetDir(),
+            this.context.config.getFileSystemService(),
           );
 
           if (fileReadResult.error) {
@@ -339,7 +344,7 @@ ${finalExclusionPatternsForDescription
           };
         } catch (error) {
           const relativePathForDisplay = path
-            .relative(this.config.getTargetDir(), filePath)
+            .relative(this.context.config.getTargetDir(), filePath)
             .replace(/\\/g, '/');
 
           return {
@@ -396,7 +401,7 @@ ${finalExclusionPatternsForDescription
             file_path: filePath,
           });
           logFileOperation(
-            this.config,
+            this.context.config,
             new FileOperationEvent(
               READ_MANY_FILES_TOOL_NAME,
               FileOperation.READ,
@@ -424,7 +429,7 @@ ${finalExclusionPatternsForDescription
     );
     const jitParts: string[] = [];
     for (const dir of uniqueDirs) {
-      const ctx = await discoverJitContext(this.config, dir);
+      const ctx = await discoverJitContext(this.context.config, dir);
       if (ctx) {
         jitParts.push(ctx);
       }
@@ -435,7 +440,7 @@ ${finalExclusionPatternsForDescription
       );
     }
 
-    let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.config.getTargetDir()}\`)\n\n`;
+    let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.context.config.getTargetDir()}\`)\n\n`;
     if (processedFilesRelativePaths.length > 0) {
       displayMessage += `Successfully read and concatenated content from **${processedFilesRelativePaths.length} file(s)**.\n`;
       if (processedFilesRelativePaths.length <= 10) {
@@ -501,17 +506,14 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
 > {
   static readonly Name = READ_MANY_FILES_TOOL_NAME;
 
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       ReadManyFilesTool.Name,
       'ReadManyFiles',
       READ_MANY_FILES_DEFINITION.base.description!,
       Kind.Read,
       READ_MANY_FILES_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -519,14 +521,13 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ReadManyFilesParams,
-    messageBus: MessageBus,
+    _messageBus?: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ReadManyFilesParams, ToolResult> {
     return new ReadManyFilesToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );

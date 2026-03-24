@@ -32,7 +32,6 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
     private readonly definition: AgentDefinition,
     private readonly context: AgentLoopContext,
-    messageBus: MessageBus,
   ) {
     const inputSchema = definition.inputConfig.inputSchema;
 
@@ -50,7 +49,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       definition.description,
       Kind.Agent,
       inputSchema,
-      messageBus,
+      context.messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
     );
@@ -113,7 +112,6 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       params,
       this.definition,
       this.context,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );
@@ -127,13 +125,12 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
     params: AgentInputs,
     private readonly definition: AgentDefinition,
     private readonly context: AgentLoopContext,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     super(
       params,
-      messageBus,
+      context.messageBus,
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName ?? definition.name,
     );
@@ -224,11 +221,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
     definition: AgentDefinition,
     agentArgs: AgentInputs,
   ): ToolInvocation<AgentInputs, ToolResult> {
-    const wrapper = new SubagentToolWrapper(
-      definition,
-      this.context,
-      this.messageBus,
-    );
+    const wrapper = new SubagentToolWrapper(definition, this.context);
 
     return wrapper.build(agentArgs);
   }

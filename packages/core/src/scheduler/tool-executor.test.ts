@@ -10,6 +10,7 @@ import {
   type Config,
   type ToolResult,
   type AnyToolInvocation,
+  type AgentLoopContext,
 } from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -554,9 +555,8 @@ describe('ToolExecutor', () => {
     // 1. Setup ShellToolInvocation
     const messageBus = createMockMessageBus();
     const shellInvocation = new ShellToolInvocation(
-      config,
+      { config, messageBus } as unknown as AgentLoopContext,
       { command: 'sleep 10' },
-      messageBus,
     );
     // We need a dummy tool that matches the invocation just for structure
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });

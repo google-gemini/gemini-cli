@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
@@ -83,7 +84,10 @@ describe('ReadFileTool', () => {
         return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
-    tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
+    tool = new ReadFileTool({
+      config: mockConfigInstance,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
   });
 
   afterEach(async () => {
@@ -499,7 +503,10 @@ describe('ReadFileTool', () => {
             return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
           },
         } as unknown as Config;
-        tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
+        tool = new ReadFileTool({
+          config: mockConfigInstance,
+          messageBus: createMockMessageBus(),
+        } as unknown as AgentLoopContext);
       });
 
       it('should throw error if path is ignored by a .geminiignore pattern', async () => {
@@ -574,10 +581,10 @@ describe('ReadFileTool', () => {
           },
         } as unknown as Config;
 
-        const toolNoIgnore = new ReadFileTool(
-          configNoIgnore,
-          createMockMessageBus(),
-        );
+        const toolNoIgnore = new ReadFileTool({
+          config: configNoIgnore,
+          messageBus: createMockMessageBus(),
+        } as unknown as AgentLoopContext);
         const params: ReadFileToolParams = {
           file_path: ignoredFilePath,
         };

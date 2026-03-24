@@ -45,6 +45,7 @@ import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   type ShellExecutionResult,
@@ -84,6 +85,7 @@ describe('ShellTool', () => {
 
   let shellTool: ShellTool;
   let mockConfig: Config;
+  let mockContext: AgentLoopContext;
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
   let tempRootDir: string;
@@ -163,7 +165,12 @@ describe('ShellTool', () => {
       }
     });
 
-    shellTool = new ShellTool(mockConfig, bus);
+    mockContext = {
+      config: mockConfig,
+      messageBus: bus,
+      geminiClient: mockConfig.geminiClient,
+    } as unknown as AgentLoopContext;
+    shellTool = new ShellTool(mockContext);
 
     mockPlatform.mockReturnValue('linux');
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
@@ -465,10 +472,11 @@ describe('ShellTool', () => {
       expect(summarizer.summarizeToolOutput).toHaveBeenCalledWith(
         mockConfig,
         { model: 'summarizer-shell' },
-        expect.any(String),
-        mockConfig.geminiClient,
-        mockAbortSignal,
+        expect.stringContaining('long output'),
+        mockContext.geminiClient,
+        expect.anything(),
       );
+
       expect(result.llmContent).toBe('summarized output');
       expect(result.returnDisplay).toBe('long output');
     });
@@ -648,13 +656,19 @@ describe('ShellTool', () => {
   describe('getDescription', () => {
     it('should return the windows description when on windows', () => {
       mockPlatform.mockReturnValue('win32');
-      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const shellTool = new ShellTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       expect(shellTool.description).toMatchSnapshot();
     });
 
     it('should return the non-windows description when not on windows', () => {
       mockPlatform.mockReturnValue('linux');
-      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const shellTool = new ShellTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       expect(shellTool.description).toMatchSnapshot();
     });
 
@@ -663,7 +677,10 @@ describe('ShellTool', () => {
       vi.mocked(mockConfig.getEnableShellOutputEfficiency).mockReturnValue(
         false,
       );
-      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const shellTool = new ShellTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       expect(shellTool.description).not.toContain('Efficiency Guidelines:');
     });
   });
@@ -799,7 +816,10 @@ describe('ShellTool', () => {
 
   describe('getConfirmationDetails', () => {
     it('should annotate sub-commands with redirection correctly', async () => {
-      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const shellTool = new ShellTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const command = 'mkdir -p baz && echo "hello" > baz/test.md && ls';
       const invocation = shellTool.build({ command });
 
@@ -815,7 +835,10 @@ describe('ShellTool', () => {
     });
 
     it('should annotate all redirected sub-commands', async () => {
-      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const shellTool = new ShellTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const command = 'cat < input.txt && grep "foo" > output.txt';
       const invocation = shellTool.build({ command });
 
@@ -833,7 +856,10 @@ describe('ShellTool', () => {
     });
 
     it('should annotate sub-commands with pipes correctly', async () => {
-      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const shellTool = new ShellTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const command = 'ls | grep "baz"';
       const invocation = shellTool.build({ command });
 

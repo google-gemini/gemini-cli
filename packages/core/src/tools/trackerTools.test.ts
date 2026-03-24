@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Config } from '../config/config.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
   TrackerCreateTaskTool,
@@ -47,7 +48,10 @@ describe('Tracker Tools Integration', () => {
   const getSignal = () => new AbortController().signal;
 
   it('creates and lists tasks', async () => {
-    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    const createTool = new TrackerCreateTaskTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
     const createResult = await createTool.buildAndExecute(
       {
         title: 'Test Task',
@@ -59,14 +63,20 @@ describe('Tracker Tools Integration', () => {
 
     expect(createResult.llmContent).toContain('Created task');
 
-    const listTool = new TrackerListTasksTool(config, messageBus);
+    const listTool = new TrackerListTasksTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
     const listResult = await listTool.buildAndExecute({}, getSignal());
     expect(listResult.llmContent).toContain('Test Task');
     expect(listResult.llmContent).toContain(`(${TaskStatus.OPEN})`);
   });
 
   it('updates task status', async () => {
-    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    const createTool = new TrackerCreateTaskTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
     await createTool.buildAndExecute(
       {
         title: 'Update Me',
@@ -79,7 +89,10 @@ describe('Tracker Tools Integration', () => {
     const tasks = await config.getTrackerService().listTasks();
     const taskId = tasks[0].id;
 
-    const updateTool = new TrackerUpdateTaskTool(config, messageBus);
+    const updateTool = new TrackerUpdateTaskTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
     const updateResult = await updateTool.buildAndExecute(
       {
         id: taskId,
@@ -97,7 +110,10 @@ describe('Tracker Tools Integration', () => {
   });
 
   it('adds dependencies and visualizes the graph', async () => {
-    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    const createTool = new TrackerCreateTaskTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
 
     // Create Parent
     await createTool.buildAndExecute(
@@ -124,7 +140,10 @@ describe('Tracker Tools Integration', () => {
     const childId = tasks.find((t) => t.title === 'Child Task')!.id;
 
     // Add Dependency
-    const addDepTool = new TrackerAddDependencyTool(config, messageBus);
+    const addDepTool = new TrackerAddDependencyTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
     await addDepTool.buildAndExecute(
       {
         taskId: parentId,
@@ -137,7 +156,10 @@ describe('Tracker Tools Integration', () => {
     expect(updatedParent?.dependencies).toContain(childId);
 
     // Visualize
-    const vizTool = new TrackerVisualizeTool(config, messageBus);
+    const vizTool = new TrackerVisualizeTool({
+      config,
+      messageBus,
+    } as unknown as AgentLoopContext);
     const vizResult = await vizTool.buildAndExecute({}, getSignal());
 
     expect(vizResult.llmContent).toContain('Parent Task');

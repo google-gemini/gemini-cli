@@ -30,6 +30,7 @@ import {
   createMockMessageBus,
   getMockMessageBusInstance,
 } from '../test-utils/mock-message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 // Mock dependencies
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -66,7 +67,9 @@ describe('MemoryTool', () => {
 
     // Clear the static allowlist before every single test to prevent pollution.
     // We need to create a dummy tool and invocation to get access to the static property.
-    const tool = new MemoryTool(createMockMessageBus());
+    const tool = new MemoryTool({
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
     const invocation = tool.build({ fact: 'dummy' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation.constructor as any).allowlist.clear();
@@ -107,7 +110,9 @@ describe('MemoryTool', () => {
     beforeEach(() => {
       const bus = createMockMessageBus();
       getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-      memoryTool = new MemoryTool(bus);
+      memoryTool = new MemoryTool({
+        messageBus: bus,
+      } as unknown as AgentLoopContext);
     });
 
     it('should have correct name, displayName, description, and schema', () => {
@@ -246,7 +251,9 @@ describe('MemoryTool', () => {
     beforeEach(() => {
       const bus = createMockMessageBus();
       getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-      memoryTool = new MemoryTool(bus);
+      memoryTool = new MemoryTool({
+        messageBus: bus,
+      } as unknown as AgentLoopContext);
       vi.mocked(fs.readFile).mockResolvedValue('');
     });
 

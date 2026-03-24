@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   TRACKER_ADD_DEPENDENCY_DEFINITION,
@@ -120,16 +120,15 @@ class TrackerCreateTaskInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: CreateTaskParams,
-    messageBus: MessageBus,
     toolName: string,
   ) {
-    super(params, messageBus, toolName);
+    super(params, context.messageBus, toolName);
   }
 
   private get service() {
-    return this.config.getTrackerService();
+    return this.context.config.getTrackerService();
   }
   getDescription(): string {
     return `Creating task: ${this.params.title}`;
@@ -169,26 +168,21 @@ export class TrackerCreateTaskTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = TRACKER_CREATE_TASK_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       TrackerCreateTaskTool.Name,
       'Create Task',
       TRACKER_CREATE_TASK_DEFINITION.base.description!,
       Kind.Edit,
       TRACKER_CREATE_TASK_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
-  protected createInvocation(params: CreateTaskParams, messageBus: MessageBus) {
-    return new TrackerCreateTaskInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
+  protected createInvocation(
+    params: CreateTaskParams,
+    _messageBus?: MessageBus,
+  ) {
+    return new TrackerCreateTaskInvocation(this.context, params, this.name);
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_CREATE_TASK_DEFINITION, modelId);
@@ -210,16 +204,15 @@ class TrackerUpdateTaskInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: UpdateTaskParams,
-    messageBus: MessageBus,
     toolName: string,
   ) {
-    super(params, messageBus, toolName);
+    super(params, context.messageBus, toolName);
   }
 
   private get service() {
-    return this.config.getTrackerService();
+    return this.context.config.getTrackerService();
   }
   getDescription(): string {
     return `Updating task ${this.params.id}`;
@@ -253,26 +246,21 @@ export class TrackerUpdateTaskTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = TRACKER_UPDATE_TASK_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       TrackerUpdateTaskTool.Name,
       'Update Task',
       TRACKER_UPDATE_TASK_DEFINITION.base.description!,
       Kind.Edit,
       TRACKER_UPDATE_TASK_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
-  protected createInvocation(params: UpdateTaskParams, messageBus: MessageBus) {
-    return new TrackerUpdateTaskInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
+  protected createInvocation(
+    params: UpdateTaskParams,
+    _messageBus?: MessageBus,
+  ) {
+    return new TrackerUpdateTaskInvocation(this.context, params, this.name);
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_UPDATE_TASK_DEFINITION, modelId);
@@ -290,16 +278,15 @@ class TrackerGetTaskInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: GetTaskParams,
-    messageBus: MessageBus,
     toolName: string,
   ) {
-    super(params, messageBus, toolName);
+    super(params, context.messageBus, toolName);
   }
 
   private get service() {
-    return this.config.getTrackerService();
+    return this.context.config.getTrackerService();
   }
   getDescription(): string {
     return `Retrieving task ${this.params.id}`;
@@ -325,26 +312,18 @@ export class TrackerGetTaskTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = TRACKER_GET_TASK_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       TrackerGetTaskTool.Name,
       'Get Task',
       TRACKER_GET_TASK_DEFINITION.base.description!,
       Kind.Read,
       TRACKER_GET_TASK_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
-  protected createInvocation(params: GetTaskParams, messageBus: MessageBus) {
-    return new TrackerGetTaskInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
+  protected createInvocation(params: GetTaskParams, _messageBus?: MessageBus) {
+    return new TrackerGetTaskInvocation(this.context, params, this.name);
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_GET_TASK_DEFINITION, modelId);
@@ -364,16 +343,15 @@ class TrackerListTasksInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: ListTasksParams,
-    messageBus: MessageBus,
     toolName: string,
   ) {
-    super(params, messageBus, toolName);
+    super(params, context.messageBus, toolName);
   }
 
   private get service() {
-    return this.config.getTrackerService();
+    return this.context.config.getTrackerService();
   }
   getDescription(): string {
     return 'Listing tasks.';
@@ -413,26 +391,21 @@ export class TrackerListTasksTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = TRACKER_LIST_TASKS_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       TrackerListTasksTool.Name,
       'List Tasks',
       TRACKER_LIST_TASKS_DEFINITION.base.description!,
       Kind.Search,
       TRACKER_LIST_TASKS_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
-  protected createInvocation(params: ListTasksParams, messageBus: MessageBus) {
-    return new TrackerListTasksInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
+  protected createInvocation(
+    params: ListTasksParams,
+    _messageBus?: MessageBus,
+  ) {
+    return new TrackerListTasksInvocation(this.context, params, this.name);
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_LIST_TASKS_DEFINITION, modelId);
@@ -451,16 +424,15 @@ class TrackerAddDependencyInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: AddDependencyParams,
-    messageBus: MessageBus,
     toolName: string,
   ) {
-    super(params, messageBus, toolName);
+    super(params, context.messageBus, toolName);
   }
 
   private get service() {
-    return this.config.getTrackerService();
+    return this.context.config.getTrackerService();
   }
   getDescription(): string {
     return `Adding dependency: ${this.params.taskId} depends on ${this.params.dependencyId}`;
@@ -525,29 +497,21 @@ export class TrackerAddDependencyTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = TRACKER_ADD_DEPENDENCY_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       TrackerAddDependencyTool.Name,
       'Add Dependency',
       TRACKER_ADD_DEPENDENCY_DEFINITION.base.description!,
       Kind.Edit,
       TRACKER_ADD_DEPENDENCY_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
   protected createInvocation(
     params: AddDependencyParams,
-    messageBus: MessageBus,
+    _messageBus?: MessageBus,
   ) {
-    return new TrackerAddDependencyInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
+    return new TrackerAddDependencyInvocation(this.context, params, this.name);
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_ADD_DEPENDENCY_DEFINITION, modelId);
@@ -561,16 +525,15 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: Record<string, never>,
-    messageBus: MessageBus,
     toolName: string,
   ) {
-    super(params, messageBus, toolName);
+    super(params, context.messageBus, toolName);
   }
 
   private get service() {
-    return this.config.getTrackerService();
+    return this.context.config.getTrackerService();
   }
   getDescription(): string {
     return 'Visualizing the task graph.';
@@ -647,29 +610,21 @@ export class TrackerVisualizeTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = TRACKER_VISUALIZE_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       TrackerVisualizeTool.Name,
       'Visualize Tracker',
       TRACKER_VISUALIZE_DEFINITION.base.description!,
       Kind.Read,
       TRACKER_VISUALIZE_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
   protected createInvocation(
     params: Record<string, never>,
-    messageBus: MessageBus,
+    _messageBus?: MessageBus,
   ) {
-    return new TrackerVisualizeInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
+    return new TrackerVisualizeInvocation(this.context, params, this.name);
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_VISUALIZE_DEFINITION, modelId);

@@ -27,6 +27,7 @@ import { LocalAgentExecutor } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { type z } from 'zod';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
@@ -65,6 +66,7 @@ const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
 describe('LocalSubagentInvocation', () => {
   let mockExecutorInstance: Mocked<LocalAgentExecutor<z.ZodUnknown>>;
   let mockMessageBus: MessageBus;
+  let mockContext: AgentLoopContext;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,6 +77,10 @@ describe('LocalSubagentInvocation', () => {
       configurable: true,
     });
     mockMessageBus = createMockMessageBus();
+    mockContext = {
+      config: mockConfig,
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext;
 
     mockExecutorInstance = {
       run: vi.fn(),
@@ -94,9 +100,8 @@ describe('LocalSubagentInvocation', () => {
     const params = { task: 'Analyze data' };
     const invocation = new LocalSubagentInvocation(
       testDefinition,
-      mockConfig,
+      mockContext,
       params,
-      mockMessageBus,
     );
 
     // Access the protected messageBus property by casting to any
@@ -109,9 +114,8 @@ describe('LocalSubagentInvocation', () => {
       const params = { task: 'Analyze data', priority: 5 };
       const invocation = new LocalSubagentInvocation(
         testDefinition,
-        mockConfig,
+        mockContext,
         params,
-        mockMessageBus,
       );
       const description = invocation.getDescription();
       expect(description).toBe(
@@ -124,9 +128,8 @@ describe('LocalSubagentInvocation', () => {
       const params = { task: longTask };
       const invocation = new LocalSubagentInvocation(
         testDefinition,
-        mockConfig,
+        mockContext,
         params,
-        mockMessageBus,
       );
       const description = invocation.getDescription();
       // Default INPUT_PREVIEW_MAX_LENGTH is 50
@@ -147,9 +150,8 @@ describe('LocalSubagentInvocation', () => {
       }
       const invocation = new LocalSubagentInvocation(
         longNameDef,
-        mockConfig,
+        mockContext,
         params,
-        mockMessageBus,
       );
       const description = invocation.getDescription();
       // Default DESCRIPTION_MAX_LENGTH is 200
@@ -173,9 +175,8 @@ describe('LocalSubagentInvocation', () => {
       updateOutput = vi.fn();
       invocation = new LocalSubagentInvocation(
         testDefinition,
-        mockConfig,
+        mockContext,
         params,
-        mockMessageBus,
       );
     });
 
@@ -190,7 +191,7 @@ describe('LocalSubagentInvocation', () => {
 
       expect(MockLocalAgentExecutor.create).toHaveBeenCalledWith(
         testDefinition,
-        mockConfig,
+        mockContext,
         expect.any(Function),
       );
       expect(updateOutput).toHaveBeenCalledWith(

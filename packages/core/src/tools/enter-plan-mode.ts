@@ -13,7 +13,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
@@ -29,32 +29,28 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
 > {
   static readonly Name = ENTER_PLAN_MODE_TOOL_NAME;
 
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       EnterPlanModeTool.Name,
       'Enter Plan Mode',
       ENTER_PLAN_MODE_DEFINITION.base.description!,
       Kind.Plan,
       ENTER_PLAN_MODE_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
 
   protected createInvocation(
     params: EnterPlanModeParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
   ): EnterPlanModeInvocation {
     return new EnterPlanModeInvocation(
+      this.context,
       params,
-      messageBus,
       toolName,
       toolDisplayName,
-      this.config,
     );
   }
 
@@ -70,13 +66,12 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
   private confirmationOutcome: ToolConfirmationOutcome | null = null;
 
   constructor(
+    private readonly context: AgentLoopContext,
     params: EnterPlanModeParams,
-    messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
-    private config: Config,
   ) {
-    super(params, messageBus, toolName, toolDisplayName);
+    super(params, context.messageBus, toolName, toolDisplayName);
   }
 
   getDescription(): string {
@@ -120,7 +115,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       };
     }
 
-    this.config.setApprovalMode(ApprovalMode.PLAN);
+    this.context.config.setApprovalMode(ApprovalMode.PLAN);
 
     return {
       llmContent: 'Switching to Plan mode.',

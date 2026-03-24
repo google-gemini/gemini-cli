@@ -11,6 +11,7 @@ import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
 import { LSTool } from './ls.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
@@ -73,7 +74,10 @@ describe('LSTool', () => {
       },
     } as unknown as Config;
 
-    lsTool = new LSTool(mockConfig, createMockMessageBus());
+    lsTool = new LSTool({
+      config: mockConfig,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
   });
 
   afterEach(async () => {

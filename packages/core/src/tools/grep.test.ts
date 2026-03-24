@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult } from './tools.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -76,7 +77,10 @@ describe('GrepTool', () => {
       },
     } as unknown as Config;
 
-    grepTool = new GrepTool(mockConfig, createMockMessageBus());
+    grepTool = new GrepTool({
+      config: mockConfig,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
 
     // Create some test files and directories
     await fs.writeFile(
@@ -360,10 +364,10 @@ describe('GrepTool', () => {
         },
       } as unknown as Config;
 
-      const multiDirGrepTool = new GrepTool(
-        multiDirConfig,
-        createMockMessageBus(),
-      );
+      const multiDirGrepTool = new GrepTool({
+        config: multiDirConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const params: GrepToolParams = { pattern: 'world' };
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -437,10 +441,10 @@ describe('GrepTool', () => {
         },
       } as unknown as Config;
 
-      const multiDirGrepTool = new GrepTool(
-        multiDirConfig,
-        createMockMessageBus(),
-      );
+      const multiDirGrepTool = new GrepTool({
+        config: multiDirConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       // Search only in the 'sub' directory of the first workspace
       const params: GrepToolParams = { pattern: 'world', dir_path: 'sub' };
@@ -620,10 +624,10 @@ describe('GrepTool', () => {
         }),
       } as unknown as Config;
 
-      const multiDirGrepTool = new GrepTool(
-        multiDirConfig,
-        createMockMessageBus(),
-      );
+      const multiDirGrepTool = new GrepTool({
+        config: multiDirConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const params: GrepToolParams = { pattern: 'testPattern' };
       const invocation = multiDirGrepTool.build(params);
       expect(invocation.getDescription()).toBe(

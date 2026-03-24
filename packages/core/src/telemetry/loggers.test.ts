@@ -20,6 +20,7 @@ import {
   type MessageBus,
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { logs } from '@opentelemetry/api-logs';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -1154,7 +1155,10 @@ describe('loggers', () => {
     });
 
     it('should log a tool call with all fields', () => {
-      const tool = new EditTool(mockConfig, createMockMessageBus());
+      const tool = new EditTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const call: CompletedToolCall = {
         status: CoreToolCallStatus.Success,
         request: {
@@ -1418,7 +1422,10 @@ describe('loggers', () => {
           contentLength: 13,
         },
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
-        tool: new EditTool(mockConfig, createMockMessageBus()),
+        tool: new EditTool({
+          config: mockConfig,
+          messageBus: createMockMessageBus(),
+        } as unknown as AgentLoopContext),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };
@@ -1497,7 +1504,10 @@ describe('loggers', () => {
           errorType: undefined,
           contentLength: 13,
         },
-        tool: new EditTool(mockConfig, createMockMessageBus()),
+        tool: new EditTool({
+          config: mockConfig,
+          messageBus: createMockMessageBus(),
+        } as unknown as AgentLoopContext),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };

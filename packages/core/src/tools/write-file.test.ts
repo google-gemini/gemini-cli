@@ -27,6 +27,7 @@ import {
   type ToolResult,
 } from './tools.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
@@ -197,7 +198,10 @@ describe('WriteFileTool', () => {
 
     const bus = createMockMessageBus();
     getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-    tool = new WriteFileTool(mockConfig, bus);
+    tool = new WriteFileTool({
+      config: mockConfig,
+      messageBus: bus,
+    } as unknown as AgentLoopContext);
 
     // Reset mocks before each test
     mockConfigInternal.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);

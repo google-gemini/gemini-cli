@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import { WebSearchTool, type WebSearchToolParams } from './web-search.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
@@ -49,7 +50,11 @@ describe('WebSearchTool', () => {
       mockConfigInstance as unknown as { config: Config; promptId: string }
     ).promptId = 'test-prompt-id';
     mockGeminiClient = new GeminiClient(mockConfigInstance);
-    tool = new WebSearchTool(mockConfigInstance, createMockMessageBus());
+    tool = new WebSearchTool({
+      config: mockConfigInstance,
+      messageBus: createMockMessageBus(),
+      geminiClient: mockGeminiClient,
+    } as unknown as AgentLoopContext);
   });
 
   afterEach(() => {

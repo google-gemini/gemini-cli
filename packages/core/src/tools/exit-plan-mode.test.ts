@@ -10,6 +10,7 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as fs from 'node:fs';
@@ -49,10 +50,10 @@ describe('ExitPlanModeTool', () => {
       } as unknown as Config['storage'],
       isInteractive: vi.fn().mockReturnValue(true),
     };
-    tool = new ExitPlanModeTool(
-      mockConfig as Config,
-      mockMessageBus as unknown as MessageBus,
-    );
+    tool = new ExitPlanModeTool({
+      config: mockConfig as Config,
+      messageBus: mockMessageBus as unknown as MessageBus,
+    } as unknown as AgentLoopContext);
     // Mock getMessageBusDecision on the invocation prototype
     vi.spyOn(
       ExitPlanModeInvocation.prototype as unknown as {

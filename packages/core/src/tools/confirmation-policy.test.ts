@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EditTool } from './edit.js';
 import { WriteFileTool } from './write-file.js';
 import { WebFetchTool } from './web-fetch.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -110,7 +111,11 @@ describe('Tool Confirmation Policy Updates', () => {
   const tools = [
     {
       name: 'EditTool',
-      create: (config: Config, bus: MessageBus) => new EditTool(config, bus),
+      create: (config: Config, bus: MessageBus) =>
+        new EditTool({
+          config,
+          messageBus: bus,
+        } as unknown as AgentLoopContext),
       params: {
         file_path: 'test.txt',
         instruction: 'change content',
@@ -121,7 +126,10 @@ describe('Tool Confirmation Policy Updates', () => {
     {
       name: 'WriteFileTool',
       create: (config: Config, bus: MessageBus) =>
-        new WriteFileTool(config, bus),
+        new WriteFileTool({
+          config,
+          messageBus: bus,
+        } as unknown as AgentLoopContext),
       params: {
         file_path: path.join(rootDir, 'test.txt'),
         content: 'new content',
@@ -130,7 +138,10 @@ describe('Tool Confirmation Policy Updates', () => {
     {
       name: 'WebFetchTool',
       create: (config: Config, bus: MessageBus) =>
-        new WebFetchTool(config, bus),
+        new WebFetchTool({
+          config,
+          messageBus: bus,
+        } as unknown as AgentLoopContext),
       params: {
         prompt: 'fetch https://example.com',
       },

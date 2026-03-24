@@ -12,7 +12,7 @@ import {
   type Todo,
   type ToolResult,
 } from './tools.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 import { WRITE_TODOS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -38,11 +38,11 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 > {
   constructor(
     params: WriteTodosToolParams,
-    messageBus: MessageBus,
+    context: AgentLoopContext,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
@@ -82,14 +82,14 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
 
-  constructor(messageBus: MessageBus) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       WriteTodosTool.Name,
       'WriteTodos',
       WRITE_TODOS_DEFINITION.base.description!,
       Kind.Other,
       WRITE_TODOS_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -132,13 +132,13 @@ export class WriteTodosTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WriteTodosToolParams,
-    messageBus: MessageBus,
+    _messageBus: unknown, // Deprecated, use this.context
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(
       params,
-      messageBus,
+      this.context,
       _toolName,
       _displayName,
     );

@@ -48,6 +48,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -345,7 +346,10 @@ describe('LocalAgentExecutor', () => {
     });
     parentToolRegistry = new ToolRegistry(mockConfig, mockConfig.messageBus);
     parentToolRegistry.registerTool(
-      new LSTool(mockConfig, mockConfig.messageBus),
+      new LSTool({
+        config: mockConfig,
+        messageBus: mockConfig.messageBus,
+      } as unknown as AgentLoopContext),
     );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),

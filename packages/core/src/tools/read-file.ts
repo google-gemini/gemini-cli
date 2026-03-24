@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -25,7 +26,6 @@ import {
   processSingleFileContent,
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
-import type { Config } from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
@@ -66,15 +66,14 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 > {
   private readonly resolvedPath: string;
   constructor(
-    private config: Config,
+    private readonly context: AgentLoopContext,
     params: ReadFileToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
     this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       this.params.file_path,
     );
   }
@@ -82,7 +81,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
     );
     return shortenPath(relativePath);
   }
@@ -105,7 +104,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
-    const validationError = this.config.validatePathAccess(
+    const validationError = this.context.config.validatePathAccess(
       this.resolvedPath,
       'read',
     );
@@ -122,8 +121,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
     const result = await processSingleFileContent(
       this.resolvedPath,
-      this.config.getTargetDir(),
-      this.config.getFileSystemService(),
+      this.context.config.getTargetDir(),
+      this.context.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,
     );
@@ -164,7 +163,7 @@ ${result.llmContent}`;
       file_path: this.resolvedPath,
     });
     logFileOperation(
-      this.config,
+      this.context.config,
       new FileOperationEvent(
         READ_FILE_TOOL_NAME,
         FileOperation.READ,
@@ -176,7 +175,10 @@ ${result.llmContent}`;
     );
 
     // Discover JIT subdirectory context for the accessed file path
-    const jitContext = await discoverJitContext(this.config, this.resolvedPath);
+    const jitContext = await discoverJitContext(
+      this.context.config,
+      this.resolvedPath,
+    );
     if (jitContext) {
       if (typeof llmContent === 'string') {
         llmContent = appendJitContext(llmContent, jitContext);
@@ -202,23 +204,20 @@ export class ReadFileTool extends BaseDeclarativeTool<
   static readonly Name = READ_FILE_TOOL_NAME;
   private readonly fileDiscoveryService: FileDiscoveryService;
 
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       ReadFileTool.Name,
       READ_FILE_DISPLAY_NAME,
       READ_FILE_DEFINITION.base.description!,
       Kind.Read,
       READ_FILE_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
     this.fileDiscoveryService = new FileDiscoveryService(
-      config.getTargetDir(),
-      config.getFileFilteringOptions(),
+      context.config.getTargetDir(),
+      context.config.getFileFilteringOptions(),
     );
   }
 
@@ -230,11 +229,11 @@ export class ReadFileTool extends BaseDeclarativeTool<
     }
 
     const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       params.file_path,
     );
 
-    const validationError = this.config.validatePathAccess(
+    const validationError = this.context.config.validatePathAccess(
       resolvedPath,
       'read',
     );
@@ -256,7 +255,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return 'start_line cannot be greater than end_line';
     }
 
-    const fileFilteringOptions = this.config.getFileFilteringOptions();
+    const fileFilteringOptions = this.context.config.getFileFilteringOptions();
     if (
       this.fileDiscoveryService.shouldIgnoreFile(
         resolvedPath,
@@ -276,9 +275,8 @@ export class ReadFileTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
     return new ReadFileToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );

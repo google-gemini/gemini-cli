@@ -18,6 +18,7 @@ import os from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
@@ -75,7 +76,10 @@ describe('GlobTool', () => {
       },
     } as unknown as Config;
 
-    globTool = new GlobTool(mockConfig, createMockMessageBus());
+    globTool = new GlobTool({
+      config: mockConfig,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
 
     // Create some test files and directories within this root
     // Top-level files

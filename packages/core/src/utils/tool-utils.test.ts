@@ -21,6 +21,7 @@ import {
   type AnyToolInvocation,
   type Config,
 } from '../index.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('shouldHideToolCall', () => {
@@ -190,7 +191,10 @@ describe('doesToolInvocationMatch', () => {
       getTargetDir: () => '/tmp',
       getFileFilteringOptions: () => ({}),
     } as unknown as Config;
-    const readFileTool = new ReadFileTool(mockConfig, createMockMessageBus());
+    const readFileTool = new ReadFileTool({
+      config: mockConfig,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
     const invocation = {
       params: { file: 'test.txt' },
     } as AnyToolInvocation;

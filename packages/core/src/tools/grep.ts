@@ -27,7 +27,7 @@ import {
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
@@ -86,14 +86,13 @@ class GrepToolInvocation extends BaseToolInvocation<
   private readonly fileExclusions: FileExclusions;
 
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: GrepToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
-    this.fileExclusions = config.getFileExclusions();
+    super(params, context.messageBus, _toolName, _toolDisplayName);
+    this.fileExclusions = context.config.getFileExclusions();
   }
 
   /**
@@ -140,13 +139,16 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      const workspaceContext = this.config.getWorkspaceContext();
+      const workspaceContext = this.context.config.getWorkspaceContext();
       const pathParam = this.params.dir_path;
 
       let searchDirAbs: string | null = null;
       if (pathParam) {
-        searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
-        const validationError = this.config.validatePathAccess(
+        searchDirAbs = path.resolve(
+          this.context.config.getTargetDir(),
+          pathParam,
+        );
+        const validationError = this.context.config.validatePathAccess(
           searchDirAbs,
           'read',
         );
@@ -306,7 +308,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     const checkArgs =
       process.platform === 'win32' ? [command] : ['-v', command];
     try {
-      const sandboxManager = this.config.sandboxManager;
+      const sandboxManager = this.context.config.sandboxManager;
 
       let finalCommand = checkCommand;
       let finalArgs = checkArgs;
@@ -407,7 +409,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
-            sandboxManager: this.config.sandboxManager,
+            sandboxManager: this.context.config.sandboxManager,
           });
 
           const results: GrepMatch[] = [];
@@ -479,7 +481,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
-            sandboxManager: this.config.sandboxManager,
+            sandboxManager: this.context.config.sandboxManager,
           });
 
           for await (const line of generator) {
@@ -600,24 +602,24 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
     if (this.params.dir_path) {
       const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
+        this.context.config.getTargetDir(),
         this.params.dir_path,
       );
       if (
-        resolvedPath === this.config.getTargetDir() ||
+        resolvedPath === this.context.config.getTargetDir() ||
         this.params.dir_path === '.'
       ) {
         description += ` within ./`;
       } else {
         const relativePath = makeRelative(
           resolvedPath,
-          this.config.getTargetDir(),
+          this.context.config.getTargetDir(),
         );
         description += ` within ${shortenPath(relativePath)}`;
       }
     } else {
       // When no path is specified, indicate searching all workspace directories
-      const workspaceContext = this.config.getWorkspaceContext();
+      const workspaceContext = this.context.config.getWorkspaceContext();
       const directories = workspaceContext.getDirectories();
       if (directories.length > 1) {
         description += ` across all workspace directories`;
@@ -632,17 +634,14 @@ class GrepToolInvocation extends BaseToolInvocation<
  */
 export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   static readonly Name = GREP_TOOL_NAME;
-  constructor(
-    private readonly config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       GrepTool.Name,
       'SearchText',
       GREP_DEFINITION.base.description!,
       Kind.Search,
       GREP_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
@@ -687,10 +686,10 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     // Only validate dir_path if one is provided
     if (params.dir_path) {
       const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
+        this.context.config.getTargetDir(),
         params.dir_path,
       );
-      const validationError = this.config.validatePathAccess(
+      const validationError = this.context.config.validatePathAccess(
         resolvedPath,
         'read',
       );
@@ -722,9 +721,8 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     _toolDisplayName?: string,
   ): ToolInvocation<GrepToolParams, ToolResult> {
     return new GrepToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName,
     );

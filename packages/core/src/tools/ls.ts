@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import fs from 'node:fs/promises';
 import path from 'node:path';
+import fs from 'node:fs/promises';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -17,7 +17,6 @@ import {
   type ToolConfirmationOutcome,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
@@ -26,6 +25,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
  * Parameters for the LS tool
@@ -82,13 +82,12 @@ export interface FileEntry {
 
 class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: LSToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   /**
@@ -122,7 +121,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   getDescription(): string {
     const relativePath = makeRelative(
       this.params.dir_path,
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
     );
     return shortenPath(relativePath);
   }
@@ -158,11 +157,11 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
    */
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     const resolvedDirPath = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       this.params.dir_path,
     );
 
-    const validationError = this.config.validatePathAccess(
+    const validationError = this.context.config.validatePathAccess(
       resolvedDirPath,
       'read',
     );
@@ -207,27 +206,30 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       const relativePaths = files.map((file) =>
         path.relative(
-          this.config.getTargetDir(),
+          this.context.config.getTargetDir(),
           path.join(resolvedDirPath, file),
         ),
       );
 
-      const fileDiscovery = this.config.getFileService();
+      const fileDiscovery = this.context.config.getFileService();
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
-            this.config.getFileFilteringOptions().respectGitIgnore ??
+            this.context.config.getFileFilteringOptions().respectGitIgnore ??
             DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
           respectGeminiIgnore:
             this.params.file_filtering_options?.respect_gemini_ignore ??
-            this.config.getFileFilteringOptions().respectGeminiIgnore ??
+            this.context.config.getFileFilteringOptions().respectGeminiIgnore ??
             DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
 
       const entries = [];
       for (const relativePath of filteredPaths) {
-        const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
+        const fullPath = path.resolve(
+          this.context.config.getTargetDir(),
+          relativePath,
+        );
 
         if (this.shouldIgnore(path.basename(fullPath), this.params.ignore)) {
           continue;
@@ -272,7 +274,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       }
 
       // Discover JIT subdirectory context for the listed directory
-      const jitContext = await discoverJitContext(this.config, resolvedDirPath);
+      const jitContext = await discoverJitContext(
+        this.context.config,
+        resolvedDirPath,
+      );
       if (jitContext) {
         resultMessage = appendJitContext(resultMessage, jitContext);
       }
@@ -303,17 +308,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   static readonly Name = LS_TOOL_NAME;
 
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       LSTool.Name,
       'ReadFolder',
       LS_DEFINITION.base.description!,
       Kind.Search,
       LS_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
@@ -328,22 +330,21 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     params: LSToolParams,
   ): string | null {
     const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       params.dir_path,
     );
-    return this.config.validatePathAccess(resolvedPath, 'read');
+    return this.context.config.validatePathAccess(resolvedPath, 'read');
   }
 
   protected createInvocation(
     params: LSToolParams,
-    messageBus: MessageBus,
+    _messageBus?: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<LSToolParams, ToolResult> {
     return new LSToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

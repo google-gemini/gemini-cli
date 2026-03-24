@@ -24,6 +24,7 @@ import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { Storage } from '../config/storage.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
@@ -311,7 +312,10 @@ describe('RipGrepTool', () => {
       },
     } as unknown as Config;
 
-    grepTool = new RipGrepTool(mockConfig, createMockMessageBus());
+    grepTool = new RipGrepTool({
+      config: mockConfig,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
 
     // Create some test files and directories
     await fs.writeFile(
@@ -700,10 +704,10 @@ describe('RipGrepTool', () => {
       );
 
       // Re-initialize tool so FileDiscoveryService loads the new .geminiignore
-      const toolWithIgnore = new RipGrepTool(
-        mockConfig,
-        createMockMessageBus(),
-      );
+      const toolWithIgnore = new RipGrepTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       // Mock ripgrep returning both an ignored file and an allowed file
       mockSpawn.mockImplementation(
@@ -918,10 +922,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const multiDirGrepTool = new RipGrepTool(
-        multiDirConfig,
-        createMockMessageBus(),
-      );
+      const multiDirGrepTool = new RipGrepTool({
+        config: multiDirConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = multiDirGrepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1010,10 +1014,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const multiDirGrepTool = new RipGrepTool(
-        multiDirConfig,
-        createMockMessageBus(),
-      );
+      const multiDirGrepTool = new RipGrepTool({
+        config: multiDirConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       // Search only in the 'sub' directory of the first workspace
       const params: RipGrepToolParams = { pattern: 'world', dir_path: 'sub' };
@@ -1534,10 +1538,10 @@ describe('RipGrepTool', () => {
           return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
         },
       } as unknown as Config;
-      const gitIgnoreDisabledTool = new RipGrepTool(
-        configWithoutGitIgnore,
-        createMockMessageBus(),
-      );
+      const gitIgnoreDisabledTool = new RipGrepTool({
+        config: configWithoutGitIgnore,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       mockSpawn.mockImplementation(
         createMockSpawn({
@@ -1600,10 +1604,10 @@ describe('RipGrepTool', () => {
           return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
         },
       } as unknown as Config;
-      const geminiIgnoreTool = new RipGrepTool(
-        configWithGeminiIgnore,
-        createMockMessageBus(),
-      );
+      const geminiIgnoreTool = new RipGrepTool({
+        config: configWithGeminiIgnore,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       mockSpawn.mockImplementation(
         createMockSpawn({
@@ -1666,10 +1670,10 @@ describe('RipGrepTool', () => {
           return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
         },
       } as unknown as Config;
-      const geminiIgnoreTool = new RipGrepTool(
-        configWithoutGeminiIgnore,
-        createMockMessageBus(),
-      );
+      const geminiIgnoreTool = new RipGrepTool({
+        config: configWithoutGeminiIgnore,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       mockSpawn.mockImplementation(
         createMockSpawn({
@@ -1841,10 +1845,10 @@ describe('RipGrepTool', () => {
         },
       } as unknown as Config;
 
-      const multiDirGrepTool = new RipGrepTool(
-        multiDirConfig,
-        createMockMessageBus(),
-      );
+      const multiDirGrepTool = new RipGrepTool({
+        config: multiDirConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
       const params: RipGrepToolParams = { pattern: 'testPattern' };
       const invocation = multiDirGrepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' within ./");

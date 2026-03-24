@@ -9,6 +9,7 @@ import { EnterPlanModeTool } from './enter-plan-mode.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -27,10 +28,10 @@ describe('EnterPlanModeTool', () => {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
     };
-    tool = new EnterPlanModeTool(
-      mockConfig as Config,
-      mockMessageBus as unknown as MessageBus,
-    );
+    tool = new EnterPlanModeTool({
+      config: mockConfig as Config,
+      messageBus: mockMessageBus as unknown as MessageBus,
+    } as unknown as AgentLoopContext);
   });
 
   afterEach(() => {

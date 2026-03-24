@@ -1284,7 +1284,6 @@ describe('Server Config (config.ts)', () => {
       expect(SubAgentToolMock).toHaveBeenCalledWith(
         expect.anything(), // AgentRegistry
         config,
-        expect.anything(), // MessageBus
       );
 
       const calls = registerToolMock.mock.calls;
@@ -3478,6 +3477,45 @@ describe('ConfigSchema validation', () => {
       expect(context.messageBus).toBe(config.messageBus);
       expect(context.geminiClient).toBe(config.geminiClient);
       expect(context.sandboxManager).toBe(config.sandboxManager);
+    });
+
+    it('should have AgentLoopContext properties as own properties (not getters)', async () => {
+      const config = new Config({
+        targetDir: '/tmp/test',
+        sessionId: 'test-session',
+        debugMode: false,
+        cwd: '/tmp/test',
+        model: 'auto',
+      });
+      // Initializing so that all properties are definitely assigned
+      await config.initialize();
+
+      const properties: Array<keyof AgentLoopContext> = [
+        'config',
+        'promptId',
+        'toolRegistry',
+        'promptRegistry',
+        'resourceRegistry',
+        'messageBus',
+        'geminiClient',
+        'sandboxManager',
+      ];
+
+      for (const prop of properties) {
+        const descriptor = Object.getOwnPropertyDescriptor(config, prop);
+        expect(
+          descriptor,
+          `Property "${prop}" should be an own property`,
+        ).toBeDefined();
+        expect(
+          descriptor?.get,
+          `Property "${prop}" should not be a getter`,
+        ).toBeUndefined();
+        expect(
+          descriptor?.value,
+          `Property "${prop}" should have a value`,
+        ).toBeDefined();
+      }
     });
   });
 });

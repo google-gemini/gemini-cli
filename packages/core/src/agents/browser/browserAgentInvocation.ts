@@ -15,7 +15,6 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Config } from '../../config/config.js';
 import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import { safeJsonToMarkdown } from '../../utils/markdownUtils.js';
@@ -31,7 +30,6 @@ import {
   type SubagentProgress,
   type SubagentActivityItem,
 } from '../types.js';
-import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
@@ -183,21 +181,16 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
   constructor(
     private readonly context: AgentLoopContext,
     params: AgentInputs,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     // Note: BrowserAgentDefinition is a factory function, so we use hardcoded names
     super(
       params,
-      messageBus,
+      context.messageBus,
       _toolName ?? 'browser_agent',
       _toolDisplayName ?? 'Browser Agent',
     );
-  }
-
-  private get config(): Config {
-    return this.context.config;
   }
 
   /**
@@ -267,8 +260,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         : undefined;
 
       const result = await createBrowserAgentDefinition(
-        this.config,
-        this.messageBus,
+        this.context.config,
+        this.context.messageBus,
         printOutput,
       );
       const { definition } = result;

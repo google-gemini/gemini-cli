@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
@@ -19,7 +19,6 @@ import {
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
@@ -37,6 +36,7 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -182,14 +182,13 @@ class GrepToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     private readonly fileDiscoveryService: FileDiscoveryService,
     params: RipGrepToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
@@ -198,8 +197,11 @@ class GrepToolInvocation extends BaseToolInvocation<
       // This forces CWD search instead of 'all workspaces' search by default.
       const pathParam = this.params.dir_path || '.';
 
-      const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
-      const validationError = this.config.validatePathAccess(
+      const searchDirAbs = path.resolve(
+        this.context.config.getTargetDir(),
+        pathParam,
+      );
+      const validationError = this.context.config.validatePathAccess(
         searchDirAbs,
         'read',
       );
@@ -244,7 +246,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const totalMaxMatches =
         this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
-      if (this.config.getDebugMode()) {
+      if (this.context.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
@@ -445,11 +447,11 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
 
     if (!no_ignore) {
-      if (!this.config.getFileFilteringRespectGitIgnore()) {
+      if (!this.context.config.getFileFilteringRespectGitIgnore()) {
         rgArgs.push('--no-ignore-vcs', '--no-ignore-exclude');
       }
 
-      const fileExclusions = new FileExclusions(this.config);
+      const fileExclusions = new FileExclusions(this.context.config);
       const excludes = fileExclusions.getGlobExcludes([
         ...COMMON_DIRECTORY_EXCLUDES,
         '*.log',
@@ -476,7 +478,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
-        sandboxManager: this.config.sandboxManager,
+        sandboxManager: this.context.config.sandboxManager,
       });
 
       let matchesFound = 0;
@@ -569,13 +571,19 @@ class GrepToolInvocation extends BaseToolInvocation<
       description += ` in ${this.params.include_pattern}`;
     }
     const pathParam = this.params.dir_path || '.';
-    const resolvedPath = path.resolve(this.config.getTargetDir(), pathParam);
-    if (resolvedPath === this.config.getTargetDir() || pathParam === '.') {
+    const resolvedPath = path.resolve(
+      this.context.config.getTargetDir(),
+      pathParam,
+    );
+    if (
+      resolvedPath === this.context.config.getTargetDir() ||
+      pathParam === '.'
+    ) {
       description += ` within ./`;
     } else {
       const relativePath = makeRelative(
         resolvedPath,
-        this.config.getTargetDir(),
+        this.context.config.getTargetDir(),
       );
       description += ` within ${shortenPath(relativePath)}`;
     }
@@ -593,23 +601,20 @@ export class RipGrepTool extends BaseDeclarativeTool<
   static readonly Name = GREP_TOOL_NAME;
   private readonly fileDiscoveryService: FileDiscoveryService;
 
-  constructor(
-    private readonly config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       RipGrepTool.Name,
       'SearchText',
       RIP_GREP_DEFINITION.base.description!,
       Kind.Search,
       RIP_GREP_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
     this.fileDiscoveryService = new FileDiscoveryService(
-      config.getTargetDir(),
-      config.getFileFilteringOptions(),
+      context.config.getTargetDir(),
+      context.config.getFileFilteringOptions(),
     );
   }
 
@@ -654,10 +659,10 @@ export class RipGrepTool extends BaseDeclarativeTool<
     // Only validate path if one is provided
     if (params.dir_path) {
       const resolvedPath = path.resolve(
-        this.config.getTargetDir(),
+        this.context.config.getTargetDir(),
         params.dir_path,
       );
-      const validationError = this.config.validatePathAccess(
+      const validationError = this.context.config.validatePathAccess(
         resolvedPath,
         'read',
       );
@@ -684,15 +689,14 @@ export class RipGrepTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: RipGrepToolParams,
-    messageBus: MessageBus,
+    _messageBus?: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<RipGrepToolParams, ToolResult> {
     return new GrepToolInvocation(
-      this.config,
+      this.context,
       this.fileDiscoveryService,
       params,
-      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

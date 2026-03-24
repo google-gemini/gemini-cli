@@ -24,7 +24,7 @@ import type {
 } from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { MEMORY_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
@@ -149,11 +149,11 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
   constructor(
     params: SaveMemoryParams,
-    messageBus: MessageBus,
+    context: AgentLoopContext,
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params, context.messageBus, toolName, displayName);
   }
 
   getDescription(): string {
@@ -276,14 +276,14 @@ export class MemoryTool
 {
   static readonly Name = MEMORY_TOOL_NAME;
 
-  constructor(messageBus: MessageBus) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       MemoryTool.Name,
       'SaveMemory',
       MEMORY_DEFINITION.base.description!,
       Kind.Think,
       MEMORY_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
@@ -301,13 +301,13 @@ export class MemoryTool
 
   protected createInvocation(
     params: SaveMemoryParams,
-    messageBus: MessageBus,
+    _messageBus: unknown, // Deprecated, use this.context
     toolName?: string,
     displayName?: string,
   ) {
     return new MemoryToolInvocation(
       params,
-      messageBus,
+      this.context,
       toolName ?? this.name,
       displayName ?? this.displayName,
     );

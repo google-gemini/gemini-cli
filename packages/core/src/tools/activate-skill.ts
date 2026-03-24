@@ -6,17 +6,17 @@
 
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import {
+import type {
+  ToolConfirmationOutcome,
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  type ToolResult,
-  type ToolCallConfirmationDetails,
   type ToolInvocation,
-  type ToolConfirmationOutcome,
+  type ToolResult,
+  type ToolCallConfirmationDetails
 } from './tools.js';
-import type { Config } from '../config/config.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
 import { ToolErrorType } from './tool-error.js';
 import { getActivateSkillDefinition } from './definitions/coreTools.js';
@@ -39,18 +39,17 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
   private cachedFolderStructure: string | undefined;
 
   constructor(
-    private config: Config,
+    private readonly context: AgentLoopContext,
     params: ActivateSkillToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   getDescription(): string {
     const skillName = this.params.name;
-    const skill = this.config.getSkillManager().getSkill(skillName);
+    const skill = this.context.config.getSkillManager().getSkill(skillName);
     if (skill) {
       return `"${skillName}": ${skill.description}`;
     }
@@ -76,7 +75,7 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     }
 
     const skillName = this.params.name;
-    const skill = this.config.getSkillManager().getSkill(skillName);
+    const skill = this.context.config.getSkillManager().getSkill(skillName);
 
     if (!skill) {
       return false;
@@ -109,7 +108,7 @@ ${folderStructure}`,
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     const skillName = this.params.name;
-    const skillManager = this.config.getSkillManager();
+    const skillManager = this.context.config.getSkillManager();
     const skill = skillManager.getSkill(skillName);
 
     if (!skill) {
@@ -130,7 +129,7 @@ ${folderStructure}`,
 
     // Add the skill's directory to the workspace context so the agent has permission
     // to read its bundled resources.
-    this.config
+    this.context.config
       .getWorkspaceContext()
       .addDirectory(path.dirname(skill.location));
 
@@ -162,11 +161,8 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
 > {
   static readonly Name = ACTIVATE_SKILL_TOOL_NAME;
 
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
-    const skills = config.getSkillManager().getSkills();
+  constructor(private readonly context: AgentLoopContext) {
+    const skills = context.config.getSkillManager().getSkills();
     const skillNames = skills.map((s) => s.name);
     const definition = getActivateSkillDefinition(skillNames);
 
@@ -176,7 +172,7 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
       definition.base.description!,
       Kind.Other,
       definition.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
@@ -184,21 +180,20 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ActivateSkillToolParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ActivateSkillToolParams, ToolResult> {
     return new ActivateSkillToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus,
       _toolName,
       _toolDisplayName ?? 'Activate Skill',
     );
   }
 
   override getSchema(modelId?: string) {
-    const skills = this.config.getSkillManager().getSkills();
+    const skills = this.context.config.getSkillManager().getSkills();
     const skillNames = skills.map((s) => s.name);
     return resolveToolDeclaration(
       getActivateSkillDefinition(skillNames),

@@ -9,6 +9,7 @@ import { BrowserAgentInvocation } from './browserAgentInvocation.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
+import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import {
   type AgentInputs,
   type SubagentProgress,
@@ -46,6 +47,7 @@ describe('BrowserAgentInvocation', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
   let mockParams: AgentInputs;
+  let mockContext: AgentLoopContext;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,6 +72,11 @@ describe('BrowserAgentInvocation', () => {
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
 
+    mockContext = {
+      config: mockConfig,
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext;
+
     mockParams = {
       task: 'Navigate to example.com and click the button',
     };
@@ -81,30 +88,21 @@ describe('BrowserAgentInvocation', () => {
 
   describe('constructor', () => {
     it('should create invocation with params', () => {
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       expect(invocation.params).toEqual(mockParams);
     });
 
     it('should use browser_agent as default tool name', () => {
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       expect(invocation['_toolName']).toBe('browser_agent');
     });
 
     it('should use custom tool name if provided', () => {
       const invocation = new BrowserAgentInvocation(
-        mockConfig,
+        mockContext,
         mockParams,
-        mockMessageBus,
         'custom_name',
         'Custom Display Name',
       );
@@ -116,11 +114,7 @@ describe('BrowserAgentInvocation', () => {
 
   describe('getDescription', () => {
     it('should return description with input summary', () => {
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const description = invocation.getDescription();
 
@@ -133,11 +127,7 @@ describe('BrowserAgentInvocation', () => {
         task: 'A'.repeat(100),
       };
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        longParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, longParams);
 
       const description = invocation.getDescription();
 
@@ -148,11 +138,7 @@ describe('BrowserAgentInvocation', () => {
 
   describe('toolLocations', () => {
     it('should return empty array by default', () => {
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const locations = invocation.toolLocations();
 
@@ -194,11 +180,7 @@ describe('BrowserAgentInvocation', () => {
     });
 
     it('should return result text and call cleanup on success', async () => {
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const controller = new AbortController();
       const updateOutput: (output: ToolLiveOutput) => void = vi.fn();
@@ -213,11 +195,7 @@ describe('BrowserAgentInvocation', () => {
     });
 
     it('should work without updateOutput (fire-and-forget)', async () => {
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const controller = new AbortController();
       // Should not throw even with no updateOutput
@@ -229,11 +207,7 @@ describe('BrowserAgentInvocation', () => {
     it('should return error result when executor throws', async () => {
       mockExecutor.run.mockRejectedValue(new Error('Unexpected crash'));
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const controller = new AbortController();
       const result = await invocation.execute(controller.signal);
@@ -272,11 +246,7 @@ describe('BrowserAgentInvocation', () => {
     it('should emit initial SubagentProgress with running state', async () => {
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       await invocation.execute(new AbortController().signal, updateOutput);
 
@@ -289,11 +259,7 @@ describe('BrowserAgentInvocation', () => {
     it('should emit completed SubagentProgress on success', async () => {
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       await invocation.execute(new AbortController().signal, updateOutput);
 
@@ -308,11 +274,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,
@@ -350,11 +312,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,
@@ -401,11 +359,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,
@@ -445,11 +399,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,
@@ -490,11 +440,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,
@@ -530,11 +476,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,
@@ -573,11 +515,7 @@ describe('BrowserAgentInvocation', () => {
       const { fireActivity } = setupActivityCapture();
       const updateOutput = vi.fn();
 
-      const invocation = new BrowserAgentInvocation(
-        mockConfig,
-        mockParams,
-        mockMessageBus,
-      );
+      const invocation = new BrowserAgentInvocation(mockContext, mockParams);
 
       const executePromise = invocation.execute(
         new AbortController().signal,

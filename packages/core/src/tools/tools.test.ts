@@ -16,6 +16,7 @@ import { ToolErrorType } from './tool-error.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { ReadFileTool } from './read-file.js';
 import { makeFakeConfig } from '../test-utils/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
   constructor(
@@ -250,7 +251,10 @@ describe('Tools Read-Only property', () => {
   it('should have isReadOnly true for ReadFileTool', () => {
     const config = makeFakeConfig();
     const bus = createMockMessageBus();
-    const tool = new ReadFileTool(config, bus);
+    const tool = new ReadFileTool({
+      config,
+      messageBus: bus,
+    } as unknown as AgentLoopContext);
     expect(tool.isReadOnly).toBe(true);
   });
 

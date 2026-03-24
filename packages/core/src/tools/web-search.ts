@@ -73,11 +73,10 @@ class WebSearchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly context: AgentLoopContext,
     params: WebSearchToolParams,
-    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
   }
 
   override getDescription(): string {
@@ -206,17 +205,14 @@ export class WebSearchTool extends BaseDeclarativeTool<
 > {
   static readonly Name = WEB_SEARCH_TOOL_NAME;
 
-  constructor(
-    private readonly context: AgentLoopContext,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       WebSearchTool.Name,
       'GoogleSearch',
       WEB_SEARCH_DEFINITION.base.description!,
       Kind.Search,
       WEB_SEARCH_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
@@ -238,14 +234,13 @@ export class WebSearchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebSearchToolParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<WebSearchToolParams, WebSearchToolResult> {
     return new WebSearchToolInvocation(
       this.context,
       params,
-      messageBus ?? this.messageBus,
       _toolName,
       _toolDisplayName,
     );

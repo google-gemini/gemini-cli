@@ -9,6 +9,8 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import * as Diff from 'diff';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -44,7 +46,6 @@ import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -150,15 +151,14 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   private readonly resolvedPath: string;
 
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: WriteFileToolParams,
-    messageBus: MessageBus,
-    toolName?: string,
-    displayName?: string,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(params, context.messageBus, _toolName, _toolDisplayName);
     this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       this.params.file_path,
     );
   }
@@ -178,7 +178,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   override getDescription(): string {
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
     );
     return `Writing to ${shortenPath(relativePath)}`;
   }
@@ -186,12 +186,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
     const correctedContentResult = await getCorrectedFileContent(
-      this.config,
+      this.context.config,
       this.resolvedPath,
       this.params.content,
       abortSignal,
@@ -205,7 +205,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     const { originalContent, correctedContent } = correctedContentResult;
     const relativePath = makeRelative(
       this.resolvedPath,
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
     );
     const fileName = path.basename(this.resolvedPath);
 
@@ -220,7 +220,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
-      this.config.getIdeMode() && ideClient.isDiffingEnabled()
+      this.context.config.getIdeMode() && ideClient.isDiffingEnabled()
         ? ideClient.openDiff(this.resolvedPath, correctedContent)
         : undefined;
 
@@ -249,7 +249,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(abortSignal: AbortSignal): Promise<ToolResult> {
-    const validationError = this.config.validatePathAccess(this.resolvedPath);
+    const validationError = this.context.config.validatePathAccess(
+      this.resolvedPath,
+    );
     if (validationError) {
       return {
         llmContent: validationError,
@@ -263,7 +265,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
-      this.config,
+      this.context.config,
       this.resolvedPath,
       content,
       abortSignal,
@@ -314,7 +316,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
-      await this.config
+      await this.context.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
 
@@ -371,7 +373,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const operation = isNewFile ? FileOperation.CREATE : FileOperation.UPDATE;
 
       logFileOperation(
-        this.config,
+        this.context.config,
         new FileOperationEvent(
           WRITE_FILE_TOOL_NAME,
           operation,
@@ -394,7 +396,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
       // Discover JIT subdirectory context for the written file path
       const jitContext = await discoverJitContext(
-        this.config,
+        this.context.config,
         this.resolvedPath,
       );
       let llmContent = llmSuccessMessageParts.join(' ');
@@ -428,7 +430,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
 
         // Include stack trace in debug mode for better troubleshooting
-        if (this.config.getDebugMode() && error.stack) {
+        if (this.context.config.getDebugMode() && error.stack) {
           debugLogger.error('Write file error stack:', error.stack);
         }
       } else if (error instanceof Error) {
@@ -458,17 +460,14 @@ export class WriteFileTool
 {
   static readonly Name = WRITE_FILE_TOOL_NAME;
 
-  constructor(
-    private readonly config: Config,
-    messageBus: MessageBus,
-  ) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       WriteFileTool.Name,
       WRITE_FILE_DISPLAY_NAME,
       WRITE_FILE_DEFINITION.base.description!,
       Kind.Edit,
       WRITE_FILE_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
       true,
       false,
     );
@@ -483,9 +482,13 @@ export class WriteFileTool
       return `Missing or empty "file_path"`;
     }
 
-    const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
+    const resolvedPath = path.resolve(
+      this.context.config.getTargetDir(),
+      filePath,
+    );
 
-    const validationError = this.config.validatePathAccess(resolvedPath);
+    const validationError =
+      this.context.config.validatePathAccess(resolvedPath);
     if (validationError) {
       return validationError;
     }
@@ -513,12 +516,11 @@ export class WriteFileTool
 
   protected createInvocation(
     params: WriteFileToolParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
   ): ToolInvocation<WriteFileToolParams, ToolResult> {
     return new WriteFileToolInvocation(
-      this.config,
+      this.context,
       params,
-      messageBus ?? this.messageBus,
       this.name,
       this.displayName,
     );
@@ -535,7 +537,7 @@ export class WriteFileTool
       getFilePath: (params: WriteFileToolParams) => params.file_path,
       getCurrentContent: async (params: WriteFileToolParams) => {
         const correctedContentResult = await getCorrectedFileContent(
-          this.config,
+          this.context.config,
           params.file_path,
           params.content,
           abortSignal,
@@ -544,7 +546,7 @@ export class WriteFileTool
       },
       getProposedContent: async (params: WriteFileToolParams) => {
         const correctedContentResult = await getCorrectedFileContent(
-          this.config,
+          this.context.config,
           params.file_path,
           params.content,
           abortSignal,

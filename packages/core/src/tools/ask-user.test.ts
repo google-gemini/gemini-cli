@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AskUserTool, isCompletedAskUserTool } from './ask-user.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { ASK_USER_DISPLAY_NAME } from './tool-names.js';
@@ -55,7 +56,9 @@ describe('AskUserTool', () => {
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
-    tool = new AskUserTool(mockMessageBus);
+    tool = new AskUserTool({
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext);
   });
 
   it('should have correct metadata', () => {

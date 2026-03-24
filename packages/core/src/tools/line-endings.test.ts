@@ -17,6 +17,7 @@ import { detectLineEnding } from '../utils/textUtils.js';
 import { WriteFileTool } from './write-file.js';
 import { EditTool } from './edit.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -159,7 +160,10 @@ describe('Line Ending Preservation', () => {
     beforeEach(() => {
       const bus = createMockMessageBus();
       getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-      tool = new WriteFileTool(mockConfig, bus);
+      tool = new WriteFileTool({
+        config: mockConfig,
+        messageBus: bus,
+      } as unknown as AgentLoopContext);
     });
 
     it('should preserve CRLF when overwriting an existing file', async () => {
@@ -232,7 +236,10 @@ describe('Line Ending Preservation', () => {
     beforeEach(() => {
       const bus = createMockMessageBus();
       getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-      tool = new EditTool(mockConfig, bus);
+      tool = new EditTool({
+        config: mockConfig,
+        messageBus: bus,
+      } as unknown as AgentLoopContext);
     });
 
     it('should preserve CRLF when editing a file', async () => {

@@ -16,7 +16,7 @@ import {
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -37,11 +37,8 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 > {
   static readonly Name = EXIT_PLAN_MODE_TOOL_NAME;
 
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
-    const plansDir = config.storage.getPlansDir();
+  constructor(private readonly context: AgentLoopContext) {
+    const plansDir = context.config.storage.getPlansDir();
     const definition = getExitPlanModeDefinition(plansDir);
     super(
       ExitPlanModeTool.Name,
@@ -49,7 +46,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
       definition.base.description!,
       Kind.Plan,
       definition.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
 
@@ -62,9 +59,11 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
     // Since validateToolParamValues is synchronous, we use a basic synchronous check
     // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
-    const plansDir = resolveToRealPath(this.config.storage.getPlansDir());
+    const plansDir = resolveToRealPath(
+      this.context.config.storage.getPlansDir(),
+    );
     const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+      this.context.config.getTargetDir(),
       params.plan_path,
     );
 
@@ -79,21 +78,20 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ExitPlanModeParams,
-    messageBus: MessageBus,
+    _messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
   ): ExitPlanModeInvocation {
     return new ExitPlanModeInvocation(
+      this.context,
       params,
-      messageBus,
       toolName,
       toolDisplayName,
-      this.config,
     );
   }
 
   override getSchema(modelId?: string) {
-    const plansDir = this.config.storage.getPlansDir();
+    const plansDir = this.context.config.storage.getPlansDir();
     return resolveToolDeclaration(getExitPlanModeDefinition(plansDir), modelId);
   }
 }
@@ -107,13 +105,12 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
   private planValidationError: string | null = null;
 
   constructor(
+    private readonly context: AgentLoopContext,
     params: ExitPlanModeParams,
-    messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
-    private config: Config,
   ) {
-    super(params, messageBus, toolName, toolDisplayName);
+    super(params, context.messageBus, toolName, toolDisplayName);
   }
 
   override async shouldConfirmExecute(
@@ -123,8 +120,8 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
     const pathError = await validatePlanPath(
       this.params.plan_path,
-      this.config.storage.getPlansDir(),
-      this.config.getTargetDir(),
+      this.context.config.storage.getPlansDir(),
+      this.context.config.getTargetDir(),
     );
     if (pathError) {
       this.planValidationError = pathError;
@@ -182,7 +179,10 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    * Note: Validation is done in validateToolParamValues, so this assumes the path is valid.
    */
   private getResolvedPlanPath(): string {
-    return path.resolve(this.config.getTargetDir(), this.params.plan_path);
+    return path.resolve(
+      this.context.config.getTargetDir(),
+      this.params.plan_path,
+    );
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
@@ -217,10 +217,10 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
         throw new Error(`Unexpected approval mode: ${newMode}`);
       }
 
-      this.config.setApprovalMode(newMode);
-      this.config.setApprovedPlanPath(resolvedPlanPath);
+      this.context.config.setApprovalMode(newMode);
+      this.context.config.setApprovedPlanPath(resolvedPlanPath);
 
-      logPlanExecution(this.config, new PlanExecutionEvent(newMode));
+      logPlanExecution(this.context.config, new PlanExecutionEvent(newMode));
 
       const exitMessage = getPlanModeExitMessage(newMode);
 
@@ -258,7 +258,7 @@ Ask the user for specific feedback on how to improve the plan.`,
    * In non-interactive environments, this defaults to YOLO to allow automated execution.
    */
   private getAllowApprovalMode(): ApprovalMode {
-    if (!this.config.isInteractive()) {
+    if (!this.context.config.isInteractive()) {
       // For non-interactive environment requires minimal user action, exit as YOLO mode for plan implementation.
       return ApprovalMode.YOLO;
     }

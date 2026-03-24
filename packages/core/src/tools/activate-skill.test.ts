@@ -9,6 +9,7 @@ import { ActivateSkillTool } from './activate-skill.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 vi.mock('../utils/getFolderStructure.js', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock folder structure'),
@@ -49,7 +50,10 @@ describe('ActivateSkillTool', () => {
         activateSkill: vi.fn(),
       }),
     } as unknown as Config;
-    tool = new ActivateSkillTool(mockConfig, mockMessageBus);
+    tool = new ActivateSkillTool({
+      config: mockConfig,
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext);
   });
 
   it('should return enhanced description', () => {
@@ -92,7 +96,10 @@ describe('ActivateSkillTool', () => {
     ]);
 
     const params = { name: 'builtin-skill' };
-    const toolWithBuiltin = new ActivateSkillTool(mockConfig, mockMessageBus);
+    const toolWithBuiltin = new ActivateSkillTool({
+      config: mockConfig,
+      messageBus: mockMessageBus,
+    } as unknown as AgentLoopContext);
     const invocation = toolWithBuiltin.build(params);
 
     const details = await (

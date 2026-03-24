@@ -68,6 +68,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { ApprovalMode } from '../policy/types.js';
 import { type Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
@@ -203,7 +204,10 @@ describe('EditTool', () => {
 
     const bus = createMockMessageBus();
     getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
-    tool = new EditTool(mockConfig, bus);
+    tool = new EditTool({
+      config: mockConfig,
+      messageBus: bus,
+    } as unknown as AgentLoopContext);
   });
 
   afterEach(() => {

@@ -24,6 +24,7 @@ import type { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from './tool-error.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   COMMON_IGNORE_PATTERNS,
   DEFAULT_FILE_EXCLUDES,
@@ -132,48 +133,55 @@ describe('ReadManyFilesTool', () => {
         return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
       },
     } as unknown as Config;
-    tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
 
-    mockReadFileFn = mockControl.mockReadFile;
-    mockReadFileFn.mockReset();
+    tool = new ReadManyFilesTool({
+      config: mockConfig,
+      messageBus: createMockMessageBus(),
+    } as unknown as AgentLoopContext);
 
-    mockReadFileFn.mockImplementation(
-      async (filePath: fs.PathLike, options?: Record<string, unknown>) => {
-        const fp =
-          typeof filePath === 'string'
-            ? filePath
-            : (filePath as Buffer).toString();
+    mockReadFileFn = vi
+      .fn()
+      .mockImplementation(
+        async (filePath: fs.PathLike, options?: Record<string, unknown>) => {
+          const fp =
+            typeof filePath === 'string'
+              ? filePath
+              : (filePath as Buffer).toString();
 
-        if (fs.existsSync(fp)) {
-          const originalFs = await vi.importActual<typeof fs>('fs');
-          return originalFs.promises.readFile(fp, options);
-        }
+          if (fs.existsSync(fp)) {
+            const originalFs = await vi.importActual<typeof fs>('fs');
+            return originalFs.promises.readFile(fp, options);
+          }
 
-        if (fp.endsWith('nonexistent-file.txt')) {
+          if (fp.endsWith('nonexistent-file.txt')) {
+            const err = new Error(
+              `ENOENT: no such file or directory, open '${fp}'`,
+            );
+            (err as NodeJS.ErrnoException).code = 'ENOENT';
+            throw err;
+          }
+          if (fp.endsWith('unreadable.txt')) {
+            const err = new Error(`EACCES: permission denied, open '${fp}'`);
+            (err as NodeJS.ErrnoException).code = 'EACCES';
+            throw err;
+          }
+          if (fp.endsWith('.png'))
+            return Buffer.from([
+              0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+            ]); // PNG header
+          if (fp.endsWith('.pdf')) return Buffer.from('%PDF-1.4...'); // PDF start
+          if (fp.endsWith('binary.bin'))
+            return Buffer.from([0x00, 0x01, 0x02, 0x00, 0x03]);
+
           const err = new Error(
-            `ENOENT: no such file or directory, open '${fp}'`,
+            `ENOENT: no such file or directory, open '${fp}' (unmocked path)`,
           );
           (err as NodeJS.ErrnoException).code = 'ENOENT';
           throw err;
-        }
-        if (fp.endsWith('unreadable.txt')) {
-          const err = new Error(`EACCES: permission denied, open '${fp}'`);
-          (err as NodeJS.ErrnoException).code = 'EACCES';
-          throw err;
-        }
-        if (fp.endsWith('.png'))
-          return Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG header
-        if (fp.endsWith('.pdf')) return Buffer.from('%PDF-1.4...'); // PDF start
-        if (fp.endsWith('binary.bin'))
-          return Buffer.from([0x00, 0x01, 0x02, 0x00, 0x03]);
+        },
+      );
 
-        const err = new Error(
-          `ENOENT: no such file or directory, open '${fp}' (unmocked path)`,
-        );
-        (err as NodeJS.ErrnoException).code = 'ENOENT';
-        throw err;
-      },
-    );
+    vi.mocked(mockControl.mockReadFile).mockImplementation(mockReadFileFn);
   });
 
   afterEach(() => {
@@ -569,7 +577,10 @@ describe('ReadManyFilesTool', () => {
           return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
         },
       } as unknown as Config;
-      tool = new ReadManyFilesTool(mockConfig, createMockMessageBus());
+      const tool = new ReadManyFilesTool({
+        config: mockConfig,
+        messageBus: createMockMessageBus(),
+      } as unknown as AgentLoopContext);
 
       fs.writeFileSync(path.join(tempDir1, 'file1.txt'), 'Content1');
       fs.writeFileSync(path.join(tempDir2, 'file2.txt'), 'Content2');
@@ -639,11 +650,7 @@ describe('ReadManyFilesTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       const expectedPath = path.join(tempRootDir, filePath);
       expect(result.llmContent).toEqual([
-        `--- ${expectedPath} ---
-
-Content of receive-detail
-
-`,
+        `--- ${expectedPath} ---\n\nContent of receive-detail\n\n`,
         `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
@@ -658,11 +665,7 @@ Content of receive-detail
       const result = await invocation.execute(new AbortController().signal);
       const expectedPath = path.join(tempRootDir, 'file[1].txt');
       expect(result.llmContent).toEqual([
-        `--- ${expectedPath} ---
-
-Content of file[1]
-
-`,
+        `--- ${expectedPath} ---\n\nContent of file[1]\n\n`,
         `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(

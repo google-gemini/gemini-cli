@@ -14,7 +14,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
 import { ASK_USER_DEFINITION } from './definitions/coreTools.js';
@@ -30,14 +30,14 @@ export class AskUserTool extends BaseDeclarativeTool<
 > {
   static readonly Name = ASK_USER_TOOL_NAME;
 
-  constructor(messageBus: MessageBus) {
+  constructor(private readonly context: AgentLoopContext) {
     super(
       AskUserTool.Name,
       ASK_USER_DISPLAY_NAME,
       ASK_USER_DEFINITION.base.description!,
       Kind.Communicate,
       ASK_USER_DEFINITION.base.parametersJsonSchema,
-      messageBus,
+      context.messageBus,
     );
   }
 
@@ -88,11 +88,16 @@ export class AskUserTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: AskUserParams,
-    messageBus: MessageBus,
+    _messageBus: unknown, // Deprecated, use this.context
     toolName: string,
     toolDisplayName: string,
   ): AskUserInvocation {
-    return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
+    return new AskUserInvocation(
+      params,
+      this.context,
+      toolName,
+      toolDisplayName,
+    );
   }
 
   override async validateBuildAndExecute(
@@ -123,6 +128,15 @@ export class AskUserInvocation extends BaseToolInvocation<
 > {
   private confirmationOutcome: ToolConfirmationOutcome | null = null;
   private userAnswers: { [questionIndex: string]: string } = {};
+
+  constructor(
+    params: AskUserParams,
+    context: AgentLoopContext,
+    toolName: string,
+    toolDisplayName: string,
+  ) {
+    super(params, context.messageBus, toolName, toolDisplayName);
+  }
 
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
