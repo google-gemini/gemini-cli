@@ -2070,6 +2070,16 @@ const SETTINGS_SCHEMA = {
           'Enable dynamic model configuration (definitions, resolutions, and chains) via settings.',
         showInDialog: false,
       },
+      useAgentProtocol: {
+        type: 'boolean',
+        label: 'Use Agent Protocol',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the experimental unified agent for interactive mode.',
+        showInDialog: false,
+      },
       gemmaModelRouter: {
         type: 'object',
         label: 'Gemma Model Router',
