@@ -190,7 +190,7 @@ export const safeLightTheme: ColorsTheme = {
   Foreground: '#1C1C1C',
   Background: '#FFFFFF',
   Comment: '#808080',
-  Gray: '#5F5F5F  ',
+  Gray: '#5F5F5F',
   DarkGray: '#4E4E4E',
 
   LightBlue: '#D7E7FF', // ANSI 189
