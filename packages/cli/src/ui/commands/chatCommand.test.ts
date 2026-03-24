@@ -9,7 +9,11 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
-import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  type GeminiClient,
+  type ChatRecordingService,
+} from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
 import { chatCommand, debugCommand } from './chatCommand.js';
@@ -48,7 +52,7 @@ describe('chatCommand', () => {
   let mockGetHistory: ReturnType<typeof vi.fn>;
 
   const getSubCommand = (
-    name: 'list' | 'save' | 'resume' | 'delete' | 'share',
+    name: 'list' | 'save' | 'resume' | 'delete' | 'share' | 'export',
   ): SlashCommand => {
     const subCommand = chatCommand.subCommands?.find(
       (cmd) => cmd.name === name,
@@ -82,6 +86,7 @@ describe('chatCommand', () => {
           },
           geminiClient: {
             getChat: mockGetChat,
+            getChatRecordingService: vi.fn(),
           } as unknown as GeminiClient,
         },
         logger: {
@@ -104,7 +109,7 @@ describe('chatCommand', () => {
       'Browse auto-saved conversations and manage chat checkpoints',
     );
     expect(chatCommand.autoExecute).toBe(true);
-    expect(chatCommand.subCommands).toHaveLength(6);
+    expect(chatCommand.subCommands).toHaveLength(7);
   });
 
   describe('list subcommand', () => {
@@ -694,68 +699,136 @@ Hi there!`;
       const result = serializeHistoryToMarkdown(history as Content[]);
       expect(result).toBe(expectedMarkdown);
     });
-    describe('debug subcommand', () => {
-      let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
+  });
+
+  describe('debug subcommand', () => {
+    let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockGetLatestApiRequest = vi.fn();
+      if (!mockContext.services.agentContext!.config) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mockContext.services.agentContext!.config as any) = {};
+      }
+      mockContext.services.agentContext!.config.getLatestApiRequest =
+        mockGetLatestApiRequest;
+      vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
+      vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+      mockFs.writeFile.mockClear();
+    });
+
+    it('should return an error if no API request is found', async () => {
+      mockGetLatestApiRequest.mockReturnValue(undefined);
+
+      const result = await debugCommand.action?.(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'No recent API request found to export.',
+      });
+      expect(mockFs.writeFile).not.toHaveBeenCalled();
+    });
+
+    it('should convert and write the API request to a json file', async () => {
+      const mockRequest = {
+        contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+      };
+      mockGetLatestApiRequest.mockReturnValue(mockRequest);
+
+      const result = await debugCommand.action?.(mockContext, '');
+
+      const expectedFilename = 'gcli-request-1234567890.json';
+      const expectedPath = path.join('/project/root', expectedFilename);
+
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        expectedPath,
+        expect.stringContaining('"role": "user"'),
+      );
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Debug API request saved to ${expectedFilename}`,
+      });
+    });
+
+    it('should handle errors during file write', async () => {
+      const mockRequest = { contents: [] };
+      mockGetLatestApiRequest.mockReturnValue(mockRequest);
+      mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+
+      const result = await debugCommand.action?.(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Error saving debug request: Write failed',
+      });
+    });
+
+    describe('export subcommand', () => {
+      let exportCommand: SlashCommand;
+      let mockExportConversation: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
-        mockGetLatestApiRequest = vi.fn();
-        if (!mockContext.services.agentContext!.config) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (mockContext.services.agentContext!.config as any) = {};
-        }
-        mockContext.services.agentContext!.config.getLatestApiRequest =
-          mockGetLatestApiRequest;
+        exportCommand = getSubCommand('export');
+        mockExportConversation = vi.fn().mockResolvedValue(undefined);
         vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
         vi.spyOn(Date, 'now').mockReturnValue(1234567890);
-        mockFs.writeFile.mockClear();
-      });
 
-      it('should return an error if no API request is found', async () => {
-        mockGetLatestApiRequest.mockReturnValue(undefined);
-
-        const result = await debugCommand.action?.(mockContext, '');
-
-        expect(result).toEqual({
-          type: 'message',
-          messageType: 'error',
-          content: 'No recent API request found to export.',
-        });
-        expect(mockFs.writeFile).not.toHaveBeenCalled();
-      });
-
-      it('should convert and write the API request to a json file', async () => {
-        const mockRequest = {
-          contents: [{ role: 'user', parts: [{ text: 'test' }] }],
-        };
-        mockGetLatestApiRequest.mockReturnValue(mockRequest);
-
-        const result = await debugCommand.action?.(mockContext, '');
-
-        const expectedFilename = 'gcli-request-1234567890.json';
-        const expectedPath = path.join('/project/root', expectedFilename);
-
-        expect(mockFs.writeFile).toHaveBeenCalledWith(
-          expectedPath,
-          expect.stringContaining('"role": "user"'),
+        mockContext.services.agentContext!.geminiClient.getChatRecordingService.mockReturnValue(
+          {
+            exportConversation: mockExportConversation,
+          } as unknown as ChatRecordingService,
         );
+      });
+
+      it('should default to a JSON file if no path is provided', async () => {
+        const result = await exportCommand?.action?.(mockContext, '');
+        const expectedFilename = 'gemini-session-1234567890.json';
+        const expectedPath = path.resolve(expectedFilename);
+        expect(mockExportConversation).toHaveBeenCalledWith(expectedPath);
         expect(result).toEqual({
           type: 'message',
           messageType: 'info',
-          content: `Debug API request saved to ${expectedFilename}`,
+          content: `Session exported to ${expectedPath}`,
         });
       });
 
-      it('should handle errors during file write', async () => {
-        const mockRequest = { contents: [] };
-        mockGetLatestApiRequest.mockReturnValue(mockRequest);
-        mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+      it('should export with a provided path', async () => {
+        const filePath = 'my-session.json';
+        const result = await exportCommand?.action?.(mockContext, filePath);
+        const expectedPath = path.resolve(filePath);
+        expect(mockExportConversation).toHaveBeenCalledWith(expectedPath);
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'info',
+          content: `Session exported to ${expectedPath}`,
+        });
+      });
 
-        const result = await debugCommand.action?.(mockContext, '');
-
+      it('should return error if file format is not .json', async () => {
+        const result = await exportCommand?.action?.(mockContext, 'session.md');
+        expect(mockExportConversation).not.toHaveBeenCalled();
         expect(result).toEqual({
           type: 'message',
           messageType: 'error',
-          content: 'Error saving debug request: Write failed',
+          content:
+            'Invalid file format. Only .json is supported for session export.',
+        });
+      });
+
+      it('should handle export errors', async () => {
+        const error = new Error('Export failed');
+        mockExportConversation.mockRejectedValue(error);
+        const result = await exportCommand?.action?.(
+          mockContext,
+          'session.json',
+        );
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: `Error exporting session: ${error.message}`,
         });
       });
     });

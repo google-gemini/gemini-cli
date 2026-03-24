@@ -32,7 +32,11 @@ import {
   ValidationRequiredError,
   type AdminControlsSettings,
   debugLogger,
+  type ConversationRecord,
 } from '@google/gemini-cli-core';
+
+import * as fsPromises from 'node:fs/promises';
+import path from 'node:path';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
@@ -578,7 +582,27 @@ export async function main() {
 
     // Handle --resume flag
     let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
+    if (argv.sessionFile) {
+      try {
+        const filePath = path.resolve(argv.sessionFile);
+        const content = await fsPromises.readFile(filePath, 'utf8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const conversation: ConversationRecord = JSON.parse(content);
+        resumedSessionData = {
+          conversation,
+          filePath,
+        };
+        // Use the existing session ID to continue recording to the same session
+        config.setSessionId(resumedSessionData.conversation.sessionId);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          `Error loading session file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_INPUT_ERROR);
+      }
+    } else if (argv.resume) {
       const sessionSelector = new SessionSelector(config);
       try {
         const result = await sessionSelector.resolveSession(argv.resume);

@@ -590,6 +590,20 @@ export class ChatRecordingService {
   }
 
   /**
+   * Exports the current conversation context to a file.
+   *
+   * @param targetPath The path where the conversation record should be saved.
+   */
+  async exportConversation(targetPath: string): Promise<void> {
+    const conversation = this.readConversation();
+    if (!conversation) {
+      throw new Error('No conversation data available to export');
+    }
+    const content = JSON.stringify(conversation, null, 2);
+    await fs.promises.writeFile(targetPath, content, 'utf8');
+  }
+
+  /**
    * Deletes a session file by sessionId, filename, or basename.
    * Derives an 8-character shortId to find and delete all associated files
    * (parent and subagents).

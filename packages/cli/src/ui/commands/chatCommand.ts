@@ -340,6 +340,55 @@ const shareCommand: SlashCommand = {
   },
 };
 
+const exportCommand: SlashCommand = {
+  name: 'export',
+  description: 'Export the current session context to a JSON file',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    let filePathArg = args.trim();
+    if (!filePathArg) {
+      filePathArg = `gemini-session-${Date.now()}.json`;
+    }
+
+    const filePath = path.resolve(filePathArg);
+    if (!filePath.endsWith('.json')) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Invalid file format. Only .json is supported for session export.',
+      };
+    }
+
+    const recordingService =
+      context.services.agentContext?.geminiClient?.getChatRecordingService();
+    if (!recordingService) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'No chat recording service available to export session.',
+      };
+    }
+
+    try {
+      await recordingService.exportConversation(filePath);
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Session exported to ${filePath}`,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Error exporting session: ${errorMessage}`,
+      };
+    }
+  },
+};
+
 export const debugCommand: SlashCommand = {
   name: 'debug',
   description: 'Export the most recent API request as a JSON payload',
@@ -386,6 +435,7 @@ export const checkpointSubCommands: SlashCommand[] = [
   resumeCheckpointCommand,
   deleteCommand,
   shareCommand,
+  exportCommand,
 ];
 
 const checkpointCompatibilityCommand: SlashCommand = {

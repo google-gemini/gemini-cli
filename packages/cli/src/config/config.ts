@@ -105,6 +105,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  sessionFile?: string;
 }
 
 /**
@@ -251,6 +252,9 @@ export async function parseArguments(
       }
       if (argv['worktree'] && !settings.experimental?.worktrees) {
         return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
+      }
+      if (argv['resume'] && argv['sessionFile']) {
+        return 'Cannot use both --resume (-r) and --session-file together';
       }
       return true;
     });
@@ -442,6 +446,10 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('session-file', {
+          type: 'string',
+          description: 'Resume a session from a specific JSON file.',
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
