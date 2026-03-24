@@ -86,8 +86,8 @@ complete list of built-in tool names, see the
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
-the arguments don't match the pattern, the rule does not apply. To understand
-which argument keys are available for a tool, see the **Parameters** in the
+the arguments don't match the pattern, the rule does not apply. For a list of
+argument keys available for each tool, see the **Parameters** in the
 [Tools reference](./tools.md#available-tools).
 
 ### Decisions
@@ -209,7 +209,7 @@ admin directories. If checks fail, system policies are **ignored**.
 
 ### TOML rule schema
 
-Here is a breakdown of the fields available in a TOML policy rule:
+This section describes the fields available in a TOML policy rule.
 
 For valid built-in `toolName` values and their argument structures (used by
 `argsPattern`), see the [Tools reference](./tools.md#available-tools).
