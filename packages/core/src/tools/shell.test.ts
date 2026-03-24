@@ -346,6 +346,54 @@ describe('ShellTool', () => {
       );
     });
 
+    it('should preserve trailing newlines for heredoc commands on linux', async () => {
+      const invocation = shellTool.build({
+        command: `cat <<EOF
+hello
+EOF
+`,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `{ cat <<EOF
+hello
+EOF
+}; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        { pager: 'cat', sanitizationConfig: {} },
+      );
+    });
+
+    it('should preserve trailing newlines for comment-only commands on linux', async () => {
+      const invocation = shellTool.build({
+        command: `# comment
+`,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `{ # comment
+}; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        { pager: 'cat', sanitizationConfig: {} },
+      );
+    });
+
     it('should handle is_background parameter by calling ShellExecutionService.background', async () => {
       vi.useFakeTimers();
       const invocation = shellTool.build({

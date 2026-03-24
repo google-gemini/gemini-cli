@@ -206,7 +206,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     options?: ExecuteOptions,
   ): Promise<ToolResult> {
     const { shellExecutionConfig, setExecutionIdCallback } = options ?? {};
-    const strippedCommand = stripShellWrapper(this.params.command);
+    const strippedCommand = stripShellWrapper(this.params.command, {
+      preserveTrailingWhitespace: true,
+    });
 
     if (signal.aborted) {
       return {
@@ -236,9 +238,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? strippedCommand
         : (() => {
             // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
-            if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+            let command = strippedCommand;
+            const hasTrailingLineTerminator = /[\r\n]$/.test(command);
+            const endsWithBackgroundOperator = command.trimEnd().endsWith('&');
+            if (!endsWithBackgroundOperator && !hasTrailingLineTerminator) {
+              command += ';';
+            }
+            const closingGroup = hasTrailingLineTerminator ? '}' : ' }';
+            const escapedTempFilePath = escapeShellArg(tempFilePath, 'bash');
+            return `{ ${command}${closingGroup}; __code=$?; pgrep -g 0 >${escapedTempFilePath} 2>&1; exit $__code;`;
           })();
 
       const cwd = this.params.dir_path

@@ -374,6 +374,30 @@ describe('stripShellWrapper', () => {
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
   });
+
+  it('should preserve trailing newlines for wrapped execution commands', () => {
+    expect(
+      stripShellWrapper(`bash -c "cat <<EOF
+text
+EOF
+"`, {
+        preserveTrailingWhitespace: true,
+      }),
+    ).toEqual(`cat <<EOF
+text
+EOF
+`);
+  });
+
+  it('should preserve trailing newlines for wrapped comment-only commands', () => {
+    expect(
+      stripShellWrapper(`bash -c "# comment
+"`, {
+        preserveTrailingWhitespace: true,
+      }),
+    ).toEqual(`# comment
+`);
+  });
 });
 
 describe('escapeShellArg', () => {
