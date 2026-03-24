@@ -154,8 +154,8 @@ export function useCommandCompletion({
         // This prevents email addresses (user@host) from triggering suggestions.
         if (i > 0) {
           const prevChar = codePoints[i - 1];
-          if (prevChar && /[a-zA-Z0-9]/.test(prevChar)) {
-            break; // Preceded by alphanumeric — not a file reference
+          if (prevChar && /\w/.test(prevChar)) {
+            break; // Preceded by word character — not a file reference
           }
         }
 
