@@ -29,7 +29,6 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
@@ -454,7 +453,16 @@ class EditToolInvocation
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
     if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
@@ -732,10 +740,6 @@ class EditToolInvocation
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, abortSignal);
@@ -896,11 +900,36 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
+        // Determine the full content as originally proposed by the AI to ensure accurate diff stats.
+        let fullAiProposedContent = editData.newContent;
+        if (
+          this.params.modified_by_user &&
+          this.params.ai_proposed_content !== undefined
+        ) {
+          try {
+            const aiReplacement = await calculateReplacement(this.config, {
+              params: {
+                ...this.params,
+                new_string: this.params.ai_proposed_content,
+              },
+              currentContent: editData.currentContent ?? '',
+              abortSignal: signal,
+            });
+            fullAiProposedContent = aiReplacement.newContent;
+          } catch (error) {
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            debugLogger.log(`AI replacement fallback: ${errorMsg}`);
+            // Fallback to newContent if speculative calculation fails
+            fullAiProposedContent = editData.newContent;
+          }
+        }
+
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
+          fullAiProposedContent,
           editData.newContent,
-          this.params.new_string,
         );
         displayResult = {
           fileDiff,

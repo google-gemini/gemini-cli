@@ -138,7 +138,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     }
 
     const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -146,7 +146,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       // If policy is allow, auto-approve with default settings and execute.
       this.confirmationOutcome = ToolConfirmationOutcome.ProceedOnce;
       this.approvalPayload = {
@@ -156,7 +156,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       return false;
     }
 
-    // decision is 'ASK_USER'
+    // decision is 'ask_user'
     return {
       type: 'exit_plan_mode',
       title: 'Plan Approval',

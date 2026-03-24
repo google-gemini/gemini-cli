@@ -40,6 +40,13 @@ exports[`<SubagentProgressDisplay /> > renders correctly with file_path 1`] = `
 "
 `;
 
+exports[`<SubagentProgressDisplay /> > renders error tool status correctly 1`] = `
+"Running subagent TestAgent...
+
+x  run_shell_command echo hello
+"
+`;
+
 exports[`<SubagentProgressDisplay /> > renders thought bubbles correctly 1`] = `
 "Running subagent TestAgent...
 
