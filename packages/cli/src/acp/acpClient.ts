@@ -1262,6 +1262,22 @@ export class Session {
             this.debug(`Path ${pathName} resolved to file: ${currentPathSpec}`);
           }
           resolvedSuccessfully = true;
+        } else if (path.isAbsolute(pathName)) {
+          const stats = await fs.stat(absolutePath);
+          this.context.config.getWorkspaceContext().addReadOnlyPath(absolutePath);
+          
+          if (stats.isDirectory()) {
+            currentPathSpec = absolutePath.endsWith('/')
+              ? `${absolutePath}**`
+              : `${absolutePath}/**`;
+            this.debug(
+              `Path ${pathName} is outside root but provided by IDE. Added read-only access to directory, using glob: ${currentPathSpec}`,
+            );
+          } else {
+            currentPathSpec = absolutePath;
+            this.debug(`Path ${pathName} is outside root but provided by IDE. Added read-only access to file: ${currentPathSpec}`);
+          }
+          resolvedSuccessfully = true;
         } else {
           this.debug(
             `Path ${pathName} is outside the project directory. Skipping.`,

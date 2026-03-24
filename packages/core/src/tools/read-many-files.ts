@@ -132,13 +132,6 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    const pathDesc = `using patterns: 
-${this.params.include.join('`, `')}
- (within target directory: 
-${this.config.getTargetDir()}
-) `;
-
-    // Determine the final list of exclusion patterns exactly as in execute method
     const paramExcludes = this.params.exclude || [];
     const paramUseDefaultExcludes = this.params.useDefaultExcludes !== false;
     const finalExclusionPatternsForDescription: string[] =
@@ -156,6 +149,21 @@ ${finalExclusionPatternsForDescription
   )}${finalExclusionPatternsForDescription.length > 2 ? '...`' : '`'}`
         : 'none specified'
     }`;
+
+    // Handle single absolute paths cleanly (e.g. IDE attachments)
+    if (this.params.include.length === 1) {
+      const singlePath = this.params.include[0];
+      // Check if it's absolute and doesn't contain basic glob characters
+      if (path.isAbsolute(singlePath) && !/[*?\[\]{}]/.test(singlePath)) {
+        return `Reading file: \`${singlePath}\`.`;
+      }
+    }
+
+    const pathDesc = `using patterns: 
+${this.params.include.join('`, `')}
+ (within target directory: 
+${this.config.getTargetDir()}
+) `;
 
     return `Will attempt to read and concatenate files ${pathDesc}. ${excludeDesc}. File encoding: ${DEFAULT_ENCODING}. Separator: "${DEFAULT_OUTPUT_SEPARATOR_FORMAT.replace(
       '{filePath}',
