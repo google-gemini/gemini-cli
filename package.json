@@ -102,7 +102,7 @@
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^3.1.1",
     "@vitest/eslint-plugin": "^1.6.13",
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "depcheck": "^1.4.7",
     "domexception": "^4.0.0",
     "esbuild": "^0.27.4",
