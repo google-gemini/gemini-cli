@@ -26,6 +26,7 @@ jobs:
     if: "github.repository == 'google-gemini/gemini-cli'"
     strategy:
       fail-fast: false
+      max-parallel: 10
       matrix:
         model:
           - 'gemini-3.1-pro-preview-customtools'
@@ -63,6 +64,11 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VITEST_RETRY: 0
         run: |
+          # Add jitter to prevent all jobs from hitting API simultaneously
+          SLEEP_TIME=$((RANDOM % 60))
+          echo "Jitter: Sleeping for $SLEEP_TIME seconds..."
+          sleep $SLEEP_TIME
+
           CMD="npm run test:all_evals"
           PATTERN="${TEST_NAME_PATTERN}"
 
