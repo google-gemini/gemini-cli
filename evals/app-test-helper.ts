@@ -79,7 +79,7 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
       }
 
       // Render the app!
-      rig.render();
+      await rig.render();
 
       // Wait for initial ready state
       await rig.waitForIdle();
