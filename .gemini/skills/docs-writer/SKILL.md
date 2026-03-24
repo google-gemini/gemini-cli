@@ -73,10 +73,11 @@ accessible.
 ### Links
 - **Accessibility:** Use descriptive anchor text; avoid "click here." Ensure the
   link makes sense out of context, such as when being read by a screen reader.
-- **Use relative links in docs:** Use relative links in documentation to ensure
-  portability. Use paths relative to the current file's directory (for example,
-  `../tools/` from `docs/cli/`). Do not include the `/docs/` section of a path,
-  but do verify that the resulting relative link exists.
+- **Use relative links in docs:** Use relative links in documentation (`/docs/`)
+  to ensure portability. Use paths relative to the current file's directory
+  (for example, `../tools/` from `docs/cli/`). Do not include the `/docs/`
+  section of a path, but do verify that the resulting relative link exists. This
+  does not apply to meta files such as README.MD and CONTRIBUTING.MD.
 - **When changing headings, check for deep links:** If a user is changing a
   heading, check for deep links to that heading in other pages and update
   accordingly.
