@@ -14,6 +14,7 @@ import {
 import {
   type SandboxPermissions,
   sanitizePaths,
+  GOVERNANCE_FILES,
 } from '../../services/sandboxManager.js';
 
 /**
@@ -76,6 +77,35 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
   if (options.workspaceWrite) {
     profile += `(allow file-write* (subpath (param "WORKSPACE")))\n`;
+  }
+
+  // Add explicit deny rules for governance files in the workspace.
+  // These are added after the workspace allow rule to ensure they take precedence
+  // (Seatbelt evaluates rules in order, later rules win for same path).
+  for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
+    const governanceFile = path.join(workspacePath, GOVERNANCE_FILES[i].path);
+    const realGovernanceFile = tryRealpath(governanceFile);
+
+    // Determine if it should be treated as a directory (subpath) or a file (literal).
+    // .git is generally a directory, while ignore files are literals.
+    let isDirectory = GOVERNANCE_FILES[i].isDirectory;
+    try {
+      if (fs.existsSync(realGovernanceFile)) {
+        isDirectory = fs.lstatSync(realGovernanceFile).isDirectory();
+      }
+    } catch {
+      // Ignore errors, use default guess
+    }
+
+    const ruleType = isDirectory ? 'subpath' : 'literal';
+
+    args.push('-D', `GOVERNANCE_FILE_${i}=${governanceFile}`);
+    profile += `(deny file-write* (${ruleType} (param "GOVERNANCE_FILE_${i}")))\n`;
+
+    if (realGovernanceFile !== governanceFile) {
+      args.push('-D', `REAL_GOVERNANCE_FILE_${i}=${realGovernanceFile}`);
+      profile += `(deny file-write* (${ruleType} (param "REAL_GOVERNANCE_FILE_${i}")))\n`;
+    }
   }
 
   // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
