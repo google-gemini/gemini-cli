@@ -323,7 +323,7 @@ auth:
 ---
 ```
 
-If the agent card advertises an `oauth` security scheme with `authorizationCode`
+If the agent card advertises an `oauth2` security scheme with `authorizationCode`
 flow, the `authorization_url`, `token_url`, and `scopes` are automatically
 discovered. You only need to provide `client_id` (and `client_secret` if
 required).
