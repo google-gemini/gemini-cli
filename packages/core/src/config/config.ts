@@ -1288,18 +1288,15 @@ export class Config implements McpContext, AgentLoopContext {
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
-    if (this.getCheckpointingEnabled()) {
-      await this.getGitService();
-    }
     this._promptRegistry = new PromptRegistry();
     this._resourceRegistry = new ResourceRegistry();
 
     this.agentRegistry = new AgentRegistry(this);
-    await this.agentRegistry.initialize();
+    const agentInitPromise = this.agentRegistry.initialize();
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
 
-    this._toolRegistry = await this.createToolRegistry();
+    this._toolRegistry = await this.createToolRegistry(agentInitPromise);
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
@@ -3157,12 +3154,32 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
-  async createToolRegistry(): Promise<ToolRegistry> {
+  async createToolRegistry(
+    agentInitPromise: Promise<void> = Promise.resolve(),
+  ): Promise<ToolRegistry> {
     const registry = new ToolRegistry(
       this,
       this.messageBus,
       /* isMainRegistry= */ true,
     );
+
+    // 1. Kick off concurrent background checks and external processes
+    const discoverAllToolsPromise = registry.discoverAllTools();
+    const useRipgrepPromise = this.getUseRipgrep()
+      ? canUseRipgrep()
+          .then((res) => ({ useRipgrep: res, errorString: undefined }))
+          .catch((error: unknown) => ({
+            useRipgrep: false,
+            errorString: String(error),
+          }))
+      : Promise.resolve({ useRipgrep: false, errorString: undefined });
+
+    // 2. Synchronize all heavy operations before registering dependent tools
+    const [_, rgResult] = await Promise.all([
+      agentInitPromise,
+      useRipgrepPromise,
+      discoverAllToolsPromise,
+    ]);
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (
@@ -3199,19 +3216,17 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     if (this.getUseRipgrep()) {
-      let useRipgrep = false;
-      let errorString: undefined | string = undefined;
-      try {
-        useRipgrep = await canUseRipgrep();
-      } catch (error: unknown) {
-        errorString = String(error);
-      }
-      if (useRipgrep) {
+      if (rgResult.useRipgrep) {
         maybeRegister(RipGrepTool, () =>
           registry.registerTool(new RipGrepTool(this, this.messageBus)),
         );
       } else {
-        logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
+        if (rgResult.errorString !== undefined) {
+          logRipgrepFallback(
+            this,
+            new RipgrepFallbackEvent(rgResult.errorString),
+          );
+        }
         maybeRegister(GrepTool, () =>
           registry.registerTool(new GrepTool(this, this.messageBus)),
         );
@@ -3291,7 +3306,6 @@ export class Config implements McpContext, AgentLoopContext {
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
 
-    await registry.discoverAllTools();
     registry.sortTools();
     return registry;
   }
