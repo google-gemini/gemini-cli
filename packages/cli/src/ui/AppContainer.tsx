@@ -1424,7 +1424,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setControlsHeight(roundedHeight);
       }
     }
-  }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
+  }, [buffer, terminalWidth, terminalHeight, controlsHeight, isInputActive]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
@@ -1707,6 +1707,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         handleCtrlCPress();
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
+        // If the input field is non-empty, do not exit.
+        if (bufferRef.current.text.length > 0) {
+          return false;
+        }
         handleCtrlDPress();
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
