@@ -12,6 +12,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { Writable } from 'node:stream';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export class UserSimulator {
   private isRunning = false;
@@ -20,6 +21,7 @@ export class UserSimulator {
   private isProcessing = false;
   private interactionsFile: string | null = null;
   private actionHistory: string[] = [];
+  private knowledgeBase = '';
 
   constructor(
     private readonly config: Config,
@@ -30,6 +32,10 @@ export class UserSimulator {
   start() {
     if (!this.config.getSimulateUser()) {
       return;
+    }
+    const sources = (this.config as any).getKnowledgeSources?.() || [];
+    if (sources.length > 0) {
+      this.loadKnowledge(sources);
     }
     this.interactionsFile = `interactions_${Date.now()}.txt`;
     this.isRunning = true;
@@ -43,6 +49,30 @@ export class UserSimulator {
       this.timer = null;
     }
     debugLogger.log('User simulator stopped');
+  }
+
+  private loadKnowledge(paths: string[]) {
+    const loadFromPath = (p: string) => {
+      try {
+        if (!fs.existsSync(p)) return;
+        const stats = fs.statSync(p);
+        if (stats.isFile()) {
+          const content = fs.readFileSync(p, 'utf-8');
+          this.knowledgeBase += `\nFile: ${p}\nContent:\n${content}\n---\n`;
+        } else if (stats.isDirectory()) {
+          const files = fs.readdirSync(p);
+          for (const file of files) {
+            loadFromPath(path.join(p, file));
+          }
+        }
+      } catch (e) {
+        debugLogger.error(`Failed to load knowledge from ${p}`, e);
+      }
+    };
+
+    for (const p of paths) {
+      loadFromPath(p);
+    }
   }
 
   private async tick() {
@@ -91,6 +121,10 @@ export class UserSimulator {
           ? `\nYou have previously taken the following actions (in order):\n${this.actionHistory.map((a, i) => `${i + 1}. ${JSON.stringify(a)}`).join('\n')}\nPay close attention to whether you have already asked for the original goal. If you have already submitted the original goal, DO NOT repeat it verbatim. If the UI shows your typed text but hasn't submitted it yet, just output \\r to press Enter.\n`
           : '';
 
+      const knowledgeInstruction = this.knowledgeBase
+        ? `\nUser Knowledge Base:\nUse this information to answer questions if applicable. If the answer is not here, respond as you normally would.\n${this.knowledgeBase}\n`
+        : '';
+
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Look carefully at the screen and determine the CLI's current state:
 
@@ -114,7 +148,7 @@ CRITICAL RULES:
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
 - RULE 3: Output ONLY the raw characters to send, <WAIT>, or <DONE>.
 - RULE 4: Do NOT output markdown, explanations of your thought process, or quotes.
-${goalInstruction}${historyInstruction}
+${goalInstruction}${historyInstruction}${knowledgeInstruction}
 
 Here is the current terminal screen output:
 

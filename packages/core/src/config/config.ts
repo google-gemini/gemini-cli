@@ -650,6 +650,7 @@ export interface ConfigParameters {
     overageStrategy?: OverageStrategy;
   };
   simulateUser?: boolean;
+  knowledgeSources?: string[];
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -868,6 +869,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
   private readonly simulateUser: boolean;
+  private readonly knowledgeSources: string[];
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
@@ -1098,6 +1100,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
     this.simulateUser = params.simulateUser ?? false;
+    this.knowledgeSources = params.knowledgeSources ?? [];
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -2514,6 +2517,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSimulateUser(): boolean {
     return this.simulateUser;
+  }
+  
+  getKnowledgeSources(): string[] {
+    return this.knowledgeSources;
   }
 
   getAcpMode(): boolean {
