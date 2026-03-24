@@ -9,9 +9,13 @@ import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
-import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { SlicingMaxSizedBox } from '../shared/SlicingMaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, AnsiLine } from '@google/gemini-cli-core';
+import {
+  type AnsiOutput,
+  type AnsiLine,
+  isSubagentProgress,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -20,10 +24,7 @@ import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
-
-// Large threshold to ensure we don't cause performance issues for very large
-// outputs that will get truncated further MaxSizedBox anyway.
-const MAXIMUM_RESULT_DISPLAY_CHARACTERS = 20000;
+import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
@@ -32,6 +33,7 @@ export interface ToolResultDisplayProps {
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
   hasFocus?: boolean;
+  overflowDirection?: 'top' | 'bottom';
 }
 
 interface FileDiffResult {
@@ -46,6 +48,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   renderOutputAsMarkdown = true,
   maxLines,
   hasFocus = false,
+  overflowDirection = 'top',
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -73,177 +76,152 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     [],
   );
 
-  const { truncatedResultDisplay, hiddenLinesCount } = React.useMemo(() => {
-    let hiddenLines = 0;
-    // Only truncate string output if not in alternate buffer mode to ensure
-    // we can scroll through the full output.
-    if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
-      let text = resultDisplay;
-      if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-        text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
-      }
-      if (maxLines) {
-        const hasTrailingNewline = text.endsWith('\n');
-        const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
-        const lines = contentText.split('\n');
-        if (lines.length > maxLines) {
-          // We will have a label from MaxSizedBox. Reserve space for it.
-          const targetLines = Math.max(1, maxLines - 1);
-          hiddenLines = lines.length - targetLines;
-          text =
-            lines.slice(-targetLines).join('\n') +
-            (hasTrailingNewline ? '\n' : '');
-        }
-      }
-      return { truncatedResultDisplay: text, hiddenLinesCount: hiddenLines };
-    }
-
-    if (Array.isArray(resultDisplay) && !isAlternateBuffer && maxLines) {
-      if (resultDisplay.length > maxLines) {
-        // We will have a label from MaxSizedBox. Reserve space for it.
-        const targetLines = Math.max(1, maxLines - 1);
-        return {
-          truncatedResultDisplay: resultDisplay.slice(-targetLines),
-          hiddenLinesCount: resultDisplay.length - targetLines,
-        };
-      }
-    }
-
-    return { truncatedResultDisplay: resultDisplay, hiddenLinesCount: 0 };
-  }, [resultDisplay, isAlternateBuffer, maxLines]);
-
-  if (!truncatedResultDisplay) return null;
+  if (!resultDisplay) return null;
 
   // 1. Early return for background tools (Todos)
-  if (
-    typeof truncatedResultDisplay === 'object' &&
-    'todos' in truncatedResultDisplay
-  ) {
+  if (typeof resultDisplay === 'object' && 'todos' in resultDisplay) {
     // display nothing, as the TodoTray will handle rendering todos
     return null;
   }
 
-  // 2. High-performance path: Virtualized ANSI in interactive mode
-  if (isAlternateBuffer && Array.isArray(truncatedResultDisplay)) {
-    // If availableHeight is undefined, fallback to a safe default to prevents infinite loop
-    // where Container grows -> List renders more -> Container grows.
-    const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-    const listHeight = Math.min(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (truncatedResultDisplay as AnsiOutput).length,
-      limit,
-    );
+  const renderContent = (contentData: string | object | undefined) => {
+    // Check if string content is valid JSON and pretty-print it
+    const prettyJSON =
+      typeof contentData === 'string' ? tryParseJSON(contentData) : null;
+    const formattedJSON = prettyJSON
+      ? JSON.stringify(prettyJSON, null, 2)
+      : null;
 
-    return (
-      <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
-        <ScrollableList
-          width={childWidth}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={truncatedResultDisplay as AnsiOutput}
-          renderItem={renderVirtualizedAnsiLine}
-          estimatedItemHeight={() => 1}
-          keyExtractor={keyExtractor}
-          initialScrollIndex={SCROLL_TO_ITEM_END}
-          hasFocus={hasFocus}
+    let content: React.ReactNode;
+
+    if (formattedJSON) {
+      // Render pretty-printed JSON
+      content = (
+        <Text wrap="wrap" color={theme.text.primary}>
+          {formattedJSON}
+        </Text>
+      );
+    } else if (isSubagentProgress(contentData)) {
+      content = (
+        <SubagentProgressDisplay
+          progress={contentData}
+          terminalWidth={childWidth}
         />
+      );
+    } else if (typeof contentData === 'string' && renderOutputAsMarkdown) {
+      content = (
+        <MarkdownDisplay
+          text={contentData}
+          terminalWidth={childWidth}
+          renderMarkdown={renderMarkdown}
+          isPending={false}
+        />
+      );
+    } else if (typeof contentData === 'string' && !renderOutputAsMarkdown) {
+      content = (
+        <Text wrap="wrap" color={theme.text.primary}>
+          {contentData}
+        </Text>
+      );
+    } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
+      content = (
+        <DiffRenderer
+          diffContent={
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (contentData as FileDiffResult).fileDiff
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          filename={(contentData as FileDiffResult).fileName}
+          availableTerminalHeight={availableHeight}
+          terminalWidth={childWidth}
+        />
+      );
+    } else {
+      const shouldDisableTruncation =
+        isAlternateBuffer ||
+        (availableTerminalHeight === undefined && maxLines === undefined);
+
+      content = (
+        <AnsiOutputText
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          data={contentData as AnsiOutput}
+          availableTerminalHeight={
+            isAlternateBuffer ? undefined : availableHeight
+          }
+          width={childWidth}
+          maxLines={isAlternateBuffer ? undefined : maxLines}
+          disableTruncation={shouldDisableTruncation}
+        />
+      );
+    }
+
+    // Final render based on session mode
+    if (isAlternateBuffer) {
+      return (
+        <Scrollable
+          width={childWidth}
+          maxHeight={maxLines ?? availableHeight}
+          hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
+          scrollToBottom={true}
+          reportOverflow={true}
+        >
+          {content}
+        </Scrollable>
+      );
+    }
+
+    return content;
+  };
+
+  // ASB Mode Handling (Interactive/Fullscreen)
+  if (isAlternateBuffer) {
+    // Virtualized path for large ANSI arrays
+    if (Array.isArray(resultDisplay)) {
+      const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
+      const listHeight = Math.min(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (resultDisplay as AnsiOutput).length,
+        limit,
+      );
+
+      return (
+        <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
+          <ScrollableList
+            width={childWidth}
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            data={resultDisplay as AnsiOutput}
+            renderItem={renderVirtualizedAnsiLine}
+            estimatedItemHeight={() => 1}
+            keyExtractor={keyExtractor}
+            initialScrollIndex={SCROLL_TO_ITEM_END}
+            hasFocus={hasFocus}
+          />
+        </Box>
+      );
+    }
+
+    // Standard path for strings/diffs in ASB
+    return (
+      <Box width={childWidth} flexDirection="column">
+        {renderContent(resultDisplay)}
       </Box>
     );
   }
 
-  // 3. Compute content node for non-virtualized paths
-  // Check if string content is valid JSON and pretty-print it
-  const prettyJSON =
-    typeof truncatedResultDisplay === 'string'
-      ? tryParseJSON(truncatedResultDisplay)
-      : null;
-  const formattedJSON = prettyJSON ? JSON.stringify(prettyJSON, null, 2) : null;
-
-  let content: React.ReactNode;
-
-  if (formattedJSON) {
-    // Render pretty-printed JSON
-    content = (
-      <Text wrap="wrap" color={theme.text.primary}>
-        {formattedJSON}
-      </Text>
-    );
-  } else if (
-    typeof truncatedResultDisplay === 'string' &&
-    renderOutputAsMarkdown
-  ) {
-    content = (
-      <MarkdownDisplay
-        text={truncatedResultDisplay}
-        terminalWidth={childWidth}
-        renderMarkdown={renderMarkdown}
-        isPending={false}
-      />
-    );
-  } else if (
-    typeof truncatedResultDisplay === 'string' &&
-    !renderOutputAsMarkdown
-  ) {
-    content = (
-      <Text wrap="wrap" color={theme.text.primary}>
-        {truncatedResultDisplay}
-      </Text>
-    );
-  } else if (
-    typeof truncatedResultDisplay === 'object' &&
-    'fileDiff' in truncatedResultDisplay
-  ) {
-    content = (
-      <DiffRenderer
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        filename={(truncatedResultDisplay as FileDiffResult).fileName}
-        availableTerminalHeight={availableHeight}
-        terminalWidth={childWidth}
-      />
-    );
-  } else {
-    const shouldDisableTruncation =
-      isAlternateBuffer ||
-      (availableTerminalHeight === undefined && maxLines === undefined);
-
-    content = (
-      <AnsiOutputText
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        data={truncatedResultDisplay as AnsiOutput}
-        availableTerminalHeight={
-          isAlternateBuffer ? undefined : availableHeight
-        }
-        width={childWidth}
-        maxLines={isAlternateBuffer ? undefined : maxLines}
-        disableTruncation={shouldDisableTruncation}
-      />
-    );
-  }
-
-  // 4. Final render based on session mode
-  if (isAlternateBuffer) {
-    return (
-      <Scrollable
-        width={childWidth}
-        maxHeight={maxLines ?? availableHeight}
-        hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
-        scrollToBottom={true}
-      >
-        {content}
-      </Scrollable>
-    );
-  }
-
+  // Standard Mode Handling (History/Scrollback)
+  // We use SlicingMaxSizedBox which includes MaxSizedBox for precision truncation + hidden labels
   return (
     <Box width={childWidth} flexDirection="column">
-      <MaxSizedBox
+      <SlicingMaxSizedBox
+        data={resultDisplay}
+        maxLines={maxLines}
+        isAlternateBuffer={isAlternateBuffer}
         maxHeight={availableHeight}
         maxWidth={childWidth}
-        additionalHiddenLinesCount={hiddenLinesCount}
+        overflowDirection={overflowDirection}
       >
-        {content}
-      </MaxSizedBox>
+        {(truncatedResultDisplay) => renderContent(truncatedResultDisplay)}
+      </SlicingMaxSizedBox>
     </Box>
   );
 };

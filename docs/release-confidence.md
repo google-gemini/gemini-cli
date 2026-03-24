@@ -21,9 +21,13 @@ All workflows in `.github/workflows/ci.yml` must pass on the `main` branch (for
 nightly) or the release branch (for preview/stable).
 
 - **Platforms:** Tests must pass on **Linux and macOS**.
-  - _Note:_ Windows tests currently run with `continue-on-error: true`. While a
-    failure here doesn't block the release technically, it should be
-    investigated.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Windows tests currently run with `continue-on-error: true`. While a
+> failure here doesn't block the release technically, it should be
+> investigated.
+
 - **Checks:**
   - **Linting:** No linting errors (ESLint, Prettier, etc.).
   - **Typechecking:** No TypeScript errors.
@@ -79,8 +83,8 @@ manually run through this checklist.
   - [ ] Verify version: `gemini --version`
 
 - **Authentication:**
-  - [ ] In interactive mode run `/auth` and verify all login flows work:
-    - [ ] Login With Google
+  - [ ] In interactive mode run `/auth` and verify all sign in flows work:
+    - [ ] Sign in with Google
     - [ ] API Key
     - [ ] Vertex AI
 

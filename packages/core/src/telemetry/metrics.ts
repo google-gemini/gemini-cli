@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
-import { diag, metrics, ValueType } from '@opentelemetry/api';
+import {
+  diag,
+  metrics,
+  ValueType,
+  type Attributes,
+  type Meter,
+  type Counter,
+  type Histogram,
+} from '@opentelemetry/api';
 import { SERVICE_NAME } from './constants.js';
 import type { Config } from '../config/config.js';
 import type {
@@ -33,6 +40,7 @@ const INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 const CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 const CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+const NETWORK_RETRY_COUNT = 'gemini_cli.network_retry.count';
 const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
@@ -43,6 +51,8 @@ const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
 const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
 const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
+const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -158,6 +168,16 @@ const COUNTER_DEFINITIONS = {
     valueType: ValueType.INT,
     assign: (c: Counter) => (contentRetryFailureCounter = c),
     attributes: {} as Record<string, never>,
+  },
+  [NETWORK_RETRY_COUNT]: {
+    description: 'Counts network retries.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (networkRetryCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      model: string;
+      attempt: number;
+    },
   },
   [MODEL_ROUTING_FAILURE_COUNT]: {
     description: 'Counts model routing failures.',
@@ -279,6 +299,20 @@ const COUNTER_DEFINITIONS = {
     attributes: {} as {
       source: string;
       model: string;
+    },
+  },
+  [EVENT_ONBOARDING_START]: {
+    description: 'Counts onboarding started',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingStartCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EVENT_ONBOARDING_SUCCESS]: {
+    description: 'Counts onboarding succeeded',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingSuccessCounter = c),
+    attributes: {} as {
+      user_tier?: string;
     },
   },
 } as const;
@@ -603,6 +637,7 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let networkRetryCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
 let modelSlashCommandCallCounter: Counter | undefined;
@@ -621,6 +656,8 @@ let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
 let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
+let onboardingStartCounter: Counter | undefined;
+let onboardingSuccessCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -794,6 +831,31 @@ export function recordLinesChanged(
 // --- New Metric Recording Functions ---
 
 /**
+ * Records a metric for when the Google auth process starts.
+ */
+export function recordOnboardingStart(config: Config): void {
+  if (!onboardingStartCounter || !isMetricsInitialized) return;
+  onboardingStartCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
+}
+
+/**
+ * Records a metric for when the Google auth process ends successfully.
+ */
+export function recordOnboardingSuccess(
+  config: Config,
+  userTier?: string,
+): void {
+  if (!onboardingSuccessCounter || !isMetricsInitialized) return;
+  onboardingSuccessCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...(userTier && { user_tier: userTier }),
+  });
+}
+
+/**
  * Records a metric for when a UI frame flickers.
  */
 export function recordFlickerFrame(config: Config): void {
@@ -839,6 +901,20 @@ export function recordSlowRender(config: Config, renderLatency: number): void {
 export function recordInvalidChunk(config: Config): void {
   if (!invalidChunkCounter || !isMetricsInitialized) return;
   invalidChunkCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+export function recordRetryAttemptMetrics(
+  config: Config,
+  attributes: {
+    model: string;
+    attempt: number;
+  },
+): void {
+  if (!networkRetryCounter || !isMetricsInitialized) return;
+  networkRetryCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
 }
 
 /**

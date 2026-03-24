@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CountTokensResponse,
-  GenerateContentResponse,
-  GenerateContentParameters,
-  CountTokensParameters,
-  EmbedContentResponse,
-  EmbedContentParameters,
+import {
+  GoogleGenAI,
+  type CountTokensResponse,
+  type GenerateContentResponse,
+  type GenerateContentParameters,
+  type CountTokensParameters,
+  type EmbedContentResponse,
+  type EmbedContentParameters,
 } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
+import * as os from 'node:os';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
+import { isCloudShell } from '../ide/detect-ide.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 
@@ -22,6 +24,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
+import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
@@ -59,6 +62,7 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
+  GATEWAY = 'gateway',
 }
 
 /**
@@ -93,12 +97,16 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  baseUrl?: string;
+  customHeaders?: Record<string, string>;
 };
 
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
   apiKey?: string,
+  baseUrl?: string,
+  customHeaders?: Record<string, string>,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
     apiKey ||
@@ -115,6 +123,8 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    baseUrl,
+    customHeaders,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -142,6 +152,13 @@ export async function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
+  if (authType === AuthType.GATEWAY) {
+    contentGeneratorConfig.apiKey = apiKey || 'gateway-placeholder-key';
+    contentGeneratorConfig.vertexai = false;
+
+    return contentGeneratorConfig;
+  }
+
   return contentGeneratorConfig;
 }
 
@@ -163,18 +180,53 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
         config.authType === AuthType.USE_VERTEX_AI ||
         ((await gcConfig.getGemini31Launched?.()) ?? false),
+      false,
+      gcConfig.getHasAccessToPreviewModel?.() ?? true,
+      gcConfig,
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
-    const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;
+    const clientName = gcConfig.getClientName();
+    const surface = determineSurface();
+
+    let userAgent: string;
+    // Use unified format for VS Code traffic.
+    // Note: We don't automatically assume a2a-server is VS Code,
+    // as it could be used by other clients unless the surface explicitly says 'vscode'.
+    if (clientName === 'acp-vscode' || surface === 'vscode') {
+      const osTypeMap: Record<string, string> = {
+        darwin: 'macOS',
+        win32: 'Windows',
+        linux: 'Linux',
+      };
+      const osType = osTypeMap[process.platform] || process.platform;
+      const osVersion = os.release();
+      const arch = process.arch;
+
+      const vscodeVersion = process.env['TERM_PROGRAM_VERSION'] || 'unknown';
+      let hostPath = `VSCode/${vscodeVersion}`;
+      if (isCloudShell()) {
+        const cloudShellVersion =
+          process.env['CLOUD_SHELL_VERSION'] || 'unknown';
+        hostPath += ` > CloudShell/${cloudShellVersion}`;
+      }
+
+      userAgent = `CloudCodeVSCode/${version} (aidev_client; os_type=${osType}; os_version=${osVersion}; arch=${arch}; host_path=${hostPath}; proxy_client=geminicli)`;
+    } else {
+      const userAgentPrefix = clientName
+        ? `GeminiCLI-${clientName}`
+        : 'GeminiCLI';
+      userAgent = `${userAgentPrefix}/${version}/${model} (${process.platform}; ${process.arch}; ${surface})`;
+    }
+
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
     const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
 
     const baseHeaders: Record<string, string> = {
-      ...customHeadersMap,
       'User-Agent': userAgent,
+      ...customHeadersMap,
     };
 
     if (
@@ -203,9 +255,13 @@ export async function createContentGenerator(
 
     if (
       config.authType === AuthType.USE_GEMINI ||
-      config.authType === AuthType.USE_VERTEX_AI
+      config.authType === AuthType.USE_VERTEX_AI ||
+      config.authType === AuthType.GATEWAY
     ) {
       let headers: Record<string, string> = { ...baseHeaders };
+      if (config.customHeaders) {
+        headers = { ...headers, ...config.customHeaders };
+      }
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();
@@ -214,7 +270,26 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      let baseUrl = config.baseUrl;
+      if (!baseUrl) {
+        const envBaseUrl = config.vertexai
+          ? process.env['GOOGLE_VERTEX_BASE_URL']
+          : process.env['GOOGLE_GEMINI_BASE_URL'];
+        if (envBaseUrl) {
+          validateBaseUrl(envBaseUrl);
+          baseUrl = envBaseUrl;
+        }
+      } else {
+        validateBaseUrl(baseUrl);
+      }
+      const httpOptions: {
+        baseUrl?: string;
+        headers: Record<string, string>;
+      } = { headers };
+
+      if (baseUrl) {
+        httpOptions.baseUrl = baseUrl;
+      }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
@@ -234,4 +309,18 @@ export async function createContentGenerator(
   }
 
   return generator;
+}
+
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+export function validateBaseUrl(baseUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
+    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+  }
 }

@@ -79,6 +79,11 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
+import {
+  DEFAULT_MAX_LINES_TEXT_FILE,
+  MAX_LINE_LENGTH_TEXT_FILE,
+  MAX_FILE_SIZE_MB,
+} from '../../../utils/constants.js';
 
 /**
  * Gemini 3 tool set. Initially a copy of the default legacy set.
@@ -86,7 +91,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding ${DEFAULT_MAX_LINES_TEXT_FILE} lines, ${MAX_LINE_LENGTH_TEXT_FILE} characters per line, or ${MAX_FILE_SIZE_MB}MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -513,6 +518,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
 - completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+- blocked: Subtask is blocked and cannot be completed at this time.
 
 
 ## Methodology for using this tool
@@ -579,7 +585,13 @@ The agent did not use the todo list because this task could be completed by a ti
               [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
-                enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+                enum: [
+                  'pending',
+                  'in_progress',
+                  'completed',
+                  'cancelled',
+                  'blocked',
+                ],
               },
             },
             required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
