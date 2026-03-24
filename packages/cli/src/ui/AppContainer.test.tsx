@@ -2157,13 +2157,8 @@ describe('AppContainer State Management', () => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
         pressKey('\x04'); // Ctrl+D
-        // Now count is 2, it should quit.
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
-          '/quit',
-          undefined,
-          undefined,
-          false,
-        );
+        // It should still not quit because buffer is non-empty.
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
         unmount();
       });
 

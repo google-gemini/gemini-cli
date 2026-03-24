@@ -760,6 +760,7 @@ describe('policy.ts', () => {
 
       (mockConfig as unknown as { config: Config }).config = mockConfig;
       const rule = {
+        toolName: '*',
         decision: PolicyDecision.DENY,
         denyMessage: 'Custom Deny',
       };
@@ -826,6 +827,7 @@ describe('Plan Mode Denial Consistency', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN), // Key: Plan Mode
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
       setApprovalMode: vi.fn(),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
