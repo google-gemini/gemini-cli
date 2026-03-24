@@ -518,12 +518,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {(!uiState.slashCommands ||
-        !uiState.isConfigInitialized ||
-        uiState.isResuming) && (
-        <ConfigInitDisplay
-          message={uiState.isResuming ? 'Resuming session...' : undefined}
-        />
+      {uiState.isResuming && (
+        <ConfigInitDisplay message="Resuming session..." />
       )}
 
       {showUiDetails && (
