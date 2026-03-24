@@ -65,6 +65,12 @@ describe('ExtensionManager - Open Plugin Support', () => {
     });
   });
 
+  afterEach(() => {
+    if (fs.existsSync(tempHomeDir)) {
+      fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    }
+  });
+
   it('should discover a plugin with plugin.json', async () => {
     const pluginDir = path.join(userExtensionsDir, 'test-plugin');
     fs.mkdirSync(pluginDir, { recursive: true });
