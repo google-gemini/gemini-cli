@@ -218,7 +218,7 @@ export const useAgentStream = (
                 isClientInitiated: false,
                 originalRequestName: event.name,
               },
-              status: 'executing',
+              status: 'scheduled',
               tool: {
                 displayName: (event._meta?.['displayName'] as string) ?? event.name,
                 isOutputMarkdown: (event._meta?.['isOutputMarkdown'] as boolean) ?? false,
@@ -236,13 +236,27 @@ export const useAgentStream = (
               tc.request.callId === event.requestId
                 ? ({
                     ...tc,
-                    liveOutput: event.displayContent?.[0]?.type === 'text' ? event.displayContent[0].text : undefined,
-                    progressMessage: event.data?.['progressMessage'] as string | undefined,
-                    progress: event.data?.['progress'] as number | undefined,
-                    progressTotal: event.data?.['progressTotal'] as number | undefined,
-                    pid: event.data?.['pid'] as number | undefined,
+                    status: (event.data?.['status'] as any) ?? tc.status,
+                    liveOutput:
+                      event.displayContent?.[0]?.type === 'text'
+                        ? event.displayContent[0].text
+                        : (tc as any).liveOutput,
+                    progressMessage:
+                      (event.data?.['progressMessage'] as string | undefined) ??
+                      (tc as any).progressMessage,
+                    progress:
+                      (event.data?.['progress'] as number | undefined) ??
+                      (tc as any).progress,
+                    progressTotal:
+                      (event.data?.['progressTotal'] as number | undefined) ??
+                      (tc as any).progressTotal,
+                    pid:
+                      (event.data?.['pid'] as number | undefined) ??
+                      (tc as any).pid,
                     invocation: {
-                      getDescription: () => (event._meta?.['description'] as string) ?? (tc as any).invocation?.getDescription(),
+                      getDescription: () =>
+                        (event._meta?.['description'] as string) ??
+                        (tc as any).invocation?.getDescription(),
                     },
                   } as unknown as TrackedToolCall)
                 : tc,
@@ -257,7 +271,11 @@ export const useAgentStream = (
                     ...tc,
                     status: event.isError ? 'error' : 'success',
                     response: {
-                      resultDisplay: event._meta?.['resultDisplay'] ?? (event.displayContent?.[0]?.type === 'text' ? event.displayContent[0].text : undefined),
+                      resultDisplay:
+                        event._meta?.['resultDisplay'] ??
+                        (event.displayContent?.[0]?.type === 'text'
+                          ? event.displayContent[0].text
+                          : undefined),
                       outputFile: event._meta?.['outputFile'] as string | undefined,
                     },
                     responseSubmittedToGemini: true,
