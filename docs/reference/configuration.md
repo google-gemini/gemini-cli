@@ -295,6 +295,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the footer from the UI
   - **Default:** `false`
 
+- **`ui.collapseDrawerDuringApproval`** (boolean):
+  - **Description:** Whether to collapse the UI drawer when a tool is awaiting
+    confirmation.
+  - **Default:** `true`
+
 - **`ui.showMemoryUsage`** (boolean):
   - **Description:** Display memory usage information in the UI
   - **Default:** `false`
@@ -1210,6 +1215,22 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Disable user input on browser window during automation.
   - **Default:** `true`
 
+- **`agents.browser.maxActionsPerTask`** (number):
+  - **Description:** The maximum number of tool calls allowed per browser task.
+    Enforcement is hard: the agent will be terminated when the limit is reached.
+  - **Default:** `100`
+
+- **`agents.browser.confirmSensitiveActions`** (boolean):
+  - **Description:** Require manual confirmation for sensitive browser actions
+    (e.g., fill_form, evaluate_script).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.blockFileUploads`** (boolean):
+  - **Description:** Hard-block file upload requests from the browser agent.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -1525,6 +1546,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
   - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.worktrees`** (boolean):
+  - **Description:** Enable automated Git worktree management for parallel work.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionManagement`** (boolean):

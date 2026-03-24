@@ -657,6 +657,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -1094,7 +1104,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         additionalProperties: {
           type: 'array',
-          ref: 'ModelPolicy',
+          ref: 'ModelPolicyChain',
         },
       },
     },
@@ -1197,6 +1207,36 @@ const SETTINGS_SCHEMA = {
             description:
               'Disable user input on browser window during automation.',
             showInDialog: false,
+          },
+          maxActionsPerTask: {
+            type: 'number',
+            label: 'Max Actions Per Task',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 100,
+            description:
+              'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
+            showInDialog: false,
+          },
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
           },
         },
       },
@@ -1905,6 +1945,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable local and remote subagents.',
         showInDialog: false,
+      },
+      worktrees: {
+        type: 'boolean',
+        label: 'Enable Git Worktrees',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable automated Git worktree management for parallel work.',
+        showInDialog: true,
       },
       extensionManagement: {
         type: 'boolean',
@@ -2986,6 +3036,14 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
           },
         },
       },
+    },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A chain of model policies for fallback behavior.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
     },
   },
   ModelPolicy: {

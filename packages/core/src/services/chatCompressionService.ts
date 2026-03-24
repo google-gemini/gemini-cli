@@ -194,6 +194,7 @@ async function truncateHistoryToBudget(
 
               newParts.unshift({
                 functionResponse: {
+                  // eslint-disable-next-line @typescript-eslint/no-misused-spread
                   ...part.functionResponse,
                   response: { output: truncatedMessage },
                 },
