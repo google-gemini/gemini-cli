@@ -8,20 +8,32 @@ import { MacOsSandboxManager } from './MacOsSandboxManager.js';
 import type { ExecutionPolicy } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 describe('MacOsSandboxManager', () => {
-  const mockWorkspace = '/test/workspace';
-  const mockAllowedPaths = ['/test/allowed'];
+  let mockWorkspace: string;
+  let mockAllowedPaths: string[];
   const mockNetworkAccess = true;
 
-  const mockPolicy: ExecutionPolicy = {
-    allowedPaths: mockAllowedPaths,
-    networkAccess: mockNetworkAccess,
-  };
-
+  let mockPolicy: ExecutionPolicy;
   let manager: MacOsSandboxManager;
 
   beforeEach(() => {
+    mockWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-macos-test-'),
+    );
+    mockAllowedPaths = [
+      path.join(os.tmpdir(), 'gemini-cli-macos-test-allowed'),
+    ];
+    if (!fs.existsSync(mockAllowedPaths[0])) {
+      fs.mkdirSync(mockAllowedPaths[0]);
+    }
+
+    mockPolicy = {
+      allowedPaths: mockAllowedPaths,
+      networkAccess: mockNetworkAccess,
+    };
+
     manager = new MacOsSandboxManager({ workspace: mockWorkspace });
     // Mock realpathSync to just return the path for testing
     vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
@@ -29,6 +41,10 @@ describe('MacOsSandboxManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    fs.rmSync(mockWorkspace, { recursive: true, force: true });
+    if (mockAllowedPaths && mockAllowedPaths[0]) {
+      fs.rmSync(mockAllowedPaths[0], { recursive: true, force: true });
+    }
   });
 
   describe('prepareCommand', () => {
@@ -50,8 +66,19 @@ describe('MacOsSandboxManager', () => {
       expect(profile).not.toContain('(allow network*)');
 
       expect(result.args).toContain('-D');
-      expect(result.args).toContain('WORKSPACE=/test/workspace');
+      expect(result.args).toContain(`WORKSPACE=${mockWorkspace}`);
       expect(result.args).toContain(`TMPDIR=${os.tmpdir()}`);
+
+      // Governance files should be protected
+      expect(profile).toContain(
+        '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+      ); // .gitignore
+      expect(profile).toContain(
+        '(deny file-write* (literal (param "GOVERNANCE_FILE_1")))',
+      ); // .geminiignore
+      expect(profile).toContain(
+        '(deny file-write* (subpath (param "GOVERNANCE_FILE_2")))',
+      ); // .git
     });
 
     it('should allow network when networkAccess is true in policy', async () => {
@@ -134,31 +161,41 @@ describe('MacOsSandboxManager', () => {
     });
 
     it('should resolve parent directories if a file does not exist', async () => {
+      const baseTmpDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-macos-realpath-test-'),
+      );
+      const realPath = path.join(baseTmpDir, 'real_path');
+      const nonexistentFile = path.join(realPath, 'nonexistent.txt');
+
       vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
-        if (p === '/test/symlink/nonexistent.txt') {
+        if (p === nonexistentFile) {
           const error = new Error('ENOENT');
           Object.assign(error, { code: 'ENOENT' });
           throw error;
         }
-        if (p === '/test/symlink') {
-          return '/test/real_path';
+        if (p === realPath) {
+          return path.join(baseTmpDir, 'resolved_path');
         }
         return p as string;
       });
 
-      const dynamicManager = new MacOsSandboxManager({
-        workspace: '/test/symlink/nonexistent.txt',
-      });
-      const dynamicResult = await dynamicManager.prepareCommand({
-        command: 'echo',
-        args: ['hello'],
-        cwd: '/test/symlink/nonexistent.txt',
-        env: {},
-      });
+      try {
+        const dynamicManager = new MacOsSandboxManager({
+          workspace: nonexistentFile,
+        });
+        const dynamicResult = await dynamicManager.prepareCommand({
+          command: 'echo',
+          args: ['hello'],
+          cwd: nonexistentFile,
+          env: {},
+        });
 
-      expect(dynamicResult.args).toContain(
-        'WORKSPACE=/test/real_path/nonexistent.txt',
-      );
+        expect(dynamicResult.args).toContain(
+          `WORKSPACE=${path.join(baseTmpDir, 'resolved_path', 'nonexistent.txt')}`,
+        );
+      } finally {
+        fs.rmSync(baseTmpDir, { recursive: true, force: true });
+      }
     });
 
     it('should throw if realpathSync throws a non-ENOENT error', async () => {
@@ -169,7 +206,7 @@ describe('MacOsSandboxManager', () => {
       });
 
       const errorManager = new MacOsSandboxManager({
-        workspace: '/test/workspace',
+        workspace: mockWorkspace,
       });
       await expect(
         errorManager.prepareCommand({
