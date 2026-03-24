@@ -323,10 +323,10 @@ auth:
 ---
 ```
 
-If the agent card advertises an `oauth2` security scheme with `authorizationCode`
-flow, the `authorization_url`, `token_url`, and `scopes` are automatically
-discovered. You only need to provide `client_id` (and `client_secret` if
-required).
+If the agent card advertises an `oauth2` security scheme with
+`authorizationCode` flow, the `authorization_url`, `token_url`, and `scopes` are
+automatically discovered. You only need to provide `client_id` (and
+`client_secret` if required).
 
 Tokens are persisted to disk and refreshed automatically when they expire.
 
