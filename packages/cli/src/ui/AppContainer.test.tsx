@@ -2690,7 +2690,6 @@ describe('AppContainer State Management', () => {
   describe('Alternate Buffer Toggle (ALT+A)', () => {
     let handleGlobalKeypress: (key: Key) => boolean;
     let mockedUseKeypress: Mock;
-    let rerender: () => void;
     let unmount: () => void;
 
     const setupToggleTest = async (
@@ -2706,31 +2705,18 @@ describe('AppContainer State Management', () => {
         ui: { useAlternateBuffer: isAlternateMode },
       });
 
-      const getTreeForToggle = (settings: LoadedSettings) => (
-        <SettingsContext.Provider value={settings}>
-          <KeypressProvider config={mockConfig}>
-            <OverflowProvider>
-              <AppContainer
-                config={mockConfig}
-                version="1.0.0"
-                initializationResult={mockInitResult}
-              />
-            </OverflowProvider>
-          </KeypressProvider>
-        </SettingsContext.Provider>
+      const renderResult = await act(async () =>
+        renderAppContainer({
+          config: mockConfig,
+          settings: testSettings,
+        }),
       );
 
-      const renderResult = await render(getTreeForToggle(testSettings));
-      await act(async () => {
-        vi.advanceTimersByTime(0);
-      });
-
-      rerender = () => renderResult.rerender(getTreeForToggle(testSettings));
       unmount = renderResult.unmount;
     };
 
-    const pressToggle = () => {
-      act(() => {
+    const pressToggle = async () => {
+      await act(async () => {
         handleGlobalKeypress({
           name: 'a',
           alt: true,
@@ -2741,11 +2727,9 @@ describe('AppContainer State Management', () => {
           sequence: '',
         } as Key);
       });
-      rerender();
     };
 
     beforeEach(() => {
-      vi.useFakeTimers();
       mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
       mockedUseKeypress.mockImplementation(
         (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
@@ -2757,7 +2741,6 @@ describe('AppContainer State Management', () => {
     });
 
     afterEach(() => {
-      vi.useRealTimers();
       vi.restoreAllMocks();
     });
 
@@ -2765,10 +2748,10 @@ describe('AppContainer State Management', () => {
       await setupToggleTest(false, false);
       expect(capturedUIState.isAlternateBuffer).toBe(false);
 
-      pressToggle();
+      await pressToggle();
       expect(capturedUIState.isAlternateBuffer).toBe(true);
 
-      pressToggle();
+      await pressToggle();
       expect(capturedUIState.isAlternateBuffer).toBe(false);
 
       unmount();
@@ -2778,7 +2761,7 @@ describe('AppContainer State Management', () => {
       await setupToggleTest(false, true);
       expect(capturedUIState.isAlternateBuffer).toBe(false);
 
-      pressToggle();
+      await pressToggle();
       expect(capturedUIState.isAlternateBuffer).toBe(false);
 
       unmount();

@@ -237,6 +237,7 @@ describe('<ShellToolMessage />', () => {
               activePtyId: focused ? 1 : 2,
               embeddedShellFocused: focused,
               constrainHeight,
+              isAlternateBuffer: true,
             },
           },
         );
@@ -288,6 +289,7 @@ describe('<ShellToolMessage />', () => {
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
+            isAlternateBuffer: true,
           },
         },
       );
@@ -317,6 +319,7 @@ describe('<ShellToolMessage />', () => {
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
+            isAlternateBuffer: true,
           },
         },
       );

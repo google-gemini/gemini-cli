@@ -144,7 +144,7 @@ describe('Full Terminal Tool Confirmation Snapshot', () => {
 
     const { waitUntilReady, lastFrame, generateSvg, unmount } =
       await renderWithProviders(<App />, {
-        uiState: mockUIState,
+        uiState: { ...mockUIState, isAlternateBuffer: true },
         config: mockConfig,
         settings: createMockSettings({
           merged: {

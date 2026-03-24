@@ -644,24 +644,15 @@ export const renderWithProviders = async (
     );
   }
 
-  const defaultIsAlternateBuffer =
-    typeof config.getUseAlternateBuffer === 'function'
-      ? config.getUseAlternateBuffer()
-      : false;
-
   const baseState: UIState = new Proxy(
     {
       ...baseMockUiState,
-      isAlternateBuffer: defaultIsAlternateBuffer,
       ...providedUiState,
     },
     {
       get(target, prop) {
         if (prop in target) {
           return target[prop as keyof typeof target];
-        }
-        if (prop === 'isAlternateBuffer') {
-          return defaultIsAlternateBuffer;
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but

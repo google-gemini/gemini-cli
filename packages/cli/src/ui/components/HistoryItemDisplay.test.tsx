@@ -85,6 +85,7 @@ describe('<HistoryItemDisplay />', () => {
         {
           config: makeFakeConfig({ useAlternateBuffer }),
           settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          uiState: { isAlternateBuffer: useAlternateBuffer },
         },
       );
       expect(lastFrame()).toMatchSnapshot();
@@ -338,6 +339,7 @@ describe('<HistoryItemDisplay />', () => {
           {
             config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
+            uiState: { isAlternateBuffer: useAlternateBuffer },
           },
         );
         expect(lastFrame()).toMatchSnapshot();
@@ -361,6 +363,7 @@ describe('<HistoryItemDisplay />', () => {
           {
             config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
+            uiState: { isAlternateBuffer: useAlternateBuffer },
           },
         );
         expect(lastFrame()).toMatchSnapshot();
@@ -383,6 +386,7 @@ describe('<HistoryItemDisplay />', () => {
           {
             config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
+            uiState: { isAlternateBuffer: useAlternateBuffer },
           },
         );
         expect(lastFrame()).toMatchSnapshot();
@@ -406,6 +410,7 @@ describe('<HistoryItemDisplay />', () => {
           {
             config: makeFakeConfig({ useAlternateBuffer }),
             settings: createMockSettings({ ui: { useAlternateBuffer } }),
+            uiState: { isAlternateBuffer: useAlternateBuffer },
           },
         );
         expect(lastFrame()).toMatchSnapshot();

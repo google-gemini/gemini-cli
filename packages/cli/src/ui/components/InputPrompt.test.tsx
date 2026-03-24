@@ -3621,6 +3621,7 @@ describe('InputPrompt', () => {
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+          uiState: { isAlternateBuffer: true },
           uiActions,
         },
       );
@@ -3712,6 +3713,7 @@ describe('InputPrompt', () => {
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+          uiState: { isAlternateBuffer: true },
           uiActions,
         },
       );
