@@ -23,79 +23,6 @@ import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
 
 /**
- * DTO for Markdown parsing - represents the structure from frontmatter.
- */
-interface FrontmatterBaseAgentDefinition {
-  name: string;
-  display_name?: string;
-}
-
-interface FrontmatterMCPServerConfig {
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  cwd?: string;
-  url?: string;
-  http_url?: string;
-  headers?: Record<string, string>;
-  tcp?: string;
-  type?: 'sse' | 'http';
-  timeout?: number;
-  trust?: boolean;
-  description?: string;
-  include_tools?: string[];
-  exclude_tools?: string[];
-}
-
-interface FrontmatterLocalAgentDefinition
-  extends FrontmatterBaseAgentDefinition {
-  kind: 'local';
-  description: string;
-  tools?: string[];
-  mcp_servers?: Record<string, FrontmatterMCPServerConfig>;
-  system_prompt: string;
-  model?: string;
-  temperature?: number;
-  max_turns?: number;
-  timeout_mins?: number;
-}
-
-/**
- * Authentication configuration for remote agents in frontmatter format.
- */
-interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http' | 'google-credentials' | 'oauth';
-  // API Key
-  key?: string;
-  name?: string;
-  // HTTP
-  scheme?: string;
-  token?: string;
-  username?: string;
-  password?: string;
-  value?: string;
-  // Google Credentials
-  scopes?: string[];
-  // OAuth2
-  client_id?: string;
-  client_secret?: string;
-  authorization_url?: string;
-  token_url?: string;
-}
-
-interface FrontmatterRemoteAgentDefinition
-  extends FrontmatterBaseAgentDefinition {
-  kind: 'remote';
-  description?: string;
-  agent_card_url: string;
-  auth?: FrontmatterAuthConfig;
-}
-
-type FrontmatterAgentDefinition =
-  | FrontmatterLocalAgentDefinition
-  | FrontmatterRemoteAgentDefinition;
-
-/**
  * Error thrown when an agent definition is invalid or cannot be loaded.
  */
 export class AgentLoadError extends Error {
@@ -160,15 +87,13 @@ const localAgentSchema = z
   })
   .strict();
 
-/**
- * Base fields shared by all auth configs.
- */
+type FrontmatterLocalAgentDefinition = z.infer<typeof localAgentSchema> & {
+  system_prompt: string;
+};
+
+// Base fields shared by all auth configs.
 const baseAuthFields = {};
 
-/**
- * API Key auth schema.
- * Supports sending key in header, query parameter, or cookie.
- */
 const apiKeyAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('apiKey'),
@@ -176,11 +101,6 @@ const apiKeyAuthSchema = z.object({
   name: z.string().optional(),
 });
 
-/**
- * HTTP auth schema (Bearer or Basic).
- * Note: Validation for scheme-specific fields is applied in authConfigSchema
- * since discriminatedUnion doesn't support refined schemas directly.
- */
 const httpAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('http'),
@@ -191,19 +111,12 @@ const httpAuthSchema = z.object({
   value: z.string().min(1).optional(),
 });
 
-/**
- * Google Credentials auth schema.
- */
 const googleCredentialsAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('google-credentials'),
   scopes: z.array(z.string()).optional(),
 });
 
-/**
- * OAuth2 auth schema.
- * authorization_url and token_url can be discovered from the agent card if omitted.
- */
 const oauth2AuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('oauth'),
@@ -223,18 +136,16 @@ const authConfigSchema = z
   ])
   .superRefine((data, ctx) => {
     if (data.type === 'http') {
-      if (data.value) {
-        // Raw mode - only scheme and value are needed
-        return;
-      }
-      if (data.scheme === 'Bearer' && !data.token) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Bearer scheme requires "token"',
-          path: ['token'],
-        });
-      }
-      if (data.scheme === 'Basic') {
+      if (data.value) return;
+      if (data.scheme === 'Bearer') {
+        if (!data.token) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Bearer scheme requires "token"',
+            path: ['token'],
+          });
+        }
+      } else if (data.scheme === 'Basic') {
         if (!data.username) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -249,6 +160,12 @@ const authConfigSchema = z
             path: ['password'],
           });
         }
+      } else {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `HTTP scheme "${data.scheme}" requires "value"`,
+          path: ['value'],
+        });
       }
     }
   });
@@ -291,12 +208,12 @@ const remoteAgentSchema = z.union([
   remoteAgentUrlSchema,
   remoteAgentJsonSchema,
 ]);
-
 type FrontmatterRemoteAgentDefinition = z.infer<typeof remoteAgentSchema>;
 
 type FrontmatterAgentDefinition =
   | FrontmatterLocalAgentDefinition
   | FrontmatterRemoteAgentDefinition;
+
 const agentUnionOptions = [
   { label: 'Local Agent' },
   { label: 'Remote Agent' },
@@ -344,7 +261,6 @@ function formatZodError(
 
   const formatIssues = (issues: z.ZodIssue[], unionPrefix?: string): string[] =>
     issues.flatMap((i) => {
-      // Handle union errors specifically to give better context
       if (i.code === z.ZodIssueCode.invalid_union) {
         return i.unionErrors.flatMap((unionError, index) => {
           const label = unionPrefix
@@ -411,8 +327,7 @@ export async function parseAgentMarkdown(
   } catch (error) {
     throw new AgentLoadError(
       filePath,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      `YAML frontmatter parsing failed: ${(error as Error).message}`,
+      `YAML frontmatter parsing failed: ${getErrorMessage(error)}`,
     );
   }
 
@@ -436,7 +351,7 @@ export async function parseAgentMarkdown(
   if (!result.success) {
     throw new AgentLoadError(
       filePath,
-      `Validation failed: ${formatZodError(result.error, 'Agent Definition')}`,
+      `Validation failed: ${formatZodError(result.error, 'Agent Definition', rawFrontmatter)}`,
     );
   }
 
@@ -451,17 +366,14 @@ export async function parseAgentMarkdown(
     ];
   }
 
-  // Local agent validation
-  // Validate tools
-
   // Construct the local agent definition
-  const agentDef: FrontmatterLocalAgentDefinition = {
-    ...frontmatter,
-    kind: 'local',
-    system_prompt: body.trim(),
-  };
-
-  return [agentDef];
+  return [
+    {
+      ...frontmatter,
+      kind: 'local',
+      system_prompt: body.trim(),
+    },
+  ];
 }
 
 /**
@@ -471,15 +383,9 @@ export async function parseAgentMarkdown(
 function convertFrontmatterAuthToConfig(
   frontmatter: FrontmatterAuthConfig,
 ): A2AAuthConfig {
-  const base = {};
-
   switch (frontmatter.type) {
     case 'apiKey':
-      if (!frontmatter.key) {
-        throw new Error('Internal error: API key missing after validation.');
-      }
       return {
-        ...base,
         type: 'apiKey',
         key: frontmatter.key,
         name: frontmatter.name,
@@ -487,20 +393,13 @@ function convertFrontmatterAuthToConfig(
 
     case 'google-credentials':
       return {
-        ...base,
         type: 'google-credentials',
         scopes: frontmatter.scopes,
       };
 
-    case 'http': {
-      if (!frontmatter.scheme) {
-        throw new Error(
-          'Internal error: HTTP scheme missing after validation.',
-        );
-      }
+    case 'http':
       if (frontmatter.value) {
         return {
-          ...base,
           type: 'http',
           scheme: frontmatter.scheme,
           value: frontmatter.value,
@@ -508,40 +407,27 @@ function convertFrontmatterAuthToConfig(
       }
       switch (frontmatter.scheme) {
         case 'Bearer':
-          if (!frontmatter.token) {
-            throw new Error(
-              'Internal error: Bearer token missing after validation.',
-            );
-          }
+          // Token is required by schema validation
           return {
-            ...base,
             type: 'http',
             scheme: 'Bearer',
-            token: frontmatter.token,
+
+            token: frontmatter.token!,
           };
         case 'Basic':
-          if (!frontmatter.username || !frontmatter.password) {
-            throw new Error(
-              'Internal error: Basic auth credentials missing after validation.',
-            );
-          }
+          // Username/password are required by schema validation
           return {
-            ...base,
             type: 'http',
             scheme: 'Basic',
             username: frontmatter.username!,
             password: frontmatter.password!,
           };
-        default: {
-          // Other IANA schemes without a value should not reach here after validation
+        default:
           throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
-        }
       }
-    }
 
     case 'oauth':
       return {
-        ...base,
         type: 'oauth2',
         client_id: frontmatter.client_id,
         client_secret: frontmatter.client_secret,
@@ -551,8 +437,12 @@ function convertFrontmatterAuthToConfig(
       };
 
     default: {
-      const exhaustive: never = frontmatter.type;
-      throw new Error(`Unknown auth type: ${exhaustive}`);
+      const exhaustive: never = frontmatter;
+      const raw: unknown = exhaustive;
+      if (typeof raw === 'object' && raw !== null && 'type' in raw) {
+        throw new Error(`Unknown auth type: ${String(raw['type'])}`);
+      }
+      throw new Error('Unknown auth type');
     }
   }
 }
@@ -617,7 +507,7 @@ export function markdownToAgentDefinition(
   const modelName = markdown.model || 'inherit';
 
   const mcpServers: Record<string, MCPServerConfig> = {};
-  if (markdown.kind === 'local' && markdown.mcp_servers) {
+  if (markdown.mcp_servers) {
     for (const [name, config] of Object.entries(markdown.mcp_servers)) {
       mcpServers[name] = new MCPServerConfig(
         config.command,
@@ -690,15 +580,13 @@ export async function loadAgentsFromDirectory(
     dirEntries = await fs.readdir(dir, { withFileTypes: true });
   } catch (error) {
     // If directory doesn't exist, just return empty
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return result;
     }
     result.errors.push(
       new AgentLoadError(
         dir,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        `Could not list directory: ${(error as Error).message}`,
+        `Could not list directory: ${getErrorMessage(error)}`,
       ),
     );
     return result;
@@ -728,8 +616,7 @@ export async function loadAgentsFromDirectory(
         result.errors.push(
           new AgentLoadError(
             filePath,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            `Unexpected error: ${(error as Error).message}`,
+            `Unexpected error: ${getErrorMessage(error)}`,
           ),
         );
       }
