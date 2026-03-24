@@ -22,6 +22,7 @@ import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
+  type FileDiff,
 } from '../tools/tools.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -359,7 +360,7 @@ describe('SchedulerStateManager', () => {
       expect(active.confirmationDetails).toEqual(details);
     });
 
-    it('should preserve diff when cancelling an edit tool call', () => {
+    it('should preserve diff and derive stats when cancelling an edit tool call', () => {
       const call = createValidatingCall();
       stateManager.enqueue([call]);
       stateManager.dequeue();
@@ -369,9 +370,9 @@ describe('SchedulerStateManager', () => {
         title: 'Edit',
         fileName: 'test.txt',
         filePath: '/path/to/test.txt',
-        fileDiff: 'diff',
-        originalContent: 'old',
-        newContent: 'new',
+        fileDiff: '@@ -1,1 +1,1 @@\n-old line\n+new line',
+        originalContent: 'old line',
+        newContent: 'new line',
         onConfirm: vi.fn(),
       };
 
@@ -389,13 +390,14 @@ describe('SchedulerStateManager', () => {
 
       const completed = stateManager.completedBatch[0] as CancelledToolCall;
       expect(completed.status).toBe(CoreToolCallStatus.Cancelled);
-      expect(completed.response.resultDisplay).toEqual({
-        fileDiff: 'diff',
-        fileName: 'test.txt',
-        filePath: '/path/to/test.txt',
-        originalContent: 'old',
-        newContent: 'new',
-      });
+      const result = completed.response.resultDisplay as FileDiff;
+      expect(result.fileDiff).toBe(details.fileDiff);
+      expect(result.diffStat).toEqual(
+        expect.objectContaining({
+          model_added_lines: 1,
+          model_removed_lines: 1,
+        }),
+      );
     });
 
     it('should ignore status updates for non-existent callIds', () => {

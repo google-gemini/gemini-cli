@@ -6,6 +6,7 @@
 
 import type { FunctionDeclaration, PartListUnion } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
+import type { GrepMatch } from './grep-utils.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -859,6 +860,51 @@ export interface TodoList {
 
 export type ToolLiveOutput = string | AnsiOutput | SubagentProgress;
 
+export interface StructuredToolResult {
+  summary: string;
+}
+
+export function isStructuredToolResult(
+  obj: unknown,
+): obj is StructuredToolResult {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'summary' in obj &&
+    typeof obj.summary === 'string'
+  );
+}
+
+export const hasSummary = (res: unknown): res is { summary: string } =>
+  isStructuredToolResult(res);
+
+export interface GrepResult extends StructuredToolResult {
+  matches: GrepMatch[];
+  payload?: string;
+}
+
+export interface ListDirectoryResult extends StructuredToolResult {
+  files: string[];
+  payload?: string;
+}
+
+export interface ReadManyFilesResult extends StructuredToolResult {
+  files: string[];
+  skipped?: Array<{ path: string; reason: string }>;
+  include?: string[];
+  excludes?: string[];
+  targetDir?: string;
+  payload?: string;
+}
+
+export const isGrepResult = (res: unknown): res is GrepResult =>
+  isStructuredToolResult(res) && 'matches' in res && Array.isArray(res.matches);
+
+export const isListResult = (
+  res: unknown,
+): res is ListDirectoryResult | ReadManyFilesResult =>
+  isStructuredToolResult(res) && 'files' in res && Array.isArray(res.files);
+
 export type ToolResultDisplay =
   | string
   | FileDiff
@@ -888,6 +934,13 @@ export interface FileDiff {
   isNewFile?: boolean;
 }
 
+export const isFileDiff = (res: unknown): res is FileDiff =>
+  typeof res === 'object' &&
+  res !== null &&
+  'fileDiff' in res &&
+  'fileName' in res &&
+  'filePath' in res;
+
 export interface DiffStat {
   model_added_lines: number;
   model_removed_lines: number;
@@ -913,6 +966,7 @@ export interface ToolEditConfirmationDetails {
   originalContent: string | null;
   newContent: string;
   isModifying?: boolean;
+  diffStat?: DiffStat;
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
