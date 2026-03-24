@@ -281,6 +281,83 @@ describe('oauth2', () => {
       );
     });
 
+    it('should not leak setTimeout or modify process.stdin listeners after successful web auth', async () => {
+      vi.useFakeTimers();
+
+      const initialTimers = vi.getTimerCount();
+      const initialDataListeners = process.stdin.listenerCount('data');
+
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockCode = 'test-code';
+      const mockState = 'test-state';
+      const mockTokens = {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      };
+
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+        getToken: vi.fn().mockResolvedValue({ tokens: mockTokens }),
+        setCredentials: vi.fn(),
+        getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-access-token' }),
+        credentials: mockTokens,
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+      vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
+      vi.mocked(open).mockImplementation(async () => ({ on: vi.fn() }) as never);
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
+      } as unknown as Response);
+
+      let requestCallback!: http.RequestListener<typeof http.IncomingMessage, typeof http.ServerResponse>;
+      let serverListeningCallback: (value: unknown) => void;
+      const serverListeningPromise = new Promise((resolve) => (serverListeningCallback = resolve));
+
+      const mockHttpServer = {
+        listen: vi.fn((port: number, _host: string, callback?: () => void) => {
+          if (callback) callback();
+          serverListeningCallback(undefined);
+        }),
+        close: vi.fn((callback?: () => void) => {
+          if (callback) callback();
+        }),
+        on: vi.fn(),
+        address: () => ({ port: 1234 }),
+      };
+      (http.createServer as Mock).mockImplementation((cb) => {
+        requestCallback = cb as http.RequestListener<typeof http.IncomingMessage, typeof http.ServerResponse>;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      const clientPromise = getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      await serverListeningPromise;
+
+      // Ensure the async flow reaches the Promise.race where stdin listener is added
+      await new Promise(process.nextTick);
+
+      // Ensure stdin was registered
+      expect(process.stdin.listenerCount('data')).toBe(initialDataListeners + 1);
+
+      // Simulate completion
+      requestCallback(
+        { url: `/oauth2callback?code=${mockCode}&state=${mockState}` } as http.IncomingMessage,
+        { writeHead: vi.fn(), end: vi.fn() } as unknown as http.ServerResponse,
+      );
+
+      await clientPromise;
+
+      // Timers should be identical to what they were before (the 5 minute timer should be cleared)
+      expect(vi.getTimerCount()).toBe(initialTimers);
+      
+      // The stream data listener should be cleanly removed.
+      expect(process.stdin.listenerCount('data')).toBe(initialDataListeners);
+      
+      vi.useRealTimers();
+    });
+
     it('should clear credentials file', async () => {
       // Setup initial state with files
       const credsPath = path.join(tempHomeDir, GEMINI_DIR, 'oauth_creds.json');
