@@ -796,21 +796,57 @@ export function getCommandRoots(command: string): string[] {
     .filter(Boolean);
 }
 
-export function stripShellWrapper(command: string): string {
+interface StripShellWrapperOptions {
+  preserveTrailingWhitespace?: boolean;
+}
+
+function stripSurroundingQuotes(
+  command: string,
+  preserveTrailingWhitespace: boolean,
+): string {
+  if (!command) {
+    return command;
+  }
+
+  if (!preserveTrailingWhitespace) {
+    let trimmedCommand = command.trim();
+    if (
+      (trimmedCommand.startsWith('"') && trimmedCommand.endsWith('"')) ||
+      (trimmedCommand.startsWith("'") && trimmedCommand.endsWith("'"))
+    ) {
+      trimmedCommand = trimmedCommand.substring(1, trimmedCommand.length - 1);
+    }
+    return trimmedCommand;
+  }
+
+  const firstChar = command[0];
+  if (firstChar !== '"' && firstChar !== "'") {
+    return command;
+  }
+
+  const trimmedEnd = command.trimEnd();
+  if (!trimmedEnd.endsWith(firstChar)) {
+    return command;
+  }
+
+  return trimmedEnd.substring(1, trimmedEnd.length - 1);
+}
+
+export function stripShellWrapper(
+  command: string,
+  options: StripShellWrapperOptions = {},
+): string {
+  const { preserveTrailingWhitespace = false } = options;
   const pattern =
     /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
-    let newCommand = command.substring(match[0].length).trim();
-    if (
-      (newCommand.startsWith('"') && newCommand.endsWith('"')) ||
-      (newCommand.startsWith("'") && newCommand.endsWith("'"))
-    ) {
-      newCommand = newCommand.substring(1, newCommand.length - 1);
-    }
-    return newCommand;
+    return stripSurroundingQuotes(
+      command.substring(match[0].length),
+      preserveTrailingWhitespace,
+    );
   }
-  return command.trim();
+  return preserveTrailingWhitespace ? command : command.trim();
 }
 
 /**
