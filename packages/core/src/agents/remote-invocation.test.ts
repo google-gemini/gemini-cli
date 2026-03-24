@@ -498,9 +498,7 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(controller.signal);
 
-      // Error is now rendered via returnDisplay instead of raw error
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
-      // expect(result.error?.message).toContain('Operation aborted');
     });
 
     it('should handle errors gracefully', async () => {
@@ -522,7 +520,6 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      // Error is now rendered via returnDisplay instead of raw error
       expect(result.returnDisplay).toMatchObject({
         state: 'error',
         result: expect.stringContaining('Network error'),
@@ -744,7 +741,6 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      // Error is now rendered via returnDisplay instead of raw error
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
         a2aError.userMessage,
@@ -765,7 +761,6 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      // Error is now rendered via returnDisplay instead of raw error
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       expect((result.returnDisplay as SubagentProgress).result).toContain(
         'Error calling remote agent: something unexpected',
@@ -795,7 +790,6 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      // Error is now rendered via returnDisplay instead of raw error
       expect(result.returnDisplay).toMatchObject({ state: 'error' });
       // Should contain both the partial output and the error message
       expect(result.returnDisplay).toMatchObject({
