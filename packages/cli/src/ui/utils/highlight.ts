@@ -74,11 +74,39 @@ export function parseInputForHighlighting(
         tokens.push({ text: text.slice(last, matchIndex), type: 'default' });
       }
 
-      const type = fullMatch.startsWith('/')
+      let type: HighlightToken['type'] = fullMatch.startsWith('/')
         ? 'command'
         : fullMatch.startsWith('@')
           ? 'file'
           : 'paste';
+
+      // If this is a file reference, check if @ is inside a quoted region
+      if (type === 'file') {
+        const textBefore = text.slice(0, matchIndex);
+        let inSingleQuote = false;
+        let inBacktick = false;
+        let escaped = false;
+        for (const char of textBefore) {
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+          if (char === '\\') {
+            escaped = true;
+            continue;
+          }
+          if (char === "'" && !inBacktick) {
+            inSingleQuote = !inSingleQuote;
+          }
+          if (char === '`' && !inSingleQuote) {
+            inBacktick = !inBacktick;
+          }
+        }
+        if (inSingleQuote || inBacktick) {
+          type = 'default';
+        }
+      }
+
       if (type === 'command' && index !== 0) {
         tokens.push({ text: fullMatch, type: 'default' });
       } else {
