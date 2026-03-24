@@ -72,10 +72,45 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 
-  it('should handle adjacent highlights at start', () => {
+  it('should not highlight @ after alphanumeric in adjacent text', () => {
     const text = '/run@file.js';
     expect(parseInputForHighlighting(text, 0)).toEqual([
       { text: '/run', type: 'command' },
+      { text: '@file.js', type: 'default' },
+    ]);
+  });
+
+  it('should not highlight @ inside an unmatched single quote or backtick region', () => {
+    expect(parseInputForHighlighting("say '@file.js", 0)).toEqual([
+      { text: "say '", type: 'default' },
+      { text: '@file.js', type: 'default' },
+    ]);
+    expect(parseInputForHighlighting('say `@file.js', 0)).toEqual([
+      { text: 'say `', type: 'default' },
+      { text: '@file.js', type: 'default' },
+    ]);
+  });
+
+  it('should not highlight @ inside a quoted contraction', () => {
+    expect(parseInputForHighlighting("say 'don't @mention people'", 0)).toEqual(
+      [
+        { text: "say 'don't ", type: 'default' },
+        { text: '@mention', type: 'default' },
+        { text: " people'", type: 'default' },
+      ],
+    );
+  });
+
+  it('should still highlight @ after an apostrophe in plain text', () => {
+    expect(parseInputForHighlighting("don't @file.js", 0)).toEqual([
+      { text: "don't ", type: 'default' },
+      { text: '@file.js', type: 'file' },
+    ]);
+  });
+
+  it('should still highlight @ after a closed quoted literal followed by a word', () => {
+    expect(parseInputForHighlighting("say 'hello'world @file.js", 0)).toEqual([
+      { text: "say 'hello'world ", type: 'default' },
       { text: '@file.js', type: 'file' },
     ]);
   });

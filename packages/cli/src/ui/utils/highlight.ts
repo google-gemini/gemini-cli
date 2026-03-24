@@ -11,7 +11,10 @@ import {
 import { LRUCache } from 'mnemonist';
 import { cpLen, cpSlice } from './textUtils.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
-import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+import {
+  AT_COMMAND_PATH_REGEX_SOURCE,
+  isInsideQuotedRegion,
+} from '../hooks/atCommandProcessor.js';
 
 export type HighlightToken = {
   text: string;
@@ -21,11 +24,10 @@ export type HighlightToken = {
 // Matches slash commands (e.g., /help), @ references (files or MCP resource URIs),
 // and large paste placeholders (e.g., [Pasted Text: 6 lines]).
 //
-// The @ pattern uses the same source as the command processor to ensure consistency.
-// It matches any character except strict delimiters (ASCII whitespace, comma, etc.).
-// This supports URIs like `@file:///example.txt` and filenames with Unicode spaces (like NNBSP).
+// The lookbehind requires @ to NOT be preceded by a word character or backslash,
+// preventing email-like patterns (user@host) from being highlighted as file references.
 const HIGHLIGHT_REGEX = new RegExp(
-  `(^/[a-zA-Z0-9_-]+|(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
+  `(^/[a-zA-Z0-9_-]+|(?<![\\w\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
   'g',
 );
 
@@ -75,11 +77,19 @@ export function parseInputForHighlighting(
         tokens.push({ text: text.slice(last, matchIndex), type: 'default' });
       }
 
-      const type = fullMatch.startsWith('/')
+      let type: HighlightToken['type'] = fullMatch.startsWith('/')
         ? 'command'
         : fullMatch.startsWith('@')
           ? 'file'
           : 'paste';
+
+      // If this is a file reference, check if @ is inside a quoted region
+      if (type === 'file') {
+        if (isInsideQuotedRegion(text, matchIndex)) {
+          type = 'default';
+        }
+      }
+
       if (type === 'command' && index !== 0) {
         tokens.push({ text: fullMatch, type: 'default' });
       } else {

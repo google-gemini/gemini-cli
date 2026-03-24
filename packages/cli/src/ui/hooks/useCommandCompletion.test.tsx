@@ -314,6 +314,82 @@ describe('useCommandCompletion', () => {
         });
       });
 
+      it('should not trigger @ completion inside an unmatched single quote or backtick region', async () => {
+        const { result: singleQuoteResult } =
+          await renderCommandCompletionHook("say '@file");
+
+        await waitFor(() => {
+          expect(singleQuoteResult.current.completionMode).toBe(
+            CompletionMode.IDLE,
+          );
+        });
+
+        const { result: backtickResult } =
+          await renderCommandCompletionHook('say `@file');
+
+        await waitFor(() => {
+          expect(backtickResult.current.completionMode).toBe(
+            CompletionMode.IDLE,
+          );
+        });
+      });
+
+      it('should not trigger @ completion inside a quoted contraction', async () => {
+        const { result } = await renderCommandCompletionHook(
+          "say 'don't @mention",
+        );
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.IDLE);
+        });
+      });
+
+      it('should not trigger @ completion when @ is preceded by an underscore', async () => {
+        const { result } = await renderCommandCompletionHook('my_@file.txt');
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.IDLE);
+        });
+      });
+
+      it('should still trigger @ completion after an apostrophe in plain text', async () => {
+        const { result } = await renderCommandCompletionHook("don't @file.txt");
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.AT);
+          expect(useAtCompletion).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              enabled: true,
+              pattern: 'file.txt',
+            }),
+          );
+        });
+      });
+
+      it('should still trigger @ completion after a closed quoted literal followed by a word', async () => {
+        const { result } = await renderCommandCompletionHook(
+          "say 'hello'world @file.txt",
+        );
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.AT);
+          expect(useAtCompletion).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              enabled: true,
+              pattern: 'file.txt',
+            }),
+          );
+        });
+      });
+
+      it('should not trigger @ completion when @ is escaped with a backslash', async () => {
+        const { result } = await renderCommandCompletionHook('\\@file.txt');
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.IDLE);
+        });
+      });
+
       it.each([
         {
           shellModeActive: false,

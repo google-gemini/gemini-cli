@@ -17,6 +17,7 @@ import {
   handleAtCommand,
   escapeAtSymbols,
   unescapeLiteralAt,
+  escapeAtInQuotedRegions,
 } from './atCommandProcessor.js';
 import {
   FileDiscoveryService,
@@ -1536,5 +1537,394 @@ describe('unescapeLiteralAt', () => {
   it('roundtrips correctly with escapeAtSymbols', () => {
     const input = 'user@example.com and @scope/pkg';
     expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
+  });
+});
+
+describe('escapeAtInQuotedRegions', () => {
+  it('should escape @ inside backtick-quoted strings', () => {
+    expect(escapeAtInQuotedRegions('explain `@decorators` in Python')).toBe(
+      'explain `\\@decorators` in Python',
+    );
+  });
+
+  it('should escape @ inside single-quoted strings', () => {
+    expect(escapeAtInQuotedRegions("explain '@override' in Java")).toBe(
+      "explain '\\@override' in Java",
+    );
+  });
+
+  it('should not escape @ outside of quotes', () => {
+    expect(escapeAtInQuotedRegions('explain @file.py')).toBe(
+      'explain @file.py',
+    );
+  });
+
+  it('should handle mixed quoted and unquoted @', () => {
+    expect(
+      escapeAtInQuotedRegions('read @file.py and explain `@decorators`'),
+    ).toBe('read @file.py and explain `\\@decorators`');
+  });
+
+  it('should handle text with no @ symbols', () => {
+    expect(escapeAtInQuotedRegions('hello world')).toBe('hello world');
+  });
+
+  it('should handle empty string', () => {
+    expect(escapeAtInQuotedRegions('')).toBe('');
+  });
+});
+
+describe('handleAtCommand - email and quote scenarios', () => {
+  let testRootDir: string;
+  let mockConfig: Config;
+  const mockAddItem: Mock<UseHistoryManagerReturn['addItem']> = vi.fn();
+  const mockOnDebugMessage: Mock<(message: string) => void> = vi.fn();
+  let abortController: AbortController;
+
+  async function createTestFile(relativePath: string, contents: string) {
+    const fullPath = path.join(testRootDir, relativePath);
+    await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
+    await fsPromises.writeFile(fullPath, contents);
+    return fullPath;
+  }
+
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+
+    testRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'at-command-email-test-'),
+    );
+
+    abortController = new AbortController();
+
+    const getToolRegistry = vi.fn();
+
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as core.MessageBus;
+
+    mockConfig = {
+      getToolRegistry,
+      getTargetDir: () => testRootDir,
+      isSandboxed: () => false,
+      getExcludeTools: vi.fn(),
+      getFileService: () => new FileDiscoveryService(testRootDir),
+      getFileFilteringRespectGitIgnore: () => true,
+      getFileFilteringRespectGeminiIgnore: () => true,
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      getFileSystemService: () => new StandardFileSystemService(),
+      getEnableRecursiveFileSearch: vi.fn(() => true),
+      getWorkspaceContext: () => ({
+        isPathWithinWorkspace: (p: string) =>
+          p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
+        getDirectories: () => [testRootDir],
+      }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        if (this.interactive && path.isAbsolute(absolutePath)) {
+          return true;
+        }
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+      getMcpServers: () => ({}),
+      getMcpServerCommand: () => undefined,
+      getPromptRegistry: () => ({
+        getPromptsByServer: () => [],
+      }),
+      getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
+      getFileExclusions: () => ({
+        getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+        getDefaultExcludePatterns: () => [],
+        getGlobExcludes: () => [],
+        buildExcludePatterns: () => [],
+        getReadManyFilesExcludes: () => [],
+      }),
+      getUsageStatisticsEnabled: () => false,
+      getEnableExtensionReloading: () => false,
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+      getMcpClientManager: () => ({
+        getClient: () => undefined,
+      }),
+      getMessageBus: () => mockMessageBus,
+    } as unknown as Config;
+
+    const registry = new ToolRegistry(mockConfig, mockMessageBus);
+    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
+    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
+    getToolRegistry.mockReturnValue(registry);
+  });
+
+  afterEach(async () => {
+    abortController.abort();
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
+  });
+
+  it('should pass through query with email address as plain text', async () => {
+    const query = 'send email to user@gmail.com please';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 900,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query when @ is preceded by a word character', async () => {
+    await createTestFile('file.txt', 'should not be read');
+    const query = 'hello@file.txt';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 903,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query when @ is escaped with a backslash', async () => {
+    await createTestFile('file.txt', 'should not be read');
+    const query = '\\@file.txt';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 904,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query with backtick-quoted @ as plain text', async () => {
+    const query = 'explain `@decorators` in Python';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 905,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query with single-quoted @ as plain text', async () => {
+    const query = "explain '@override' in Java";
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 906,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should keep @ literal inside a quoted contraction', async () => {
+    await createTestFile('mention', 'should stay literal');
+    const query = "say 'don't @mention people'";
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 9061,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query with unmatched single-quoted or backtick-quoted @ as plain text', async () => {
+    const singleQuoteQuery = "say '@file.txt";
+
+    const singleQuoteResult = await handleAtCommand({
+      query: singleQuoteQuery,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 907,
+      signal: abortController.signal,
+    });
+
+    expect(singleQuoteResult).toEqual({
+      processedQuery: [{ text: singleQuoteQuery }],
+    });
+
+    const backtickQuery = 'say `@file.txt';
+
+    const backtickResult = await handleAtCommand({
+      query: backtickQuery,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 908,
+      signal: abortController.signal,
+    });
+
+    expect(backtickResult).toEqual({
+      processedQuery: [{ text: backtickQuery }],
+    });
+  });
+
+  it('should preserve quoted literals while still processing a later @file', async () => {
+    const fileContent = 'Referenced file content.';
+    const filePath = await createTestFile('file.txt', fileContent);
+    const relativePath = path.relative(testRootDir, filePath);
+    const query = `explain '@override' and @${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 909,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `explain '@override' and @${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
+  it('should still process @file after an apostrophe in plain text', async () => {
+    const fileContent = 'Referenced file content.';
+    const filePath = await createTestFile('file.txt', fileContent);
+    const relativePath = path.relative(testRootDir, filePath);
+    const query = `don't @${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 910,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `don't @${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
+  it('should still process @file after a closed quoted literal followed by a word', async () => {
+    const fileContent = 'Referenced file content.';
+    const filePath = await createTestFile('file.txt', fileContent);
+    const relativePath = path.relative(testRootDir, filePath);
+    const query = `say 'hello'world @${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 912,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `say 'hello'world @${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
+  it('should recursively resolve extensionless filenames like Dockerfile', async () => {
+    const fileContent = 'FROM node:20';
+    await createTestFile(path.join('nested', 'Dockerfile'), fileContent);
+
+    const result = await handleAtCommand({
+      query: '@Dockerfile',
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 911,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: '@nested/Dockerfile' },
+        { text: '\n--- Content from referenced files ---' },
+        { text: '\nContent from @nested/Dockerfile:\n' },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
   });
 });

@@ -11,6 +11,7 @@ import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { logicalPosToOffset } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+import { isInsideQuotedRegion } from './atCommandProcessor.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
@@ -148,6 +149,22 @@ export function useCommandCompletion({
           break;
         }
       } else if (char === '@') {
+        // Only trigger @ completion if @ is preceded by whitespace,
+        // start of line, or punctuation — not word characters or backslashes.
+        // This prevents email addresses (user@host) and escaped literals (\@file)
+        // from triggering suggestions.
+        if (i > 0) {
+          const prevChar = codePoints[i - 1];
+          if (prevChar && /[\w\\]/.test(prevChar)) {
+            break; // Preceded by word character or backslash — not a file reference
+          }
+        }
+
+        // Check if @ is inside backtick or single-quote quoted region
+        if (isInsideQuotedRegion(currentLine, i)) {
+          break; // Inside a quoted region — treat as literal
+        }
+
         let end = codePoints.length;
         for (let i = cursorCol; i < codePoints.length; i++) {
           if (codePoints[i] === ' ') {

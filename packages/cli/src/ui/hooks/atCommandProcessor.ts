@@ -51,6 +51,126 @@ export function unescapeLiteralAt(text: string): string {
 }
 
 /**
+ * Escapes @ symbols inside quoted regions (backticks and single quotes)
+ * so they are not interpreted as @path commands.
+ * This allows users to write `@decorator` or '@override' without triggering file lookup.
+ *
+ * Note: Double quotes are NOT handled here because AT_COMMAND_PATH_REGEX_SOURCE
+ * uses double quotes for Windows paths with spaces (e.g., @"C:\Program Files\file.txt").
+ */
+export function escapeAtInQuotedRegions(text: string): string {
+  return text.replace(/`(\\.|[^`\\])*`|'(\\.|[^'\\])*'/g, (match) =>
+    match.replace(/@/g, '\\@'),
+  );
+}
+
+function isWordChar(char: string | undefined): boolean {
+  return char !== undefined && /\w/.test(char);
+}
+
+function hasLaterClosingQuoteAfterBoundary(
+  text: string,
+  start: number,
+): boolean {
+  let escaped = false;
+  let sawBoundary = false;
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === "'") {
+      return sawBoundary;
+    }
+    if (!isWordChar(char)) {
+      sawBoundary = true;
+    }
+  }
+
+  return false;
+}
+
+function isQuotedWordApostrophe(text: string, index: number): boolean {
+  const prevChar = index > 0 ? text[index - 1] : undefined;
+  const nextChar = index + 1 < text.length ? text[index + 1] : undefined;
+
+  if (!isWordChar(prevChar) || !isWordChar(nextChar)) {
+    return false;
+  }
+
+  let end = index + 1;
+  while (end < text.length && /[A-Za-z]/.test(text[end])) {
+    end++;
+  }
+
+  const suffix = text.slice(index + 1, end).toLowerCase();
+  return (
+    ['s', 't', 're', 've', 'll', 'd', 'm', 'em'].includes(suffix) ||
+    hasLaterClosingQuoteAfterBoundary(text, index + 1)
+  );
+}
+
+/**
+ * Returns true when the given position is inside an open single-quote or
+ * backtick region. Double quotes are intentionally ignored because @"..."
+ * is a valid Windows-style @path.
+ */
+export function isInsideQuotedRegion(text: string, position: number): boolean {
+  let inSingleQuote = false;
+  let inBacktick = false;
+  let escaped = false;
+
+  for (let i = 0; i < position; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === "'" && !inBacktick) {
+      if (inSingleQuote) {
+        if (isQuotedWordApostrophe(text, i)) {
+          continue;
+        }
+        inSingleQuote = false;
+        continue;
+      }
+
+      const prevChar = i > 0 ? text[i - 1] : undefined;
+      const nextChar = i + 1 < text.length ? text[i + 1] : undefined;
+
+      // Ignore apostrophes in prose like "don't" or "students'".
+      if (
+        isWordChar(prevChar) ||
+        nextChar === undefined ||
+        /\s/.test(nextChar)
+      ) {
+        continue;
+      }
+
+      inSingleQuote = true;
+      continue;
+    }
+    if (char === '`' && !inSingleQuote) {
+      inBacktick = !inBacktick;
+    }
+  }
+
+  return inSingleQuote || inBacktick;
+}
+
+/**
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
@@ -94,8 +214,11 @@ function parseAllAtCommands(
   let lastIndex = 0;
 
   // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
+  // The lookbehind requires @ to NOT be preceded by a word character or backslash.
+  // This prevents email addresses (user@host), concatenated text (hello@file),
+  // and escaped @-references (\\@file) from matching.
   const atCommandRegex = new RegExp(
-    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `(?<![\\w\\\\])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 
@@ -104,6 +227,10 @@ function parseAllAtCommands(
   while ((match = atCommandRegex.exec(query)) !== null) {
     const matchIndex = match.index;
     const fullMatch = match[0];
+
+    if (isInsideQuotedRegion(query, matchIndex)) {
+      continue;
+    }
 
     // Add text before @
     if (matchIndex > lastIndex) {
@@ -122,7 +249,7 @@ function parseAllAtCommands(
     lastIndex = matchIndex + fullMatch.length;
   }
 
-  // Add remaining text
+  // Add remaining text (use original query for text content, not preprocessed)
   if (lastIndex < query.length) {
     parts.push({
       type: 'text',
@@ -299,14 +426,24 @@ async function resolveFilePaths(
         break;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
+          const looksLikePath =
+            pathName.includes('/') ||
+            pathName.includes('.') ||
+            pathName.startsWith('~');
+          const globPattern = looksLikePath
+            ? `**/*${pathName}*`
+            : `**/${pathName}`;
+
           if (config.getEnableRecursiveFileSearch() && globTool) {
             onDebugMessage(
-              `Path ${pathName} not found directly, attempting glob search.`,
+              looksLikePath
+                ? `Path ${pathName} not found directly, attempting glob search.`
+                : `Path ${pathName} not found directly, attempting exact-name glob search.`,
             );
             try {
               const globResult = await globTool.buildAndExecute(
                 {
-                  pattern: `**/*${pathName}*`,
+                  pattern: globPattern,
                   path: dir,
                 },
                 signal,
@@ -334,12 +471,12 @@ async function resolveFilePaths(
                   break;
                 } else {
                   onDebugMessage(
-                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                    `Glob search for '${globPattern}' did not return a usable path. Path ${pathName} will be skipped.`,
                   );
                 }
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                  `Glob search for '${globPattern}' found no files or an error. Path ${pathName} will be skipped.`,
                 );
               }
             } catch (globError) {

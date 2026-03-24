@@ -170,16 +170,45 @@ describe('commandUtils', () => {
       expect(isAtCommand('   @file')).toBe(true);
     });
 
-    it('should return true when @ is preceded by non-whitespace (external editor scenario)', () => {
+    it('should return true when @ is preceded by punctuation (external editor scenario)', () => {
       // When a user composes a prompt in an external editor, @-references may
       // appear after punctuation characters such as ':' or '(' without a space.
       // The processor must still recognise these as @-commands so that the
       // referenced files are pre-loaded before the query is sent to the model.
       expect(isAtCommand('check:@file.py')).toBe(true);
       expect(isAtCommand('analyze(@file.py)')).toBe(true);
-      expect(isAtCommand('hello@file')).toBe(true);
-      expect(isAtCommand('text@path/to/file')).toBe(true);
-      expect(isAtCommand('user@host')).toBe(true);
+    });
+
+    it('should return false when @ is preceded by alphanumeric characters', () => {
+      // Email-like patterns and concatenated text should NOT trigger file lookup.
+      expect(isAtCommand('hello@file')).toBe(false);
+      expect(isAtCommand('text@path/to/file')).toBe(false);
+      expect(isAtCommand('user@host')).toBe(false);
+      expect(isAtCommand('user@gmail.com')).toBe(false);
+    });
+
+    it('should return false when @ is inside backtick or single quotes', () => {
+      expect(isAtCommand('explain `@decorators` in Python')).toBe(false);
+      expect(isAtCommand("explain '@override' in Java")).toBe(false);
+      expect(isAtCommand("say 'don't @mention people'")).toBe(false);
+    });
+
+    it('should return false when @ is inside an unmatched single quote or backtick region', () => {
+      expect(isAtCommand("say '@file")).toBe(false);
+      expect(isAtCommand('say `@file')).toBe(false);
+    });
+
+    it('should return true when @ is outside quotes even if quotes exist', () => {
+      expect(isAtCommand('explain `something` @file.py')).toBe(true);
+    });
+
+    it('should return true when an apostrophe in prose appears before @', () => {
+      expect(isAtCommand("don't @file.txt")).toBe(true);
+      expect(isAtCommand("it's @README")).toBe(true);
+    });
+
+    it('should return true when a closed quoted literal is followed by a word before @', () => {
+      expect(isAtCommand("say 'hello'world @file.txt")).toBe(true);
     });
 
     it('should return false when query does not contain any @<path> pattern', () => {
@@ -198,7 +227,9 @@ describe('commandUtils', () => {
       expect(isAtCommand('Please review:\n@src/main.py\nand fix bugs.')).toBe(
         true,
       );
-      // @file after a colon on the same line.
+      // @file after a comma on the same line.
+      expect(isAtCommand('Files: @src/a.py, @src/b.py')).toBe(true);
+      // @file after punctuation without spaces (colon, comma are in the allowed set).
       expect(isAtCommand('Files:@src/a.py,@src/b.py')).toBe(true);
     });
   });
