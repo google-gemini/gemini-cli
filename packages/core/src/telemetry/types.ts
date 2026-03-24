@@ -44,7 +44,6 @@ import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 import { LlmRole } from './llmRole.js';
 export { LlmRole };
 import type { HookType } from '../hooks/types.js';
-import type { UserTierId } from '../code_assist/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -2388,10 +2387,10 @@ export const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
 export class OnboardingSuccessEvent implements BaseTelemetryEvent {
   'event.name': 'onboarding_success';
   'event.timestamp': string;
-  userTier?: UserTierId;
+  userTier?: string;
   duration_ms?: number;
 
-  constructor(userTier?: UserTierId, duration_ms?: number) {
+  constructor(userTier?: string, duration_ms?: number) {
     this['event.name'] = 'onboarding_success';
     this['event.timestamp'] = new Date().toISOString();
     this.userTier = userTier;

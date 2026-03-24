@@ -257,7 +257,7 @@ describe('setupUser', () => {
         expect.any(OnboardingSuccessEvent),
       );
       const event = vi.mocked(logOnboardingSuccess).mock.calls[0][1];
-      expect(event.userTier).toBe(UserTierId.STANDARD);
+      expect(event.userTier).toBe('paid');
       expect(event.duration_ms).toBeGreaterThanOrEqual(1500);
     });
 

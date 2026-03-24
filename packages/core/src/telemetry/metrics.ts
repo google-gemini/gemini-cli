@@ -860,21 +860,18 @@ export function recordOnboardingSuccess(
   userTier?: string,
   durationMs?: number,
 ): void {
-  if (
-    !onboardingSuccessCounter ||
-    !onboardingDurationHistogram ||
-    !isMetricsInitialized
-  )
-    return;
+  if (!isMetricsInitialized) return;
 
   const attributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     ...(userTier && { user_tier: userTier }),
   };
 
-  onboardingSuccessCounter.add(1, attributes);
+  if (onboardingSuccessCounter) {
+    onboardingSuccessCounter.add(1, attributes);
+  }
 
-  if (durationMs !== undefined) {
+  if (durationMs !== undefined && onboardingDurationHistogram) {
     onboardingDurationHistogram.record(durationMs, attributes);
   }
 }

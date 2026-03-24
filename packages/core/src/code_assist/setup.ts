@@ -262,10 +262,9 @@ async function _doSetupUser(
     }
   }
 
-  const userTier = tier.id ?? UserTierId.STANDARD;
   logOnboardingSuccess(
     config,
-    new OnboardingSuccessEvent(userTier, Date.now() - onboardingStartTime),
+    new OnboardingSuccessEvent(tier.name, Date.now() - onboardingStartTime),
   );
 
   if (!lroRes.response?.cloudaicompanionProject?.id) {
