@@ -53,6 +53,10 @@ const RESTRICTED_HOOK_ENV_KEYS = new Set([
   'PATH',
   // Node.js runtime injection
   'NODE_OPTIONS',
+  'NODE_PATH',
+  // Shell startup injection (bash sources BASH_ENV in non-interactive mode)
+  'BASH_ENV',
+  'ENV',
   // Linux dynamic linker variables
   'LD_PRELOAD',
   'LD_LIBRARY_PATH',
@@ -63,8 +67,13 @@ const RESTRICTED_HOOK_ENV_KEYS = new Set([
   'DYLD_LIBRARY_PATH',
   'DYLD_FORCE_FLAT_NAMESPACE',
   'DYLD_PRINT_TO_FILE',
-  // Language-specific path overrides
+  // Language-specific path/config overrides
   'PYTHONPATH',
+  'PERL5LIB',
+  'RUBYLIB',
+  'JAVA_TOOL_OPTIONS',
+  '_JAVA_OPTIONS',
+  'CLASSPATH',
   // Project-specific variables
   'GEMINI_PROJECT_DIR',
   'CLAUDE_PROJECT_DIR',
