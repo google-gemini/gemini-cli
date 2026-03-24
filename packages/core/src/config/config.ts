@@ -35,6 +35,17 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import {
+  DebugAttachTool,
+  DebugContinueTool,
+  DebugDisconnectTool,
+  DebugEvaluateTool,
+  DebugLaunchTool,
+  DebugSetBreakpointTool,
+  DebugStacktraceTool,
+  DebugStepTool,
+  DebugVariablesTool,
+} from '../tools/debug-tools.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
@@ -895,6 +906,7 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
+  private debugCompanionMode = false;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
@@ -1874,6 +1886,15 @@ export class Config implements McpContext, AgentLoopContext {
   getDebugMode(): boolean {
     return this.debugMode;
   }
+
+  getDebugCompanionMode(): boolean {
+    return this.debugCompanionMode;
+  }
+
+  setDebugCompanionMode(enabled: boolean): void {
+    this.debugCompanionMode = enabled;
+  }
+
   getQuestion(): string | undefined {
     return this.question;
   }
@@ -3250,6 +3271,33 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
+    );
+    maybeRegister(DebugAttachTool, () =>
+      registry.registerTool(new DebugAttachTool(this.messageBus)),
+    );
+    maybeRegister(DebugLaunchTool, () =>
+      registry.registerTool(new DebugLaunchTool(this, this.messageBus)),
+    );
+    maybeRegister(DebugSetBreakpointTool, () =>
+      registry.registerTool(new DebugSetBreakpointTool(this.messageBus)),
+    );
+    maybeRegister(DebugStacktraceTool, () =>
+      registry.registerTool(new DebugStacktraceTool(this.messageBus)),
+    );
+    maybeRegister(DebugVariablesTool, () =>
+      registry.registerTool(new DebugVariablesTool(this.messageBus)),
+    );
+    maybeRegister(DebugEvaluateTool, () =>
+      registry.registerTool(new DebugEvaluateTool(this.messageBus)),
+    );
+    maybeRegister(DebugStepTool, () =>
+      registry.registerTool(new DebugStepTool(this.messageBus)),
+    );
+    maybeRegister(DebugContinueTool, () =>
+      registry.registerTool(new DebugContinueTool(this.messageBus)),
+    );
+    maybeRegister(DebugDisconnectTool, () =>
+      registry.registerTool(new DebugDisconnectTool(this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>

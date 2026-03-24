@@ -122,3 +122,33 @@ export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- debug tools --
+export const DEBUG_ATTACH_TOOL_NAME = 'debug_attach';
+export const DEBUG_LAUNCH_TOOL_NAME = 'debug_launch';
+export const DEBUG_SET_BREAKPOINT_TOOL_NAME = 'debug_set_breakpoint';
+export const DEBUG_STACKTRACE_TOOL_NAME = 'debug_stacktrace';
+export const DEBUG_VARIABLES_TOOL_NAME = 'debug_variables';
+export const DEBUG_EVALUATE_TOOL_NAME = 'debug_evaluate';
+export const DEBUG_STEP_TOOL_NAME = 'debug_step';
+export const DEBUG_CONTINUE_TOOL_NAME = 'debug_continue';
+export const DEBUG_DISCONNECT_TOOL_NAME = 'debug_disconnect';
+// debug parameter names
+export const DEBUG_PARAM_RUNTIME = 'runtime';
+export const DEBUG_PARAM_PORT = 'port';
+export const DEBUG_PARAM_HOST = 'host';
+export const DEBUG_PARAM_PID = 'pid';
+export const DEBUG_PARAM_PROGRAM = 'program';
+export const DEBUG_PARAM_ARGS = 'args';
+export const DEBUG_PARAM_STOP_ON_ENTRY = 'stop_on_entry';
+export const DEBUG_PARAM_THREAD_ID = 'thread_id';
+export const DEBUG_PARAM_FRAME_ID = 'frame_id';
+export const DEBUG_PARAM_EXPRESSION = 'expression';
+export const DEBUG_PARAM_LINES = 'lines';
+export const DEBUG_PARAM_CONDITION = 'condition';
+export const DEBUG_PARAM_ACTION = 'action';
+export const DEBUG_PARAM_TERMINATE = 'terminate';
+export const DEBUG_PARAM_LEVELS = 'levels';
+export const DEBUG_PARAM_SCOPE = 'scope';
+export const DEBUG_PARAM_DEPTH = 'depth';
+export const DEBUG_PARAM_CONTEXT = 'context';
