@@ -16,7 +16,7 @@ import { GeminiSpinner } from './GeminiSpinner.js';
 import { theme } from '../semantic-colors.js';
 
 export const ConfigInitDisplay = ({
-  message: initialMessage = 'Initializing...',
+  message: initialMessage = 'Working...',
 }: {
   message?: string;
 }) => {
@@ -45,14 +45,14 @@ export const ConfigInitDisplay = ({
         const suffix = remaining > 0 ? `, +${remaining} more` : '';
         const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size}) - Waiting for: ${displayedServers}${suffix}`;
         setMessage(
-          initialMessage && initialMessage !== 'Initializing...'
+          initialMessage && initialMessage !== 'Working...'
             ? `${initialMessage} (${mcpMessage})`
             : mcpMessage,
         );
       } else {
         const mcpMessage = `Connecting to MCP servers... (${connected}/${clients.size})`;
         setMessage(
-          initialMessage && initialMessage !== 'Initializing...'
+          initialMessage && initialMessage !== 'Working...'
             ? `${initialMessage} (${mcpMessage})`
             : mcpMessage,
         );

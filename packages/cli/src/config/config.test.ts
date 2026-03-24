@@ -322,6 +322,41 @@ describe('parseArguments', () => {
     },
   );
 
+  describe('isCommand middleware', () => {
+    it.each([
+      { cmd: 'mcp list', expected: true },
+      { cmd: 'extensions list', expected: true },
+      { cmd: 'extension list', expected: true },
+      { cmd: 'skills list', expected: true },
+      { cmd: 'skill list', expected: true },
+      { cmd: 'hooks migrate', expected: true },
+      { cmd: 'hook migrate', expected: true },
+      { cmd: 'some query', expected: undefined },
+      { cmd: 'hello world', expected: undefined },
+    ])(
+      'should set isCommand to $expected for "$cmd"',
+      async ({ cmd, expected }) => {
+        process.argv = ['node', 'script.js', ...cmd.split(' ')];
+        const settings = createTestMergedSettings({
+          admin: {
+            mcp: { enabled: true },
+          },
+          experimental: {
+            extensionManagement: true,
+          },
+          skills: {
+            enabled: true,
+          },
+          hooksConfig: {
+            enabled: true,
+          },
+        });
+        const parsedArgs = await parseArguments(settings);
+        expect(parsedArgs.isCommand).toBe(expected);
+      },
+    );
+  });
+
   it.each([
     {
       description: 'should allow --prompt without --prompt-interactive',
@@ -1716,6 +1751,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
 
     const serverA = config.getMcpServers()?.['serverA'];
     expect(serverA).toEqual({
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...localMcpServers['serverA'],
       type: 'sse',
       url: 'https://admin-server-a.com/sse',
@@ -1766,6 +1802,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     };
     const localMcpServersWithTools: Record<string, MCPServerConfig> = {
       serverA: {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localMcpServers['serverA'],
         includeTools: ['local_tool'],
         timeout: 1234,
@@ -1808,6 +1845,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     };
     const localMcpServersWithTools: Record<string, MCPServerConfig> = {
       serverA: {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localMcpServers['serverA'],
         includeTools: ['local_tool'],
       },

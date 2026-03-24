@@ -674,6 +674,7 @@ describe('ReadFileTool', () => {
       const parts = result.llmContent as Array<Record<string, unknown>>;
       const jitTextPart = parts.find(
         (p) =>
+          // eslint-disable-next-line no-restricted-syntax
           typeof p['text'] === 'string' && p['text'].includes('Auth rules'),
       );
       expect(jitTextPart).toBeDefined();

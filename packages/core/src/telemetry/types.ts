@@ -13,7 +13,7 @@ import type {
 import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../policy/types.js';
 
-import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { AuthType } from '../core/contentGenerator.js';
@@ -44,6 +44,7 @@ import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 import { LlmRole } from './llmRole.js';
 export { LlmRole };
 import type { HookType } from '../hooks/types.js';
+import type { UserTierId } from '../code_assist/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -2357,6 +2358,55 @@ export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Keychain availability: ${this.available}`;
+  }
+}
+
+export const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+export class OnboardingStartEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_start';
+  'event.timestamp': string;
+
+  constructor() {
+    this['event.name'] = 'onboarding_start';
+    this['event.timestamp'] = new Date().toISOString();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ONBOARDING_START,
+      'event.timestamp': this['event.timestamp'],
+    };
+  }
+
+  toLogBody(): string {
+    return 'Onboarding started.';
+  }
+}
+
+export const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+export class OnboardingSuccessEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_success';
+  'event.timestamp': string;
+  userTier?: UserTierId;
+
+  constructor(userTier?: UserTierId) {
+    this['event.name'] = 'onboarding_success';
+    this['event.timestamp'] = new Date().toISOString();
+    this.userTier = userTier;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ONBOARDING_SUCCESS,
+      'event.timestamp': this['event.timestamp'],
+      user_tier: this.userTier ?? '',
+    };
+  }
+
+  toLogBody(): string {
+    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}`;
   }
 }
 
