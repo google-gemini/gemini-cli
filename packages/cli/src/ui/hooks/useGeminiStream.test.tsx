@@ -13,13 +13,11 @@ import {
   beforeEach,
   afterEach,
   type Mock,
-  type MockInstance,
 } from 'vitest';
 import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
-import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
 import {
   useToolScheduler,
@@ -29,41 +27,24 @@ import {
   type TrackedCancelledToolCall,
   type TrackedWaitingToolCall,
 } from './useToolScheduler.js';
-import type { UIState } from '../contexts/UIStateContext.js';
 import {
   ApprovalMode,
   AuthType,
   GeminiEventType as ServerGeminiEventType,
-  ToolErrorType,
-  ToolConfirmationOutcome,
-  MessageBusType,
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
-  coreEvents,
-  CoreEvent,
-  MCPDiscoveryState,
   GeminiCliOperation,
-  getPlanModeExitMessage,
   CompressionStatus,
-  Kind,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import type {
   Config,
   EditorType,
   GeminiClient,
-  ServerGeminiChatCompressedEvent,
-  ServerGeminiContentEvent as ContentEvent,
-  ServerGeminiFinishedEvent,
-  ServerGeminiStreamEvent as GeminiEvent,
-  ThoughtSummary,
   ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  GeminiErrorEventValue,
-  RetryAttemptPayload,
 } from '@google/gemini-cli-core';
-import type { Part, PartListUnion } from '@google/genai';
+import { type PartListUnion, FinishReason } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
 import { MessageType, StreamingState } from '../types.js';
@@ -83,32 +64,28 @@ const mockMessageBus = {
 };
 
 const MockedGeminiClientClass = vi.hoisted(() =>
-  vi.fn().mockImplementation((config: Config) => {
-    return {
-      sendMessageStream: mockSendMessageStream,
-      startChat: mockStartChat,
-      addHistory: vi.fn(),
-      generateContent: vi.fn().mockResolvedValue({
-        candidates: [
-          { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
-        ],
-      }),
-      getChat: vi.fn().mockReturnValue({
-        recordCompletedToolCalls: vi.fn(),
-      }),
-      getChatRecordingService: vi.fn().mockReturnValue({
-        recordThought: vi.fn(),
-        initialize: vi.fn(),
-        recordMessage: vi.fn(),
-        recordMessageTokens: vi.fn(),
-        recordToolCalls: vi.fn(),
-        getConversationFile: vi.fn(),
-      }),
-      getCurrentSequenceModel: vi
-        .fn()
-        .mockReturnValue('gemini-2.0-flash-exp'),
-    };
-  }),
+  vi.fn().mockImplementation(() => ({
+    sendMessageStream: mockSendMessageStream,
+    startChat: mockStartChat,
+    addHistory: vi.fn(),
+    generateContent: vi.fn().mockResolvedValue({
+      candidates: [
+        { content: { parts: [{ text: 'Got it. Focusing on tests only.' }] } },
+      ],
+    }),
+    getChat: vi.fn().mockReturnValue({
+      recordCompletedToolCalls: vi.fn(),
+    }),
+    getChatRecordingService: vi.fn().mockReturnValue({
+      recordThought: vi.fn(),
+      initialize: vi.fn(),
+      recordMessage: vi.fn(),
+      recordMessageTokens: vi.fn(),
+      recordToolCalls: vi.fn(),
+      getConversationFile: vi.fn(),
+    }),
+    getCurrentSequenceModel: vi.fn().mockReturnValue('gemini-2.0-flash-exp'),
+  })),
 );
 
 const MockedUserPromptEvent = vi.hoisted(() =>
@@ -437,6 +414,7 @@ describe('useGeminiStream', () => {
             title: 'Confirm Edit',
             fileName: 'file.txt',
             filePath: '/test/file.txt',
+            fileDiff: '',
             originalContent: 'old',
             newContent: 'new',
             onConfirm: mockOnConfirm,
@@ -481,7 +459,7 @@ describe('useGeminiStream', () => {
       modelSwitched = false,
     } = options;
 
-    return await renderHookWithProviders(() =>
+    return renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -690,6 +668,15 @@ describe('useGeminiStream', () => {
       status: CoreToolCallStatus.Executing,
       pid: 1234,
       startTime: Date.now(),
+      tool: {
+        name: 'tool1',
+        displayName: 'tool1',
+        description: 'desc1',
+        build: vi.fn(),
+      } as any,
+      invocation: {
+        getDescription: () => 'Mock description',
+      } as any,
     };
 
     const { result } = await renderTestHook([executingTool]);
@@ -1296,6 +1283,7 @@ describe('useGeminiStream', () => {
       callId: 'call1',
       name: 'tool1',
       args: {},
+      isClientInitiated: false,
       prompt_id: 'p1',
     };
 
@@ -1533,7 +1521,7 @@ describe('useGeminiStream', () => {
     it('should disable loop detection and show message when user selects "disable"', async () => {
       const client = new MockedGeminiClientClass(mockConfig);
       const disableForSessionSpy = vi.fn();
-      (client as any).getLoopDetectionService = vi.fn().mockReturnValue({
+      (client as unknown as any).getLoopDetectionService = vi.fn().mockReturnValue({
         disableForSession: disableForSessionSpy,
       });
 
@@ -1725,7 +1713,7 @@ describe('useGeminiStream', () => {
         );
 
         await act(async () => {
-          await result.current.loopDetectionConfirmationRequest!.onComplete({
+          result.current.loopDetectionConfirmationRequest!.onComplete({
             userSelection: 'disable',
           });
         });
