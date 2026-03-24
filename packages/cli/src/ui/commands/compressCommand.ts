@@ -76,11 +76,8 @@ export const compressCommand: SlashCommand = {
               isPending: false,
               beforePercentage,
               afterPercentage,
-              /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-              compressionStatus: Number(
-                compressed.compressionStatus,
-              ) as unknown as CompressionStatus,
-              /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              compressionStatus: Number(compressed.compressionStatus) as unknown as CompressionStatus,
               isManual: true,
               thresholdPercentage: Math.round(threshold * 100),
             },

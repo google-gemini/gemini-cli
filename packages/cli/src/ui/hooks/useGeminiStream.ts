@@ -40,7 +40,6 @@ import {
   isBackgroundExecutionData,
   type CompressionStatus,
   Kind,
-  ACTIVATE_SKILL_TOOL_NAME,
   type Config,
   type EditorType,
   type GeminiClient,
@@ -549,9 +548,11 @@ export const useGeminiStream = (
       if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
         return false;
       }
-      // ToolGroupMessage now shows all non-canceled tools, so they are visible
-      // in pending and we need to draw the closing border for them.
-      return true;
+      return (
+        tc.status !== 'scheduled' &&
+        tc.status !== 'validating' &&
+        tc.status !== 'awaiting_approval'
+      );
     });
 
     if (
@@ -1170,8 +1171,13 @@ export const useGeminiStream = (
             isPending: false,
             beforePercentage,
             afterPercentage,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            compressionStatus: eventValue ? ((Number(eventValue.compressionStatus) as unknown) as CompressionStatus) : null,
+            /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+            compressionStatus: eventValue
+              ? (Number(
+                  eventValue.compressionStatus,
+                ) as unknown as CompressionStatus)
+              : null,
+            /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
             isManual: false,
             thresholdPercentage: Math.round(threshold * 100),
           },
@@ -1673,7 +1679,7 @@ export const useGeminiStream = (
       ) {
         let awaitingApprovalCalls = toolCalls.filter(
           (call): call is TrackedWaitingToolCall =>
-            call.status === 'awaiting_approval' && !call.request.forcedAsk,
+            call.status === 'awaiting_approval',
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
@@ -1737,36 +1743,6 @@ export const useGeminiStream = (
       );
       if (clientTools.length > 0) {
         markToolsAsSubmitted(clientTools.map((t) => t.request.callId));
-
-        if (geminiClient) {
-          for (const tool of clientTools) {
-            // Only manually record skill activations in the chat history.
-            // Other client-initiated tools (like save_memory) update the system
-            // prompt/context and don't strictly need to be in the history.
-            if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
-              continue;
-            }
-
-            // Add both the call (model turn) and the result (user turn) to history.
-            // Client-initiated calls are essentially "synthetic" turns that let
-            // subsequent model calls understand what just happened in the UI.
-            await geminiClient.addHistory({
-              role: 'model',
-              parts: [
-                {
-                  functionCall: {
-                    name: tool.request.name,
-                    args: tool.request.args,
-                  },
-                },
-              ],
-            });
-            await geminiClient.addHistory({
-              role: 'user',
-              parts: tool.response.responseParts,
-            });
-          }
-        }
       }
 
       // Identify new, successful save_memory calls that we haven't processed yet.
