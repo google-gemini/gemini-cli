@@ -42,7 +42,7 @@ export function parseAndFormatApiError(
   fallbackModel?: string,
 ): string {
   if (isStructuredError(error)) {
-    if (error.message.includes('API_KEY_INVALID')) {
+    if (error.reason === 'API_KEY_INVALID') {
       return `[API Error: Invalid API key.]${INVALID_API_KEY_ERROR_MESSAGE}`;
     }
     let text = `[API Error: ${error.message}]`;

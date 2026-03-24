@@ -34,6 +34,7 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
+import { parseGoogleApiError, type ErrorInfo } from '../utils/googleErrors.js';
 
 export interface ServerTool {
   name: string;
@@ -112,6 +113,7 @@ export type ServerGeminiModelInfoEvent = {
 export interface StructuredError {
   message: string;
   status?: number;
+  reason?: string;
 }
 
 export interface GeminiErrorEventValue {
@@ -393,9 +395,17 @@ export class Turn {
           ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             (error as { status: number }).status
           : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const googleApiError = parseGoogleApiError((e as Error).message);
+      const reason = googleApiError?.details.find(
+        (d): d is ErrorInfo =>
+          d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
+          'reason' in d,
+      )?.reason;
       const structuredError: StructuredError = {
         message: getErrorMessage(error),
         status,
+        reason,
       };
       await this.chat.maybeIncludeSchemaDepthContext(structuredError);
       yield { type: GeminiEventType.Error, value: { error: structuredError } };
