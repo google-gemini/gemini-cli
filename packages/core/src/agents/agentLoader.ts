@@ -118,7 +118,7 @@ const googleCredentialsAuthSchema = z.object({
 
 const oauth2AuthSchema = z.object({
   ...baseAuthFields,
-  type: z.literal('oauth2'),
+  type: z.literal('oauth'),
   client_id: z.string().optional(),
   client_secret: z.string().optional(),
   scopes: z.array(z.string()).optional(),
@@ -406,7 +406,7 @@ function convertFrontmatterAuthToConfig(
           throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
       }
 
-    case 'oauth2':
+    case 'oauth':
       return {
         type: 'oauth2',
         client_id: frontmatter.client_id,
@@ -418,8 +418,11 @@ function convertFrontmatterAuthToConfig(
 
     default: {
       const exhaustive: never = frontmatter;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-      throw new Error(`Unknown auth type: ${(exhaustive as any).type}`);
+      const raw: unknown = exhaustive;
+      if (typeof raw === 'object' && raw !== null && 'type' in raw) {
+        throw new Error(`Unknown auth type: ${String(raw['type'])}`);
+      }
+      throw new Error('Unknown auth type');
     }
   }
 }
