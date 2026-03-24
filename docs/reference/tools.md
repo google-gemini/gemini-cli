@@ -63,39 +63,58 @@ details.
 
 ## Available tools
 
-The following table lists all available tools, categorized by their primary
-function.
+The following list details all available tools, categorized by their primary function.
 
-| Category    | Tool                                             | Kind          | Description                                                                                                                                                                                                                                 |
-| :---------- | :----------------------------------------------- | :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Execution   | [`run_shell_command`](../tools/shell.md)         | `Execute`     | Executes arbitrary shell commands. Supports interactive sessions and background processes. Requires manual confirmation.<br><br>**Parameters:** `command`, `description`, `dir_path`, `is_background`                                       |
-| File System | [`glob`](../tools/file-system.md)                | `Search`      | Finds files matching specific glob patterns across the workspace.<br><br>**Parameters:** `pattern`, `dir_path`, `case_sensitive`, `respect_git_ignore`, `respect_gemini_ignore`                                                             |
-| File System | [`grep_search`](../tools/file-system.md)         | `Search`      | Searches for a regular expression pattern within file contents. Legacy alias: `search_file_content`.<br><br>**Parameters:** `pattern`, `dir_path`, `include`, `exclude_pattern`, `names_only`, `max_matches_per_file`, `total_max_matches`  |
-| File System | [`list_directory`](../tools/file-system.md)      | `Read`        | Lists the names of files and subdirectories within a specified path.<br><br>**Parameters:** `dir_path`, `ignore`, `file_filtering_options`                                                                                                  |
-| File System | [`read_file`](../tools/file-system.md)           | `Read`        | Reads the content of a specific file. Supports text, images, audio, and PDF.<br><br>**Parameters:** `file_path`, `start_line`, `end_line`                                                                                                   |
-| File System | [`read_many_files`](../tools/file-system.md)     | `Read`        | Reads and concatenates content from multiple files. Often triggered by the `@` symbol in your prompt.<br><br>**Parameters:** `include`, `exclude`, `recursive`, `useDefaultExcludes`, `file_filtering_options`                              |
-| File System | [`replace`](../tools/file-system.md)             | `Edit`        | Performs precise text replacement within a file. Requires manual confirmation.<br><br>**Parameters:** `file_path`, `instruction`, `old_string`, `new_string`, `allow_multiple`                                                              |
-| File System | [`write_file`](../tools/file-system.md)          | `Edit`        | Creates or overwrites a file with new content. Requires manual confirmation.<br><br>**Parameters:** `file_path`, `content`                                                                                                                  |
-| Interaction | [`ask_user`](../tools/ask-user.md)               | `Communicate` | Requests clarification or missing information via an interactive dialog.<br><br>**Parameters:** `questions`                                                                                                                                 |
-| Interaction | [`write_todos`](../tools/todos.md)               | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress and display it to you.<br><br>**Parameters:** `todos`                                                                                                 |
-| Memory      | [`activate_skill`](../tools/activate-skill.md)   | `Other`       | Loads specialized procedural expertise for specific tasks from the `.gemini/skills` directory.<br><br>**Parameters:** `name`                                                                                                                |
-| Memory      | [`get_internal_docs`](../tools/internal-docs.md) | `Think`       | Accesses Gemini CLI's own documentation to provide more accurate answers about its capabilities.<br><br>**Parameters:** `path`                                                                                                              |
-| Memory      | [`save_memory`](../tools/memory.md)              | `Think`       | Persists specific facts and project details to your `GEMINI.md` file to retain context.<br><br>**Parameters:** `fact`                                                                                                                       |
-| Planning    | [`enter_plan_mode`](../tools/planning.md)        | `Plan`        | Switches the CLI to a safe, read-only "Plan Mode" for researching complex changes.<br><br>**Parameters:** `reason`                                                                                                                          |
-| Planning    | [`exit_plan_mode`](../tools/planning.md)         | `Plan`        | Finalizes a plan, presents it for review, and requests approval to start implementation.<br><br>**Parameters:** `plan`                                                                                                                      |
-| System      | `complete_task`                                  | `Other`       | Finalizes a subagent's mission and returns the result to the parent agent. This tool is not available to the user.<br><br>**Parameters:** `result`                                                                                          |
-| Web         | [`google_web_search`](../tools/web-search.md)    | `Search`      | Performs a Google Search to find up-to-date information.<br><br>**Parameters:** `query`                                                                                                                                                     |
-| Web         | [`web_fetch`](../tools/web-fetch.md)             | `Fetch`       | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts.<br><br>**Parameters:** `prompt` |
+### Execution
+* **[`run_shell_command`](../tools/shell.md)** (`Execute`): Executes arbitrary shell commands. Supports interactive sessions and background processes. Requires manual confirmation.
+  * **Parameters:** `command`, `description`, `dir_path`, `is_background`
 
-## Under the hood
+### File System
+* **[`glob`](../tools/file-system.md)** (`Search`): Finds files matching specific glob patterns across the workspace.
+  * **Parameters:** `pattern`, `dir_path`, `case_sensitive`, `respect_git_ignore`, `respect_gemini_ignore`
+* **[`grep_search`](../tools/file-system.md)** (`Search`): Searches for a regular expression pattern within file contents. Legacy alias: `search_file_content`.
+  * **Parameters:** `pattern`, `dir_path`, `include`, `exclude_pattern`, `names_only`, `max_matches_per_file`, `total_max_matches`
+* **[`list_directory`](../tools/file-system.md)** (`Read`): Lists the names of files and subdirectories within a specified path.
+  * **Parameters:** `dir_path`, `ignore`, `file_filtering_options`
+* **[`read_file`](../tools/file-system.md)** (`Read`): Reads the content of a specific file. Supports text, images, audio, and PDF.
+  * **Parameters:** `file_path`, `start_line`, `end_line`
+* **[`read_many_files`](../tools/file-system.md)** (`Read`): Reads and concatenates content from multiple files. Often triggered by the `@` symbol in your prompt.
+  * **Parameters:** `include`, `exclude`, `recursive`, `useDefaultExcludes`, `file_filtering_options`
+* **[`replace`](../tools/file-system.md)** (`Edit`): Performs precise text replacement within a file. Requires manual confirmation.
+  * **Parameters:** `file_path`, `instruction`, `old_string`, `new_string`, `allow_multiple`
+* **[`write_file`](../tools/file-system.md)** (`Edit`): Creates or overwrites a file with new content. Requires manual confirmation.
+  * **Parameters:** `file_path`, `content`
 
-For developers, the tool system is designed to be extensible and robust. The
-`ToolRegistry` class manages all available tools.
+### Interaction
+* **[`ask_user`](../tools/ask-user.md)** (`Communicate`): Requests clarification or missing information via an interactive dialog.
+  * **Parameters:** `questions`
+* **[`write_todos`](../tools/todos.md)** (`Other`): Maintains an internal list of subtasks. The model uses this to track its own progress and display it to you.
+  * **Parameters:** `todos`
 
-You can extend Gemini CLI with custom tools by configuring
-`tools.discoveryCommand` in your settings or by connecting to MCP servers.
+### Memory
+* **[`activate_skill`](../tools/activate-skill.md)** (`Other`): Loads specialized procedural expertise for specific tasks from the `.gemini/skills` directory.
+  * **Parameters:** `name`
+* **[`get_internal_docs`](../tools/internal-docs.md)** (`Think`): Accesses Gemini CLI's own documentation to provide more accurate answers about its capabilities.
+  * **Parameters:** `path`
+* **[`save_memory`](../tools/memory.md)** (`Think`): Persists specific facts and project details to your `GEMINI.md` file to retain context.
+  * **Parameters:** `fact`
 
-<!-- prettier-ignore -->
+### Planning
+* **[`enter_plan_mode`](../tools/planning.md)** (`Plan`): Switches the CLI to a safe, read-only "Plan Mode" for researching complex changes.
+  * **Parameters:** `reason`
+* **[`exit_plan_mode`](../tools/planning.md)** (`Plan`): Finalizes a plan, presents it for review, and requests approval to start implementation.
+  * **Parameters:** `plan`
+
+### System
+* **`complete_task`** (`Other`): Finalizes a subagent's mission and returns the result to the parent agent. This tool is not available to the user.
+  * **Parameters:** `result`
+
+### Web
+* **[`google_web_search`](../tools/web-search.md)** (`Search`): Performs a Google Search to find up-to-date information.
+  * **Parameters:** `query`
+* **[`web_fetch`](../tools/web-fetch.md)** (`Fetch`): Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts.
+  * **Parameters:** `prompt`
+
 > [!NOTE]
 > For a deep dive into the internal Tool API and how to implement your
 > own tools in the codebase, see the `packages/core/src/tools/` directory in
