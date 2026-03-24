@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
+import * as sandboxManager from '../../services/sandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 
@@ -41,6 +42,10 @@ describe('LinuxSandboxManager', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
     manager = new LinuxSandboxManager({ workspace });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const getBwrapArgs = async (req: SandboxRequest) => {
@@ -203,6 +208,144 @@ describe('LinuxSandboxManager', () => {
       '--ro-bind',
       `${workspace}/.git`,
       `${workspace}/.git`,
+    ]);
+  });
+
+  it('maps forbiddenPaths to empty mounts', async () => {
+    vi.spyOn(fs.promises, 'stat').mockImplementation(async (p) => {
+      // Mock /tmp/cache as a directory, and /opt/secret.txt as a file
+      if (p.toString().includes('cache')) {
+        return { isDirectory: () => true } as fs.Stats;
+      }
+      return { isDirectory: () => false } as fs.Stats;
+    });
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) =>
+      p.toString(),
+    );
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: ['-la'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/tmp/cache', '/opt/secret.txt'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).toEqual([
+      '--bind',
+      workspace,
+      workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+      '--tmpfs',
+      '/tmp/cache',
+      '--remount-ro',
+      '/tmp/cache',
+      '--ro-bind-try',
+      '/dev/null',
+      '/opt/secret.txt',
+    ]);
+  });
+
+  it('overrides allowedPaths if a path is also in forbiddenPaths', async () => {
+    vi.spyOn(fs.promises, 'stat').mockImplementation(
+      async () => ({ isDirectory: () => true }) as fs.Stats,
+    );
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) =>
+      p.toString(),
+    );
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: ['-la'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        allowedPaths: ['/tmp/conflict'],
+        forbiddenPaths: ['/tmp/conflict'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).toEqual([
+      '--bind',
+      workspace,
+      workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+      '--bind-try',
+      '/tmp/conflict',
+      '/tmp/conflict',
+      '--tmpfs',
+      '/tmp/conflict',
+      '--remount-ro',
+      '/tmp/conflict',
+    ]);
+  });
+
+  it('protects both the symlink and the real path for forbidden paths', async () => {
+    vi.spyOn(fs.promises, 'stat').mockImplementation(
+      async () => ({ isDirectory: () => false }) as fs.Stats,
+    );
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) => {
+      if (p === '/tmp/forbidden-symlink') return '/opt/real-target.txt';
+      return p.toString();
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: ['-la'],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: ['/tmp/forbidden-symlink'],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    // Should explicitly mask both the resolved target and the original symlink string
+    expect(binds).toEqual([
+      '--bind',
+      workspace,
+      workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+      '--ro-bind-try',
+      '/dev/null',
+      '/opt/real-target.txt',
+      '--ro-bind-try',
+      '/dev/null',
+      '/tmp/forbidden-symlink',
     ]);
   });
 });

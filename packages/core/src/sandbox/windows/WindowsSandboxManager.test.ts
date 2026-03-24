@@ -135,4 +135,78 @@ describe('WindowsSandboxManager', () => {
       fs.rmSync(allowedPath, { recursive: true, force: true });
     }
   });
+
+  it('should deny Low Integrity access to forbidden paths', async () => {
+    const forbiddenPath = path.join(os.tmpdir(), 'gemini-cli-test-forbidden');
+    if (!fs.existsSync(forbiddenPath)) {
+      fs.mkdirSync(forbiddenPath);
+    }
+    try {
+      const req: SandboxRequest = {
+        command: 'test',
+        args: [],
+        cwd: testCwd,
+        env: {},
+        policy: {
+          forbiddenPaths: [forbiddenPath],
+        },
+      };
+
+      await manager.prepareCommand(req);
+
+      expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+        path.resolve(forbiddenPath),
+        '/deny',
+        '*S-1-16-4096:(OI)(CI)(F)',
+      ]);
+    } finally {
+      fs.rmSync(forbiddenPath, { recursive: true, force: true });
+    }
+  });
+
+  it('should override allowed paths if a path is also in forbidden paths', async () => {
+    const conflictPath = path.join(os.tmpdir(), 'gemini-cli-test-conflict');
+    if (!fs.existsSync(conflictPath)) {
+      fs.mkdirSync(conflictPath);
+    }
+    try {
+      const req: SandboxRequest = {
+        command: 'test',
+        args: [],
+        cwd: testCwd,
+        env: {},
+        policy: {
+          allowedPaths: [conflictPath],
+          forbiddenPaths: [conflictPath],
+        },
+      };
+
+      await manager.prepareCommand(req);
+
+      const spawnMock = vi.mocked(spawnAsync);
+      const allowCallIndex = spawnMock.mock.calls.findIndex(
+        (call) =>
+          call[1] &&
+          call[1].includes('/setintegritylevel') &&
+          call[0] === 'icacls' &&
+          call[1][0] === path.resolve(conflictPath),
+      );
+      const denyCallIndex = spawnMock.mock.calls.findIndex(
+        (call) =>
+          call[1] &&
+          call[1].includes('/deny') &&
+          call[0] === 'icacls' &&
+          call[1][0] === path.resolve(conflictPath),
+      );
+
+      // Both should have been called
+      expect(allowCallIndex).toBeGreaterThan(-1);
+      expect(denyCallIndex).toBeGreaterThan(-1);
+
+      // Verify order: explicitly denying must happen after the explicit allow
+      expect(allowCallIndex).toBeLessThan(denyCallIndex);
+    } finally {
+      fs.rmSync(conflictPath, { recursive: true, force: true });
+    }
+  });
 });

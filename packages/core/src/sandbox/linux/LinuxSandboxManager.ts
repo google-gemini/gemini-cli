@@ -14,11 +14,13 @@ import {
   type SandboxedCommand,
   GOVERNANCE_FILES,
   sanitizePaths,
+  tryRealpath,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import { isNodeError } from '../../utils/errors.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -111,7 +113,15 @@ export class LinuxSandboxManager implements SandboxManager {
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
     const bwrapArgs: string[] = [
-      '--unshare-all',
+      ...(req.policy?.networkAccess
+        ? [
+            '--unshare-user',
+            '--unshare-ipc',
+            '--unshare-pid',
+            '--unshare-uts',
+            '--unshare-cgroup',
+          ]
+        : ['--unshare-all']),
       '--new-session', // Isolate session
       '--die-with-parent', // Prevent orphaned runaway processes
       '--ro-bind',
@@ -145,18 +155,40 @@ export class LinuxSandboxManager implements SandboxManager {
     }
 
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(this.options.workspace).replace(
-      /\/$/,
-      '',
-    );
-    for (const allowedPath of allowedPaths) {
-      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
+    const normalizedWorkspace = this.normalizePath(this.options.workspace);
+    for (const p of allowedPaths) {
+      if (this.normalizePath(p) !== normalizedWorkspace) {
+        bwrapArgs.push('--bind-try', p, p);
       }
     }
 
-    // TODO: handle forbidden paths
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const p of forbiddenPaths) {
+      try {
+        const resolvedPath = await tryRealpath(p);
+        const stats = await fs.promises.stat(resolvedPath);
+
+        if (stats.isDirectory()) {
+          // Directories are masked by an empty, read-only tmpfs.
+          bwrapArgs.push('--tmpfs', resolvedPath, '--remount-ro', resolvedPath);
+        } else {
+          // Files are masked by binding them to /dev/null.
+          bwrapArgs.push('--ro-bind-try', '/dev/null', resolvedPath);
+        }
+
+        // Ensure the original path (if it was a symlink) is also masked.
+        if (resolvedPath !== normalize(p)) {
+          bwrapArgs.push('--ro-bind-try', '/dev/null', p);
+        }
+      } catch (e) {
+        if (isNodeError(e) && e.code === 'ENOENT') continue;
+        throw new Error(
+          `Failed to deny access to forbidden path: ${p}. ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
 
     const bpfPath = getSeccompBpfPath();
 
@@ -176,5 +208,9 @@ export class LinuxSandboxManager implements SandboxManager {
       args: shArgs,
       env: sanitizedEnv,
     };
+  }
+
+  private normalizePath(p: string): string {
+    return normalize(p).replace(/\/$/, '');
   }
 }
