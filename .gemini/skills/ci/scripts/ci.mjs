@@ -32,7 +32,11 @@ function runGh(args) {
 function fetchFailuresViaApi(jobId) {
   try {
     const cmd = `gh api repos/${REPO}/actions/jobs/${jobId}/logs | grep -iE " FAIL |❌|ERROR|Lint failed|Build failed|Exception|failed with exit code"`;
-    return execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 10 * 1024 * 1024 }).toString();
+    const output = execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 10 * 1024 * 1024 }).toString();
+    if (output.includes("logs are not complete")) {
+       return ""; // Fallback to step-based analysis if API also says logs aren't ready
+    }
+    return output;
   } catch (e) {
     return "";
   }
