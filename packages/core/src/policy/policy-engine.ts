@@ -29,6 +29,7 @@ import {
   initializeShellParsers,
   splitCommands,
   hasRedirection,
+  getCommandRoots,
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 import {
@@ -42,6 +43,16 @@ import {
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
 }
+
+const REDIRECTION_ONLY_ROOTS = new Set([
+  '>',
+  '>>',
+  '<',
+  'redirection (<)',
+  'redirection (>)',
+  'heredoc (<<)',
+  'herestring (<<<)',
+]);
 
 /**
  * Checks if a tool call matches a wildcard pattern.
@@ -296,6 +307,15 @@ export class PolicyEngine {
     return true;
   }
 
+  private isRedirectionOnlyFragment(command: string): boolean {
+    const roots = getCommandRoots(command);
+    if (roots.length > 0) {
+      return roots.every((root) => REDIRECTION_ONLY_ROOTS.has(root));
+    }
+
+    return /^\d*(?:\u003e\u003e?|\u0026\u003e|\u003c\u003c\u003c?|\u003c|\u003e\u0026|\u003c\u0026)(?!\()/.test(command.trim());
+  }
+
   /**
    * Check if a shell command is allowed.
    */
@@ -427,6 +447,13 @@ export class PolicyEngine {
               responsibleRule = rule;
             }
           }
+          continue;
+        }
+
+        if (allowRedirection && this.isRedirectionOnlyFragment(subCmd)) {
+          debugLogger.debug(
+            `[PolicyEngine.check] Skipping redirection-only fragment allowed by matching rule: ${subCmd}`,
+          );
           continue;
         }
 

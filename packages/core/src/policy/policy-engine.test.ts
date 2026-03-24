@@ -1590,6 +1590,41 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should allow redirection-only fragments when the matched rule explicitly allows redirection', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+          allowRedirection: true,
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      vi.mocked(splitCommands).mockReturnValueOnce([
+        'echo "hello"',
+        '> test.txt',
+      ]);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "hello" > test.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should allow compound commands with safe operators (&&, ||) if individual commands are allowed', async () => {
       const rules: PolicyRule[] = [
         {
