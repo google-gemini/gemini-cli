@@ -115,6 +115,17 @@ npm install -g @google/gemini-cli@nightly
 
 ### Automation & Integration
 
+- **UX Extension Extension**: This branch introduces a formal extension for the
+  AI DevTools UX team. Link it to enable specialized workflows without causing
+  ghost file issues during local development: \`gemini extensions link
+  ./packages/extensions/ux-extension\`
+  - **\_ux_git-worktree**: Manage Git Worktrees using the "Base Folder
+    Strategy".
+  - **\_ux_finish-pr**: Co-author assistant for authors to cross the finish line
+    with UX polish and CI fixes.
+  - **\_ux_designer**: Lead UX Designer expert to review React/Ink components
+    against the v1.0 Design Principles (Density, Progressive Disclosure, State).
+  - **\_ux_help**: Show the welcome guide and documentation.
 - Automate operational tasks like querying pull requests or handling complex
   rebases
 - Use MCP servers to connect new capabilities, including
@@ -314,6 +325,7 @@ gemini
 
 - [**Headless Mode (Scripting)**](./docs/cli/headless.md) - Use Gemini CLI in
   automated workflows.
+- [**Architecture Overview**](./docs/architecture.md) - How Gemini CLI works.
 - [**IDE Integration**](./docs/ide-integration/index.md) - VS Code companion.
 - [**Sandboxing & Security**](./docs/cli/sandbox.md) - Safe execution
   environments.

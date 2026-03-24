@@ -8,6 +8,12 @@ OBJECTIVE: Help the user review and address comments on their PR.
 
 # Comment Review Procedure
 
-1. Run the `scripts/fetch-pr-info.js` script to get PR info and state. MAKE SURE you read the entire output of the command, even if it gets truncated.
-2. Summarize the review status by analyzing the diff, commit log, and comments to see which still need to be addressed. Pay attention to the current user's comments. For resolved threads, summarize as a single line with a ✅. For open threads, provide a reference number e.g. [1] and the comment content.
-3. Present your summary of the feedback and current state and allow the user to guide you as to what to fix/address/skip. DO NOT begin fixing issues automatically.
+1. **Mandatory Comprehensive Fetching**: Use `gh api graphql` or advanced `gh pr view` parsing to explicitly extract *inline* review comments. Basic commands often miss these nested comments.
+2. **Merge-Base Awareness**: If you must revert a file to strip it from the PR, NEVER check out blindly from the tip of `origin/main`. Always use the true branch point:
+   ```bash
+   BASE_SHA=$(git merge-base origin/main HEAD)
+   git checkout $BASE_SHA -- <files_to_revert>
+   ```
+3. **Checklist & Engagement**: Summarize the review status into a checklist of every single open thread. For every addressed inline comment, you MUST post a direct reply (e.g., "Done.") via the GitHub API to confirm resolution.
+4. **Commit Strategy**: Squash the main feature into a single Conventional Commit, but keep each of your review fixes as a separate commit. Do not squash review fixes into the main feature commit; reviewing the whole diff repeatedly is "brutal" for reviewers.
+5. **Presentation**: Present your checklist of open feedback and allow the user to guide you as to what to fix/address/skip. DO NOT begin fixing issues automatically.
