@@ -104,7 +104,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
-  requestTimeout: number | undefined;
+  requestTimeout?: number;
   isCommand: boolean | undefined;
 }
 

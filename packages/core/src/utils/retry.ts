@@ -197,7 +197,7 @@ export function isRetryableError(
  * @throws The last error encountered if all attempts fail.
  */
 export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
+  fn: (signal?: AbortSignal) => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
   if (options?.signal?.aborted) {
@@ -272,7 +272,7 @@ export async function retryWithBackoff<T>(
       attempt++;
       try {
         const result = await Promise.race([
-          fn(),
+          fn(overallSignal),
           new Promise<never>((_, reject) => {
             const onAbort = () => {
               if (
@@ -306,7 +306,7 @@ export async function retryWithBackoff<T>(
           if (onRetry) {
             onRetry(attempt, new Error('Invalid content'), delayWithJitter);
           }
-          await delay(delayWithJitter, signal);
+          await delay(delayWithJitter, overallSignal);
           currentDelay = Math.min(maxDelayMs, currentDelay * 2);
           continue;
         }
