@@ -150,12 +150,13 @@ export function useCommandCompletion({
         }
       } else if (char === '@') {
         // Only trigger @ completion if @ is preceded by whitespace,
-        // start of line, or punctuation — not alphanumeric characters.
-        // This prevents email addresses (user@host) from triggering suggestions.
+        // start of line, or punctuation — not word characters or backslashes.
+        // This prevents email addresses (user@host) and escaped literals (\@file)
+        // from triggering suggestions.
         if (i > 0) {
           const prevChar = codePoints[i - 1];
-          if (prevChar && /\w/.test(prevChar)) {
-            break; // Preceded by word character — not a file reference
+          if (prevChar && /[\w\\]/.test(prevChar)) {
+            break; // Preceded by word character or backslash — not a file reference
           }
         }
 

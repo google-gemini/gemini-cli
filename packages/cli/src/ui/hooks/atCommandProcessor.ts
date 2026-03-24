@@ -64,6 +64,10 @@ export function escapeAtInQuotedRegions(text: string): string {
   );
 }
 
+function isWordChar(char: string | undefined): boolean {
+  return char !== undefined && /\w/.test(char);
+}
+
 /**
  * Returns true when the given position is inside an open single-quote or
  * backtick region. Double quotes are intentionally ignored because @"..."
@@ -86,7 +90,26 @@ export function isInsideQuotedRegion(text: string, position: number): boolean {
       continue;
     }
     if (char === "'" && !inBacktick) {
-      inSingleQuote = !inSingleQuote;
+      const prevChar = i > 0 ? text[i - 1] : undefined;
+      const nextChar = i + 1 < text.length ? text[i + 1] : undefined;
+
+      if (inSingleQuote) {
+        if (!isWordChar(nextChar)) {
+          inSingleQuote = false;
+        }
+        continue;
+      }
+
+      // Ignore apostrophes in prose like "don't" or "students'".
+      if (
+        isWordChar(prevChar) ||
+        nextChar === undefined ||
+        /\s/.test(nextChar)
+      ) {
+        continue;
+      }
+
+      inSingleQuote = true;
       continue;
     }
     if (char === '`' && !inSingleQuote) {
@@ -353,26 +376,24 @@ async function resolveFilePaths(
         break;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          // Only attempt glob search if the path looks like a real file path
-          // (contains '/', '.', or starts with '~'). Simple words like 'decorators'
-          // or 'host' should not trigger expensive glob searches.
           const looksLikePath =
             pathName.includes('/') ||
             pathName.includes('.') ||
             pathName.startsWith('~');
+          const globPattern = looksLikePath
+            ? `**/*${pathName}*`
+            : `**/${pathName}`;
 
-          if (
-            looksLikePath &&
-            config.getEnableRecursiveFileSearch() &&
-            globTool
-          ) {
+          if (config.getEnableRecursiveFileSearch() && globTool) {
             onDebugMessage(
-              `Path ${pathName} not found directly, attempting glob search.`,
+              looksLikePath
+                ? `Path ${pathName} not found directly, attempting glob search.`
+                : `Path ${pathName} not found directly, attempting exact-name glob search.`,
             );
             try {
               const globResult = await globTool.buildAndExecute(
                 {
-                  pattern: `**/*${pathName}*`,
+                  pattern: globPattern,
                   path: dir,
                 },
                 signal,
@@ -400,12 +421,12 @@ async function resolveFilePaths(
                   break;
                 } else {
                   onDebugMessage(
-                    `Glob search for '**/*${pathName}*' did not return a usable path. Path ${pathName} will be skipped.`,
+                    `Glob search for '${globPattern}' did not return a usable path. Path ${pathName} will be skipped.`,
                   );
                 }
               } else {
                 onDebugMessage(
-                  `Glob search for '**/*${pathName}*' found no files or an error. Path ${pathName} will be skipped.`,
+                  `Glob search for '${globPattern}' found no files or an error. Path ${pathName} will be skipped.`,
                 );
               }
             } catch (globError) {
@@ -416,10 +437,6 @@ async function resolveFilePaths(
                 `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
               );
             }
-          } else if (!looksLikePath) {
-            onDebugMessage(
-              `Path ${pathName} does not look like a file path, skipping glob search.`,
-            );
           } else {
             onDebugMessage(
               `Glob tool not found. Path ${pathName} will be skipped.`,

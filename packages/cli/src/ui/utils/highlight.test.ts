@@ -91,6 +91,13 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 
+  it('should still highlight @ after an apostrophe in plain text', () => {
+    expect(parseInputForHighlighting("don't @file.js", 0)).toEqual([
+      { text: "don't ", type: 'default' },
+      { text: '@file.js', type: 'file' },
+    ]);
+  });
+
   it('should not highlight command at the end of the string', () => {
     const text = 'Get help with /help';
     expect(parseInputForHighlighting(text, 0)).toEqual([

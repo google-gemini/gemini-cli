@@ -1833,4 +1833,54 @@ describe('handleAtCommand - email and quote scenarios', () => {
       ],
     });
   });
+
+  it('should still process @file after an apostrophe in plain text', async () => {
+    const fileContent = 'Referenced file content.';
+    const filePath = await createTestFile('file.txt', fileContent);
+    const relativePath = path.relative(testRootDir, filePath);
+    const query = `don't @${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 910,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `don't @${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
+  it('should recursively resolve extensionless filenames like Dockerfile', async () => {
+    const fileContent = 'FROM node:20';
+    await createTestFile(path.join('nested', 'Dockerfile'), fileContent);
+
+    const result = await handleAtCommand({
+      query: '@Dockerfile',
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 911,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [
+        { text: '@nested/Dockerfile' },
+        { text: '\n--- Content from referenced files ---' },
+        { text: '\nContent from @nested/Dockerfile:\n' },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
 });

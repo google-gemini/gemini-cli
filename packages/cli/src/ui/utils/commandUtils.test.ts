@@ -201,6 +201,11 @@ describe('commandUtils', () => {
       expect(isAtCommand('explain `something` @file.py')).toBe(true);
     });
 
+    it('should return true when an apostrophe in prose appears before @', () => {
+      expect(isAtCommand("don't @file.txt")).toBe(true);
+      expect(isAtCommand("it's @README")).toBe(true);
+    });
+
     it('should return false when query does not contain any @<path> pattern', () => {
       expect(isAtCommand('file')).toBe(false);
       expect(isAtCommand('hello')).toBe(false);

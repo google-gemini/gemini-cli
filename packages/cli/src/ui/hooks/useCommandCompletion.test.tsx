@@ -342,6 +342,28 @@ describe('useCommandCompletion', () => {
         });
       });
 
+      it('should still trigger @ completion after an apostrophe in plain text', async () => {
+        const { result } = await renderCommandCompletionHook("don't @file.txt");
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.AT);
+          expect(useAtCompletion).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              enabled: true,
+              pattern: 'file.txt',
+            }),
+          );
+        });
+      });
+
+      it('should not trigger @ completion when @ is escaped with a backslash', async () => {
+        const { result } = await renderCommandCompletionHook('\\@file.txt');
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.IDLE);
+        });
+      });
+
       it.each([
         {
           shellModeActive: false,
