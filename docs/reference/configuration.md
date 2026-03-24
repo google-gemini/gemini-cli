@@ -1540,7 +1540,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.worktrees`** (boolean):
