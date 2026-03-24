@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -22,6 +23,8 @@ vi.mock('node:fs', async () => {
       openSync: vi.fn(),
       closeSync: vi.fn(),
       writeFileSync: vi.fn(),
+      readdirSync: vi.fn(() => []),
+      chmodSync: vi.fn(),
     },
     existsSync: vi.fn(() => true),
     realpathSync: vi.fn((p: string | Buffer) => p.toString()),
@@ -29,8 +32,14 @@ vi.mock('node:fs', async () => {
     openSync: vi.fn(),
     closeSync: vi.fn(),
     writeFileSync: vi.fn(),
+    readdirSync: vi.fn(() => []),
+    chmodSync: vi.fn(),
   };
 });
+
+vi.mock('node:child_process', () => ({
+  spawnSync: vi.fn(() => ({ status: 0, stdout: Buffer.from('') })),
+}));
 
 describe('LinuxSandboxManager', () => {
   const workspace = '/home/user/workspace';
@@ -204,5 +213,62 @@ describe('LinuxSandboxManager', () => {
       `${workspace}/.git`,
       `${workspace}/.git`,
     ]);
+  });
+
+  it('blocks .env and .env.* files in the workspace root', async () => {
+    vi.mocked(spawnSync).mockImplementation((cmd, args) => {
+      if (cmd === 'find' && args?.[0] === workspace) {
+        return {
+          status: 0,
+          stdout: Buffer.from(
+            `${workspace}/.env\n${workspace}/.env.local\n${workspace}/.env.test\n`,
+          ),
+        } as unknown as ReturnType<typeof spawnSync>;
+      }
+      return {
+        status: 0,
+        stdout: Buffer.from(''),
+      } as unknown as ReturnType<typeof spawnSync>;
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).toContain(`${workspace}/.env`);
+    expect(binds).toContain(`${workspace}/.env.local`);
+    expect(binds).toContain(`${workspace}/.env.test`);
+
+    // Verify they are bound to a mask file (we will check for --bind or --ro-bind)
+    const envIndex = binds.indexOf(`${workspace}/.env`);
+    expect(['--bind', '--ro-bind']).toContain(binds[envIndex - 2]);
+    expect(binds[envIndex - 1]).toMatch(/gemini-cli-mask-.*/);
+  });
+
+  it('blocks explicitly forbidden paths', async () => {
+    const forbiddenPath = '/etc/passwd';
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+      policy: {
+        forbiddenPaths: [forbiddenPath],
+      },
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
+
+    expect(binds).toContain(forbiddenPath);
+    const forbiddenIndex = binds.indexOf(forbiddenPath);
+    expect(binds[forbiddenIndex - 2]).toBe('--bind-try');
+    expect(binds[forbiddenIndex - 1]).toMatch(/gemini-cli-mask-.*/);
   });
 });

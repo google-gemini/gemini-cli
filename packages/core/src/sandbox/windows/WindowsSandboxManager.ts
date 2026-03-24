@@ -13,6 +13,7 @@ import {
   type SandboxRequest,
   type SandboxedCommand,
   GOVERNANCE_FILES,
+  findSecretFiles,
   type GlobalSandboxOptions,
   sanitizePaths,
 } from '../../services/sandboxManager.js';
@@ -185,40 +186,62 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(allowedPath);
     }
 
-    // TODO: handle forbidden paths
+    // 2. Collect secret files and apply protective ACLs
+    // On Windows, we must explicitly set the integrity level of secret files
+    // to Medium with No-Read-Up (NR) to prevent Low Integrity processes (the sandbox)
+    // from reading them.
+    const secretsToBlock: string[] = [];
+    try {
+      const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+      for (const dir of searchDirs) {
+        // We use maxDepth 3 to catch common nested secrets while keeping performance high.
+        const secretFiles = findSecretFiles(dir, 3);
+        for (const secretFile of secretFiles) {
+          secretsToBlock.push(secretFile);
+          if (!this.lowIntegrityCache.has(secretFile)) {
+            // Apply the mandatory label that blocks reading and writing by Low processes.
+            await spawnAsync('icacls', [
+              secretFile,
+              '/setintegritylevel',
+              'Medium(NW,NR)',
+            ]);
+            this.lowIntegrityCache.add(secretFile);
+          }
+        }
+      }
+    } catch (e) {
+      debugLogger.log(
+        'WindowsSandboxManager: Failed to secure secret files',
+        e,
+      );
+    }
 
-    // 2. Protected governance files
+    // 3. Protected governance files
     // These must exist on the host before running the sandbox to prevent
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
       const filePath = path.join(this.options.workspace, file.path);
       this.touch(filePath, file.isDirectory);
-
-      // We resolve real paths to ensure protection for both the symlink and its target.
-      try {
-        const realPath = fs.realpathSync(filePath);
-        if (realPath !== filePath) {
-          // If it's a symlink, the target is already implicitly protected
-          // if it's outside the Low integrity workspace (likely Medium).
-          // If it's inside, we ensure it's not accidentally Low.
-        }
-      } catch {
-        // Ignore realpath errors
-      }
     }
 
-    // 3. Construct the helper command
-    // GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]
+    // 4. Forbidden paths
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    const allForbidden = Array.from(
+      new Set([...secretsToBlock, ...forbiddenPaths]),
+    );
+
+    // 5. Construct the helper command
+    // GeminiSandbox.exe <network:0|1> <cwd> [--forbidden <path>...] <command> [args...]
     const program = this.helperPath;
 
-    // If the command starts with __, it's an internal command for the sandbox helper itself.
-    const args = [
-      req.policy?.networkAccess ? '1' : '0',
-      req.cwd,
-      req.command,
-      ...req.args,
-    ];
+    const args = [req.policy?.networkAccess ? '1' : '0', req.cwd];
+
+    for (const forbidden of allForbidden) {
+      args.push('--forbidden', forbidden);
+    }
+
+    args.push(req.command, ...req.args);
 
     return {
       program,

@@ -7,12 +7,14 @@
 import fs from 'node:fs';
 import { join, dirname, normalize } from 'node:path';
 import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import {
   type SandboxManager,
   type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
   GOVERNANCE_FILES,
+  getSecretFileFindArgs,
   sanitizePaths,
 } from '../../services/sandboxManager.js';
 import {
@@ -101,7 +103,23 @@ function touch(filePath: string, isDirectory: boolean) {
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 export class LinuxSandboxManager implements SandboxManager {
+  private static maskPath: string | undefined;
+
   constructor(private readonly options: GlobalSandboxOptions) {}
+
+  private getMaskPath(): string {
+    if (
+      LinuxSandboxManager.maskPath &&
+      fs.existsSync(LinuxSandboxManager.maskPath)
+    ) {
+      return LinuxSandboxManager.maskPath;
+    }
+    const maskPath = join(os.tmpdir(), `gemini-cli-mask-${process.pid}`);
+    fs.writeFileSync(maskPath, '');
+    fs.chmodSync(maskPath, 0);
+    LinuxSandboxManager.maskPath = maskPath;
+    return maskPath;
+  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const sanitizationConfig = getSecureSanitizationConfig(
@@ -156,7 +174,48 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    // TODO: handle forbidden paths
+    // Protect secret files (.env, .env.*) by masking them with a 000-permission file.
+    // This makes them effectively invisible and results in "Permission Denied" if accessed.
+    const maskPath = this.getMaskPath();
+    try {
+      const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+      const findPatterns = getSecretFileFindArgs();
+      for (const dir of searchDirs) {
+        // Use the native 'find' command for performance and to catch nested secrets.
+        // We limit depth to 3 to keep it fast while covering common nested structures.
+        const findResult = spawnSync('find', [
+          dir,
+          '-maxdepth',
+          '3',
+          '-not',
+          '-path',
+          '*/.*', // Skip hidden dirs (like .git)
+          '-not',
+          '-path',
+          '*/node_modules/*',
+          '-type',
+          'f',
+          ...findPatterns,
+        ]);
+
+        if (findResult.status === 0) {
+          const files = findResult.stdout.toString().split('\n');
+          for (const file of files) {
+            if (file.trim()) {
+              bwrapArgs.push('--bind', maskPath, file.trim());
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore errors finding secrets
+    }
+
+    // Handle explicitly forbidden paths
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const forbiddenPath of forbiddenPaths) {
+      bwrapArgs.push('--bind-try', maskPath, forbiddenPath);
+    }
 
     const bpfPath = getSeccompBpfPath();
 

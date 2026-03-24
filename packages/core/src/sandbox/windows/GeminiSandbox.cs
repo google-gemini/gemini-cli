@@ -150,14 +150,31 @@ public class GeminiSandbox {
 
     static int Main(string[] args) {
         if (args.Length < 3) {
-            Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]");
+            Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden <path>...] <command> [args...]");
             Console.WriteLine("Internal commands: __read <path>, __write <path>");
             return 1;
         }
 
         bool networkAccess = args[0] == "1";
         string cwd = args[1];
-        string command = args[2];
+        List<string> forbiddenPaths = new List<string>();
+        int argIndex = 2;
+
+        while (argIndex < args.Length && args[argIndex] == "--forbidden") {
+            if (argIndex + 1 < args.Length) {
+                forbiddenPaths.Add(Path.GetFullPath(args[argIndex + 1]).ToLower());
+                argIndex += 2;
+            } else {
+                break;
+            }
+        }
+
+        if (argIndex >= args.Length) {
+            Console.WriteLine("Error: Missing command");
+            return 1;
+        }
+
+        string command = args[argIndex];
 
         IntPtr hToken = IntPtr.Zero;
         IntPtr hRestrictedToken = IntPtr.Zero;
@@ -225,7 +242,8 @@ public class GeminiSandbox {
 
             // 3. Handle Internal Commands or External Process
             if (command == "__read") {
-                string path = args[3];
+                string path = args[argIndex + 1];
+                CheckForbidden(path, forbiddenPaths);
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -243,7 +261,8 @@ public class GeminiSandbox {
                     }
                 });
             } else if (command == "__write") {
-                string path = args[3];
+                string path = args[argIndex + 1];
+                CheckForbidden(path, forbiddenPaths);
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (StreamReader reader = new StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8))
@@ -287,8 +306,8 @@ public class GeminiSandbox {
             si.hStdError = GetStdHandle(-12);
 
             string commandLine = "";
-            for (int i = 2; i < args.Length; i++) {
-                if (i > 2) commandLine += " ";
+            for (int i = argIndex; i < args.Length; i++) {
+                if (i > argIndex) commandLine += " ";
                 commandLine += QuoteArgument(args[i]);
             }
 
@@ -325,6 +344,15 @@ public class GeminiSandbox {
             if (networkSid != IntPtr.Zero) LocalFree(networkSid);
             if (restrictedSid != IntPtr.Zero) LocalFree(restrictedSid);
             if (lowIntegritySid != IntPtr.Zero) LocalFree(lowIntegritySid);
+        }
+    }
+
+    private static void CheckForbidden(string path, List<string> forbiddenPaths) {
+        string fullPath = Path.GetFullPath(path).ToLower();
+        foreach (string forbidden in forbiddenPaths) {
+            if (fullPath == forbidden || fullPath.StartsWith(forbidden + Path.DirectorySeparatorChar)) {
+                throw new UnauthorizedAccessException("Access to forbidden path is denied: " + path);
+            }
         }
     }
 

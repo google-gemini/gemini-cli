@@ -5,12 +5,109 @@
  */
 
 import os from 'node:os';
-import { describe, expect, it, vi } from 'vitest';
-import { NoopSandboxManager, sanitizePaths } from './sandboxManager.js';
+import path from 'node:path';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import {
+  NoopSandboxManager,
+  sanitizePaths,
+  findSecretFiles,
+  isSecretFile,
+} from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
 import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
+import fs from 'node:fs';
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      readdirSync: vi.fn(),
+    },
+    readdirSync: vi.fn(),
+  };
+});
+
+describe('isSecretFile', () => {
+  it('should return true for .env', () => {
+    expect(isSecretFile('.env')).toBe(true);
+  });
+
+  it('should return true for .env.local', () => {
+    expect(isSecretFile('.env.local')).toBe(true);
+  });
+
+  it('should return true for .env.production', () => {
+    expect(isSecretFile('.env.production')).toBe(true);
+  });
+
+  it('should return false for regular files', () => {
+    expect(isSecretFile('package.json')).toBe(false);
+    expect(isSecretFile('index.ts')).toBe(false);
+    expect(isSecretFile('.gitignore')).toBe(false);
+  });
+
+  it('should return false for files starting with .env but not matching pattern', () => {
+    // This depends on the pattern ".env.*". ".env-foo" would match ".env.*" if it was glob,
+    // but our implementation uses startsWith(".env.")
+    expect(isSecretFile('.env-backup')).toBe(false);
+  });
+});
+
+describe('findSecretFiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should find secret files in the root directory', () => {
+    vi.mocked(fs.readdirSync).mockImplementation(((dir: string) => {
+      if (dir === '/workspace') {
+        return [
+          { name: '.env', isDirectory: () => false, isFile: () => true },
+          {
+            name: 'package.json',
+            isDirectory: () => false,
+            isFile: () => true,
+          },
+          { name: 'src', isDirectory: () => true, isFile: () => false },
+        ] as unknown as fs.Dirent[];
+      }
+      return [] as unknown as fs.Dirent[];
+    }) as unknown as typeof fs.readdirSync);
+
+    const secrets = findSecretFiles('/workspace');
+    expect(secrets).toEqual([path.join('/workspace', '.env')]);
+  });
+
+  it('should NOT find secret files recursively (shallow scan only)', () => {
+    vi.mocked(fs.readdirSync).mockImplementation(((dir: string) => {
+      if (dir === '/workspace') {
+        return [
+          { name: '.env', isDirectory: () => false, isFile: () => true },
+          { name: 'packages', isDirectory: () => true, isFile: () => false },
+        ] as unknown as fs.Dirent[];
+      }
+      if (dir === path.join('/workspace', 'packages')) {
+        return [
+          { name: '.env.local', isDirectory: () => false, isFile: () => true },
+        ] as unknown as fs.Dirent[];
+      }
+      return [] as unknown as fs.Dirent[];
+    }) as unknown as typeof fs.readdirSync);
+
+    const secrets = findSecretFiles('/workspace');
+    expect(secrets).toEqual([path.join('/workspace', '.env')]);
+    // Should NOT have called readdirSync for subdirectories
+    expect(fs.readdirSync).toHaveBeenCalledTimes(1);
+    expect(fs.readdirSync).not.toHaveBeenCalledWith(
+      path.join('/workspace', 'packages'),
+      expect.anything(),
+    );
+  });
+});
 
 describe('sanitizePaths', () => {
   it('should return undefined if no paths are provided', () => {

@@ -6,6 +6,7 @@
 
 import os from 'node:os';
 import path from 'node:path';
+import fs from 'node:fs';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -99,6 +100,74 @@ export const GOVERNANCE_FILES = [
   { path: '.geminiignore', isDirectory: false },
   { path: '.git', isDirectory: true },
 ] as const;
+
+/**
+ * Files that contain sensitive secrets or credentials and should be
+ * completely hidden (deny read/write) in any sandbox.
+ */
+export const SECRET_FILES = [
+  { pattern: '.env' },
+  { pattern: '.env.*' },
+] as const;
+
+/**
+ * Checks if a given file name matches any of the secret file patterns.
+ */
+export function isSecretFile(fileName: string): boolean {
+  return SECRET_FILES.some((s) => {
+    if (s.pattern.endsWith('*')) {
+      const prefix = s.pattern.slice(0, -1);
+      return fileName.startsWith(prefix);
+    }
+    return fileName === s.pattern;
+  });
+}
+
+/**
+ * Returns arguments for the Linux 'find' command to locate secret files.
+ */
+export function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s, i) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
+  return args;
+}
+
+/**
+ * Finds all secret files in a directory up to a certain depth.
+ * Default is shallow scan (depth 1) for performance.
+ */
+export function findSecretFiles(baseDir: string, maxDepth = 1): string[] {
+  const secrets: string[] = [];
+  const skipDirs = new Set(['node_modules', '.git', '.venv', '__pycache__']);
+
+  function walk(dir: string, depth: number) {
+    if (depth > maxDepth) return;
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!skipDirs.has(entry.name)) {
+            walk(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          if (isSecretFile(entry.name)) {
+            secrets.push(fullPath);
+          }
+        }
+      }
+    } catch {
+      // Ignore read errors
+    }
+  }
+
+  walk(baseDir, 1);
+  return secrets;
+}
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands

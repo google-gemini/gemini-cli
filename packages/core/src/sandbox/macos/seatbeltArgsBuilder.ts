@@ -15,6 +15,7 @@ import {
   type SandboxPermissions,
   sanitizePaths,
   GOVERNANCE_FILES,
+  SECRET_FILES,
 } from '../../services/sandboxManager.js';
 
 /**
@@ -106,6 +107,23 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
       args.push('-D', `REAL_GOVERNANCE_FILE_${i}=${realGovernanceFile}`);
       profile += `(deny file-write* (${ruleType} (param "REAL_GOVERNANCE_FILE_${i}")))\n`;
     }
+  }
+
+  // Add explicit deny rules for secret files (.env, .env.*) in the workspace.
+  // We use regex rules to avoid expensive file discovery scans.
+  for (const secret of SECRET_FILES) {
+    // Map pattern to Seatbelt regex
+    let regexPattern: string;
+    if (secret.pattern.endsWith('*')) {
+      // .env.* -> .env\..+ (match .env followed by dot and something)
+      const base = secret.pattern.slice(0, -1).replace(/\./g, '\\.');
+      regexPattern = `.*/${base}[^/]+$`;
+    } else {
+      // .env -> \.env$
+      const base = secret.pattern.replace(/\./g, '\\.');
+      regexPattern = `.*/${base}$`;
+    }
+    profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
   }
 
   // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
