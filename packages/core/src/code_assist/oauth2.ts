@@ -301,7 +301,6 @@ async function initOauthClient(
       // We do not use the `wait` option here because the main script's execution
       // is already paused by `loginCompletePromise`, which awaits the server callback.
       const childProcess = await open(webLogin.authUrl);
-      childProcess.unref?.(); // Detach the browser process from the node event loop
 
       // IMPORTANT: Attach an error handler to the returned child process.
       // Without this, if `open` fails to spawn a process (e.g., `xdg-open` is not found
@@ -333,9 +332,9 @@ async function initOauthClient(
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
-    let timerId: NodeJS.Timeout | undefined;
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      timerId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(
           new FatalAuthenticationError(
             'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
@@ -373,15 +372,14 @@ async function initOauthClient(
         cancellationPromise,
       ]);
     } finally {
-      if (timerId) {
-        clearTimeout(timerId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
       if (sigIntHandler) {
         process.removeListener('SIGINT', sigIntHandler);
       }
       if (stdinHandler) {
         process.stdin.removeListener('data', stdinHandler);
-        process.stdin.resume(); // Vital for preserving Ink stdin buffer flow
       }
     }
 
@@ -592,16 +590,12 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           );
         }
       } finally {
-        res.on?.('finish', () => {
-          server.closeAllConnections?.();
-        });
-        server.close(); // Stop accepting new connections immediately
+        server.close();
       }
     });
 
     server.listen(port, host, () => {
       // Server started successfully
-      server.unref?.(); // Prevent the server listening socket from keeping the event loop alive
     });
 
     server.on('error', (err) => {
