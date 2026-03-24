@@ -30,12 +30,18 @@ import type {
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { type BackgroundShell } from './shellCommandProcessor.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
+import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import {
   useToolScheduler,
 } from './useToolScheduler.js';
+import type {
+  TrackedToolCall,
+} from './useToolScheduler.js';
+
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SlashCommandProcessorResult } from '../types.js';
@@ -85,6 +91,13 @@ export const useAgentStream = (
   const geminiMessageBufferRef = useRef<string>('');
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+
+  const [trackedTools, , setTrackedTools] =
+    useStateAndRef<TrackedToolCall[]>([]);
+  const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
+    useStateAndRef<Set<string>>(new Set());
+  const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
+    useStateAndRef<boolean>(true);
 
   const [
     toolCalls,
@@ -189,10 +202,58 @@ export const useAgentStream = (
           }
           break;
         case 'tool_request':
-          // UI state is handled automatically by useToolScheduler via MessageBus
+          setTrackedTools((prev) => [
+            ...prev,
+            {
+              request: {
+                callId: event.requestId,
+                name: event.name,
+                args: event.args,
+                isClientInitiated: false,
+                originalRequestName: event.name,
+              },
+              status: 'executing',
+              tool: {
+                displayName: (event._meta?.['displayName'] as string) ?? event.name,
+                isOutputMarkdown: (event._meta?.['isOutputMarkdown'] as boolean) ?? false,
+              },
+              invocation: {
+                getDescription: () => (event._meta?.['description'] as string) ?? '',
+              },
+            } as unknown as TrackedToolCall,
+          ]);
+          break;
+        case 'tool_update':
+          setTrackedTools((prev) =>
+            prev.map((tc) =>
+              tc.request.callId === event.requestId
+                ? ({
+                    ...tc,
+                    liveOutput: event.displayContent?.[0]?.type === 'text' ? event.displayContent[0].text : undefined,
+                    progressMessage: event.data?.['progressMessage'] as string | undefined,
+                    progress: event.data?.['progress'] as number | undefined,
+                    progressTotal: event.data?.['progressTotal'] as number | undefined,
+                    pid: event.data?.['pid'] as number | undefined,
+                  } as unknown as TrackedToolCall)
+                : tc,
+            ),
+          );
           break;
         case 'tool_response':
-          // UI state is handled automatically by useToolScheduler via MessageBus
+          setTrackedTools((prev) =>
+            prev.map((tc) =>
+              tc.request.callId === event.requestId
+                ? ({
+                    ...tc,
+                    status: event.isError ? 'error' : 'success',
+                    response: {
+                      resultDisplay: event.displayContent?.[0]?.type === 'text' ? event.displayContent[0].text : undefined,
+                    },
+                    responseSubmittedToGemini: true,
+                  } as unknown as TrackedToolCall)
+                : tc,
+            ),
+          );
           break;
         case 'error':
           addItem(
@@ -263,9 +324,152 @@ export const useAgentStream = (
     [addItem, logger, startNewPrompt],
   );
 
+  useEffect(() => {
+    if (trackedTools.length > 0) {
+      const isNewBatch = !trackedTools.some((tc) =>
+        pushedToolCallIdsRef.current.has(tc.request.callId),
+      );
+      if (isNewBatch) {
+        setPushedToolCallIds(new Set());
+        setIsFirstToolInGroup(true);
+      }
+    } else if (streamingState === StreamingState.Idle) {
+      setPushedToolCallIds(new Set());
+      setIsFirstToolInGroup(true);
+    }
+  }, [
+    trackedTools,
+    pushedToolCallIdsRef,
+    setPushedToolCallIds,
+    setIsFirstToolInGroup,
+    streamingState,
+  ]);
+
+  // Push completed tools to history
+  useEffect(() => {
+    const toolsToPush: TrackedToolCall[] = [];
+    for (let i = 0; i < trackedTools.length; i++) {
+      const tc = trackedTools[i];
+      if (pushedToolCallIdsRef.current.has(tc.request.callId)) continue;
+
+      if (
+        tc.status === 'success' ||
+        tc.status === 'error' ||
+        tc.status === 'cancelled'
+      ) {
+        toolsToPush.push(tc);
+      } else {
+        break;
+      }
+    }
+
+    if (toolsToPush.length > 0) {
+      const newPushed = new Set(pushedToolCallIdsRef.current);
+      for (const tc of toolsToPush) {
+        newPushed.add(tc.request.callId);
+      }
+
+      const isLastInBatch =
+        toolsToPush[toolsToPush.length - 1] === trackedTools[trackedTools.length - 1];
+
+      const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
+        borderTop: isFirstToolInGroupRef.current,
+        borderBottom: isLastInBatch,
+        ...getToolGroupBorderAppearance(
+          { type: 'tool_group', tools: trackedTools as any[] },
+          activePtyId,
+          !!_isShellFocused,
+          [],
+          backgroundShells,
+        ),
+      });
+
+      addItem(historyItem);
+      setPushedToolCallIds(newPushed);
+      setIsFirstToolInGroup(false);
+    }
+  }, [
+    trackedTools,
+    pushedToolCallIdsRef,
+    isFirstToolInGroupRef,
+    setPushedToolCallIds,
+    setIsFirstToolInGroup,
+    addItem,
+    activePtyId,
+    _isShellFocused,
+    backgroundShells,
+  ]);
+
+  const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
+    const remainingTools = trackedTools.filter(
+      (tc) => !pushedToolCallIds.has(tc.request.callId),
+    );
+
+    const items: HistoryItemWithoutId[] = [];
+
+    const appearance = getToolGroupBorderAppearance(
+      { type: 'tool_group', tools: trackedTools as any[] },
+      activePtyId,
+      !!_isShellFocused,
+      [],
+      backgroundShells,
+    );
+
+    if (remainingTools.length > 0) {
+      items.push(
+        mapTrackedToolCallsToDisplay(remainingTools, {
+          borderTop: pushedToolCallIds.size === 0,
+          borderBottom: false,
+          ...appearance,
+        }),
+      );
+    }
+
+    const allTerminal =
+      trackedTools.length > 0 &&
+      trackedTools.every(
+        (tc) =>
+          tc.status === 'success' ||
+          tc.status === 'error' ||
+          tc.status === 'cancelled',
+      );
+
+    const allPushed =
+      trackedTools.length > 0 &&
+      trackedTools.every((tc) => pushedToolCallIds.has(tc.request.callId));
+
+    const anyVisibleInHistory = pushedToolCallIds.size > 0;
+    const anyVisibleInPending = remainingTools.length > 0;
+
+    if (
+      trackedTools.length > 0 &&
+      !(allTerminal && allPushed) &&
+      (anyVisibleInHistory || anyVisibleInPending)
+    ) {
+      items.push({
+        type: 'tool_group' as const,
+        tools: [],
+        borderTop: false,
+        borderBottom: true,
+        ...appearance,
+      });
+    }
+
+    return items;
+  }, [
+    trackedTools,
+    pushedToolCallIds,
+    isFirstToolInGroupRef,
+    activePtyId,
+    _isShellFocused,
+    backgroundShells,
+  ]);
+
   const pendingHistoryItems = useMemo(() => {
-    return pendingHistoryItem ? [pendingHistoryItem] : [];
-  }, [pendingHistoryItem]);
+    return [pendingHistoryItem, ...pendingToolGroupItems].filter(
+      (i): i is HistoryItemWithoutId => i !== undefined && i !== null,
+    );
+  }, [pendingHistoryItem, pendingToolGroupItems]);
 
   return {
     streamingState,
