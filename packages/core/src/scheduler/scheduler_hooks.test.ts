@@ -1,12 +1,13 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { CoreToolScheduler } from './coreToolScheduler.js';
-import type { ToolCall, ErroredToolCall } from '../scheduler/types.js';
+import { Scheduler } from './scheduler.js';
+import type { ErroredToolCall } from './types.js';
+import { CoreToolCallStatus } from './types.js';
 import type { Config, ToolRegistry, AgentLoopContext } from '../index.js';
 import {
   ApprovalMode,
@@ -16,8 +17,8 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
-import type { HookSystem } from '../hooks/hookSystem.js';
-import { BeforeToolHookOutput } from '../hooks/types.js';
+import { HookSystem } from '../hooks/hookSystem.js';
+import { HookType, HookEventName } from '../hooks/types.js';
 
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   const defaultToolRegistry = {
@@ -63,22 +64,27 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
     getTruncateToolOutputLines: () => 1000,
     getToolRegistry: () => defaultToolRegistry,
+    getWorkingDir: () => '/mock/dir',
     getActiveModel: () => DEFAULT_GEMINI_MODEL,
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
-    getEnableHooks: () => true, // Enabled for these tests
+    getEnableHooks: () => true,
     getExperiments: () => {},
+    getTelemetryLogPromptsEnabled: () => false,
     getPolicyEngine: () =>
       ({
-        check: async () => ({ decision: 'allow' }), // Default allow for hook tests
+        check: async () => ({ decision: 'allow' }),
       }) as unknown as PolicyEngine,
   } as unknown as Config;
 
-  // eslint-disable-next-line @typescript-eslint/no-misused-spread
-  return { ...baseConfig, ...overrides } as Config;
+  const mockConfig = Object.assign({}, baseConfig, overrides) as Config;
+
+  (mockConfig as { config?: Config }).config = mockConfig;
+
+  return mockConfig;
 }
 
-describe('CoreToolScheduler Hooks', () => {
+describe('Scheduler Hooks', () => {
   it('should stop execution if BeforeTool hook requests stop', async () => {
     const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
@@ -88,44 +94,43 @@ describe('CoreToolScheduler Hooks', () => {
 
     const toolRegistry = {
       getTool: () => mockTool,
-      getToolByName: () => mockTool,
-      getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {},
-      registerTool: () => {},
-      getToolByDisplayName: () => mockTool,
-      getTools: () => [],
-      discoverTools: async () => {},
-      getAllTools: () => [],
-      getToolsByServer: () => [],
+      getAllToolNames: () => ['mockTool'],
     } as unknown as ToolRegistry;
 
     const mockMessageBus = createMockMessageBus();
-    const mockHookSystem = {
-      fireBeforeToolEvent: vi.fn().mockResolvedValue({
-        shouldStopExecution: () => true,
-        getEffectiveReason: () => 'Hook stopped execution',
-        getBlockingError: () => ({ blocked: false }),
-        isAskDecision: () => false,
-      }),
-    } as unknown as HookSystem;
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => toolRegistry,
       getMessageBus: () => mockMessageBus,
-      getHookSystem: () => mockHookSystem,
       getApprovalMode: () => ApprovalMode.YOLO,
     });
 
-    const onAllToolCallsComplete = vi.fn();
-    const scheduler = new CoreToolScheduler({
+    const hookSystem = new HookSystem(mockConfig);
+
+    (mockConfig as { getHookSystem?: () => HookSystem }).getHookSystem = () =>
+      hookSystem;
+
+    // Register a programmatic runtime hook
+    hookSystem.registerHook(
+      {
+        type: HookType.Runtime,
+        name: 'test-stop-hook',
+        action: async () => ({
+          continue: false,
+          stopReason: 'Hook stopped execution',
+        }),
+      },
+      HookEventName.BeforeTool,
+    );
+
+    const scheduler = new Scheduler({
       context: {
         config: mockConfig,
         messageBus: mockMessageBus,
         toolRegistry,
       } as unknown as AgentLoopContext,
-      onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
+      schedulerId: 'test-scheduler',
     });
 
     const request = {
@@ -136,20 +141,18 @@ describe('CoreToolScheduler Hooks', () => {
       prompt_id: 'prompt-1',
     };
 
-    await scheduler.schedule([request], new AbortController().signal);
+    const results = await scheduler.schedule(
+      [request],
+      new AbortController().signal,
+    );
 
-    await vi.waitFor(() => {
-      expect(onAllToolCallsComplete).toHaveBeenCalled();
-    });
+    expect(results.length).toBe(1);
+    const result = results[0];
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    const erroredCall = result as ErroredToolCall;
 
-    const completedCalls = onAllToolCallsComplete.mock
-      .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('error');
-    const erroredCall = completedCalls[0] as ErroredToolCall;
-
-    // Check error type/message
     expect(erroredCall.response.error?.message).toContain(
-      'Hook stopped execution',
+      'Agent execution stopped by hook: Hook stopped execution',
     );
     expect(executeFn).not.toHaveBeenCalled();
   });
@@ -160,46 +163,42 @@ describe('CoreToolScheduler Hooks', () => {
 
     const toolRegistry = {
       getTool: () => mockTool,
-      getToolByName: () => mockTool,
-      getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {},
-      registerTool: () => {},
-      getToolByDisplayName: () => mockTool,
-      getTools: () => [],
-      discoverTools: async () => {},
-      getAllTools: () => [],
-      getToolsByServer: () => [],
+      getAllToolNames: () => ['mockTool'],
     } as unknown as ToolRegistry;
 
     const mockMessageBus = createMockMessageBus();
-    const mockHookSystem = {
-      fireBeforeToolEvent: vi.fn().mockResolvedValue({
-        shouldStopExecution: () => false,
-        getBlockingError: () => ({
-          blocked: true,
-          reason: 'Hook blocked execution',
-        }),
-        isAskDecision: () => false,
-      }),
-    } as unknown as HookSystem;
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => toolRegistry,
       getMessageBus: () => mockMessageBus,
-      getHookSystem: () => mockHookSystem,
       getApprovalMode: () => ApprovalMode.YOLO,
     });
 
-    const onAllToolCallsComplete = vi.fn();
-    const scheduler = new CoreToolScheduler({
+    const hookSystem = new HookSystem(mockConfig);
+
+    (mockConfig as { getHookSystem?: () => HookSystem }).getHookSystem = () =>
+      hookSystem;
+
+    hookSystem.registerHook(
+      {
+        type: HookType.Runtime,
+        name: 'test-block-hook',
+        action: async () => ({
+          decision: 'block',
+          reason: 'Hook blocked execution',
+        }),
+      },
+      HookEventName.BeforeTool,
+    );
+
+    const scheduler = new Scheduler({
       context: {
         config: mockConfig,
         messageBus: mockMessageBus,
         toolRegistry,
       } as unknown as AgentLoopContext,
-      onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
+      schedulerId: 'test-scheduler',
     });
 
     const request = {
@@ -210,18 +209,18 @@ describe('CoreToolScheduler Hooks', () => {
       prompt_id: 'prompt-1',
     };
 
-    await scheduler.schedule([request], new AbortController().signal);
+    const results = await scheduler.schedule(
+      [request],
+      new AbortController().signal,
+    );
 
-    await vi.waitFor(() => {
-      expect(onAllToolCallsComplete).toHaveBeenCalled();
-    });
+    expect(results.length).toBe(1);
+    const result = results[0];
+    expect(result.status).toBe(CoreToolCallStatus.Error);
+    const erroredCall = result as ErroredToolCall;
 
-    const completedCalls = onAllToolCallsComplete.mock
-      .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('error');
-    const erroredCall = completedCalls[0] as ErroredToolCall;
     expect(erroredCall.response.error?.message).toContain(
-      'Hook blocked execution',
+      'Tool execution blocked: Hook blocked execution',
     );
     expect(executeFn).not.toHaveBeenCalled();
   });
@@ -235,48 +234,45 @@ describe('CoreToolScheduler Hooks', () => {
 
     const toolRegistry = {
       getTool: () => mockTool,
-      getToolByName: () => mockTool,
-      getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {},
-      registerTool: () => {},
-      getToolByDisplayName: () => mockTool,
-      getTools: () => [],
-      discoverTools: async () => {},
-      getAllTools: () => [],
-      getToolsByServer: () => [],
+      getAllToolNames: () => ['mockTool'],
     } as unknown as ToolRegistry;
 
     const mockMessageBus = createMockMessageBus();
-    const mockBeforeOutput = new BeforeToolHookOutput({
-      continue: true,
-      hookSpecificOutput: {
-        hookEventName: 'BeforeTool',
-        tool_input: { newParam: 'modifiedValue' },
-      },
-    });
-
-    const mockHookSystem = {
-      fireBeforeToolEvent: vi.fn().mockResolvedValue(mockBeforeOutput),
-      fireAfterToolEvent: vi.fn(),
-    } as unknown as HookSystem;
 
     const mockConfig = createMockConfig({
       getToolRegistry: () => toolRegistry,
       getMessageBus: () => mockMessageBus,
-      getHookSystem: () => mockHookSystem,
       getApprovalMode: () => ApprovalMode.YOLO,
     });
 
-    const onAllToolCallsComplete = vi.fn();
-    const scheduler = new CoreToolScheduler({
+    const hookSystem = new HookSystem(mockConfig);
+
+    (mockConfig as { getHookSystem?: () => HookSystem }).getHookSystem = () =>
+      hookSystem;
+
+    hookSystem.registerHook(
+      {
+        type: HookType.Runtime,
+        name: 'test-modify-input-hook',
+        action: async () => ({
+          continue: true,
+          hookSpecificOutput: {
+            hookEventName: 'BeforeTool',
+            tool_input: { newParam: 'modifiedValue' },
+          },
+        }),
+      },
+      HookEventName.BeforeTool,
+    );
+
+    const scheduler = new Scheduler({
       context: {
         config: mockConfig,
         messageBus: mockMessageBus,
         toolRegistry,
       } as unknown as AgentLoopContext,
-      onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
+      schedulerId: 'test-scheduler',
     });
 
     const request = {
@@ -287,17 +283,15 @@ describe('CoreToolScheduler Hooks', () => {
       prompt_id: 'prompt-1',
     };
 
-    await scheduler.schedule([request], new AbortController().signal);
+    const results = await scheduler.schedule(
+      [request],
+      new AbortController().signal,
+    );
 
-    await vi.waitFor(() => {
-      expect(onAllToolCallsComplete).toHaveBeenCalled();
-    });
+    expect(results.length).toBe(1);
+    const result = results[0];
+    expect(result.status).toBe(CoreToolCallStatus.Success);
 
-    const completedCalls = onAllToolCallsComplete.mock
-      .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('success');
-
-    // Verify execute was called with modified args
     expect(executeFn).toHaveBeenCalledWith(
       { newParam: 'modifiedValue' },
       expect.anything(),
@@ -305,8 +299,7 @@ describe('CoreToolScheduler Hooks', () => {
       expect.anything(),
     );
 
-    // Verify call request args were updated in the completion report
-    expect(completedCalls[0].request.args).toEqual({
+    expect(result.request.args).toEqual({
       newParam: 'modifiedValue',
     });
   });

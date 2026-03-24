@@ -98,6 +98,12 @@ export async function runAcpClient(
 }
 
 export class GeminiAgent {
+  private static callIdCounter = 0;
+
+  static generateCallId(name: string): string {
+    return `${name}-${Date.now()}-${++GeminiAgent.callIdCounter}`;
+  }
+
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
   private apiKey: string | undefined;
@@ -294,6 +300,7 @@ export class GeminiAgent {
         sessionId,
         this.clientCapabilities.fs,
         config.getFileSystemService(),
+        cwd,
       );
       config.setFileSystemService(acpFileSystemService);
     }
@@ -350,16 +357,6 @@ export class GeminiAgent {
     const sessionSelector = new SessionSelector(config);
     const { sessionData, sessionPath } =
       await sessionSelector.resolveSession(sessionId);
-
-    if (this.clientCapabilities?.fs) {
-      const acpFileSystemService = new AcpFileSystemService(
-        this.connection,
-        sessionId,
-        this.clientCapabilities.fs,
-        config.getFileSystemService(),
-      );
-      config.setFileSystemService(acpFileSystemService);
-    }
 
     const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
@@ -434,7 +431,19 @@ export class GeminiAgent {
       throw acp.RequestError.authRequired();
     }
 
-    // 3. Now that we are authenticated, it is safe to initialize the config
+    // 3. Set the ACP FileSystemService (if supported) before config initialization
+    if (this.clientCapabilities?.fs) {
+      const acpFileSystemService = new AcpFileSystemService(
+        this.connection,
+        sessionId,
+        this.clientCapabilities.fs,
+        config.getFileSystemService(),
+        cwd,
+      );
+      config.setFileSystemService(acpFileSystemService);
+    }
+
+    // 4. Now that we are authenticated, it is safe to initialize the config
     // which starts the MCP servers and other heavy resources.
     await config.initialize();
     startupProfiler.flush(config);
@@ -897,7 +906,7 @@ export class Session {
     promptId: string,
     fc: FunctionCall,
   ): Promise<Part[]> {
-    const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+    const callId = fc.id ?? GeminiAgent.generateCallId(fc.name || 'unknown');
     const args = fc.args ?? {};
 
     const startTime = Date.now();
@@ -947,6 +956,23 @@ export class Session {
     try {
       const invocation = tool.build(args);
 
+      const displayTitle =
+        typeof invocation.getDisplayTitle === 'function'
+          ? invocation.getDisplayTitle()
+          : invocation.getDescription();
+
+      const explanation =
+        typeof invocation.getExplanation === 'function'
+          ? invocation.getExplanation()
+          : '';
+
+      if (explanation) {
+        await this.sendUpdate({
+          sessionUpdate: 'agent_thought_chunk',
+          content: { type: 'text', text: explanation },
+        });
+      }
+
       const confirmationDetails =
         await invocation.shouldConfirmExecute(abortSignal);
 
@@ -978,7 +1004,7 @@ export class Session {
           toolCall: {
             toolCallId: callId,
             status: 'pending',
-            title: invocation.getDescription(),
+            title: displayTitle,
             content,
             locations: invocation.toolLocations(),
             kind: toAcpToolKind(tool.kind),
@@ -1014,12 +1040,14 @@ export class Session {
           }
         }
       } else {
+        const content: acp.ToolCallContent[] = [];
+
         await this.sendUpdate({
           sessionUpdate: 'tool_call',
           toolCallId: callId,
           status: 'in_progress',
-          title: invocation.getDescription(),
-          content: [],
+          title: displayTitle,
+          content,
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(tool.kind),
         });
@@ -1028,12 +1056,14 @@ export class Session {
       const toolResult: ToolResult = await invocation.execute(abortSignal);
       const content = toToolCallContent(toolResult);
 
+      const updateContent: acp.ToolCallContent[] = content ? [content] : [];
+
       await this.sendUpdate({
         sessionUpdate: 'tool_call_update',
         toolCallId: callId,
         status: 'completed',
-        title: invocation.getDescription(),
-        content: content ? [content] : [],
+        title: displayTitle,
+        content: updateContent,
         locations: invocation.toolLocations(),
         kind: toAcpToolKind(tool.kind),
       });
@@ -1370,7 +1400,7 @@ export class Session {
         include: pathSpecsToRead,
       };
 
-      const callId = `${readManyFilesTool.name}-${Date.now()}`;
+      const callId = GeminiAgent.generateCallId(readManyFilesTool.name);
 
       try {
         const invocation = readManyFilesTool.build(toolArgs);
@@ -1598,6 +1628,7 @@ function toPermissionOptions(
     case 'info':
     case 'ask_user':
     case 'exit_plan_mode':
+    case 'sandbox_expansion':
       break;
     default: {
       const unreachable: never = confirmation;

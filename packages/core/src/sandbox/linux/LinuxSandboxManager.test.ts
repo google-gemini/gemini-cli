@@ -4,15 +4,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
+import fs from 'node:fs';
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    ...actual,
+    default: {
+      // @ts-expect-error - Property 'default' does not exist on type 'typeof import("node:fs")'
+      ...actual.default,
+      existsSync: vi.fn(() => true),
+      realpathSync: vi.fn((p: string | Buffer) => p.toString()),
+      mkdirSync: vi.fn(),
+      openSync: vi.fn(),
+      closeSync: vi.fn(),
+      writeFileSync: vi.fn(),
+    },
+    existsSync: vi.fn(() => true),
+    realpathSync: vi.fn((p: string | Buffer) => p.toString()),
+    mkdirSync: vi.fn(),
+    openSync: vi.fn(),
+    closeSync: vi.fn(),
+    writeFileSync: vi.fn(),
+  };
+});
 
 describe('LinuxSandboxManager', () => {
   const workspace = '/home/user/workspace';
   let manager: LinuxSandboxManager;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
     manager = new LinuxSandboxManager({ workspace });
   });
 
@@ -52,6 +79,15 @@ describe('LinuxSandboxManager', () => {
       '--bind',
       workspace,
       workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
       '--seccomp',
       '9',
       '--',
@@ -79,6 +115,15 @@ describe('LinuxSandboxManager', () => {
       '--bind',
       workspace,
       workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
       '--bind-try',
       '/tmp/cache',
       '/tmp/cache',
@@ -86,6 +131,48 @@ describe('LinuxSandboxManager', () => {
       '/opt/tools',
       '/opt/tools',
     ]);
+  });
+
+  it('protects real paths of governance files if they are symlinks', async () => {
+    vi.mocked(fs.realpathSync).mockImplementation((p) => {
+      if (p.toString() === `${workspace}/.gitignore`)
+        return '/shared/global.gitignore';
+      return p.toString();
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+    });
+
+    expect(bwrapArgs).toContain('--ro-bind');
+    expect(bwrapArgs).toContain(`${workspace}/.gitignore`);
+    expect(bwrapArgs).toContain('/shared/global.gitignore');
+
+    // Check that both are bound
+    const gitignoreIndex = bwrapArgs.indexOf(`${workspace}/.gitignore`);
+    expect(bwrapArgs[gitignoreIndex - 1]).toBe('--ro-bind');
+    expect(bwrapArgs[gitignoreIndex + 1]).toBe(`${workspace}/.gitignore`);
+
+    const realGitignoreIndex = bwrapArgs.indexOf('/shared/global.gitignore');
+    expect(bwrapArgs[realGitignoreIndex - 1]).toBe('--ro-bind');
+    expect(bwrapArgs[realGitignoreIndex + 1]).toBe('/shared/global.gitignore');
+  });
+
+  it('touches governance files if they do not exist', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+    });
+
+    expect(fs.mkdirSync).toHaveBeenCalled();
+    expect(fs.openSync).toHaveBeenCalled();
   });
 
   it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
@@ -102,7 +189,20 @@ describe('LinuxSandboxManager', () => {
     const bindsIndex = bwrapArgs.indexOf('--seccomp');
     const binds = bwrapArgs.slice(bwrapArgs.indexOf('--bind'), bindsIndex);
 
-    // Should only contain the primary workspace bind, not the second one with a trailing slash
-    expect(binds).toEqual(['--bind', workspace, workspace]);
+    // Should only contain the primary workspace bind and governance files, not the second workspace bind with a trailing slash
+    expect(binds).toEqual([
+      '--bind',
+      workspace,
+      workspace,
+      '--ro-bind',
+      `${workspace}/.gitignore`,
+      `${workspace}/.gitignore`,
+      '--ro-bind',
+      `${workspace}/.geminiignore`,
+      `${workspace}/.geminiignore`,
+      '--ro-bind',
+      `${workspace}/.git`,
+      `${workspace}/.git`,
+    ]);
   });
 });
