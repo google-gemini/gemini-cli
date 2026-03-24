@@ -8,8 +8,10 @@ import { type FunctionCall } from '@google/genai';
 import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
+  DiffStat,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
+import type { SandboxPermissions } from '../services/sandboxManager.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -78,6 +80,14 @@ export interface ToolConfirmationResponse {
  */
 export type SerializableConfirmationDetails =
   | {
+      type: 'sandbox_expansion';
+      title: string;
+      command: string;
+      rootCommand: string;
+      additionalPermissions: SandboxPermissions;
+      systemMessage?: string;
+    }
+  | {
       type: 'info';
       title: string;
       systemMessage?: string;
@@ -94,6 +104,7 @@ export type SerializableConfirmationDetails =
       originalContent: string | null;
       newContent: string;
       isModifying?: boolean;
+      diffStat?: DiffStat;
     }
   | {
       type: 'exec';

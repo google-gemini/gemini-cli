@@ -128,7 +128,7 @@ export const MainContent = () => {
 
   const pendingItems = useMemo(
     () => (
-      <Box flexDirection="column">
+      <Box flexDirection="column" key="pending-items-group">
         {pendingHistoryItems.map((item, i) => {
           const prevType =
             i === 0
@@ -141,13 +141,13 @@ export const MainContent = () => {
 
           return (
             <HistoryItemDisplay
-              key={i}
               context={uiState.commandContext}
+              key={`pending-${i}`}
               availableTerminalHeight={
                 uiState.constrainHeight ? availableTerminalHeight : undefined
               }
               terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
+              item={{ ...item, id: -(i + 1) }}
               isPending={true}
               isExpandable={true}
               isFirstThinking={isFirstThinking}
@@ -156,7 +156,10 @@ export const MainContent = () => {
           );
         })}
         {showConfirmationQueue && confirmingTool && (
-          <ToolConfirmationQueue confirmingTool={confirmingTool} />
+          <ToolConfirmationQueue
+            key="confirmation-queue"
+            confirmingTool={confirmingTool}
+          />
         )}
       </Box>
     ),
