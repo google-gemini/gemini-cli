@@ -86,7 +86,17 @@ export const SkillsList: React.FC<SkillsListProps> = ({
       )}
 
       {skills.length === 0 && (
-        <Text color={theme.text.primary}> No skills available</Text>
+        <Box flexDirection="column">
+          <Text color={theme.text.primary}> No skills available.</Text>
+          <Box>
+            <Text color={theme.text.secondary}>
+              {' '}Learn how to add skills:{' '}
+            </Text>
+            <Text color={theme.text.link}>
+              https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md
+            </Text>
+          </Box>
+        </Box>
       )}
     </Box>
   );
