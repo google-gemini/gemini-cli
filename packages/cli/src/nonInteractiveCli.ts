@@ -370,7 +370,9 @@ export async function runNonInteractive({
         return errToThrow;
       };
 
-      const runTerminalExitHandler = (handler: () => never): never => {
+      const runTerminalExitHandler = (
+        handler: () => void | never,
+      ): void | never => {
         terminalProcessExitHandled = true;
         return handler();
       };
