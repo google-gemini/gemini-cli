@@ -30,8 +30,6 @@ import {
 import { ConfigContext } from './contexts/ConfigContext.js';
 import {
   type HistoryItem,
-  type HistoryItemWithoutId,
-  type HistoryItemToolGroup,
   AuthState,
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
@@ -81,7 +79,6 @@ import {
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
   ProjectIdRequiredError,
-  CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
@@ -170,29 +167,11 @@ import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
-
-function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
-  return pendingHistoryItems.some((item) => {
-    if (item && item.type === 'tool_group') {
-      return item.tools.some(
-        (tool) => CoreToolCallStatus.Executing === tool.status,
-      );
-    }
-    return false;
-  });
-}
-
-function isToolAwaitingConfirmation(
-  pendingHistoryItems: HistoryItemWithoutId[],
-) {
-  return pendingHistoryItems
-    .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
-    .some((item) =>
-      item.tools.some(
-        (tool) => CoreToolCallStatus.AwaitingApproval === tool.status,
-      ),
-    );
-}
+import {
+  isToolExecuting,
+  isToolAwaitingConfirmation,
+  getAllToolCalls,
+} from './utils/historyUtils.js';
 
 interface AppContainerProps {
   config: Config;
@@ -1151,6 +1130,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
   );
 
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+  );
+
+  const hasPendingToolConfirmation = useMemo(
+    () => isToolAwaitingConfirmation(pendingHistoryItems),
+    [pendingHistoryItems],
+  );
+
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
   backgroundShellsRef.current = backgroundShells;
@@ -1222,10 +1211,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
-      const pendingHistoryItems = [
-        ...pendingSlashCommandHistoryItems,
-        ...pendingGeminiHistoryItems,
-      ];
       if (isToolAwaitingConfirmation(pendingHistoryItems)) {
         return; // Don't clear - user may be composing a follow-up message
       }
@@ -1259,8 +1244,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       inputHistory,
       getQueuedMessagesText,
       clearQueue,
-      pendingSlashCommandHistoryItems,
-      pendingGeminiHistoryItems,
+      pendingHistoryItems,
     ],
   );
 
@@ -1296,10 +1280,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
-        isToolExecuting([
-          ...pendingSlashCommandHistoryItems,
-          ...pendingGeminiHistoryItems,
-        ]);
+        isToolExecuting(pendingHistoryItems);
 
       if (isSlash && isAgentRunning) {
         const { commandToExecute } = parseSlashCommand(
@@ -1361,8 +1342,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isMcpReady,
       streamingState,
       messageQueue.length,
-      pendingSlashCommandHistoryItems,
-      pendingGeminiHistoryItems,
+      pendingHistoryItems,
       config,
       constrainHeight,
       setConstrainHeight,
@@ -1684,6 +1664,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
+      // Debug log keystrokes if enabled
+      if (settings.merged.general.debugKeystrokeLogging) {
+        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
@@ -1866,6 +1851,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activePtyId,
       handleSuspend,
       embeddedShellFocused,
+      settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
       tabFocusTimeoutRef,
@@ -2026,16 +2012,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
 
-  const pendingHistoryItems = useMemo(
-    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
-    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
-  );
-
-  const hasPendingToolConfirmation = useMemo(
-    () => isToolAwaitingConfirmation(pendingHistoryItems),
-    [pendingHistoryItems],
-  );
-
   const hasConfirmUpdateExtensionRequests =
     confirmUpdateExtensionRequests.length > 0;
   const hasLoopDetectionConfirmationRequest =
@@ -2125,12 +2101,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   ]);
 
   const allToolCalls = useMemo(
-    () =>
-      pendingHistoryItems
-        .filter(
-          (item): item is HistoryItemToolGroup => item.type === 'tool_group',
-        )
-        .flatMap((item) => item.tools),
+    () => getAllToolCalls(pendingHistoryItems),
     [pendingHistoryItems],
   );
 
@@ -2295,11 +2266,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       showIsExpandableHint,
       hintMode:
-        config.isModelSteeringEnabled() &&
-        isToolExecuting([
-          ...pendingSlashCommandHistoryItems,
-          ...pendingGeminiHistoryItems,
-        ]),
+        config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
       hintBuffer: '',
     }),
     [
