@@ -197,7 +197,9 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
       message: 'An update is available!\nPlease update manually.',
+      isUpdating: false,
     });
     expect(mockSpawn).not.toHaveBeenCalled();
   });
@@ -236,7 +238,9 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
       message: 'An update is available!\nCannot determine update command.',
+      isUpdating: false,
     });
     expect(mockSpawn).not.toHaveBeenCalled();
   });
@@ -253,7 +257,9 @@ describe('handleAutoUpdate', () => {
 
     expect(updateEventEmitter.emit).toHaveBeenCalledTimes(1);
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-received', {
+      ...mockUpdateInfo,
       message: 'An update is available!\nThis is an additional message.',
+      isUpdating: false,
     });
   });
 
