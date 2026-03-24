@@ -87,6 +87,7 @@ export async function loadConfig(
         approvalMode === ApprovalMode.YOLO
           ? [
               {
+                toolName: '*',
                 decision: PolicyDecision.ALLOW,
                 priority: PRIORITY_YOLO_ALLOW_ALL,
                 modes: [ApprovalMode.YOLO],
@@ -127,7 +128,7 @@ export async function loadConfig(
     interactive: !isHeadlessMode(),
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
-    enableAgents: settings.experimental?.enableAgents ?? true,
+    enableAgents: settings.experimental?.enableAgents ?? false,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {
