@@ -27,16 +27,19 @@ Think about where this type of code *would* live if it already existed in the pr
 
 **Check Package Files:** Before flagging a custom implementation of a complex algorithm, check `package.json` to see if a standard library (like `lodash` or `uuid`) is already installed that provides this functionality.
 
-### 3. Investigate the Codebase (Advanced Search)
-Use your search tools to thoroughly investigate the hypothesized locations and the broader codebase. Employ these advanced strategies:
+### 3. Investigate the Codebase (Sub-Agent Delegation)
+Delegate the heavy lifting of codebase investigation to specialized sub-agents. They are optimized to perform deep searches and semantic mapping without bloating your session history.
 
-- **Targeted Directory Searches:** Always perform a targeted search first. If you hypothesize the code belongs in utilities, run `grep_search(dir_path: 'packages/core/src/utils', pattern: '...')` before falling back to a global search.
-- **Semantic/Structural Grepping:** Do not just search for the exact function name the author used. Search for the underlying APIs being used. For example:
-  - Date utility: `grep_search(pattern: 'Intl\\.DateTimeFormat|\\.getTime\\(\\)|date-fns')`
-  - Debounce function: Search for `setTimeout` combined with `clearTimeout`.
-- **Naming Conventions:** Search for similar function names, variable names, class names, or prop structures.
-- **Comments:** Search for comments or documentation describing similar behavior.
-- **Codebase Investigator:** If exact text searches fail or the scope is too broad, delegate to the `codebase_investigator` tool using queries like: "Where are date formatting utilities centralized in this project?" or "Is there an existing React hook for managing debounced state?"
+To ensure a comprehensive review, you MUST formulate highly specific objectives for the sub-agents, providing them with the "scents" you discovered in Step 1.
+
+- **Codebase Investigator:** Use the `codebase_investigator` as your primary researcher. When delegating, formulate an objective that asks specific, investigative questions about the codebase, explicitly including these search vectors:
+  - **Structural Similarity:** Ask if existing code uses the same underlying APIs (e.g., "Does any existing code use `Intl.DateTimeFormat` or `setTimeout` for similar purposes?").
+  - **Naming Conventions:** Ask if there are existing symbols with similar naming patterns (e.g., "Are there existing symbols with naming patterns like `*Format*` or `*Debounce*`?").
+  - **Comments & Documentation:** Ask if keywords from the PR's comments or JSDoc exist in describing similar behavior elsewhere.
+  - **Architectural Fit:** Ask where this type of logic is currently centralized (e.g., "Where is centralized date formatting logic located?").
+  - **Refactoring Guidance:** Crucially, ask the sub-agent to explain *how* the new code could be refactored to use any existing logic it finds.
+- **Generalist Agent:** Use the `generalist` for detailed, turn-intensive comparisons. For example: "Review the implementation of `MyNewComponent` in the PR and compare it semantically against all components in `packages/ui/src`. Are there any existing components that could be extended or used instead?"
+- **Retain Fast Path for Simple Searches:** For extremely simple, unambiguous checks (e.g., "Does `package.json` include `lodash`?"), perform a direct search to save time. Default to delegation for any open-ended "investigations."
 
 ### 4. Evaluate Best Practices
 Check if the new code aligns with the project's established conventions.
