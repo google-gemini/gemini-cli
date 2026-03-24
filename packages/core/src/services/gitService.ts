@@ -8,9 +8,15 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { spawnAsync } from '../utils/shell-utils.js';
-import { simpleGit, CheckRepoActions, type SimpleGit } from 'simple-git';
+import type { SimpleGit } from 'simple-git';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
+
+
+async function getSimpleGit() {
+  const { simpleGit, CheckRepoActions } = await import('simple-git');
+  return { simpleGit, CheckRepoActions };
+}
 
 export class GitService {
   private projectRoot: string;
@@ -79,6 +85,7 @@ export class GitService {
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
     await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '');
+    const { simpleGit, CheckRepoActions } = await getSimpleGit();
     const repo = simpleGit(repoDir).env(shadowRepoEnv);
     let isRepoDefined = false;
     try {
@@ -114,8 +121,9 @@ export class GitService {
     await fs.writeFile(shadowGitIgnorePath, userGitIgnoreContent);
   }
 
-  private get shadowGitRepository(): SimpleGit {
+  private async shadowGitRepository(): Promise<SimpleGit> {
     const repoDir = this.getHistoryDir();
+    const { simpleGit } = await getSimpleGit();
     return simpleGit(this.projectRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
@@ -124,13 +132,13 @@ export class GitService {
   }
 
   async getCurrentCommitHash(): Promise<string> {
-    const hash = await this.shadowGitRepository.raw('rev-parse', 'HEAD');
+    const hash = await (await this.shadowGitRepository()).raw('rev-parse', 'HEAD');
     return hash.trim();
   }
 
   async createFileSnapshot(message: string): Promise<string> {
     try {
-      const repo = this.shadowGitRepository;
+      const repo = await this.shadowGitRepository();
       await repo.add('.');
       const status = await repo.status();
       if (status.isClean()) {
@@ -149,7 +157,7 @@ export class GitService {
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
-    const repo = this.shadowGitRepository;
+    const repo = await this.shadowGitRepository();
     await repo.raw(['restore', '--source', commitHash, '.']);
     // Removes any untracked files that were introduced post snapshot.
     await repo.clean('f', ['-d']);

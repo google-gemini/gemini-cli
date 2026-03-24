@@ -14,7 +14,7 @@ import {
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 import * as readline from 'node:readline';
-import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
+import type { Language, Parser, Node, Tree, QueryCapture } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 import type { SandboxManager } from '../services/sandboxManager.js';
@@ -70,6 +70,8 @@ export async function resolveExecutable(
   return undefined;
 }
 
+let _Parser: any = null;
+let _Query: any = null;
 let bashLanguage: Language | null = null;
 let treeSitterInitialization: Promise<void> | null = null;
 let treeSitterInitializationError: Error | null = null;
@@ -113,8 +115,20 @@ async function loadBashLanguage(): Promise<void> {
       ),
     ]);
 
-    await Parser.init({ wasmBinary: treeSitterBinary });
-    bashLanguage = await Language.load(bashBinary);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+    const wts: any = await import('web-tree-sitter');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const ParserImpl = wts.default || wts;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const LanguageImpl = wts.Language || ParserImpl.Language;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    _Query = wts.Query || ParserImpl.Query;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    _Parser = ParserImpl;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    await ParserImpl.init({ wasmBinary: treeSitterBinary });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    bashLanguage = await LanguageImpl.load(bashBinary);
   } catch (error) {
     bashLanguage = null;
     const normalized = toError(error);
@@ -213,7 +227,8 @@ function createParser(): Parser | null {
   }
 
   try {
-    const parser = new Parser();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const parser = new _Parser() as Parser;
     parser.setLanguage(bashLanguage);
     return parser;
   } catch {
@@ -404,9 +419,10 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
   if (hasError) {
     let query = null;
     try {
-      query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
+      query = // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      new _Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
       const captures = query.captures(tree.rootNode);
-      const syntaxErrors = captures.map((capture) => {
+      const syntaxErrors = captures.map((capture: QueryCapture) => {
         const { node, name } = capture;
         const type = name === 'missing' ? 'Missing' : 'Error';
         return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
