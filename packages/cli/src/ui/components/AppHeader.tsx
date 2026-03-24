@@ -108,7 +108,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
           Gemini CLI
         </Text>
         <Text color={theme.text.secondary}> v{version}</Text>
-        {updateInfo && (
+        {updateInfo?.isUpdating && (
           <Box marginLeft={2}>
             <Text color={theme.text.secondary}>
               <CliSpinner /> Updating
