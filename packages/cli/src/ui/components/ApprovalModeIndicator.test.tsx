@@ -35,7 +35,7 @@ describe('ApprovalModeIndicator', () => {
   });
 
   it('renders correctly for YOLO mode', async () => {
-    const { lastFrame, waitUntilReady } = await render(
+    const { lastFrame } = await render(
       <ApprovalModeIndicator
         approvalMode={ApprovalMode.DEFAULT}
         isWildcardPolicyEnabled={true}
