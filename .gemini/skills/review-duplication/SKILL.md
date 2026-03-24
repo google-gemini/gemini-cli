@@ -23,7 +23,7 @@ Think about where this type of code *would* live if it already existed in the pr
 - **Data Access:** `api/`, `services/`, `repositories/`
 - **Constants:** `constants/`, `config/`, `types/`
 
-**Trace Third-Party Dependencies:** If the PR introduces a new import for a utility library (e.g., `lodash.merge`, `date-fns`), immediately run a `grep_search` for that import string across the codebase to see how and where the project currently uses that library. There is likely an existing wrapper or shared utility.
+**Trace Third-Party Dependencies:** If the PR introduces a new import for a utility library (e.g., `lodash.merge`, `date-fns`), immediately run a `grep_search` for that import string across the codebase to see how and where the project currently uses that library. Use the `include_pattern` (e.g., `packages/*/src/**`) to narrow your search and save context. There is likely an existing wrapper or shared utility.
 
 **Check Package Files:** Before flagging a custom implementation of a complex algorithm, check `package.json` to see if a standard library (like `lodash` or `uuid`) is already installed that provides this functionality.
 
@@ -60,7 +60,7 @@ Example comment:
 >
 > You can replace your implementation by importing it like this:
 > ```typescript
-> import { formatDate } from '@/utils/dateHelpers';
+> import { formatDate } from '../utils/dateHelpers';
 > 
 > // Then use it here:
 > const displayDate = formatDate(userDate, 'MMM Do, YYYY');
