@@ -19,6 +19,7 @@ import {
   getShellConfiguration,
   initializeShellParsers,
   parseCommandDetails,
+  splitCommands,
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
@@ -119,8 +120,10 @@ describe('getCommandRoots', () => {
     expect(getCommandRoots('ls -l')).toEqual(['ls']);
   });
 
-  it('should handle paths and return the binary name', () => {
-    expect(getCommandRoots('/usr/local/bin/node script.js')).toEqual(['node']);
+  it('should handle paths and return the full path', () => {
+    expect(getCommandRoots('/usr/local/bin/node script.js')).toEqual([
+      '/usr/local/bin/node',
+    ]);
   });
 
   it('should return an empty array for an empty string', () => {
@@ -299,6 +302,40 @@ describeWindowsOnly('PowerShell integration', () => {
     const roots = getCommandRoots('Get-ChildItem | Select-Object Name');
     expect(roots.length).toBeGreaterThan(0);
     expect(roots).toContain('Get-ChildItem');
+  });
+});
+
+describe('splitCommands', () => {
+  it('should split chained commands', () => {
+    expect(splitCommands('ls -l && git status')).toEqual([
+      'ls -l',
+      'git status',
+    ]);
+  });
+
+  it('should filter out redirection tokens but keep command parts', () => {
+    // Standard redirection
+    expect(splitCommands('echo "hello" > file.txt')).toEqual(['echo "hello"']);
+    expect(splitCommands('printf "test" >> log.txt')).toEqual([
+      'printf "test"',
+    ]);
+    expect(splitCommands('cat < input.txt')).toEqual(['cat']);
+
+    // Heredoc/Herestring
+    expect(splitCommands('cat << EOF\nhello\nEOF')).toEqual(['cat']);
+    // Note: The Tree-sitter bash parser includes the herestring in the main
+    // command node's text, unlike standard redirections which are siblings.
+    expect(splitCommands('grep "foo" <<< "foobar"')).toEqual([
+      'grep "foo" <<< "foobar"',
+    ]);
+  });
+
+  it('should extract nested commands from process substitution while filtering the redirection operator', () => {
+    // This is the key security test: we want cat to be checked, but not the > >(...) wrapper part
+    const parts = splitCommands('echo "foo" > >(cat)');
+    expect(parts).toContain('echo "foo"');
+    expect(parts).toContain('cat');
+    expect(parts.some((p) => p.includes('>'))).toBe(false);
   });
 });
 

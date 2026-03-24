@@ -4,18 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import fs from 'node:fs';
+import { join, dirname, normalize } from 'node:path';
 import os from 'node:os';
 import {
   type SandboxManager,
+  type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
+  GOVERNANCE_FILES,
+  sanitizePaths,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-  type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 
 let cachedBpfPath: string | undefined;
@@ -71,33 +73,39 @@ function getSeccompBpfPath(): string {
   }
 
   const bpfPath = join(os.tmpdir(), `gemini-cli-seccomp-${process.pid}.bpf`);
-  writeFileSync(bpfPath, buf);
+  fs.writeFileSync(bpfPath, buf);
   cachedBpfPath = bpfPath;
   return bpfPath;
 }
 
 /**
- * Options for configuring the LinuxSandboxManager.
+ * Ensures a file or directory exists.
  */
-export interface LinuxSandboxOptions {
-  /** The primary workspace path to bind into the sandbox. */
-  workspace: string;
-  /** Additional paths to bind into the sandbox. */
-  allowedPaths?: string[];
-  /** Optional base sanitization config. */
-  sanitizationConfig?: EnvironmentSanitizationConfig;
+function touch(filePath: string, isDirectory: boolean) {
+  try {
+    // If it exists (even as a broken symlink), do nothing
+    if (fs.lstatSync(filePath)) return;
+  } catch {
+    // Ignore ENOENT
+  }
+
+  if (isDirectory) {
+    fs.mkdirSync(filePath, { recursive: true });
+  } else {
+    fs.mkdirSync(dirname(filePath), { recursive: true });
+    fs.closeSync(fs.openSync(filePath, 'a'));
+  }
 }
 
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 export class LinuxSandboxManager implements SandboxManager {
-  constructor(private readonly options: LinuxSandboxOptions) {}
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const sanitizationConfig = getSecureSanitizationConfig(
-      req.config?.sanitizationConfig,
-      this.options.sanitizationConfig,
+      req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
@@ -121,12 +129,34 @@ export class LinuxSandboxManager implements SandboxManager {
       this.options.workspace,
     ];
 
-    const allowedPaths = this.options.allowedPaths ?? [];
-    for (const path of allowedPaths) {
-      if (path !== this.options.workspace) {
-        bwrapArgs.push('--bind', path, path);
+    // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
+    // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
+    // In bwrap, later binds override earlier ones for the same path.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(this.options.workspace, file.path);
+      touch(filePath, file.isDirectory);
+
+      const realPath = fs.realpathSync(filePath);
+
+      bwrapArgs.push('--ro-bind', filePath, filePath);
+      if (realPath !== filePath) {
+        bwrapArgs.push('--ro-bind', realPath, realPath);
       }
     }
+
+    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    const normalizedWorkspace = normalize(this.options.workspace).replace(
+      /\/$/,
+      '',
+    );
+    for (const allowedPath of allowedPaths) {
+      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
+      if (normalizedAllowedPath !== normalizedWorkspace) {
+        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
+      }
+    }
+
+    // TODO: handle forbidden paths
 
     const bpfPath = getSeccompBpfPath();
 

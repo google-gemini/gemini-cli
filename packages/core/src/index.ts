@@ -43,7 +43,6 @@ export * from './core/prompts.js';
 export * from './core/tokenLimits.js';
 export * from './core/turn.js';
 export * from './core/geminiRequest.js';
-export * from './core/coreToolScheduler.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
@@ -180,6 +179,31 @@ export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
+
+// Export agent session interface
+export * from './agent/agent-session.js';
+export * from './agent/legacy-agent-session.js';
+export * from './agent/event-translator.js';
+export * from './agent/content-utils.js';
+// Agent event types — namespaced to avoid collisions with existing exports
+export type {
+  AgentEvent,
+  AgentEventCommon,
+  AgentEventData,
+  AgentEnd,
+  AgentEvents as AgentEventMap,
+  AgentEventType,
+  AgentProtocol,
+  AgentSend,
+  AgentStart,
+  ContentPart,
+  ErrorData,
+  StreamEndReason,
+  Trajectory,
+  Unsubscribe,
+  Usage as AgentUsage,
+  WithMeta,
+} from './agent/types.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
