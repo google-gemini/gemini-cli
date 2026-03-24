@@ -142,13 +142,6 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
   (subpath (param "WORKSPACE"))
 )
 
-; Explicit workspace write access
-(if (defined? 'WORKSPACE_WRITE)
-    (allow file-write*
-        (subpath (param "WORKSPACE"))
-    )
-)
-
 `;
 
 /**

@@ -68,9 +68,14 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
   const workspacePath = tryRealpath(options.workspace);
   args.push('-D', `WORKSPACE=${workspacePath}`);
+  args.push('-D', `WORKSPACE_RAW=${options.workspace}`);
+  profile += `(allow file-read* (subpath (param "WORKSPACE_RAW")))\n`;
+  if (options.workspaceWrite) {
+    profile += `(allow file-write* (subpath (param "WORKSPACE_RAW")))\n`;
+  }
 
   if (options.workspaceWrite) {
-    args.push('-D', 'WORKSPACE_WRITE=1');
+    profile += `(allow file-write* (subpath (param "WORKSPACE")))\n`;
   }
 
   // Auto-detect and support git worktrees by granting read and write access to the underlying git directory

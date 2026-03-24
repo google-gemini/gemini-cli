@@ -1186,12 +1186,19 @@ export class Config implements McpContext, AgentLoopContext {
       params.policyUpdateConfirmationRequest;
 
     this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
+    const engineApprovalMode =
+      params.approvalMode ??
+      params.policyEngineConfig?.approvalMode ??
+      ApprovalMode.DEFAULT;
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
-        approvalMode:
-          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+        approvalMode: engineApprovalMode,
         disableAlwaysAllow: this.disableAlwaysAllow,
+        toolSandboxEnabled: this.getSandboxEnabled(),
+        sandboxApprovedTools:
+          this.sandboxPolicyManager?.getModeConfig(engineApprovalMode)
+            ?.approvedTools ?? [],
       },
       checkerRunner,
     );
@@ -2379,7 +2386,10 @@ export class Config implements McpContext, AgentLoopContext {
       );
     }
 
-    this.policyEngine.setApprovalMode(mode);
+    this.policyEngine.setApprovalMode(
+      mode,
+      this.sandboxPolicyManager?.getModeConfig(mode)?.approvedTools ?? [],
+    );
     this.refreshSandboxManager();
 
     const isPlanModeTransition =

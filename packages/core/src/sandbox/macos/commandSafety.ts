@@ -6,7 +6,17 @@
 import { parse as shellParse } from 'shell-quote';
 
 /**
- * Checks if a command with its arguments is known to be safe to execute.
+ * Checks if a command with its arguments is known to be safe to execute
+ * without requiring user confirmation. This is primarily used to allow
+ * harmless, read-only commands to run silently in the macOS sandbox.
+ *
+ * It handles raw command execution as well as wrapped commands like `bash -c "..."` or `bash -lc "..."`.
+ * For wrapped commands, it parses the script and ensures all individual
+ * sub-commands are in the known-safe list and no dangerous shell operators
+ * (like subshells or redirection) are used.
+ *
+ * @param args - The command and its arguments (e.g., ['ls', '-la'])
+ * @returns true if the command is considered safe, false otherwise.
  */
 export function isKnownSafeCommand(args: string[]): boolean {
   if (!args || args.length === 0) {
@@ -62,6 +72,15 @@ export function isKnownSafeCommand(args: string[]): boolean {
   return false;
 }
 
+/**
+ * Core validation logic that checks a single command and its arguments
+ * against an allowlist of known safe operations. It performs deep validation
+ * for specific tools like `base64`, `find`, `rg`, `git`, and `sed` to ensure
+ * unsafe flags (like `--output`, `-exec`, or mutating options) are not used.
+ *
+ * @param args - The command and its arguments.
+ * @returns true if the command is strictly read-only and safe.
+ */
 function isSafeToCallWithExec(args: string[]): boolean {
   if (!args || args.length === 0) return false;
   const cmd = args[0];
@@ -182,6 +201,14 @@ function isSafeToCallWithExec(args: string[]): boolean {
   return false;
 }
 
+/**
+ * Helper to identify which git subcommand is being executed, skipping over
+ * global git options like `-c` or `--git-dir`.
+ *
+ * @param args - The full git command arguments.
+ * @param subcommands - A list of subcommands to look for.
+ * @returns An object containing the index of the subcommand and its name.
+ */
 function findGitSubcommand(
   args: string[],
   subcommands: string[],
@@ -236,6 +263,14 @@ function findGitSubcommand(
   return { idx: -1, subcommand: null };
 }
 
+/**
+ * Checks if a git command contains global configuration override flags
+ * (e.g., `-c` or `--config-env`) which could be used maliciously to
+ * execute arbitrary code via git config.
+ *
+ * @param args - The git command arguments.
+ * @returns true if config overrides are present.
+ */
 function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
   return args.some(
     (arg) =>
@@ -246,6 +281,14 @@ function gitHasConfigOverrideGlobalOption(args: string[]): boolean {
   );
 }
 
+/**
+ * Validates that the arguments for safe git subcommands (like `status`, `log`,
+ * `diff`, `show`) do not contain flags that could cause mutations or execute
+ * arbitrary commands (e.g., `--output`, `--exec`).
+ *
+ * @param args - Arguments passed to the git subcommand.
+ * @returns true if the arguments only represent read-only operations.
+ */
 function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
   const unsafeFlags = new Set([
     '--output',
@@ -263,6 +306,13 @@ function gitSubcommandArgsAreReadOnly(args: string[]): boolean {
   );
 }
 
+/**
+ * Validates that `git branch` is only used for read operations
+ * (e.g., listing branches) rather than creating, deleting, or renaming branches.
+ *
+ * @param args - Arguments passed to `git branch`.
+ * @returns true if it's purely a listing/read-only branch command.
+ */
 function gitBranchIsReadOnly(args: string[]): boolean {
   if (args.length === 0) return true;
 
@@ -292,6 +342,13 @@ function gitBranchIsReadOnly(args: string[]): boolean {
   return sawReadOnlyFlag;
 }
 
+/**
+ * Ensures that a `sed` command argument is a valid line-printing instruction
+ * (e.g., `10p` or `5,10p`), preventing unsafe script execution in `sed`.
+ *
+ * @param arg - The script argument passed to `sed -n`.
+ * @returns true if it's a valid, safe print command.
+ */
 function isValidSedNArg(arg: string | undefined): boolean {
   if (!arg) return false;
 
@@ -312,7 +369,13 @@ function isValidSedNArg(arg: string | undefined): boolean {
 }
 
 /**
- * Checks if a command with its arguments is known to be dangerous to execute.
+ * Checks if a command with its arguments is explicitly known to be dangerous
+ * and should be blocked or require strict user confirmation. This catches
+ * destructive commands like `rm -rf`, `sudo`, and commands with execution
+ * flags like `find -exec`.
+ *
+ * @param args - The command and its arguments.
+ * @returns true if the command is identified as dangerous, false otherwise.
  */
 export function isDangerousCommand(args: string[]): boolean {
   if (!args || args.length === 0) {

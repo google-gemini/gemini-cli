@@ -197,6 +197,8 @@ export class PolicyEngine {
   private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
+  private toolSandboxEnabled: boolean;
+  private sandboxApprovedTools: string[];
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -213,13 +215,18 @@ export class PolicyEngine {
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+    this.toolSandboxEnabled = config.toolSandboxEnabled ?? false;
+    this.sandboxApprovedTools = config.sandboxApprovedTools ?? [];
   }
 
   /**
    * Update the current approval mode.
    */
-  setApprovalMode(mode: ApprovalMode): void {
+  setApprovalMode(mode: ApprovalMode, sandboxApprovedTools?: string[]): void {
     this.approvalMode = mode;
+    if (sandboxApprovedTools !== undefined) {
+      this.sandboxApprovedTools = sandboxApprovedTools;
+    }
   }
 
   /**
@@ -240,12 +247,19 @@ export class PolicyEngine {
     command: string,
     allowRedirection?: boolean,
   ): boolean {
-    return (
-      !allowRedirection &&
-      hasRedirection(command) &&
-      this.approvalMode !== ApprovalMode.AUTO_EDIT &&
-      this.approvalMode !== ApprovalMode.YOLO
-    );
+    if (allowRedirection) return false;
+    if (!hasRedirection(command)) return false;
+
+    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    if (
+      this.toolSandboxEnabled &&
+      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
+        this.approvalMode === ApprovalMode.YOLO)
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -258,15 +272,20 @@ export class PolicyEngine {
   ): Promise<PolicyDecision> {
     await initializeShellParsers();
     try {
-      const parsedArgs = shellParse(command).map(String);
+      const parsedObjArgs = shellParse(command);
+      if (parsedObjArgs.some((arg) => typeof arg === 'object')) return decision;
+      const parsedArgs = parsedObjArgs.map(String);
       if (isDangerousCommand(parsedArgs)) {
         debugLogger.debug(
           `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
         );
         return PolicyDecision.ASK_USER;
       }
+      const isApprovedBySandbox =
+        this.toolSandboxEnabled &&
+        this.sandboxApprovedTools.includes(parsedArgs[0]);
       if (
-        isKnownSafeCommand(parsedArgs) &&
+        (isKnownSafeCommand(parsedArgs) || isApprovedBySandbox) &&
         decision === PolicyDecision.ASK_USER
       ) {
         debugLogger.debug(

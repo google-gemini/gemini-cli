@@ -329,7 +329,11 @@ describe('PolicyEngine', () => {
       );
 
       // Switch to autoEdit mode
-      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+        toolSandboxEnabled: true,
+      });
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
       );
@@ -1572,7 +1576,7 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({ rules });
+      engine = new PolicyEngine({ rules, toolSandboxEnabled: true });
       engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
 
       const result = await engine.check(
