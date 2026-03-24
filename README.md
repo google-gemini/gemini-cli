@@ -1,10 +1,286 @@
-# Gemini CLI
+<div align="center">
+
+<img src="./EXP_CLI.png" alt="Gemini CLI Experimental" width="100%" />
+
+# Gemini CLI — Experimental Fork
+
+[![Version](https://img.shields.io/badge/version-0.36.0--experimental-orange?style=for-the-badge)](.)
+[![License](https://img.shields.io/github/license/google-gemini/gemini-cli?style=for-the-badge)](./LICENSE)
+[![Beta](https://img.shields.io/badge/status-beta-red?style=for-the-badge)](.)
+[![Built on](https://img.shields.io/badge/built%20on-Gemini%20CLI-blue?style=for-the-badge)](https://github.com/google-gemini/gemini-cli)
+
+> **This is not the official Gemini CLI.** This is an experimental fork that
+> changes how the agent navigates codebases at a protocol level. Use at your own
+> risk. Things will break. That is expected.
+
+</div>
+
+---
+
+## What Makes This Different
+
+The official Gemini CLI uses a standard **ReAct loop** (Reason → Act → Observe)
+where codebase navigation resolves through file I/O — grep, read_file, glob —
+iterating 4–10 turns per navigation query, burning tokens and time proportional
+to codebase size.
+
+This fork introduces **G+ReAct** — Graph-Index-Augmented ReAct.
+
+```
+Standard ReAct                          G+ReAct
+──────────────────────────────────      ──────────────────────────────────
+Reason: "find set_stance"               Reason: "find set_stance"
+Act:    grep_search("set_stance")       Act:    graph_search("set_stance")
+Obs:    50 matches, 12 files            Obs:    { file, line, callers,
+Reason: "narrow down"                            callees } in ~130ms
+Act:    read_file(...)                  Reason: "done navigating"
+Act:    read_file(...)
+...  (6–10 more turns)
+```
+
+A SQLite-backed code index (`.gemini/gemini.idx`) is built once with `/idx` and
+then **auto-refreshed every session start and every hour**. Every agent — main
+model and subagents — queries the graph before touching the filesystem.
+
+The result on a large codebase (PyTorch, ~6,330 files, 1.2M call edges):
+
+| Metric                          | Standard | G+ReAct |
+| ------------------------------- | -------- | ------- |
+| `read_file` calls per nav query | 5–8      | 0       |
+| Graph tool calls                | 0        | 13      |
+| Subagent duration               | 2m 21s   | —       |
+| Total tokens                    | ~389k    | ~240k   |
+| Cache hit rate                  | 35.8%    | 89.1%   |
+| Avg lookup latency              | —        | 134ms   |
+
+For the full technical breakdown of the implementation, the loop mechanics, and
+how G+ReAct differs from standard ReAct at the code level, read
+**[idx_readme.md](./idx_readme.md)**.
+
+---
+
+## Key Changes vs Official CLI
+
+| Area                  | Official CLI                 | This Fork                                    |
+| --------------------- | ---------------------------- | -------------------------------------------- |
+| Codebase navigation   | grep + read_file loop        | `graph_search` / `graph_query` — single turn |
+| Subagent tool access  | grep, ls, read_file only     | Graph tools available to all agents          |
+| GEMINI.md on re-index | Overwritten                  | Smart write — prepends only missing lines    |
+| Index freshness       | Manual `/idx`                | Auto-refresh at session start + every 1hr    |
+| Loop convergence      | O(files matching grep) turns | O(1) turns for symbol navigation             |
+| Startup banner        | Default diamond icon         | — you can see it above                       |
+
+---
+
+## ⚠️ Beta Disclaimer
+
+This fork is in **active development and beta stage**. You should:
+
+- Expect breaking changes between versions
+- Not use this in production workflows without understanding the changes
+- Take full responsibility for any issues arising from use of this experimental
+  build
+- Treat the graph index as a best-effort cache — it can be stale or incomplete
+
+You have been warned. Now install it.
+
+---
+
+## Installation
+
+### From Source (GitHub)
+
+```bash
+# Clone this fork
+git clone https://github.com/[repo-coming-soon]/gemini-cli-experimental
+cd gemini-cli-experimental
+
+# Install dependencies and build
+npm install
+npm run build
+
+# Link globally
+npm link
+```
+
+> The npm package link will be updated here once published. For now, build from
+> source.
+
+### Using npm (once published)
+
+```bash
+npm install -g @google/gemini-cli-experimental
+```
+
+### Run
+
+```bash
+gemini
+```
+
+---
+
+## Getting Started with Code Indexing
+
+Once installed, navigate to your project directory and initialize the graph
+index:
+
+```bash
+cd your-project/
+gemini
+
+# Inside the CLI — run once to build the index
+/idx
+```
+
+After that, the index auto-refreshes every time you start a session and every
+hour while a session is running. You never need to manually run `/idx` again
+unless you want to force an immediate re-index.
+
+**Query the graph directly:**
+
+```bash
+> Where is the processPayment function defined?
+> What calls validateUser?
+> Trace the full call chain from handleRequest
+```
+
+The agent will use `graph_search` and `graph_query` instead of scanning files.
+
+---
+
+## 🔐 Authentication
+
+This fork uses the same authentication as the official CLI. All three options
+work:
+
+### Option 1 — Sign in with Google (recommended)
+
+Best for individual developers. Free tier: 60 req/min, 1,000 req/day.
+
+```bash
+gemini
+# Choose "Sign in with Google" and follow the browser flow
+```
+
+### Option 2 — Gemini API Key
+
+```bash
+export GEMINI_API_KEY="YOUR_API_KEY"
+gemini
+```
+
+Get your key at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey).
+
+### Option 3 — Vertex AI (Enterprise)
+
+```bash
+export GOOGLE_API_KEY="YOUR_API_KEY"
+export GOOGLE_GENAI_USE_VERTEXAI=true
+gemini
+```
+
+For full auth documentation see the
+[upstream auth guide](./docs/get-started/authentication.md).
+
+---
+
+## Usage
+
+Everything from the official CLI works. The fork adds:
+
+| Command                | What it does                                                  |
+| ---------------------- | ------------------------------------------------------------- |
+| `/idx`                 | Build or rebuild the code graph index for the current project |
+| `graph_search("name")` | Find where a symbol is defined — file, line, args             |
+| `graph_query("name")`  | Trace full caller/callee chain for a symbol                   |
+
+Standard CLI commands (`/help`, `/chat`, `/clear`, `/bug`, etc.) are unchanged.
+
+```bash
+# Start in current directory
+gemini
+
+# Non-interactive
+gemini -p "What calls the authenticate function?"
+
+# Specific model
+gemini -m gemini-2.5-flash
+```
+
+---
+
+## How the Index Works
+
+```
+/idx  →  GraphService.indexProject()
+           ├── walks all files under project root
+           ├── skips unchanged files (hash-based manifest)
+           ├── parses functions, classes, call edges into SQLite
+           └── writes GEMINI.md (smart: never overwrites existing content)
+
+Session start  →  autoIndex.ts
+                   ├── checks .gemini/gemini.idx exists
+                   ├── setImmediate: re-index in background after UI renders
+                   └── setInterval(1hr).unref(): hourly refresh, won't block exit
+```
+
+The index file lives at `.gemini/gemini.idx`. Add `.gemini/` to your
+`.gitignore` — it is a local cache, not source code.
+
+**Full technical implementation details → [idx_readme.md](./idx_readme.md)**
+
+---
+
+## Based On
+
+This is a fork of the official
+[google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) (Apache
+2.0). The core ReAct loop, authentication, tool infrastructure, and MCP support
+are upstream. The graph index, G+ReAct routing, auto-indexing, and smart
+GEMINI.md write are additions in this fork.
+
+Upstream documentation: [geminicli.com/docs](https://geminicli.com/docs)
+
+---
+
+## Contributing
+
+This is experimental research-grade software. If you find issues or want to
+extend the graph index:
+
+- Open an issue describing what broke and on what codebase
+- PRs welcome — especially for language coverage beyond Python (C++, Go, Rust
+  call edge parsing)
+- Read [idx_readme.md](./idx_readme.md) before touching anything in
+  `graphService.ts` or `graphTools.ts`
+
+---
+
+<div align="center">
+
+**Not affiliated with Google. Not the official Gemini CLI.** **Fork responsibly.
+Index everything.**
+
+</div>
+
+---
+
+---
+
+# Original Gemini CLI README
+
+> Everything below is the upstream README from
+> [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli),
+> preserved in full. All credit to the Google Gemini team.
+
+---
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
-[![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
 ![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
 
@@ -38,7 +314,6 @@ for recommended system specifications and a detailed installation guide.
 #### Run instantly with npx
 
 ```bash
-# Using npx (no installation required)
 npx @google/gemini-cli
 ```
 
@@ -63,11 +338,8 @@ sudo port install gemini-cli
 #### Install with Anaconda (for restricted environments)
 
 ```bash
-# Create and activate a new environment
 conda create -y -n gemini_env -c conda-forge nodejs
 conda activate gemini_env
-
-# Install Gemini CLI globally via npm (inside the environment)
 npm install -g @google/gemini-cli
 ```
 
@@ -77,29 +349,17 @@ See [Releases](./docs/releases.md) for more details.
 
 ### Preview
 
-New preview releases will be published each week at UTC 23:59 on Tuesdays. These
-releases will not have been fully vetted and may contain regressions or other
-outstanding issues. Please help us test and install with `preview` tag.
-
 ```bash
 npm install -g @google/gemini-cli@preview
 ```
 
 ### Stable
 
-- New stable releases will be published each week at UTC 20:00 on Tuesdays, this
-  will be the full promotion of last week's `preview` release + any bug fixes
-  and validations. Use `latest` tag.
-
 ```bash
 npm install -g @google/gemini-cli@latest
 ```
 
 ### Nightly
-
-- New releases will be published each day at UTC 00:00. This will be all changes
-  from the main branch as represented at time of release. It should be assumed
-  there are pending validations and issues. Use `nightly` tag.
 
 ```bash
 npm install -g @google/gemini-cli@nightly
@@ -150,9 +410,7 @@ Choose the authentication method that best fits your needs:
 ### Option 1: Sign in with Google (OAuth login using your Google Account)
 
 **✨ Best for:** Individual developers as well as anyone who has a Gemini Code
-Assist License. (see
-[quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas)
-for details)
+Assist License.
 
 **Benefits:**
 
@@ -161,16 +419,12 @@ for details)
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-#### Start Gemini CLI, then choose _Sign in with Google_ and follow the browser authentication flow when prompted
-
 ```bash
 gemini
 ```
 
-#### If you are using a paid Code Assist License from your organization, remember to set the Google Cloud Project
-
 ```bash
-# Set your Google Cloud Project
+# Set your Google Cloud Project (for paid Code Assist License)
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 gemini
 ```
@@ -178,12 +432,6 @@ gemini
 ### Option 2: Gemini API Key
 
 **✨ Best for:** Developers who need specific model control or paid tier access
-
-**Benefits:**
-
-- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
-- **Model selection**: Choose specific Gemini models
-- **Usage-based billing**: Upgrade for higher limits when needed
 
 ```bash
 # Get your key from https://aistudio.google.com/apikey
@@ -195,14 +443,7 @@ gemini
 
 **✨ Best for:** Enterprise teams and production workloads
 
-**Benefits:**
-
-- **Enterprise features**: Advanced security and compliance
-- **Scalable**: Higher rate limits with billing account
-- **Integration**: Works with existing Google Cloud infrastructure
-
 ```bash
-# Get your key from Google Cloud Console
 export GOOGLE_API_KEY="YOUR_API_KEY"
 export GOOGLE_GENAI_USE_VERTEXAI=true
 gemini
@@ -215,59 +456,35 @@ For Google Workspace accounts and other authentication methods, see the
 
 ### Basic Usage
 
-#### Start in current directory
-
 ```bash
+# Start in current directory
 gemini
-```
 
-#### Include multiple directories
-
-```bash
+# Include multiple directories
 gemini --include-directories ../lib,../docs
-```
 
-#### Use specific model
-
-```bash
+# Use specific model
 gemini -m gemini-2.5-flash
-```
 
-#### Non-interactive mode for scripts
-
-Get a simple text response:
-
-```bash
+# Non-interactive
 gemini -p "Explain the architecture of this codebase"
-```
 
-For more advanced scripting, including how to parse JSON and handle errors, use
-the `--output-format json` flag to get structured output:
-
-```bash
+# Structured output
 gemini -p "Explain the architecture of this codebase" --output-format json
-```
 
-For real-time event streaming (useful for monitoring long-running operations),
-use `--output-format stream-json` to get newline-delimited JSON events:
-
-```bash
+# Streaming
 gemini -p "Run tests and deploy" --output-format stream-json
 ```
 
 ### Quick Examples
 
-#### Start a new project
-
 ```bash
+# Start a new project
 cd new-project/
 gemini
 > Write me a Discord bot that answers questions using a FAQ.md file I will provide
-```
 
-#### Analyze existing code
-
-```bash
+# Analyze existing code
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
 gemini
@@ -278,26 +495,18 @@ gemini
 
 ### Getting Started
 
-- [**Quickstart Guide**](./docs/get-started/index.md) - Get up and running
-  quickly.
-- [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
-  auth configuration.
-- [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
-  customization.
-- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
-  Productivity tips.
+- [**Quickstart Guide**](./docs/get-started/index.md)
+- [**Authentication Setup**](./docs/get-started/authentication.md)
+- [**Configuration Guide**](./docs/reference/configuration.md)
+- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md)
 
 ### Core Features
 
-- [**Commands Reference**](./docs/reference/commands.md) - All slash commands
-  (`/help`, `/chat`, etc).
-- [**Custom Commands**](./docs/cli/custom-commands.md) - Create your own
-  reusable commands.
-- [**Context Files (GEMINI.md)**](./docs/cli/gemini-md.md) - Provide persistent
-  context to Gemini CLI.
-- [**Checkpointing**](./docs/cli/checkpointing.md) - Save and resume
-  conversations.
-- [**Token Caching**](./docs/cli/token-caching.md) - Optimize token usage.
+- [**Commands Reference**](./docs/reference/commands.md)
+- [**Custom Commands**](./docs/cli/custom-commands.md)
+- [**Context Files (GEMINI.md)**](./docs/cli/gemini-md.md)
+- [**Checkpointing**](./docs/cli/checkpointing.md)
+- [**Token Caching**](./docs/cli/token-caching.md)
 
 ### Tools & Extensions
 
@@ -305,32 +514,23 @@ gemini
   - [File System Operations](./docs/tools/file-system.md)
   - [Shell Commands](./docs/tools/shell.md)
   - [Web Fetch & Search](./docs/tools/web-fetch.md)
-- [**MCP Server Integration**](./docs/tools/mcp-server.md) - Extend with custom
-  tools.
-- [**Custom Extensions**](./docs/extensions/index.md) - Build and share your own
-  commands.
+- [**MCP Server Integration**](./docs/tools/mcp-server.md)
+- [**Custom Extensions**](./docs/extensions/index.md)
 
 ### Advanced Topics
 
-- [**Headless Mode (Scripting)**](./docs/cli/headless.md) - Use Gemini CLI in
-  automated workflows.
-- [**IDE Integration**](./docs/ide-integration/index.md) - VS Code companion.
-- [**Sandboxing & Security**](./docs/cli/sandbox.md) - Safe execution
-  environments.
-- [**Trusted Folders**](./docs/cli/trusted-folders.md) - Control execution
-  policies by folder.
-- [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
-  corporate environment.
-- [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
-- [**Local development**](./docs/local-development.md) - Local development
-  tooling.
+- [**Headless Mode (Scripting)**](./docs/cli/headless.md)
+- [**IDE Integration**](./docs/ide-integration/index.md)
+- [**Sandboxing & Security**](./docs/cli/sandbox.md)
+- [**Trusted Folders**](./docs/cli/trusted-folders.md)
+- [**Enterprise Guide**](./docs/cli/enterprise.md)
+- [**Telemetry & Monitoring**](./docs/cli/telemetry.md)
+- [**Local development**](./docs/local-development.md)
 
 ### Troubleshooting & Support
 
-- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common
-  issues and solutions.
-- [**FAQ**](./docs/resources/faq.md) - Frequently asked questions.
+- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md)
+- [**FAQ**](./docs/resources/faq.md)
 - Use `/bug` command to report issues directly from the CLI.
 
 ### Using MCP Servers
@@ -365,28 +565,13 @@ for planned features and priorities.
 
 ## 📖 Resources
 
-- **[Official Roadmap](./ROADMAP.md)** - See what's coming next.
-- **[Changelog](./docs/changelogs/index.md)** - See recent notable updates.
-- **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package
-  registry.
-- **[GitHub Issues](https://github.com/google-gemini/gemini-cli/issues)** -
-  Report bugs or request features.
-- **[Security Advisories](https://github.com/google-gemini/gemini-cli/security/advisories)** -
-  Security updates.
+- **[Official Roadmap](./ROADMAP.md)**
+- **[Changelog](./docs/changelogs/index.md)**
+- **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)**
+- **[GitHub Issues](https://github.com/google-gemini/gemini-cli/issues)**
+- **[Security Advisories](https://github.com/google-gemini/gemini-cli/security/advisories)**
 
 ### Uninstall
 
 See the [Uninstall Guide](./docs/resources/uninstall.md) for removal
 instructions.
-
-## 📄 Legal
-
-- **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**: [Terms & Privacy](./docs/resources/tos-privacy.md)
-- **Security**: [Security Policy](SECURITY.md)
-
----
-
-<p align="center">
-  Built with ❤️ by Google and the open source community
-</p>

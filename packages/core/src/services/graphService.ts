@@ -358,18 +358,30 @@ export class GraphService {
 
   private writeGeminiMd(_db: Database.Database) {
     const projectName = path.basename(path.resolve(this.root));
-    const lines = [
+    const newLines = [
       `# ${projectName} — Code Index`,
       '',
       'LOCATIONS only — no callers/callees. Use graph_search(name) before editing any symbol.',
       'graph_search=definition+callers+callees | graph_query=full call chain | grep_search=strings only',
     ];
 
-    // Write to project root so gemini-cli auto-loads it on every session
-    fs.writeFileSync(
-      path.join(this.root, 'GEMINI.md'),
-      lines.join('\n') + '\n',
+    const geminiMdPath = path.join(this.root, 'GEMINI.md');
+
+    // If file doesn't exist, create it fresh
+    if (!fs.existsSync(geminiMdPath)) {
+      fs.writeFileSync(geminiMdPath, newLines.join('\n') + '\n');
+      return;
+    }
+
+    // File exists — prepend only the lines that aren't already present
+    const existing = fs.readFileSync(geminiMdPath, 'utf8');
+    const missing = newLines.filter(
+      (line) => line.trim() !== '' && !existing.includes(line),
     );
+
+    if (missing.length > 0) {
+      fs.writeFileSync(geminiMdPath, missing.join('\n') + '\n\n' + existing);
+    }
   }
 
   queryGraph(search: string): any[] {

@@ -17,6 +17,7 @@ import {
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
+import { startAutoIndex } from './autoIndex.js';
 import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
 
 export interface InitializationResult {
@@ -59,6 +60,9 @@ export async function initializeApp(
     await ideClient.connect();
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
+
+  // Auto-refresh idx in background if it already exists
+  startAutoIndex(config.getTargetDir());
 
   return {
     authError,

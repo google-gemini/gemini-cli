@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import Gradient from 'ink-gradient';
 import { UserIdentity } from './UserIdentity.js';
 import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -41,11 +42,21 @@ const MAC_TERMINAL_ICON = `▝▜▄
   ▗▟▀
 ▗▟▀  `;
 
-const EXPERIMENTAL_ICON = `  ★  
- ★★★ 
-★★★★★
- ★★★ 
-  ★  `;
+const EXP_GRADIENT = ['#FF8C00', '#FFA500', '#FF6347'];
+
+const EXPERIMENTAL_LOGO = ` ████       ██████  ███████ ███    ███ ██ ███    ██ ██      ██████ ██      ██      ███████ ██   ██ ██████
+  ████     ██       ██      ████  ████ ██ ████   ██ ██     ██      ██      ██      ██       ██ ██  ██   ██
+   ████    ██   ███ █████   ██ ████ ██ ██ ██ ██  ██ ██     ██      ██      ██      █████     ███   ██████
+  ████     ██    ██ ██      ██  ██  ██ ██ ██  ██ ██ ██     ██      ██      ██      ██       ██ ██  ██
+ ████       ██████  ███████ ██      ██ ██ ██   ████ ██      ██████ ███████ ██      ███████ ██   ██ ██      `;
+
+const ExperimentalIcon = ({ width }: { width: number }) => (
+  <Box flexDirection="column" width={width} alignItems="center" marginTop={1}>
+    <Gradient colors={EXP_GRADIENT}>
+      <Text bold>{EXPERIMENTAL_LOGO}</Text>
+    </Gradient>
+  </Box>
+);
 
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
@@ -59,15 +70,8 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
     settings.merged.ui.hideBanner || config.getScreenReader()
   );
 
-  let ICON = isAppleTerminal() ? MAC_TERMINAL_ICON : DEFAULT_ICON;
-  if (version.includes('experimental')) {
-    ICON = EXPERIMENTAL_ICON;
-  }
-  const iconElement = version.includes('experimental') ? (
-    <Text color="yellow">{ICON}</Text>
-  ) : (
-    <ThemedGradient>{ICON}</ThemedGradient>
-  );
+  const ICON = isAppleTerminal() ? MAC_TERMINAL_ICON : DEFAULT_ICON;
+  const iconElement = <ThemedGradient>{ICON}</ThemedGradient>;
 
   if (!showDetails) {
     return (
@@ -96,43 +100,80 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
 
   return (
     <Box flexDirection="column">
-      {showHeader && (
-        <Box flexDirection="row" marginTop={1} marginBottom={1} paddingLeft={2}>
-          <Box flexShrink={0}>{iconElement}</Box>
-          <Box marginLeft={2} flexDirection="column">
-            {/* Line 1: Gemini CLI vVersion [Updating] */}
-            <Box>
-              <Text
-                bold
-                color={
-                  version.includes('experimental')
-                    ? theme.status.warning
-                    : theme.text.primary
-                }
-              >
-                Gemini {version.includes('experimental') ? 'Experimental ' : ''}
-                CLI
-              </Text>
-              <Text color={theme.text.secondary}> v{version}</Text>
-              {updateInfo && (
-                <Box marginLeft={2}>
-                  <Text color={theme.text.secondary}>
-                    <CliSpinner /> Updating
-                  </Text>
-                </Box>
+      {showHeader &&
+        (version.includes('experimental') ? (
+          <Box flexDirection="column" marginTop={1} marginBottom={1}>
+            {/* Full-width icon across 5 lines */}
+            <ExperimentalIcon width={terminalWidth} />
+
+            {/* Info below the icon — spaced and centred */}
+            <Box
+              flexDirection="column"
+              alignItems="center"
+              marginTop={1}
+              marginBottom={1}
+              width={terminalWidth}
+            >
+              <Box>
+                <Text bold color={theme.status.warning}>
+                  Gemini Experimental CLI
+                </Text>
+                <Text color={theme.text.secondary}> v{version}</Text>
+                {updateInfo && (
+                  <Box marginLeft={2}>
+                    <Text color={theme.text.secondary}>
+                      <CliSpinner /> Updating
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+              {settings.merged.ui.showUserIdentity !== false && (
+                <UserIdentity config={config} />
+              )}
+              <Box marginTop={1}>
+                <Text color={theme.text.secondary}>v{version} </Text>
+                <Text color={theme.text.secondary}>{'< '}</Text>
+                <Text color="yellow" bold>
+                  {'## beta experimental ##'}
+                </Text>
+                <Text color={theme.text.secondary}>{' >'}</Text>
+              </Box>
+            </Box>
+          </Box>
+        ) : (
+          <Box
+            flexDirection="row"
+            marginTop={1}
+            marginBottom={1}
+            paddingLeft={2}
+          >
+            <Box flexShrink={0}>{iconElement}</Box>
+            <Box marginLeft={2} flexDirection="column">
+              {/* Line 1: Gemini CLI vVersion [Updating] */}
+              <Box>
+                <Text bold color={theme.text.primary}>
+                  Gemini CLI
+                </Text>
+                <Text color={theme.text.secondary}> v{version}</Text>
+                {updateInfo && (
+                  <Box marginLeft={2}>
+                    <Text color={theme.text.secondary}>
+                      <CliSpinner /> Updating
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Line 2: Blank */}
+              <Box height={1} />
+
+              {/* Lines 3 & 4: User Identity info (Email /auth and Plan /upgrade) */}
+              {settings.merged.ui.showUserIdentity !== false && (
+                <UserIdentity config={config} />
               )}
             </Box>
-
-            {/* Line 2: Blank */}
-            <Box height={1} />
-
-            {/* Lines 3 & 4: User Identity info (Email /auth and Plan /upgrade) */}
-            {settings.merged.ui.showUserIdentity !== false && (
-              <UserIdentity config={config} />
-            )}
           </Box>
-        </Box>
-      )}
+        ))}
 
       {bannerVisible && bannerText && (
         <Banner
