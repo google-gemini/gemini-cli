@@ -156,11 +156,29 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
     );
+
+    if (this.config.isPlanMode()) {
+      const safeFilename = path.basename(this.params.file_path);
+      this.resolvedPath = path.join(
+        this.config.storage.getPlansDir(),
+        safeFilename,
+      );
+    } else {
+      this.resolvedPath = path.resolve(
+        this.config.getTargetDir(),
+        this.params.file_path,
+      );
+    }
   }
 
   override toolLocations(): ToolLocation[] {

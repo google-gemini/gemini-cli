@@ -454,8 +454,23 @@ class EditToolInvocation
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
-    if (!path.isAbsolute(this.params.file_path)) {
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
+    if (this.config.isPlanMode()) {
+      const safeFilename = path.basename(this.params.file_path);
+      this.resolvedPath = path.join(
+        this.config.storage.getPlansDir(),
+        safeFilename,
+      );
+    } else if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
         this.resolvedPath = result.correctedPath;

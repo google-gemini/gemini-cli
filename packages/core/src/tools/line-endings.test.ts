@@ -85,6 +85,10 @@ const mockConfigInternal = {
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
+  isPlanMode: () => false,
+  storage: {
+    getPlansDir: () => '/tmp/plans',
+  },
 };
 const mockConfig = mockConfigInternal as unknown as Config;
 
