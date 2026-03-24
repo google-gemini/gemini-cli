@@ -271,7 +271,7 @@ export async function main() {
   if (argv.channels && argv.channels.length > 0) {
     coreEvents.emitFeedback(
       'info',
-      `Channels enabled: ${argv.channels.join(', ')}`,
+      `Channels listening for messages: ${argv.channels.join(', ')}`,
     );
   }
 

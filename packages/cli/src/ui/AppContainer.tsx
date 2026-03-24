@@ -68,6 +68,7 @@ import {
   flattenMemory,
   type MemoryChangedPayload,
   type ChannelMessagePayload,
+  activeChannels,
   writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
@@ -1240,6 +1241,22 @@ Logging in with Google... Restarting Gemini CLI to continue.
       coreEvents.off(CoreEvent.ChannelMessage, handler);
     };
   }, [channelsEnabled, addMessage]);
+
+  // Warn about requested channels whose MCP servers did not declare capability.
+  const channelWarningFired = useRef(false);
+  useEffect(() => {
+    if (!isMcpReady || !channelsEnabled || channelWarningFired.current) return;
+    channelWarningFired.current = true;
+    const requested = config.getChannels();
+    for (const name of requested) {
+      if (!activeChannels.has(name)) {
+        coreEvents.emitFeedback(
+          'warning',
+          `Channel "${name}" was requested but the MCP server did not declare channel capability.`,
+        );
+      }
+    }
+  }, [isMcpReady, channelsEnabled, config]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
