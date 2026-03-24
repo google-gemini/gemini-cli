@@ -508,7 +508,7 @@ other events. For more information, see the
 You can enforce a specific authentication method for all users by setting the
 `enforcedAuthType` in the system-level `settings.json` file. This prevents users
 from choosing a different authentication method. See the
-[Authentication docs](../get-started/authentication.md) for more details.
+[Authentication docs](../resources/authentication.md) for more details.
 
 **Example:** Enforce the use of Google login for all users.
 
