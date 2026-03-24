@@ -143,7 +143,6 @@ export function ExtensionRegistryView({
       const updateState = extensionsUpdateState.get(
         item.extension.extensionName,
       );
-      const hasUpdate = updateState === ExtensionUpdateState.UPDATE_AVAILABLE;
 
       return (
         <Box flexDirection="row" width="100%" justifyContent="space-between">
@@ -166,9 +165,13 @@ export function ExtensionRegistryView({
             <Box flexShrink={0} marginX={1}>
               <Text color={theme.text.secondary}>|</Text>
             </Box>
-            {hasUpdate ? (
+            {updateState === ExtensionUpdateState.UPDATE_AVAILABLE ? (
               <Box marginRight={1} flexShrink={0}>
                 <Text color={theme.status.warning}>[Update available]</Text>
+              </Box>
+            ) : updateState === ExtensionUpdateState.UPDATING ? (
+              <Box marginRight={1} flexShrink={0}>
+                <Text color={theme.text.secondary}>[Updating...]</Text>
               </Box>
             ) : (
               isInstalled && (
@@ -306,10 +309,9 @@ export function ExtensionRegistryView({
           isInstalled={installedExtensions.some(
             (e) => e.name === selectedExtension.extensionName,
           )}
-          hasUpdate={
-            extensionsUpdateState.get(selectedExtension.extensionName) ===
-            ExtensionUpdateState.UPDATE_AVAILABLE
-          }
+          updateState={extensionsUpdateState.get(
+            selectedExtension.extensionName,
+          )}
           onUpdate={async () => {
             await handleUpdate(selectedExtension);
           }}
