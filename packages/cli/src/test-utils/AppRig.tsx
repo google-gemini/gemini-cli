@@ -181,6 +181,16 @@ export class AppRig {
     );
     this.sessionId = `test-session-${uniqueId}`;
     activeRigs.set(this.sessionId, this);
+
+    // Pre-create the persistent state file to bypass the terminal setup prompt
+    const geminiDir = path.join(this.testDir, '.gemini');
+    if (!fs.existsSync(geminiDir)) {
+      fs.mkdirSync(geminiDir, { recursive: true });
+    }
+    fs.writeFileSync(
+      path.join(geminiDir, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }),
+    );
   }
 
   async initialize() {
