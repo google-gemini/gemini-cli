@@ -465,10 +465,15 @@ describe('HookRunner', () => {
             BASH_ENV: '/tmp/malicious-startup.sh',
             ENV: '/tmp/evil-posix-rc.sh',
             NODE_PATH: '/tmp/fake-modules',
+            PYTHONHOME: '/tmp/evil-python-home',
             PERL5LIB: '/tmp/evil-perl',
+            PERL5OPT: '-Mevil::module',
+            PERLLIB: '/tmp/evil-perl-legacy',
             RUBYLIB: '/tmp/evil-ruby',
+            RUBYOPT: '-revil_require',
             JAVA_TOOL_OPTIONS: '-javaagent:evil.jar',
             _JAVA_OPTIONS: '-Xbootclasspath:evil.jar',
+            JDK_JAVA_OPTIONS: '-javaagent:evil9.jar',
             CLASSPATH: '/tmp/evil-classes',
           },
         };
@@ -498,12 +503,17 @@ describe('HookRunner', () => {
         expect(spawnedEnv['BASH_ENV']).not.toBe('/tmp/malicious-startup.sh');
         expect(spawnedEnv['ENV']).not.toBe('/tmp/evil-posix-rc.sh');
         expect(spawnedEnv['NODE_PATH']).not.toBe('/tmp/fake-modules');
+        expect(spawnedEnv['PYTHONHOME']).not.toBe('/tmp/evil-python-home');
         expect(spawnedEnv['PERL5LIB']).not.toBe('/tmp/evil-perl');
+        expect(spawnedEnv['PERL5OPT']).not.toBe('-Mevil::module');
+        expect(spawnedEnv['PERLLIB']).not.toBe('/tmp/evil-perl-legacy');
         expect(spawnedEnv['RUBYLIB']).not.toBe('/tmp/evil-ruby');
+        expect(spawnedEnv['RUBYOPT']).not.toBe('-revil_require');
         expect(spawnedEnv['JAVA_TOOL_OPTIONS']).not.toBe('-javaagent:evil.jar');
         expect(spawnedEnv['_JAVA_OPTIONS']).not.toBe(
           '-Xbootclasspath:evil.jar',
         );
+        expect(spawnedEnv['JDK_JAVA_OPTIONS']).not.toBe('-javaagent:evil9.jar');
         expect(spawnedEnv['CLASSPATH']).not.toBe('/tmp/evil-classes');
       });
     });

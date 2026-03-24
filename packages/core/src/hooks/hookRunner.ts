@@ -67,12 +67,20 @@ const RESTRICTED_HOOK_ENV_KEYS = new Set([
   'DYLD_LIBRARY_PATH',
   'DYLD_FORCE_FLAT_NAMESPACE',
   'DYLD_PRINT_TO_FILE',
-  // Language-specific path/config overrides
+  // Python runtime injection
   'PYTHONPATH',
+  'PYTHONHOME',
+  // Perl runtime injection
   'PERL5LIB',
+  'PERL5OPT',
+  'PERLLIB',
+  // Ruby runtime injection
   'RUBYLIB',
+  'RUBYOPT',
+  // Java runtime injection
   'JAVA_TOOL_OPTIONS',
   '_JAVA_OPTIONS',
+  'JDK_JAVA_OPTIONS',
   'CLASSPATH',
   // Project-specific variables
   'GEMINI_PROJECT_DIR',
