@@ -30,6 +30,7 @@ import {
   type SubagentActivityEvent,
   type SubagentProgress,
   type SubagentActivityItem,
+  isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
@@ -210,8 +211,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const callId = activity.data['id']
               ? String(activity.data['id'])
               : undefined;
-            // Find the tool call by ID
-            // Find the tool call by ID
+            const data = activity.data['data'];
+            const isError = isToolActivityError(data);
+
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
@@ -219,7 +221,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
                 recentActivity[i].id === callId &&
                 recentActivity[i].status === 'running'
               ) {
-                recentActivity[i].status = 'completed';
+                recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
                 break;
               }
