@@ -51,6 +51,20 @@ export function unescapeLiteralAt(text: string): string {
 }
 
 /**
+ * Escapes @ symbols inside quoted regions (backticks and single quotes)
+ * so they are not interpreted as @path commands.
+ * This allows users to write `@decorator` or '@override' without triggering file lookup.
+ *
+ * Note: Double quotes are NOT handled here because AT_COMMAND_PATH_REGEX_SOURCE
+ * uses double quotes for Windows paths with spaces (e.g., @"C:\Program Files\file.txt").
+ */
+export function escapeAtInQuotedRegions(text: string): string {
+  return text.replace(/`[^`]*`|'[^']*'/g, (match) =>
+    match.replace(/@/g, '\\@'),
+  );
+}
+
+/**
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
@@ -90,18 +104,23 @@ function parseAllAtCommands(
   query: string,
   escapePastedAtSymbols = false,
 ): AtCommandPart[] {
+  // Pre-process: escape @ inside quoted regions so they are treated as literal text.
+  const preprocessed = escapeAtInQuotedRegions(query);
+
   const parts: AtCommandPart[] = [];
   let lastIndex = 0;
 
   // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
+  // The lookbehind requires @ to be preceded by whitespace, start-of-string, or punctuation.
+  // This prevents email addresses (user@host) and concatenated text (hello@file) from matching.
   const atCommandRegex = new RegExp(
-    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `(?<=^|[\\s,;:!?()\\[\\]{}])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 
   let match: RegExpExecArray | null;
 
-  while ((match = atCommandRegex.exec(query)) !== null) {
+  while ((match = atCommandRegex.exec(preprocessed)) !== null) {
     const matchIndex = match.index;
     const fullMatch = match[0];
 
@@ -122,7 +141,7 @@ function parseAllAtCommands(
     lastIndex = matchIndex + fullMatch.length;
   }
 
-  // Add remaining text
+  // Add remaining text (use original query for text content, not preprocessed)
   if (lastIndex < query.length) {
     parts.push({
       type: 'text',
@@ -299,7 +318,19 @@ async function resolveFilePaths(
         break;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (config.getEnableRecursiveFileSearch() && globTool) {
+          // Only attempt glob search if the path looks like a real file path
+          // (contains '/', '.', or starts with '~'). Simple words like 'decorators'
+          // or 'host' should not trigger expensive glob searches.
+          const looksLikePath =
+            pathName.includes('/') ||
+            pathName.includes('.') ||
+            pathName.startsWith('~');
+
+          if (
+            looksLikePath &&
+            config.getEnableRecursiveFileSearch() &&
+            globTool
+          ) {
             onDebugMessage(
               `Path ${pathName} not found directly, attempting glob search.`,
             );
@@ -350,6 +381,10 @@ async function resolveFilePaths(
                 `Error during glob search for ${pathName}. Path ${pathName} will be skipped.`,
               );
             }
+          } else if (!looksLikePath) {
+            onDebugMessage(
+              `Path ${pathName} does not look like a file path, skipping glob search.`,
+            );
           } else {
             onDebugMessage(
               `Glob tool not found. Path ${pathName} will be skipped.`,

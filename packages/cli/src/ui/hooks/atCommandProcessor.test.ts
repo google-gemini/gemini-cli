@@ -17,6 +17,7 @@ import {
   handleAtCommand,
   escapeAtSymbols,
   unescapeLiteralAt,
+  escapeAtInQuotedRegions,
 } from './atCommandProcessor.js';
 import {
   FileDiscoveryService,
@@ -1536,5 +1537,199 @@ describe('unescapeLiteralAt', () => {
   it('roundtrips correctly with escapeAtSymbols', () => {
     const input = 'user@example.com and @scope/pkg';
     expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
+  });
+});
+
+describe('escapeAtInQuotedRegions', () => {
+  it('should escape @ inside backtick-quoted strings', () => {
+    expect(escapeAtInQuotedRegions('explain `@decorators` in Python')).toBe(
+      'explain `\\@decorators` in Python',
+    );
+  });
+
+  it('should escape @ inside single-quoted strings', () => {
+    expect(escapeAtInQuotedRegions("explain '@override' in Java")).toBe(
+      "explain '\\@override' in Java",
+    );
+  });
+
+  it('should not escape @ outside of quotes', () => {
+    expect(escapeAtInQuotedRegions('explain @file.py')).toBe(
+      'explain @file.py',
+    );
+  });
+
+  it('should handle mixed quoted and unquoted @', () => {
+    expect(
+      escapeAtInQuotedRegions('read @file.py and explain `@decorators`'),
+    ).toBe('read @file.py and explain `\\@decorators`');
+  });
+
+  it('should handle text with no @ symbols', () => {
+    expect(escapeAtInQuotedRegions('hello world')).toBe('hello world');
+  });
+
+  it('should handle empty string', () => {
+    expect(escapeAtInQuotedRegions('')).toBe('');
+  });
+});
+
+describe('handleAtCommand - email and quote scenarios', () => {
+  let testRootDir: string;
+  let mockConfig: Config;
+  const mockAddItem: Mock<UseHistoryManagerReturn['addItem']> = vi.fn();
+  const mockOnDebugMessage: Mock<(message: string) => void> = vi.fn();
+  let abortController: AbortController;
+
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+
+    testRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'at-command-email-test-'),
+    );
+
+    abortController = new AbortController();
+
+    const getToolRegistry = vi.fn();
+
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as core.MessageBus;
+
+    mockConfig = {
+      getToolRegistry,
+      getTargetDir: () => testRootDir,
+      isSandboxed: () => false,
+      getExcludeTools: vi.fn(),
+      getFileService: () => new FileDiscoveryService(testRootDir),
+      getFileFilteringRespectGitIgnore: () => true,
+      getFileFilteringRespectGeminiIgnore: () => true,
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      getFileSystemService: () => new StandardFileSystemService(),
+      getEnableRecursiveFileSearch: vi.fn(() => true),
+      getWorkspaceContext: () => ({
+        isPathWithinWorkspace: (p: string) =>
+          p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
+        getDirectories: () => [testRootDir],
+      }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        if (this.interactive && path.isAbsolute(absolutePath)) {
+          return true;
+        }
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+      getMcpServers: () => ({}),
+      getMcpServerCommand: () => undefined,
+      getPromptRegistry: () => ({
+        getPromptsByServer: () => [],
+      }),
+      getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
+      getFileExclusions: () => ({
+        getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+        getDefaultExcludePatterns: () => [],
+        getGlobExcludes: () => [],
+        buildExcludePatterns: () => [],
+        getReadManyFilesExcludes: () => [],
+      }),
+      getUsageStatisticsEnabled: () => false,
+      getEnableExtensionReloading: () => false,
+      getResourceRegistry: () => ({
+        findResourceByUri: () => undefined,
+        getAllResources: () => [],
+      }),
+      getMcpClientManager: () => ({
+        getClient: () => undefined,
+      }),
+      getMessageBus: () => mockMessageBus,
+    } as unknown as Config;
+
+    const registry = new ToolRegistry(mockConfig, mockMessageBus);
+    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
+    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
+    getToolRegistry.mockReturnValue(registry);
+  });
+
+  afterEach(async () => {
+    abortController.abort();
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
+  });
+
+  it('should pass through query with email address as plain text', async () => {
+    const query = 'send email to user@gmail.com please';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 900,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query with backtick-quoted @ as plain text', async () => {
+    const query = 'explain `@decorators` in Python';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 901,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
+  it('should pass through query with single-quoted @ as plain text', async () => {
+    const query = "explain '@override' in Java";
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 902,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
   });
 });

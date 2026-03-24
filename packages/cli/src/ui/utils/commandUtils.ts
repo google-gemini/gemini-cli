@@ -10,13 +10,17 @@ import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
 import type { Settings } from '../../config/settingsSchema.js';
-import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+import {
+  AT_COMMAND_PATH_REGEX_SOURCE,
+  escapeAtInQuotedRegions,
+} from '../hooks/atCommandProcessor.js';
 
 // Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
 // Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
 // parseAllAtCommands would find at least one atPath part.
+// The lookbehind requires @ to be preceded by whitespace, start-of-string, or punctuation.
 const AT_COMMAND_DETECT_REGEX = new RegExp(
-  `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+  `(?<=^|[\\s,;:!?()\\[\\]{}])@${AT_COMMAND_PATH_REGEX_SOURCE}`,
 );
 
 /**
@@ -32,7 +36,7 @@ const AT_COMMAND_DETECT_REGEX = new RegExp(
  * @returns True if the query looks like an '@' command, false otherwise.
  */
 export const isAtCommand = (query: string): boolean =>
-  AT_COMMAND_DETECT_REGEX.test(query);
+  AT_COMMAND_DETECT_REGEX.test(escapeAtInQuotedRegions(query));
 
 /**
  * Checks if a query string potentially represents an '/' command.

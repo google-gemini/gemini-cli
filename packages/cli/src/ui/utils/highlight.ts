@@ -24,8 +24,10 @@ export type HighlightToken = {
 // The @ pattern uses the same source as the command processor to ensure consistency.
 // It matches any character except strict delimiters (ASCII whitespace, comma, etc.).
 // This supports URIs like `@file:///example.txt` and filenames with Unicode spaces (like NNBSP).
+// The lookbehind requires @ to be preceded by whitespace, start-of-string, or punctuation,
+// preventing email-like patterns (user@host) from being highlighted as file references.
 const HIGHLIGHT_REGEX = new RegExp(
-  `(^/[a-zA-Z0-9_-]+|(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
+  `(^/[a-zA-Z0-9_-]+|(?<=^|[\\s,;:!?()\\[\\]{}])@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
   'g',
 );
 

@@ -148,6 +148,24 @@ export function useCommandCompletion({
           break;
         }
       } else if (char === '@') {
+        // Only trigger @ completion if @ is preceded by whitespace,
+        // start of line, or punctuation — not alphanumeric characters.
+        // This prevents email addresses (user@host) from triggering suggestions.
+        if (i > 0) {
+          const prevChar = codePoints[i - 1];
+          if (prevChar && /[a-zA-Z0-9]/.test(prevChar)) {
+            break; // Preceded by alphanumeric — not a file reference
+          }
+        }
+
+        // Check if @ is inside backtick or single-quote quoted region
+        const textBeforeAt = currentLine.substring(0, i);
+        const backtickCount = (textBeforeAt.match(/`/g) || []).length;
+        const singleQuoteCount = (textBeforeAt.match(/'/g) || []).length;
+        if (backtickCount % 2 !== 0 || singleQuoteCount % 2 !== 0) {
+          break; // Inside a quoted region — treat as literal
+        }
+
         let end = codePoints.length;
         for (let i = cursorCol; i < codePoints.length; i++) {
           if (codePoints[i] === ' ') {

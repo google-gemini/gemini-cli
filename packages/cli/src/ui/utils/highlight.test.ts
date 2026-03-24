@@ -72,11 +72,11 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 
-  it('should handle adjacent highlights at start', () => {
+  it('should not highlight @ after alphanumeric in adjacent text', () => {
     const text = '/run@file.js';
     expect(parseInputForHighlighting(text, 0)).toEqual([
       { text: '/run', type: 'command' },
-      { text: '@file.js', type: 'file' },
+      { text: '@file.js', type: 'default' },
     ]);
   });
 
