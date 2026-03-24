@@ -1738,7 +1738,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         applyAlternateBufferMode(next);
         setIsAlternateBuffer(next);
 
-        setHistoryRemountKey((prev) => prev + 1);
         return true;
       }
 
