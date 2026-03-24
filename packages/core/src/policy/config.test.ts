@@ -314,7 +314,7 @@ describe('createPolicyEngineConfig', () => {
   it('should allow all tools in YOLO mode', async () => {
     const config = await createPolicyEngineConfig({}, ApprovalMode.YOLO);
     const rule = config.rules?.find(
-      (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
+      (r) => r.decision === PolicyDecision.ALLOW && r.toolName === '*',
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBeCloseTo(1.998, 5);
@@ -513,7 +513,7 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const wildcardRule = config.rules?.find(
-      (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
+      (r) => r.toolName === '*' && r.decision === PolicyDecision.ALLOW,
     );
     const writeToolRules = config.rules?.filter(
       (r) =>
