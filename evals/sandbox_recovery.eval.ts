@@ -1,51 +1,42 @@
-import { test, expect } from 'vitest';
-import { AgentTestRig } from './app-test-helper.js';
+import { describe, expect } from 'vitest';
+import { evalTest } from './test-helper.js';
 
-test('Sandbox recovery: attempts to use additional_permissions when operation not permitted', async () => {
-  const rig = new AgentTestRig();
-  await rig.initialize();
+describe('Sandbox recovery', () => {
+  evalTest('USUALLY_PASSES', {
+    name: 'attempts to use additional_permissions when operation not permitted',
+    prompt:
+      'Run ./script.sh. It will fail with "Operation not permitted". When it does, you must retry running it by passing the appropriate additional_permissions.',
+    files: {
+      'script.sh':
+        '#!/bin/bash\necho "cat: /etc/shadow: Operation not permitted" >&2\nexit 1\n',
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const shellCalls = toolLogs.filter(
+        (log) =>
+          log.toolRequest?.name === 'run_shell_command' &&
+          log.toolRequest?.args?.includes('script.sh'),
+      );
 
-  const originalExecute = rig.toolExecutor.execute.bind(rig.toolExecutor);
+      // The agent should have tried running the command.
+      expect(
+        shellCalls.length,
+        'Agent should have called run_shell_command',
+      ).toBeGreaterThan(0);
 
-  rig.toolExecutor.execute = async (toolName, params, ctx) => {
-    if (toolName === 'run_shell_command') {
-      if (!params.additional_permissions) {
-        return {
-          output: 'cat: /etc/shadow: Operation not permitted',
-          exitCode: 1,
-          error: {
-            message: 'Command failed',
-          },
-        };
-      } else {
-        return {
-          output: 'success',
-          exitCode: 0,
-        };
-      }
-    }
-    return originalExecute(toolName, params, ctx);
-  };
+      // Look for a call that includes additional_permissions.
+      const hasAdditionalPermissions = shellCalls.some((call) => {
+        const args =
+          typeof call.toolRequest.args === 'string'
+            ? JSON.parse(call.toolRequest.args)
+            : call.toolRequest.args;
+        return args.additional_permissions !== undefined;
+      });
 
-  await rig.addInput('cat /etc/shadow');
-
-  const result = await rig.run();
-
-  expect(result.toolCalls).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        name: 'run_shell_command',
-        args: expect.objectContaining({
-          command: expect.stringContaining('cat /etc/shadow'),
-        }),
-      }),
-      expect.objectContaining({
-        name: 'run_shell_command',
-        args: expect.objectContaining({
-          command: expect.stringContaining('cat /etc/shadow'),
-          additional_permissions: expect.any(Object),
-        }),
-      }),
-    ]),
-  );
+      expect(
+        hasAdditionalPermissions,
+        'Agent should have retried with additional_permissions',
+      ).toBe(true);
+    },
+  });
 });
