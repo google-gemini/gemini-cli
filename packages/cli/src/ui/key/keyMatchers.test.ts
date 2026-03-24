@@ -506,16 +506,33 @@ describe('keyMatchers', () => {
   });
 
   describe('Platform-specific bindings', () => {
-    it('should bind Ctrl+Z to undo and empty suspend on Windows', () => {
-      // Simulate Windows config: ctrl+z for undo, no suspend binding
-      const winConfig = new Map(defaultKeyBindingConfig);
-      winConfig.set(Command.UNDO, [
-        new KeyBinding('ctrl+z'),
-        new KeyBinding('alt+z'),
-      ]);
-      winConfig.set(Command.SUSPEND_APP, []);
+    const originalPlatform = process.platform;
 
-      const matchers = createKeyMatchers(winConfig);
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        writable: true,
+        configurable: true,
+      });
+      vi.resetModules();
+    });
+
+    it('should bind Ctrl+Z to undo and empty suspend on Windows', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        writable: true,
+        configurable: true,
+      });
+      vi.resetModules();
+
+      const { defaultKeyBindingConfig: winConfig } = await import(
+        './keyBindings.js'
+      );
+      const { createKeyMatchers: createMatchers } = await import(
+        './keyMatchers.js'
+      );
+
+      const matchers = createMatchers(winConfig);
 
       expect(matchers[Command.UNDO](createKey('z', { ctrl: true }))).toBe(true);
       expect(matchers[Command.UNDO](createKey('z', { alt: true }))).toBe(true);
@@ -526,19 +543,25 @@ describe('keyMatchers', () => {
       ).toBe(false);
     });
 
-    it('should bind Cmd+Z to undo and Ctrl+Z to suspend on non-Windows', () => {
-      // Verify non-Windows config: cmd+z for undo, ctrl+z for suspend
-      const posixConfig = new Map(defaultKeyBindingConfig);
-      posixConfig.set(Command.UNDO, [
-        new KeyBinding('cmd+z'),
-        new KeyBinding('alt+z'),
-      ]);
-      posixConfig.set(Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]);
+    it('should bind Alt+Z/Cmd+Z to undo and Ctrl+Z to suspend on non-Windows', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        writable: true,
+        configurable: true,
+      });
+      vi.resetModules();
 
-      const matchers = createKeyMatchers(posixConfig);
+      const { defaultKeyBindingConfig: posixConfig } = await import(
+        './keyBindings.js'
+      );
+      const { createKeyMatchers: createMatchers } = await import(
+        './keyMatchers.js'
+      );
 
-      expect(matchers[Command.UNDO](createKey('z', { cmd: true }))).toBe(true);
+      const matchers = createMatchers(posixConfig);
+
       expect(matchers[Command.UNDO](createKey('z', { alt: true }))).toBe(true);
+      expect(matchers[Command.UNDO](createKey('z', { cmd: true }))).toBe(true);
       expect(matchers[Command.UNDO](createKey('z', { ctrl: true }))).toBe(
         false,
       );
