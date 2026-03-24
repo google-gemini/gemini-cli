@@ -702,8 +702,6 @@ export class PolicyEngine {
       }
     }
 
-
-
     return {
       decision: this.applyNonInteractiveMode(decision),
       rule: matchedRule,
