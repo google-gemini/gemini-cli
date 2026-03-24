@@ -8,6 +8,7 @@ import { type FunctionCall } from '@google/genai';
 import type {
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
+  DiffStat,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
 import type { SandboxPermissions } from '../services/sandboxManager.js';
@@ -103,6 +104,7 @@ export type SerializableConfirmationDetails =
       originalContent: string | null;
       newContent: string;
       isModifying?: boolean;
+      diffStat?: DiffStat;
     }
   | {
       type: 'exec';

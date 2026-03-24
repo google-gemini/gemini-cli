@@ -76,23 +76,35 @@ export class ShellToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  getDescription(): string {
-    let description = `${this.params.command}`;
+  private getContextualDetails(): string {
+    let details = '';
     // append optional [in directory]
-    // note description is needed even if validation fails due to absolute path
+    // note explanation is needed even if validation fails due to absolute path
     if (this.params.dir_path) {
-      description += ` [in ${this.params.dir_path}]`;
+      details += `[in ${this.params.dir_path}]`;
     } else {
-      description += ` [current working directory ${process.cwd()}]`;
+      details += `[current working directory ${process.cwd()}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
-      description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+      details += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     if (this.params.is_background) {
-      description += ' [background]';
+      details += ' [background]';
     }
-    return description;
+    return details;
+  }
+
+  getDescription(): string {
+    return `${this.params.command} ${this.getContextualDetails()}`;
+  }
+
+  override getDisplayTitle(): string {
+    return this.params.command;
+  }
+
+  override getExplanation(): string {
+    return this.getContextualDetails().trim();
   }
 
   override getPolicyUpdateOptions(
@@ -416,6 +428,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (result.exitCode !== null && result.exitCode !== 0) {
           llmContentParts.push(`Exit Code: ${result.exitCode}`);
+          data = {
+            exitCode: result.exitCode,
+            isError: true,
+          };
         }
 
         if (result.signal) {

@@ -19,7 +19,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -73,6 +72,7 @@ describe('LoggingContentGenerator', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'API_KEY',
       }),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
@@ -158,7 +158,7 @@ describe('LoggingContentGenerator', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata: SpanMetadata = { name: '', attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
 
       expect(metadata).toMatchObject({
         input: req.contents,
@@ -222,7 +222,7 @@ describe('LoggingContentGenerator', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata: SpanMetadata = { name: '', attributes: {} };
-      promise = fn({ metadata, endSpan: vi.fn() });
+      promise = fn({ metadata });
 
       await expect(promise).rejects.toThrow(error);
 
@@ -407,7 +407,7 @@ describe('LoggingContentGenerator', () => {
       expect(runInDevTraceSpan).toHaveBeenCalledWith(
         expect.objectContaining({
           operation: GeminiCliOperation.LLMCall,
-          noAutoEnd: true,
+
           attributes: expect.objectContaining({
             [GEN_AI_REQUEST_MODEL]: 'gemini-pro',
             [GEN_AI_PROMPT_NAME]: userPromptId,
@@ -427,7 +427,7 @@ describe('LoggingContentGenerator', () => {
       vi.mocked(wrapped.generateContentStream).mockResolvedValue(
         createAsyncGenerator(),
       );
-      stream = await fn({ metadata, endSpan: vi.fn() });
+      stream = await fn({ metadata });
 
       for await (const _ of stream) {
         // consume stream
@@ -644,7 +644,7 @@ describe('LoggingContentGenerator', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata: SpanMetadata = { name: '', attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
 
       expect(metadata).toMatchObject({
         input: req.contents,

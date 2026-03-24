@@ -7,3 +7,4 @@
 export * from './file-system-test-helpers.js';
 export * from './test-rig.js';
 export * from './mock-utils.js';
+export * from './test-mcp-server.js';
