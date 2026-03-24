@@ -13,7 +13,7 @@
     "@google/gemini-cli-core": "file:../core",
     "@lydell/node-pty": "1.1.0",
     "strip-ansi": "^7.2.0",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.1"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

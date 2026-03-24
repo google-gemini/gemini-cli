@@ -109,7 +109,7 @@
     "chrome-devtools-mcp": "^0.20.3",
     "msw": "^2.12.14",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.1"
   },
   "engines": {
     "node": ">=20"

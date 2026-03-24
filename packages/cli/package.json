@@ -83,7 +83,7 @@
     "@types/yargs": "^17.0.32",
     "@xterm/headless": "^5.5.0",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
+    "vitest": "^4.1.1"
   },
   "engines": {
     "node": ">=20"

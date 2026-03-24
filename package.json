@@ -132,7 +132,7 @@
     "ts-prune": "^0.10.3",
     "tsx": "^4.21.0",
     "typescript-eslint": "^8.57.2",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.1",
     "yargs": "^17.7.2"
   },
   "dependencies": {
