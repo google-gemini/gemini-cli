@@ -77,7 +77,8 @@ export async function checkPolicy(
   // confirmation prompt if the policy engine's decision is 'ASK_USER'.
   if (
     decision === PolicyDecision.ASK_USER &&
-    toolCall.request.isClientInitiated
+    toolCall.request.isClientInitiated &&
+    !toolCall.request.args?.['additional_permissions']
   ) {
     return {
       decision: PolicyDecision.ALLOW,

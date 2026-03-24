@@ -11,6 +11,7 @@ import type {
   DiffStat,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
+import type { SandboxPermissions } from '../services/sandboxManager.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -78,6 +79,14 @@ export interface ToolConfirmationResponse {
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
+  | {
+      type: 'sandbox_expansion';
+      title: string;
+      command: string;
+      rootCommand: string;
+      additionalPermissions: SandboxPermissions;
+      systemMessage?: string;
+    }
   | {
       type: 'info';
       title: string;

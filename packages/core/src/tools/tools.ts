@@ -992,6 +992,16 @@ export type ToolConfirmationPayload =
   | ToolAskUserConfirmationPayload
   | ToolExitPlanModeConfirmationPayload;
 
+export interface ToolSandboxExpansionConfirmationDetails {
+  type: 'sandbox_expansion';
+  systemMessage?: string;
+  title: string;
+  command: string;
+  rootCommand: string;
+  additionalPermissions: import('../services/sandboxManager.js').SandboxPermissions;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+}
+
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
@@ -1048,6 +1058,7 @@ export interface ToolExitPlanModeConfirmationDetails {
 }
 
 export type ToolCallConfirmationDetails =
+  | ToolSandboxExpansionConfirmationDetails
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails
