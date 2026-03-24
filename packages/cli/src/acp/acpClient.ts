@@ -98,6 +98,12 @@ export async function runAcpClient(
 }
 
 export class GeminiAgent {
+  private static callIdCounter = 0;
+
+  static generateCallId(name: string): string {
+    return `${name}-${Date.now()}-${++GeminiAgent.callIdCounter}`;
+  }
+
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
   private apiKey: string | undefined;
@@ -897,7 +903,7 @@ export class Session {
     promptId: string,
     fc: FunctionCall,
   ): Promise<Part[]> {
-    const callId = fc.id ?? `${fc.name}-${Date.now()}`;
+    const callId = fc.id ?? GeminiAgent.generateCallId(fc.name || 'unknown');
     const args = fc.args ?? {};
 
     const startTime = Date.now();
@@ -1391,7 +1397,7 @@ export class Session {
         include: pathSpecsToRead,
       };
 
-      const callId = `${readManyFilesTool.name}-${Date.now()}`;
+      const callId = GeminiAgent.generateCallId(readManyFilesTool.name);
 
       try {
         const invocation = readManyFilesTool.build(toolArgs);
