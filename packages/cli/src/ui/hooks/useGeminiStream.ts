@@ -38,32 +38,9 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
   type CompressionStatus,
->>>>>>> 12bc9cace (fix(cli): resolve merge conflicts and align with async test helpers)
   Kind,
-<<<<<<< HEAD
   ACTIVATE_SKILL_TOOL_NAME,
-=======
-  CompressionStatus,
->>>>>>> 97ff2bea4 (feat(ui): restore threshold hint and thin arrow to compression message)
-} from '@google/gemini-cli-core';
-import type {
-  Config,
-  EditorType,
-  GeminiClient,
-  ServerGeminiChatCompressedEvent,
-  ServerGeminiContentEvent as ContentEvent,
-  ServerGeminiFinishedEvent,
-  ServerGeminiStreamEvent as GeminiEvent,
-  ThoughtSummary,
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  GeminiErrorEventValue,
-  RetryAttemptPayload,
-=======
   type Config,
   type EditorType,
   type GeminiClient,
@@ -76,7 +53,6 @@ import type {
   type ToolCallResponseInfo,
   type GeminiErrorEventValue,
   type RetryAttemptPayload,
->>>>>>> 17740dc2d (fix(cli): resolve merge conflicts and align with async test helpers)
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -279,6 +255,8 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const handleCompletedToolsRef =
+    useRef<(completedTools: TrackedToolCall[]) => Promise<void>>(undefined);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -352,7 +330,7 @@ export const useGeminiStream = (
         }
 
         // Handle tool response submission immediately when tools complete
-        await handleCompletedTools(
+        await handleCompletedToolsRef.current?.(
           completedToolCallsFromScheduler as TrackedToolCall[],
         );
       }
@@ -1192,13 +1170,8 @@ export const useGeminiStream = (
             isPending: false,
             beforePercentage,
             afterPercentage,
-            /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-            compressionStatus: eventValue
-              ? (Number(
-                  eventValue.compressionStatus,
-                ) as unknown as CompressionStatus)
-              : null,
-            /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            compressionStatus: eventValue ? ((Number(eventValue.compressionStatus) as unknown) as CompressionStatus) : null,
             isManual: false,
             thresholdPercentage: Math.round(threshold * 100),
           },
@@ -1949,6 +1922,7 @@ export const useGeminiStream = (
       setIsResponding,
     ],
   );
+  handleCompletedToolsRef.current = handleCompletedTools;
 
   const pendingHistoryItems = useMemo(
     () =>

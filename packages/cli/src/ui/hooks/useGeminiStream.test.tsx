@@ -408,6 +408,8 @@ describe('useGeminiStream', () => {
       toolCalls: initialToolCalls,
     };
 
+    let rerenderHook: (props?: typeof initialProps) => void;
+
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
       return [
@@ -421,7 +423,7 @@ describe('useGeminiStream', () => {
         ) => {
           lastToolCalls =
             typeof updater === 'function' ? updater(lastToolCalls) : updater;
-          rerender({ ...initialProps, toolCalls: lastToolCalls });
+          rerenderHook?.({ ...initialProps, toolCalls: lastToolCalls });
         },
         (signal: AbortSignal) => {
           mockCancelAllToolCalls(signal);
@@ -445,7 +447,7 @@ describe('useGeminiStream', () => {
             }
             return tc;
           });
-          rerender({ ...initialProps, toolCalls: lastToolCalls });
+          rerenderHook?.({ ...initialProps, toolCalls: lastToolCalls });
         },
         0,
       ];
@@ -476,6 +478,7 @@ describe('useGeminiStream', () => {
         initialProps,
       },
     );
+    rerenderHook = rerender;
     return {
       result,
       rerender,
