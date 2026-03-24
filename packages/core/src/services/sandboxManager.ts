@@ -11,6 +11,18 @@ import {
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+export interface SandboxPermissions {
+  /** Filesystem permissions. */
+  fileSystem?: {
+    /** Paths that should be readable by the command. */
+    read?: string[];
+    /** Paths that should be writable by the command. */
+    write?: string[];
+  };
+  /** Whether the command should have network access. */
+  network?: boolean;
+}
+
 /**
  * Security boundaries and permissions applied to a specific sandboxed execution.
  */
@@ -23,6 +35,8 @@ export interface ExecutionPolicy {
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+  /** Additional granular permissions to grant to this command. */
+  additionalPermissions?: SandboxPermissions;
 }
 
 /**
@@ -75,6 +89,16 @@ export interface SandboxManager {
    */
   prepareCommand(req: SandboxRequest): Promise<SandboxedCommand>;
 }
+
+/**
+ * Files that represent the governance or "constitution" of the repository
+ * and should be write-protected in any sandbox.
+ */
+export const GOVERNANCE_FILES = [
+  { path: '.gitignore', isDirectory: false },
+  { path: '.geminiignore', isDirectory: false },
+  { path: '.git', isDirectory: true },
+] as const;
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands
