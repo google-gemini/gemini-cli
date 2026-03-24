@@ -2142,6 +2142,13 @@
               "default": true,
               "type": "boolean"
             },
+            "maxActionsPerTask": {
+              "title": "Max Actions Per Task",
+              "description": "The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.",
+              "markdownDescription": "The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `100`",
+              "default": 100,
+              "type": "number"
+            },
             "confirmSensitiveActions": {
               "title": "Confirm Sensitive Actions",
               "description": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).",
