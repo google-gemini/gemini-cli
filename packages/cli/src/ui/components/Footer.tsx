@@ -359,7 +359,17 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
         break;
       }
       case 'memory-usage': {
-        addCol(id, header, () => <MemoryUsageDisplay color={itemColor} />, 10);
+        addCol(
+          id,
+          header,
+          () => (
+            <MemoryUsageDisplay
+              color={itemColor}
+              isActive={!uiState.copyModeEnabled}
+            />
+          ),
+          10,
+        );
         break;
       }
       case 'session-id': {
