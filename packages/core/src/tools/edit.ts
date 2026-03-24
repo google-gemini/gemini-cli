@@ -463,7 +463,13 @@ class EditToolInvocation
       true,
       () => this.config.getApprovalMode(),
     );
-    if (!path.isAbsolute(this.params.file_path)) {
+    if (this.config.isPlanMode()) {
+      const safeFilename = path.basename(this.params.file_path);
+      this.resolvedPath = path.join(
+        this.config.storage.getPlansDir(),
+        safeFilename,
+      );
+    } else if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
         this.resolvedPath = result.correctedPath;
