@@ -997,6 +997,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
+        effectiveExtensionPath,
       );
       agentLoadResult.agents = agentLoadResult.agents.map((agent) => ({
         ...recursivelyHydrateStrings(agent, hydrationContext),
@@ -1182,6 +1183,12 @@ Would you like to attempt to install via "git clone" instead?`,
       output += `\n Agent skills:`;
       extension.skills.forEach((skill) => {
         output += `\n  ${skill.name}: ${skill.description}`;
+      });
+    }
+    if (extension.agents && extension.agents.length > 0) {
+      output += `\n Sub-agents:`;
+      extension.agents.forEach((agent) => {
+        output += `\n  ${agent.name}: ${agent.description}`;
       });
     }
     const resolvedSettings = extension.resolvedSettings;

@@ -490,16 +490,54 @@ function convertFrontmatterAuthToConfig(
 }
 
 /**
+ * Recursively expands ${PLUGIN_ROOT} in strings, arrays, and objects.
+ */
+function recursivelyExpandPluginRoot<T>(obj: T, pluginRoot: string): T {
+  if (typeof obj === 'string') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return obj.replace(/\${PLUGIN_ROOT}/g, pluginRoot) as unknown as T;
+  }
+  if (Array.isArray(obj)) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return obj.map((item) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      recursivelyExpandPluginRoot(item, pluginRoot),
+    ) as unknown as T;
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const newObj: Record<string, unknown> = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        newObj[key] = recursivelyExpandPluginRoot(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (obj as Record<string, unknown>)[key],
+          pluginRoot,
+        );
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return newObj as T;
+  }
+  return obj;
+}
+
+/**
  * Converts a FrontmatterAgentDefinition DTO to the internal AgentDefinition structure.
  *
  * @param markdown The parsed Markdown/Frontmatter definition.
- * @param metadata Optional metadata including hash and file path.
+ * @param metadata Optional metadata including hash, file path, and plugin root.
  * @returns The internal AgentDefinition.
  */
 export function markdownToAgentDefinition(
   markdown: FrontmatterAgentDefinition,
-  metadata?: { hash?: string; filePath?: string },
+  metadata?: { hash?: string; filePath?: string; pluginRoot?: string },
 ): AgentDefinition {
+  const pluginRoot = metadata?.pluginRoot;
+  const processedMarkdown =
+    pluginRoot !== undefined
+      ? recursivelyExpandPluginRoot(markdown, pluginRoot)
+      : markdown;
+
   const inputConfig = {
     inputSchema: {
       type: 'object',
@@ -514,15 +552,15 @@ export function markdownToAgentDefinition(
     },
   };
 
-  if (markdown.kind === 'remote') {
+  if (processedMarkdown.kind === 'remote') {
     return {
       kind: 'remote',
-      name: markdown.name,
-      description: markdown.description || '',
-      displayName: markdown.display_name,
-      agentCardUrl: markdown.agent_card_url,
-      auth: markdown.auth
-        ? convertFrontmatterAuthToConfig(markdown.auth)
+      name: processedMarkdown.name,
+      description: processedMarkdown.description || '',
+      displayName: processedMarkdown.display_name,
+      agentCardUrl: processedMarkdown.agent_card_url,
+      auth: processedMarkdown.auth
+        ? convertFrontmatterAuthToConfig(processedMarkdown.auth)
         : undefined,
       inputConfig,
       metadata,
@@ -530,11 +568,13 @@ export function markdownToAgentDefinition(
   }
 
   // If a model is specified, use it. Otherwise, inherit
-  const modelName = markdown.model || 'inherit';
+  const modelName = processedMarkdown.model || 'inherit';
 
   const mcpServers: Record<string, MCPServerConfig> = {};
-  if (markdown.kind === 'local' && markdown.mcp_servers) {
-    for (const [name, config] of Object.entries(markdown.mcp_servers)) {
+  if (processedMarkdown.kind === 'local' && processedMarkdown.mcp_servers) {
+    for (const [name, config] of Object.entries(
+      processedMarkdown.mcp_servers,
+    )) {
       mcpServers[name] = new MCPServerConfig(
         config.command,
         config.args,
@@ -556,27 +596,28 @@ export function markdownToAgentDefinition(
 
   return {
     kind: 'local',
-    name: markdown.name,
-    description: markdown.description,
-    displayName: markdown.display_name,
+    name: processedMarkdown.name,
+    description: processedMarkdown.description,
+    displayName: processedMarkdown.display_name,
     promptConfig: {
-      systemPrompt: markdown.system_prompt,
+      systemPrompt: processedMarkdown.system_prompt,
       query: '${query}',
     },
     modelConfig: {
       model: modelName,
       generateContentConfig: {
-        temperature: markdown.temperature ?? 1,
+        temperature: processedMarkdown.temperature ?? 1,
         topP: 0.95,
       },
     },
     runConfig: {
-      maxTurns: markdown.max_turns ?? DEFAULT_MAX_TURNS,
-      maxTimeMinutes: markdown.timeout_mins ?? DEFAULT_MAX_TIME_MINUTES,
+      maxTurns: processedMarkdown.max_turns ?? DEFAULT_MAX_TURNS,
+      maxTimeMinutes:
+        processedMarkdown.timeout_mins ?? DEFAULT_MAX_TIME_MINUTES,
     },
-    toolConfig: markdown.tools
+    toolConfig: processedMarkdown.tools
       ? {
-          tools: markdown.tools,
+          tools: processedMarkdown.tools,
         }
       : undefined,
     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
@@ -591,10 +632,12 @@ export function markdownToAgentDefinition(
  * Supported extensions: .md
  *
  * @param dir Directory path to scan.
+ * @param pluginRoot Optional plugin root path for variable expansion.
  * @returns Object containing successfully loaded agents and any errors.
  */
 export async function loadAgentsFromDirectory(
   dir: string,
+  pluginRoot?: string,
 ): Promise<AgentLoadResult> {
   const result: AgentLoadResult = {
     agents: [],
@@ -634,7 +677,11 @@ export async function loadAgentsFromDirectory(
       const hash = crypto.createHash('sha256').update(content).digest('hex');
       const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {
-        const agent = markdownToAgentDefinition(def, { hash, filePath });
+        const agent = markdownToAgentDefinition(def, {
+          hash,
+          filePath,
+          pluginRoot,
+        });
         result.agents.push(agent);
       }
     } catch (error) {

@@ -129,6 +129,7 @@ export interface BaseAgentDefinition<
   metadata?: {
     hash?: string;
     filePath?: string;
+    pluginRoot?: string;
   };
 }
 
