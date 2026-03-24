@@ -1,13 +1,17 @@
-name: Depen Check
+name: CI Pipeline
+
 on:
-  workflow_check:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+
 jobs:
-  depen workflow_check:
-    uses:dep-check_2.yml    
+  build:
+    runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-
+      - name: Print message
+        run: echo "GitHub Actions is working 🚀"
