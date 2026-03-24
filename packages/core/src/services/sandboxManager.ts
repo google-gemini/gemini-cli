@@ -11,6 +11,18 @@ import {
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+export interface SandboxPermissions {
+  /** Filesystem permissions. */
+  fileSystem?: {
+    /** Paths that should be readable by the command. */
+    read?: string[];
+    /** Paths that should be writable by the command. */
+    write?: string[];
+  };
+  /** Whether the command should have network access. */
+  network?: boolean;
+}
+
 /**
  * Security boundaries and permissions applied to a specific sandboxed execution.
  */
@@ -23,6 +35,8 @@ export interface ExecutionPolicy {
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+  /** Additional granular permissions to grant to this command. */
+  additionalPermissions?: SandboxPermissions;
 }
 
 /**
