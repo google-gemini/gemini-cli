@@ -151,7 +151,7 @@ This system guarantees that:
 For example:
 
 - A `priority: 50` rule in a Default policy file becomes `1.050`.
-- A `priority: 10` rule in a Workspace policy policy file becomes `2.010`.
+- A `priority: 10` rule in a Workspace policy file becomes `2.010`.
 - A `priority: 100` rule in a User policy file becomes `3.100`.
 - A `priority: 20` rule in an Admin policy file becomes `4.020`.
 
