@@ -131,12 +131,43 @@ class MockExtensionManager extends ExtensionLoader {
   };
 }
 
+// Mock terminalCapabilityManager to avoid terminal setup prompt during tests
+vi.mock('../ui/utils/terminalCapabilityManager.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../ui/utils/terminalCapabilityManager.js')
+    >();
+  const mockedManager = Object.create(
+    Object.getPrototypeOf(actual.terminalCapabilityManager),
+  );
+  Object.assign(mockedManager, actual.terminalCapabilityManager, {
+    isKittyProtocolEnabled: () => true,
+    enableKittyProtocol: vi.fn(),
+    disableKittyProtocol: vi.fn(),
+    enableSupportedModes: vi.fn(),
+    disableSupportedModes: vi.fn(),
+    onSupportChange: vi.fn(),
+    offSupportChange: vi.fn(),
+  });
+  return {
+    ...actual,
+    terminalCapabilityManager: mockedManager,
+  };
+});
+
+vi.mock('../ui/components/GeminiSpinner.js', async () => {
+  const React = await import('react');
+  const { Text } = await import('ink');
+  return {
+    GeminiSpinner: () => React.createElement(Text, null, '...'),
+  };
+});
+
 // Mock GeminiRespondingSpinner to disable animations (avoiding 'act()' warnings) without triggering screen reader mode.
 vi.mock('../ui/components/GeminiRespondingSpinner.js', async () => {
   const React = await import('react');
   const { Text } = await import('ink');
   return {
-    GeminiSpinner: () => React.createElement(Text, null, '...'),
     GeminiRespondingSpinner: ({
       nonRespondingDisplay,
     }: {
@@ -202,6 +233,9 @@ export class AppRig {
     this.setupEnvironment();
     resetSettingsCacheForTesting();
     this.settings = this.createRigSettings();
+
+    // Disable the terminal setup prompt globally for AppRig tests.
+    persistentStateMock.set('terminalSetupPromptShown', true);
 
     const approvalMode =
       this.options.configOverrides?.approvalMode ?? ApprovalMode.DEFAULT;
@@ -280,6 +314,10 @@ export class AppRig {
             enabled: false,
             hasSeenNudge: true,
           },
+          ui: {
+            hasSeenTerminalSetupPrompt: true,
+            showSpinner: false,
+          },
         },
         originalSettings: {},
       },
@@ -299,6 +337,8 @@ export class AppRig {
         },
         ui: {
           useAlternateBuffer: false,
+          hasSeenTerminalSetupPrompt: true,
+          showSpinner: false,
         },
       },
     });

@@ -10,8 +10,8 @@ import type { SubagentProgress } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Text } from 'ink';
 
-vi.mock('ink-spinner', () => ({
-  default: () => <Text>⠋</Text>,
+vi.mock('../BrailleAnimation.js', () => ({
+  BrailleAnimation: () => <Text>⠋</Text>,
 }));
 
 describe('<SubagentProgressDisplay />', () => {

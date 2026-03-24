@@ -15,14 +15,13 @@ import {
 } from '../textConstants.js';
 import { theme } from '../semantic-colors.js';
 import { GeminiSpinner } from './GeminiSpinner.js';
-
 interface GeminiRespondingSpinnerProps {
   /**
-   * Optional string to display when not in Responding state.
+   * Optional string or component to display when not in Responding state.
    * If not provided and not Responding, renders null.
    */
-  nonRespondingDisplay?: string;
-  spinnerType?: SpinnerName;
+  nonRespondingDisplay?: React.ReactNode;
+  spinnerType?: SpinnerName | 'dynamic';
   /**
    * If true, we prioritize showing the nonRespondingDisplay (hook icon)
    * even if the state is Responding.
@@ -35,7 +34,7 @@ export const GeminiRespondingSpinner: React.FC<
   GeminiRespondingSpinnerProps
 > = ({
   nonRespondingDisplay,
-  spinnerType = 'dots',
+  spinnerType = 'dynamic',
   isHookActive = false,
   color,
 }) => {
@@ -54,10 +53,14 @@ export const GeminiRespondingSpinner: React.FC<
   }
 
   if (nonRespondingDisplay) {
-    return isScreenReaderEnabled ? (
-      <Text>{SCREEN_READER_LOADING}</Text>
-    ) : (
+    if (isScreenReaderEnabled) {
+      return <Text>{SCREEN_READER_LOADING}</Text>;
+    }
+
+    return typeof nonRespondingDisplay === 'string' ? (
       <Text color={color ?? theme.text.primary}>{nonRespondingDisplay}</Text>
+    ) : (
+      <>{nonRespondingDisplay}</>
     );
   }
 

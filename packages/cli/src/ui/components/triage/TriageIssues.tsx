@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
 import {
   debugLogger,
   spawnAsync,
@@ -18,6 +17,7 @@ import { Command } from '../../key/keyMatchers.js';
 import { TextInput } from '../shared/TextInput.js';
 import { useTextBuffer } from '../shared/text-buffer.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { BrailleAnimation } from '../BrailleAnimation.js';
 
 interface Issue {
   number: number;
@@ -448,7 +448,7 @@ Return a JSON object with:
   if (state.status === 'loading') {
     return (
       <Box>
-        <Spinner type="dots" />
+        <BrailleAnimation />
         <Text> {state.message}</Text>
       </Box>
     );
@@ -521,7 +521,7 @@ Return a JSON object with:
     if (state.status === 'analyzing') {
       return (
         <Box>
-          <Spinner type="dots" />
+          <BrailleAnimation />
           <Text> {state.message}</Text>
         </Box>
       );
@@ -610,7 +610,7 @@ Return a JSON object with:
       >
         {state.status === 'analyzing' ? (
           <Box>
-            <Spinner type="dots" />
+            <BrailleAnimation />
             <Text> Analyzing issue with Gemini...</Text>
           </Box>
         ) : analysis ? (

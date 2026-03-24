@@ -11,19 +11,23 @@ import { CliSpinner } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
 import { Colors } from '../colors.js';
 import tinygradient from 'tinygradient';
+import { BrailleAnimation } from './BrailleAnimation.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 const COLOR_CYCLE_DURATION_MS = 4000;
 
 interface GeminiSpinnerProps {
-  spinnerType?: SpinnerName;
+  spinnerType?: SpinnerName | 'dynamic';
   altText?: string;
 }
 
 export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
-  spinnerType = 'dots',
+  spinnerType = 'dynamic',
   altText,
 }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const settings = useSettings();
+  const shouldShow = settings.merged.ui?.showSpinner !== false;
   const [time, setTime] = useState(0);
 
   const googleGradient = useMemo(() => {
@@ -39,7 +43,7 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isScreenReaderEnabled) {
+    if (isScreenReaderEnabled || !shouldShow) {
       return;
     }
 
@@ -48,16 +52,22 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
     }, 30); // ~33fps for smooth color transitions
 
     return () => clearInterval(interval);
-  }, [isScreenReaderEnabled]);
+  }, [isScreenReaderEnabled, shouldShow]);
 
   const progress = (time % COLOR_CYCLE_DURATION_MS) / COLOR_CYCLE_DURATION_MS;
   const currentColor = googleGradient.rgbAt(progress).toHexString();
 
+  const renderSpinner = () => {
+    if (spinnerType === 'dynamic') {
+      return <BrailleAnimation variant="Composite" />;
+    }
+
+    return <CliSpinner type={spinnerType} />;
+  };
+
   return isScreenReaderEnabled ? (
     <Text>{altText}</Text>
   ) : (
-    <Text color={currentColor}>
-      <CliSpinner type={spinnerType} />
-    </Text>
+    <Text color={currentColor}>{renderSpinner()}</Text>
   );
 };
