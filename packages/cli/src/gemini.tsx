@@ -37,6 +37,7 @@ import {
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
+import { readStdinLines } from './utils/readStdinLines.js';
 import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
@@ -284,15 +285,6 @@ export async function main() {
     });
   }
 
-  // Check for invalid input combinations early to prevent crashes
-  if (argv.promptInteractive && !process.stdin.isTTY) {
-    writeToStderr(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
-    );
-    await runExitCleanup();
-    process.exit(ExitCodes.FATAL_INPUT_ERROR);
-  }
-
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
     stderr: true,
@@ -403,7 +395,7 @@ export async function main() {
         process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
       }
       let stdinData = '';
-      if (!process.stdin.isTTY) {
+      if (!process.stdin.isTTY && !argv.promptInteractive) {
         stdinData = await readStdin();
       }
 
@@ -612,7 +604,7 @@ export async function main() {
 
     cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
-    if (config.isInteractive()) {
+    if (config.isInteractive() && process.stdin.isTTY) {
       await startInteractiveUI(
         config,
         settings,
@@ -623,15 +615,13 @@ export async function main() {
       );
       return;
     }
-
     await config.initialize();
     startupProfiler.flush(config);
 
-    // If not a TTY, read from stdin
-    // This is for cases where the user pipes input directly into the command
-    let stdinData: string | undefined = undefined;
-    if (!process.stdin.isTTY) {
-      stdinData = await readStdin();
+    // If not a TTY, read from stdin as a single prompt.
+    // Skip in interactive mode (-i) — stdin will be read line-by-line.
+    if (!process.stdin.isTTY && !config.isInteractive()) {
+      const stdinData = await readStdin();
       if (stdinData) {
         input = input ? `${stdinData}\n\n${input}` : stdinData;
       }
@@ -665,25 +655,6 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
-    if (!input) {
-      debugLogger.error(
-        `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
-      );
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_INPUT_ERROR);
-    }
-
-    const prompt_id = sessionId;
-    logUserPrompt(
-      config,
-      new UserPromptEvent(
-        input.length,
-        prompt_id,
-        config.getContentGeneratorConfig()?.authType,
-        input,
-      ),
-    );
-
     const authType = await validateNonInteractiveAuth(
       settings.merged.security.auth.selectedType,
       settings.merged.security.auth.useExternal,
@@ -698,17 +669,61 @@ export async function main() {
 
     initializeOutputListenersAndFlush();
 
-    await runNonInteractive({
-      config,
-      settings,
-      input,
-      prompt_id,
-      resumedSessionData,
-    });
+    // Unified prompt loop: yields once for single-shot, multiple times for
+    // multi-turn pipe sessions. RESULT events signal each response end.
+    let promptCount = 0;
+    for await (const prompt of prompts(input, config.isInteractive())) {
+      promptCount++;
+      const prompt_id =
+        promptCount === 1 ? sessionId : `${sessionId}-${promptCount}`;
+      logUserPrompt(
+        config,
+        new UserPromptEvent(
+          prompt.length,
+          prompt_id,
+          config.getContentGeneratorConfig()?.authType,
+          prompt,
+        ),
+      );
+
+      await runNonInteractive({
+        config,
+        settings,
+        input: prompt,
+        prompt_id,
+        resumedSessionData: promptCount === 1 ? resumedSessionData : undefined,
+      });
+    }
+
+    if (promptCount === 0) {
+      debugLogger.error(
+        `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
+      );
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_INPUT_ERROR);
+    }
+
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(ExitCodes.SUCCESS);
   }
+}
+
+/**
+ * Yields prompts from the available input source.
+ * Single-shot (interactive=false): yields the provided input once.
+ * Multi-turn (interactive=true): yields initial input, then reads stdin line-by-line.
+ */
+async function* prompts(
+  input?: string,
+  interactive?: boolean,
+): AsyncGenerator<string> {
+  if (input) {
+    yield input;
+    if (!interactive) return;
+  }
+  if (!interactive || process.stdin.isTTY) return;
+  yield* readStdinLines();
 }
 
 export function initializeOutputListenersAndFlush() {
