@@ -190,6 +190,7 @@ describe('commandUtils', () => {
     it('should return false when @ is inside backtick or single quotes', () => {
       expect(isAtCommand('explain `@decorators` in Python')).toBe(false);
       expect(isAtCommand("explain '@override' in Java")).toBe(false);
+      expect(isAtCommand("say 'don't @mention people'")).toBe(false);
     });
 
     it('should return false when @ is inside an unmatched single quote or backtick region', () => {

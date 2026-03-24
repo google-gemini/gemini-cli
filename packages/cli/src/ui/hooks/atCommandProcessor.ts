@@ -68,6 +68,55 @@ function isWordChar(char: string | undefined): boolean {
   return char !== undefined && /\w/.test(char);
 }
 
+function hasLaterClosingQuoteAfterBoundary(
+  text: string,
+  start: number,
+): boolean {
+  let escaped = false;
+  let sawBoundary = false;
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === "'") {
+      return sawBoundary;
+    }
+    if (!isWordChar(char)) {
+      sawBoundary = true;
+    }
+  }
+
+  return false;
+}
+
+function isQuotedWordApostrophe(text: string, index: number): boolean {
+  const prevChar = index > 0 ? text[index - 1] : undefined;
+  const nextChar = index + 1 < text.length ? text[index + 1] : undefined;
+
+  if (!isWordChar(prevChar) || !isWordChar(nextChar)) {
+    return false;
+  }
+
+  let end = index + 1;
+  while (end < text.length && /[A-Za-z]/.test(text[end])) {
+    end++;
+  }
+
+  const suffix = text.slice(index + 1, end).toLowerCase();
+  return (
+    ['s', 't', 're', 've', 'll', 'd', 'm', 'em'].includes(suffix) ||
+    hasLaterClosingQuoteAfterBoundary(text, index + 1)
+  );
+}
+
 /**
  * Returns true when the given position is inside an open single-quote or
  * backtick region. Double quotes are intentionally ignored because @"..."
@@ -91,6 +140,9 @@ export function isInsideQuotedRegion(text: string, position: number): boolean {
     }
     if (char === "'" && !inBacktick) {
       if (inSingleQuote) {
+        if (isQuotedWordApostrophe(text, i)) {
+          continue;
+        }
         inSingleQuote = false;
         continue;
       }

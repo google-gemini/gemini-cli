@@ -1776,6 +1776,24 @@ describe('handleAtCommand - email and quote scenarios', () => {
     });
   });
 
+  it('should keep @ literal inside a quoted contraction', async () => {
+    await createTestFile('mention', 'should stay literal');
+    const query = "say 'don't @mention people'";
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 9061,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+  });
+
   it('should pass through query with unmatched single-quoted or backtick-quoted @ as plain text', async () => {
     const singleQuoteQuery = "say '@file.txt";
 

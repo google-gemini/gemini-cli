@@ -334,6 +334,16 @@ describe('useCommandCompletion', () => {
         });
       });
 
+      it('should not trigger @ completion inside a quoted contraction', async () => {
+        const { result } = await renderCommandCompletionHook(
+          "say 'don't @mention",
+        );
+
+        await waitFor(() => {
+          expect(result.current.completionMode).toBe(CompletionMode.IDLE);
+        });
+      });
+
       it('should not trigger @ completion when @ is preceded by an underscore', async () => {
         const { result } = await renderCommandCompletionHook('my_@file.txt');
 

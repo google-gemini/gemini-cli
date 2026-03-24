@@ -91,6 +91,16 @@ describe('parseInputForHighlighting', () => {
     ]);
   });
 
+  it('should not highlight @ inside a quoted contraction', () => {
+    expect(parseInputForHighlighting("say 'don't @mention people'", 0)).toEqual(
+      [
+        { text: "say 'don't ", type: 'default' },
+        { text: '@mention', type: 'default' },
+        { text: " people'", type: 'default' },
+      ],
+    );
+  });
+
   it('should still highlight @ after an apostrophe in plain text', () => {
     expect(parseInputForHighlighting("don't @file.js", 0)).toEqual([
       { text: "don't ", type: 'default' },
