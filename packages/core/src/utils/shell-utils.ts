@@ -264,11 +264,7 @@ function normalizeCommandName(raw: string): string {
       return raw.slice(1, -1);
     }
   }
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  return trimmed.split(/[\\/]/).pop() ?? trimmed;
+  return raw.trim();
 }
 
 function extractNameFromNode(node: Node): string | null {
@@ -667,7 +663,10 @@ export function splitCommands(command: string): string[] {
     return [];
   }
 
-  return parsed.details.map((detail) => detail.text).filter(Boolean);
+  return parsed.details
+    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+    .map((detail) => detail.text)
+    .filter(Boolean);
 }
 
 /**
