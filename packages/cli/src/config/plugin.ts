@@ -11,11 +11,14 @@ import {
   loadSkillsFromDir,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
+  type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   HIDDEN_OPEN_PLUGIN_CONFIG_FILENAME,
   OPEN_PLUGIN_CONFIG_FILENAME,
+  OPEN_PLUGIN_MCP_CONFIG_FILENAME,
+  HIDDEN_OPEN_PLUGIN_MCP_CONFIG_FILENAME,
   recursivelyHydrateStrings,
   type JsonObject,
 } from './extensions/variables.js';
@@ -35,7 +38,7 @@ export interface OpenPluginConfig {
   skills?: string[] | Record<string, unknown>;
   agents?: string[] | Record<string, unknown>;
   hooks?: string[] | Record<string, unknown>;
-  mcpServers?: string[] | Record<string, unknown>;
+  mcpServers?: string | string[] | Record<string, unknown>;
 }
 
 export const OPEN_PLUGIN_NAME_REGEX = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
@@ -58,7 +61,13 @@ export const openPluginSchema = z.object({
   skills: z.union([z.array(z.string()), z.record(z.any())]).optional(),
   agents: z.union([z.array(z.string()), z.record(z.any())]).optional(),
   hooks: z.union([z.array(z.string()), z.record(z.any())]).optional(),
-  mcpServers: z.union([z.array(z.string()), z.record(z.any())]).optional(),
+  mcpServers: z
+    .union([z.string(), z.array(z.string()), z.record(z.any())])
+    .optional(),
+});
+
+export const openPluginMcpSchema = z.object({
+  mcpServers: z.record(z.any()),
 });
 
 export interface ManifestInfo {
@@ -119,6 +128,8 @@ export async function loadOpenPluginConfig(
     },
   ) as unknown as OpenPluginConfig;
 
+  const mcpServers = await resolveMcpServers(hydratedConfig, extensionDir);
+
   return {
     name: hydratedConfig.name,
     version: hydratedConfig.version ?? '0.0.0',
@@ -126,8 +137,81 @@ export async function loadOpenPluginConfig(
     description: hydratedConfig.description,
     author: hydratedConfig.author,
     license: hydratedConfig.license,
-    // Features are explicitly NOT mapped here for v1 plugins
+    mcpServers,
   };
+}
+
+/**
+ * Resolves MCP server configurations for an Open Plugin by checking the manifest
+ * and falling back to default filesystem locations.
+ */
+async function resolveMcpServers(
+  hydratedConfig: OpenPluginConfig,
+  extensionDir: string,
+): Promise<Record<string, MCPServerConfig> | undefined> {
+  let mcpServers: Record<string, MCPServerConfig> | undefined;
+
+  // 1. Explicit mcpServers in plugin.json
+  if (hydratedConfig.mcpServers) {
+    if (typeof hydratedConfig.mcpServers === 'string') {
+      const mcpPath = path.resolve(extensionDir, hydratedConfig.mcpServers);
+      mcpServers = await loadMcpConfigFile(mcpPath);
+    } else if (Array.isArray(hydratedConfig.mcpServers)) {
+      const mcpServersValue = hydratedConfig.mcpServers;
+      if (mcpServersValue.length > 0) {
+        const first = mcpServersValue[0];
+        if (typeof first === 'string') {
+          // Support array of paths
+          mcpServers = {};
+          for (const p of mcpServersValue) {
+            const mcpPath = path.resolve(extensionDir, p);
+            const servers = await loadMcpConfigFile(mcpPath);
+            if (servers) {
+              Object.assign(mcpServers, servers);
+            }
+          }
+        }
+      }
+    } else {
+      // It's a Record<string, MCPServerConfig>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      mcpServers = hydratedConfig.mcpServers as Record<string, MCPServerConfig>;
+    }
+  }
+
+  // 2. Fallback to .mcp.json at plugin root if no servers found yet
+  if (!mcpServers) {
+    const mcpPath = path.join(extensionDir, OPEN_PLUGIN_MCP_CONFIG_FILENAME);
+    const hiddenMcpPath = path.join(
+      extensionDir,
+      HIDDEN_OPEN_PLUGIN_MCP_CONFIG_FILENAME,
+    );
+
+    if (fs.existsSync(mcpPath)) {
+      mcpServers = await loadMcpConfigFile(mcpPath);
+    } else if (fs.existsSync(hiddenMcpPath)) {
+      mcpServers = await loadMcpConfigFile(hiddenMcpPath);
+    }
+  }
+
+  return mcpServers;
+}
+
+async function loadMcpConfigFile(
+  mcpPath: string,
+): Promise<Record<string, MCPServerConfig> | undefined> {
+  try {
+    const content = await fs.promises.readFile(mcpPath, 'utf-8');
+    const json = JSON.parse(content) as unknown;
+    const result = openPluginMcpSchema.safeParse(json);
+    if (result.success) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return result.data.mcpServers as Record<string, MCPServerConfig>;
+    }
+  } catch (_e) {
+    // Ignore errors loading fallback file
+  }
+  return undefined;
 }
 
 /**
@@ -173,8 +257,9 @@ export async function createOpenPlugin(
     description: config.description,
     author: config.author,
     license: config.license,
+    // Features partially enabled for Open Plugins
     contextFiles: [],
-    mcpServers: undefined,
+    mcpServers: config.mcpServers,
     excludeTools: undefined,
     settings: undefined,
     resolvedSettings: undefined,

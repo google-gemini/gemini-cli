@@ -2271,11 +2271,22 @@ export async function createTransport(
       }
     }
 
+    const expandedCommand = expandEnvVars(
+      mcpServerConfig.command,
+      expansionEnv,
+    );
+    const expandedArgs = (mcpServerConfig.args || []).map((arg) =>
+      expandEnvVars(arg, expansionEnv),
+    );
+    const expandedCwd = mcpServerConfig.cwd
+      ? expandEnvVars(mcpServerConfig.cwd, expansionEnv)
+      : undefined;
+
     let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
+      command: expandedCommand,
+      args: expandedArgs,
       env: finalEnv,
-      cwd: mcpServerConfig.cwd,
+      cwd: expandedCwd,
       stderr: 'pipe',
     });
 
@@ -2329,6 +2340,9 @@ function getExtensionEnvironment(
   extension?: GeminiCLIExtension,
 ): Record<string, string> {
   const env: Record<string, string> = {};
+  if (extension?.path) {
+    env['PLUGIN_ROOT'] = extension.path;
+  }
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
       if (setting.value !== undefined) {

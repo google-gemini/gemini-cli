@@ -25,6 +25,11 @@ export const HIDDEN_OPEN_PLUGIN_CONFIG_FILENAME = path.join(
   '.plugin',
   'plugin.json',
 );
+export const OPEN_PLUGIN_MCP_CONFIG_FILENAME = '.mcp.json';
+export const HIDDEN_OPEN_PLUGIN_MCP_CONFIG_FILENAME = path.join(
+  '.plugin',
+  '.mcp.json',
+);
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 export const EXTENSION_SETTINGS_FILENAME = '.env';
 
