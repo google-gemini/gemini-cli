@@ -310,49 +310,53 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
-    let streamDoneResolver: () => void;
-    const streamDonePromise = new Promise<void>((resolve) => {
-      streamDoneResolver = resolve;
-    });
-    this.sendPromise = streamDonePromise;
-
     const userContent = createUserContent(message);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
-    // Record user input - capture complete message with all parts (text, files, images, etc.)
-    // but skip recording function responses (tool call results) as they should be stored in tool call records
-    if (!isFunctionResponse(userContent)) {
-      const userMessageParts = userContent.parts || [];
-      const userMessageContent = partListUnionToString(userMessageParts);
-
-      let finalDisplayContent: Part[] | undefined = undefined;
-      if (displayContent !== undefined) {
-        const displayParts = toParts(
-          Array.isArray(displayContent) ? displayContent : [displayContent],
-        );
-        const displayContentString = partListUnionToString(displayParts);
-        if (displayContentString !== userMessageContent) {
-          finalDisplayContent = displayParts;
-        }
-      }
-
-      this.chatRecordingService.recordMessage({
-        model,
-        type: 'user',
-        content: userMessageParts,
-        displayContent: finalDisplayContent,
-      });
-    }
-
-    // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
-    const requestContents = this.getHistory(true);
-
     const streamWithRetries = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      // Acquire the send lock inside the generator body so that if the caller
+      // obtains the generator but never iterates it, sendPromise is never
+      // locked and history is never mutated — preventing a permanent deadlock
+      // and orphaned history entries. Fixes #22521.
+      let streamDoneResolver: () => void;
+      const streamDonePromise = new Promise<void>((resolve) => {
+        streamDoneResolver = resolve;
+      });
+      this.sendPromise = streamDonePromise;
+
       try {
+        // Record user input - capture complete message with all parts (text, files, images, etc.)
+        // but skip recording function responses (tool call results) as they should be stored in tool call records
+        if (!isFunctionResponse(userContent)) {
+          const userMessageParts = userContent.parts || [];
+          const userMessageContent = partListUnionToString(userMessageParts);
+
+          let finalDisplayContent: Part[] | undefined = undefined;
+          if (displayContent !== undefined) {
+            const displayParts = toParts(
+              Array.isArray(displayContent) ? displayContent : [displayContent],
+            );
+            const displayContentString = partListUnionToString(displayParts);
+            if (displayContentString !== userMessageContent) {
+              finalDisplayContent = displayParts;
+            }
+          }
+
+          this.chatRecordingService.recordMessage({
+            model,
+            type: 'user',
+            content: userMessageParts,
+            displayContent: finalDisplayContent,
+          });
+        }
+
+        // Add user content to history ONCE before any attempts.
+        this.history.push(userContent);
+        const requestContents = this.getHistory(true);
+
         const maxAttempts = this.context.config.getMaxAttempts();
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
