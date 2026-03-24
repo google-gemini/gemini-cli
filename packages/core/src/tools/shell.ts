@@ -36,6 +36,7 @@ import {
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
+  escapeShellArg,
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,

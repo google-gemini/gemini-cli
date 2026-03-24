@@ -41,7 +41,10 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import { initializeShellParsers } from '../utils/shell-utils.js';
+import {
+  escapeShellArg,
+  initializeShellParsers,
+} from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
@@ -277,7 +280,8 @@ describe('ShellTool', () => {
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
@@ -306,7 +310,8 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
@@ -331,7 +336,8 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
@@ -358,10 +364,11 @@ EOF
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
       const wrappedCommand = `{ cat <<EOF
 hello
 EOF
-}; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+}; __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
@@ -382,8 +389,9 @@ EOF
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
       const wrappedCommand = `{ # comment
-}; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+}; __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
