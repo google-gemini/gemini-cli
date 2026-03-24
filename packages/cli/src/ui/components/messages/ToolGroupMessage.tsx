@@ -172,12 +172,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
   // internal errors, plan-mode hidden write/edit), we should not emit standalone
   // border fragments. The only case where an empty group should render is the
-  // explicit "closing slice" (tools: []) used to bridge static/pending sections.
+  // explicit "closing slice" (tools: []) used to bridge static/pending sections,
+  // and only if it's actually continuing an open box from above.
   const isExplicitClosingSlice = allToolCalls.length === 0;
-  if (
-    visibleToolCalls.length === 0 &&
-    (!isExplicitClosingSlice || borderBottomOverride !== true)
-  ) {
+  if (visibleToolCalls.length === 0 && !isExplicitClosingSlice) {
     return null;
   }
 
@@ -269,19 +267,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             We have to keep the bottom border separate so it doesn't get
             drawn over by the sticky header directly inside it.
            */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
-          <Box
-            height={0}
-            width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
-            borderTop={false}
-            borderBottom={borderBottomOverride ?? true}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
-            borderStyle="round"
-          />
-        )
+        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
+          borderBottomOverride !== false && (
+            <Box
+              height={0}
+              width={contentWidth}
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={borderBottomOverride ?? true}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              borderStyle="round"
+            />
+          )
       }
     </Box>
   );

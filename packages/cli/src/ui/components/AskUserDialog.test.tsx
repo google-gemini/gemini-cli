@@ -1491,4 +1491,47 @@ describe('AskUserDialog', () => {
       expect(frame).toContain('3.  Option 3');
     });
   });
+
+  it('allows the question to exceed 15 lines in a tall terminal', async () => {
+    const longQuestion = Array.from(
+      { length: 25 },
+      (_, i) => `Line ${i + 1}`,
+    ).join('\n');
+    const questions: Question[] = [
+      {
+        question: longQuestion,
+        header: 'Tall Test',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'Option 1', description: 'D1' },
+          { label: 'Option 2', description: 'D2' },
+          { label: 'Option 3', description: 'D3' },
+        ],
+        multiSelect: false,
+        unconstrainedHeight: false,
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={80}
+        availableHeight={40} // Tall terminal
+      />,
+      { width: 80 },
+    );
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      const frame = lastFrame();
+      // Should show more than 15 lines of the question
+      // (The limit was previously 15, so showing Line 20 proves it's working)
+      expect(frame).toContain('Line 20');
+      expect(frame).toContain('Line 25');
+      // Should still show the options
+      expect(frame).toContain('1.  Option 1');
+    });
+  });
 });

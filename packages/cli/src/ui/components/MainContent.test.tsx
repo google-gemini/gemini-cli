@@ -21,6 +21,7 @@ import {
   type UIState,
 } from '../contexts/UIStateContext.js';
 import { type IndividualToolCallDisplay } from '../types.js';
+import { type ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 
 // Mock dependencies
 const mockUseSettings = vi.fn().mockReturnValue({
@@ -51,6 +52,10 @@ vi.mock('../contexts/AppContext.js', async () => {
 
 vi.mock('../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(),
+}));
+
+vi.mock('../hooks/useConfirmingTool.js', () => ({
+  useConfirmingTool: vi.fn(),
 }));
 
 vi.mock('./AppHeader.js', () => ({
@@ -503,6 +508,53 @@ describe('MainContent', () => {
     unmount();
   });
 
+  it('renders a subagent with a complete box including bottom border', async () => {
+    const subagentCall = {
+      callId: 'subagent-1',
+      name: 'codebase_investigator',
+      description: 'Investigating codebase',
+      status: CoreToolCallStatus.Executing,
+      kind: 'agent',
+      resultDisplay: {
+        isSubagentProgress: true,
+        agentName: 'codebase_investigator',
+        recentActivity: [
+          {
+            id: '1',
+            type: 'tool_call',
+            content: 'run_shell_command',
+            args: '{"command": "echo hello"}',
+            status: 'running',
+          },
+        ],
+        state: 'running',
+      },
+    } as unknown as IndividualToolCallDisplay;
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Investigate' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: [subagentCall],
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    const output = lastFrame();
+
+    expect(output).toContain('codebase_investigator');
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
   it('renders a split tool group without a gap between static and pending areas', async () => {
     const toolCalls = [
       {
@@ -553,6 +605,111 @@ describe('MainContent', () => {
     expect(output).toContain('Part 2');
 
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a ToolConfirmationQueue without an extra line when preceded by hidden tools', async () => {
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
+    const hiddenToolCalls = [
+      {
+        callId: 'tool-hidden',
+        name: WRITE_FILE_DISPLAY_NAME,
+        approvalMode: ApprovalMode.PLAN,
+        status: CoreToolCallStatus.Success,
+        resultDisplay: 'Hidden content',
+      } as unknown as IndividualToolCallDisplay,
+    ];
+
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'exit_plan_mode',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'exit_plan_mode' as const,
+          planPath: '/path/to/plan',
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Apply plan' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: hiddenToolCalls,
+          borderBottom: true,
+        },
+      ],
+    };
+
+    // We need to mock useConfirmingTool to return our confirmingTool
+    const { useConfirmingTool } = await import('../hooks/useConfirmingTool.js');
+    vi.mocked(useConfirmingTool).mockReturnValue(
+      confirmingTool as unknown as ConfirmingToolState,
+    );
+
+    mockUseSettings.mockReturnValue(
+      createMockSettings({
+        security: { enablePermanentToolApproval: true },
+        ui: { errorVerbosity: 'full' },
+      }),
+    );
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    const output = lastFrame();
+
+    // The output should NOT contain 'Hidden content'
+    expect(output).not.toContain('Hidden content');
+    // The output should contain the confirmation header
+    expect(output).toContain('Ready to start implementation?');
+
+    // Snapshot will reveal if there are extra blank lines
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a spurious line when a tool group has only hidden tools and borderBottom true', async () => {
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Apply plan' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: [
+            {
+              callId: 'tool-1',
+              name: WRITE_FILE_DISPLAY_NAME,
+              approvalMode: ApprovalMode.PLAN,
+              status: CoreToolCallStatus.Success,
+              resultDisplay: 'hidden',
+            } as unknown as IndividualToolCallDisplay,
+          ],
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    const output = lastFrame();
+    // This snapshot will show no spurious line because the group is now correctly suppressed.
     expect(output).toMatchSnapshot();
     unmount();
   });
