@@ -1,0 +1,13 @@
+name: Depen Check
+on:
+  workflow_check:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+jobs:
+  depen workflow_check:
+    uses:dep-check_2.yml    
+
+
+
