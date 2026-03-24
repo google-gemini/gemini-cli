@@ -700,7 +700,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
-  const isAuthenticating = authState === AuthState.Unauthenticated;
+  // TODO: Consider handling other auth types that should also skip the blocking screen
+  const isAuthenticating =
+    authState === AuthState.Unauthenticated &&
+    settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI;
 
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
@@ -1300,7 +1303,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      if (isSlash || (isIdle && isMcpReady)) {
+      const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
+      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1323,10 +1327,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpReady && messageQueue.length === 0) {
+        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
           coreEvents.emitFeedback(
             'info',
-            'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
+            !isConfigInitialized
+              ? 'Initializing... Prompts will be queued.'
+              : 'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
           );
         }
         addMessage(submittedValue);
@@ -1350,6 +1356,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       reset,
       handleHintSubmit,
+      isConfigInitialized,
       triggerExpandHint,
     ],
   );
@@ -1380,11 +1387,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
    * - Any future streaming states not explicitly allowed
    */
   const isInputActive =
-    isConfigInitialized &&
     !initError &&
     !isProcessing &&
     !isResuming &&
-    !!slashCommands &&
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding ||
       streamingState === StreamingState.WaitingForConfirmation) &&
