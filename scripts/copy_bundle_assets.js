@@ -17,7 +17,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync, cpSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
@@ -58,7 +58,14 @@ console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
 if (existsSync(docsSrc)) {
-  cpSync(docsSrc, docsDest, { recursive: true, dereference: true });
+  if (existsSync(docsDest)) {
+    rmSync(docsDest, { recursive: true, force: true });
+  }
+  cpSync(docsSrc, docsDest, {
+    recursive: true,
+    dereference: true,
+    force: true,
+  });
   console.log('Copied docs to bundle/docs/');
 }
 
@@ -66,9 +73,13 @@ if (existsSync(docsSrc)) {
 const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
 const builtinSkillsDest = join(bundleDir, 'builtin');
 if (existsSync(builtinSkillsSrc)) {
+  if (existsSync(builtinSkillsDest)) {
+    rmSync(builtinSkillsDest, { recursive: true, force: true });
+  }
   cpSync(builtinSkillsSrc, builtinSkillsDest, {
     recursive: true,
     dereference: true,
+    force: true,
   });
   console.log('Copied built-in skills to bundle/builtin/');
 }
@@ -84,9 +95,14 @@ const devtoolsDest = join(
 const devtoolsDistSrc = join(devtoolsSrc, 'dist');
 if (existsSync(devtoolsDistSrc)) {
   mkdirSync(devtoolsDest, { recursive: true });
-  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
+  const destDist = join(devtoolsDest, 'dist');
+  if (existsSync(destDist)) {
+    rmSync(destDist, { recursive: true, force: true });
+  }
+  cpSync(devtoolsDistSrc, destDist, {
     recursive: true,
     dereference: true,
+    force: true,
   });
   copyFileSync(
     join(devtoolsSrc, 'package.json'),
@@ -99,7 +115,14 @@ if (existsSync(devtoolsDistSrc)) {
 const bundleMcpSrc = join(root, 'packages/core/dist/bundled');
 const bundleMcpDest = join(bundleDir, 'bundled');
 if (existsSync(bundleMcpSrc)) {
-  cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
+  if (existsSync(bundleMcpDest)) {
+    rmSync(bundleMcpDest, { recursive: true, force: true });
+  }
+  cpSync(bundleMcpSrc, bundleMcpDest, {
+    recursive: true,
+    dereference: true,
+    force: true,
+  });
   console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
 }
 
