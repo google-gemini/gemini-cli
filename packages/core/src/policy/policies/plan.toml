@@ -111,6 +111,7 @@ modes = ["plan"]
 
 # Allow write_file and replace for .md files in the plans directory (cross-platform)
 # We split this into two rules to avoid ReDoS checker issues with nested optional segments.
+# This rule handles the case where there is a session ID in the plan file path
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
@@ -118,6 +119,7 @@ priority = 70
 modes = ["plan"]
 argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
 
+# This rule handles the case where there isn't a session ID in the plan file path
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
