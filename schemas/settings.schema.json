@@ -392,6 +392,13 @@
           "default": false,
           "type": "boolean"
         },
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Whether to collapse the UI drawer when a tool is awaiting confirmation.",
+          "markdownDescription": "Whether to collapse the UI drawer when a tool is awaiting confirmation.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showMemoryUsage": {
           "title": "Show Memory Usage",
           "description": "Display memory usage information in the UI",
@@ -2673,8 +2680,8 @@
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents.",
-          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "worktrees": {

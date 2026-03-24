@@ -295,6 +295,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the footer from the UI
   - **Default:** `false`
 
+- **`ui.collapseDrawerDuringApproval`** (boolean):
+  - **Description:** Whether to collapse the UI drawer when a tool is awaiting
+    confirmation.
+  - **Default:** `true`
+
 - **`ui.showMemoryUsage`** (boolean):
   - **Description:** Display memory usage information in the UI
   - **Default:** `false`
@@ -1535,7 +1540,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
-  - **Default:** `true`
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.worktrees`** (boolean):

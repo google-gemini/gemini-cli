@@ -657,6 +657,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -1922,7 +1932,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Agents',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description: 'Enable local and remote subagents.',
         showInDialog: false,
       },

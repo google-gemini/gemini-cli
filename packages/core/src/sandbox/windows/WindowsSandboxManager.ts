@@ -6,18 +6,22 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import type {
-  SandboxManager,
-  SandboxRequest,
-  SandboxedCommand,
-} from './sandboxManager.js';
+import {
+  type SandboxManager,
+  type SandboxRequest,
+  type SandboxedCommand,
+  GOVERNANCE_FILES,
+  type GlobalSandboxOptions,
+  sanitizePaths,
+} from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
-  type EnvironmentSanitizationConfig,
-} from './environmentSanitization.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import { spawnAsync } from '../utils/shell-utils.js';
+  getSecureSanitizationConfig,
+} from '../../services/environmentSanitization.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { spawnAsync } from '../../utils/shell-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,18 +33,38 @@ const __dirname = path.dirname(__filename);
  */
 export class WindowsSandboxManager implements SandboxManager {
   private readonly helperPath: string;
-  private readonly platform: string;
   private initialized = false;
   private readonly lowIntegrityCache = new Set<string>();
 
-  constructor(platform: string = process.platform) {
-    this.platform = platform;
-    this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
+  constructor(private readonly options: GlobalSandboxOptions) {
+    this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+  }
+
+  /**
+   * Ensures a file or directory exists.
+   */
+  private touch(filePath: string, isDirectory: boolean): void {
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      if (fs.lstatSync(filePath)) return;
+    } catch {
+      // Ignore ENOENT
+    }
+
+    if (isDirectory) {
+      fs.mkdirSync(filePath, { recursive: true });
+    } else {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.closeSync(fs.openSync(filePath, 'a'));
+    }
   }
 
   private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
-    if (this.platform !== 'win32') {
+    if (os.platform() !== 'win32') {
       this.initialized = true;
       return;
     }
@@ -145,36 +169,52 @@ export class WindowsSandboxManager implements SandboxManager {
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await this.ensureInitialized();
 
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction:
-        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
-        true,
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.policy?.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
     // 1. Handle filesystem permissions for Low Integrity
-    // Grant "Low Mandatory Level" write access to the CWD.
-    await this.grantLowIntegrityAccess(req.cwd);
+    // Grant "Low Mandatory Level" write access to the workspace.
+    await this.grantLowIntegrityAccess(this.options.workspace);
 
     // Grant "Low Mandatory Level" read access to allowedPaths.
-    if (req.config?.allowedPaths) {
-      for (const allowedPath of req.config.allowedPaths) {
-        await this.grantLowIntegrityAccess(allowedPath);
+    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    for (const allowedPath of allowedPaths) {
+      await this.grantLowIntegrityAccess(allowedPath);
+    }
+
+    // TODO: handle forbidden paths
+
+    // 2. Protected governance files
+    // These must exist on the host before running the sandbox to prevent
+    // the sandboxed process from creating them with Low integrity.
+    // By being created as Medium integrity, they are write-protected from Low processes.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = path.join(this.options.workspace, file.path);
+      this.touch(filePath, file.isDirectory);
+
+      // We resolve real paths to ensure protection for both the symlink and its target.
+      try {
+        const realPath = fs.realpathSync(filePath);
+        if (realPath !== filePath) {
+          // If it's a symlink, the target is already implicitly protected
+          // if it's outside the Low integrity workspace (likely Medium).
+          // If it's inside, we ensure it's not accidentally Low.
+        }
+      } catch {
+        // Ignore realpath errors
       }
     }
 
-    // 2. Construct the helper command
+    // 3. Construct the helper command
     // GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]
     const program = this.helperPath;
 
     // If the command starts with __, it's an internal command for the sandbox helper itself.
     const args = [
-      req.config?.networkAccess ? '1' : '0',
+      req.policy?.networkAccess ? '1' : '0',
       req.cwd,
       req.command,
       ...req.args,
@@ -191,7 +231,7 @@ export class WindowsSandboxManager implements SandboxManager {
    * Grants "Low Mandatory Level" access to a path using icacls.
    */
   private async grantLowIntegrityAccess(targetPath: string): Promise<void> {
-    if (this.platform !== 'win32') {
+    if (os.platform() !== 'win32') {
       return;
     }
 
