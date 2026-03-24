@@ -15,6 +15,7 @@ import {
   type RemoteAgentInputs,
   type RemoteAgentDefinition,
   type AgentInputs,
+  type SubagentProgress,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -25,7 +26,6 @@ import type {
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
-import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import { A2AAgentError } from './a2a-errors.js';
@@ -125,13 +125,30 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
   async execute(
     _signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: string | AnsiOutput | SubagentProgress) => void,
   ): Promise<ToolResult> {
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
     const reassembler = new A2AResultReassembler();
+    const agentName = this.definition.displayName ?? this.definition.name;
     try {
+      if (updateOutput) {
+        updateOutput({
+          isSubagentProgress: true,
+          agentName,
+          state: 'running',
+          recentActivity: [
+            {
+              id: 'pending',
+              type: 'thought',
+              content: 'Working...',
+              status: 'running',
+            },
+          ],
+        });
+      }
+
       const priorState = RemoteAgentInvocation.sessionState.get(
         this.definition.name,
       );
@@ -172,7 +189,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         reassembler.update(chunk);
 
         if (updateOutput) {
-          updateOutput(reassembler.toString());
+          updateOutput({
+            isSubagentProgress: true,
+            agentName,
+            state: 'running',
+            recentActivity: reassembler.toActivityItems(),
+            result: reassembler.toString(),
+          });
         }
 
         const {
@@ -198,9 +221,21 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         `[RemoteAgent] Final response from ${this.definition.name}:\n${JSON.stringify(finalResponse, null, 2)}`,
       );
 
+      const finalProgress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName,
+        state: 'completed',
+        result: finalOutput,
+        recentActivity: reassembler.toActivityItems(),
+      };
+
+      if (updateOutput) {
+        updateOutput(finalProgress);
+      }
+
       return {
         llmContent: [{ text: finalOutput }],
-        returnDisplay: safeJsonToMarkdown(finalOutput),
+        returnDisplay: finalProgress,
       };
     } catch (error: unknown) {
       const partialOutput = reassembler.toString();
@@ -209,10 +244,22 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const fullDisplay = partialOutput
         ? `${partialOutput}\n\n${errorMessage}`
         : errorMessage;
+
+      const errorProgress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName,
+        state: 'error',
+        result: fullDisplay,
+        recentActivity: reassembler.toActivityItems(),
+      };
+
+      if (updateOutput) {
+        updateOutput(errorProgress);
+      }
+
       return {
         llmContent: [{ text: fullDisplay }],
-        returnDisplay: fullDisplay,
-        error: { message: errorMessage },
+        returnDisplay: errorProgress,
       };
     } finally {
       // Persist state even on partial failures or aborts to maintain conversational continuity.
