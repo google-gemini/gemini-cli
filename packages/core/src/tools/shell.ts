@@ -383,6 +383,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           llmContentParts.push(`Exit Code: ${result.exitCode}`);
           data = {
             exitCode: result.exitCode,
+            isError: true,
           };
         }
 

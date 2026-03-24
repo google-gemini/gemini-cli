@@ -30,6 +30,7 @@ import {
   type SubagentActivityEvent,
   type SubagentProgress,
   type SubagentActivityItem,
+  isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
@@ -211,12 +212,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               ? String(activity.data['id'])
               : undefined;
             const data = activity.data['data'];
-            const isError =
-              data &&
-              typeof data === 'object' &&
-              'exitCode' in data &&
-              data.exitCode !== undefined &&
-              data.exitCode !== 0;
+            const isError = isToolActivityError(data);
 
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (

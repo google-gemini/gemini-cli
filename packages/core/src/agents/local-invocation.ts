@@ -21,6 +21,7 @@ import {
   SubagentActivityErrorType,
   SUBAGENT_REJECTED_ERROR_PREFIX,
   SUBAGENT_CANCELLED_ERROR_MESSAGE,
+  isToolActivityError,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -167,12 +168,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'TOOL_CALL_END': {
             const name = String(activity.data['name']);
             const data = activity.data['data'];
-            const isError =
-              data &&
-              typeof data === 'object' &&
-              'exitCode' in data &&
-              data.exitCode !== undefined &&
-              data.exitCode !== 0;
+            const isError = isToolActivityError(data);
 
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
