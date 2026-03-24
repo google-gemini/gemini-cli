@@ -113,7 +113,7 @@ describe('subagent eval test cases', () => {
     },
     prompt: 'Please add a small test file that verifies add(1, 2) returns 3.',
     files: {
-      '.gemini/agents/test-agent.md': TEST_AGENTS.TEST_AGENT,
+      '.gemini/agents/testing-agent.md': TEST_AGENTS.TESTING_AGENT,
       'index.ts': INDEX_TS,
       'package.json': JSON.stringify(
         {
@@ -130,7 +130,7 @@ describe('subagent eval test cases', () => {
         toolRequest: { name: string };
       }>;
 
-      await rig.expectToolCallSuccess(['test-agent']);
+      await rig.expectToolCallSuccess(['testing-agent']);
       expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
         false,
       );
@@ -159,7 +159,7 @@ describe('subagent eval test cases', () => {
       'Add a short README description for this library and also add a test file that verifies add(1, 2) returns 3.',
     files: {
       '.gemini/agents/docs-agent.md': TEST_AGENTS.DOCS_AGENT,
-      '.gemini/agents/test-agent.md': TEST_AGENTS.TEST_AGENT,
+      '.gemini/agents/testing-agent.md': TEST_AGENTS.TESTING_AGENT,
       'index.ts': INDEX_TS,
       'README.md': 'TODO: update the README.\n',
       'package.json': JSON.stringify(
@@ -178,7 +178,7 @@ describe('subagent eval test cases', () => {
       }>;
       const readme = readProjectFile(rig, 'README.md');
 
-      await rig.expectToolCallSuccess(['docs-agent', 'test-agent']);
+      await rig.expectToolCallSuccess(['docs-agent', 'testing-agent']);
       expect(readme).not.toContain('TODO: update the README.');
       expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
         false,

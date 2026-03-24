@@ -28,8 +28,8 @@ You are the docs agent. Update documentation clearly and accurately.
    * An agent with expertise in writing and updating tests.
    * Tools: read_file, write_file
    */
-  TEST_AGENT: `---
-name: test-agent
+  TESTING_AGENT: `---
+name: testing-agent
 description: An agent with expertise in writing and updating tests.
 tools:
   - read_file
