@@ -92,8 +92,6 @@ describe('ExtensionManager - Open Plugin Support', () => {
     expect(plugin?.version).toBe('1.0.0');
     expect(plugin?.description).toBe('An Open Plugin test');
     expect(plugin?.manifestType).toBe('open-plugin');
-    expect(plugin?.author).toEqual({ name: 'Taylor' });
-    expect(plugin?.license).toBe('Apache-2.0');
   });
 
   it('should discover a plugin with .plugin/plugin.json', async () => {

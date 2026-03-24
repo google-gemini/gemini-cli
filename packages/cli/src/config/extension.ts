@@ -37,10 +37,6 @@ export interface ExtensionConfig {
   description?: string;
   author?: string | { name: string; email?: string; url?: string };
   license?: string;
-  repository?: string | { type: string; url: string; directory?: string };
-  homepage?: string;
-  logo?: string;
-  keywords?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -80,19 +76,6 @@ export const geminiExtensionSchema = z.object({
     ])
     .optional(),
   license: z.string().optional(),
-  repository: z
-    .union([
-      z.string(),
-      z.object({
-        type: z.string(),
-        url: z.string(),
-        directory: z.string().optional(),
-      }),
-    ])
-    .optional(),
-  homepage: z.string().url().optional(),
-  logo: z.string().optional(),
-  keywords: z.array(z.string()).optional(),
   mcpServers: z.record(z.any()).optional(),
   contextFileName: z.union([z.string(), z.array(z.string())]).optional(),
   excludeTools: z.array(z.string()).optional(),
@@ -190,10 +173,6 @@ export function createGeminiExtension(
     description: config.description,
     author: config.author,
     license: config.license,
-    repository: config.repository ?? config.migratedTo,
-    homepage: config.homepage,
-    logo: config.logo,
-    keywords: config.keywords,
     contextFiles,
     mcpServers: config.mcpServers,
     excludeTools: config.excludeTools,
