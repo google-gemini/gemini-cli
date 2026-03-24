@@ -20,7 +20,7 @@ import {
   type A2AClientManager,
 } from './a2a-client-manager.js';
 
-import type { RemoteAgentDefinition } from './types.js';
+import type { RemoteAgentDefinition, SubagentProgress } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
@@ -266,9 +266,11 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error?.message).toContain(
-        "Failed to create auth provider for agent 'test-agent'",
-      );
+      expect(result.returnDisplay).toMatchObject({
+        result: expect.stringContaining(
+          "Failed to create auth provider for agent 'test-agent'",
+        ),
+      });
     });
 
     it('should not load the agent if already present', async () => {
@@ -325,7 +327,9 @@ describe('RemoteAgentInvocation', () => {
 
       // Execute first time
       const result1 = await invocation1.execute(new AbortController().signal);
-      expect(result1.returnDisplay).toBe('Response 1');
+      expect(result1.returnDisplay).toMatchObject({
+        result: 'Response 1',
+      });
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
         'first',
@@ -355,7 +359,9 @@ describe('RemoteAgentInvocation', () => {
         mockMessageBus,
       );
       const result2 = await invocation2.execute(new AbortController().signal);
-      expect(result2.returnDisplay).toBe('Response 2');
+      expect((result2.returnDisplay as SubagentProgress).result).toBe(
+        'Response 2',
+      );
 
       expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
         'test-agent',
@@ -444,8 +450,22 @@ describe('RemoteAgentInvocation', () => {
       );
       await invocation.execute(new AbortController().signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledWith('Hello');
-      expect(updateOutput).toHaveBeenCalledWith('Hello\n\nHello World');
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'running',
+          recentActivity: expect.arrayContaining([
+            expect.objectContaining({ content: 'Working...' }),
+          ]),
+        }),
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'completed',
+          result: 'HelloHello World',
+        }),
+      );
     });
 
     it('should abort when signal is aborted during streaming', async () => {
@@ -478,8 +498,9 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(controller.signal);
 
-      expect(result.error).toBeDefined();
-      expect(result.error?.message).toContain('Operation aborted');
+      // Error is now rendered via returnDisplay instead of raw error
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      // expect(result.error?.message).toContain('Operation aborted');
     });
 
     it('should handle errors gracefully', async () => {
@@ -501,9 +522,11 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error).toBeDefined();
-      expect(result.error?.message).toContain('Network error');
-      expect(result.returnDisplay).toContain('Network error');
+      // Error is now rendered via returnDisplay instead of raw error
+      expect(result.returnDisplay).toMatchObject({
+        state: 'error',
+        result: expect.stringContaining('Network error'),
+      });
     });
 
     it('should use a2a helpers for extracting text', async () => {
@@ -534,7 +557,9 @@ describe('RemoteAgentInvocation', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       // Just check that text is present, exact formatting depends on helper
-      expect(result.returnDisplay).toContain('Extracted text');
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        'Extracted text',
+      );
     });
 
     it('should handle mixed response types during streaming (TaskStatusUpdateEvent + Message)', async () => {
@@ -577,9 +602,25 @@ describe('RemoteAgentInvocation', () => {
         updateOutput,
       );
 
-      expect(updateOutput).toHaveBeenCalledWith('Thinking...');
-      expect(updateOutput).toHaveBeenCalledWith('Thinking...\n\nFinal Answer');
-      expect(result.returnDisplay).toBe('Thinking...\n\nFinal Answer');
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'running',
+          recentActivity: expect.arrayContaining([
+            expect.objectContaining({ content: 'Working...' }),
+          ]),
+        }),
+      );
+      expect(updateOutput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'completed',
+          result: 'Thinking...Final Answer',
+        }),
+      );
+      expect(result.returnDisplay).toMatchObject({
+        result: 'Thinking...Final Answer',
+      });
     });
 
     it('should handle artifact reassembly with append: true', async () => {
@@ -635,12 +676,21 @@ describe('RemoteAgentInvocation', () => {
       );
       await invocation.execute(new AbortController().signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledWith('Generating...');
       expect(updateOutput).toHaveBeenCalledWith(
-        'Generating...\n\nArtifact (Result):\nPart 1',
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'running',
+          recentActivity: expect.arrayContaining([
+            expect.objectContaining({ content: 'Working...' }),
+          ]),
+        }),
       );
       expect(updateOutput).toHaveBeenCalledWith(
-        'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
+        expect.objectContaining({
+          isSubagentProgress: true,
+          state: 'completed',
+          result: 'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
+        }),
       );
     });
   });
@@ -694,8 +744,11 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error).toBeDefined();
-      expect(result.returnDisplay).toContain(a2aError.userMessage);
+      // Error is now rendered via returnDisplay instead of raw error
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        a2aError.userMessage,
+      );
     });
 
     it('should use generic message for non-A2AAgentError errors', async () => {
@@ -712,8 +765,9 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error).toBeDefined();
-      expect(result.returnDisplay).toContain(
+      // Error is now rendered via returnDisplay instead of raw error
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
         'Error calling remote agent: something unexpected',
       );
     });
@@ -741,10 +795,15 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error).toBeDefined();
+      // Error is now rendered via returnDisplay instead of raw error
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
       // Should contain both the partial output and the error message
-      expect(result.returnDisplay).toContain('Partial response');
-      expect(result.returnDisplay).toContain('connection reset');
+      expect(result.returnDisplay).toMatchObject({
+        result: expect.stringContaining('Partial response'),
+      });
+      expect(result.returnDisplay).toMatchObject({
+        result: expect.stringContaining('connection reset'),
+      });
     });
   });
 });
