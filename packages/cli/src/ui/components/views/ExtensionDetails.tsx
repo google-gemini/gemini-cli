@@ -23,6 +23,8 @@ export interface ExtensionDetailsProps {
     requestConsentOverride: (consent: string) => Promise<boolean>,
   ) => void | Promise<void>;
   isInstalled: boolean;
+  hasUpdate?: boolean;
+  onUpdate?: () => void | Promise<void>;
 }
 
 export function ExtensionDetails({
@@ -31,6 +33,8 @@ export function ExtensionDetails({
   onInstall,
   onLink,
   isInstalled,
+  hasUpdate,
+  onUpdate,
 }: ExtensionDetailsProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
   const [consentRequest, setConsentRequest] = useState<{
@@ -84,6 +88,10 @@ export function ExtensionDetails({
               setConsentRequest({ prompt, resolve });
             }),
         );
+        return true;
+      }
+      if (key.name === 'i' && hasUpdate && !isInstalling) {
+        void onUpdate?.();
         return true;
       }
       return false;
@@ -150,6 +158,11 @@ export function ExtensionDetails({
           <Text color={theme.text.primary} bold>
             {extension.extensionName}
           </Text>
+          {hasUpdate && (
+            <Box marginLeft={1}>
+              <Text color={theme.status.warning}>[I] Update</Text>
+            </Box>
+          )}
         </Box>
         <Box flexDirection="row">
           <Text color={theme.text.secondary}>
