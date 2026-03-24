@@ -131,9 +131,7 @@ export class GeminiCliSession {
       if (registry.getTool(toolName)) {
         registry.unregisterTool(toolName);
       }
-      registry.registerTool(
-        new ActivateSkillTool(this.config, loopContext.messageBus),
-      );
+      registry.registerTool(new ActivateSkillTool(loopContext));
     }
 
     // Register tools

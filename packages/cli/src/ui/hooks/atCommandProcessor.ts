@@ -513,10 +513,7 @@ async function readLocalFiles(
     return { parts: [] };
   }
 
-  const readManyFilesTool = new ReadManyFilesTool(
-    config,
-    config.getMessageBus(),
-  );
+  const readManyFilesTool = new ReadManyFilesTool(config);
 
   const pathSpecsToRead = resolvedFiles.map((rf) => rf.pathSpec);
   const fileLabelsForDisplay = resolvedFiles.map((rf) => rf.displayLabel);

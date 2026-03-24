@@ -6,14 +6,14 @@
 
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
-import type {
-  ToolConfirmationOutcome,
+import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   type ToolInvocation,
   type ToolResult,
-  type ToolCallConfirmationDetails
+  type ToolCallConfirmationDetails,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';

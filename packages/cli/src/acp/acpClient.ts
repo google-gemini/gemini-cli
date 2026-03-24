@@ -1197,10 +1197,7 @@ export class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.context.toolRegistry;
-    const readManyFilesTool = new ReadManyFilesTool(
-      this.context.config,
-      this.context.messageBus,
-    );
+    const readManyFilesTool = new ReadManyFilesTool(this.context);
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {

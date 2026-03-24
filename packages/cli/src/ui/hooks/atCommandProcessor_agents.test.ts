@@ -10,6 +10,7 @@ import type {
   Config,
   AgentDefinition,
   MessageBus,
+  AgentLoopContext,
 } from '@google/gemini-cli-core';
 import {
   FileDiscoveryService,
@@ -139,8 +140,18 @@ describe('handleAtCommand with Agents', () => {
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig, mockMessageBus);
-    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
-    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
+    registry.registerTool(
+      new ReadManyFilesTool({
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext),
+    );
+    registry.registerTool(
+      new GlobTool({
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext),
+    );
     getToolRegistry.mockReturnValue(registry);
   });
 

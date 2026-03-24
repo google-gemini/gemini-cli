@@ -30,6 +30,7 @@ import {
   CoreToolCallStatus,
   type Config,
   type DiscoveredMCPResource,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
@@ -149,8 +150,18 @@ describe('handleAtCommand', () => {
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig, mockMessageBus);
-    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
-    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
+    registry.registerTool(
+      new ReadManyFilesTool({
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext),
+    );
+    registry.registerTool(
+      new GlobTool({
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext),
+    );
     getToolRegistry.mockReturnValue(registry);
   });
 

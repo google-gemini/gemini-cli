@@ -28,7 +28,7 @@ export class SdkAgentShell implements AgentShell {
 
     // Use ShellTool to check policy
     const loopContext: AgentLoopContext = this.config;
-    const shellTool = new ShellTool(this.config, loopContext.messageBus);
+    const shellTool = new ShellTool(loopContext);
     try {
       const invocation = shellTool.build({
         command,
