@@ -250,8 +250,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`list`** or **`ls`**:
     - **Description:** List configured MCP servers and tools. This is the
       default action if no subcommand is specified.
-  - **`refresh`**:
-    - **Description:** Restarts all MCP servers and re-discovers their available
+  - **`reload`**:
+    - **Description:** Reloads all MCP servers and re-discovers their available
       tools.
   - **`schema`**:
     - **Description:** List configured MCP servers and tools with descriptions
