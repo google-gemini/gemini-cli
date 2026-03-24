@@ -105,7 +105,7 @@ extension to `.skill`.
 
 ```bash
 # Example: Package 'my-skill' directory into 'my-skill.skill'
-zip -r my-skill.skill my-skill/
+(cd my-skill/ && zip -r ../my-skill.skill .)
 ```
 
 ## Installing a Packaged Skill
