@@ -681,6 +681,7 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   experimentalMemoryManager?: boolean;
+  useAgentProtocol?: boolean;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -909,6 +910,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly useAgentProtocol: boolean;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -1118,6 +1120,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.useAgentProtocol = params.useAgentProtocol ?? false;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2296,6 +2299,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isMemoryManagerEnabled(): boolean {
     return this.experimentalMemoryManager;
+  }
+
+  getExperimentalUseAgentProtocol(): boolean {
+    return this.useAgentProtocol;
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
