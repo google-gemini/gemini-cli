@@ -63,7 +63,7 @@ interface FrontmatterLocalAgentDefinition
  * Authentication configuration for remote agents in frontmatter format.
  */
 interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http' | 'google-credentials' | 'oauth2';
+  type: 'apiKey' | 'http' | 'google-credentials' | 'oauth';
   // API Key
   key?: string;
   name?: string;
@@ -205,7 +205,7 @@ const googleCredentialsAuthSchema = z.object({
  */
 const oauth2AuthSchema = z.object({
   ...baseAuthFields,
-  type: z.literal('oauth2'),
+  type: z.literal('oauth'),
   client_id: z.string().optional(),
   client_secret: z.string().optional(),
   scopes: z.array(z.string()).optional(),
@@ -471,7 +471,7 @@ function convertFrontmatterAuthToConfig(
       }
     }
 
-    case 'oauth2':
+    case 'oauth':
       return {
         ...base,
         type: 'oauth2',
