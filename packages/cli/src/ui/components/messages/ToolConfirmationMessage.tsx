@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback, useState } from 'react';
-import { Box, Text } from 'ink';
+import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
@@ -79,10 +79,69 @@ export const ToolConfirmationMessage: React.FC<
     callId,
     expanded: false,
   });
+  const [isCancelling, setIsCancelling] = useState(false);
   const isMcpToolDetailsExpanded =
     mcpDetailsExpansionState.callId === callId
       ? mcpDetailsExpansionState.expanded
       : false;
+
+  const [measuredSecurityWarningsHeight, setMeasuredSecurityWarningsHeight] =
+    useState(0);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const deceptiveUrlWarnings = useMemo(() => {
+    const urls: string[] = [];
+    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
+      urls.push(...confirmationDetails.urls);
+    } else if (confirmationDetails.type === 'exec') {
+      const commands =
+        confirmationDetails.commands && confirmationDetails.commands.length > 0
+          ? confirmationDetails.commands
+          : [confirmationDetails.command];
+      for (const cmd of commands) {
+        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
+        if (matches) urls.push(...matches);
+      }
+    }
+
+    const uniqueUrls = Array.from(new Set(urls));
+    return uniqueUrls
+      .map(getDeceptiveUrlDetails)
+      .filter((d): d is DeceptiveUrlDetails => d !== null);
+  }, [confirmationDetails]);
+
+  const deceptiveUrlWarningText = useMemo(() => {
+    if (deceptiveUrlWarnings.length === 0) return null;
+    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
+      .map(
+        (w) =>
+          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
+      )
+      .join('\n\n')}`;
+  }, [deceptiveUrlWarnings]);
+
+  const onSecurityWarningsRefChange = useCallback((node: DOMElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const newHeight = Math.round(entry.contentRect.height);
+          setMeasuredSecurityWarningsHeight((prev) =>
+            newHeight !== prev ? newHeight : prev,
+          );
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    } else {
+      setMeasuredSecurityWarningsHeight((prev) => (prev !== 0 ? 0 : prev));
+    }
+  }, []);
 
   const settings = useSettings();
   const allowPermanentApproval =
@@ -183,7 +242,7 @@ export const ToolConfirmationMessage: React.FC<
         return true;
       }
       if (keyMatchers[Command.ESCAPE](key)) {
-        handleConfirm(ToolConfirmationOutcome.Cancel);
+        setIsCancelling(true);
         return true;
       }
       if (keyMatchers[Command.QUIT](key)) {
@@ -196,41 +255,24 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused, priority: true },
   );
 
+  // TODO(#23009): Remove this hack once we migrate to the new renderer.
+  // Why useEffect is used here instead of calling handleConfirm directly:
+  // There is a race condition where calling handleConfirm immediately upon
+  // keypress removes the tool UI component while the UI is in an expanded state.
+  // This simultaneously triggers setConstrainHeight, causing render two footers.
+  // By bridging the cancel action through state (isCancelling) and this useEffect,
+  // we delay handleConfirm until the next render cycle, ensuring setConstrainHeight
+  // resolves properly first.
+  useEffect(() => {
+    if (isCancelling) {
+      handleConfirm(ToolConfirmationOutcome.Cancel);
+    }
+  }, [isCancelling, handleConfirm]);
+
   const handleSelect = useCallback(
     (item: ToolConfirmationOutcome) => handleConfirm(item),
     [handleConfirm],
   );
-
-  const deceptiveUrlWarnings = useMemo(() => {
-    const urls: string[] = [];
-    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
-      urls.push(...confirmationDetails.urls);
-    } else if (confirmationDetails.type === 'exec') {
-      const commands =
-        confirmationDetails.commands && confirmationDetails.commands.length > 0
-          ? confirmationDetails.commands
-          : [confirmationDetails.command];
-      for (const cmd of commands) {
-        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
-        if (matches) urls.push(...matches);
-      }
-    }
-
-    const uniqueUrls = Array.from(new Set(urls));
-    return uniqueUrls
-      .map(getDeceptiveUrlDetails)
-      .filter((d): d is DeceptiveUrlDetails => d !== null);
-  }, [confirmationDetails]);
-
-  const deceptiveUrlWarningText = useMemo(() => {
-    if (deceptiveUrlWarnings.length === 0) return null;
-    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
-      .map(
-        (w) =>
-          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
-      )
-      .join('\n\n')}`;
-  }, [deceptiveUrlWarnings]);
 
   const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
@@ -374,23 +416,36 @@ export const ToolConfirmationMessage: React.FC<
 
     // Calculate the vertical space (in lines) consumed by UI elements
     // surrounding the main body content.
-    const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
-    const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
+    const PADDING_OUTER_Y = 1; // Main container has `paddingBottom={1}`.
     const HEIGHT_QUESTION = 1; // The question text is one line.
     const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
+    const SECURITY_WARNING_BOTTOM_MARGIN = 1; // Margin on the securityWarnings container.
+    const SHOW_MORE_LINES_HEIGHT = 1; // The "Press Ctrl+O to show more lines" hint.
 
     const optionsCount = getOptions().length;
 
+    // The measured height includes the margin inside WarningMessage (1 line).
+    // We also add 1 line for the marginBottom on the securityWarnings container.
+    const securityWarningsHeight = deceptiveUrlWarningText
+      ? measuredSecurityWarningsHeight + SECURITY_WARNING_BOTTOM_MARGIN
+      : 0;
+
     const surroundingElementsHeight =
       PADDING_OUTER_Y +
-      MARGIN_BODY_BOTTOM +
       HEIGHT_QUESTION +
       MARGIN_QUESTION_BOTTOM +
+      SHOW_MORE_LINES_HEIGHT +
       optionsCount +
-      1; // Reserve one line for 'ShowMoreLines' hint
+      securityWarningsHeight;
 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
-  }, [availableTerminalHeight, getOptions, handlesOwnUI]);
+  }, [
+    availableTerminalHeight,
+    handlesOwnUI,
+    getOptions,
+    measuredSecurityWarningsHeight,
+    deceptiveUrlWarningText,
+  ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =
     useMemo<{
@@ -531,10 +586,6 @@ export const ToolConfirmationMessage: React.FC<
 
         let bodyContentHeight = availableBodyContentHeight();
         let warnings: React.ReactNode = null;
-
-        if (bodyContentHeight !== undefined) {
-          bodyContentHeight -= 2; // Account for padding;
-        }
 
         if (containsRedirection) {
           // Calculate lines needed for Note and Tip
@@ -720,6 +771,15 @@ export const ToolConfirmationMessage: React.FC<
       paddingTop={0}
       paddingBottom={handlesOwnUI ? 0 : 1}
     >
+      {/* System message from hook */}
+      {confirmationDetails.systemMessage && (
+        <Box marginBottom={1}>
+          <Text color={theme.status.warning}>
+            {confirmationDetails.systemMessage}
+          </Text>
+        </Box>
+      )}
+
       {handlesOwnUI ? (
         bodyContent
       ) : (
@@ -735,7 +795,11 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
 
           {securityWarnings && (
-            <Box flexShrink={0} marginBottom={1}>
+            <Box
+              flexShrink={0}
+              marginBottom={1}
+              ref={onSecurityWarningsRefChange}
+            >
               {securityWarnings}
             </Box>
           )}
