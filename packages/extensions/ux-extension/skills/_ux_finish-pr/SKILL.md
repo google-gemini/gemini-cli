@@ -48,8 +48,11 @@ You are a senior co-author assistant. Your goal is to ensure this PR passes CI o
 - **Diff Verification**: After reverting, run `git diff origin/main...HEAD` on the specific reverted files to ensure their diff is completely empty.
 
 ### 7. Final Submission
-- **Commit Strategy**: Squash commits for the main feature into a single Conventional Commit (e.g., `feat(ui): ...`), BUT keep code review fixes as separate commits. Do not squash review fixes into the main feature commit; reviewing the entire diff repeatedly is brutal for reviewers.
+- **Commit Strategy**: Maintain a **Two-Tier** commit history to optimize for reviewer speed (30s vs 10m):
+  1.  **Tier 1 (Base)**: A single squashed Conventional Commit (e.g., `feat(ui): ...`) containing the core feature and all *previously addressed* review cycles.
+  2.  **Tier 2 (Latest)**: Separate, granular commits addressing only the **very last** round of reviewer feedback.
+  - **Action**: Use `git rebase -i` or `git reset --soft` to squash all older review-fix commits into the Tier 1 base. Ensure only the commits from the current (latest) review cycle remain as separate entries.
 - **Push**: `git push origin HEAD --force-with-lease`.
-- **Link**: Provide the GitHub PR link.
+- **Link**: You MUST provide the full, clickable GitHub PR link (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`) as the final output of this skill. This allows the user to immediately verify the update.
 
 **Note**: If any step fails, do NOT claim completion. Fix the issue and restart from Step 1.

@@ -50,8 +50,10 @@ When you're happy, just say "I'm ready to submit." I'll run the
     structural integrity.
 3.  **Snapshots**: Fixes snapshots for CI using a neutral environment.
 4.  **Preflight**: Runs the full `preflight` suite.
-5.  **Commit Strategy**: Squashes your main feature into one commit, but keeps
-    review-fix commits separate to keep the diffs manageable for reviewers.
+5.  **Commit Strategy**: Squashes your main feature and ALL previous review
+    fixes into one commit, but keeps only the **very last** round of code review
+    comments as separate commits. This keeps the diffs manageable and fast for
+    reviewers (30 seconds vs. 10 minutes).
 
 ### **Phase 5: Handling Feedback**
 
