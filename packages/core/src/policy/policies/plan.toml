@@ -110,12 +110,20 @@ priority = 70
 modes = ["plan"]
 
 # Allow write_file and replace for .md files in the plans directory (cross-platform)
+# We split this into two rules to avoid ReDoS checker issues with nested optional segments.
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+([\\\\/]+[\\w-]+)?[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
+argsPattern = '\.gemini[\\/]+tmp[\\/]+[\w-]+[\\/]+[\w-]+[\\/]+plans[\\/]+[\w-]+\.md'
+
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = '\.gemini[\\/]+tmp[\\/]+[\w-]+[\\/]+plans[\\/]+[\w-]+\.md'
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]
