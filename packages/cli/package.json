@@ -81,7 +81,7 @@
     "@types/shell-quote": "^1.7.5",
     "@types/ws": "^8.5.10",
     "@types/yargs": "^17.0.32",
-    "@xterm/headless": "^5.5.0",
+    "@xterm/headless": "^6.0.0",
     "typescript": "^5.3.3",
     "vitest": "^4.1.1"
   },
