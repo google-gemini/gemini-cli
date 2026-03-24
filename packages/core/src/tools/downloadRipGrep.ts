@@ -128,11 +128,7 @@ export async function downloadFile(
     if (!response.body) {
       throw new Error('Ripgrep download returned no response body.');
     }
-    const responseBody = response.body;
-    // undici returns a web ReadableStream that is compatible with Readable.fromWeb.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const webStream = responseBody as unknown as ReadableStream<Uint8Array>;
-    await pipeline(Readable.fromWeb(webStream), fs.createWriteStream(tmpFile));
+    await pipeline(response.body, fs.createWriteStream(tmpFile));
     await fsPromises.mkdir(path.dirname(outFile), { recursive: true });
     await moveFile(tmpFile, outFile);
   } catch (error) {
