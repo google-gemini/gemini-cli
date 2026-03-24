@@ -7,7 +7,7 @@
 import type { CSSProperties } from 'react';
 
 import type { SemanticColors } from './semantic-tokens.js';
-import { isAppleTerminal, supportsTrueColor } from '@google/gemini-cli-core';
+import { isLowColorDepth, isITerm2 } from '../utils/terminalUtils.js';
 
 import type { CustomTheme } from '@google/gemini-cli-core';
 import {
@@ -290,7 +290,7 @@ export const safeDarkTheme: ColorsTheme = {
   GradientColors: ['#5FAFD7', '#5F87D7', '#8787D7', '#AF5FAF', '#D75F87'],
 };
 
-export const isActuallyTrueColor = supportsTrueColor() && !isAppleTerminal();
+export const isActuallyTrueColor = !isLowColorDepth() || isITerm2();
 export const darkTheme: ColorsTheme = isActuallyTrueColor
   ? richDarkTheme
   : safeDarkTheme;
