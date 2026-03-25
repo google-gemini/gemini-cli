@@ -2,11 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist/src",
+    "composite": true,
     "declaration": true,
     "sourceMap": true,
     "noEmit": false,
-    "composite": false,
-    "incremental": false,
+    "incremental": true,
     "verbatimModuleSyntax": false
   },
   "include": ["src"]

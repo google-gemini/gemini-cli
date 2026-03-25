@@ -11,7 +11,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+    "copy:assets": "node ../../scripts/copy_files.js",
+    "build": "tsc -b && npm run copy:assets",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",

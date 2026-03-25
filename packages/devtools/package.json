@@ -12,7 +12,8 @@
     }
   },
   "scripts": {
-    "build": "npm run build:client && tsc -p tsconfig.build.json",
+    "copy:assets": "node ../../scripts/copy_files.js",
+    "build": "npm run build:client && tsc -b tsconfig.build.json && npm run copy:assets",
     "build:client": "node esbuild.client.js"
   },
   "files": [

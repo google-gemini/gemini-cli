@@ -6,7 +6,8 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+    "copy:assets": "node ../../scripts/copy_files.js",
+    "build": "tsc -b && npm run copy:assets",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

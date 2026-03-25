@@ -18,41 +18,29 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { writeFileSync, existsSync, cpSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
   console.error('must be invoked from a package directory');
   process.exit(1);
 }
 
-const packageName = basename(process.cwd());
+// build typescript files incrementally
+execSync('tsc -b', { stdio: 'inherit' });
 
-// build typescript files
-execSync('tsc --build', { stdio: 'inherit' });
-
-// Run package-specific bundling if the script exists
-const bundleScript = join(process.cwd(), 'scripts', 'bundle-browser-mcp.mjs');
-if (packageName === 'core' && existsSync(bundleScript)) {
-  console.log('Running chrome devtools MCP bundling...');
-  execSync('npm run bundle:browser-mcp', {
-    stdio: 'inherit',
-  });
-}
-
-// copy .{md,json} files
-execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
-
-// Copy documentation for the core package
-if (packageName === 'core') {
-  const docsSource = join(process.cwd(), '..', '..', 'docs');
-  const docsTarget = join(process.cwd(), 'dist', 'docs');
-  if (existsSync(docsSource)) {
-    cpSync(docsSource, docsTarget, { recursive: true, dereference: true });
-    console.log('Copied documentation to dist/docs');
-  }
+// Check for copy:assets script in package.json
+const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+if (packageJson.scripts && packageJson.scripts['copy:assets']) {
+  execSync('npm run copy:assets', { stdio: 'inherit' });
+} else {
+  // fallback to generic copy
+  execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
 }
 
 // touch dist/.last_build
-writeFileSync(join(process.cwd(), 'dist', '.last_build'), '');
+const distDir = join(process.cwd(), 'dist');
+if (existsSync(distDir)) {
+  writeFileSync(join(distDir, '.last_build'), '');
+}
 process.exit(0);
