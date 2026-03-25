@@ -64,6 +64,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
+  const isExpanded = isExpandable && !constrainHeight;
+
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,
@@ -169,6 +171,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
+          isExpanded={isExpanded}
         />
 
         <FocusHint
