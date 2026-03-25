@@ -883,7 +883,8 @@ describe('ShellExecutionService', () => {
         async (pty) => {
           ShellExecutionService.background(pty.pid);
 
-          const history = ShellExecutionService.listBackgroundProcesses('default');
+          const history =
+            ShellExecutionService.listBackgroundProcesses('default');
           expect(history).toHaveLength(1);
           expect(history[0]).toEqual(
             expect.objectContaining({
@@ -921,7 +922,10 @@ describe('ShellExecutionService', () => {
         });
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+      (ShellExecutionService as any).backgroundProcessHistory.set(
+        'default',
+        history,
+      );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ShellExecutionService as any).activeChildProcesses.set(101, {
@@ -932,8 +936,9 @@ describe('ShellExecutionService', () => {
       });
 
       ShellExecutionService.background(101);
-      
-      const processes = ShellExecutionService.listBackgroundProcesses('default');
+
+      const processes =
+        ShellExecutionService.listBackgroundProcesses('default');
       expect(processes).toHaveLength(MAX);
       expect(processes.some((p) => p.pid === 1)).toBe(false);
       expect(processes.some((p) => p.pid === 101)).toBe(true);

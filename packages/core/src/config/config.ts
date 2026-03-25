@@ -3363,10 +3363,14 @@ export class Config implements McpContext, AgentLoopContext {
       registry.registerTool(new ShellTool(this, this.messageBus)),
     );
     maybeRegister(ListBackgroundProcessesTool, () =>
-      registry.registerTool(new ListBackgroundProcessesTool(this, this.messageBus)),
+      registry.registerTool(
+        new ListBackgroundProcessesTool(this, this.messageBus),
+      ),
     );
     maybeRegister(ReadBackgroundOutputTool, () =>
-      registry.registerTool(new ReadBackgroundOutputTool(this, this.messageBus)),
+      registry.registerTool(
+        new ReadBackgroundOutputTool(this, this.messageBus),
+      ),
     );
     if (!this.isMemoryManagerEnabled()) {
       maybeRegister(MemoryTool, () =>
