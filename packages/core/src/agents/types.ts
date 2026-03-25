@@ -13,6 +13,7 @@ import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
+import type { AgentCard } from '@a2a-js/sdk';
 import type { A2AAuthConfig } from './auth-provider/types.js';
 import type { MCPServerConfig } from '../config/config.js';
 
@@ -128,6 +129,62 @@ export function isToolActivityError(data: unknown): boolean {
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
  */
+export type AgentCardLoadOptions =
+  | { type: 'url'; url: string }
+  | { type: 'json'; json: string };
+
+/** Minimal shape needed by helper functions, avoids generic TOutput constraints. */
+interface RemoteAgentRef {
+  name: string;
+  agentCardUrl?: string;
+  agentCardJson?: string;
+}
+
+/**
+ * Derives the AgentCardLoadOptions from a RemoteAgentDefinition.
+ * Throws if neither agentCardUrl nor agentCardJson is present.
+ */
+export function getAgentCardLoadOptions(
+  def: RemoteAgentRef,
+): AgentCardLoadOptions {
+  if (def.agentCardJson) {
+    return { type: 'json', json: def.agentCardJson };
+  }
+  if (def.agentCardUrl) {
+    return { type: 'url', url: def.agentCardUrl };
+  }
+  throw new Error(
+    `Remote agent '${def.name}' has neither agentCardUrl nor agentCardJson`,
+  );
+}
+
+/**
+ * Extracts a target URL for auth providers from a RemoteAgentDefinition.
+ * For URL-based agents, returns the agentCardUrl.
+ * For JSON-based agents, attempts to parse the URL from the inline card JSON.
+ * Returns undefined if no URL can be determined.
+ */
+export function getRemoteAgentTargetUrl(
+  def: RemoteAgentRef,
+): string | undefined {
+  if (def.agentCardUrl) {
+    return def.agentCardUrl;
+  }
+  if (def.agentCardJson) {
+    try {
+      const parsed: unknown = JSON.parse(def.agentCardJson);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const card = parsed as AgentCard;
+      if (card.url) {
+        return card.url;
+      }
+    } catch {
+      // JSON parse will fail properly later in loadAgent
+    }
+  }
+  return undefined;
+}
+
 export interface BaseAgentDefinition<
   TOutput extends z.ZodTypeAny = z.ZodUnknown,
 > {
@@ -172,11 +229,10 @@ export interface LocalAgentDefinition<
   processOutput?: (output: z.infer<TOutput>) => string;
 }
 
-export interface RemoteAgentDefinition<
+export interface BaseRemoteAgentDefinition<
   TOutput extends z.ZodTypeAny = z.ZodUnknown,
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
-  agentCardUrl: string;
   /** The user-provided description, before any remote card merging. */
   originalDescription?: string;
   /**
@@ -185,6 +241,13 @@ export interface RemoteAgentDefinition<
    * security requirements.
    */
   auth?: A2AAuthConfig;
+}
+
+export interface RemoteAgentDefinition<
+  TOutput extends z.ZodTypeAny = z.ZodUnknown,
+> extends BaseRemoteAgentDefinition<TOutput> {
+  agentCardUrl?: string;
+  agentCardJson?: string;
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
