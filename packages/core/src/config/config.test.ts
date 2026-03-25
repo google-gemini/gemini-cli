@@ -1474,6 +1474,22 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(100); // default
+    });
+
+    it('should return custom maxActionsPerTask', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          browser: {
+            maxActionsPerTask: 50,
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(50);
     });
 
     it('should apply defaults for partial custom config', () => {

@@ -309,6 +309,15 @@ export interface PolicyEngineConfig {
    * Used to filter rules that have specific 'modes' defined.
    */
   approvalMode?: ApprovalMode;
+
+  /**
+   * Whether tool sandboxing is enabled.
+   */
+  toolSandboxEnabled?: boolean;
+  /**
+   * List of tools approved by the sandbox policy for the current mode.
+   */
+  sandboxApprovedTools?: string[];
 }
 
 export interface PolicySettings {

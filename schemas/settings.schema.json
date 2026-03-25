@@ -392,6 +392,13 @@
           "default": false,
           "type": "boolean"
         },
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Whether to collapse the UI drawer when a tool is awaiting confirmation.",
+          "markdownDescription": "Whether to collapse the UI drawer when a tool is awaiting confirmation.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showMemoryUsage": {
           "title": "Show Memory Usage",
           "description": "Display memory usage information in the UI",
@@ -2135,6 +2142,13 @@
               "default": true,
               "type": "boolean"
             },
+            "maxActionsPerTask": {
+              "title": "Max Actions Per Task",
+              "description": "The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.",
+              "markdownDescription": "The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `100`",
+              "default": 100,
+              "type": "number"
+            },
             "confirmSensitiveActions": {
               "title": "Confirm Sensitive Actions",
               "description": "Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).",
@@ -2673,8 +2687,8 @@
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents.",
-          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable local and remote subagents.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "worktrees": {
