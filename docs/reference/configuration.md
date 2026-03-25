@@ -645,6 +645,11 @@ their corresponding top-level category object in your `settings.json` file.
           "model": "gemini-3-flash-preview"
         }
       },
+      "chat-compression-3.1-flash-lite": {
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite-preview"
+        }
+      },
       "chat-compression-2.5-pro": {
         "modelConfig": {
           "model": "gemini-2.5-pro"
@@ -973,6 +978,17 @@ their corresponding top-level category object in your `settings.json` file.
       "auto-gemini-2.5": {
         "default": "gemini-2.5-pro"
       },
+      "gemini-3.1-flash-lite-preview": {
+        "default": "gemini-3.1-flash-lite-preview",
+        "contexts": [
+          {
+            "condition": {
+              "useGemini3_1FlashLite": false
+            },
+            "target": "gemini-2.5-flash-lite"
+          }
+        ]
+      },
       "flash": {
         "default": "gemini-3-flash-preview",
         "contexts": [
@@ -985,7 +1001,15 @@ their corresponding top-level category object in your `settings.json` file.
         ]
       },
       "flash-lite": {
-        "default": "gemini-2.5-flash-lite"
+        "default": "gemini-2.5-flash-lite",
+        "contexts": [
+          {
+            "condition": {
+              "useGemini3_1FlashLite": true
+            },
+            "target": "gemini-3.1-flash-lite-preview"
+          }
+        ]
       }
     }
     ```

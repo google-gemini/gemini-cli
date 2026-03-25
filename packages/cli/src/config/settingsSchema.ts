@@ -3014,6 +3014,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {
