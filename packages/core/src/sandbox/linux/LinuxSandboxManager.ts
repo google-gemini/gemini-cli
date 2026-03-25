@@ -16,11 +16,13 @@ import {
   GOVERNANCE_FILES,
   getSecretFileFindArgs,
   sanitizePaths,
+  tryRealpath,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import { isNodeError } from '../../utils/errors.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -129,7 +131,55 @@ export class LinuxSandboxManager implements SandboxManager {
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
     const bwrapArgs: string[] = [
-      '--unshare-all',
+      ...this.getNetworkArgs(req),
+      ...this.getBaseArgs(),
+      ...this.getGovernanceArgs(),
+      ...this.getAllowedPathsArgs(req.policy?.allowedPaths),
+      ...(await this.getForbiddenPathsArgs(req.policy?.forbiddenPaths)),
+      ...this.getSecretFilesArgs(req.policy?.allowedPaths),
+    ];
+
+    const bpfPath = getSeccompBpfPath();
+
+    bwrapArgs.push('--seccomp', '9');
+    bwrapArgs.push('--', req.command, ...req.args);
+
+    const shArgs = [
+      '-c',
+      'bpf_path="$1"; shift; exec bwrap "$@" 9< "$bpf_path"',
+      '_',
+      bpfPath,
+      ...bwrapArgs,
+    ];
+
+    return {
+      program: 'sh',
+      args: shArgs,
+      env: sanitizedEnv,
+      cwd: req.cwd,
+    };
+  }
+
+  /**
+   * Generates arguments for network isolation.
+   */
+  private getNetworkArgs(req: SandboxRequest): string[] {
+    return req.policy?.networkAccess
+      ? [
+          '--unshare-user',
+          '--unshare-ipc',
+          '--unshare-pid',
+          '--unshare-uts',
+          '--unshare-cgroup',
+        ]
+      : ['--unshare-all'];
+  }
+
+  /**
+   * Generates the base bubblewrap arguments for isolation.
+   */
+  private getBaseArgs(): string[] {
+    return [
       '--new-session', // Isolate session
       '--die-with-parent', // Prevent orphaned runaway processes
       '--ro-bind',
@@ -146,7 +196,13 @@ export class LinuxSandboxManager implements SandboxManager {
       this.options.workspace,
       this.options.workspace,
     ];
+  }
 
+  /**
+   * Generates arguments for protected governance files.
+   */
+  private getGovernanceArgs(): string[] {
+    const args: string[] = [];
     // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
     // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
     // In bwrap, later binds override earlier ones for the same path.
@@ -156,31 +212,77 @@ export class LinuxSandboxManager implements SandboxManager {
 
       const realPath = fs.realpathSync(filePath);
 
-      bwrapArgs.push('--ro-bind', filePath, filePath);
+      args.push('--ro-bind', filePath, filePath);
       if (realPath !== filePath) {
-        bwrapArgs.push('--ro-bind', realPath, realPath);
+        args.push('--ro-bind', realPath, realPath);
       }
     }
+    return args;
+  }
 
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(this.options.workspace).replace(
-      /\/$/,
-      '',
-    );
-    for (const allowedPath of allowedPaths) {
-      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
+  /**
+   * Generates arguments for allowed paths.
+   */
+  private getAllowedPathsArgs(allowedPaths?: string[]): string[] {
+    const args: string[] = [];
+    const paths = sanitizePaths(allowedPaths) || [];
+    const normalizedWorkspace = this.normalizePath(this.options.workspace);
+
+    for (const p of paths) {
+      if (this.normalizePath(p) !== normalizedWorkspace) {
+        args.push('--bind-try', p, p);
       }
     }
+    return args;
+  }
 
-    // Protect secret files (.env, .env.*) by masking them with a 000-permission file.
-    // This makes them effectively invisible and results in "Permission Denied" if accessed.
+  /**
+   * Generates arguments for forbidden paths.
+   */
+  private async getForbiddenPathsArgs(
+    forbiddenPaths?: string[],
+  ): Promise<string[]> {
+    const args: string[] = [];
+    const paths = sanitizePaths(forbiddenPaths) || [];
+
+    for (const p of paths) {
+      try {
+        const originalPath = this.normalizePath(p);
+        const resolvedPath = await tryRealpath(originalPath);
+
+        // Mask the resolved path to prevent access to the underlying file.
+        const resolvedMask = await this.getMaskArgs(resolvedPath);
+        args.push(...resolvedMask);
+
+        // If the original path was a symlink, mask it as well to prevent access
+        // through the link itself.
+        if (resolvedPath !== originalPath) {
+          const originalMask = await this.getMaskArgs(originalPath);
+          args.push(...originalMask);
+        }
+      } catch (e) {
+        throw new Error(
+          `Failed to deny access to forbidden path: ${p}. ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
+    return args;
+  }
+
+  /**
+   * Generates bubblewrap arguments to mask secret files.
+   */
+  private getSecretFilesArgs(allowedPaths?: string[]): string[] {
+    const args: string[] = [];
     const maskPath = this.getMaskPath();
-    try {
-      const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
-      const findPatterns = getSecretFileFindArgs();
-      for (const dir of searchDirs) {
+    const paths = sanitizePaths(allowedPaths) || [];
+    const searchDirs = new Set([this.options.workspace, ...paths]);
+    const findPatterns = getSecretFileFindArgs();
+
+    for (const dir of searchDirs) {
+      try {
         // Use the native 'find' command for performance and to catch nested secrets.
         // We limit depth to 3 to keep it fast while covering common nested structures.
         const findResult = spawnSync('find', [
@@ -202,38 +304,41 @@ export class LinuxSandboxManager implements SandboxManager {
           const files = findResult.stdout.toString().split('\n');
           for (const file of files) {
             if (file.trim()) {
-              bwrapArgs.push('--bind', maskPath, file.trim());
+              args.push('--bind', maskPath, file.trim());
             }
           }
         }
+      } catch {
+        // Ignore errors finding secrets
       }
-    } catch {
-      // Ignore errors finding secrets
     }
+    return args;
+  }
 
-    // Handle explicitly forbidden paths
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
-    for (const forbiddenPath of forbiddenPaths) {
-      bwrapArgs.push('--bind-try', maskPath, forbiddenPath);
+  /**
+   * Generates bubblewrap arguments to mask a forbidden path.
+   */
+  private async getMaskArgs(path: string): Promise<string[]> {
+    try {
+      const stats = await fs.promises.stat(path);
+
+      if (stats.isDirectory()) {
+        // Directories are masked by mounting an empty, read-only tmpfs.
+        return ['--tmpfs', path, '--remount-ro', path];
+      }
+      // Existing files are masked by binding them to /dev/null.
+      return ['--ro-bind-try', '/dev/null', path];
+    } catch (e) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        // Non-existent paths are masked by a broken symlink. This prevents
+        // creation within the sandbox while avoiding host remnants.
+        return ['--symlink', '/.forbidden', path];
+      }
+      throw e;
     }
+  }
 
-    const bpfPath = getSeccompBpfPath();
-
-    bwrapArgs.push('--seccomp', '9');
-    bwrapArgs.push('--', req.command, ...req.args);
-
-    const shArgs = [
-      '-c',
-      'bpf_path="$1"; shift; exec bwrap "$@" 9< "$bpf_path"',
-      '_',
-      bpfPath,
-      ...bwrapArgs,
-    ];
-
-    return {
-      program: 'sh',
-      args: shArgs,
-      env: sanitizedEnv,
-    };
+  private normalizePath(p: string): string {
+    return normalize(p).replace(/\/$/, '');
   }
 }

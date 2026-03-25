@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs';
+import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -147,7 +150,7 @@ export function findSecretFiles(baseDir: string, maxDepth = 1): string[] {
   function walk(dir: string, depth: number) {
     if (depth > maxDepth) return;
     try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      const entries = fsSync.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
@@ -233,4 +236,25 @@ export function sanitizePaths(paths?: string[]): string[] | undefined {
 
   return Array.from(uniquePathsMap.values());
 }
+
+/**
+ * Resolves symlinks for a given path to prevent sandbox escapes.
+ * If a file does not exist (ENOENT), it recursively resolves the parent directory.
+ * Other errors (e.g. EACCES) are re-thrown.
+ */
+export async function tryRealpath(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      const parentDir = path.dirname(p);
+      if (parentDir === p) {
+        return p;
+      }
+      return path.join(await tryRealpath(parentDir), path.basename(p));
+    }
+    throw e;
+  }
+}
+
 export { createSandboxManager } from './sandboxManagerFactory.js';
