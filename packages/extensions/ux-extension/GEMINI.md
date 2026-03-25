@@ -25,14 +25,19 @@ underlying "rigor."
 ## 🚨 Standard Operating Procedures (Agent Only)
 
 1.  **Worktree Strategy**: ALWAYS use `_ux_git-worktree` for task isolation.
-2.  **Submission Rigor**: ALWAYS use `/_ux_finish-pr` for final pushes. Never
+2.  **Diff Minimization**: ALWAYS minimize diffs. Never move code between files
+    while making logic changes in the same step. Separate refactors
+    (zero-modification moves) into their own commits before applying logic
+    changes.
+3.  **Submission Rigor**: ALWAYS use `/_ux_finish-pr` for final pushes. This
+    includes running `/review-frontend` to perform an automated audit. Never
     push manually.
-3.  **UI Review**: Use `_ux_designer` to audit components against the v1.0
+4.  **UI Review**: Use `_ux_designer` to audit components against the v1.0
     principles.
-4.  **Remediation**: Use **`/review-and-fix`** if CI checks fail on GitHub to
+5.  **Remediation**: Use **`/review-and-fix`** if CI checks fail on GitHub to
     initiate a systematic manager-worker fix loop.
-5.  **No Shortcuts**: Never use `--no-verify`. Protect the PR from CI failures.
-6.  **Task Finality**: ALWAYS run `npm run build` or `npm run typecheck` to
+6.  **No Shortcuts**: Never use `--no-verify`. Protect the PR from CI failures.
+7.  **Task Finality**: ALWAYS run `npm run build` or `npm run typecheck` to
     verify structural integrity before declaring any task as "complete".
 
 ## Mandatory Workflow Triggers

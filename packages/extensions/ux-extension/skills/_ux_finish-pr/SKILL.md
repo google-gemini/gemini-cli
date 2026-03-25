@@ -26,6 +26,7 @@ You are a senior co-author assistant. Your goal is to ensure this PR passes CI o
   ```bash
   npm run preflight
   ```
+- **Automated Audit**: You MUST run `/review-frontend <PR_NUMBER>` and address any issues found. This provides an automated audit of your changes to catch common mistakes before a maintainer review.
 - **Constraint**: Passing individual tests is NOT enough. `preflight` ensures `tsc --build` passes, catching TypeScript inference bugs that unit tests miss.
 - **TDD Fallback**: If `preflight` fails, you must create a local reproduction test before attempting a fix.
 
@@ -47,11 +48,18 @@ You are a senior co-author assistant. Your goal is to ensure this PR passes CI o
   ```
 - **Diff Verification**: After reverting, run `git diff origin/main...HEAD` on the specific reverted files to ensure their diff is completely empty.
 
-### 7. Final Submission
-- **Commit Strategy**: Maintain a **Two-Tier** commit history to optimize for reviewer speed (30s vs 10m):
-  1.  **Tier 1 (Base)**: A single squashed Conventional Commit (e.g., `feat(ui): ...`) containing the core feature and all *previously addressed* review cycles.
-  2.  **Tier 2 (Latest)**: Separate, granular commits addressing only the **very last** round of reviewer feedback.
-  - **Action**: Use `git rebase -i` or `git reset --soft` to squash all older review-fix commits into the Tier 1 base. Ensure only the commits from the current (latest) review cycle remain as separate entries.
+### 7. Diff Minimization & Refactor Isolation (Jacob's Protocol)
+- **Mandatory Two-Step Process**: Never move code between files AND make logic changes in the same commit.
+- **Refactor Commit**: If your task requires moving code or reorganization, create a "zero-modification" commit first. Verify that `npm run typecheck` passes but no functional logic has changed.
+- **Logic Commit**: Apply logic changes or new features in a separate, follow-up commit.
+- **Goal**: Ensure the diff for the refactor commit is purely about movement, and the diff for the logic commit is purely about behavior.
+
+### 8. Final Submission
+- **Commit Strategy**: Maintain a structured commit history to optimize for reviewer speed (30s vs 10m):
+  1.  **Tier 1 (Base Refactor)**: A single commit for all "zero-modification" refactors (file moves, reorgs).
+  2.  **Tier 2 (Base Logic)**: A single squashed Conventional Commit (e.g., `feat(ui): ...`) containing the core feature logic and all *previously addressed* review cycles.
+  3.  **Tier 3 (Latest Feedback)**: Separate, granular commits addressing only the **very last** round of reviewer feedback.
+  - **Action**: Use `git rebase -i` or `git reset --soft` to organize commits into these tiers. Ensure refactors are ALWAYS isolated from logic.
 - **Push**: `git push origin HEAD --force-with-lease`.
 - **Link**: You MUST provide the full, clickable GitHub PR link (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`) as the final output of this skill. This allows the user to immediately verify the update.
 
