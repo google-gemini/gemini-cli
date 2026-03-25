@@ -518,6 +518,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
 - completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+- blocked: Subtask is blocked and cannot be completed at this time.
 
 
 ## Methodology for using this tool
@@ -584,7 +585,13 @@ The agent did not use the todo list because this task could be completed by a ti
               [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
-                enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+                enum: [
+                  'pending',
+                  'in_progress',
+                  'completed',
+                  'cancelled',
+                  'blocked',
+                ],
               },
             },
             required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
@@ -707,6 +714,6 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
-  exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
+  exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
 };

@@ -60,8 +60,8 @@ Slash commands provide meta-level control over the CLI itself.
     - `list` (selecting this opens the auto-saved session browser)
   - `-- checkpoints --`
     - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
-  - **Note:** Unique prefixes (for example `/cha` or `/resum`) resolve to the
-    same grouped menu.
+  - Unique prefixes (for example `/cha` or `/resu`) resolve to the same grouped
+    menu.
 - **Sub-commands:**
   - **`debug`**
     - **Description:** Export the most recent API request as a JSON payload.
@@ -250,8 +250,8 @@ Slash commands provide meta-level control over the CLI itself.
   - **`list`** or **`ls`**:
     - **Description:** List configured MCP servers and tools. This is the
       default action if no subcommand is specified.
-  - **`refresh`**:
-    - **Description:** Restarts all MCP servers and re-discovers their available
+  - **`reload`**:
+    - **Description:** Reloads all MCP servers and re-discovers their available
       tools.
   - **`schema`**:
     - **Description:** List configured MCP servers and tools with descriptions
