@@ -26,8 +26,17 @@ describe('copyCommand', () => {
     mockGetLastOutput = vi.fn().mockReturnValue(undefined);
 
     mockContext = createMockCommandContext({
+ Fix/copy-to-Capture-Slash-Command-Output
       ui: {
         getLastOutput: mockGetLastOutput,
+
+      services: {
+        agentContext: {
+          geminiClient: {
+            getChat: mockGetChat,
+          },
+        },
+ main
       },
     });
   });
@@ -118,8 +127,36 @@ describe('copyCommand', () => {
   it('should handle clipboard errors gracefully', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
+ Fix/copy-to-Capture-Slash-Command-Output
     mockGetLastOutput.mockReturnValue({
       content: 'Some text',
+
+    const historyWithEmptyParts = [
+      {
+        role: 'model',
+        parts: [{ image: 'base64data' }], // No text parts
+      },
+    ];
+
+    mockGetHistory.mockReturnValue(historyWithEmptyParts);
+
+    const result = await copyCommand.action(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: 'Last AI output contains no text to copy.',
+    });
+
+    expect(mockCopyToClipboard).not.toHaveBeenCalled();
+  });
+
+  it('should handle unavailable config service', async () => {
+    if (!copyCommand.action) throw new Error('Command has no action');
+
+    const nullConfigContext = createMockCommandContext({
+      services: { agentContext: null },
+ main
     });
     mockCopyToClipboard.mockRejectedValue(new Error('Clipboard access denied'));
 
