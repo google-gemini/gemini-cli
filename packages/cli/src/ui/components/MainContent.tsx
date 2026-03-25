@@ -88,7 +88,6 @@ export const MainContent = () => {
     () =>
       augmentedHistory.map(
         ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => (
-          // ({ item, isExpandable, isFirstThinking, /* isFirstAfterThinking */ }) => (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={

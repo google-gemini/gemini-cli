@@ -13,6 +13,16 @@ exports[`DenseToolMessage > Toggleable Diff View (Alternate Buffer) > shows diff
 "
 `;
 
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for a Rejected tool call 1`] = `"  -  read_file  Reading important.txt"`;
+
+exports[`DenseToolMessage > Visual Regression > matches SVG snapshot for an Accepted file edit with diff stats 1`] = `
+"  ✓  edit  test.ts → Accepted (+1, -1)
+
+      1 - old
+      1 + new
+"
+`;
+
 exports[`DenseToolMessage > does not render result arrow if resultDisplay is missing 1`] = `
 "  o  test-tool  Test description
 "
@@ -128,8 +138,6 @@ exports[`DenseToolMessage > renders generic output message for unknown object re
 
 exports[`DenseToolMessage > truncates long string results 1`] = `
 "  ✓  test-tool  Test description
-   →
-   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-   AAAAAAAAAAAAAAAAAAAA...
+   → AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…
 "
 `;

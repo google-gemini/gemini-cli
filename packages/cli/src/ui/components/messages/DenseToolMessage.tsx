@@ -16,6 +16,7 @@ import {
   hasSummary,
   isGrepResult,
   isListResult,
+  isReadManyFilesResult,
 } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay, isTodoList } from '../../types.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -33,6 +34,7 @@ import { COMPACT_TOOL_SUBVIEW_MAX_LINES } from '../../constants.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import { colorizeCode } from '../../utils/CodeColorizer.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
+import { getFileExtension } from '../../utils/fileUtils.js';
 
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth?: number;
@@ -242,14 +244,10 @@ function getListResultData(
   result: ListDirectoryResult | ReadManyFilesResult,
   originalDescription?: string,
 ): ViewParts {
-  // Use 'include' to determine if this is a ReadManyFilesResult
-  if ('include' in result) {
+  if (isReadManyFilesResult(result)) {
     return getReadManyFilesData(result);
   }
-  return getListDirectoryData(
-    result as ListDirectoryResult,
-    originalDescription,
-  );
+  return getListDirectoryData(result, originalDescription);
 }
 
 function getGenericSuccessData(
@@ -268,8 +266,8 @@ function getGenericSuccessData(
   if (typeof resultDisplay === 'string') {
     const flattened = resultDisplay.replace(/\n/g, ' ').trim();
     summary = (
-      <Text color={theme.text.accent} wrap="wrap">
-        → {flattened.length > 120 ? flattened.slice(0, 117) + '...' : flattened}
+      <Text color={theme.text.accent} wrap="truncate-end">
+        → {flattened}
       </Text>
     );
   } else if (isGrepResult(resultDisplay)) {
@@ -406,8 +404,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           ? resultDisplay.replace(/\n/g, ' ')
           : 'Failed';
       const errorSummary = (
-        <Text color={theme.status.error} wrap="wrap">
-          → {text.length > 120 ? text.slice(0, 117) + '...' : text}
+        <Text color={theme.status.error} wrap="truncate-end">
+          → {text}
         </Text>
       );
       const descriptionText = originalDescription ? (
@@ -455,7 +453,9 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
         .filter((line) => line.type === 'add')
         .map((line) => line.content)
         .join('\n');
-      const fileExtension = diff.fileName?.split('.').pop() || null;
+
+      const fileExtension = getFileExtension(diff.fileName);
+
       return colorizeCode({
         code: addedContent,
         language: fileExtension,

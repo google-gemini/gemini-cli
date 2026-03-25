@@ -665,9 +665,6 @@ export const useGeminiStream = (
       return true;
     };
 
-    const anyVisibleInHistory = pushedToolCallIds.size > 0;
-    const anyVisibleInPending = remainingTools.some(isToolVisible);
-
     let lastVisibleIsCompact = false;
     const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
     for (let i = toolCalls.length - 1; i >= 0; i--) {
@@ -683,7 +680,7 @@ export const useGeminiStream = (
     if (
       toolCalls.length > 0 &&
       !(allTerminal && allPushed) &&
-      (anyVisibleInHistory || anyVisibleInPending) &&
+      toolCalls.some(isToolVisible) &&
       !lastVisibleIsCompact
     ) {
       items.push({

@@ -54,9 +54,8 @@ describe('DenseToolMessage', () => {
       />,
     );
     await waitUntilReady();
-    // Remove all whitespace to check the continuous string content truncation
-    const output = lastFrame()?.replace(/\s/g, '');
-    expect(output).toContain('A'.repeat(117) + '...');
+    const output = lastFrame();
+    expect(output).toContain('…');
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -503,7 +502,7 @@ describe('DenseToolMessage', () => {
       expect(output).toMatchSnapshot();
     });
 
-    it('shows diff content after clicking summary', async () => {
+    it('shows diff content when expanded via ToolActionsContext', async () => {
       const { lastFrame, waitUntilReady } = await renderWithProviders(
         <DenseToolMessage
           {...defaultProps}
@@ -513,13 +512,65 @@ describe('DenseToolMessage', () => {
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
           settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-          mouseEventsEnabled: true,
+          toolActions: {
+            isExpanded: () => true,
+          },
         },
       );
       await waitUntilReady();
 
-      // Verify it's hidden initially
-      expect(lastFrame()).not.toContain('new line');
+      // Verify it shows the diff when expanded
+      expect(lastFrame()).toContain('new line');
+    });
+  });
+
+  describe('Visual Regression', () => {
+    it('matches SVG snapshot for an Accepted file edit with diff stats', async () => {
+      const diffResult: FileDiff = {
+        fileName: 'test.ts',
+        filePath: '/mock/test.ts',
+        fileDiff: '--- a/test.ts\n+++ b/test.ts\n@@ -1 +1 @@\n-old\n+new',
+        originalContent: 'old',
+        newContent: 'new',
+        diffStat: {
+          model_added_lines: 1,
+          model_removed_lines: 1,
+          model_added_chars: 3,
+          model_removed_chars: 3,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+      };
+
+      const renderResult = await renderWithProviders(
+        <DenseToolMessage
+          {...defaultProps}
+          name="edit"
+          description="Editing test.ts"
+          resultDisplay={diffResult as ToolResultDisplay}
+          status={CoreToolCallStatus.Success}
+        />,
+      );
+
+      await renderResult.waitUntilReady();
+      await expect(renderResult).toMatchSvgSnapshot();
+    });
+
+    it('matches SVG snapshot for a Rejected tool call', async () => {
+      const renderResult = await renderWithProviders(
+        <DenseToolMessage
+          {...defaultProps}
+          name="read_file"
+          description="Reading important.txt"
+          resultDisplay="Rejected by user"
+          status={CoreToolCallStatus.Cancelled}
+        />,
+      );
+
+      await renderResult.waitUntilReady();
+      await expect(renderResult).toMatchSvgSnapshot();
     });
   });
 });

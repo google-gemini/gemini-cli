@@ -222,38 +222,41 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         !Array.isArray(prevGroup) &&
         isCompactTool(prevGroup, isCompactModeEnabled);
 
-      if (Array.isArray(group)) {
+      const isAgentGroup = Array.isArray(group);
+      const isCompact =
+        !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
+
+      if (isFirst) {
+        height += (borderTopOverride ?? false) ? 1 : 0;
+      } else if (isCompact && prevIsCompact) {
+        height += 0;
+      } else if (isCompact || prevIsCompact) {
+        height += 1;
+      } else {
+        // Gap is provided by StickyHeader's paddingTop=1
+        height += 0;
+      }
+
+      const isFirstProp = !!(isFirst
+        ? (borderTopOverride ?? true)
+        : prevIsCompact);
+
+      if (isAgentGroup) {
         // Agent group
         height += 1; // Header
         height += group.length; // 1 line per agent
-        const isFirstProp = isFirst
-          ? (borderTopOverride ?? true)
-          : prevIsCompact;
         if (isFirstProp) height += 1; // Top border
-
-        // Spacing logic
-        if (isFirst) {
-          height += (borderTopOverride ?? true) ? 1 : 0;
-        } else {
-          height += 1; // marginTop
-        }
       } else {
-        const isCompact = isCompactTool(group, isCompactModeEnabled);
         if (isCompact) {
           height += 1; // Base height for compact tool
-          // Spacing logic (matching marginTop)
-          if (isFirst) {
-            height += (borderTopOverride ?? true) ? 1 : 0;
-          } else if (!prevIsCompact) {
-            height += 1;
-          }
         } else {
-          height += 3; // Static overhead for standard tool
-          if (isFirst) {
-            height += (borderTopOverride ?? true) ? 1 : 0;
-          } else {
-            height += 1; // marginTop is always 1 for non-compact tools (not first)
-          }
+          // Static overhead for standard tool header:
+          // 1 line for header text
+          // 1 line for dark separator
+          // 1 line for tool body internal paddingTop=1
+          // 1 line for top border (if isFirstProp) OR StickyHeader paddingTop=1 (if !isFirstProp)
+          height += 3;
+          height += isFirstProp ? 1 : 1; // Either top border or paddingTop
         }
       }
     }
@@ -352,12 +355,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         let marginTop = 0;
         if (isFirst) {
-          // marginTop = (borderTopOverride ?? true) ? 1 : 0;
           marginTop = (borderTopOverride ?? false) ? 1 : 0;
         } else if (isCompact && prevIsCompact) {
           marginTop = 0;
-        } else {
+        } else if (isCompact || prevIsCompact) {
           marginTop = 1;
+        } else {
+          // Subsequent standard tools: StickyHeader's paddingTop=1 provides the gap.
+          marginTop = 0;
         }
 
         const isFirstProp = !!(isFirst
