@@ -167,7 +167,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
           returnDisplay: `Symlink detected for PID ${pid}`,
           error: {
             message:
-              'Symbolic link detected at predicted log path triggers accurately reading triggers accurately',
+              'Symbolic link detected at predicted log path. Access is denied for security reasons.',
             type: ToolErrorType.EXECUTION_FAILED,
           },
         };
