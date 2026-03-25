@@ -10,6 +10,7 @@ import { act, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -28,6 +29,7 @@ import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 import type { TextBuffer } from './shared/text-buffer.js';
+import { getCachedStringWidth } from '../utils/textUtils.js';
 
 // Mock VimModeContext hook
 vi.mock('../contexts/VimModeContext.js', () => ({
@@ -43,6 +45,8 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
     rows: 24,
   })),
 }));
+
+const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
 const composerTestControls = vi.hoisted(() => ({
   suggestionsVisible: false,
@@ -501,6 +505,119 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).not.toContain('LoadingIndicator');
+    });
+  });
+
+  describe('Tip collision width', () => {
+    it('hides the proactive tip when it does not fit by measured display width', async () => {
+      const elapsedTime = 1; // keeps cancel string stable as (esc to cancel, 1s)
+      const thoughtSubject = 'Thinking...';
+      const cancelAndTimerContentStr = `(esc to cancel, ${elapsedTime}s)`;
+
+      // Fullwidth characters are width=2 in terminal but length=1 in JS, so this
+      // specifically exercises display-width measurement.
+      const tipChar = 'Ａ';
+      let tipCount = 20;
+
+      let terminalWidthBoundary = 0;
+      // Ensure we stay out of "narrow" mode (isNarrowWidth < 80).
+      while (true) {
+        const tip = tipChar.repeat(tipCount);
+        const tipLabel = `Tip: ${tip}`;
+
+        // Mirror the logic in Composer.tsx for the showLoadingIndicator path.
+        const statusWidthForTipCollision =
+          // inlineSpinnerCharWidth
+          1 +
+          // spinnerAndPrimaryGapWidth
+          1 +
+          getCachedStringWidth(thoughtSubject) +
+          // interactiveExtra (empty)
+          0 +
+          // cancelShown: cancelSpacerWidth + width(cancel string)
+          1 +
+          getCachedStringWidth(cancelAndTimerContentStr);
+
+        terminalWidthBoundary =
+          statusWidthForTipCollision + getCachedStringWidth(tipLabel) + 5;
+
+        if (terminalWidthBoundary - 1 >= 80) break;
+        tipCount += 5;
+      }
+
+      const tip = tipChar.repeat(tipCount);
+
+      // Columns just below the measured collision boundary -> tip should not show.
+      vi.mocked(useTerminalSizeMock).mockReturnValue({
+        columns: terminalWidthBoundary - 1,
+        rows: 24,
+      });
+
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: { subject: thoughtSubject, description: '' },
+        elapsedTime,
+        currentTip: tip,
+        // Avoid shortcut fallback; we want to test the proactive tip only.
+        cleanUiDetailsVisible: false,
+        buffer: { text: 'x' } as unknown as TextBuffer,
+      });
+
+      const settings = createMockSettings({
+        ui: { loadingPhrases: 'tips', showShortcutsHint: false },
+      });
+
+      const { lastFrame } = await renderComposer(uiState, settings);
+      const output = lastFrame();
+
+      expect(output).not.toContain(`Tip: ${tip}`);
+    });
+
+    it('shows the proactive tip when it fits by measured display width', async () => {
+      const elapsedTime = 1;
+      const thoughtSubject = 'Thinking...';
+      const cancelAndTimerContentStr = `(esc to cancel, ${elapsedTime}s)`;
+
+      const tipChar = 'Ａ';
+      const tipCount = 20;
+      const tip = tipChar.repeat(tipCount);
+      const tipLabel = `Tip: ${tip}`;
+
+      const statusWidthForTipCollision =
+        1 + // inlineSpinnerCharWidth
+        1 + // spinnerAndPrimaryGapWidth
+        getCachedStringWidth(thoughtSubject) +
+        1 + // cancelSpacerWidth
+        getCachedStringWidth(cancelAndTimerContentStr);
+
+      const terminalWidthBoundary =
+        statusWidthForTipCollision + getCachedStringWidth(tipLabel) + 5;
+
+      // Ensure we are not in narrow mode.
+      expect(terminalWidthBoundary).toBeGreaterThanOrEqual(80);
+
+      vi.mocked(useTerminalSizeMock).mockReturnValue({
+        columns: terminalWidthBoundary,
+        rows: 24,
+      });
+
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: { subject: thoughtSubject, description: '' },
+        elapsedTime,
+        currentTip: tip,
+        cleanUiDetailsVisible: false,
+        buffer: { text: 'x' } as unknown as TextBuffer,
+      });
+
+      const settings = createMockSettings({
+        ui: { loadingPhrases: 'tips', showShortcutsHint: false },
+      });
+
+      const { lastFrame } = await renderComposer(uiState, settings);
+      const output = lastFrame();
+
+      expect(output).toContain(`Tip: ${tip}`);
     });
   });
 

@@ -21,10 +21,12 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { isContextUsageHigh } from '../utils/contextUsage.js';
+import { formatDuration } from '../utils/formatters.js';
 import { theme } from '../semantic-colors.js';
 import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 import { StreamingState, type HistoryItemToolGroup } from '../types.js';
+import { getCachedStringWidth } from '../utils/textUtils.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { StatusDisplay } from './StatusDisplay.js';
@@ -166,6 +168,27 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const userVisibleHooks = allHooks.filter((h) => isUserVisibleHook(h.source));
   const hasUserVisibleHooks = userVisibleHooks.length > 0;
 
+  const hookText = (() => {
+    if (!hasAnyHooks) return undefined;
+
+    let computedHookText = GENERIC_WORKING_LABEL;
+
+    if (hasUserVisibleHooks) {
+      const label =
+        userVisibleHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+      const displayNames = userVisibleHooks.map((h) => {
+        let name = h.name;
+        if (h.index && h.total && h.total > 1) {
+          name += ` (${h.index}/${h.total})`;
+        }
+        return name;
+      });
+      computedHookText = `${label}: ${displayNames.join(', ')}`;
+    }
+
+    return computedHookText;
+  })();
+
   const shouldReserveSpaceForShortcutsHint =
     settings.merged.ui.showShortcutsHint &&
     !hideUiDetailsForSuggestions &&
@@ -175,40 +198,90 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     INTERACTIVE_SHELL_WAITING_PHRASE,
   );
 
+  const cancelAndTimerContentStr =
+    uiState.streamingState !== StreamingState.WaitingForConfirmation
+      ? `(esc to cancel, ${
+          uiState.elapsedTime < 60
+            ? `${uiState.elapsedTime}s`
+            : formatDuration(uiState.elapsedTime * 1000)
+        })`
+      : '';
+
   /**
-   * Calculate the estimated length of the status message to avoid collisions
-   * with the tips area.
+   * Calculate the measured display width of the status row.
+   *
+   * This is used to decide whether the "tip" line can safely fit without
+   * colliding with the status area.
    */
-  let estimatedStatusLength = 0;
-  if (hasAnyHooks) {
-    if (hasUserVisibleHooks) {
-      const hookLabel =
-        userVisibleHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
-      const hookNames = userVisibleHooks
-        .map(
-          (h) =>
-            h.name +
-            (h.index && h.total && h.total > 1
-              ? ` (${h.index}/${h.total})`
-              : ''),
-        )
-        .join(', ');
-      estimatedStatusLength = hookLabel.length + hookNames.length + 10;
-    } else {
-      estimatedStatusLength = GENERIC_WORKING_LABEL.length + 10;
+  const statusWidthForTipCollision = (() => {
+    const inlineSpinnerCharWidth = hasAnyHooks || showLoadingIndicator ? 1 : 0;
+    const spinnerAndPrimaryGapWidth = 1; // LoadingIndicator marginRight={1}
+    const cancelSpacerWidth = 1; // LoadingIndicator width={1}
+    const wittySpacerWidth = 1; // LoadingIndicator marginLeft={1}
+    const interactiveShellFocusSuffix = ' (press tab to focus)';
+
+    if (hasAnyHooks && hookText) {
+      const primaryText = hookText;
+      const interactiveExtra =
+        primaryText === INTERACTIVE_SHELL_WAITING_PHRASE
+          ? interactiveShellFocusSuffix
+          : '';
+      const cancelShown =
+        uiState.streamingState !== StreamingState.WaitingForConfirmation;
+      const inlineWittyShown =
+        showWit &&
+        Boolean(uiState.currentWittyPhrase) &&
+        primaryText === 'Thinking...';
+
+      return (
+        inlineSpinnerCharWidth +
+        spinnerAndPrimaryGapWidth +
+        getCachedStringWidth(primaryText) +
+        getCachedStringWidth(interactiveExtra) +
+        (cancelShown
+          ? cancelSpacerWidth + getCachedStringWidth(cancelAndTimerContentStr)
+          : 0) +
+        (inlineWittyShown
+          ? wittySpacerWidth + getCachedStringWidth(uiState.currentWittyPhrase!)
+          : 0)
+      );
     }
-  } else if (showLoadingIndicator) {
-    const thoughtText = uiState.thought?.subject || GENERIC_WORKING_LABEL;
-    const inlineWittyLength =
-      showWit && uiState.currentWittyPhrase
-        ? uiState.currentWittyPhrase.length + 1
-        : 0;
-    estimatedStatusLength = thoughtText.length + 25 + inlineWittyLength;
-  } else if (hasPendingActionRequired) {
-    estimatedStatusLength = 20;
-  } else if (hasToast) {
-    estimatedStatusLength = 40;
-  }
+
+    if (showLoadingIndicator) {
+      const primaryText =
+        uiState.thought?.subject ??
+        (uiState.streamingState === StreamingState.Responding
+          ? 'Thinking...'
+          : undefined);
+      const interactiveExtra =
+        primaryText === INTERACTIVE_SHELL_WAITING_PHRASE
+          ? interactiveShellFocusSuffix
+          : '';
+      const cancelShown =
+        uiState.streamingState !== StreamingState.WaitingForConfirmation;
+      const inlineWittyShown =
+        showWit &&
+        Boolean(uiState.currentWittyPhrase) &&
+        primaryText === 'Thinking...';
+
+      return (
+        inlineSpinnerCharWidth +
+        spinnerAndPrimaryGapWidth +
+        getCachedStringWidth(primaryText ?? '') +
+        getCachedStringWidth(interactiveExtra) +
+        (cancelShown
+          ? cancelSpacerWidth + getCachedStringWidth(cancelAndTimerContentStr)
+          : 0) +
+        (inlineWittyShown
+          ? wittySpacerWidth + getCachedStringWidth(uiState.currentWittyPhrase!)
+          : 0)
+      );
+    }
+
+    if (hasPendingActionRequired) return 20;
+    if (hasToast) return 40;
+    return 0;
+  })();
 
   /**
    * Determine the ambient text (tip) to display.
@@ -224,7 +297,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       )
     ) {
       if (
-        estimatedStatusLength + uiState.currentTip.length + 10 <=
+        statusWidthForTipCollision +
+          getCachedStringWidth(`Tip: ${uiState.currentTip}`) +
+          5 <=
         terminalWidth
       ) {
         return uiState.currentTip;
@@ -244,39 +319,44 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     return undefined;
   })();
 
-  const tipLength = tipContentStr?.length || 0;
-  const willCollideTip = estimatedStatusLength + tipLength + 5 > terminalWidth;
+  const tipDisplayText =
+    tipContentStr && tipContentStr === uiState.currentTip
+      ? `Tip: ${tipContentStr}`
+      : tipContentStr;
+  const tipWidth = tipDisplayText ? getCachedStringWidth(tipDisplayText) : 0;
+  const willCollideTip =
+    statusWidthForTipCollision + tipWidth + 5 > terminalWidth;
 
   const showTipLine =
     !hasPendingActionRequired && tipContentStr && !willCollideTip && !isNarrow;
 
   // Mini Mode VIP Flags (Pure Content Triggers)
-  const miniMode_ShowApprovalMode =
+  const miniModeShowApprovalMode =
     Boolean(modeContentObj) && !hideUiDetailsForSuggestions;
-  const miniMode_ShowToast = hasToast;
-  const miniMode_ShowShortcuts = shouldReserveSpaceForShortcutsHint;
-  const miniMode_ShowStatus = showLoadingIndicator || hasAnyHooks;
-  const miniMode_ShowTip = showTipLine;
-  const miniMode_ShowContext = isContextUsageHigh(
+  const miniModeShowToast = hasToast;
+  const miniModeShowShortcuts = shouldReserveSpaceForShortcutsHint;
+  const miniModeShowStatus = showLoadingIndicator || hasAnyHooks;
+  const miniModeShowTip = showTipLine;
+  const miniModeShowContext = isContextUsageHigh(
     uiState.sessionStats.lastPromptTokenCount,
     uiState.currentModel,
     settings.merged.model?.compressionThreshold,
   );
 
   // Composite Mini Mode Triggers
-  const showRow1_MiniMode =
-    miniMode_ShowToast ||
-    miniMode_ShowStatus ||
-    miniMode_ShowShortcuts ||
-    miniMode_ShowTip;
+  const showRow1MiniMode =
+    miniModeShowToast ||
+    miniModeShowStatus ||
+    miniModeShowShortcuts ||
+    miniModeShowTip;
 
-  const showRow2_MiniMode = miniMode_ShowApprovalMode || miniMode_ShowContext;
+  const showRow2MiniMode = miniModeShowApprovalMode || miniModeShowContext;
 
   // Final Display Rules (Stable Footer Architecture)
-  const showRow1 = showUiDetails || showRow1_MiniMode;
-  const showRow2 = showUiDetails || showRow2_MiniMode;
+  const showRow1 = showUiDetails || showRow1MiniMode;
+  const showRow2 = showUiDetails || showRow2MiniMode;
 
-  const showMinimalBleedThroughRow = !showUiDetails && showRow2_MiniMode;
+  const showMinimalBleedThroughRow = !showUiDetails && showRow2MiniMode;
 
   const renderTipNode = () => {
     if (!tipContentStr) return null;
@@ -307,53 +387,25 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   };
 
   const renderStatusNode = () => {
-    const allHooks = uiState.activeHooks;
-    if (allHooks.length === 0 && !showLoadingIndicator) return null;
+    if (!hasAnyHooks && !showLoadingIndicator) return null;
 
-    if (allHooks.length > 0) {
-      const userVisibleHooks = allHooks.filter((h) =>
-        isUserVisibleHook(h.source),
-      );
+    const commonProps = {
+      inline: true,
+      showTips,
+      showWit,
+      errorVerbosity: settings.merged.ui.errorVerbosity,
+      elapsedTime: uiState.elapsedTime,
+      forceRealStatusOnly: false,
+      wittyPhrase: uiState.currentWittyPhrase,
+    } as const;
 
-      let hookText = GENERIC_WORKING_LABEL;
-      if (userVisibleHooks.length > 0) {
-        const label =
-          userVisibleHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
-        const displayNames = userVisibleHooks.map((h) => {
-          let name = h.name;
-          if (h.index && h.total && h.total > 1) {
-            name += ` (${h.index}/${h.total})`;
-          }
-          return name;
-        });
-        hookText = `${label}: ${displayNames.join(', ')}`;
-      }
-
-      return (
-        <LoadingIndicator
-          inline
-          showTips={showTips}
-          showWit={showWit}
-          errorVerbosity={settings.merged.ui.errorVerbosity}
-          currentLoadingPhrase={hookText}
-          elapsedTime={uiState.elapsedTime}
-          forceRealStatusOnly={false}
-          wittyPhrase={uiState.currentWittyPhrase}
-        />
-      );
-    }
-
-    return (
+    return hasAnyHooks ? (
       <LoadingIndicator
-        inline
-        showTips={showTips}
-        showWit={showWit}
-        errorVerbosity={settings.merged.ui.errorVerbosity}
-        thought={uiState.thought}
-        elapsedTime={uiState.elapsedTime}
-        forceRealStatusOnly={false}
-        wittyPhrase={uiState.currentWittyPhrase}
+        {...commonProps}
+        currentLoadingPhrase={hookText ?? GENERIC_WORKING_LABEL}
       />
+    ) : (
+      <LoadingIndicator {...commonProps} thought={uiState.thought} />
     );
   };
 
@@ -367,7 +419,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       {renderStatusNode()}
       {showMinimalBleedThroughRow && (
         <Box>
-          {miniMode_ShowApprovalMode && modeContentObj && (
+          {miniModeShowApprovalMode && modeContentObj && (
             <Text color={modeContentObj.color}>● {modeContentObj.text}</Text>
           )}
         </Box>
@@ -375,9 +427,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     </Box>
   );
 
-  const renderStatusRow = () => {
+  const StatusRow = () => {
     // Mini Mode Height Reservation (The "Anti-Jitter" line)
-    if (!showUiDetails && !showRow1_MiniMode && !showRow2_MiniMode) {
+    if (!showUiDetails && !showRow1MiniMode && !showRow2MiniMode) {
       return <Box height={1} />;
     }
 
@@ -393,7 +445,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             minHeight={1}
           >
             <Box flexDirection="row" flexGrow={1} flexShrink={1}>
-              {!showUiDetails && showRow1_MiniMode ? (
+              {!showUiDetails && showRow1MiniMode ? (
                 renderMinimalMetaRowContent()
               ) : isInteractiveShellWaiting ? (
                 <Box width="100%" marginLeft={1}>
@@ -423,7 +475,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         {/* Internal Separator Line */}
         {showRow1 &&
           showRow2 &&
-          (showUiDetails || (showRow1_MiniMode && showRow2_MiniMode)) && (
+          (showUiDetails || (showRow1MiniMode && showRow2MiniMode)) && (
             <Box width="100%">
               <HorizontalLine dim />
             </Box>
@@ -474,7 +526,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   )}
                 </>
               ) : (
-                miniMode_ShowApprovalMode &&
+                miniModeShowApprovalMode &&
                 modeContentObj && (
                   <Text color={modeContentObj.color}>
                     ● {modeContentObj.text}
@@ -488,10 +540,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               alignItems="center"
               marginLeft={isNarrow ? 1 : 0}
             >
-              {(showUiDetails || miniMode_ShowContext) && (
+              {(showUiDetails || miniModeShowContext) && (
                 <StatusDisplay hideContextSummary={hideContextSummary} />
               )}
-              {miniMode_ShowContext && !showUiDetails && (
+              {miniModeShowContext && !showUiDetails && (
                 <Box marginLeft={1}>
                   <ContextUsageDisplay
                     promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
@@ -530,14 +582,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showShortcutsHelp && <ShortcutsHelp />}
 
-      {(showUiDetails || miniMode_ShowToast) && (
+      {(showUiDetails || miniModeShowToast) && (
         <Box minHeight={1} marginLeft={isNarrow ? 0 : 1}>
           <ToastDisplay />
         </Box>
       )}
 
       <Box width="100%" flexDirection="column">
-        {renderStatusRow()}
+        <StatusRow />
       </Box>
 
       {showUiDetails && uiState.showErrorDetails && (

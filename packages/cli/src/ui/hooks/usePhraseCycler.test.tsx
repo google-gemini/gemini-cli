@@ -102,6 +102,32 @@ describe('usePhraseCycler', () => {
     unmount();
   });
 
+  it('should not cycle phrases while shouldShowFocusHint is true', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5);
+
+    const { lastFrame, waitUntilReady, unmount } = await render(
+      <TestComponent
+        isActive={true}
+        isWaiting={false}
+        shouldShowFocusHint={true}
+        showTips={true}
+        showWit={true}
+      />,
+    );
+    await waitUntilReady();
+
+    const initial = lastFrame().trim();
+    expect(initial).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PHRASE_CHANGE_INTERVAL_MS * 2);
+    });
+    await waitUntilReady();
+
+    expect(lastFrame().trim()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
+    unmount();
+  });
+
   it('should prioritize interactive shell waiting over normal waiting immediately', async () => {
     const { lastFrame, rerender, waitUntilReady, unmount } = await render(
       <TestComponent isActive={true} isWaiting={true} />,
