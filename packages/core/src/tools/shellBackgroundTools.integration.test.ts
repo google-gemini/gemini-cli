@@ -48,6 +48,7 @@ describe('Background Tools Integration', () => {
       true,
       {
         originalCommand: 'node continuous_log',
+        sessionId: 'default',
         sanitizationConfig: {
           allowedEnvironmentVariables: [],
           blockedEnvironmentVariables: [],
