@@ -120,13 +120,12 @@ export async function createBrowserAgentDefinition(
     }
 
     // Reduce noise for read-only tools in default mode
-    const readOnlyTools = [
-      'take_snapshot',
-      'take_screenshot',
-      'list_pages',
-      'list_network_requests',
-    ];
-    for (const toolName of readOnlyTools) {
+    const readOnlyTools = (await browserManager.getDiscoveredTools())
+      .filter((t) => !!t.annotations?.readOnlyHint)
+      .map((t) => t.name);
+    const allowlistedReadonlyTools = ['take_snapshot', 'take_screenshot'];
+
+    for (const toolName of [...readOnlyTools, ...allowlistedReadonlyTools]) {
       if (availableToolNames.includes(toolName)) {
         const rule = generateAllowRules(toolName);
         if (!existingRules.some((r) => isRuleEqual(r, rule))) {
