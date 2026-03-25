@@ -65,6 +65,7 @@ import {
 } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
@@ -1187,11 +1188,17 @@ export class Session {
           };
         case 'resource_link': {
           if (part.uri.startsWith(FILE_URI_SCHEME)) {
+            let fileUri = part.uri.slice(FILE_URI_SCHEME.length);
+            try {
+              fileUri = fileURLToPath(new URL(part.uri));
+            } catch (e) {
+              // fallback to slice if parsing fails
+            }
             return {
               fileData: {
                 mimeData: part.mimeType,
                 name: part.name,
-                fileUri: part.uri.slice(FILE_URI_SCHEME.length),
+                fileUri,
               },
             };
           } else {
@@ -1265,6 +1272,22 @@ export class Session {
             this.debug(`Path ${pathName} resolved to file: ${currentPathSpec}`);
           }
           resolvedSuccessfully = true;
+        } else if (path.isAbsolute(pathName)) {
+          const stats = await fs.stat(absolutePath);
+          this.context.config.getWorkspaceContext().addReadOnlyPath(absolutePath);
+          
+          if (stats.isDirectory()) {
+            currentPathSpec = absolutePath.endsWith('/')
+              ? `${absolutePath}**`
+              : `${absolutePath}/**`;
+            this.debug(
+              `Path ${pathName} is outside root but provided by IDE. Added read-only access to directory, using glob: ${currentPathSpec}`,
+            );
+          } else {
+            currentPathSpec = absolutePath;
+            this.debug(`Path ${pathName} is outside root but provided by IDE. Added read-only access to file: ${currentPathSpec}`);
+          }
+          resolvedSuccessfully = true;
         } else {
           this.debug(
             `Path ${pathName} is outside the project directory. Skipping.`,
@@ -1272,7 +1295,7 @@ export class Session {
         }
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (this.context.config.getEnableRecursiveFileSearch() && globTool) {
+          if (this.context.config.getEnableRecursiveFileSearch() && globTool && !path.isAbsolute(pathName)) {
             this.debug(
               `Path ${pathName} not found directly, attempting glob search.`,
             );
