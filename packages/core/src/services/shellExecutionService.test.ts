@@ -919,6 +919,7 @@ describe('ShellExecutionService', () => {
           startTime: Date.now(),
         });
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
       ShellExecutionService.background(101);
