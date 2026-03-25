@@ -17,9 +17,9 @@ steps:
     entrypoint: 'npm'
     args: ['run', 'build:packages']
 
-  # Step 4: Build Maintainer Image
+  # Step 4: Build Development Image
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
-    id: 'Build Maintainer Image'
+    id: 'Build Development Image'
     entrypoint: 'bash'
     args:
       - '-c'
@@ -36,9 +36,9 @@ steps:
         
         TAG_SHA="${SHORT_SHA}"
         
-        echo "📦 Building Maintainer Image for: $${RAW_BRANCH} -> $${TAG_PRIMARY}"
+        echo "📦 Building Development Image for: $${RAW_BRANCH} -> $${TAG_PRIMARY}"
         
-        docker build -f .gcp/Dockerfile.maintainer \
+        docker build -f .gcp/Dockerfile.development \
           -t "$${IMAGE_BASE}:$${TAG_SHA}" \
           -t "$${IMAGE_BASE}:$${TAG_PRIMARY}" .
           

@@ -14,10 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# --- STAGE 2: Maintainer ---
-FROM base AS maintainer
+# --- STAGE 2: Development ---
+FROM base AS development
 
-# Install "Maintainer Bloat" - tools needed for development and offloading
+# Install "Development Bloat" - tools needed for development and offloading
 RUN apt-get update && apt-get install -y --no-install-recommends \
   make \
   g++ \
