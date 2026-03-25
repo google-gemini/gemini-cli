@@ -21,9 +21,13 @@ All workflows in `.github/workflows/ci.yml` must pass on the `main` branch (for
 nightly) or the release branch (for preview/stable).
 
 - **Platforms:** Tests must pass on **Linux and macOS**.
-  - _Note:_ Windows tests currently run with `continue-on-error: true`. While a
-    failure here doesn't block the release technically, it should be
-    investigated.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Windows tests currently run with `continue-on-error: true`. While a
+> failure here doesn't block the release technically, it should be
+> investigated.
+
 - **Checks:**
   - **Linting:** No linting errors (ESLint, Prettier, etc.).
   - **Typechecking:** No TypeScript errors.

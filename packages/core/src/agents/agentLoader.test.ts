@@ -242,6 +242,99 @@ Body`);
         /Name must be a valid slug/,
       );
     });
+
+    describe('error formatting and kind inference', () => {
+      it('should only show local agent errors when kind is inferred as local (via kind field)', async () => {
+        const filePath = await writeAgentMarkdown(`---
+kind: local
+name: invalid-local
+# missing description
+---
+Body`);
+        const error = await parseAgentMarkdown(filePath).catch((e) => e);
+        expect(error).toBeInstanceOf(AgentLoadError);
+        expect(error.message).toContain('Validation failed');
+        expect(error.message).toContain('description: Required');
+        expect(error.message).not.toContain('Remote Agent');
+      });
+
+      it('should only show local agent errors when kind is inferred as local (via local-specific keys)', async () => {
+        const filePath = await writeAgentMarkdown(`---
+name: invalid-local
+# missing description
+tools:
+  - run_shell_command
+---
+Body`);
+        const error = await parseAgentMarkdown(filePath).catch((e) => e);
+        expect(error).toBeInstanceOf(AgentLoadError);
+        expect(error.message).toContain('Validation failed');
+        expect(error.message).toContain('description: Required');
+        expect(error.message).not.toContain('Remote Agent');
+      });
+
+      it('should only show remote agent errors when kind is inferred as remote (via kind field)', async () => {
+        const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-remote
+# missing agent_card_url
+---
+Body`);
+        const error = await parseAgentMarkdown(filePath).catch((e) => e);
+        expect(error).toBeInstanceOf(AgentLoadError);
+        expect(error.message).toContain('Validation failed');
+        expect(error.message).toContain('agent_card_url: Required');
+        expect(error.message).not.toContain('Local Agent');
+      });
+
+      it('should only show remote agent errors when kind is inferred as remote (via remote-specific keys)', async () => {
+        const filePath = await writeAgentMarkdown(`---
+name: invalid-remote
+auth:
+  type: apiKey
+  key: my_key
+# missing agent_card_url
+---
+Body`);
+        const error = await parseAgentMarkdown(filePath).catch((e) => e);
+        expect(error).toBeInstanceOf(AgentLoadError);
+        expect(error.message).toContain('Validation failed');
+        expect(error.message).toContain('agent_card_url: Required');
+        expect(error.message).not.toContain('Local Agent');
+      });
+
+      it('should show errors for both types when kind cannot be inferred', async () => {
+        const filePath = await writeAgentMarkdown(`---
+name: invalid-unknown
+# missing description and missing agent_card_url, no specific keys
+---
+Body`);
+        const error = await parseAgentMarkdown(filePath).catch((e) => e);
+        expect(error).toBeInstanceOf(AgentLoadError);
+        expect(error.message).toContain('Validation failed');
+        expect(error.message).toContain('(Local Agent)');
+        expect(error.message).toContain('(Remote Agent)');
+        expect(error.message).toContain('description: Required');
+        expect(error.message).toContain('agent_card_url: Required');
+      });
+
+      it('should format errors without a stray colon when the path is empty (e.g. strict object with unknown keys)', async () => {
+        const filePath = await writeAgentMarkdown(`---
+kind: local
+name: my-agent
+description: test
+unknown_field: true
+---
+Body`);
+        const error = await parseAgentMarkdown(filePath).catch((e) => e);
+        expect(error).toBeInstanceOf(AgentLoadError);
+        expect(error.message).toContain(
+          "Unrecognized key(s) in object: 'unknown_field'",
+        );
+        expect(error.message).not.toContain(': Unrecognized key(s)');
+        expect(error.message).not.toContain('Required');
+      });
+    });
   });
 
   describe('markdownToAgentDefinition', () => {
@@ -617,7 +710,7 @@ kind: remote
 name: oauth2-agent
 agent_card_url: https://example.com/card
 auth:
-  type: oauth2
+  type: oauth
   client_id: $MY_OAUTH_CLIENT_ID
   scopes:
     - read
@@ -630,7 +723,7 @@ auth:
         kind: 'remote',
         name: 'oauth2-agent',
         auth: {
-          type: 'oauth2',
+          type: 'oauth',
           client_id: '$MY_OAUTH_CLIENT_ID',
           scopes: ['read', 'write'],
         },
@@ -643,7 +736,7 @@ kind: remote
 name: oauth2-full-agent
 agent_card_url: https://example.com/card
 auth:
-  type: oauth2
+  type: oauth
   client_id: my-client-id
   client_secret: my-client-secret
   scopes:
@@ -659,7 +752,7 @@ auth:
         kind: 'remote',
         name: 'oauth2-full-agent',
         auth: {
-          type: 'oauth2',
+          type: 'oauth',
           client_id: 'my-client-id',
           client_secret: 'my-client-secret',
           scopes: ['openid', 'profile'],
@@ -675,7 +768,7 @@ kind: remote
 name: oauth2-minimal-agent
 agent_card_url: https://example.com/card
 auth:
-  type: oauth2
+  type: oauth
 ---
 `);
       const result = await parseAgentMarkdown(filePath);
@@ -684,7 +777,7 @@ auth:
         kind: 'remote',
         name: 'oauth2-minimal-agent',
         auth: {
-          type: 'oauth2',
+          type: 'oauth',
         },
       });
     });
@@ -695,7 +788,7 @@ kind: remote
 name: invalid-oauth2-agent
 agent_card_url: https://example.com/card
 auth:
-  type: oauth2
+  type: oauth
   client_id: my-client
   authorization_url: not-a-valid-url
 ---
@@ -709,7 +802,7 @@ kind: remote
 name: invalid-oauth2-agent
 agent_card_url: https://example.com/card
 auth:
-  type: oauth2
+  type: oauth
   client_id: my-client
   token_url: not-a-valid-url
 ---
@@ -723,7 +816,7 @@ auth:
         name: 'oauth2-convert-agent',
         agent_card_url: 'https://example.com/card',
         auth: {
-          type: 'oauth2' as const,
+          type: 'oauth' as const,
           client_id: '$MY_CLIENT_ID',
           scopes: ['read'],
           authorization_url: 'https://auth.example.com/authorize',
@@ -743,6 +836,25 @@ auth:
           token_url: 'https://auth.example.com/token',
         },
       });
+    });
+
+    it('should throw an error for an unknown auth type in markdownToAgentDefinition', () => {
+      const markdown = {
+        kind: 'remote' as const,
+        name: 'unknown-auth-agent',
+        agent_card_url: 'https://example.com/card',
+        auth: {
+          type: 'apiKey' as const,
+          key: 'some-key',
+        },
+      };
+
+      // Mutate the object at runtime to bypass TypeScript compile-time checks cleanly
+      Object.assign(markdown.auth, { type: 'some-unknown-type' });
+
+      expect(() => markdownToAgentDefinition(markdown)).toThrow(
+        /Unknown auth type: some-unknown-type/,
+      );
     });
   });
 });

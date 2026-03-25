@@ -381,6 +381,7 @@ describe('Policy Engine Integration Tests', () => {
       // Add a manual rule with annotations to the config
       config.rules = config.rules || [];
       config.rules.push({
+        toolName: '*',
         toolAnnotations: { readOnlyHint: true },
         decision: PolicyDecision.ALLOW,
         priority: 10,
@@ -516,7 +517,9 @@ describe('Policy Engine Integration Tests', () => {
       );
       expect(mcpServerRule?.priority).toBe(4.1); // MCP allowed server
 
-      const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
+      const readOnlyToolRule = rules.find(
+        (r) => r.toolName === 'glob' && !r.subagent,
+      );
       // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
       expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
 
@@ -673,7 +676,7 @@ describe('Policy Engine Integration Tests', () => {
       const server1Rule = rules.find((r) => r.toolName === 'mcp_server1_*');
       expect(server1Rule?.priority).toBe(4.1); // Allowed servers (user tier)
 
-      const globRule = rules.find((r) => r.toolName === 'glob');
+      const globRule = rules.find((r) => r.toolName === 'glob' && !r.subagent);
       // Priority 70 in default tier → 1.07
       expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
 

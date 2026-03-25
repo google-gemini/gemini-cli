@@ -215,6 +215,7 @@ export class McpClientManager {
     await Promise.all(
       Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
         this.maybeDiscoverMcpServer(name, {
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...config,
           extension,
         }),
@@ -331,7 +332,9 @@ export class McpClientManager {
     const env = { ...(base.env ?? {}), ...(override.env ?? {}) };
 
     return {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...base,
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...override,
       includeTools,
       excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
@@ -551,8 +554,10 @@ export class McpClientManager {
     );
 
     if (Object.keys(servers).length === 0) {
-      this.discoveryState = MCPDiscoveryState.COMPLETED;
-      this.eventEmitter?.emit('mcp-client-update', this.clients);
+      if (!this.discoveryPromise) {
+        this.discoveryState = MCPDiscoveryState.COMPLETED;
+        this.eventEmitter?.emit('mcp-client-update', this.clients);
+      }
       return;
     }
 
@@ -571,7 +576,10 @@ export class McpClientManager {
     // If every configured server was skipped (for example because all are
     // disabled by user settings), no discovery promise is created. In that
     // case we must still mark discovery complete or the UI will wait forever.
-    if (this.discoveryState === MCPDiscoveryState.IN_PROGRESS) {
+    if (
+      this.discoveryState === MCPDiscoveryState.IN_PROGRESS &&
+      !this.discoveryPromise
+    ) {
       this.discoveryState = MCPDiscoveryState.COMPLETED;
       this.eventEmitter?.emit('mcp-client-update', this.clients);
     }
