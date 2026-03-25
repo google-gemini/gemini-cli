@@ -263,6 +263,16 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.hideContextSummary`** (boolean):
   - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
     input.
+  - **Default:** `true`
+
+- **`ui.showContextWindowWarning`** (boolean):
+  - **Description:** Show a warning message when the context window limit is
+    nearly reached. If disabled, the CLI will attempt to automatically compress
+    the history when the limit is reached.
+  - **Default:** `false`
+
+- **`ui.showContextCompression`** (boolean):
+  - **Description:** Show a message in the chat history when it is compressed.
   - **Default:** `false`
 
 - **`ui.footer.items`** (array):

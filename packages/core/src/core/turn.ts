@@ -188,6 +188,7 @@ export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
   compressionStatus: CompressionStatus;
+  requestTokenCount?: number;
 }
 
 export type ServerGeminiChatCompressedEvent = {

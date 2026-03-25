@@ -6,6 +6,7 @@
 
 import { MessageType, type HistoryItemCompression } from '../types.js';
 import { CommandKind, type SlashCommand } from './types.js';
+import { tokenLimit, type CompressionStatus } from '@google/gemini-cli-core';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
@@ -14,7 +15,21 @@ export const compressCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {
-    const { ui } = context;
+    const { ui, services } = context;
+    const agentContext = services.agentContext;
+    if (!agentContext) {
+      ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: 'Agent context not found.',
+        },
+        Date.now(),
+      );
+      return;
+    }
+
+    const config = agentContext.config;
+
     if (ui.pendingItem) {
       ui.addItem(
         {
@@ -30,29 +45,43 @@ export const compressCommand: SlashCommand = {
       type: MessageType.COMPRESSION,
       compression: {
         isPending: true,
-        originalTokenCount: null,
-        newTokenCount: null,
+        beforePercentage: null,
+        afterPercentage: null,
         compressionStatus: null,
+        isManual: true,
       },
     };
 
     try {
       ui.setPendingItem(pendingMessage);
       const promptId = `compress-${Date.now()}`;
-      const compressed =
-        await context.services.agentContext?.geminiClient?.tryCompressChat(
-          promptId,
-          true,
-        );
+      const compressed = await agentContext.geminiClient.tryCompressChat(
+        promptId,
+        true,
+      );
       if (compressed) {
+        const limit = tokenLimit(config.getModel());
+        const threshold = config.getContextWindowCompressionThreshold();
+        const beforePercentage = Math.round(
+          (compressed.originalTokenCount / limit) * 100,
+        );
+        const afterPercentage = Math.round(
+          (compressed.newTokenCount / limit) * 100,
+        );
+
         ui.addItem(
           {
             type: MessageType.COMPRESSION,
             compression: {
               isPending: false,
-              originalTokenCount: compressed.originalTokenCount,
-              newTokenCount: compressed.newTokenCount,
-              compressionStatus: compressed.compressionStatus,
+              beforePercentage,
+              afterPercentage,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              compressionStatus: Number(
+                compressed.compressionStatus,
+              ) as unknown as CompressionStatus,
+              isManual: true,
+              thresholdPercentage: Math.round(threshold * 100),
             },
           } as HistoryItemCompression,
           Date.now(),

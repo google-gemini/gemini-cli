@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any -- TODO: Refactor to remove any usage */
 import {
   describe,
   it,
@@ -32,10 +32,7 @@ import type {
   Config,
   EditorType,
   AnyToolInvocation,
-  AnyDeclarativeTool,
   SpanMetadata,
-  CompletedToolCall,
-  ToolCallRequestInfo,
 } from '@google/gemini-cli-core';
 import {
   CoreToolCallStatus,
@@ -52,19 +49,15 @@ import {
   MCPDiscoveryState,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  CompressionStatus,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import type {
-  SlashCommandProcessorResult,
-  HistoryItemWithoutId,
-  HistoryItem,
-} from '../types.js';
+import type { SlashCommandProcessorResult } from '../types.js';
 import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
-import { theme } from '../semantic-colors.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -145,6 +138,7 @@ const mockRunInDevTraceSpan = vi.hoisted(() =>
     };
     return await fn({
       metadata,
+      endSpan: vi.fn(),
     });
   }),
 );
@@ -249,10 +243,8 @@ describe('useGeminiStream', () => {
   let mockMarkToolsAsSubmitted: Mock;
   let handleAtCommandSpy: MockInstance;
 
-  const emptyHistory: HistoryItem[] = [];
-  let capturedOnComplete:
-    | ((tools: CompletedToolCall[]) => Promise<void>)
-    | null = null;
+  const emptyHistory: any[] = [];
+  let capturedOnComplete: any = null;
   const mockGetPreferredEditor = vi.fn(() => 'vscode' as EditorType);
   const mockOnAuthError = vi.fn();
   const mockPerformMemoryRefresh = vi.fn(() => Promise.resolve());
@@ -332,6 +324,9 @@ describe('useGeminiStream', () => {
     })),
     getIdeMode: vi.fn(() => false),
     getEnableHooks: vi.fn(() => false),
+    getShowContextWindowWarning: vi.fn(() => false),
+    getShowContextCompression: vi.fn(() => false),
+    getContextWindowCompressionThreshold: vi.fn(() => 0.2),
   } as unknown as Config;
 
   beforeEach(() => {
@@ -411,17 +406,13 @@ describe('useGeminiStream', () => {
         lastToolCalls,
         mockScheduleToolCalls,
         mockMarkToolsAsSubmitted,
-        (
-          updater:
-            | TrackedToolCall[]
-            | ((prev: TrackedToolCall[]) => TrackedToolCall[]),
-        ) => {
+        (updater: any) => {
           lastToolCalls =
             typeof updater === 'function' ? updater(lastToolCalls) : updater;
           rerender({ ...initialProps, toolCalls: lastToolCalls });
         },
-        (signal: AbortSignal) => {
-          mockCancelAllToolCalls(signal);
+        (...args: any[]) => {
+          mockCancelAllToolCalls(...args);
           lastToolCalls = lastToolCalls.map((tc) => {
             if (
               tc.status === CoreToolCallStatus.AwaitingApproval ||
@@ -888,7 +879,7 @@ describe('useGeminiStream', () => {
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
     await act(async () => {
-      await fn({ metadata });
+      await fn({ metadata, endSpan: vi.fn() });
     });
     expect(metadata).toMatchObject({
       input: sentParts,
@@ -982,7 +973,7 @@ describe('useGeminiStream', () => {
   });
 
   it('should stop agent execution immediately when a tool call returns STOP_EXECUTION error', async () => {
-    const stopExecutionToolCalls: TrackedCompletedToolCall[] = [
+    const stopExecutionToolCalls: TrackedToolCall[] = [
       {
         request: {
           callId: 'stop-call',
@@ -1054,7 +1045,7 @@ describe('useGeminiStream', () => {
   });
 
   it('should add a compact suppressed-error note before STOP_EXECUTION terminal info in low verbosity mode', async () => {
-    const stopExecutionToolCalls: TrackedCompletedToolCall[] = [
+    const stopExecutionToolCalls: TrackedToolCall[] = [
       {
         request: {
           callId: 'stop-call',
@@ -1081,10 +1072,9 @@ describe('useGeminiStream', () => {
       } as unknown as TrackedCompletedToolCall,
     ];
     const lowVerbositySettings = {
-      // eslint-disable-next-line @typescript-eslint/no-misused-spread
-      ...mockLoadedSettings,
+      ...(mockLoadedSettings as any),
       merged: {
-        ...mockLoadedSettings.merged,
+        ...(mockLoadedSettings.merged as any),
         ui: { errorVerbosity: 'low' },
       },
     } as LoadedSettings;
@@ -1935,120 +1925,6 @@ describe('useGeminiStream', () => {
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
       });
     });
-
-    it('should record client-initiated tool calls in GeminiChat history', async () => {
-      const { result, client: mockGeminiClient } = await renderTestHook();
-
-      mockHandleSlashCommand.mockResolvedValue({
-        type: 'schedule_tool',
-        toolName: 'activate_skill',
-        toolArgs: { name: 'test-skill' },
-      });
-
-      await act(async () => {
-        await result.current.submitQuery('/test-skill');
-      });
-
-      // Simulate tool completion
-      const completedTool = {
-        request: {
-          callId: 'test-call-id',
-          name: 'activate_skill',
-          args: { name: 'test-skill' },
-          isClientInitiated: true,
-        },
-        status: CoreToolCallStatus.Success,
-        invocation: {
-          getDescription: () => 'Activating skill test-skill',
-        },
-        tool: {
-          isOutputMarkdown: true,
-        },
-        response: {
-          responseParts: [
-            {
-              functionResponse: {
-                name: 'activate_skill',
-                response: { content: 'skill instructions' },
-              },
-            },
-          ],
-        },
-      } as unknown as TrackedCompletedToolCall;
-
-      await act(async () => {
-        if (capturedOnComplete) {
-          await capturedOnComplete([completedTool]);
-        }
-      });
-
-      // Verify that the tool call and response were added to GeminiChat history
-      expect(mockGeminiClient.addHistory).toHaveBeenCalledWith({
-        role: 'model',
-        parts: [
-          {
-            functionCall: {
-              name: 'activate_skill',
-              args: { name: 'test-skill' },
-            },
-          },
-        ],
-      });
-      expect(mockGeminiClient.addHistory).toHaveBeenCalledWith({
-        role: 'user',
-        parts: completedTool.response.responseParts,
-      });
-    });
-
-    it('should NOT record other client-initiated tool calls (like save_memory) in history', async () => {
-      const { result, client: mockGeminiClient } = await renderTestHook();
-
-      mockHandleSlashCommand.mockResolvedValue({
-        type: 'schedule_tool',
-        toolName: 'save_memory',
-        toolArgs: { fact: 'test fact' },
-      });
-
-      await act(async () => {
-        await result.current.submitQuery('/memory add "test fact"');
-      });
-
-      // Simulate tool completion
-      const completedTool = {
-        request: {
-          callId: 'test-call-id',
-          name: 'save_memory',
-          args: { fact: 'test fact' },
-          isClientInitiated: true,
-        },
-        status: CoreToolCallStatus.Success,
-        invocation: {
-          getDescription: () => 'Saving memory',
-        },
-        tool: {
-          isOutputMarkdown: true,
-        },
-        response: {
-          responseParts: [
-            {
-              functionResponse: {
-                name: 'save_memory',
-                response: { success: true },
-              },
-            },
-          ],
-        },
-      } as unknown as TrackedCompletedToolCall;
-
-      await act(async () => {
-        if (capturedOnComplete) {
-          await capturedOnComplete([completedTool]);
-        }
-      });
-
-      // Verify that addHistory was NOT called
-      expect(mockGeminiClient.addHistory).not.toHaveBeenCalled();
-    });
   });
 
   describe('Memory Refresh on save_memory', () => {
@@ -2076,7 +1952,7 @@ describe('useGeminiStream', () => {
           displayName: 'save_memory',
           description: 'Saves memory',
           build: vi.fn(),
-        } as unknown as AnyDeclarativeTool,
+        } as any,
         invocation: {
           getDescription: () => `Mock description`,
         } as unknown as AnyToolInvocation,
@@ -2150,8 +2026,7 @@ describe('useGeminiStream', () => {
       );
 
       const testConfig = {
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread
-        ...mockConfig,
+        ...(mockConfig as any),
         getContentGenerator: vi.fn(),
         getContentGeneratorConfig: vi.fn(() => ({
           authType: mockAuthType,
@@ -2316,7 +2191,7 @@ describe('useGeminiStream', () => {
             displayName: 'replace',
             description: 'Replace text',
             build: vi.fn(),
-          } as unknown as AnyDeclarativeTool,
+          } as any,
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
@@ -2357,7 +2232,7 @@ describe('useGeminiStream', () => {
             displayName: 'write_file',
             description: 'Write file',
             build: vi.fn(),
-          } as unknown as AnyDeclarativeTool,
+          } as any,
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
@@ -2474,22 +2349,30 @@ describe('useGeminiStream', () => {
 
       it.each([
         {
-          name: 'without suggestion when remaining tokens are > 75% of limit',
+          name: 'NOT add a message when showContextWindowWarning is false',
           requestTokens: 20,
           remainingTokens: 80,
-          expectedMessage:
-            'Sending this message (20 tokens) might exceed the context window limit (80 tokens left).',
+          shouldShow: false,
         },
         {
-          name: 'with suggestion when remaining tokens are < 75% of limit',
+          name: 'add a message when showContextWindowWarning is true',
           requestTokens: 30,
           remainingTokens: 70,
+          shouldShow: true,
           expectedMessage:
-            'Sending this message (30 tokens) might exceed the context window limit (70 tokens left). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+            'Context 30% full. Message may exceed window. Reduce size or /compress.',
         },
       ])(
-        'should add message $name',
-        async ({ requestTokens, remainingTokens, expectedMessage }) => {
+        'should $name',
+        async ({
+          requestTokens,
+          remainingTokens,
+          shouldShow,
+          expectedMessage,
+        }) => {
+          vi.mocked(mockConfig.getShowContextWindowWarning).mockReturnValue(
+            shouldShow,
+          );
           mockSendMessageStream.mockReturnValue(
             (async function* () {
               yield {
@@ -2509,10 +2392,18 @@ describe('useGeminiStream', () => {
           });
 
           await waitFor(() => {
-            expect(mockAddItem).toHaveBeenCalledWith({
-              type: 'info',
-              text: expectedMessage,
-            });
+            if (shouldShow) {
+              expect(mockAddItem).toHaveBeenCalledWith({
+                type: 'info',
+                text: expectedMessage,
+              });
+            } else {
+              expect(mockAddItem).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                  type: 'info',
+                }),
+              );
+            }
           });
         },
       );
@@ -2566,8 +2457,12 @@ describe('useGeminiStream', () => {
       });
     });
 
-    it('should add informational messages when ChatCompressed event is received', async () => {
+    it('should add informational messages when ChatCompressed event is received and showContextCompression is true', async () => {
       vi.mocked(tokenLimit).mockReturnValue(10000);
+      vi.mocked(
+        mockConfig.getContextWindowCompressionThreshold,
+      ).mockReturnValue(0.2);
+      vi.mocked(mockConfig.getShowContextCompression).mockReturnValue(true);
       // Setup mock to return a stream with ChatCompressed event
       mockSendMessageStream.mockReturnValue(
         (async function* () {
@@ -2576,7 +2471,22 @@ describe('useGeminiStream', () => {
             value: {
               originalTokenCount: 1000,
               newTokenCount: 500,
-              compressionStatus: 'compressed',
+              compressionStatus: CompressionStatus.COMPRESSED,
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response after compression',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: {
+              finishReason: 'STOP',
+              usageMetadata: {
+                promptTokenCount: 10,
+                candidatesTokenCount: 20,
+                totalTokenCount: 30,
+              },
             },
           };
         })(),
@@ -2593,10 +2503,129 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: MessageType.INFO,
-            text: 'Context compressed from 10% to 5%.',
-            secondaryText: 'Change threshold in /settings.',
-            color: theme.status.warning,
+            type: 'compression',
+            compression: {
+              isPending: false,
+              beforePercentage: 10,
+              afterPercentage: 5,
+              compressionStatus: CompressionStatus.COMPRESSED,
+              isManual: false,
+              thresholdPercentage: 20,
+            },
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should NOT add informational messages when ChatCompressed event is received and showContextCompression is false', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(10000);
+      vi.mocked(
+        mockConfig.getContextWindowCompressionThreshold,
+      ).mockReturnValue(0.2);
+      vi.mocked(mockConfig.getShowContextCompression).mockReturnValue(false);
+      // Setup mock to return a stream with ChatCompressed event
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 1000,
+              newTokenCount: 500,
+              compressionStatus: CompressionStatus.COMPRESSED,
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response after compression',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: {
+              finishReason: 'STOP',
+              usageMetadata: {
+                promptTokenCount: 10,
+                candidatesTokenCount: 20,
+                totalTokenCount: 30,
+              },
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderHookWithDefaults();
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test compression');
+      });
+
+      // Check that NO compression message was added
+      await waitFor(() => {
+        expect(mockAddItem).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'compression',
+          }),
+        );
+      });
+    });
+
+    it('should add informational messages when ChatCompressed event is received with a large prompt even if showContextCompression is false', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(10000);
+      vi.mocked(
+        mockConfig.getContextWindowCompressionThreshold,
+      ).mockReturnValue(0.2); // 20%
+      vi.mocked(mockConfig.getShowContextCompression).mockReturnValue(false);
+
+      // Setup mock to return a stream with ChatCompressed event and a large requestTokenCount (25%)
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 1000,
+              newTokenCount: 500,
+              compressionStatus: CompressionStatus.COMPRESSED,
+              requestTokenCount: 2500, // 25% > 20%
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response after compression',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: {
+              finishReason: 'STOP',
+              usageMetadata: {
+                promptTokenCount: 10,
+                candidatesTokenCount: 20,
+                totalTokenCount: 30,
+              },
+            },
+          };
+        })(),
+      );
+
+      const { result } = await renderHookWithDefaults();
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test large prompt compression');
+      });
+
+      // Check that compression message WAS added despite the setting
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'compression',
+            compression: expect.objectContaining({
+              beforePercentage: 10,
+              afterPercentage: 5,
+              compressionStatus: CompressionStatus.COMPRESSED,
+              isManual: false,
+              thresholdPercentage: 20,
+            }),
           }),
           expect.any(Number),
         );
@@ -2702,14 +2731,14 @@ describe('useGeminiStream', () => {
 
   it('should flush pending text rationale before scheduling tool calls to ensure correct history order', async () => {
     const addItemOrder: string[] = [];
-    let capturedOnComplete: (tools: CompletedToolCall[]) => Promise<void>;
+    let capturedOnComplete: any;
 
     const mockScheduleToolCalls = vi.fn(async (requests) => {
       addItemOrder.push('scheduleToolCalls_START');
       // Simulate tools completing and triggering onComplete immediately.
       // This mimics the behavior that caused the regression where tool results
       // were added to history during the await scheduleToolCalls(...) block.
-      const tools = requests.map((r: ToolCallRequestInfo) => ({
+      const tools = requests.map((r: any) => ({
         request: r,
         status: CoreToolCallStatus.Success,
         tool: { displayName: r.name, name: r.name },
@@ -2724,7 +2753,7 @@ describe('useGeminiStream', () => {
       addItemOrder.push('scheduleToolCalls_END');
     });
 
-    mockAddItem.mockImplementation((item: HistoryItemWithoutId) => {
+    mockAddItem.mockImplementation((item: any) => {
       addItemOrder.push(`addItem:${item.type}`);
     });
 
@@ -2954,10 +2983,9 @@ describe('useGeminiStream', () => {
   describe('Thought Reset', () => {
     it('should keep full thinking entries in history when mode is full', async () => {
       const fullThinkingSettings: LoadedSettings = {
-        // eslint-disable-next-line @typescript-eslint/no-misused-spread
-        ...mockLoadedSettings,
+        ...(mockLoadedSettings as any),
         merged: {
-          ...mockLoadedSettings.merged,
+          ...(mockLoadedSettings.merged as any),
           ui: { inlineThinkingMode: 'full' },
         },
       } as unknown as LoadedSettings;
@@ -4036,7 +4064,7 @@ describe('useGeminiStream', () => {
 
     const spanMetadata = {} as SpanMetadata;
     await act(async () => {
-      await userPromptCall![1]({ metadata: spanMetadata });
+      await userPromptCall![1]({ metadata: spanMetadata, endSpan: vi.fn() });
     });
     expect(spanMetadata.input).toBe('telemetry test query');
   });

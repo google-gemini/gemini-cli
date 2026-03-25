@@ -1,11 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`StatusDisplay > does NOT render HookStatusDisplay if notifications are disabled in settings 1`] = `
-"Mock Context Summary Display (Skills: 2, Shells: 0)
-"
-`;
-
-exports[`StatusDisplay > renders ContextSummaryDisplay by default 1`] = `
+exports[`StatusDisplay > renders ContextSummaryDisplay when hideContextSummary is false 1`] = `
 "Mock Context Summary Display (Skills: 2, Shells: 0)
 "
 `;

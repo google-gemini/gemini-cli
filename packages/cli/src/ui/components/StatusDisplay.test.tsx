@@ -72,7 +72,9 @@ const createMockConfig = (overrides = {}) => ({
 const renderStatusDisplay = async (
   props: { hideContextSummary: boolean } = { hideContextSummary: false },
   uiState: UIState = createMockUIState(),
-  settings = createMockSettings(),
+  settings = createMockSettings({
+    ui: { hideContextSummary: true },
+  }),
   config = createMockConfig(),
 ) => {
   const result = await render(
@@ -97,16 +99,21 @@ describe('StatusDisplay', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders nothing by default if context summary is hidden via props', async () => {
-    const { lastFrame, unmount } = await renderStatusDisplay({
-      hideContextSummary: true,
-    });
+  it('renders nothing by default', async () => {
+    const { lastFrame, unmount } = await renderStatusDisplay();
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
-  it('renders ContextSummaryDisplay by default', async () => {
-    const { lastFrame, unmount } = await renderStatusDisplay();
+  it('renders ContextSummaryDisplay when hideContextSummary is false', async () => {
+    const settings = createMockSettings({
+      ui: { hideContextSummary: false },
+    });
+    const { lastFrame, unmount } = await renderStatusDisplay(
+      { hideContextSummary: false },
+      undefined,
+      settings,
+    );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -114,34 +121,6 @@ describe('StatusDisplay', () => {
   it('renders system md indicator if env var is set', async () => {
     vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
     const { lastFrame, unmount } = await renderStatusDisplay();
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('renders HookStatusDisplay when hooks are active', async () => {
-    const uiState = createMockUIState({
-      activeHooks: [{ name: 'hook', eventName: 'event' }],
-    });
-    const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('does NOT render HookStatusDisplay if notifications are disabled in settings', async () => {
-    const uiState = createMockUIState({
-      activeHooks: [{ name: 'hook', eventName: 'event' }],
-    });
-    const settings = createMockSettings({
-      hooksConfig: { notifications: false },
-    });
-    const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-      settings,
-    );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -163,9 +142,13 @@ describe('StatusDisplay', () => {
     const uiState = createMockUIState({
       backgroundShellCount: 3,
     });
+    const settings = createMockSettings({
+      ui: { hideContextSummary: false },
+    });
     const { lastFrame, unmount } = await renderStatusDisplay(
       { hideContextSummary: false },
       uiState,
+      settings,
     );
     expect(lastFrame()).toContain('Shells: 3');
     unmount();

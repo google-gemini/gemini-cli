@@ -38,22 +38,20 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
+  type CompressionStatus,
   Kind,
-  ACTIVATE_SKILL_TOOL_NAME,
-} from '@google/gemini-cli-core';
-import type {
-  Config,
-  EditorType,
-  GeminiClient,
-  ServerGeminiChatCompressedEvent,
-  ServerGeminiContentEvent as ContentEvent,
-  ServerGeminiFinishedEvent,
-  ServerGeminiStreamEvent as GeminiEvent,
-  ThoughtSummary,
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  GeminiErrorEventValue,
-  RetryAttemptPayload,
+  type Config,
+  type EditorType,
+  type GeminiClient,
+  type ServerGeminiChatCompressedEvent,
+  type ServerGeminiContentEvent as ContentEvent,
+  type ServerGeminiFinishedEvent,
+  type ServerGeminiStreamEvent as GeminiEvent,
+  type ThoughtSummary,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type GeminiErrorEventValue,
+  type RetryAttemptPayload,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -61,7 +59,6 @@ import type {
   HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
-  HistoryItemInfo,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
@@ -257,6 +254,8 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const handleCompletedToolsRef =
+    useRef<(completedTools: TrackedToolCall[]) => Promise<void>>(undefined);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -302,22 +301,23 @@ export const useGeminiStream = (
             }),
           );
         }
-
         // Clear the live-updating display now that the final state is in history.
         setToolCallsForDisplay([]);
 
         // Record tool calls with full metadata before sending responses.
         try {
           const currentModel =
-            config.getGeminiClient().getCurrentSequenceModel() ??
-            config.getModel();
-          config
-            .getGeminiClient()
-            .getChat()
-            .recordCompletedToolCalls(
-              currentModel,
-              completedToolCallsFromScheduler,
-            );
+            (typeof geminiClient.getCurrentSequenceModel === 'function'
+              ? geminiClient.getCurrentSequenceModel()
+              : undefined) ?? config.getModel();
+          const chat =
+            typeof geminiClient.getChat === 'function'
+              ? geminiClient.getChat()
+              : undefined;
+          chat?.recordCompletedToolCalls(
+            currentModel,
+            completedToolCallsFromScheduler,
+          );
 
           await recordToolCallInteractions(
             config,
@@ -330,7 +330,7 @@ export const useGeminiStream = (
         }
 
         // Handle tool response submission immediately when tools complete
-        await handleCompletedTools(
+        await handleCompletedToolsRef.current?.(
           completedToolCallsFromScheduler as TrackedToolCall[],
         );
       }
@@ -549,9 +549,11 @@ export const useGeminiStream = (
       if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
         return false;
       }
-      // ToolGroupMessage now shows all non-canceled tools, so they are visible
-      // in pending and we need to draw the closing border for them.
-      return true;
+      return (
+        tc.status !== 'scheduled' &&
+        tc.status !== 'validating' &&
+        tc.status !== 'awaiting_approval'
+      );
     });
 
     if (
@@ -1145,21 +1147,43 @@ export const useGeminiStream = (
       }
 
       const limit = tokenLimit(config.getModel());
-      const originalPercentage = Math.round(
-        ((eventValue?.originalTokenCount ?? 0) / limit) * 100,
-      );
-      const newPercentage = Math.round(
-        ((eventValue?.newTokenCount ?? 0) / limit) * 100,
-      );
+      const beforePercentage =
+        eventValue?.originalTokenCount != null
+          ? Math.round((eventValue.originalTokenCount / limit) * 100)
+          : null;
+      const afterPercentage =
+        eventValue?.newTokenCount != null
+          ? Math.round((eventValue.newTokenCount / limit) * 100)
+          : null;
+
+      const threshold = config.getContextWindowCompressionThreshold();
+      const isLargePrompt =
+        eventValue?.requestTokenCount != null &&
+        eventValue.requestTokenCount / limit > threshold;
+
+      if (!config.getShowContextCompression() && !isLargePrompt) {
+        return;
+      }
 
       addItem(
         {
-          type: MessageType.INFO,
-          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%.`,
-          secondaryText: `Change threshold in /settings.`,
-          color: theme.status.warning,
-          marginBottom: 1,
-        } as HistoryItemInfo,
+          type: 'compression',
+          compression: {
+            isPending: false,
+            beforePercentage,
+            afterPercentage,
+            /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+            compressionStatus: eventValue
+              ? (Number(
+                  eventValue.compressionStatus,
+                ) as unknown as CompressionStatus)
+              : null,
+            /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+            isManual: false,
+            thresholdPercentage: Math.round(threshold * 100),
+          },
+          timestamp: new Date(userMessageTimestamp),
+        } as HistoryItemWithoutId,
         userMessageTimestamp,
       );
     },
@@ -1181,17 +1205,16 @@ export const useGeminiStream = (
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
       onCancelSubmit(true);
 
-      const limit = tokenLimit(config.getModel());
-
-      const isMoreThan25PercentUsed =
-        limit > 0 && remainingTokenCount < limit * 0.75;
-
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
-
-      if (isMoreThan25PercentUsed) {
-        text +=
-          ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
+      if (!config.getShowContextWindowWarning()) {
+        return;
       }
+
+      const limit = tokenLimit(config.getModel());
+      const usedPercentage = Math.round(
+        ((limit - remainingTokenCount) / limit) * 100,
+      );
+
+      const text = `Context ${usedPercentage}% full. Message may exceed window. Reduce size or /compress.`;
 
       addItem({
         type: 'info',
@@ -1538,8 +1561,7 @@ export const useGeminiStream = (
                     setLoopDetectionConfirmationRequest(null);
 
                     if (result.userSelection === 'disable') {
-                      config
-                        .getGeminiClient()
+                      geminiClient
                         .getLoopDetectionService()
                         .disableForSession();
                       addItem({
@@ -1657,7 +1679,7 @@ export const useGeminiStream = (
       ) {
         let awaitingApprovalCalls = toolCalls.filter(
           (call): call is TrackedWaitingToolCall =>
-            call.status === 'awaiting_approval' && !call.request.forcedAsk,
+            call.status === 'awaiting_approval',
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
@@ -1715,42 +1737,24 @@ export const useGeminiStream = (
           },
         );
 
+      // Check if all tools in the batch are in a terminal state
+      const allTerminal = completedToolCallsFromScheduler.every(
+        (tc) =>
+          tc.status === 'success' ||
+          tc.status === 'error' ||
+          tc.status === 'cancelled',
+      );
+
+      if (!allTerminal) {
+        return;
+      }
+
       // Finalize any client-initiated tools as soon as they are done.
       const clientTools = completedAndReadyToSubmitTools.filter(
         (t) => t.request.isClientInitiated,
       );
       if (clientTools.length > 0) {
         markToolsAsSubmitted(clientTools.map((t) => t.request.callId));
-
-        if (geminiClient) {
-          for (const tool of clientTools) {
-            // Only manually record skill activations in the chat history.
-            // Other client-initiated tools (like save_memory) update the system
-            // prompt/context and don't strictly need to be in the history.
-            if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
-              continue;
-            }
-
-            // Add both the call (model turn) and the result (user turn) to history.
-            // Client-initiated calls are essentially "synthetic" turns that let
-            // subsequent model calls understand what just happened in the UI.
-            await geminiClient.addHistory({
-              role: 'model',
-              parts: [
-                {
-                  functionCall: {
-                    name: tool.request.name,
-                    args: tool.request.args,
-                  },
-                },
-              ],
-            });
-            await geminiClient.addHistory({
-              role: 'user',
-              parts: tool.response.responseParts,
-            });
-          }
-        }
       }
 
       // Identify new, successful save_memory calls that we haven't processed yet.
@@ -1906,6 +1910,7 @@ export const useGeminiStream = (
       setIsResponding,
     ],
   );
+  handleCompletedToolsRef.current = handleCompletedTools;
 
   const pendingHistoryItems = useMemo(
     () =>

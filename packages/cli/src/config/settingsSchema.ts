@@ -575,9 +575,29 @@ const SETTINGS_SCHEMA = {
         label: 'Hide Context Summary',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Hide the context summary (GEMINI.md, MCP servers) above the input.',
+        showInDialog: true,
+      },
+      showContextWindowWarning: {
+        type: 'boolean',
+        label: 'Show Context Window Warning',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show a warning message when the context window limit is nearly reached. If disabled, the CLI will attempt to automatically compress the history when the limit is reached.',
+        showInDialog: true,
+      },
+      showContextCompression: {
+        type: 'boolean',
+        label: 'Show Context Compression Messages',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show a message in the chat history when it is compressed.',
         showInDialog: true,
       },
       footer: {

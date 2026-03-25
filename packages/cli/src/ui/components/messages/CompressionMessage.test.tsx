@@ -11,17 +11,22 @@ import {
 } from './CompressionMessage.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
 import { type CompressionProps } from '../../types.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 describe('<CompressionMessage />', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const createCompressionProps = (
     overrides: Partial<CompressionProps> = {},
   ): CompressionDisplayProps => ({
     compression: {
       isPending: false,
-      originalTokenCount: null,
-      newTokenCount: null,
+      beforePercentage: null,
+      afterPercentage: null,
       compressionStatus: CompressionStatus.COMPRESSED,
+      isManual: true,
       ...overrides,
     },
   });
@@ -29,9 +34,10 @@ describe('<CompressionMessage />', () => {
   describe('pending state', () => {
     it('renders pending message when compression is in progress', async () => {
       const props = createCompressionProps({ isPending: true });
-      const { lastFrame, unmount } = await renderWithProviders(
+      const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
+      await waitUntilReady();
       const output = lastFrame();
 
       expect(output).toContain('Compressing chat history');
@@ -43,56 +49,28 @@ describe('<CompressionMessage />', () => {
     it('renders success message when tokens are reduced', async () => {
       const props = createCompressionProps({
         isPending: false,
-        originalTokenCount: 100,
-        newTokenCount: 50,
+        beforePercentage: 22,
+        afterPercentage: 6,
         compressionStatus: CompressionStatus.COMPRESSED,
+        thresholdPercentage: 50,
       });
       const { lastFrame, unmount } = await renderWithProviders(
         <CompressionMessage {...props} />,
       );
       const output = lastFrame();
 
-      expect(output).toContain('✦');
+      expect(output).not.toContain('✦');
       expect(output).toContain(
-        'Chat history compressed from 100 to 50 tokens.',
+        'Context compressed (22% → 6%). Adjust threshold (50%) in /settings.',
       );
       unmount();
     });
-
-    it.each([
-      { original: 50000, newTokens: 25000 }, // Large compression
-      { original: 700000, newTokens: 350000 }, // Very large compression
-    ])(
-      'renders success message for large successful compression (from $original to $newTokens)',
-      async ({ original, newTokens }) => {
-        const props = createCompressionProps({
-          isPending: false,
-          originalTokenCount: original,
-          newTokenCount: newTokens,
-          compressionStatus: CompressionStatus.COMPRESSED,
-        });
-        const { lastFrame, unmount } = await renderWithProviders(
-          <CompressionMessage {...props} />,
-        );
-        const output = lastFrame();
-
-        expect(output).toContain('✦');
-        expect(output).toContain(
-          `compressed from ${original} to ${newTokens} tokens`,
-        );
-        expect(output).not.toContain('Skipping compression');
-        expect(output).not.toContain('did not reduce size');
-        unmount();
-      },
-    );
   });
 
   describe('skipped compression (tokens increased or same)', () => {
     it('renders skip message when compression would increase token count', async () => {
       const props = createCompressionProps({
         isPending: false,
-        originalTokenCount: 50,
-        newTokenCount: 75,
         compressionStatus:
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
@@ -101,121 +79,12 @@ describe('<CompressionMessage />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('✦');
+      expect(output).not.toContain('✦');
       expect(output).toContain(
         'Compression was not beneficial for this history size.',
       );
       unmount();
     });
-
-    it('renders skip message when token counts are equal', async () => {
-      const props = createCompressionProps({
-        isPending: false,
-        originalTokenCount: 50,
-        newTokenCount: 50,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
-      });
-      const { lastFrame, unmount } = await renderWithProviders(
-        <CompressionMessage {...props} />,
-      );
-      const output = lastFrame();
-
-      expect(output).toContain(
-        'Compression was not beneficial for this history size.',
-      );
-      unmount();
-    });
-  });
-
-  describe('message content validation', () => {
-    it.each([
-      {
-        original: 200,
-        newTokens: 80,
-        expected: 'compressed from 200 to 80 tokens',
-      },
-      {
-        original: 500,
-        newTokens: 150,
-        expected: 'compressed from 500 to 150 tokens',
-      },
-      {
-        original: 1500,
-        newTokens: 400,
-        expected: 'compressed from 1500 to 400 tokens',
-      },
-    ])(
-      'displays correct compression statistics (from $original to $newTokens)',
-      async ({ original, newTokens, expected }) => {
-        const props = createCompressionProps({
-          isPending: false,
-          originalTokenCount: original,
-          newTokenCount: newTokens,
-          compressionStatus: CompressionStatus.COMPRESSED,
-        });
-        const { lastFrame, unmount } = await renderWithProviders(
-          <CompressionMessage {...props} />,
-        );
-        const output = lastFrame();
-
-        expect(output).toContain(expected);
-        unmount();
-      },
-    );
-
-    it.each([
-      { original: 50, newTokens: 60 }, // Increased
-      { original: 100, newTokens: 100 }, // Same
-      { original: 49999, newTokens: 50000 }, // Just under 50k threshold
-    ])(
-      'shows skip message for small histories when new tokens >= original tokens ($original -> $newTokens)',
-      async ({ original, newTokens }) => {
-        const props = createCompressionProps({
-          isPending: false,
-          originalTokenCount: original,
-          newTokenCount: newTokens,
-          compressionStatus:
-            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
-        });
-        const { lastFrame, unmount } = await renderWithProviders(
-          <CompressionMessage {...props} />,
-        );
-        const output = lastFrame();
-
-        expect(output).toContain(
-          'Compression was not beneficial for this history size.',
-        );
-        expect(output).not.toContain('compressed from');
-        unmount();
-      },
-    );
-
-    it.each([
-      { original: 50000, newTokens: 50100 }, // At 50k threshold
-      { original: 700000, newTokens: 710000 }, // Large history case
-      { original: 100000, newTokens: 100000 }, // Large history, same count
-    ])(
-      'shows compression failure message for large histories when new tokens >= original tokens ($original -> $newTokens)',
-      async ({ original, newTokens }) => {
-        const props = createCompressionProps({
-          isPending: false,
-          originalTokenCount: original,
-          newTokenCount: newTokens,
-          compressionStatus:
-            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
-        });
-        const { lastFrame, unmount } = await renderWithProviders(
-          <CompressionMessage {...props} />,
-        );
-        const output = lastFrame();
-
-        expect(output).toContain('compression did not reduce size');
-        expect(output).not.toContain('compressed from');
-        expect(output).not.toContain('Compression was not beneficial');
-        unmount();
-      },
-    );
   });
 
   describe('failure states', () => {
@@ -229,9 +98,9 @@ describe('<CompressionMessage />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('✦');
+      expect(output).not.toContain('✦');
       expect(output).toContain(
-        'Chat history compression failed: the model returned an empty summary.',
+        'Chat history compression failed: empty summary.',
       );
       unmount();
     });

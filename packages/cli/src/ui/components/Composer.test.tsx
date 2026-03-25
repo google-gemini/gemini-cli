@@ -17,11 +17,7 @@ import {
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import {
-  ApprovalMode,
-  tokenLimit,
-  CoreToolCallStatus,
-} from '@google/gemini-cli-core';
+import { ApprovalMode, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
@@ -732,37 +728,6 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('Press Esc again to rewind.');
       expect(output).not.toContain('ContextSummaryDisplay');
-    });
-
-    it('shows context usage bleed-through when over 60%', async () => {
-      const model = 'gemini-2.5-pro';
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        currentModel: model,
-        sessionStats: {
-          sessionId: 'test-session',
-          sessionStartTime: new Date(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          metrics: {} as any,
-          lastPromptTokenCount: Math.floor(tokenLimit(model) * 0.7),
-          promptCount: 0,
-        },
-      });
-      const settings = createMockSettings({
-        ui: {
-          footer: { hideContextPercentage: false },
-        },
-      });
-
-      const { lastFrame } = await renderComposer(uiState, settings);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
-      // StatusDisplay (which contains ContextUsageDisplay) should bleed through in minimal mode
-      expect(lastFrame()).toContain('StatusDisplay');
-      expect(lastFrame()).toContain('70% used');
     });
   });
 
