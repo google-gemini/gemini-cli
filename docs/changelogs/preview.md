@@ -376,4 +376,3 @@ npm install -g @google/gemini-cli@preview
 
 **Full Changelog**:
 https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.0
-file_path: docs/changelogs/preview.md
