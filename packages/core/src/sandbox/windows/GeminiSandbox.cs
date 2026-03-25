@@ -121,6 +121,9 @@ public class GeminiSandbox {
     [DllImport("advapi32.dll", SetLastError = true)]
     static extern bool RevertToSelf();
 
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern uint GetLongPathName(string lpszShortPath, [Out] StringBuilder lpszLongPath, uint cchBuffer);
+
     static int Main(string[] args) {
         if (args.Length < 3) {
             Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
@@ -139,7 +142,7 @@ public class GeminiSandbox {
                 if (File.Exists(manifestPath)) {
                     foreach (string line in File.ReadAllLines(manifestPath)) {
                         if (!string.IsNullOrWhiteSpace(line)) {
-                            forbiddenPaths.Add(Path.GetFullPath(line.Trim()));
+                            forbiddenPaths.Add(GetNormalizedPath(line.Trim()));
                         }
                     }
                 }
@@ -280,8 +283,18 @@ public class GeminiSandbox {
         }
     }
 
-    private static void CheckForbidden(string path, HashSet<string> forbiddenPaths) {
+    private static string GetNormalizedPath(string path) {
         string fullPath = Path.GetFullPath(path);
+        StringBuilder longPath = new StringBuilder(1024);
+        uint result = GetLongPathName(fullPath, longPath, (uint)longPath.Capacity);
+        if (result > 0 && result < longPath.Capacity) {
+            return longPath.ToString();
+        }
+        return fullPath;
+    }
+
+    private static void CheckForbidden(string path, HashSet<string> forbiddenPaths) {
+        string fullPath = GetNormalizedPath(path);
         foreach (string forbidden in forbiddenPaths) {
             if (fullPath.Equals(forbidden, StringComparison.OrdinalIgnoreCase) || fullPath.StartsWith(forbidden + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) {
                 throw new UnauthorizedAccessException("Access to forbidden path is denied: " + path);
