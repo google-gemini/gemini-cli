@@ -5,6 +5,14 @@
  */
 
 import { describe, expect } from 'vitest';
+import {
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  LS_TOOL_NAME,
+} from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 
 describe('Tool Selection', () => {
@@ -37,7 +45,7 @@ describe('Tool Selection', () => {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const grepCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'grep_search',
+        (log) => log.toolRequest.name === GREP_TOOL_NAME,
       );
       expect(
         grepCalls.length,
@@ -46,7 +54,7 @@ describe('Tool Selection', () => {
 
       // Agent should not fall back to reading every file individually
       const readCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'read_file',
+        (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
       );
       expect(
         readCalls.length,
@@ -82,14 +90,14 @@ describe('Tool Selection', () => {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'run_shell_command',
+        (log) => log.toolRequest.name === SHELL_TOOL_NAME,
       );
       // Agent should use shell (wc, find, cloc) rather than reading every file
       expect(shellCalls.length).toBeGreaterThanOrEqual(1);
 
       // Agent should not read files individually to count lines
       const readCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'read_file',
+        (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
       );
       expect(
         readCalls.length,
@@ -120,7 +128,7 @@ describe('Tool Selection', () => {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'run_shell_command',
+        (log) => log.toolRequest.name === SHELL_TOOL_NAME,
       );
       expect(
         shellCalls.length,
@@ -163,7 +171,7 @@ describe('Tool Selection', () => {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'run_shell_command',
+        (log) => log.toolRequest.name === SHELL_TOOL_NAME,
       );
 
       const gitLogCall = shellCalls.find((call) => {
@@ -232,8 +240,8 @@ describe('Tool Selection', () => {
       const toolLogs = rig.readToolLogs();
       const editCalls = toolLogs.filter(
         (log) =>
-          log.toolRequest.name === 'write_file' ||
-          log.toolRequest.name === 'replace',
+          log.toolRequest.name === WRITE_FILE_TOOL_NAME ||
+          log.toolRequest.name === EDIT_TOOL_NAME,
       );
       expect(
         editCalls.length,
