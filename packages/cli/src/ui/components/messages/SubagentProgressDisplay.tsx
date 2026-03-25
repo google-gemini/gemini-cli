@@ -8,18 +8,21 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import Spinner from 'ink-spinner';
+import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import type {
   SubagentProgress,
   SubagentActivityItem,
 } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
 import { STATUS_INDICATOR_WIDTH } from './ToolShared.js';
+import { safeJsonToMarkdown } from '@google/gemini-cli-core';
 
 export interface SubagentProgressDisplayProps {
   progress: SubagentProgress;
+  terminalWidth: number;
 }
 
-const formatToolArgs = (args?: string): string => {
+export const formatToolArgs = (args?: string): string => {
   if (!args) return '';
   try {
     const parsed: unknown = JSON.parse(args);
@@ -54,7 +57,7 @@ const formatToolArgs = (args?: string): string => {
 
 export const SubagentProgressDisplay: React.FC<
   SubagentProgressDisplayProps
-> = ({ progress }) => {
+> = ({ progress, terminalWidth }) => {
   let headerText: string | undefined;
   let headerColor = theme.text.secondary;
 
@@ -67,6 +70,9 @@ export const SubagentProgressDisplay: React.FC<
   } else if (progress.state === 'completed') {
     headerText = `Subagent ${progress.agentName} completed.`;
     headerColor = theme.status.success;
+  } else {
+    headerText = `Running subagent ${progress.agentName}...`;
+    headerColor = theme.text.primary;
   }
 
   return (
@@ -146,6 +152,23 @@ export const SubagentProgressDisplay: React.FC<
           return null;
         })}
       </Box>
+
+      {progress.result && (
+        <Box flexDirection="column" marginTop={1}>
+          {progress.terminateReason && progress.terminateReason !== 'GOAL' && (
+            <Box marginBottom={1}>
+              <Text color={theme.status.warning} bold>
+                Agent Finished Early ({progress.terminateReason})
+              </Text>
+            </Box>
+          )}
+          <MarkdownDisplay
+            text={safeJsonToMarkdown(progress.result)}
+            isPending={progress.state !== 'completed'}
+            terminalWidth={terminalWidth}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

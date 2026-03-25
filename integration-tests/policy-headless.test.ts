@@ -185,9 +185,15 @@ describe('Policy Engine Headless Mode', () => {
       policyContent: `
         [[rule]]
         toolName = "run_shell_command"
+        commandPrefix = "echo"
+        decision = "deny"
+        priority = 100
+
+        [[rule]]
+        toolName = "run_shell_command"
         commandPrefix = "node"
         decision = "allow"
-        priority = 100
+        priority = 90
       `,
       expectAllowed: false,
       expectedDenialString: 'Tool execution denied by policy',

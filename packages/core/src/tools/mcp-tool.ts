@@ -80,11 +80,11 @@ export function formatMcpToolName(
   serverName: string,
   toolName?: string,
 ): string {
-  if (serverName === '*' && !toolName) {
+  if (serverName === '*' && (toolName === undefined || toolName === '*')) {
     return `${MCP_TOOL_PREFIX}*`;
   } else if (serverName === '*') {
     return `${MCP_TOOL_PREFIX}*_${toolName}`;
-  } else if (!toolName) {
+  } else if (toolName === undefined || toolName === '*') {
     return `${MCP_TOOL_PREFIX}${serverName}_*`;
   } else {
     return `${MCP_TOOL_PREFIX}${serverName}_${toolName}`;
@@ -105,12 +105,13 @@ export interface McpToolAnnotation extends Record<string, unknown> {
 export function isMcpToolAnnotation(
   annotation: unknown,
 ): annotation is McpToolAnnotation {
-  return (
-    typeof annotation === 'object' &&
-    annotation !== null &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, no-restricted-syntax
-    typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
-  );
+  if (typeof annotation !== 'object' || annotation === null) {
+    return false;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const record = annotation as Record<string, unknown>;
+  const serverName = record['_serverName'];
+  return typeof serverName === 'string';
 }
 
 type ToolParams = Record<string, unknown>;
@@ -330,6 +331,35 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     return safeJsonStringify(this.params);
+  }
+
+  override getDisplayTitle(): string {
+    // If it's a known terminal execute tool provided by JetBrains or similar,
+    // and a command argument is present, return just the command.
+    const command = this.params['command'];
+    if (typeof command === 'string') {
+      return command;
+    }
+
+    // Otherwise fallback to the display name or server tool name
+    return this.displayName || this.serverToolName;
+  }
+
+  override getExplanation(): string {
+    const MAX_EXPLANATION_LENGTH = 500;
+    const stringified = safeJsonStringify(this.params);
+    if (stringified.length > MAX_EXPLANATION_LENGTH) {
+      const keys = Object.keys(this.params);
+      const displayedKeys = keys.slice(0, 5);
+      const keysDesc =
+        displayedKeys.length > 0
+          ? ` with parameters: ${displayedKeys.join(', ')}${
+              keys.length > 5 ? ', ...' : ''
+            }`
+          : '';
+      return `[Payload omitted due to length${keysDesc}]`;
+    }
+    return stringified;
   }
 }
 
