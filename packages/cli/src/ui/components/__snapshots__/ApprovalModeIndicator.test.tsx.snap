@@ -1,31 +1,31 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ApprovalModeIndicator > renders correctly for AUTO_EDIT mode 1`] = `
-"auto-accept edits Shift+Tab to manual
+"auto-accept
 "
 `;
 
 exports[`ApprovalModeIndicator > renders correctly for AUTO_EDIT mode with plan enabled 1`] = `
-"auto-accept edits Shift+Tab to plan
+"auto-accept
 "
 `;
 
 exports[`ApprovalModeIndicator > renders correctly for DEFAULT mode 1`] = `
-"Shift+Tab to accept edits
+"manual
 "
 `;
 
 exports[`ApprovalModeIndicator > renders correctly for DEFAULT mode with plan enabled 1`] = `
-"Shift+Tab to accept edits
+"manual
 "
 `;
 
 exports[`ApprovalModeIndicator > renders correctly for PLAN mode 1`] = `
-"plan Shift+Tab to manual
+"plan
 "
 `;
 
 exports[`ApprovalModeIndicator > renders correctly for YOLO mode 1`] = `
-"YOLO Ctrl+Y
+"YOLO
 "
 `;

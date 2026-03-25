@@ -14,6 +14,7 @@ import {
   checkExhaustive,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
+import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import process from 'node:process';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
@@ -261,6 +262,19 @@ export const Footer: React.FC = () => {
     const header = itemConfig?.header ?? id;
 
     switch (id) {
+      case 'approval-mode': {
+        addCol(
+          id,
+          header,
+          () => (
+            <ApprovalModeIndicator
+              approvalMode={uiState.showApprovalModeIndicator}
+            />
+          ),
+          11, // 'auto-accept' is 11 chars
+        );
+        break;
+      }
       case 'workspace': {
         const fullPath = tildeifyPath(targetDir);
         const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';

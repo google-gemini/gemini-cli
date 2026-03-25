@@ -8,6 +8,11 @@ import type { MergedSettings } from './settings.js';
 
 export const ALL_ITEMS = [
   {
+    id: 'approval-mode',
+    header: 'mode (Shift+Tab)',
+    description: 'Current approval mode',
+  },
+  {
     id: 'workspace',
     header: 'workspace (/directory)',
     description: 'Current working directory',
@@ -62,6 +67,7 @@ export const ALL_ITEMS = [
 export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
 
 export const DEFAULT_ORDER = [
+  'approval-mode',
   'workspace',
   'git-branch',
   'sandbox',
@@ -78,6 +84,7 @@ export function deriveItemsFromLegacySettings(
   settings: MergedSettings,
 ): string[] {
   const defaults = [
+    'approval-mode',
     'workspace',
     'git-branch',
     'sandbox',

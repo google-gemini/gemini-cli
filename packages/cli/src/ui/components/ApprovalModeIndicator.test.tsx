@@ -19,10 +19,7 @@ describe('ApprovalModeIndicator', () => {
 
   it('renders correctly for AUTO_EDIT mode with plan enabled', async () => {
     const { lastFrame } = await render(
-      <ApprovalModeIndicator
-        approvalMode={ApprovalMode.AUTO_EDIT}
-        allowPlanMode={true}
-      />,
+      <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
@@ -50,10 +47,7 @@ describe('ApprovalModeIndicator', () => {
 
   it('renders correctly for DEFAULT mode with plan enabled', async () => {
     const { lastFrame } = await render(
-      <ApprovalModeIndicator
-        approvalMode={ApprovalMode.DEFAULT}
-        allowPlanMode={true}
-      />,
+      <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
     expect(lastFrame()).toMatchSnapshot();
   });

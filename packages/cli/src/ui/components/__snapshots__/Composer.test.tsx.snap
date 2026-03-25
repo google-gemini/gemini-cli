@@ -3,7 +3,7 @@
 exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
 "                                                                                       ShortcutsHint
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- ApprovalModeIndicator                                                                 StatusDisplay
+                                                                                       StatusDisplay
 InputPrompt:   Type your message or @path/to/file
 Footer
 "
@@ -25,7 +25,6 @@ exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
 "
 ShortcutsHint
 ────────────────────────────────────────
- ApprovalModeIndicator
 
 StatusDisplay
 InputPrompt:   Type your message or
@@ -35,9 +34,9 @@ Footer
 `;
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
-" LoadingIndicator: Thinking
+"
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- ApprovalModeIndicator
+ LoadingIndicator: Thinking
 InputPrompt:   Type your message or @path/to/file
 Footer
 "

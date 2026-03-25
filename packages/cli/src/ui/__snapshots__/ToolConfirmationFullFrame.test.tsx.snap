@@ -37,8 +37,8 @@ exports[`Full Terminal Tool Confirmation Snapshot > renders tool confirmation bo
 
  Initializing...
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- Shift+Tab to accept edits                                                 undefined undefined file
- workspace (/directory)                sandbox                   /model                     context
- /directory                            no sandbox                gemini-pro                17% used
+                                                                           undefined undefined file
+ mode (Shift+Tab)        workspace (/directory)        sandbox           /model             context
+ manual                  /directory                    no sandbox        gemini-pro        17% used
 "
 `;

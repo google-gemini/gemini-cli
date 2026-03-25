@@ -15,6 +15,7 @@ describe('deriveItemsFromLegacySettings', () => {
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
     expect(items).toEqual([
+      'approval-mode',
       'workspace',
       'git-branch',
       'sandbox',
@@ -82,6 +83,7 @@ describe('deriveItemsFromLegacySettings', () => {
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
     expect(items).toEqual([
+      'approval-mode',
       'git-branch',
       'sandbox',
       'context-used',

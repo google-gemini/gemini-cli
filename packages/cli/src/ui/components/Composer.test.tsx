@@ -80,10 +80,6 @@ vi.mock('./HookStatusDisplay.js', () => ({
   HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
 }));
 
-vi.mock('./ApprovalModeIndicator.js', () => ({
-  ApprovalModeIndicator: () => <Text>ApprovalModeIndicator</Text>,
-}));
-
 vi.mock('./ShellModeIndicator.js', () => ({
   ShellModeIndicator: () => <Text>ShellModeIndicator</Text>,
 }));
@@ -471,7 +467,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator');
     });
 
-    it('renders both LoadingIndicator and ApprovalModeIndicator when streaming in full UI mode', async () => {
+    it('renders LoadingIndicator when streaming in full UI mode', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: {
@@ -485,7 +481,6 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator: Thinking');
-      expect(output).toContain('ApprovalModeIndicator');
     });
 
     it('does NOT render LoadingIndicator when embedded shell is focused and background shell is NOT visible', async () => {
@@ -535,7 +530,7 @@ describe('Composer', () => {
   });
 
   describe('Context and Status Display', () => {
-    it('shows StatusDisplay and ApprovalModeIndicator in normal state', async () => {
+    it('shows StatusDisplay in normal state', async () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: false,
         ctrlDPressedOnce: false,
@@ -546,11 +541,10 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('StatusDisplay');
-      expect(output).toContain('ApprovalModeIndicator');
       expect(output).not.toContain('ToastDisplay');
     });
 
-    it('shows ToastDisplay and hides ApprovalModeIndicator when a toast is present', async () => {
+    it('shows ToastDisplay when a toast is present', async () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
       });
@@ -559,7 +553,6 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('ToastDisplay');
-      expect(output).not.toContain('ApprovalModeIndicator');
       expect(output).toContain('StatusDisplay');
     });
 
@@ -575,7 +568,6 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('ToastDisplay');
-      expect(output).not.toContain('ApprovalModeIndicator');
     });
   });
 
@@ -591,7 +583,6 @@ describe('Composer', () => {
       expect(output).toContain('ShortcutsHint');
       expect(output).toContain('InputPrompt');
       expect(output).not.toContain('Footer');
-      expect(output).not.toContain('ApprovalModeIndicator');
       expect(output).not.toContain('ContextSummaryDisplay');
     });
 
@@ -614,25 +605,6 @@ describe('Composer', () => {
 
       expect(lastFrame()).not.toContain('InputPrompt');
     });
-
-    it.each([
-      [ApprovalMode.DEFAULT],
-      [ApprovalMode.AUTO_EDIT],
-      [ApprovalMode.PLAN],
-      [ApprovalMode.YOLO],
-    ])(
-      'shows ApprovalModeIndicator when approval mode is %s and shell mode is inactive',
-      async (mode) => {
-        const uiState = createMockUIState({
-          showApprovalModeIndicator: mode,
-          shellModeActive: false,
-        });
-
-        const { lastFrame } = await renderComposer(uiState);
-
-        expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
-      },
-    );
 
     it('shows ShellModeIndicator when shell mode is active', async () => {
       const uiState = createMockUIState({
@@ -662,55 +634,6 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('raw markdown mode');
-    });
-
-    it.each([
-      [ApprovalMode.YOLO, 'YOLO'],
-      [ApprovalMode.PLAN, 'plan'],
-      [ApprovalMode.AUTO_EDIT, 'auto edit'],
-    ])(
-      'shows minimal mode badge "%s" when clean UI details are hidden',
-      async (mode, label) => {
-        const uiState = createMockUIState({
-          cleanUiDetailsVisible: false,
-          showApprovalModeIndicator: mode,
-        });
-
-        const { lastFrame } = await renderComposer(uiState);
-        expect(lastFrame()).toContain(label);
-      },
-    );
-
-    it('hides minimal mode badge while loading in clean mode', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        streamingState: StreamingState.Responding,
-        elapsedTime: 1,
-        showApprovalModeIndicator: ApprovalMode.PLAN,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('plan');
-      expect(output).not.toContain('ShortcutsHint');
-    });
-
-    it('hides minimal mode badge while action-required state is active', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        showApprovalModeIndicator: ApprovalMode.PLAN,
-        customDialog: (
-          <Box>
-            <Text>Prompt</Text>
-          </Box>
-        ),
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).not.toContain('plan');
-      expect(output).not.toContain('ShortcutsHint');
     });
 
     it('shows Esc rewind prompt in minimal mode without showing full UI', async () => {
@@ -939,9 +862,7 @@ describe('Composer', () => {
         showApprovalModeIndicator: ApprovalMode.YOLO,
       });
 
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).not.toContain('ApprovalModeIndicator');
+      await renderComposer(uiState);
     });
 
     it('keeps shortcuts hint when suggestions are visible below input in regular buffer', async () => {
