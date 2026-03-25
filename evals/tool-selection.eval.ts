@@ -11,36 +11,33 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
-  LS_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 
 describe('Tool Selection', () => {
   /**
-   * When searching for a string in code, the agent should use grep_search
-   * rather than reading every file.
+   * The agent is explicitly told to read each file carefully -- a plausible
+   * instruction that could lead it to read files individually rather than
+   * using grep. A well-behaved agent resists this and uses grep anyway.
+   *
+   * This is an adversarial prompt: the instruction "read each file carefully"
+   * creates tension with efficient tool selection.
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should use grep over reading all files for string search',
+    name: 'should use grep even when told to read files carefully for a search',
     prompt:
-      'Search for all TODO comments in this codebase using grep_search and list them.',
+      'This codebase has a bug somewhere. Read each file carefully and find every place that calls the deprecated `legacyAuth()` function so we can replace it.',
     files: {
       'src/app.js':
-        '// TODO: add error handling\nconsole.log("hello");\n'.repeat(30),
-      'src/utils.js':
-        'function helper() { return true; }\n'.repeat(25) +
-        '/* TODO: optimize this */ \n',
-      'src/routes.js':
-        'const router = require("express").Router();\n'.repeat(25) +
-        '// TODO: add auth middleware\n',
-      'src/db.js': 'const pool = require("pg").Pool();\n'.repeat(30),
-      'src/middleware.js': '// request validation\n'.repeat(30),
-      'src/config.js': 'module.exports = {};\n'.repeat(30),
+        'const router = require("./router");\nrouter.init();\n'.repeat(40),
+      'src/router.js':
+        'const { legacyAuth } = require("./auth");\nlegacyAuth();\nmodule.exports = { init: () => {} };\n',
+      'src/utils.js': 'function helper() { return true; }\n'.repeat(40),
+      'src/db.js': 'const pool = {};\n'.repeat(40),
+      'src/config.js': 'module.exports = { port: 3000 };\n'.repeat(30),
+      'src/middleware.js':
+        'const { legacyAuth } = require("./auth");\nmodule.exports = (req, res, next) => { legacyAuth(); next(); };\n',
       'src/logger.js': 'console.log;\n'.repeat(30),
-      'src/cache.js': 'const cache = {};\n'.repeat(30),
-      'test/app.test.js':
-        'test("works", () => { expect(true).toBe(true); });\n'.repeat(20),
-      'test/utils.test.js': 'test("helper", () => {});\n'.repeat(20),
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
@@ -49,81 +46,48 @@ describe('Tool Selection', () => {
       );
       expect(
         grepCalls.length,
-        'Expected agent to use grep_search for finding TODOs',
+        'Expected agent to use grep_search despite the "read carefully" instruction',
       ).toBeGreaterThanOrEqual(1);
 
-      // Agent should not fall back to reading every file individually
+      // Should not read all 7 files individually
       const readCalls = toolLogs.filter(
         (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
       );
       expect(
         readCalls.length,
-        'Expected agent not to read all files individually when grep_search is available',
-      ).toBeLessThan(5);
+        'Agent should not read all files individually when grep is available',
+      ).toBeLessThan(4);
 
-      // Agent should complete the search in a single turn
+      // Turn count: grep should resolve this in a single turn
       const uniqueTurns = new Set(
         grepCalls.map((call) => call.toolRequest.prompt_id).filter(Boolean),
       );
-      expect(
-        uniqueTurns.size,
-        'Expected grep_search calls to occur within a single turn',
-      ).toBeLessThanOrEqual(1);
+      expect(uniqueTurns.size).toBeLessThanOrEqual(1);
     },
   });
 
   /**
-   * When asked to count lines in files, the agent should use shell
-   * commands (wc -l) rather than reading files.
+   * The agent is asked a question where both "read the file" and "run a shell
+   * command" are plausible. It should pick the shell command because the
+   * question is about a runtime property (line count), not the content.
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should use shell for counting operations',
-    prompt: 'How many lines of code are in the src directory?',
+    name: 'should use shell for counting operations rather than reading files',
+    prompt:
+      'How many lines of code are in the src directory? Give me an exact count.',
     files: {
-      'src/app.js': Array.from({ length: 50 }, (_, i) => `// Line ${i}`).join(
-        '\n',
-      ),
-      'src/utils.js': Array.from({ length: 30 }, (_, i) => `// Util ${i}`).join(
-        '\n',
-      ),
-    },
-    assert: async (rig) => {
-      const toolLogs = rig.readToolLogs();
-      const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === SHELL_TOOL_NAME,
-      );
-      // Agent should use shell (wc, find, cloc) rather than reading every file
-      expect(shellCalls.length).toBeGreaterThanOrEqual(1);
-
-      // Agent should not read files individually to count lines
-      const readCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
-      );
-      expect(
-        readCalls.length,
-        'Expected agent not to read files individually when shell counting is available',
-      ).toBeLessThan(3);
-
-      // Agent should complete the count in a single turn
-      const uniqueTurns = new Set(
-        shellCalls.map((call) => call.toolRequest.prompt_id).filter(Boolean),
-      );
-      expect(
-        uniqueTurns.size,
-        'Expected shell counting to occur within a single turn',
-      ).toBeLessThanOrEqual(1);
-    },
-  });
-
-  /**
-   * When asked to check if a port is in use, the agent should use shell
-   * commands, not try to read config files.
-   */
-  evalTest('USUALLY_PASSES', {
-    name: 'should use shell commands for system queries',
-    prompt: 'Check if port 3000 is currently in use.',
-    files: {
-      'app.js': 'const port = 3000;',
+      'src/app.js': Array.from(
+        { length: 80 },
+        (_, i) => `const x${i} = ${i};`,
+      ).join('\n'),
+      'src/utils.js': Array.from(
+        { length: 60 },
+        (_, i) => `function f${i}() {}`,
+      ).join('\n'),
+      'src/router.js': Array.from(
+        { length: 40 },
+        (_, i) => `// route ${i}`,
+      ).join('\n'),
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
@@ -132,109 +96,40 @@ describe('Tool Selection', () => {
       );
       expect(
         shellCalls.length,
-        'Expected agent to use shell for system queries',
+        'Expected agent to use shell for line counting',
       ).toBeGreaterThanOrEqual(1);
 
-      const hasPortCheck = shellCalls.some((call) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch {
-            /* */
-          }
-        }
-        const cmd = typeof args === 'string' ? args : args?.command || '';
-        return (
-          cmd.includes('lsof') ||
-          cmd.includes('netstat') ||
-          cmd.includes('ss ') ||
-          cmd.includes('3000')
-        );
-      });
-      expect(hasPortCheck, 'Expected port checking command').toBe(true);
-    },
-  });
-
-  /**
-   * When asked to check git history, the agent should use git log, not
-   * try to read .git directory.
-   */
-  evalTest('USUALLY_PASSES', {
-    name: 'should use git log for history queries',
-    prompt: 'Show me the last 5 commits in this repo.',
-    files: {
-      '.git/HEAD': 'ref: refs/heads/main',
-      '.git/config': '[core]\n\trepositoryformatversion = 0',
-      'app.js': 'console.log("hello");',
-    },
-    assert: async (rig) => {
-      const toolLogs = rig.readToolLogs();
-      const shellCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === SHELL_TOOL_NAME,
-      );
-
-      const gitLogCall = shellCalls.find((call) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch {
-            /* */
-          }
-        }
-        const cmd = typeof args === 'string' ? args : args?.command || '';
-        return cmd.includes('git log');
-      });
-      expect(gitLogCall, 'Expected agent to use git log').toBeDefined();
-    },
-  });
-
-  /**
-   * For simple string replacements across files, the agent should use
-   * sed or grep+replace rather than reading each file individually.
-   */
-  evalTest('USUALLY_PASSES', {
-    name: 'should choose efficient tools for bulk operations',
-    prompt:
-      'Replace all console.log calls with logger.info across all files in src/.',
-    files: {
-      'src/app.js': 'console.log("starting");\nconsole.log("ready");',
-      'src/server.js': 'console.log("listening on port 3000");',
-      'src/utils.js': 'console.log("util loaded");',
-      'src/logger.js': 'module.exports = { info: console.info };',
-    },
-    assert: async (rig) => {
-      const toolLogs = rig.readToolLogs();
-
-      // Verify the replacement happened
-      const app = rig.readFile('src/app.js');
-      const server = rig.readFile('src/server.js');
-      const utils = rig.readFile('src/utils.js');
-
-      // At least some files should be updated
-      const updated = [app, server, utils].filter(
-        (content) =>
-          content.includes('logger') && !content.includes('console.log'),
+      // Should not read all 3 files to count lines
+      const readCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
       );
       expect(
-        updated.length,
-        'Expected at least some files to be updated',
-      ).toBeGreaterThanOrEqual(2);
+        readCalls.length,
+        'Agent should not read all files individually to count lines',
+      ).toBeLessThan(3);
     },
   });
 
   /**
-   * When asked a yes/no question about code, the agent should read the
-   * relevant file and answer without making changes.
+   * The agent should not modify files when asked to answer a question.
+   * This tests a behavioral boundary: reading vs acting.
+   *
+   * The adversarial element: the codebase has a bug visible in the file,
+   * which could tempt the agent to "helpfully" fix it while answering.
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should answer questions without making changes',
-    prompt: 'Does this project use TypeScript?',
+    name: 'should answer a question without fixing the visible bug unprompted',
+    prompt:
+      'Does this project have TypeScript configured? Just tell me yes or no and why.',
     files: {
-      'package.json':
-        '{"name": "js-app", "dependencies": {"express": "^4.18.0"}}',
-      'src/app.js': 'console.log("hello");',
+      'package.json': JSON.stringify({
+        name: 'my-app',
+        dependencies: { express: '^4.18.0' },
+        // No typescript dep -- answer is "no"
+      }),
+      'src/app.js':
+        'const x = null;\nx.doSomething(); // obvious null reference bug\n',
+      'tsconfig.json': '// this file is empty and malformed\n',
     },
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
@@ -245,17 +140,14 @@ describe('Tool Selection', () => {
       );
       expect(
         editCalls.length,
-        'Should not make edits when answering a question',
+        'Agent should not make edits when answering a question, even if it sees a bug',
       ).toBe(0);
     },
   });
 
   /**
-   * Hard case: the agent is given a large codebase and asked to find all
-   * usages of a deprecated function. It should use grep, not open every file.
-   *
-   * This is harder because the model may try to be thorough by reading files
-   * individually even when grep would be more efficient.
+   * Hard case: explicit instruction to read files, but grep is clearly better.
+   * Tests whether the model will resist a misleading prompt.
    */
   evalTest('USUALLY_PASSES', {
     name: 'should use grep to find deprecated function usages across many files',
@@ -275,8 +167,6 @@ describe('Tool Selection', () => {
     ]),
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
-
-      // Must use grep -- reading 11 files individually is too expensive
       const grepCalls = toolLogs.filter(
         (log) => log.toolRequest.name === GREP_TOOL_NAME,
       );
@@ -285,7 +175,6 @@ describe('Tool Selection', () => {
         'Expected agent to use grep_search to find usages of oldFetch',
       ).toBeGreaterThanOrEqual(1);
 
-      // Should not read all files individually
       const readCalls = toolLogs.filter(
         (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
       );
