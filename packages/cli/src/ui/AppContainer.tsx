@@ -1094,6 +1094,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [config]);
 
   const useAgentProtocol = config.getExperimentalUseAgentProtocol();
+  const useActiveStream = useAgentProtocol ? useAgentStream : useGeminiStream;
 
   const {
     streamingState,
@@ -1114,50 +1115,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-  } = useAgentProtocol
-    ? useAgentStream(
-        config.getGeminiClient(),
-        historyManager.history,
-        historyManager.addItem,
-        config,
-        settings,
-        setDebugMessage,
-        handleSlashCommand,
-        shellModeActive,
-        getPreferredEditor,
-        onAuthError,
-        performMemoryRefresh,
-        modelSwitchedFromQuotaError,
-        setModelSwitchedFromQuotaError,
-        onCancelSubmit,
-        setEmbeddedShellFocused,
-        terminalWidth,
-        terminalHeight,
-        embeddedShellFocused,
-        consumePendingHints,
-      )
-    : useGeminiStream(
-        config.getGeminiClient(),
-        historyManager.history,
-        historyManager.addItem,
-        config,
-        settings,
-        setDebugMessage,
-        handleSlashCommand,
-        shellModeActive,
-        getPreferredEditor,
-        onAuthError,
-        performMemoryRefresh,
-        modelSwitchedFromQuotaError,
-        setModelSwitchedFromQuotaError,
-        onCancelSubmit,
-        setEmbeddedShellFocused,
-        terminalWidth,
-        terminalHeight,
-        embeddedShellFocused,
-        consumePendingHints,
-      );
+  } = useActiveStream(
+    config.getGeminiClient(),
+    historyManager.history,
+    historyManager.addItem,
+    config,
+    settings,
+    setDebugMessage,
+    handleSlashCommand,
+    shellModeActive,
+    getPreferredEditor,
+    onAuthError,
+    performMemoryRefresh,
+    modelSwitchedFromQuotaError,
+    setModelSwitchedFromQuotaError,
+    onCancelSubmit,
+    setEmbeddedShellFocused,
+    terminalWidth,
+    terminalHeight,
+    embeddedShellFocused,
+    consumePendingHints,
+  );
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -1705,7 +1683,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
-        cancelOngoingRequest?.();
+        void cancelOngoingRequest?.();
 
         handleCtrlCPress();
         return true;

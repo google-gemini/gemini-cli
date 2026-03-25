@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
+import {
+  type Config,
+  type GeminiClient,
+  LegacyAgentSession as MockLegacyAgentSession,
+} from '@google/gemini-cli-core';
+import { type LoadedSettings } from '../../config/settings.js';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 
 // --- MOCKS ---
@@ -47,9 +47,9 @@ vi.mock('./useLogger.js', () => ({
 }));
 
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
-    ...(actual as any),
+    ...actual,
     useSessionStats: vi.fn(() => ({
       startNewPrompt: vi.fn(),
     })),
@@ -58,19 +58,18 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 // Mock core classes properly
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
-    LegacyAgentSession: vi.fn().mockImplementation(() => mockLegacyAgentSession),
+    LegacyAgentSession: vi
+      .fn()
+      .mockImplementation(() => mockLegacyAgentSession),
   };
 });
 
 // --- END MOCKS ---
 
 import { useAgentStream } from './useAgentStream.js';
-import {
-  LegacyAgentSession as MockLegacyAgentSession,
-} from '@google/gemini-cli-core';
 import { MessageType, StreamingState } from '../types.js';
 
 describe('useAgentStream', () => {
@@ -89,14 +88,14 @@ describe('useAgentStream', () => {
     getExperimentalUseAgentProtocol: () => true,
     getApprovalMode: () => 'default',
     getMessageBus: () => ({}),
-  } as any;
+  } as Config;
 
   const mockSettings = {
     merged: {
       billing: { overageStrategy: 'stop' },
       ui: { errorVerbosity: 'full' },
     },
-  } as any;
+  } as unknown as LoadedSettings;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,7 +104,7 @@ describe('useAgentStream', () => {
   it('should initialize LegacyAgentSession on mount', async () => {
     await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -132,7 +131,7 @@ describe('useAgentStream', () => {
   it('should call session.send when submitQuery is called', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -168,7 +167,7 @@ describe('useAgentStream', () => {
   it('should update streamingState based on agent_start and agent_end events', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -188,7 +187,8 @@ describe('useAgentStream', () => {
       ),
     );
 
-    const eventHandler = (mockLegacyAgentSession.subscribe as any).mock.calls[0][0];
+    const eventHandler = vi.mocked(mockLegacyAgentSession.subscribe).mock
+      .calls[0][0];
 
     expect(result.current.streamingState).toBe(StreamingState.Idle);
 
@@ -206,7 +206,7 @@ describe('useAgentStream', () => {
   it('should accumulate text content and update pendingHistoryItems', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -226,7 +226,8 @@ describe('useAgentStream', () => {
       ),
     );
 
-    const eventHandler = (mockLegacyAgentSession.subscribe as any).mock.calls[0][0];
+    const eventHandler = vi.mocked(mockLegacyAgentSession.subscribe).mock
+      .calls[0][0];
 
     act(() => {
       eventHandler({
@@ -256,7 +257,7 @@ describe('useAgentStream', () => {
   it('should process thought events and update thought state', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -276,7 +277,8 @@ describe('useAgentStream', () => {
       ),
     );
 
-    const eventHandler = (mockLegacyAgentSession.subscribe as any).mock.calls[0][0];
+    const eventHandler = vi.mocked(mockLegacyAgentSession.subscribe).mock
+      .calls[0][0];
 
     act(() => {
       eventHandler({
@@ -293,15 +295,17 @@ describe('useAgentStream', () => {
   });
 
   it('should display error message when a tool call requires approval', async () => {
-    let eventHandler: (event: any) => void = () => {};
-    vi.spyOn(mockLegacyAgentSession, 'subscribe').mockImplementation((handler) => {
-      eventHandler = handler;
-      return () => {};
-    });
+    let eventHandler: (event: unknown) => void = () => {};
+    vi.spyOn(mockLegacyAgentSession, 'subscribe').mockImplementation(
+      (handler) => {
+        eventHandler = handler;
+        return () => {};
+      },
+    );
 
     await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -325,7 +329,8 @@ describe('useAgentStream', () => {
       eventHandler({
         type: 'error',
         status: 'UNIMPLEMENTED',
-        message: 'TODO: Tool approvals not yet implemented, please switch to YOLO mode to test.',
+        message:
+          'TODO: Tool approvals not yet implemented, please switch to YOLO mode to test.',
         fatal: true,
       });
     });
@@ -342,7 +347,7 @@ describe('useAgentStream', () => {
   it('should call session.abort when cancelOngoingRequest is called', async () => {
     const { result } = await renderHookWithProviders(() =>
       useAgentStream(
-        {} as any,
+        {} as GeminiClient,
         [],
         mockAddItem,
         mockConfig,

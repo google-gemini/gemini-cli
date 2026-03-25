@@ -31,9 +31,10 @@ export type CancelAllFn = (signal: AbortSignal) => void;
  * The shape expected by useGeminiStream.
  * It matches the Core ToolCall structure + the UI metadata flag.
  */
-export type TrackedToolCall = ToolCall & {
-  responseSubmittedToGemini?: boolean;
-};
+export type Tracked<T> = T extends unknown
+  ? T & { responseSubmittedToGemini?: boolean }
+  : never;
+export type TrackedToolCall = Tracked<ToolCall>;
 
 // Narrowed types for specific statuses (used by useGeminiStream)
 export type TrackedScheduledToolCall = Extract<
