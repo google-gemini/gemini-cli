@@ -145,6 +145,7 @@ describe('Background Tools', () => {
       status: 'running',
       startTime: Date.now(),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.set('other-session', history);
 
     const invocation = readTool.build({ pid });
@@ -167,6 +168,7 @@ describe('Background Tools', () => {
       status: 'running',
       startTime: Date.now(),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     fs.mkdirSync(logDir, { recursive: true });
@@ -193,6 +195,7 @@ describe('Background Tools', () => {
       status: 'running',
       startTime: Date.now(),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     fs.mkdirSync(logDir, { recursive: true });
