@@ -194,6 +194,17 @@ export function createMockSettings(
     user: { settings: {} },
     workspace: { settings: {} },
     errors: [],
+    subscribe: vi.fn().mockReturnValue(() => {}),
+    getSnapshot: vi.fn().mockReturnValue({
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      isTrusted: true,
+      errors: [],
+      merged,
+    }),
+    setValue: vi.fn(),
     ...overrides,
     merged,
   } as unknown as LoadedSettings;

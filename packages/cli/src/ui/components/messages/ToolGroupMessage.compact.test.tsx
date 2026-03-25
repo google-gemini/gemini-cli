@@ -5,6 +5,7 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/mockConfig.js';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
   CoreToolCallStatus,
@@ -13,7 +14,6 @@ import {
 } from '@google/gemini-cli-core';
 import { expect, it, describe } from 'vitest';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import type { LoadedSettings } from '../../../config/settings.js';
 
 describe('ToolGroupMessage Compact Rendering', () => {
   const defaultProps = {
@@ -27,14 +27,13 @@ describe('ToolGroupMessage Compact Rendering', () => {
     terminalWidth: 80,
   };
 
-  const compactSettings: LoadedSettings = {
+  const compactSettings = createMockSettings({
     merged: {
       ui: {
         compactToolOutput: true,
       },
     },
-    sources: [],
-  } as unknown as LoadedSettings; // Test mock of settings
+  });
 
   it('renders consecutive compact tools without empty lines between them', async () => {
     const toolCalls: IndividualToolCallDisplay[] = [
