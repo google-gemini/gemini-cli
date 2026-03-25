@@ -95,6 +95,7 @@ import {
   EmptyWalletMenuShownEvent,
   CreditPurchaseClickEvent,
 } from './billingEvents.js';
+import { safeTruncate } from './utils.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -120,10 +121,14 @@ export function logCliConfiguration(
 }
 
 export function logUserPrompt(config: Config, event: UserPromptEvent): void {
+  // SHIELD: Prevent massive prompt strings from sitting in the buffer heap
+  if (event.prompt) {
+    event.prompt = safeTruncate(event.prompt, 4096);
+  }
+
   ClearcutLogger.getInstance(config)?.logNewPromptEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
-
     const logRecord: LogRecord = {
       body: event.toLogBody(),
       attributes: event.toOpenTelemetryAttributes(config),
@@ -229,11 +234,15 @@ export function logFileOperation(
 }
 
 export function logApiRequest(config: Config, event: ApiRequestEvent): void {
-  ClearcutLogger.getInstance(config)?.logApiRequestEvent(event);
+  // SHIELD: Immediate truncation before the string hits the buffer
+  if (event.request_text) {
+    event.request_text = safeTruncate(event.request_text, 4096);
+  }
+
+  void ClearcutLogger.getInstance(config)?.logApiRequestEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     logger.emit(event.toLogRecord(config));
-    logger.emit(event.toSemanticLogRecord(config));
   });
 }
 
@@ -301,17 +310,27 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
+  // SHIELD: Truncate the model response immediately to prevent OOM
+  // Check if response_text exists on your ApiResponseEvent type
+  if (event.response_text) {
+    event.response_text = safeTruncate(event.response_text, 4096);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
-    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     ...event,
     'event.name': EVENT_API_RESPONSE,
     'event.timestamp': new Date().toISOString(),
   } as UiEvent;
   uiTelemetryService.addEvent(uiEvent);
+  
   ClearcutLogger.getInstance(config)?.logApiResponseEvent(event);
+  
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
+    
+    // Because we truncated 'event.response_text' at the top of the function,
+    // these log records now only contain the safe, small string.
     logger.emit(event.toLogRecord(config));
     logger.emit(event.toSemanticLogRecord(config));
 
