@@ -91,6 +91,19 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 "
 `;
 
+exports[`MainContent > renders a ToolConfirmationQueue without an extra line when preceded by hidden tools 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Apply plan                                                                   
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Ready to start implementation?                                               │
+│                                                                              │
+│  Error reading plan: Storage must be initialized before use                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────╮
@@ -101,6 +114,30 @@ exports[`MainContent > renders a split tool group without a gap between static a
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │
 │ Part 2                                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`MainContent > renders a spurious line when a tool group has only hidden tools and borderBottom true 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Apply plan                                                                   
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+"
+`;
+
+exports[`MainContent > renders a subagent with a complete box including bottom border 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Investigate                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ≡ Running Agent... (ctrl+o to collapse)                                  │
+│                                                                          │
+│ Running subagent codebase_investigator...                                │
+│                                                                          │
+│ ⠋  run_shell_command echo hello                                          │
+│                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
