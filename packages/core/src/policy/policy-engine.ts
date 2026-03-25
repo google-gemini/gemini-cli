@@ -6,6 +6,11 @@
 
 import { type FunctionCall } from '@google/genai';
 import {
+  isDangerousCommand,
+  isKnownSafeCommand,
+} from '../sandbox/macos/commandSafety.js';
+import { parse as shellParse } from 'shell-quote';
+import {
   PolicyDecision,
   type PolicyEngineConfig,
   type PolicyRule,
@@ -192,6 +197,8 @@ export class PolicyEngine {
   private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
+  private toolSandboxEnabled: boolean;
+  private sandboxApprovedTools: string[];
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -242,13 +249,18 @@ export class PolicyEngine {
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+    this.toolSandboxEnabled = config.toolSandboxEnabled ?? false;
+    this.sandboxApprovedTools = config.sandboxApprovedTools ?? [];
   }
 
   /**
    * Update the current approval mode.
    */
-  setApprovalMode(mode: ApprovalMode): void {
+  setApprovalMode(mode: ApprovalMode, sandboxApprovedTools?: string[]): void {
     this.approvalMode = mode;
+    if (sandboxApprovedTools !== undefined) {
+      this.sandboxApprovedTools = sandboxApprovedTools;
+    }
   }
 
   /**
@@ -269,17 +281,58 @@ export class PolicyEngine {
     command: string,
     allowRedirection?: boolean,
   ): boolean {
-    return (
-      !allowRedirection &&
-      hasRedirection(command) &&
-      this.approvalMode !== ApprovalMode.AUTO_EDIT &&
-      this.approvalMode !== ApprovalMode.YOLO
-    );
+    if (allowRedirection) return false;
+    if (!hasRedirection(command)) return false;
+
+    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    if (
+      this.toolSandboxEnabled &&
+      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
+        this.approvalMode === ApprovalMode.YOLO)
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
    * Check if a shell command is allowed.
    */
+
+  private async applyShellHeuristics(
+    command: string,
+    decision: PolicyDecision,
+  ): Promise<PolicyDecision> {
+    await initializeShellParsers();
+    try {
+      const parsedObjArgs = shellParse(command);
+      if (parsedObjArgs.some((arg) => typeof arg === 'object')) return decision;
+      const parsedArgs = parsedObjArgs.map(String);
+      if (isDangerousCommand(parsedArgs)) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
+        );
+        return PolicyDecision.ASK_USER;
+      }
+      const isApprovedBySandbox =
+        this.toolSandboxEnabled &&
+        this.sandboxApprovedTools.includes(parsedArgs[0]);
+      if (
+        (isKnownSafeCommand(parsedArgs) || isApprovedBySandbox) &&
+        decision === PolicyDecision.ASK_USER
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`,
+        );
+        return PolicyDecision.ALLOW;
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return decision;
+  }
+
   private async checkShellCommand(
     toolName: string,
     command: string | undefined,
@@ -522,11 +575,21 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
+        let ruleDecision = rule.decision;
+        if (
+          isShellCommand &&
+          command &&
+          !('commandPrefix' in rule) &&
+          !rule.argsPattern
+        ) {
+          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+        }
+
         if (isShellCommand && toolName) {
           const shellResult = await this.checkShellCommand(
             toolName,
             command,
-            rule.decision,
+            ruleDecision,
             serverName,
             shellDirPath,
             rule.allowRedirection,
@@ -562,10 +625,18 @@ export class PolicyEngine {
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+        let heuristicDecision = this.defaultDecision;
+        if (command) {
+          heuristicDecision = await this.applyShellHeuristics(
+            command,
+            heuristicDecision,
+          );
+        }
+
         const shellResult = await this.checkShellCommand(
           toolName,
           command,
-          this.defaultDecision,
+          heuristicDecision,
           serverName,
           shellDirPath,
           false,

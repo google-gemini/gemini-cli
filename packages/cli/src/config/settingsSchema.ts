@@ -657,6 +657,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -1196,6 +1206,16 @@ const SETTINGS_SCHEMA = {
             default: true,
             description:
               'Disable user input on browser window during automation.',
+            showInDialog: false,
+          },
+          maxActionsPerTask: {
+            type: 'number',
+            label: 'Max Actions Per Task',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 100,
+            description:
+              'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
             showInDialog: false,
           },
           confirmSensitiveActions: {
@@ -1922,7 +1942,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Agents',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable local and remote subagents.',
         showInDialog: false,
       },
