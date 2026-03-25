@@ -143,7 +143,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
-    specified, defaults to the system temporary directory.
+    specified, defaults to the system temporary directory. A custom directory
+    requires a policy to allow write access in Plan Mode.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -2352,9 +2353,13 @@ can be based on the base sandbox image:
 ```dockerfile
 FROM gemini-cli-sandbox
 
-# Add your custom dependencies or configurations here
+# Add your custom dependencies or configurations here.
+# Note: The base image runs as the non-root 'node' user.
+# You must switch to 'root' to install system packages.
 # For example:
+# USER root
 # RUN apt-get update && apt-get install -y some-package
+# USER node
 # COPY ./my-config /app/my-config
 ```
 
