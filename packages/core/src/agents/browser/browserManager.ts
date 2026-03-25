@@ -594,7 +594,7 @@ export class BrowserManager {
 
     try {
       const parsedUrl = new URL(url);
-      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+      const urlHostname = parsedUrl.hostname;
 
       if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
         // If none matched, then deny
@@ -603,7 +603,12 @@ export class BrowserManager {
 
       // Check query parameters for embedded URLs that could bypass domain
       // restrictions via proxy services (e.g. translate.google.com/translate?u=BLOCKED).
-      for (const paramValue of parsedUrl.searchParams.values()) {
+      const paramsToCheck = [
+        ...parsedUrl.searchParams.values(),
+        // Also check fragments which might contain query-like params
+        ...new URLSearchParams(parsedUrl.hash.replace(/^#/, '')).values(),
+      ];
+      for (const paramValue of paramsToCheck) {
         try {
           const embeddedUrl = new URL(paramValue);
           if (
@@ -612,7 +617,7 @@ export class BrowserManager {
           ) {
             const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
             if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
-              return `Tool '${toolName}' is not permitted: embedded URL targets disallowed domain '${embeddedHostname}'.`;
+              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
             }
           }
         } catch {
