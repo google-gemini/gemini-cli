@@ -5,6 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
+import { WRITE_TODOS_TOOL_NAME } from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 
 describe('Write Todos', () => {
@@ -28,7 +29,7 @@ function processData(data) {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const todoCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'write_todos',
+        (log) => log.toolRequest.name === WRITE_TODOS_TOOL_NAME,
       );
       expect(
         todoCalls.length,
