@@ -1214,7 +1214,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
           handleAnswer(srInput.trim());
           setSrInput('');
         } else {
-          const raw = srInput.trim().split(/\s+/).map(Number);
+          setSrInputError('');
+
+          const raw = srInput.trim()
+            ? srInput.trim().split(/\s+/).map(Number)
+            : [];
+
           const maxOption = effectiveQuestion.options?.length ?? 0;
           const valid = raw.filter(
             (n) => !isNaN(n) && n >= 1 && n <= maxOption,
@@ -1282,20 +1287,26 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     return (
       <Box flexDirection="column" width={width}>
         <Text>{questionNumber}</Text>
-        <Text>{srQuestion?.header}</Text>
-        <Text>{srQuestion?.question}</Text>
+        <Text>
+          <RenderInline text={srQuestion?.header || ''} />
+        </Text>
+        <Text>
+          <RenderInline text={srQuestion?.question || ''} />
+        </Text>
         {srQuestion?.type !== 'text' && srQuestion?.options && (
           <Box flexDirection="column" marginTop={1}>
             <Text>Options:</Text>
             {srQuestion.options.map((opt, i) => (
               <Text key={i}>
                 {'  '}
-                {i + 1}. {opt.label}
-                {opt.description ? ` - ${opt.description}` : ''}
+                {i + 1}. <RenderInline text={opt.label} />
+                {opt.description ? ' - ' : ''}
+                {opt.description && <RenderInline text={opt.description} />}
               </Text>
             ))}
           </Box>
         )}
+
         <Box marginTop={1}>
           {srQuestion?.type === 'text' ? (
             <Text>
