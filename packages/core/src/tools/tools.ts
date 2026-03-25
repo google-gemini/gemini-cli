@@ -379,6 +379,12 @@ export abstract class BaseToolInvocation<
     updateOutput?: (output: ToolLiveOutput) => void,
     options?: ExecuteOptions,
   ): Promise<TResult>;
+
+  toJSON() {
+    return {
+      params: this.params,
+    };
+  }
 }
 
 /**
@@ -496,6 +502,16 @@ export abstract class DeclarativeTool<
       });
     }
     return cloned;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      displayName: this.displayName,
+      description: this.description,
+      kind: this.kind,
+      parameterSchema: this.parameterSchema,
+    };
   }
 
   get isReadOnly(): boolean {
