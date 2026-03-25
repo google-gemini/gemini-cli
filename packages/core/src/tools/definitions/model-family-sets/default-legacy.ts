@@ -332,8 +332,16 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    enableToolSandboxing,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,

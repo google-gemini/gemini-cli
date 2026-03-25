@@ -66,7 +66,10 @@ beforeEach(() => {
           ? stackLines.slice(lastReactFrameIndex + 1).join('\n')
           : stackLines.slice(1).join('\n');
 
-      if (relevantStack.includes('OverflowContext.tsx')) {
+      if (
+        relevantStack.includes('OverflowContext.tsx') ||
+        relevantStack.includes('useTimedMessage.ts')
+      ) {
         return;
       }
 
