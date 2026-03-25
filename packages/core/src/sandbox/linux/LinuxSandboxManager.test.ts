@@ -122,7 +122,7 @@ describe('LinuxSandboxManager', () => {
         customManager,
       );
 
-      expect(bwrapArgs).toContain('--bind');
+      expect(bwrapArgs).toContain('--bind-try');
       expect(bwrapArgs).toContain(workspace);
     });
 
