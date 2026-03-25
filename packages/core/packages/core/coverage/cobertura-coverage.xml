@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage lines-valid="0" lines-covered="0" line-rate="NaN" branches-valid="0" branches-covered="0" branch-rate="NaN" timestamp="1774453563777" complexity="0" version="0.1">
+  <sources>
+    <source>C:/Users/Veerendranath/OneDrive/Documents/GSOC2026/Gemini-cli/gemini-cli/packages/core/packages/core</source>
+  </sources>
+  <packages>
+  </packages>
+</coverage>
