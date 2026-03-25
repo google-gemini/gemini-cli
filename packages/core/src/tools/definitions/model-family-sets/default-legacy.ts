@@ -332,8 +332,16 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
     },
   },
 
-  run_shell_command: (enableInteractiveShell, enableEfficiency) =>
-    getShellDeclaration(enableInteractiveShell, enableEfficiency),
+  run_shell_command: (
+    enableInteractiveShell,
+    enableEfficiency,
+    enableToolSandboxing,
+  ) =>
+    getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
 
   replace: {
     name: EDIT_TOOL_NAME,
@@ -739,6 +747,6 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
-  exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
+  exit_plan_mode: () => getExitPlanModeDeclaration(),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
 };

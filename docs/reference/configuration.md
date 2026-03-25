@@ -295,6 +295,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the footer from the UI
   - **Default:** `false`
 
+- **`ui.collapseDrawerDuringApproval`** (boolean):
+  - **Description:** Whether to collapse the UI drawer when a tool is awaiting
+    confirmation.
+  - **Default:** `true`
+
 - **`ui.showMemoryUsage`** (boolean):
   - **Description:** Display memory usage information in the UI
   - **Default:** `false`
@@ -844,6 +849,12 @@ their corresponding top-level category object in your `settings.json` file.
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
           }
         ]
       },
@@ -1209,6 +1220,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`agents.browser.disableUserInput`** (boolean):
   - **Description:** Disable user input on browser window during automation.
   - **Default:** `true`
+
+- **`agents.browser.maxActionsPerTask`** (number):
+  - **Description:** The maximum number of tool calls allowed per browser task.
+    Enforcement is hard: the agent will be terminated when the limit is reached.
+  - **Default:** `100`
 
 - **`agents.browser.confirmSensitiveActions`** (boolean):
   - **Description:** Require manual confirmation for sensitive browser actions
