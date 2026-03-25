@@ -610,29 +610,65 @@ export class BrowserManager {
 
     try {
       const parsedUrl = new URL(url);
-      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+      const urlHostname = parsedUrl.hostname;
 
-      for (const domainPattern of allowedDomains) {
-        if (domainPattern.startsWith('*.')) {
-          const baseDomain = domainPattern.substring(2);
+      if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
+        // If none matched, then deny
+        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+      }
+
+      // Check query parameters for embedded URLs that could bypass domain
+      // restrictions via proxy services (e.g. translate.google.com/translate?u=BLOCKED).
+      const paramsToCheck = [
+        ...parsedUrl.searchParams.values(),
+        // Also check fragments which might contain query-like params
+        ...new URLSearchParams(parsedUrl.hash.replace(/^#/, '')).values(),
+      ];
+      for (const paramValue of paramsToCheck) {
+        try {
+          const embeddedUrl = new URL(paramValue);
           if (
-            urlHostname === baseDomain ||
-            urlHostname.endsWith(`.${baseDomain}`)
+            embeddedUrl.protocol === 'http:' ||
+            embeddedUrl.protocol === 'https:'
           ) {
-            return undefined;
+            const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
+            if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
+              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
+            }
           }
-        } else {
-          if (urlHostname === domainPattern) {
-            return undefined;
-          }
+        } catch {
+          // Not a valid URL, skip.
         }
       }
+
+      return undefined;
     } catch {
       return `Invalid URL: Malformed URL string.`;
     }
+  }
 
+  /**
+   * Checks whether a hostname matches any pattern in the allowed domains list.
+   */
+  private isDomainAllowed(hostname: string, allowedDomains: string[]): boolean {
+    const normalized = hostname.replace(/\.$/, '');
+    for (const domainPattern of allowedDomains) {
+      if (domainPattern.startsWith('*.')) {
+        const baseDomain = domainPattern.substring(2);
+        if (
+          normalized === baseDomain ||
+          normalized.endsWith(`.${baseDomain}`)
+        ) {
+          return true;
+        }
+      } else {
+        if (normalized === domainPattern) {
+          return true;
+        }
+      }
+    }
     // If none matched, then deny
-    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+    return false;
   }
 
   /**

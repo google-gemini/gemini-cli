@@ -32,6 +32,7 @@ import {
   ValidationRequiredError,
   type AdminControlsSettings,
   debugLogger,
+  isHeadlessMode,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -313,6 +314,7 @@ export async function main() {
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
     stderr: true,
+    interactive: isHeadlessMode() ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
