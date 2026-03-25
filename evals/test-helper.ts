@@ -366,7 +366,8 @@ export interface EvalCase {
   name: string;
   params?: {
     settings?: ForbiddenToolSettings & Record<string, unknown>;
-    [key: string]: unknown;
+    state?: Record<string, unknown>;
+    fakeResponsesPath?: string;
   };
   prompt: string;
   timeout?: number;
