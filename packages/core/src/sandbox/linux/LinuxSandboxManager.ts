@@ -235,6 +235,7 @@ export class LinuxSandboxManager implements SandboxManager {
     const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
     for (const allowedPath of allowedPaths) {
       const resolved = tryRealpath(allowedPath);
+      if (!fs.existsSync(resolved)) continue;
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
         bwrapArgs.push('--bind-try', resolved, resolved);
@@ -278,6 +279,7 @@ export class LinuxSandboxManager implements SandboxManager {
       let resolved: string;
       try {
         resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
+        if (!fs.existsSync(resolved)) continue;
       } catch (e: unknown) {
         debugLogger.warn(
           `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
@@ -288,7 +290,7 @@ export class LinuxSandboxManager implements SandboxManager {
       try {
         const stat = fs.statSync(resolved);
         if (stat.isDirectory()) {
-          bwrapArgs.push('--tmpfs', resolved);
+          bwrapArgs.push('--tmpfs', resolved, '--remount-ro', resolved);
         } else {
           bwrapArgs.push('--ro-bind', '/dev/null', resolved);
         }
