@@ -5,7 +5,7 @@
  */
 
 import { type FunctionCall } from '@google/genai';
-import {  
+import {
   SHELL_TOOL_NAMES,
   initializeShellParsers,
   splitCommands,

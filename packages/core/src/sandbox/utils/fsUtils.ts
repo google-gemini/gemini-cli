@@ -59,7 +59,10 @@ export function resolveGitWorktreePaths(workspacePath: string): {
             const config = fs.readFileSync(configPath, 'utf8');
             const match = config.match(/^\s*worktree\s*=\s*(.+)$/m);
             if (match && match[1]) {
-              const worktreePath = path.resolve(resolvedWorktreeGitDir, match[1].trim());
+              const worktreePath = path.resolve(
+                resolvedWorktreeGitDir,
+                match[1].trim(),
+              );
               if (tryRealpath(worktreePath) === tryRealpath(workspacePath)) {
                 isValid = true;
               }

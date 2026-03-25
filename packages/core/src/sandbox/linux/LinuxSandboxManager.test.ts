@@ -18,7 +18,7 @@ vi.mock('node:fs', async () => {
       ...actual.default,
       existsSync: vi.fn(() => true),
       realpathSync: vi.fn((p) => p.toString()),
-      statSync: vi.fn(() => ({ isDirectory: () => true } as fs.Stats)),
+      statSync: vi.fn(() => ({ isDirectory: () => true }) as fs.Stats),
       mkdirSync: vi.fn(),
       openSync: vi.fn(),
       closeSync: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock('node:fs', async () => {
     },
     existsSync: vi.fn(() => true),
     realpathSync: vi.fn((p) => p.toString()),
-    statSync: vi.fn(() => ({ isDirectory: () => true } as fs.Stats)),
+    statSync: vi.fn(() => ({ isDirectory: () => true }) as fs.Stats),
     mkdirSync: vi.fn(),
     openSync: vi.fn(),
     closeSync: vi.fn(),
@@ -65,7 +65,6 @@ describe('LinuxSandboxManager', () => {
     return result.args.slice(4);
   };
 
-  
   describe('prepareCommand', () => {
     it('should correctly format the base command and args', async () => {
       const bwrapArgs = await getBwrapArgs({
@@ -113,12 +112,15 @@ describe('LinuxSandboxManager', () => {
         workspace,
         modeConfig: { readonly: false },
       });
-      const bwrapArgs = await getBwrapArgs({
-        command: 'ls',
-        args: [],
-        cwd: workspace,
-        env: {},
-      }, customManager);
+      const bwrapArgs = await getBwrapArgs(
+        {
+          command: 'ls',
+          args: [],
+          cwd: workspace,
+          env: {},
+        },
+        customManager,
+      );
 
       expect(bwrapArgs).toContain('--bind');
       expect(bwrapArgs).toContain(workspace);
@@ -283,8 +285,12 @@ describe('LinuxSandboxManager', () => {
         });
 
         expect(bwrapArgs).toContain('--bind-try');
-        expect(bwrapArgs[bwrapArgs.indexOf('/tmp/cache') - 1]).toBe('--bind-try');
-        expect(bwrapArgs[bwrapArgs.indexOf('/opt/tools') - 1]).toBe('--bind-try');
+        expect(bwrapArgs[bwrapArgs.indexOf('/tmp/cache') - 1]).toBe(
+          '--bind-try',
+        );
+        expect(bwrapArgs[bwrapArgs.indexOf('/opt/tools') - 1]).toBe(
+          '--bind-try',
+        );
       });
 
       it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {
@@ -298,7 +304,7 @@ describe('LinuxSandboxManager', () => {
           },
         });
 
-        const binds = bwrapArgs.filter(a => a === workspace);
+        const binds = bwrapArgs.filter((a) => a === workspace);
         expect(binds.length).toBe(2);
       });
     });
@@ -333,14 +339,12 @@ describe('LinuxSandboxManager', () => {
 
       it('resolves forbidden symlink paths to their real paths', async () => {
         vi.mocked(fs.statSync).mockImplementation(
-          () => ({ isDirectory: () => false } as fs.Stats),
+          () => ({ isDirectory: () => false }) as fs.Stats,
         );
-        vi.mocked(fs.realpathSync).mockImplementation(
-          (p) => {
-            if (p === '/tmp/forbidden-symlink') return '/opt/real-target.txt';
-            return p.toString();
-          },
-        );
+        vi.mocked(fs.realpathSync).mockImplementation((p) => {
+          if (p === '/tmp/forbidden-symlink') return '/opt/real-target.txt';
+          return p.toString();
+        });
 
         const bwrapArgs = await getBwrapArgs({
           command: 'ls',
@@ -360,7 +364,9 @@ describe('LinuxSandboxManager', () => {
       it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
         const error = new Error('File not found') as NodeJS.ErrnoException;
         error.code = 'ENOENT';
-        vi.mocked(fs.statSync).mockImplementation(() => { throw error; });
+        vi.mocked(fs.statSync).mockImplementation(() => {
+          throw error;
+        });
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 
         const bwrapArgs = await getBwrapArgs({
@@ -380,14 +386,12 @@ describe('LinuxSandboxManager', () => {
 
       it('masks directory symlinks with tmpfs for both paths', async () => {
         vi.mocked(fs.statSync).mockImplementation(
-          () => ({ isDirectory: () => true } as fs.Stats),
+          () => ({ isDirectory: () => true }) as fs.Stats,
         );
-        vi.mocked(fs.realpathSync).mockImplementation(
-          (p) => {
-            if (p === '/tmp/dir-link') return '/opt/real-dir';
-            return p.toString();
-          },
-        );
+        vi.mocked(fs.realpathSync).mockImplementation((p) => {
+          if (p === '/tmp/dir-link') return '/opt/real-dir';
+          return p.toString();
+        });
 
         const bwrapArgs = await getBwrapArgs({
           command: 'ls',
@@ -405,7 +409,7 @@ describe('LinuxSandboxManager', () => {
 
       it('should override allowed paths if a path is also in forbidden paths', async () => {
         vi.mocked(fs.statSync).mockImplementation(
-          () => ({ isDirectory: () => true } as fs.Stats),
+          () => ({ isDirectory: () => true }) as fs.Stats,
         );
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 

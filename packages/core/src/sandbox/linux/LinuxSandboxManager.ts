@@ -231,8 +231,6 @@ export class LinuxSandboxManager implements SandboxManager {
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
-
-
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
     for (const allowedPath of allowedPaths) {
@@ -281,7 +279,9 @@ export class LinuxSandboxManager implements SandboxManager {
       try {
         resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
       } catch (e: unknown) {
-        debugLogger.warn(`Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`);
+        debugLogger.warn(
+          `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
+        );
         bwrapArgs.push('--ro-bind', '/dev/null', p);
         continue;
       }
@@ -296,7 +296,9 @@ export class LinuxSandboxManager implements SandboxManager {
         if (isErrnoException(e) && e.code === 'ENOENT') {
           bwrapArgs.push('--symlink', '/dev/null', resolved);
         } else {
-          debugLogger.warn(`Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`);
+          debugLogger.warn(
+            `Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`,
+          );
           bwrapArgs.push('--ro-bind', '/dev/null', resolved);
         }
       }
@@ -322,5 +324,4 @@ export class LinuxSandboxManager implements SandboxManager {
       cwd: req.cwd,
     };
   }
-
-  }
+}
