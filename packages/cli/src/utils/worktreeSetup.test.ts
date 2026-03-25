@@ -6,7 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupWorktree } from './worktreeSetup.js';
-import * as coreFunctions from '@google/gemini-cli-core';
+import {
+  getProjectRootForWorktree,
+  createWorktreeService,
+  writeToStderr,
+} from '@google/gemini-cli-core';
 
 // Mock dependencies
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -47,12 +51,8 @@ describe('setupWorktree', () => {
     });
 
     // Mock successful execution of core utilities
-    vi.mocked(coreFunctions.getProjectRootForWorktree).mockResolvedValue(
-      '/mock/project',
-    );
-    vi.mocked(coreFunctions.createWorktreeService).mockResolvedValue(
-      mockService as never,
-    );
+    vi.mocked(getProjectRootForWorktree).mockResolvedValue('/mock/project');
+    vi.mocked(createWorktreeService).mockResolvedValue(mockService as never);
     mockService.setup.mockResolvedValue({
       name: 'my-feature',
       path: '/mock/project/.gemini/worktrees/my-feature',
@@ -69,12 +69,8 @@ describe('setupWorktree', () => {
   it('should create and switch to a new worktree', async () => {
     await setupWorktree('my-feature');
 
-    expect(coreFunctions.getProjectRootForWorktree).toHaveBeenCalledWith(
-      '/mock/project',
-    );
-    expect(coreFunctions.createWorktreeService).toHaveBeenCalledWith(
-      '/mock/project',
-    );
+    expect(getProjectRootForWorktree).toHaveBeenCalledWith('/mock/project');
+    expect(createWorktreeService).toHaveBeenCalledWith('/mock/project');
     expect(mockService.setup).toHaveBeenCalledWith('my-feature');
     expect(process.chdir).toHaveBeenCalledWith(
       '/mock/project/.gemini/worktrees/my-feature',
@@ -99,7 +95,7 @@ describe('setupWorktree', () => {
 
     await setupWorktree('my-feature');
 
-    expect(coreFunctions.createWorktreeService).not.toHaveBeenCalled();
+    expect(createWorktreeService).not.toHaveBeenCalled();
     expect(process.chdir).not.toHaveBeenCalled();
   });
 
@@ -112,7 +108,7 @@ describe('setupWorktree', () => {
 
     await expect(setupWorktree('my-feature')).rejects.toThrow('PROCESS_EXIT');
 
-    expect(coreFunctions.writeToStderr).toHaveBeenCalledWith(
+    expect(writeToStderr).toHaveBeenCalledWith(
       expect.stringContaining(
         'Failed to create or switch to worktree: Git failure',
       ),

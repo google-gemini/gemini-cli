@@ -72,7 +72,8 @@ This skill guides the agent in conducting thorough code reviews.
 - **Local Changes**: If changes are local... ...
 ```
 
-- **`name`**: A unique identifier for the skill. This should match the directory name.
+- **`name`**: A unique identifier for the skill. This should match the directory
+  name.
 - **`description`**: A description of what the skill does and when Gemini should
   use it.
 - **Body**: The Markdown body of the file contains the instructions that guide
@@ -81,8 +82,8 @@ This skill guides the agent in conducting thorough code reviews.
 ## Packaging and Distribution
 
 To share a skill or distribute it as a standalone archive, you can package the
-skill directory into a `.skill` file. This is essentially a ZIP archive that
-the `gemini skills install` command can process.
+skill directory into a `.skill` file. This is essentially a ZIP archive that the
+`gemini skills install` command can process.
 
 ### Using the `skill-creator` toolchain
 
@@ -121,7 +122,8 @@ gemini skills install ./my-skill.skill
 gemini skills install ./my-skill.skill --scope workspace
 ```
 
-After installation, remember to reload your session to pick up the new expertise:
+After installation, remember to reload your session to pick up the new
+expertise:
 
 1.  In an interactive session, run `/skills reload`.
 2.  Verify the installation with `/skills list`.
