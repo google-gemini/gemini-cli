@@ -11,8 +11,10 @@ import {
 } from './browserAgentFactory.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
+import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
+import type { PolicyEngine } from '../../policy/policy-engine.js';
 import type { BrowserManager } from './browserManager.js';
 
 // Create mock browser manager
@@ -300,6 +302,116 @@ describe('browserAgentFactory', () => {
     });
   });
 
+  describe('Policy Registration', () => {
+    let mockPolicyEngine: {
+      addRule: ReturnType<typeof vi.fn>;
+      hasRuleForTool: ReturnType<typeof vi.fn>;
+      removeRulesForTool: ReturnType<typeof vi.fn>;
+      getRules: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockPolicyEngine = {
+        addRule: vi.fn(),
+        hasRuleForTool: vi.fn().mockReturnValue(false),
+        removeRulesForTool: vi.fn(),
+        getRules: vi.fn().mockReturnValue([]),
+      };
+      vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
+        mockPolicyEngine as unknown as PolicyEngine,
+      );
+    });
+
+    it('should register sensitive action rules', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            confirmSensitiveActions: true,
+          },
+        },
+      });
+      vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
+        mockPolicyEngine as unknown as PolicyEngine,
+      );
+
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_fill',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_upload_file',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_evaluate_script',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+        }),
+      );
+    });
+
+    it('should register fill rule even when confirmSensitiveActions is disabled', async () => {
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_fill',
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_upload_file',
+        }),
+      );
+    });
+
+    it('should register ALLOW rules for read-only tools', async () => {
+      mockBrowserManager.getDiscoveredTools.mockResolvedValue([
+        { name: 'take_snapshot', description: 'Take snapshot' },
+        { name: 'take_screenshot', description: 'Take screenshot' },
+        { name: 'list_pages', description: 'list all pages' },
+      ]);
+
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_take_snapshot',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_take_screenshot',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'mcp_browser_agent_list_pages',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        }),
+      );
+    });
+  });
+
   describe('cleanupBrowserAgent', () => {
     it('should call close on browser manager', async () => {
       await cleanupBrowserAgent(
@@ -342,6 +454,8 @@ describe('buildBrowserSystemPrompt', () => {
       expect(prompt).toContain('COMPLEX WEB APPS');
       expect(prompt).toContain('TERMINAL FAILURES');
       expect(prompt).toContain('complete_task');
+      expect(prompt).toContain('PROMPT INJECTION & SECURITY - CRITICAL:');
+      expect(prompt).toContain('untrusted input');
     }
   });
 

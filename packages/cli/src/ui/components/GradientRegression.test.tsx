@@ -10,7 +10,7 @@ import * as SessionContext from '../contexts/SessionContext.js';
 import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { Banner } from './Banner.js';
 import { Footer } from './Footer.js';
-import { Header } from './Header.js';
+import { AppHeader } from './AppHeader.js';
 import { ModelDialog } from './ModelDialog.js';
 import { StatsDisplay } from './StatsDisplay.js';
 
@@ -71,54 +71,47 @@ useSessionStatsMock.mockReturnValue({
 });
 
 describe('Gradient Crash Regression Tests', () => {
-  it('<Header /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <Header version="1.0.0" nightly={false} />,
+  it('<AppHeader /> should not crash when theme.ui.gradient is empty', async () => {
+    const { lastFrame, unmount } = await renderWithProviders(
+      <AppHeader version="1.0.0" />,
       {
         width: 120,
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
     unmount();
   });
 
   it('<ModelDialog /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ModelDialog onClose={async () => {}} />,
       {
         width: 120,
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
     unmount();
   });
 
   it('<Banner /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <Banner bannerText="Test Banner" isWarning={false} width={80} />,
       {
         width: 120,
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
     unmount();
   });
 
   it('<Footer /> should not crash when theme.ui.gradient has only one color (or empty) and nightly is true', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <Footer />,
-      {
-        width: 120,
-        uiState: {
-          nightly: true, // Enable nightly to trigger Gradient usage logic
-          sessionStats: mockSessionStats,
-        },
+    const { lastFrame, unmount } = await renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        nightly: true, // Enable nightly to trigger Gradient usage logic
+        sessionStats: mockSessionStats,
       },
-    );
-    await waitUntilReady();
+    });
     // If it crashes, this line won't be reached or lastFrame() will throw
     expect(lastFrame()).toBeDefined();
     // It should fall back to rendering text without gradient
@@ -127,7 +120,7 @@ describe('Gradient Crash Regression Tests', () => {
   });
 
   it('<StatsDisplay /> should not crash when theme.ui.gradient is empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <StatsDisplay duration="1s" title="My Stats" />,
       {
         width: 120,
@@ -136,7 +129,6 @@ describe('Gradient Crash Regression Tests', () => {
         },
       },
     );
-    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
     // Ensure title is rendered
     expect(lastFrame()).toContain('My Stats');
