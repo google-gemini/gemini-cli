@@ -93,14 +93,6 @@ if (existsSync(devtoolsDistSrc)) {
     join(devtoolsDest, 'package.json'),
   );
   console.log('Copied devtools package to bundle/node_modules/');
-
-  // 5a. Copy 'ws' dependency for DevTools
-  const wsSrc = join(root, 'node_modules', 'ws');
-  const wsDest = join(bundleDir, 'node_modules', 'ws');
-  if (existsSync(wsSrc)) {
-    cpSync(wsSrc, wsDest, { recursive: true, dereference: true });
-    console.log('Copied ws dependency to bundle/node_modules/');
-  }
 }
 
 // 6. Copy bundled chrome-devtools-mcp
