@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- STAGE 2: Builder (Compile Main) ---
 FROM base AS builder
 WORKDIR /build
-# Copy only manifest files first to leverage layer caching for dependencies
+# Copy manifest and lockfiles first
 COPY package*.json ./
 COPY packages/cli/package.json ./packages/cli/
 COPY packages/core/package.json ./packages/core/
@@ -24,8 +24,10 @@ COPY packages/devtools/package.json ./packages/devtools/
 COPY packages/test-utils/package.json ./packages/test-utils/
 COPY packages/a2a-server/package.json ./packages/a2a-server/
 COPY packages/vscode-ide-companion/package.json ./packages/vscode-ide-companion/
+# Copy the lockfile to ensure exact version pinning
+COPY package-lock.json ./
 
-RUN npm install
+RUN npm ci
 
 # Now copy the rest and bundle
 COPY . .
