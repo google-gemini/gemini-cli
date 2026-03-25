@@ -5,8 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
-import { assertModelHasOutput } from '../integration-tests/test-helper.js';
+import { evalTest, assertModelHasOutput } from './test-helper.js';
 
 describe('Hierarchical Memory', () => {
   const conflictResolutionTest =
