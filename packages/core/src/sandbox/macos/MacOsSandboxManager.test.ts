@@ -69,7 +69,7 @@ describe('MacOsSandboxManager', () => {
         allowedPaths: mockAllowedPaths,
         networkAccess: mockNetworkAccess,
         forbiddenPaths: undefined,
-        workspaceWrite: false,
+        workspaceWrite: true,
         additionalPermissions: {
           fileSystem: {
             read: [],
