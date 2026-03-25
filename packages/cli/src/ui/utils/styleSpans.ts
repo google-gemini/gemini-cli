@@ -40,7 +40,11 @@ export const parseToStyleSpans = (text: string): StyleSpan[] => {
     if (
       ansiCode === '\x1b[0m' ||
       ansiCode === '\x1b[39m' ||
-      ansiCode === '\x1b[49m'
+      ansiCode === '\x1b[49m' ||
+      ansiCode === '\x1b[22m' ||
+      ansiCode === '\x1b[23m' ||
+      ansiCode === '\x1b[24m' ||
+      ansiCode === '\x1b[29m'
     ) {
       if (ansiCode === '\x1b[0m') {
         currentAnsiState = [];
@@ -54,8 +58,16 @@ export const parseToStyleSpans = (text: string): StyleSpan[] => {
           // eslint-disable-next-line no-control-regex
           (c) => !c.match(/\x1b\[4\d(?:;\d+)*m/),
         );
-      } else {
-        currentAnsiState.push(ansiCode);
+      } else if (ansiCode === '\x1b[22m') {
+        currentAnsiState = currentAnsiState.filter(
+          (c) => c !== '\x1b[1m' && c !== '\x1b[2m',
+        );
+      } else if (ansiCode === '\x1b[23m') {
+        currentAnsiState = currentAnsiState.filter((c) => c !== '\x1b[3m');
+      } else if (ansiCode === '\x1b[24m') {
+        currentAnsiState = currentAnsiState.filter((c) => c !== '\x1b[4m');
+      } else if (ansiCode === '\x1b[29m') {
+        currentAnsiState = currentAnsiState.filter((c) => c !== '\x1b[9m');
       }
     } else {
       currentAnsiState.push(ansiCode);
