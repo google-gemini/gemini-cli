@@ -692,6 +692,10 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
+    if (/<<[-]?\s*['"\\\]?EOF['"]?/.test(params.command)) {
+      return "Large heredoc detected. Please use the 'write_file' tool for better reliability.";
+    }
+
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.context.config.getTargetDir(),

@@ -237,6 +237,24 @@ describe('ShellTool', () => {
       ).toThrow(/Path not in workspace/);
     });
 
+    it('should throw an error for a command with a heredoc (EOF)', () => {
+      expect(() =>
+        shellTool.build({ command: "cat << 'EOF'\nhello\nEOF" }),
+      ).toThrow(/Large heredoc detected/);
+      expect(() =>
+        shellTool.build({ command: 'cat <<EOF\nhello\nEOF' }),
+      ).toThrow(/Large heredoc detected/);
+      expect(() =>
+        shellTool.build({ command: 'cat << EOF\nhello\nEOF' }),
+      ).toThrow(/Large heredoc detected/);
+      expect(() =>
+        shellTool.build({ command: 'cat <<-EOF\nhello\nEOF' }),
+      ).toThrow(/Large heredoc detected/);
+      expect(() =>
+        shellTool.build({ command: 'cat <<\\\\EOF\\nhello\\nEOF' }),
+      ).toThrow(/Large heredoc detected/);
+    });
+
     it('should return an invocation for a valid absolute directory path', () => {
       const invocation = shellTool.build({
         command: 'ls',
