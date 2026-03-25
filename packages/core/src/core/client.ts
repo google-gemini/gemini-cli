@@ -1011,6 +1011,7 @@ export class GeminiClient {
           if (contHookState) {
             contHookState.hasFiredBeforeAgent = false;
             contHookState.activeCalls--;
+            contHookState.originalRequest = continueRequest;
           }
 
           continuationHandled = true;
