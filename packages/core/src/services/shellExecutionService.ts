@@ -1320,10 +1320,13 @@ export class ShellExecutionService {
     const activeChild = this.activeChildProcesses.get(pid);
     const command =
       activePty?.command ?? activeChild?.command ?? 'unknown command';
-    const sessionId =
-      activePty?.sessionId ?? activeChild?.sessionId ?? 'default';
+    const sessionId = activePty?.sessionId ?? activeChild?.sessionId;
 
-    const MAX_HISTORY_SIZE = 100;
+    if (!sessionId) {
+      throw new Error('Session ID is required for background operations');
+    }
+
+    const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
     const history =
       this.backgroundProcessHistory.get(sessionId) ??
       new Map<
@@ -1338,8 +1341,8 @@ export class ShellExecutionService {
         }
       >();
 
-    if (history.size >= MAX_HISTORY_SIZE) {
-      const oldestPid = history.keys().next().value;
+    if (history.size >= MAX_BACKGROUND_PROCESS_HISTORY_SIZE) {
+      const oldestPid = history.keys().next().value as number | undefined;
       if (oldestPid !== undefined) {
         history.delete(oldestPid);
       }
@@ -1356,7 +1359,7 @@ export class ShellExecutionService {
     const logPath = this.getLogFilePath(pid);
     const logDir = this.getLogDir();
     try {
-      mkdirSync(logDir, { recursive: true });
+      mkdirSync(logDir, { recursive: true, mode: 0o700 });
       const stream = fs.createWriteStream(logPath, { flags: 'w' });
       stream.on('error', (err) => {
         debugLogger.warn('Background log stream error:', err);
@@ -1471,15 +1474,17 @@ export class ShellExecutionService {
     }
   }
 
-  static listBackgroundProcesses(sessionId?: string): Array<{
+  static listBackgroundProcesses(sessionId: string): Array<{
     pid: number;
     command: string;
     status: 'running' | 'exited';
     exitCode?: number | null;
     signal?: number | null;
   }> {
-    const session = sessionId ?? 'default';
-    const history = this.backgroundProcessHistory.get(session);
+    if (!sessionId) {
+      throw new Error('Session ID is required');
+    }
+    const history = this.backgroundProcessHistory.get(sessionId);
     if (!history) return [];
 
     return Array.from(history.entries()).map(([pid, info]) => ({

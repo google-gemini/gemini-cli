@@ -128,6 +128,7 @@ const mockProcessKill = vi
   .mockImplementation(() => true);
 
 const shellExecutionConfig: ShellExecutionConfig = {
+  sessionId: 'default',
   terminalWidth: 80,
   terminalHeight: 24,
   pager: 'cat',
@@ -794,7 +795,7 @@ describe('ShellExecutionService', () => {
 
       expect(mockMkdirSync).toHaveBeenCalledWith(
         expect.stringContaining('background-processes'),
-        { recursive: true },
+        { recursive: true, mode: 0o700 },
       );
 
       // Verify initial output was written
@@ -882,7 +883,7 @@ describe('ShellExecutionService', () => {
         async (pty) => {
           ShellExecutionService.background(pty.pid);
 
-          const history = ShellExecutionService.listBackgroundProcesses();
+          const history = ShellExecutionService.listBackgroundProcesses('default');
           expect(history).toHaveLength(1);
           expect(history[0]).toEqual(
             expect.objectContaining({
@@ -898,7 +899,7 @@ describe('ShellExecutionService', () => {
         { ...shellExecutionConfig, originalCommand: 'history-test-cmd' },
       );
 
-      const history = ShellExecutionService.listBackgroundProcesses();
+      const history = ShellExecutionService.listBackgroundProcesses('default');
       expect(history[0]).toEqual(
         expect.objectContaining({
           pid: mockPtyProcess.pid,
@@ -921,6 +922,14 @@ describe('ShellExecutionService', () => {
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).activeChildProcesses.set(101, {
+        process: {},
+        state: { output: '' },
+        command: 'cmd-101',
+        sessionId: 'default',
+      });
 
       ShellExecutionService.background(101);
       
