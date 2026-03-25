@@ -83,6 +83,48 @@ export class FileDiscoveryService {
     }
   }
 
+  /**
+   * Returns all absolute paths (files and directories) within the project root that should be ignored.
+   */
+  async getIgnoredPaths(options: FilterFilesOptions = {}): Promise<string[]> {
+    const ignoredPaths: string[] = [];
+
+    /**
+     * Recursively walks the directory tree to find ignored paths.
+     */
+    const walk = async (currentDir: string) => {
+      let dirEntries: fs.Dirent[];
+      try {
+        dirEntries = await fs.promises.readdir(currentDir, {
+          withFileTypes: true,
+        });
+      } catch {
+        // Stop if the directory is inaccessible or doesn't exist
+        return;
+      }
+
+      for (const entry of dirEntries) {
+        const fullPath = path.join(currentDir, entry.name);
+
+        if (entry.isDirectory()) {
+          // Optimization: If a directory is ignored, its contents are not traversed.
+          if (this.shouldIgnoreDirectory(fullPath, options)) {
+            ignoredPaths.push(fullPath);
+          } else {
+            await walk(fullPath);
+          }
+        } else {
+          if (this.shouldIgnoreFile(fullPath, options)) {
+            ignoredPaths.push(fullPath);
+          }
+        }
+      }
+    };
+
+    await walk(this.projectRoot);
+    return ignoredPaths;
+  }
+
   private applyFilterFilesOptions(options?: FilterFilesOptions): void {
     if (!options) return;
 
@@ -103,31 +145,10 @@ export class FileDiscoveryService {
    * Filters a list of file paths based on ignore rules
    */
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
-    const {
-      respectGitIgnore = this.defaultFilterFileOptions.respectGitIgnore,
-      respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
-    } = options;
     return filePaths.filter((filePath) => {
-      if (
-        respectGitIgnore &&
-        respectGeminiIgnore &&
-        this.combinedIgnoreFilter
-      ) {
-        return !this.combinedIgnoreFilter.isIgnored(filePath);
-      }
-
-      // Always respect custom ignore filter if provided
-      if (this.customIgnoreFilter?.isIgnored(filePath)) {
-        return false;
-      }
-
-      if (respectGitIgnore && this.gitIgnoreFilter?.isIgnored(filePath)) {
-        return false;
-      }
-      if (respectGeminiIgnore && this.geminiIgnoreFilter?.isIgnored(filePath)) {
-        return false;
-      }
-      return true;
+      // Infer directory status from the string format
+      const isDir = filePath.endsWith('/') || filePath.endsWith('\\');
+      return !this._shouldIgnore(filePath, isDir, options);
     });
   }
 
@@ -152,13 +173,61 @@ export class FileDiscoveryService {
   }
 
   /**
-   * Unified method to check if a file should be ignored based on filtering options
+   * Checks if a specific file should be ignored based on project ignore rules.
    */
   shouldIgnoreFile(
     filePath: string,
     options: FilterFilesOptions = {},
   ): boolean {
-    return this.filterFiles([filePath], options).length === 0;
+    return this._shouldIgnore(filePath, false, options);
+  }
+
+  /**
+   * Checks if a specific directory should be ignored based on project ignore rules.
+   */
+  shouldIgnoreDirectory(
+    dirPath: string,
+    options: FilterFilesOptions = {},
+  ): boolean {
+    return this._shouldIgnore(dirPath, true, options);
+  }
+
+  /**
+   * Internal unified check for paths.
+   */
+  private _shouldIgnore(
+    filePath: string,
+    isDirectory: boolean,
+    options: FilterFilesOptions = {},
+  ): boolean {
+    const {
+      respectGitIgnore = this.defaultFilterFileOptions.respectGitIgnore,
+      respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
+    } = options;
+
+    if (respectGitIgnore && respectGeminiIgnore && this.combinedIgnoreFilter) {
+      return this.combinedIgnoreFilter.isIgnored(filePath, isDirectory);
+    }
+
+    if (this.customIgnoreFilter?.isIgnored(filePath, isDirectory)) {
+      return true;
+    }
+
+    if (
+      respectGitIgnore &&
+      this.gitIgnoreFilter?.isIgnored(filePath, isDirectory)
+    ) {
+      return true;
+    }
+
+    if (
+      respectGeminiIgnore &&
+      this.geminiIgnoreFilter?.isIgnored(filePath, isDirectory)
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

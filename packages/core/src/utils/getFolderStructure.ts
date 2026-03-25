@@ -178,7 +178,7 @@ async function readFullStructure(
         const subFolderPath = path.join(currentPath, subFolderName);
 
         const isIgnored =
-          options.fileService?.shouldIgnoreFile(
+          options.fileService?.shouldIgnoreDirectory(
             subFolderPath,
             filterFileOptions,
           ) ?? false;
