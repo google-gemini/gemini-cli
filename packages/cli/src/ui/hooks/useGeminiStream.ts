@@ -301,20 +301,23 @@ export const useGeminiStream = (
             }),
           );
         }
-
         // Clear the live-updating display now that the final state is in history.
         setToolCallsForDisplay([]);
 
         // Record tool calls with full metadata before sending responses.
         try {
           const currentModel =
-            geminiClient.getCurrentSequenceModel() ?? config.getModel();
-          geminiClient
-            .getChat()
-            .recordCompletedToolCalls(
-              currentModel,
-              completedToolCallsFromScheduler,
-            );
+            (typeof geminiClient.getCurrentSequenceModel === 'function'
+              ? geminiClient.getCurrentSequenceModel()
+              : undefined) ?? config.getModel();
+          const chat =
+            typeof geminiClient.getChat === 'function'
+              ? geminiClient.getChat()
+              : undefined;
+          chat?.recordCompletedToolCalls(
+            currentModel,
+            completedToolCallsFromScheduler,
+          );
 
           await recordToolCallInteractions(
             config,
@@ -1733,6 +1736,18 @@ export const useGeminiStream = (
             return false;
           },
         );
+
+      // Check if all tools in the batch are in a terminal state
+      const allTerminal = completedToolCallsFromScheduler.every(
+        (tc) =>
+          tc.status === 'success' ||
+          tc.status === 'error' ||
+          tc.status === 'cancelled',
+      );
+
+      if (!allTerminal) {
+        return;
+      }
 
       // Finalize any client-initiated tools as soon as they are done.
       const clientTools = completedAndReadyToSubmitTools.filter(

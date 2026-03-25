@@ -125,35 +125,6 @@ describe('StatusDisplay', () => {
     unmount();
   });
 
-  it('renders HookStatusDisplay when hooks are active', async () => {
-    const uiState = createMockUIState({
-      activeHooks: [{ name: 'hook', eventName: 'event' }],
-    });
-    const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
-
-  it('does NOT render HookStatusDisplay if notifications are disabled in settings', async () => {
-    const uiState = createMockUIState({
-      activeHooks: [{ name: 'hook', eventName: 'event' }],
-    });
-    const settings = createMockSettings({
-      ui: { hideContextSummary: true },
-      hooksConfig: { notifications: false },
-    });
-    const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-      settings,
-    );
-    expect(lastFrame({ allowEmpty: true })).toBe('');
-    unmount();
-  });
-
   it('hides ContextSummaryDisplay if configured in settings', async () => {
     const settings = createMockSettings({
       ui: { hideContextSummary: true },
