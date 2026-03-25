@@ -107,6 +107,11 @@ function touch(filePath: string, isDirectory: boolean) {
   }
 }
 
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../utils/commandSafety.js';
+
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
@@ -124,6 +129,14 @@ export interface LinuxSandboxOptions extends GlobalSandboxOptions {
 
 export class LinuxSandboxManager implements SandboxManager {
   constructor(private readonly options: LinuxSandboxOptions) {}
+
+  isKnownSafeCommand(args: string[]): boolean {
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
@@ -306,6 +319,8 @@ export class LinuxSandboxManager implements SandboxManager {
       program: 'sh',
       args: shArgs,
       env: sanitizedEnv,
+      cwd: req.cwd,
     };
   }
-}
+
+  }

@@ -272,6 +272,76 @@ describe('BrowserManager', () => {
       expect(result.isError).toBe(true);
       expect((result.content || [])[0]?.text).toContain('not permitted');
     });
+
+    it('should block proxy URL with embedded disallowed domain in query params', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should block proxy URL with embedded disallowed domain in URL fragment (hash)', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should allow proxy URL when embedded domain is also allowed', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com', 'github.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?u=https://github.com/repo',
+      });
+
+      expect(result.isError).toBe(false);
+    });
+
+    it('should allow navigation to allowed domain without proxy params', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/?sl=en&tl=zh',
+      });
+
+      expect(result.isError).toBe(false);
+    });
   });
 
   describe('MCP connection', () => {
@@ -695,6 +765,30 @@ describe('BrowserManager', () => {
       await manager.callTool('click', { uid: 'bad' });
 
       expect(injectAutomationOverlay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Rate limiting', () => {
+    it('should terminate task when maxActionsPerTask is reached', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 3,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // First 3 calls should succeed
+      await manager.callTool('take_snapshot', {});
+      await manager.callTool('take_snapshot', { some: 'args' });
+      await manager.callTool('take_snapshot', { other: 'args' });
+      await manager.callTool('take_snapshot', { other: 'new args' });
+
+      // 4th call should throw
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(3\)/,
+      );
     });
   });
 });

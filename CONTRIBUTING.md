@@ -323,8 +323,8 @@ fi
 
 #### Formatting
 
-To separately format the code in this project by running the following command
-from the root directory:
+To separately format the code in this project, run the following command from
+the root directory:
 
 ```bash
 npm run format

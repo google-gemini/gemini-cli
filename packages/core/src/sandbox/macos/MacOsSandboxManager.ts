@@ -14,16 +14,20 @@ import {
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-  type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
-import { initializeShellParsers } from '../../utils/shell-utils.js';
-import { isStrictlyApproved, getCommandName } from '../utils/commandUtils.js';
+import {
+  initializeShellParsers,
+  getCommandName,
+} from '../../utils/shell-utils.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+  isStrictlyApproved,
+} from '../utils/commandSafety.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 
 export interface MacOsSandboxOptions extends GlobalSandboxOptions {
-  /** Optional base sanitization config. */
-  sanitizationConfig?: EnvironmentSanitizationConfig;
   /** The current sandbox mode behavior from config. */
   modeConfig?: {
     readonly?: boolean;
@@ -40,6 +44,19 @@ export interface MacOsSandboxOptions extends GlobalSandboxOptions {
  */
 export class MacOsSandboxManager implements SandboxManager {
   constructor(private readonly options: MacOsSandboxOptions) {}
+
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0];
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.includes(toolName)) {
+      return true;
+    }
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     await initializeShellParsers();
@@ -67,15 +84,19 @@ export class MacOsSandboxManager implements SandboxManager {
 
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
-      ? await isStrictlyApproved(req, this.options.modeConfig?.approvedTools)
+      ? await isStrictlyApproved(
+          req.command,
+          req.args,
+          this.options.modeConfig?.approvedTools,
+        )
       : false;
 
     const workspaceWrite = !isReadonlyMode || isApproved;
-    const networkAccess =
+    const defaultNetwork =
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
 
     // Fetch persistent approvals for this command
-    const commandName = await getCommandName(req);
+    const commandName = await getCommandName(req.command, req.args);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
@@ -93,13 +114,13 @@ export class MacOsSandboxManager implements SandboxManager {
         ],
       },
       network:
-        networkAccess ||
+        defaultNetwork ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,
     };
 
-    const sandboxArgs = buildSeatbeltArgs({
+    const sandboxArgs = await buildSeatbeltArgs({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
       forbiddenPaths: req.policy?.forbiddenPaths,
