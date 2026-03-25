@@ -49,6 +49,8 @@ export interface ToolCallRequestInfo {
   traceId?: string;
   parentCallId?: string;
   schedulerId?: string;
+  inputModifiedByHook?: boolean;
+  forcedAsk?: boolean;
 }
 
 export interface ToolCallResponseInfo {

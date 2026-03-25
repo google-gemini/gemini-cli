@@ -46,7 +46,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
-  sandbox?: SandboxMode;
+  sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
 }
@@ -60,6 +60,7 @@ export interface CoreMandatesOptions {
   hasSkills: boolean;
   hasHierarchicalMemory: boolean;
   contextFilenames?: string[];
+  topicUpdateNarration: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -71,20 +72,29 @@ export interface PrimaryWorkflowsOptions {
   enableGlob: boolean;
   approvedPlan?: { path: string };
   taskTracker?: boolean;
+  topicUpdateNarration: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
+  topicUpdateNarration: boolean;
+  memoryManagerEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
+
+export interface SandboxOptions {
+  mode: SandboxMode;
+  toolSandboxingEnabled: boolean;
+}
 
 export interface GitRepoOptions {
   interactive: boolean;
 }
 
 export interface PlanningWorkflowOptions {
+  interactive: boolean;
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
@@ -217,16 +227,19 @@ Use the following guidelines to optimize your search and read patterns.
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
+- **Types, warnings and linters:** NEVER use hacks like disabling or suppressing warnings or bypassing the type system (i.e.: casts in TypeScript) unless explicitly instructed to by the user. Instead, use idiomatic language features (e.g.: type guard functions).
 - **Libraries/Frameworks:** NEVER assume a library/framework is available. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', etc.) before employing it.
 - **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
 - **Expertise & Intent Alignment:** Provide proactive technical opinions grounded in research while strictly adhering to the user's intended workflow. Distinguish between **Directives** (unambiguous requests for action or implementation) and **Inquiries** (requests for analysis, advice, or observations). Assume all requests are Inquiries unless they contain an explicit instruction to perform a task. For Inquiries, your scope is strictly limited to research and analysis; you may propose a solution or strategy, but you MUST NOT modify files until a corresponding Directive is issued. Do not initiate implementation based on observations of bugs or statements of fact. Once an Inquiry is resolved, or while waiting for a Directive, stop and wait for the next user instruction. ${options.interactive ? 'For Directives, only clarify if critically underspecified; otherwise, work autonomously.' : 'For Directives, you must work autonomously as no further user input is available.'} You should only seek user intervention if you have exhausted all possible routes or if a proposed solution would take the workspace in a significantly different architectural direction.
 - **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
 - **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
-- ${mandateConfirm(options.interactive)}
-- **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
-- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.${mandateContinueWork(options.interactive)}
+- ${mandateConfirm(options.interactive)}${
+    options.topicUpdateNarration
+      ? mandateTopicUpdateModel()
+      : mandateExplainBeforeActing()
+  }
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -308,11 +321,16 @@ export function renderPrimaryWorkflows(
   options?: PrimaryWorkflowsOptions,
 ): string {
   if (!options) return '';
+
+  const transitionOverride = options.approvedPlan
+    ? `\n\n**State Transition Override:** You are now in **Execution Mode**. All previous "Read-Only", "Plan Mode", and "ONLY FOR PLANS" constraints are **immediately lifted**. You are explicitly authorized and required to use tools to modify source code and environment files to implement the approved plan. Begin executing the steps of the plan immediately.`
+    : '';
+
   return `
 # Primary Workflows
 
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.${transitionOverride}
 
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
@@ -341,10 +359,18 @@ export function renderOperationalGuidelines(
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
-- **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and mechanical tool-use narration (e.g., "I will now call...").
+- **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and ${
+    options.topicUpdateNarration
+      ? 'per-tool explanations.'
+      : 'mechanical tool-use narration (e.g., "I will now call...").'
+  }
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
-- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they are ${
+    options.topicUpdateNarration
+      ? 'part of the **Topic Model**.'
+      : "part of the 'Explain Before Acting' mandate."
+  }
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -369,18 +395,44 @@ export function renderOperationalGuidelines(
 `.trim();
 }
 
-export function renderSandbox(mode?: SandboxMode): string {
-  if (!mode) return '';
+export function renderSandbox(options?: SandboxOptions): string {
+  if (!options || !options.mode) return '';
+  const { mode, toolSandboxingEnabled } = options;
   if (mode === 'macos-seatbelt') {
-    return `
+    if (toolSandboxingEnabled) {
+      return `
+    # macOS Seatbelt
+    
+    You are running under macos seatbelt with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. 
+    **Sandbox Failure Recovery:**
+    If an interactive command (like nvim, nano, git) fails to load plugins, crashes, or hangs waiting for user input (e.g. at a '-- More --' prompt) with errors indicating missing files or 'Operation not permitted', it is likely blocked by the sandbox.
+    If you see these errors (e.g. Vim:E303, 'should be read/write') in the command output (even if the command timed out or was cancelled by the user):
+    1.  IMMEDIATELY analyze the output to identify the required filesystem paths or network access.
+    2.  WITHOUT asking the user or explaining the failure first, AUTOMATICALLY retry the command using the 'run_shell_command' tool, explicitly providing the missing permissions in the 'additional_permissions' parameter.
+    3.  This will immediately present the user with a modal to approve the expansion for the command so they don't have to reprompt you.`.trim();
+    } else {
+      return `
     # macOS Seatbelt
     
     You are running under macos seatbelt with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to macOS Seatbelt (e.g. if a command fails with 'Operation not permitted' or similar error), as you report the error to the user, also explain why you think it could be due to macOS Seatbelt, and how the user may need to adjust their Seatbelt profile.`.trim();
+    }
   } else if (mode === 'generic') {
-    return `
+    if (toolSandboxingEnabled) {
+      return `
+      # Sandbox
+      
+      You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. 
+    **Sandbox Failure Recovery:**
+    If a command fails with 'Operation not permitted' or similar sandbox errors, do NOT ask the user to adjust settings manually. Instead:
+    1.  Analyze the command and error to identify the required filesystem paths or network access.
+    2.  Retry the command using the 'run_shell_command' tool, providing the missing permissions in the 'additional_permissions' parameter.
+    3.  The user will be presented with a modal to approve this expansion for the current command.`.trim();
+    } else {
+      return `
       # Sandbox
       
       You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
+    }
   }
   return '';
 }
@@ -500,7 +552,7 @@ export function renderPlanningWorkflow(
   return `
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`${options.plansDir}/\` and ${options.interactive ? 'get user approval before editing source code.' : 'create a design document before proceeding autonomously.'}
 
 ## Available Tools
 The following tools are available in Plan Mode:
@@ -537,7 +589,7 @@ Write the implementation plan to \`${options.plansDir}/\`. The plan's structure 
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
 
 ### 4. Review & Approval
-Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and formally request approval.
+Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
@@ -558,6 +610,56 @@ function mandateConfirm(interactive: boolean): string {
   return interactive
     ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it."
     : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically.';
+}
+
+function mandateTopicUpdateModel(): string {
+  return `
+- **Protocol: Topic Model**
+  You are an agentic system. You must maintain a visible state log that tracks broad logical phases using a specific header format.
+
+- **1. Topic Initialization & Persistence:**
+  - **The Trigger:** You MUST issue a \`Topic: <Phase> : <Brief Summary>\` header ONLY when beginning a task or when the broad logical nature of the task changes (e.g., transitioning from research to implementation).
+  - **The Format:** Use exactly \`Topic: <Phase> : <Brief Summary>\` (e.g., \`Topic: <Research> : Researching Agent Skills in the repo\`).
+  - **Persistence:** Once a Topic is declared, do NOT repeat it for subsequent tool calls or in subsequent messages within that same phase. 
+  - **Start of Task:** Your very first tool execution must be preceded by a Topic header.
+
+- **2. Tool Execution Protocol (Zero-Noise):**
+  - **No Per-Tool Headers:** It is a violation of protocol to print "Topic:" before every tool call. 
+  - **Silent Mode:** No conversational filler, no "I will now...", and no summaries between tools. 
+  - Only the Topic header at the start of a broad phase is permitted to break the silence. Everything in between must be silent.
+
+- **3. Thinking Protocol:**
+  - Use internal thought blocks to keep track of what tools you have called, plan your next steps, and reason about the task.
+  - Without reasoning and tracking in thought blocks, you may lose context.
+  - Always use the required syntax for thought blocks to ensure they remain hidden from the user interface.
+
+- **4. Completion:**
+  - Only when the entire task is finalized do you provide a **Final Summary**.
+
+**IMPORTANT: Topic Headers vs. Thoughts**
+The \`Topic: <Phase> : <Brief Summary>\` header must **NOT** be placed inside a thought block. It must be standard text output so that it is properly rendered and displayed in the UI.
+
+**Correct State Log Example:**
+\`\`\`
+Topic: <Research> : Researching Agent Skills in the repo
+<tool_call 1>
+<tool_call 2>
+<tool_call 3>
+
+Topic: <Implementation> : Implementing the skill-creator logic
+<tool_call 1>
+<tool_call 2>
+
+The task is complete. [Final Summary]
+\`\`\`
+
+- **Constraint Enforcement:** If you repeat a "Topic:" line without a fundamental shift in work, or if you provide a Topic for every tool call, you have failed the system integrity protocol.`;
+}
+
+function mandateExplainBeforeActing(): string {
+  return `
+- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.
+- **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.`;
 }
 
 function mandateSkillGuidance(hasSkills: boolean): string {
@@ -648,7 +750,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   // standard 'Execution' loop handle implementation once the plan is approved.
   if (options.enableEnterPlanModeTool) {
     return `
-1. **Mandatory Planning:** You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document and obtain user approval before writing any code.
+1. **Mandatory Planning:** You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document${options.interactive ? ' and obtain user approval' : ''} before writing any code.
 2. **Design Constraints:** When drafting your plan, adhere to these defaults unless explicitly overridden by the user:
    - **Goal:** Autonomously design a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, typography, and interactive feedback.
    - **Visuals:** Describe your strategy for sourcing or generating placeholders (e.g., stylized CSS shapes, gradients, procedurally generated patterns) to ensure a visually complete prototype. Never plan for assets that cannot be locally generated.
@@ -713,6 +815,10 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
+  if (options.memoryManagerEnabled) {
+    return `
+- **Memory Tool:** You MUST use ${formatToolName(MEMORY_TOOL_NAME)} to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+  }
   const base = `
 - **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
   const suffix = options.interactive

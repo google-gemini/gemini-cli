@@ -54,12 +54,15 @@ describe('PromptProvider', () => {
       },
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),

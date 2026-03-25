@@ -22,6 +22,7 @@ vi.mock('../confirmation-bus/message-bus.js', () => ({
 vi.mock('../policy/policy-engine.js', () => ({
   PolicyEngine: vi.fn().mockImplementation(() => ({
     getExcludedTools: vi.fn().mockReturnValue(new Set()),
+    getApprovalMode: vi.fn().mockReturnValue('yolo'),
   })),
 }));
 vi.mock('../skills/skillManager.js', () => ({

@@ -44,7 +44,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -142,7 +141,7 @@ describe('ToolExecutor', () => {
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
-    await fn({ metadata, endSpan: vi.fn() });
+    await fn({ metadata });
     expect(metadata).toMatchObject({
       input: scheduledCall.request,
       output: {
@@ -205,7 +204,7 @@ describe('ToolExecutor', () => {
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
-    await fn({ metadata, endSpan: vi.fn() });
+    await fn({ metadata });
     expect(metadata).toMatchObject({
       error: new Error('Tool Failed'),
     });
@@ -617,14 +616,13 @@ describe('ToolExecutor', () => {
         _sig,
         _tool,
         _liveCb,
-        _shellCfg,
-        setExecutionIdCallback,
+        options,
         _config,
         _originalRequestName,
       ) => {
         // Simulate the tool reporting an execution ID
-        if (setExecutionIdCallback) {
-          setExecutionIdCallback(testPid);
+        if (options?.setExecutionIdCallback) {
+          options.setExecutionIdCallback(testPid);
         }
         return { llmContent: 'done', returnDisplay: 'done' };
       },
@@ -671,16 +669,8 @@ describe('ToolExecutor', () => {
 
     const testExecutionId = 67890;
     vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
-      async (
-        _inv,
-        _name,
-        _sig,
-        _tool,
-        _liveCb,
-        _shellCfg,
-        setExecutionIdCallback,
-      ) => {
-        setExecutionIdCallback?.(testExecutionId);
+      async (_inv, _name, _sig, _tool, _liveCb, options) => {
+        options?.setExecutionIdCallback?.(testExecutionId);
         return { llmContent: 'done', returnDisplay: 'done' };
       },
     );
