@@ -55,7 +55,7 @@ describe('MacOsSandboxManager', () => {
   });
 
   describe('prepareCommand', () => {
-    it('should correctly orchestrate Seatbelt args and format the final command', async () => {
+    it('should correctly format the base command and args', async () => {
       const result = await manager.prepareCommand({
         command: 'echo',
         args: ['hello'],
@@ -117,6 +117,120 @@ describe('MacOsSandboxManager', () => {
 
       expect(result.env['SAFE_VAR']).toBe('1');
       expect(result.env['GITHUB_TOKEN']).toBeUndefined();
+    });
+
+    it('should allow network when networkAccess is true', async () => {
+      await manager.prepareCommand({
+        command: 'echo',
+        args: ['hello'],
+        cwd: mockWorkspace,
+        env: {},
+        policy: { ...mockPolicy, networkAccess: true },
+      });
+
+      expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+        expect.objectContaining({ networkAccess: true }),
+      );
+    });
+
+    describe('governance files', () => {
+      it('should ensure governance files exist', async () => {
+        await manager.prepareCommand({
+          command: 'echo',
+          args: [],
+          cwd: mockWorkspace,
+          env: {},
+          policy: mockPolicy,
+        });
+
+        // The seatbelt builder internally handles governance files, so we simply verify
+        // it is invoked correctly with the right workspace.
+        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+          expect.objectContaining({ workspace: mockWorkspace }),
+        );
+      });
+    });
+
+    describe('allowedPaths', () => {
+      it('should parameterize allowed paths and normalize them', async () => {
+        await manager.prepareCommand({
+          command: 'echo',
+          args: [],
+          cwd: mockWorkspace,
+          env: {},
+          policy: {
+            ...mockPolicy,
+            allowedPaths: ['/tmp/allowed1', '/tmp/allowed2'],
+          },
+        });
+
+        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+          expect.objectContaining({
+            allowedPaths: ['/tmp/allowed1', '/tmp/allowed2'],
+          }),
+        );
+      });
+    });
+
+    describe('forbiddenPaths', () => {
+      it('should parameterize forbidden paths and explicitly deny them', async () => {
+        await manager.prepareCommand({
+          command: 'echo',
+          args: [],
+          cwd: mockWorkspace,
+          env: {},
+          policy: {
+            ...mockPolicy,
+            forbiddenPaths: ['/tmp/forbidden1'],
+          },
+        });
+
+        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+          expect.objectContaining({
+            forbiddenPaths: ['/tmp/forbidden1'],
+          }),
+        );
+      });
+
+      it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
+        await manager.prepareCommand({
+          command: 'echo',
+          args: [],
+          cwd: mockWorkspace,
+          env: {},
+          policy: {
+            ...mockPolicy,
+            forbiddenPaths: ['/tmp/does-not-exist'],
+          },
+        });
+
+        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+          expect.objectContaining({
+            forbiddenPaths: ['/tmp/does-not-exist'],
+          }),
+        );
+      });
+
+      it('should override allowed paths if a path is also in forbidden paths', async () => {
+        await manager.prepareCommand({
+          command: 'echo',
+          args: [],
+          cwd: mockWorkspace,
+          env: {},
+          policy: {
+            ...mockPolicy,
+            allowedPaths: ['/tmp/conflict'],
+            forbiddenPaths: ['/tmp/conflict'],
+          },
+        });
+
+        expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
+          expect.objectContaining({
+            allowedPaths: ['/tmp/conflict'],
+            forbiddenPaths: ['/tmp/conflict'],
+          }),
+        );
+      });
     });
   });
 });

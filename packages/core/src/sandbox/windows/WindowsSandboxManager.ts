@@ -231,6 +231,7 @@ export class WindowsSandboxManager implements SandboxManager {
       program,
       args,
       env: sanitizedEnv,
+      cwd: req.cwd,
     };
   }
 
