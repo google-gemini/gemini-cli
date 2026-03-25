@@ -19,6 +19,7 @@ vi.mock('../../utils/events.js', () => ({
 
 function createRecordingProcessMock(onClose: () => void) {
   let closeHandler: (() => void) | null = null;
+  let stdoutDataHandler: ((chunk: Buffer) => void) | null = null;
 
   return {
     kill: vi.fn(() => closeHandler?.()),
@@ -30,6 +31,14 @@ function createRecordingProcessMock(onClose: () => void) {
         };
       }
     }),
+    stdout: {
+      on: vi.fn((event: string, callback: (chunk: Buffer) => void) => {
+        if (event === 'data') {
+          stdoutDataHandler = callback;
+        }
+      }),
+    },
+    emitStdoutData: (chunk: Buffer) => stdoutDataHandler?.(chunk),
   };
 }
 
@@ -75,6 +84,55 @@ describe('GeminiRestBackend', () => {
     expect(recordingProcess.kill).toHaveBeenCalledWith('SIGTERM');
     expect(transcribeSpy).toHaveBeenCalledOnce();
     expect(mockEmitVoiceTranscript).toHaveBeenCalledWith('hello world');
+  });
+
+  it('keeps the final flushed audio chunk that arrives after stop begins', async () => {
+    const onStateChange = vi.fn().mockResolvedValue(undefined);
+    const backend = new GeminiRestBackend(
+      {
+        onStateChange,
+        silenceThreshold: 0,
+      },
+      {
+        getContentGenerator: vi.fn(),
+      } as never,
+    );
+
+    const recordingProcess = createRecordingProcessMock(() => {
+      recordingProcess.emitStdoutData(Buffer.from([3, 0, 4, 0]));
+    });
+
+    (backend as unknown as { recordingProcess: unknown }).recordingProcess =
+      recordingProcess;
+    (backend as unknown as { audioChunks: Buffer[] }).audioChunks = [
+      Buffer.from([1, 0, 2, 0]),
+    ];
+
+    const transcribeSpy = vi
+      .spyOn(backend as never, 'transcribe')
+      .mockResolvedValue('hello world');
+
+    // Register the stdout listener the same way start() would.
+    (
+      recordingProcess.stdout.on as (
+        event: string,
+        callback: (chunk: Buffer) => void,
+      ) => void
+    )('data', (chunk: Buffer) => {
+      (
+        backend as unknown as {
+          audioChunks: Buffer[];
+        }
+      ).audioChunks.push(chunk);
+    });
+
+    await backend.stop();
+
+    expect(recordingProcess.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(transcribeSpy).toHaveBeenCalledOnce();
+    expect((transcribeSpy.mock.calls[0] as [Buffer])[0].subarray(44)).toEqual(
+      Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]),
+    );
   });
 
   it('repro: stop remains pending if the recorder never emits close', async () => {

@@ -34,7 +34,6 @@ export class GeminiRestBackend implements VoiceBackend {
   private recordingProcess: ReturnType<typeof spawn> | null = null;
   private audioChunks: Buffer[] = [];
   private stderrChunks: Buffer[] = [];
-  private isStopping = false;
 
   constructor(
     private readonly options: VoiceBackendOptions,
@@ -45,7 +44,6 @@ export class GeminiRestBackend implements VoiceBackend {
     if (this.recordingProcess) return;
 
     try {
-      this.isStopping = false;
       this.audioChunks = [];
       this.stderrChunks = [];
       let recordingProcess: ReturnType<typeof spawn> | null = null;
@@ -93,9 +91,7 @@ export class GeminiRestBackend implements VoiceBackend {
       this.recordingProcess = recordingProcess;
 
       this.recordingProcess.stdout?.on('data', (chunk: Buffer) => {
-        if (!this.isStopping) {
-          this.audioChunks.push(chunk);
-        }
+        this.audioChunks.push(chunk);
       });
 
       this.recordingProcess.stderr?.on('data', (chunk: Buffer) => {
@@ -127,7 +123,7 @@ export class GeminiRestBackend implements VoiceBackend {
 
   async cancel(): Promise<void> {
     if (!this.recordingProcess) return;
-    this.isStopping = true;
+
     const proc = this.recordingProcess;
     this.recordingProcess = null;
 
@@ -159,8 +155,6 @@ export class GeminiRestBackend implements VoiceBackend {
 
   async stop(): Promise<void> {
     if (!this.recordingProcess) return;
-
-    this.isStopping = true;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
     const closePromise = new Promise<void>((resolve) => {
