@@ -249,4 +249,50 @@ describe('Tool Selection', () => {
       ).toBe(0);
     },
   });
+
+  /**
+   * Hard case: the agent is given a large codebase and asked to find all
+   * usages of a deprecated function. It should use grep, not open every file.
+   *
+   * This is harder because the model may try to be thorough by reading files
+   * individually even when grep would be more efficient.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should use grep to find deprecated function usages across many files',
+    prompt:
+      'Find all usages of the deprecated `oldFetch` function in this codebase so I can replace them.',
+    files: Object.fromEntries([
+      ...Array.from({ length: 10 }, (_, i) => [
+        `src/module${i}.ts`,
+        i % 3 === 0
+          ? `import { oldFetch } from './api';\noldFetch('/endpoint${i}');\n`
+          : `export function util${i}() { return ${i}; }\n`,
+      ]),
+      [
+        'src/api.ts',
+        `export function oldFetch(url: string) { return fetch(url); }\nexport function newFetch(url: string) { return fetch(url); }\n`,
+      ],
+    ]),
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Must use grep -- reading 11 files individually is too expensive
+      const grepCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === GREP_TOOL_NAME,
+      );
+      expect(
+        grepCalls.length,
+        'Expected agent to use grep_search to find usages of oldFetch',
+      ).toBeGreaterThanOrEqual(1);
+
+      // Should not read all files individually
+      const readCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === READ_FILE_TOOL_NAME,
+      );
+      expect(
+        readCalls.length,
+        'Agent should not read all files individually when grep is available',
+      ).toBeLessThan(6);
+    },
+  });
 });
