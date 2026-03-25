@@ -400,7 +400,7 @@ export function runGithubActionsPinningLinter() {
   let files = [];
   try {
     files = execSync(
-      "git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml'",
+      "git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml' '.github/actions/**/*.yml' '.github/actions/**/*.yaml'",
     )
       .toString()
       .trim()
@@ -458,8 +458,8 @@ export function runGithubActionsPinningLinter() {
 GitHub Actions pinning violations found. Please use exact commit hashes.
 
 To automatically fix these, you can use the "ratchet" tool (https://github.com/sethvargo/ratchet):
-  - Mac/Linux (Homebrew): brew install ratchet && ratchet pin .github/workflows/*.yml
-  - Other platforms: Download from GitHub releases and run "ratchet pin .github/workflows/*.yml"
+  - Mac/Linux (Homebrew): brew install ratchet && ratchet pin .github/workflows/*.yml .github/actions/**/*.yml
+  - Other platforms: Download from GitHub releases and run "ratchet pin .github/workflows/*.yml .github/actions/**/*.yml"
 
 If you must use a tag, you can ignore this check by adding a comment (discouraged):
   uses: some-action@v1 # github-actions-pinning:ignore
