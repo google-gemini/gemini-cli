@@ -26,9 +26,9 @@ COPY packages/vscode-ide-companion/package.json ./packages/vscode-ide-companion/
 
 RUN npm install
 
-# Now copy the rest and build
+# Now copy the rest and bundle
 COPY . .
-RUN npm run build:packages
+RUN npm run bundle
 
 # --- STAGE 3: Development Environment ---
 FROM base AS development
@@ -66,13 +66,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /root/.npm
 
-# Copy the pre-built main branch and link it as the primary 'gemini' command
-# We only copy the necessary packages to keep the image small
-COPY --from=builder /build/packages /home/node/dev/main/packages
-COPY --from=builder /build/package.json /home/node/dev/main/package.json
-COPY --from=builder /build/tsconfig.json /home/node/dev/main/tsconfig.json
-
-RUN cd /home/node/dev/main && npm link && chown -R node:node /home/node/dev
+# Copy the pre-built bundle and alias it as 'gemini'
+# Note: Adjust path based on your 'npm run bundle' output location
+COPY --from=builder /build/bundle/gemini.js /usr/local/bin/gemini-bundled
+RUN echo '#!/usr/bin/env node\nrequire("/usr/local/bin/gemini-bundled")' > /usr/local/bin/gemini \
+    && chmod +x /usr/local/bin/gemini
 
 USER node
 WORKDIR /home/node/dev/main
