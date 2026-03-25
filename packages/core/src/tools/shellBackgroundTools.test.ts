@@ -243,4 +243,40 @@ describe('Background Tools', () => {
 
     fs.unlinkSync(logPath);
   });
+
+  it('read_background_output should deny access if log is a symbolic link', async () => {
+    const pid = 66666;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'symlink command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(logPath, 'dummy content');
+
+    // Mock lstat to report symbolic link
+    vi.spyOn(fs.promises, 'lstat').mockResolvedValue({
+      isSymbolicLink: () => true,
+    } as any);
+
+    const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('Access denied');
+    expect(result.error?.message).toContain('Symbolic link detected');
+
+    fs.unlinkSync(logPath);
+  });
 });

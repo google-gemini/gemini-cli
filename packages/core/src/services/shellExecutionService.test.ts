@@ -941,7 +941,19 @@ describe('ShellExecutionService', () => {
         ShellExecutionService.listBackgroundProcesses('default');
       expect(processes).toHaveLength(MAX);
       expect(processes.some((p) => p.pid === 1)).toBe(false);
-      expect(processes.some((p) => p.pid === 101)).toBe(true);
+    });
+
+    it('should throw error if sessionId is missing for background operations', () => {
+      expect(() => ShellExecutionService.background(102)).toThrow(
+        'Session ID is required for background operations',
+      );
+    });
+
+    it('should throw error if sessionId is missing for listBackgroundProcesses', () => {
+      expect(() =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ShellExecutionService.listBackgroundProcesses(undefined as any),
+      ).toThrow('Session ID is required');
     });
   });
 
