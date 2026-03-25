@@ -70,9 +70,7 @@ describe('App', () => {
     cleanUiDetailsVisible: true,
     quittingMessages: null,
     dialogsVisible: false,
-    mainControlsRef: {
-      current: null,
-    } as unknown as React.MutableRefObject<DOMElement | null>,
+    mainControlsRef: vi.fn(),
     rootUiRef: {
       current: null,
     } as unknown as React.MutableRefObject<DOMElement | null>,
