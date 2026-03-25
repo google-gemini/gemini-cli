@@ -90,6 +90,16 @@ export interface SandboxManager {
    * Prepares a command to run in a sandbox, including environment sanitization.
    */
   prepareCommand(req: SandboxRequest): Promise<SandboxedCommand>;
+
+  /**
+   * Checks if a command with its arguments is known to be safe for this sandbox.
+   */
+  isKnownSafeCommand(args: string[]): boolean;
+
+  /**
+   * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
+   */
+  isDangerousCommand(args: string[]): boolean;
 }
 
 /**
@@ -124,6 +134,14 @@ export class NoopSandboxManager implements SandboxManager {
       env: sanitizedEnv,
     };
   }
+
+  isKnownSafeCommand(_args: string[]): boolean {
+    return false;
+  }
+
+  isDangerousCommand(_args: string[]): boolean {
+    return false;
+  }
 }
 
 /**
@@ -132,6 +150,14 @@ export class NoopSandboxManager implements SandboxManager {
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
+  }
+
+  isKnownSafeCommand(_args: string[]): boolean {
+    return false;
+  }
+
+  isDangerousCommand(_args: string[]): boolean {
+    return false;
   }
 }
 

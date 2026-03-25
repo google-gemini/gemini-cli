@@ -1918,6 +1918,8 @@ describe('ShellExecutionService environment variables', () => {
         args: ['-c', 'ls'],
         env: { SANDBOXED: 'true' },
       }),
+      isKnownSafeCommand: vi.fn().mockReturnValue(false),
+      isDangerousCommand: vi.fn().mockReturnValue(false),
     };
 
     const configWithSandbox: ShellExecutionConfig = {
