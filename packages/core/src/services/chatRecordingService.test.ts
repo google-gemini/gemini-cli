@@ -475,7 +475,7 @@ describe('ChatRecordingService', () => {
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
       // Call with shortId
-      chatRecordingService.deleteSession(shortId);
+      await chatRecordingService.deleteSession(shortId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
@@ -537,7 +537,7 @@ describe('ChatRecordingService', () => {
       fs.mkdirSync(subagentToolOutputDir, { recursive: true });
 
       // Call with parent sessionId
-      chatRecordingService.deleteSession(parentSessionId);
+      await chatRecordingService.deleteSession(parentSessionId);
 
       expect(fs.existsSync(parentFile)).toBe(false);
       expect(fs.existsSync(subagentFile)).toBe(false);
@@ -564,16 +564,16 @@ describe('ChatRecordingService', () => {
       fs.writeFileSync(logFile, '{}');
 
       // Call with basename
-      chatRecordingService.deleteSession(basename);
+      await chatRecordingService.deleteSession(basename);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
     });
 
     it('should not throw if session file does not exist', async () => {
-      expect(() =>
+      await expect(
         chatRecordingService.deleteSession('non-existent'),
-      ).not.toThrow();
+      ).resolves.not.toThrow();
     });
   });
 

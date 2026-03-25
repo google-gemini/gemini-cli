@@ -632,17 +632,24 @@ export class ChatRecordingService {
     return this.conversationFile;
   }
 
-  deleteSession(sessionIdOrBasename: string): void {
+  async deleteSession(sessionIdOrBasename: string): Promise<void> {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
       const shortId = this.deriveShortId(sessionIdOrBasename);
 
-      if (!fs.existsSync(chatsDir)) return;
+      try {
+        await fs.promises.access(chatsDir);
+      } catch {
+        return;
+      }
 
-      const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
+      const matchingFiles = await this.getMatchingSessionFiles(
+        chatsDir,
+        shortId,
+      );
       for (const file of matchingFiles) {
-        this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
@@ -669,8 +676,11 @@ export class ChatRecordingService {
     return shortId;
   }
 
-  private getMatchingSessionFiles(chatsDir: string, shortId: string): string[] {
-    const files = fs.readdirSync(chatsDir);
+  private async getMatchingSessionFiles(
+    chatsDir: string,
+    shortId: string,
+  ): Promise<string[]> {
+    const files = await fs.promises.readdir(chatsDir);
     return files.filter(
       (f) =>
         f.startsWith(SESSION_FILE_PREFIX) &&
@@ -678,22 +688,22 @@ export class ChatRecordingService {
     );
   }
 
-  private deleteSessionAndArtifacts(
+  private async deleteSessionAndArtifacts(
     chatsDir: string,
     file: string,
     tempDir: string,
-  ): void {
+  ): Promise<void> {
     const filePath = path.join(chatsDir, file);
     try {
       const CHUNK_SIZE = 4096;
       const buffer = Buffer.alloc(CHUNK_SIZE);
       let firstLine: string;
-      let fd: number | undefined;
+      let fd: fs.promises.FileHandle | undefined;
       try {
-        fd = fs.openSync(filePath, 'r');
-        const bytesRead = fs.readSync(fd, buffer, 0, CHUNK_SIZE, null);
+        fd = await fs.promises.open(filePath, 'r');
+        const { bytesRead } = await fd.read(buffer, 0, CHUNK_SIZE, 0);
         if (bytesRead === 0) {
-          fs.unlinkSync(filePath);
+          await fs.promises.unlink(filePath);
           return;
         }
         const contentChunk = buffer.toString('utf8', 0, bytesRead);
@@ -704,7 +714,7 @@ export class ChatRecordingService {
             : contentChunk;
       } finally {
         if (fd !== undefined) {
-          fs.closeSync(fd);
+          await fd.close();
         }
       }
       const content = JSON.parse(firstLine) as unknown;
@@ -717,28 +727,38 @@ export class ChatRecordingService {
         }
       }
 
-      fs.unlinkSync(filePath);
+      await fs.promises.unlink(filePath);
 
       if (fullSessionId) {
-        this.deleteSessionLogs(fullSessionId, tempDir);
-        this.deleteSessionToolOutputs(fullSessionId, tempDir);
-        this.deleteSessionDirectory(fullSessionId, tempDir);
+        await this.deleteSessionLogs(fullSessionId, tempDir);
+        await this.deleteSessionToolOutputs(fullSessionId, tempDir);
+        await this.deleteSessionDirectory(fullSessionId, tempDir);
       }
     } catch (error) {
       debugLogger.error(`Error deleting associated file ${file}:`, error);
     }
   }
 
-  private deleteSessionLogs(sessionId: string, tempDir: string): void {
+  private async deleteSessionLogs(
+    sessionId: string,
+    tempDir: string,
+  ): Promise<void> {
     const logsDir = path.join(tempDir, 'logs');
     const safeSessionId = sanitizeFilenamePart(sessionId);
     const logPath = path.join(logsDir, `session-${safeSessionId}.jsonl`);
-    if (fs.existsSync(logPath) && logPath.startsWith(logsDir)) {
-      fs.unlinkSync(logPath);
+    if (logPath.startsWith(logsDir)) {
+      try {
+        await fs.promises.unlink(logPath);
+      } catch {
+        // ignore
+      }
     }
   }
 
-  private deleteSessionToolOutputs(sessionId: string, tempDir: string): void {
+  private async deleteSessionToolOutputs(
+    sessionId: string,
+    tempDir: string,
+  ): Promise<void> {
     const safeSessionId = sanitizeFilenamePart(sessionId);
     const toolOutputDir = path.join(
       tempDir,
@@ -746,19 +766,27 @@ export class ChatRecordingService {
       `session-${safeSessionId}`,
     );
     const toolOutputsBase = path.join(tempDir, 'tool-outputs');
-    if (
-      fs.existsSync(toolOutputDir) &&
-      toolOutputDir.startsWith(toolOutputsBase)
-    ) {
-      fs.rmSync(toolOutputDir, { recursive: true, force: true });
+    if (toolOutputDir.startsWith(toolOutputsBase)) {
+      try {
+        await fs.promises.rm(toolOutputDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
     }
   }
 
-  private deleteSessionDirectory(sessionId: string, tempDir: string): void {
+  private async deleteSessionDirectory(
+    sessionId: string,
+    tempDir: string,
+  ): Promise<void> {
     const safeSessionId = sanitizeFilenamePart(sessionId);
     const sessionDir = path.join(tempDir, safeSessionId);
-    if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
-      fs.rmSync(sessionDir, { recursive: true, force: true });
+    if (sessionDir.startsWith(tempDir)) {
+      try {
+        await fs.promises.rm(sessionDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
     }
   }
 
