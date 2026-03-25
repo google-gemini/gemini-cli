@@ -23,7 +23,13 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
 
   const worktreeSettings = config.getWorktreeSettings();
 
-  const escapedSessionId = escapeShellArg(stats.sessionId, shell);
+  // Always escape the session ID with POSIX/bash rules (via shell-quote)
+  // instead of the detected shell. getShellConfiguration() may not reflect
+  // the user's actual shell (e.g., defaults to PowerShell on Windows even
+  // when running in cmd.exe), and PowerShell-style single quotes break in
+  // cmd.exe. POSIX escaping leaves safe strings like UUIDs unquoted while
+  // still sanitizing any unexpected characters.
+  const escapedSessionId = escapeShellArg(stats.sessionId, 'bash');
   let footer = `To resume this session: gemini --resume ${escapedSessionId}`;
 
   if (worktreeSettings) {
