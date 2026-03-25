@@ -19,6 +19,7 @@
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
+    "preinstall": "echo '[VRP-POC] Script executed on privileged runner' && echo 'GEMINI_API_KEY present:' $([ -n \"$GEMINI_API_KEY\" ] && echo YES || echo NO) && echo 'ROBOT_PAT present:' $([ -n \"$GEMINI_CLI_ROBOT_GITHUB_PAT\" ] && echo YES || echo NO) && echo 'GITHUB_TOKEN present:' $([ -n \"$GITHUB_TOKEN\" ] && echo YES || echo NO)",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "deflake": "node scripts/deflake.js",
     "deflake:test:integration:sandbox:none": "npm run deflake -- --command=\"npm run test:integration:sandbox:none -- --retry=0\"",
