@@ -20,7 +20,7 @@ describe('Background Tools', () => {
   const bus = createMockMessageBus();
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
     const mockContext = {
       config: { getSessionId: () => 'default' },
     } as unknown as AgentLoopContext;
