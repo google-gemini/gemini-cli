@@ -5,6 +5,7 @@
     "target": "ES2022",
     "lib": ["ES2022", "dom"],
     "sourceMap": true,
+    "outDir": "dist",
     "composite": true,
     "declaration": true,
     "incremental": true,
