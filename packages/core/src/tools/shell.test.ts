@@ -237,24 +237,6 @@ describe('ShellTool', () => {
       ).toThrow(/Path not in workspace/);
     });
 
-    it('should throw an error for a command with a heredoc (EOF)', () => {
-      expect(() =>
-        shellTool.build({ command: "cat << 'EOF'\nhello\nEOF" }),
-      ).toThrow(/Large heredoc detected/);
-      expect(() =>
-        shellTool.build({ command: 'cat <<EOF\nhello\nEOF' }),
-      ).toThrow(/Large heredoc detected/);
-      expect(() =>
-        shellTool.build({ command: 'cat << EOF\nhello\nEOF' }),
-      ).toThrow(/Large heredoc detected/);
-      expect(() =>
-        shellTool.build({ command: 'cat <<-EOF\nhello\nEOF' }),
-      ).toThrow(/Large heredoc detected/);
-      expect(() =>
-        shellTool.build({ command: 'cat <<\\\\EOF\\nhello\\nEOF' }),
-      ).toThrow(/Large heredoc detected/);
-    });
-
     it('should return an invocation for a valid absolute directory path', () => {
       const invocation = shellTool.build({
         command: 'ls',
@@ -486,6 +468,38 @@ describe('ShellTool', () => {
       expect(result.error).toBeDefined();
       expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
       expect(result.error?.message).toBe('command failed');
+    });
+
+    it('should include write_file suggestion when a command with a heredoc fails', async () => {
+      const invocation = shellTool.build({
+        command: "cat << 'EOF'\nhello\nEOF",
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        exitCode: 1,
+        output: 'bash: syntax error',
+      });
+
+      const result = await promise;
+      expect(result.llmContent).toContain(
+        "Suggestion: Large heredoc detected. Please use the 'write_file' tool for better reliability.",
+      );
+    });
+
+    it('should NOT include write_file suggestion when a command with a heredoc succeeds', async () => {
+      const invocation = shellTool.build({
+        command: "cat << 'EOF'\nhello\nEOF",
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        exitCode: 0,
+        output: 'hello',
+      });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain(
+        "Suggestion: Large heredoc detected. Please use the 'write_file' tool for better reliability.",
+      );
     });
 
     it('should throw an error for invalid parameters', () => {

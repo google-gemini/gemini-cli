@@ -51,6 +51,8 @@ import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
+const HEREDOC_REGEX = /<<[-]?\s*['"\\\]?EOF['"]?/;
+
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
 
@@ -430,6 +432,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
+
+        if (HEREDOC_REGEX.test(this.params.command)) {
+          llmContent +=
+            "\nSuggestion: Large heredoc detected. Please use the 'write_file' tool for better reliability.";
+        }
       } else if (this.params.is_background || result.backgrounded) {
         llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         data = {
@@ -466,6 +473,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
         if (result.pid) {
           llmContentParts.push(`Process Group PGID: ${result.pid}`);
+        }
+
+        const failed =
+          !!result.error ||
+          !!result.signal ||
+          (result.exitCode !== null && result.exitCode !== 0);
+
+        if (failed && HEREDOC_REGEX.test(this.params.command)) {
+          llmContentParts.push(
+            "Suggestion: Large heredoc detected. Please use the 'write_file' tool for better reliability.",
+          );
         }
 
         llmContent = llmContentParts.join('\n');
@@ -690,10 +708,6 @@ export class ShellTool extends BaseDeclarativeTool<
   ): string | null {
     if (!params.command.trim()) {
       return 'Command cannot be empty.';
-    }
-
-    if (/<<[-]?\s*['"\\\]?EOF['"]?/.test(params.command)) {
-      return "Large heredoc detected. Please use the 'write_file' tool for better reliability.";
     }
 
     if (params.dir_path) {
