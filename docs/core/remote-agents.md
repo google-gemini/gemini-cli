@@ -110,7 +110,9 @@ This format is useful for shorter, single-line JSON strings.
 ---
 kind: remote
 name: single-quotes-agent
-agent_card_json: '{ "protocolVersion": "0.3.0", "name": "Example Agent", "version": "1.0.0", "url": "dummy-url" }'
+agent_card_json:
+  '{ "protocolVersion": "0.3.0", "name": "Example Agent", "version": "1.0.0",
+  "url": "dummy-url" }'
 ---
 ```
 
@@ -168,7 +170,9 @@ must be escaped with a backslash.
 ---
 kind: remote
 name: double-quotes-agent
-agent_card_json: "{ \"protocolVersion\": \"0.3.0\", \"name\": \"Example Agent\", \"version\": \"1.0.0\", \"url\": \"dummy-url\" }"
+agent_card_json:
+  '{ "protocolVersion": "0.3.0", "name": "Example Agent", "version": "1.0.0",
+  "url": "dummy-url" }'
 ---
 ```
 
