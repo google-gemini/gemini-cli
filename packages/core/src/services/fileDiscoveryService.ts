@@ -14,6 +14,7 @@ import {
 } from '../utils/ignoreFileParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import { isNodeError } from '../utils/errors.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -98,9 +99,15 @@ export class FileDiscoveryService {
         dirEntries = await fs.promises.readdir(currentDir, {
           withFileTypes: true,
         });
-      } catch {
-        // Stop if the directory is inaccessible or doesn't exist
-        return;
+      } catch (error: unknown) {
+        if (
+          isNodeError(error) &&
+          (error.code === 'EACCES' || error.code === 'ENOENT')
+        ) {
+          // Stop if the directory is inaccessible or doesn't exist
+          return;
+        }
+        throw error;
       }
 
       for (const entry of dirEntries) {
