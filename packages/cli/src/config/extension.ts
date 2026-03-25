@@ -43,6 +43,15 @@ export interface ExtensionConfig {
     directory?: string;
   };
   /**
+   * Task tracking configuration contributed by this extension.
+   */
+  tracker?: {
+    /**
+     * The directory where task tracking data is stored.
+     */
+    directory?: string;
+  };
+  /**
    * Used to migrate an extension to a new repository source.
    */
   migratedTo?: string;

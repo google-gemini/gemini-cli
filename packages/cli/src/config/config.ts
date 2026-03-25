@@ -570,9 +570,17 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
-  const extensionPlanSettings = extensionManager
+  const activeExtensions = extensionManager
     .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+    .filter((ext) => ext.isActive);
+
+  const extensionPlanSettings = activeExtensions.find(
+    (ext) => !!ext.plan?.directory,
+  )?.plan;
+
+  const extensionTrackerSettings = activeExtensions.find(
+    (ext) => !!ext.tracker?.directory,
+  )?.tracker;
 
   const experimentalJitContext = settings.experimental.jitContext;
 
@@ -931,6 +939,9 @@ export async function loadCliConfig(
     planSettings: settings.general?.plan?.directory
       ? settings.general.plan
       : (extensionPlanSettings ?? settings.general?.plan),
+    trackerSettings: settings.general?.tracker?.directory
+      ? settings.general.tracker
+      : (extensionTrackerSettings ?? settings.general?.tracker),
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

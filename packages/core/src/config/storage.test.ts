@@ -371,6 +371,78 @@ describe('Storage – additional helpers', () => {
       });
     });
   });
+
+  describe('getTrackerDir', () => {
+    interface TestCase {
+      name: string;
+      customDir: string | undefined;
+      expected: string | (() => string);
+      expectedError?: string;
+      setup?: () => () => void;
+    }
+
+    const testCases: TestCase[] = [
+      {
+        name: 'custom relative path',
+        customDir: '.gemini/tracker',
+        expected: path.resolve(projectRoot, '.gemini/tracker'),
+      },
+      {
+        name: 'custom absolute path outside throws',
+        customDir: '/absolute/path/to/tracker',
+        expected: '',
+        expectedError: `Custom tracker directory '/absolute/path/to/tracker' resolves to '/absolute/path/to/tracker', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
+      },
+      {
+        name: 'absolute path that happens to be inside project root',
+        customDir: path.join(projectRoot, '.gemini/tracker'),
+        expected: path.join(projectRoot, '.gemini/tracker'),
+      },
+      {
+        name: 'relative path that stays within project root',
+        customDir: 'subdir/../tracker',
+        expected: path.resolve(projectRoot, 'tracker'),
+      },
+      {
+        name: 'dot path',
+        customDir: '.',
+        expected: projectRoot,
+      },
+      {
+        name: 'default behavior when customDir is undefined',
+        customDir: undefined,
+        expected: () => storage.getProjectTempTrackerDir(),
+      },
+      {
+        name: 'escaping relative path throws',
+        customDir: '../escaped-tracker',
+        expected: '',
+        expectedError: `Custom tracker directory '../escaped-tracker' resolves to '${resolveToRealPath(path.resolve(projectRoot, '../escaped-tracker'))}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
+      },
+    ];
+
+    testCases.forEach(({ name, customDir, expected, expectedError, setup }) => {
+      it(`should handle ${name}`, async () => {
+        const cleanup = setup?.();
+        try {
+          if (name.includes('default behavior')) {
+            await storage.initialize();
+          }
+
+          storage.setCustomTrackerDir(customDir);
+          if (expectedError) {
+            expect(() => storage.getTrackerDir()).toThrow(expectedError);
+          } else {
+            const expectedValue =
+              typeof expected === 'function' ? expected() : expected;
+            expect(storage.getTrackerDir()).toBe(expectedValue);
+          }
+        } finally {
+          cleanup?.();
+        }
+      });
+    });
+  });
 });
 
 describe('Storage - System Paths', () => {

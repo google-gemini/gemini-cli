@@ -3688,6 +3688,46 @@ describe('loadCliConfig mcpEnabled', () => {
       expect(config.storage.getPlansDir()).not.toContain('ext-plans-dir');
     });
 
+    it('should use tracker directory from active extension when user has not specified one', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+        {
+          name: 'ext-tracker',
+          isActive: true,
+          tracker: { directory: 'ext-tracker-dir' },
+        } as unknown as GeminiCLIExtension,
+      ]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.storage.getTrackerDir()).toContain('ext-tracker-dir');
+    });
+
+    it('should NOT use tracker directory from active extension when user has specified one', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        general: { tracker: { directory: 'user-tracker-dir' } },
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+        {
+          name: 'ext-tracker',
+          isActive: true,
+          tracker: { directory: 'ext-tracker-dir' },
+        } as unknown as GeminiCLIExtension,
+      ]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.storage.getTrackerDir()).toContain('user-tracker-dir');
+      expect(config.storage.getTrackerDir()).not.toContain('ext-tracker-dir');
+    });
+
     it('should NOT use plan directory from inactive extension', async () => {
       process.argv = ['node', 'script.js'];
       const settings = createTestMergedSettings({
@@ -3706,6 +3746,27 @@ describe('loadCliConfig mcpEnabled', () => {
       const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.storage.getPlansDir()).not.toContain(
         'ext-plans-dir-inactive',
+      );
+    });
+
+    it('should NOT use tracker directory from inactive extension', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+        {
+          name: 'ext-tracker',
+          isActive: false,
+          tracker: { directory: 'ext-tracker-dir-inactive' },
+        } as unknown as GeminiCLIExtension,
+      ]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.storage.getTrackerDir()).not.toContain(
+        'ext-tracker-dir-inactive',
       );
     });
 
