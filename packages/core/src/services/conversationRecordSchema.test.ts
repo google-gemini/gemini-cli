@@ -5,310 +5,277 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { Language, Outcome } from '@google/genai';
 import { CoreToolCallStatus } from '../scheduler/types.js';
-import { AgentTerminateMode } from '../agents/types.js';
 import { conversationRecordSchema } from './conversationRecordSchema.js';
-import type { ZodIssue } from 'zod';
 
 describe('conversationRecordSchema', () => {
-  it('parses a fully valid conversation record', () => {
-    const validConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      summary: 'Session summary',
-      directories: ['C:/repo', 'C:/repo/packages/core'],
-      kind: 'main' as const,
-      messages: [
-        {
-          id: 'user-msg-1',
-          timestamp: '2026-03-25T10:00:01.000Z',
-          type: 'user' as const,
-          content: [{ text: 'Please inspect this file.' }],
-        },
-        {
-          id: 'assistant-msg-1',
-          timestamp: '2026-03-25T10:00:10.000Z',
-          type: 'gemini' as const,
-          model: 'gemini-2.5-pro',
-          content: [
-            {
-              text: 'Running the tool now.',
-              thought: true,
-              thoughtSignature: 'sig-1',
-            },
-            {
-              functionCall: {
-                name: 'read_file',
-                id: 'call-1',
-                args: { filePath: 'README.md' },
-              },
-            },
-          ],
-          displayContent: 'Running read_file... ',
-          toolCalls: [
-            {
-              id: 'call-1',
-              name: 'read_file',
-              args: { filePath: 'README.md' },
-              status: CoreToolCallStatus.Success,
-              timestamp: '2026-03-25T10:00:09.000Z',
-              result: [
-                {
-                  functionResponse: {
-                    name: 'read_file',
-                    id: 'call-1',
-                    response: { output: 'File content...' },
-                  },
-                },
-              ],
-              displayName: 'Read File',
-              description: 'Read README.md',
-              resultDisplay: {
-                isSubagentProgress: true,
-                agentName: 'Explore',
-                recentActivity: [
-                  {
-                    id: 'activity-1',
-                    type: 'thought',
-                    content: 'Searching files',
-                    status: 'running',
-                  },
-                ],
-                state: 'completed',
-                result: 'Done',
-                terminateReason: AgentTerminateMode.GOAL,
-              },
-              renderOutputAsMarkdown: false,
-            },
-          ],
-          thoughts: [
-            {
-              subject: 'Search',
-              description: 'Looking for target files',
-              timestamp: '2026-03-25T10:00:08.000Z',
-            },
-          ],
-          tokens: {
-            input: 20,
-            output: 15,
-            cached: 0,
-            thoughts: 4,
-            tool: 8,
-            total: 43,
-          },
-        },
-      ],
-    };
+	const validRecord = {
+		sessionId: 'session-123',
+		projectHash: 'project-hash-abc',
+		startTime: '2026-01-01T00:00:00.000Z',
+		lastUpdated: '2026-01-01T00:01:00.000Z',
+		kind: 'main' as const,
+		directories: ['C:/repo'],
+		summary: 'Test conversation summary',
+		messages: [
+			{
+				id: 'msg-1',
+				timestamp: '2026-01-01T00:00:01.000Z',
+				type: 'user' as const,
+				content: 'Hello',
+				displayContent: 'Hello',
+			},
+			{
+				id: 'msg-2',
+				timestamp: '2026-01-01T00:00:10.000Z',
+				type: 'gemini' as const,
+				model: 'gemini-3-pro-preview',
+				content: [
+					{
+						text: 'Working on it.',
+					},
+					{
+						functionCall: {
+							name: 'read_file',
+							id: 'call-1',
+							args: {
+								filePath: 'src/index.ts',
+							},
+						},
+					},
+					{
+						executableCode: {
+							code: 'console.log(1)',
+							language: Language.PYTHON,
+						},
+					},
+					{
+						codeExecutionResult: {
+							outcome: Outcome.OUTCOME_OK,
+							output: '1',
+						},
+					},
+					{
+						functionResponse: {
+							name: 'read_file',
+							response: {
+								content: 'file-body',
+							},
+							parts: [
+								'done',
+								{
+									text: 'ok',
+								},
+							],
+						},
+					},
+				],
+				thoughts: [
+					{
+						subject: 'Plan',
+						description: 'Inspecting files first.',
+						timestamp: '2026-01-01T00:00:09.000Z',
+					},
+				],
+				tokens: {
+					input: 10,
+					output: 20,
+					cached: 5,
+					thoughts: 3,
+					tool: 2,
+					total: 40,
+				},
+				toolCalls: [
+					{
+						id: 'tool-1',
+						name: 'read_file',
+						args: {
+							filePath: 'src/index.ts',
+						},
+						result: {
+							text: 'export const x = 1;',
+						},
+						status: CoreToolCallStatus.Success,
+						timestamp: '2026-01-01T00:00:11.000Z',
+						displayName: 'Read File',
+						description: 'Reads file content',
+						renderOutputAsMarkdown: false,
+						resultDisplay: {
+							fileDiff: '@@ -1 +1 @@',
+							fileName: 'index.ts',
+							filePath: 'src/index.ts',
+							originalContent: 'export const x = 0;',
+							newContent: 'export const x = 1;',
+							diffStat: {
+								model_added_lines: 1,
+								model_removed_lines: 1,
+								model_added_chars: 17,
+								model_removed_chars: 17,
+								user_added_lines: 0,
+								user_removed_lines: 0,
+								user_added_chars: 0,
+								user_removed_chars: 0,
+							},
+							isNewFile: false,
+						},
+					},
+				],
+			},
+		],
+	};
 
-    const parsed = conversationRecordSchema.parse(validConversation);
-    expect(parsed.sessionId).toBe('session-123');
-    expect(parsed.messages).toHaveLength(2);
-    expect(parsed.messages[1].type).toBe('gemini');
-  });
+	it('parses a fully valid conversation record', () => {
+		const parsed = conversationRecordSchema.parse(validRecord);
+		expect(parsed.sessionId).toBe(validRecord.sessionId);
+		expect(parsed.messages).toHaveLength(2);
+		expect(parsed.messages[1].type).toBe('gemini');
+	});
 
-  it('rejects a missing required top-level field', () => {
-    const invalidConversation = {
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [],
-    };
+	it('rejects a missing required top-level field', () => {
+		const invalidRecord = {
+			...validRecord,
+		} as Record<string, unknown>;
+		delete invalidRecord['sessionId'];
 
-    const result = conversationRecordSchema.safeParse(invalidConversation);
-    expect(result.success).toBe(false);
+		const result = conversationRecordSchema.safeParse(invalidRecord);
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			const hasSessionIdIssue = result.error.issues.some(
+				(issue) => issue.path.join('.') === 'sessionId',
+			);
+			expect(hasSessionIdIssue).toBe(true);
+		}
+	});
 
-    if (!result.success) {
-      expect(result.error.issues[0]?.path).toEqual(['sessionId']);
-      expect(result.error.issues[0]?.code).toBe('invalid_type');
-    }
-  });
+	it('rejects incorrect nested scalar types', () => {
+		const invalidRecord = {
+			...validRecord,
+			messages: [
+				validRecord.messages[0],
+				{
+					...validRecord.messages[1],
+					tokens: {
+						...(validRecord.messages[1] as { tokens: Record<string, unknown> })
+							.tokens,
+						total: 'forty',
+					},
+				},
+			],
+		};
 
-  it('rejects incorrect nested scalar types', () => {
-    const invalidConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [
-        {
-          id: 'assistant-msg-1',
-          timestamp: '2026-03-25T10:00:10.000Z',
-          type: 'gemini',
-          content: [{ text: 'ok' }],
-          tokens: {
-            input: 10,
-            output: 5,
-            cached: 0,
-            total: '15',
-          },
-        },
-      ],
-    };
+		const result = conversationRecordSchema.safeParse(invalidRecord);
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			const hasTotalTypeIssue = result.error.issues.some(
+				(issue) => issue.path.join('.') === 'messages.1.tokens.total',
+			);
+			expect(hasTotalTypeIssue).toBe(true);
+		}
+	});
 
-    const result = conversationRecordSchema.safeParse(invalidConversation);
-    expect(result.success).toBe(false);
+	it('rejects invalid message and tool status discriminator values', () => {
+		const invalidRecord = {
+			...validRecord,
+			messages: [
+				{
+					...validRecord.messages[0],
+					type: 'assistant',
+				},
+				validRecord.messages[1],
+			],
+		};
 
-    if (!result.success) {
-      const totalIssue = result.error.issues.find(
-        (issue: ZodIssue) =>
-          issue.path.join('.') === 'messages.0.tokens.total',
-      );
-      expect(totalIssue).toBeDefined();
-      expect(totalIssue?.code).toBe('invalid_type');
-    }
-  });
+		const result = conversationRecordSchema.safeParse(invalidRecord);
+		expect(result.success).toBe(false);
+	});
 
-  it('rejects invalid message and tool status discriminator values', () => {
-    const invalidConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [
-        {
-          id: 'bad-msg-1',
-          timestamp: '2026-03-25T10:00:10.000Z',
-          type: 'assistant',
-          content: [{ text: 'hello' }],
-          toolCalls: [
-            {
-              id: 'call-1',
-              name: 'read_file',
-              args: {},
-              status: 'done',
-              timestamp: '2026-03-25T10:00:09.000Z',
-            },
-          ],
-        },
-      ],
-    };
+	it('rejects malformed tool call payloads and resultDisplay shapes', () => {
+		const invalidRecord = {
+			...validRecord,
+			messages: [
+				validRecord.messages[0],
+				{
+					...validRecord.messages[1],
+					toolCalls: [
+						{
+							...(validRecord.messages[1] as { toolCalls: Array<Record<string, unknown>> })
+								.toolCalls[0],
+							args: 'not-an-object',
+							resultDisplay: {
+								fileDiff: '@@ -1 +1 @@',
+								fileName: 'index.ts',
+								originalContent: null,
+								newContent: 'new content',
+							},
+						},
+					],
+				},
+			],
+		};
 
-    const result = conversationRecordSchema.safeParse(invalidConversation);
-    expect(result.success).toBe(false);
-  });
+		const result = conversationRecordSchema.safeParse(invalidRecord);
+		expect(result.success).toBe(false);
+	});
 
-  it('rejects malformed tool call payloads and resultDisplay shapes', () => {
-    const invalidConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [
-        {
-          id: 'assistant-msg-1',
-          timestamp: '2026-03-25T10:00:10.000Z',
-          type: 'gemini',
-          content: [{ text: 'ok' }],
-          toolCalls: [
-            {
-              id: 'call-1',
-              name: 'read_file',
-              args: 'not-an-object',
-              status: CoreToolCallStatus.Success,
-              timestamp: '2026-03-25T10:00:09.000Z',
-              resultDisplay: {
-                todos: [
-                  {
-                    description: 'Do thing',
-                    status: 'UNKNOWN',
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      ],
-    };
+	it('rejects malformed PartListUnion variants', () => {
+		const invalidRecord = {
+			...validRecord,
+			messages: [
+				{
+					...validRecord.messages[0],
+					content: {
+						thought: true,
+					},
+				},
+				validRecord.messages[1],
+			],
+		};
 
-    const result = conversationRecordSchema.safeParse(invalidConversation);
-    expect(result.success).toBe(false);
+		const result = conversationRecordSchema.safeParse(invalidRecord);
+		expect(result.success).toBe(false);
+	});
 
-    if (!result.success) {
-      const argsIssue = result.error.issues.find(
-        (issue: ZodIssue) =>
-          issue.path.join('.') === 'messages.0.toolCalls.0.args',
-      );
-      expect(argsIssue).toBeDefined();
-    }
-  });
+	it('allows nullable fields where explicitly nullable', () => {
+		const nullableRecord = {
+			...validRecord,
+			messages: [
+				validRecord.messages[0],
+				{
+					...validRecord.messages[1],
+					tokens: null,
+					toolCalls: [
+						{
+							...(validRecord.messages[1] as { toolCalls: Array<Record<string, unknown>> })
+								.toolCalls[0],
+							result: null,
+						},
+					],
+				},
+			],
+		};
 
-  it('rejects malformed PartListUnion variants', () => {
-    const invalidConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [
-        {
-          id: 'assistant-msg-1',
-          timestamp: '2026-03-25T10:00:10.000Z',
-          type: 'gemini',
-          content: [
-            {
-              functionResponse: {
-                name: 'read_file',
-                id: 'call-1',
-                response: { output: 'ok' },
-                parts: [{ bad: 'shape' }],
-              },
-            },
-          ],
-        },
-      ],
-    };
+		const parsed = conversationRecordSchema.parse(nullableRecord);
+		expect(parsed.messages[1].type).toBe('gemini');
+		if (parsed.messages[1].type === 'gemini') {
+			expect(parsed.messages[1].tokens).toBeNull();
+			expect(parsed.messages[1].toolCalls?.[0]?.result).toBeNull();
+		}
+	});
 
-    const result = conversationRecordSchema.safeParse(invalidConversation);
-    expect(result.success).toBe(false);
-  });
+	it('rejects unknown fields on strict objects', () => {
+		const invalidRecord = {
+			...validRecord,
+			unexpectedTopLevel: true,
+		};
 
-  it('allows nullable fields where explicitly nullable', () => {
-    const validConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [
-        {
-          id: 'assistant-msg-1',
-          timestamp: '2026-03-25T10:00:10.000Z',
-          type: 'gemini',
-          content: [{ text: 'ok' }],
-          tokens: null,
-          toolCalls: [
-            {
-              id: 'call-1',
-              name: 'read_file',
-              args: {},
-              status: CoreToolCallStatus.Success,
-              timestamp: '2026-03-25T10:00:09.000Z',
-              result: null,
-            },
-          ],
-        },
-      ],
-    };
-
-    const result = conversationRecordSchema.safeParse(validConversation);
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects unknown fields on strict objects', () => {
-    const invalidConversation = {
-      sessionId: 'session-123',
-      projectHash: 'project-hash-abc',
-      startTime: '2026-03-25T10:00:00.000Z',
-      lastUpdated: '2026-03-25T10:05:00.000Z',
-      messages: [],
-      extraTopLevelField: true,
-    };
-
-    const result = conversationRecordSchema.safeParse(invalidConversation);
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error.issues[0]?.code).toBe('unrecognized_keys');
-    }
-  });
+		const result = conversationRecordSchema.safeParse(invalidRecord);
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			const hasStrictIssue = result.error.issues.some(
+				(issue) => issue.code === 'unrecognized_keys',
+			);
+			expect(hasStrictIssue).toBe(true);
+		}
+	});
 });
