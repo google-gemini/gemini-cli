@@ -1915,7 +1915,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       showTransientMessage,
       settings.merged.general.devtools,
-      settings.merged.general.debugKeystrokeLogging,
       showErrorDetails,
       triggerExpandHint,
       voice,

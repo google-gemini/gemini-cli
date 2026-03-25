@@ -209,7 +209,7 @@ describe('LocalWhisperBackend', () => {
     expect(settled).toBe(false);
   });
 
-  it('repro: cancel remains pending if the recorder never emits close', async () => {
+  it('cancel resolves immediately even if the recorder never emits close', async () => {
     const onStateChange = vi.fn().mockResolvedValue(undefined);
     const backend = new LocalWhisperBackend({
       onStateChange,
@@ -238,6 +238,6 @@ describe('LocalWhisperBackend', () => {
       expect.any(Function),
     );
     expect(recordingProcess.kill).toHaveBeenCalledWith('SIGTERM');
-    expect(settled).toBe(false);
+    expect(settled).toBe(true);
   });
 });
