@@ -16,6 +16,8 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
+  getAgentCardLoadOptions,
+  getRemoteAgentTargetUrl,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -92,10 +94,11 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     }
 
     if (this.definition.auth) {
+      const targetUrl = getRemoteAgentTargetUrl(this.definition);
       const provider = await A2AAuthProviderFactory.create({
         authConfig: this.definition.auth,
         agentName: this.definition.name,
-        targetUrl: this.definition.agentCardUrl,
+        targetUrl,
         agentCardUrl: this.definition.agentCardUrl,
       });
       if (!provider) {
@@ -162,7 +165,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       if (!this.clientManager.getClient(this.definition.name)) {
         await this.clientManager.loadAgent(
           this.definition.name,
-          this.definition.agentCardUrl,
+          getAgentCardLoadOptions(this.definition),
           authHandler,
         );
       }
