@@ -7,6 +7,14 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  isKnownSafeCommand as isMacSafeCommand,
+  isDangerousCommand as isMacDangerousCommand,
+} from '../sandbox/macos/commandSafety.js';
+import {
+  isKnownSafeCommand as isWindowsSafeCommand,
+  isDangerousCommand as isWindowsDangerousCommand,
+} from '../sandbox/windows/commandSafety.js';
 import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
@@ -90,6 +98,16 @@ export interface SandboxManager {
    * Prepares a command to run in a sandbox, including environment sanitization.
    */
   prepareCommand(req: SandboxRequest): Promise<SandboxedCommand>;
+
+  /**
+   * Checks if a command with its arguments is known to be safe for this sandbox.
+   */
+  isKnownSafeCommand(args: string[]): boolean;
+
+  /**
+   * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
+   */
+  isDangerousCommand(args: string[]): boolean;
 }
 
 /**
@@ -124,6 +142,18 @@ export class NoopSandboxManager implements SandboxManager {
       env: sanitizedEnv,
     };
   }
+
+  isKnownSafeCommand(args: string[]): boolean {
+    return os.platform() === 'win32'
+      ? isWindowsSafeCommand(args)
+      : isMacSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return os.platform() === 'win32'
+      ? isWindowsDangerousCommand(args)
+      : isMacDangerousCommand(args);
+  }
 }
 
 /**
@@ -132,6 +162,14 @@ export class NoopSandboxManager implements SandboxManager {
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
+  }
+
+  isKnownSafeCommand(_args: string[]): boolean {
+    return false;
+  }
+
+  isDangerousCommand(_args: string[]): boolean {
+    return false;
   }
 }
 
