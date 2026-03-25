@@ -88,7 +88,11 @@ export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export { PolicyDecision, ApprovalMode } from './policy/types.js';
+export {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_YOLO_ALLOW_ALL,
+} from './policy/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
@@ -126,7 +130,7 @@ export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
-export * from './services/windowsSandboxManager.js';
+export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
 export * from './services/trackerService.js';

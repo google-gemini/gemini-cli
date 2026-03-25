@@ -331,6 +331,8 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Maximum number of actions (tool calls) allowed per task. Default: 100 */
+  maxActionsPerTask?: number;
   /** Whether to confirm sensitive actions (e.g., fill_form, evaluate_script). */
   confirmSensitiveActions?: boolean;
   /** Whether to block file uploads. */
@@ -1027,7 +1029,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -2335,6 +2337,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.policyEngine.getApprovalMode();
   }
 
+  isPlanMode(): boolean {
+    return this.getApprovalMode() === ApprovalMode.PLAN;
+  }
+
   getPolicyUpdateConfirmationRequest():
     | PolicyUpdateConfirmationRequest
     | undefined {
@@ -3190,6 +3196,7 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        maxActionsPerTask: customConfig.maxActionsPerTask ?? 100,
         confirmSensitiveActions: customConfig.confirmSensitiveActions,
         blockFileUploads: customConfig.blockFileUploads,
       },
