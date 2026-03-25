@@ -36,6 +36,7 @@ describe('AuthInProgress', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it('renders initial state with spinner', async () => {

@@ -11,34 +11,12 @@ Enter to submit · Esc to cancel
 "
 `;
 
-exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 2`] = `
-"Select your preferred language:
-
-  1.  TypeScript
-  2.  JavaScript
-● 3.  Enter a custom value
-
-Enter to submit · Esc to cancel
-"
-`;
-
 exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
 "Select your preferred language:
 
   1.  TypeScript
   2.  JavaScript
 ● 3.  Type another language...                                                  
-
-Enter to submit · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 2`] = `
-"Select your preferred language:
-
-  1.  TypeScript
-  2.  JavaScript
-● 3.  Type another language...
 
 Enter to submit · Esc to cancel
 "
@@ -60,44 +38,12 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 
-exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 2`] = `
-"Choose an option
-
-▲
-●  1.  Option 1
-       Description 1
-   2.  Option 2
-       Description 2
-   3.  Option 3
-       Description 3
-▼
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-"
-`;
-
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 1`] = `
 "Choose an option
 
 ▲
 ●  1.  Option 1                                                                 
        Description 1                                                            
-   2.  Option 2
-       Description 2
-   3.  Option 3
-       Description 3
-▼
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 2`] = `
-"Choose an option
-
-▲
-●  1.  Option 1
-       Description 1
    2.  Option 2
        Description 2
    3.  Option 3
@@ -243,22 +189,6 @@ exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 
   2. [x] ESLint
 ● 3. [x] All of the above                                                                                               
       Select all options                                                                                                
-  4. [ ] Enter a custom value
-   Done
-   Finish selection
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > verifies "All of the above" visual state with snapshot 2`] = `
-"Which features?
-(Select all that apply)
-
-  1. [x] TypeScript
-  2. [x] ESLint
-● 3. [x] All of the above
-      Select all options
   4. [ ] Enter a custom value
    Done
    Finish selection
