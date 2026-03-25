@@ -267,7 +267,7 @@ describe('Background Tools', () => {
     // Mock lstat to report symbolic link
     vi.spyOn(fs.promises, 'lstat').mockResolvedValue({
       isSymbolicLink: () => true,
-    } as any);
+    } as unknown as fs.Stats);
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
