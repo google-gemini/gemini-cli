@@ -124,6 +124,7 @@ export function resolvePolicyChain(
         previewEnabled,
         userTier: config.getUserTier(),
         useGemini31,
+        useGemini31FlashLite,
         useCustomToolModel,
       });
     } else {
@@ -133,6 +134,7 @@ export function resolvePolicyChain(
         previewEnabled: false,
         userTier: config.getUserTier(),
         useGemini31,
+        useGemini31FlashLite,
         useCustomToolModel,
       });
     }
