@@ -696,6 +696,7 @@ export class ShellTool extends BaseDeclarativeTool<
     const definition = getShellDefinition(
       context.config.getEnableInteractiveShell(),
       context.config.getEnableShellOutputEfficiency(),
+      context.config.getSandboxEnabled(),
     );
     super(
       ShellTool.Name,
@@ -745,6 +746,7 @@ export class ShellTool extends BaseDeclarativeTool<
     const definition = getShellDefinition(
       this.context.config.getEnableInteractiveShell(),
       this.context.config.getEnableShellOutputEfficiency(),
+      this.context.config.getSandboxEnabled(),
     );
     return resolveToolDeclaration(definition, modelId);
   }

@@ -702,15 +702,6 @@ export class PolicyEngine {
       }
     }
 
-    // Sandbox Expansion requests MUST always be confirmed by the user,
-    // even if the base command is otherwise ALLOWED by the policy engine.
-    if (
-      decision === PolicyDecision.ALLOW &&
-      toolCall.args?.['additional_permissions']
-    ) {
-      decision = PolicyDecision.ASK_USER;
-    }
-
     return {
       decision: this.applyNonInteractiveMode(decision),
       rule: matchedRule,
