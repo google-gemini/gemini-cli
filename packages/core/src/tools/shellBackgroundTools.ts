@@ -14,6 +14,10 @@ import {
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+
+const MAX_BUFFER_LOAD_CAP_BYTES = 64 * 1024; // Safe 64KB buffer load Cap
+const DEFAULT_TAIL_LINES_COUNT = 100;
 
 // --- list_background_processes ---
 
@@ -22,8 +26,7 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private readonly context: any,
+    private readonly context: AgentLoopContext,
     params: Record<string, never>,
     messageBus: MessageBus,
     _toolName?: string,
@@ -69,8 +72,7 @@ export class ListBackgroundProcessesTool extends BaseDeclarativeTool<
   static readonly Name = 'list_background_processes';
 
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private readonly context: any,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
     super(
@@ -111,8 +113,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private readonly context: any,
+    private readonly context: AgentLoopContext,
     params: ReadBackgroundOutputParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -159,9 +160,19 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     }
 
     try {
-      const stats = await fs.promises.stat(logPath);
-      const maxBytes = 64 * 1024; // Safe buffer load Cap
-      const readSize = Math.min(stats.size, maxBytes);
+      const stats = await fs.promises.lstat(logPath);
+      if (stats.isSymbolicLink()) {
+        return {
+          llmContent: `Access denied: Predictable log path cannot be a symbolic link for security safeguarding.`,
+          returnDisplay: `Symlink detected for PID ${pid}`,
+          error: {
+            message: 'Symbolic link detected at predicted log path triggers accurately reading triggers accurately',
+            type: ToolErrorType.EXECUTION_FAILED,
+          },
+        };
+      }
+
+      const readSize = Math.min(stats.size, MAX_BUFFER_LOAD_CAP_BYTES);
       const position = Math.max(0, stats.size - readSize);
 
       const buffer = Buffer.alloc(readSize);
@@ -186,7 +197,8 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         logLines.pop();
       }
 
-      const requestedLinesCount = this.params.lines ?? 100; // Default to 100 lines
+      const requestedLinesCount =
+        this.params.lines ?? DEFAULT_TAIL_LINES_COUNT;
       const tailLines = logLines.slice(-requestedLinesCount);
       const output = tailLines.join('\n');
 
@@ -223,8 +235,7 @@ export class ReadBackgroundOutputTool extends BaseDeclarativeTool<
   static readonly Name = 'read_background_output';
 
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private readonly context: any,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
     super(

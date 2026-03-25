@@ -47,10 +47,14 @@ describe('Background Tools', () => {
     // So we MUST populate them or mock them!
     // Let's use vi.spyOn or populate the map if accessible?
     // activePtys is private static.
-    // But we can just call ShellExecutionService.background(pid) and it will fall back to 'unknown command' if not found!
-    // Let's check background() implementation:
-    // const command = activePty?.command ?? activeChild?.command ?? 'unknown command';
-    // So it works even if nothing is in the maps!
+    // Mock active process map to provide sessionId
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).activeChildProcesses.set(pid, {
+      process: {},
+      state: { output: '' },
+      command: 'unknown command',
+      sessionId: 'default',
+    });
 
     ShellExecutionService.background(pid);
 
@@ -202,7 +206,7 @@ describe('Background Tools', () => {
     fs.writeFileSync(logPath, 'dummy content');
 
     // Mock stat to throw to hit catch block
-    vi.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('Simulated read error'));
+    vi.spyOn(fs.promises, 'lstat').mockRejectedValue(new Error('Simulated read error'));
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
