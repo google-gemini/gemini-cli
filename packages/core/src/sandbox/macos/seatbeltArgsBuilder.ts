@@ -108,11 +108,11 @@ export async function buildSeatbeltArgs(
       const escapedBase = escapeRegex(resolvedBase);
       if (secret.pattern.endsWith('*')) {
         // .env.* -> .env\..+ (match .env followed by dot and something)
-        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\.');
+        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\\\.');
         regexPattern = `^${escapedBase}/.*${basePattern}[^/]+$`;
       } else {
         // .env -> \.env$
-        const basePattern = secret.pattern.replace(/\./g, '\\.');
+        const basePattern = secret.pattern.replace(/\./g, '\\\\.');
         regexPattern = `^${escapedBase}/.*${basePattern}$`;
       }
       profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
@@ -257,6 +257,15 @@ export async function buildSeatbeltArgs(
   return args;
 }
 
+/**
+ * Escapes a string for use within a Seatbelt regex literal #"..."
+ */
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // First, escape characters that are special in the regex engine.
+  // We use quadruple backslashes because this string is first parsed as
+  // a Scheme string (where \\ -> \) and then by the regex engine.
+  const regexEscaped = str.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&');
+
+  // Next, escape double quotes which would terminate the #"..." literal.
+  return regexEscaped.replace(/"/g, '\\"');
 }
