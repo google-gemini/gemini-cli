@@ -115,6 +115,14 @@ The following list details all available tools, categorized by their primary fun
 * **[`web_fetch`](../tools/web-fetch.md)** (`Fetch`): Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts.
   * **Parameters:** `prompt`
 
+## Under the hood
+
+For developers, the tool system is designed to be extensible and robust. The
+`ToolRegistry` class manages all available tools.
+
+You can extend Gemini CLI with custom tools by configuring
+`tools.discoveryCommand` in your settings or by connecting to MCP servers.
+
 > [!NOTE]
 > For a deep dive into the internal Tool API and how to implement your
 > own tools in the codebase, see the `packages/core/src/tools/` directory in
