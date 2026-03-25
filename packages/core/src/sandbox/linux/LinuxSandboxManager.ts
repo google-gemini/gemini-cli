@@ -209,9 +209,15 @@ export class LinuxSandboxManager implements SandboxManager {
     const bindFlag = workspaceWrite ? '--bind-try' : '--ro-bind-try';
 
     if (workspaceWrite) {
-      bwrapArgs.push('--bind-try', workspacePath, workspacePath);
+      bwrapArgs.push('--bind-try', this.options.workspace, this.options.workspace);
+      if (workspacePath !== this.options.workspace) {
+        bwrapArgs.push('--bind-try', workspacePath, workspacePath);
+      }
     } else {
-      bwrapArgs.push('--ro-bind-try', workspacePath, workspacePath);
+      bwrapArgs.push('--ro-bind-try', this.options.workspace, this.options.workspace);
+      if (workspacePath !== this.options.workspace) {
+        bwrapArgs.push('--ro-bind-try', workspacePath, workspacePath);
+      }
     }
 
     const { worktreeGitDir, mainGitDir } =
