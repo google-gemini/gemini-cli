@@ -21,7 +21,10 @@ import {
   type UIState,
 } from '../contexts/UIStateContext.js';
 import { type IndividualToolCallDisplay } from '../types.js';
-import { type ConfirmingToolState } from '../hooks/useConfirmingTool.js';
+import {
+  type ConfirmingToolState,
+  useConfirmingTool,
+} from '../hooks/useConfirmingTool.js';
 
 // Mock dependencies
 const mockUseSettings = vi.fn().mockReturnValue({
@@ -548,10 +551,11 @@ describe('MainContent', () => {
       config: makeFakeConfig({ useAlternateBuffer: false }),
     });
 
-    const output = lastFrame();
+    await waitFor(() => {
+      expect(lastFrame()).toContain('codebase_investigator');
+    });
 
-    expect(output).toContain('codebase_investigator');
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -599,13 +603,16 @@ describe('MainContent', () => {
     const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: uiState as Partial<UIState>,
     });
-    const output = lastFrame();
-    // Verify Part 1 and Part 2 are rendered.
-    expect(output).toContain('Part 1');
-    expect(output).toContain('Part 2');
+
+    await waitFor(() => {
+      const output = lastFrame();
+      // Verify Part 1 and Part 2 are rendered.
+      expect(output).toContain('Part 1');
+      expect(output).toContain('Part 2');
+    });
 
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -650,7 +657,6 @@ describe('MainContent', () => {
     };
 
     // We need to mock useConfirmingTool to return our confirmingTool
-    const { useConfirmingTool } = await import('../hooks/useConfirmingTool.js');
     vi.mocked(useConfirmingTool).mockReturnValue(
       confirmingTool as unknown as ConfirmingToolState,
     );
@@ -667,15 +673,16 @@ describe('MainContent', () => {
       config: makeFakeConfig({ useAlternateBuffer: false }),
     });
 
-    const output = lastFrame();
-
-    // The output should NOT contain 'Hidden content'
-    expect(output).not.toContain('Hidden content');
-    // The output should contain the confirmation header
-    expect(output).toContain('Ready to start implementation?');
+    await waitFor(() => {
+      const output = lastFrame();
+      // The output should NOT contain 'Hidden content'
+      expect(output).not.toContain('Hidden content');
+      // The output should contain the confirmation header
+      expect(output).toContain('Ready to start implementation?');
+    });
 
     // Snapshot will reveal if there are extra blank lines
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -708,9 +715,12 @@ describe('MainContent', () => {
       config: makeFakeConfig({ useAlternateBuffer: false }),
     });
 
-    const output = lastFrame();
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Apply plan');
+    });
+
     // This snapshot will show no spurious line because the group is now correctly suppressed.
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
