@@ -121,9 +121,18 @@ export interface ResumedSessionData {
  * Loads a ConversationRecord from a JSONL session file.
  * Returns null if the file is invalid or cannot be read.
  */
+export interface LoadConversationOptions {
+  maxMessages?: number;
+  metadataOnly?: boolean;
+}
+
 export async function loadConversationRecord(
   filePath: string,
-): Promise<ConversationRecord | null> {
+  options?: LoadConversationOptions,
+): Promise<
+  | (ConversationRecord & { messageCount?: number; firstUserMessage?: string })
+  | null
+> {
   if (!fs.existsSync(filePath)) {
     return null;
   }
@@ -137,6 +146,8 @@ export async function loadConversationRecord(
 
     let metadata: Partial<ConversationRecord> = {};
     const messagesMap = new Map<string, MessageRecord>();
+    const messageIds: string[] = [];
+    let firstUserMessageStr: string | undefined;
 
     for await (const line of rl) {
       if (!line.trim()) continue;
@@ -144,26 +155,72 @@ export async function loadConversationRecord(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const record = JSON.parse(line) as Record<string, unknown>;
         if (record['$rewindTo']) {
-          // Remove all messages that come after or include the rewind ID
-          const rewindId = record['$rewindTo'];
-          let found = false;
-          const idsToDelete: string[] = [];
-          for (const [id] of messagesMap) {
-            if (id === rewindId) found = true;
-            if (found) idsToDelete.push(id);
-          }
-          for (const id of idsToDelete) {
-            messagesMap.delete(id);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const rewindId = record['$rewindTo'] as string;
+          if (options?.metadataOnly) {
+            const idx = messageIds.indexOf(rewindId);
+            if (idx !== -1) {
+              messageIds.splice(idx);
+            } else {
+              messageIds.length = 0;
+            }
+          } else {
+            let found = false;
+            const idsToDelete: string[] = [];
+            for (const [id] of messagesMap) {
+              if (id === rewindId) found = true;
+              if (found) idsToDelete.push(id);
+            }
+            if (found) {
+              for (const id of idsToDelete) {
+                messagesMap.delete(id);
+              }
+            } else {
+              messagesMap.clear();
+            }
           }
         } else if (record['id']) {
-          // It's a MessageRecord
+          // Track message count and first user message
+          if (options?.metadataOnly) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            messageIds.push(record['id'] as string);
+          }
+          if (
+            !firstUserMessageStr &&
+            record['type'] === 'user' &&
+            record['content']
+          ) {
+            // Basic extraction of first user message for display
+            const rawContent = record['content'];
+            if (Array.isArray(rawContent)) {
+              firstUserMessageStr = rawContent
+                .map((p: unknown) => {
+                  if (!p || typeof p !== 'object' || !('text' in p)) return '';
 
-          messagesMap.set(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            record['id'] as string,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            record as unknown as MessageRecord,
-          );
+                  const text = (p as Record<string, unknown>)['text'];
+                  return typeof text === 'string' ? text : '';
+                })
+                .join('');
+            } else if (typeof rawContent === 'string') {
+              firstUserMessageStr = rawContent;
+            }
+          }
+
+          if (!options?.metadataOnly) {
+            messagesMap.set(
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              record['id'] as string,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              record as unknown as MessageRecord,
+            );
+            if (
+              options?.maxMessages &&
+              messagesMap.size > options.maxMessages
+            ) {
+              const firstKey = messagesMap.keys().next().value;
+              if (firstKey) messagesMap.delete(firstKey);
+            }
+          }
         } else if (record['$set']) {
           // Metadata update
           metadata = {
@@ -179,7 +236,6 @@ export async function loadConversationRecord(
       }
     }
 
-    const messages = Array.from(messagesMap.values());
     if (!metadata.sessionId || !metadata.projectHash) {
       return null;
     }
@@ -192,7 +248,11 @@ export async function loadConversationRecord(
       summary: metadata.summary,
       directories: metadata.directories,
       kind: metadata.kind,
-      messages, // Return the full array; let the caller truncate if needed
+      messages: Array.from(messagesMap.values()),
+      messageCount: options?.metadataOnly
+        ? messageIds.length
+        : messagesMap.size,
+      firstUserMessage: firstUserMessageStr,
     };
   } catch (error) {
     debugLogger.error('Error loading conversation record from JSONL:', error);
@@ -265,12 +325,13 @@ export class ChatRecordingService {
 
         const loadedRecord = await loadConversationRecord(
           this.conversationFile,
+          { maxMessages: MAX_HISTORY_MESSAGES },
         );
         if (loadedRecord) {
           // Truncate memory messages and keep bounded
-          const boundedMessages = loadedRecord.messages
-            .slice(-MAX_HISTORY_MESSAGES)
-            .map(truncateLargeToolResults);
+          const boundedMessages = loadedRecord.messages.map(
+            truncateLargeToolResults,
+          );
 
           this.cachedConversation = {
             ...loadedRecord,
@@ -624,8 +685,28 @@ export class ChatRecordingService {
   ): void {
     const filePath = path.join(chatsDir, file);
     try {
-      const contentStr = fs.readFileSync(filePath, 'utf8');
-      const firstLine = contentStr.split('\n')[0];
+      const CHUNK_SIZE = 4096;
+      const buffer = Buffer.alloc(CHUNK_SIZE);
+      let firstLine: string;
+      let fd: number | undefined;
+      try {
+        fd = fs.openSync(filePath, 'r');
+        const bytesRead = fs.readSync(fd, buffer, 0, CHUNK_SIZE, null);
+        if (bytesRead === 0) {
+          fs.unlinkSync(filePath);
+          return;
+        }
+        const contentChunk = buffer.toString('utf8', 0, bytesRead);
+        const newlineIndex = contentChunk.indexOf('\n');
+        firstLine =
+          newlineIndex !== -1
+            ? contentChunk.substring(0, newlineIndex)
+            : contentChunk;
+      } finally {
+        if (fd !== undefined) {
+          fs.closeSync(fd);
+        }
+      }
       const content = JSON.parse(firstLine) as unknown;
 
       let fullSessionId: string | undefined;
