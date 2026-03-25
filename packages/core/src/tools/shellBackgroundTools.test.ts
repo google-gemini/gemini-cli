@@ -279,4 +279,36 @@ describe('Background Tools', () => {
 
     fs.unlinkSync(logPath);
   });
+
+  it('read_background_output should tail reading trailing logic correctly', async () => {
+    const pid = 77777;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'tail command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
+
+    fs.mkdirSync(logDir, { recursive: true });
+    // Write 5 lines
+    fs.writeFileSync(logPath, 'line1\nline2\nline3\nline4\nline5');
+
+    const invocation = readTool.build({ pid, tailLines: 2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('line4\nline5');
+    expect(result.llmContent).not.toContain('line1');
+
+    fs.unlinkSync(logPath);
+  });
 });
