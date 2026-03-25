@@ -77,7 +77,7 @@ const createErrorResponse = (
     {
       functionResponse: {
         id: request.callId,
-        name: request.name,
+        name: request.originalRequestName ?? request.name,
         response: { error: error.message },
       },
     },
@@ -766,6 +766,8 @@ export class Scheduler {
         name: tailRequest.name,
         args: tailRequest.args,
         originalRequestName,
+        originalRequestArgs:
+          result.request.originalRequestArgs ?? result.request.args,
         isClientInitiated: result.request.isClientInitiated,
         prompt_id: result.request.prompt_id,
         schedulerId: this.schedulerId,

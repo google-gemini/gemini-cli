@@ -669,6 +669,30 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should use originalRequestName when generating an error response', async () => {
+      const error = new Error('Some error');
+      vi.mocked(checkPolicy).mockRejectedValue(error);
+
+      const tailReq = { ...req1, originalRequestName: 'original-tool-name' };
+      await scheduler.schedule(tailReq, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                name: 'original-tool-name',
+                response: { error: 'Some error' },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
     it('should handle errors from checkPolicy (e.g. non-interactive ASK_USER)', async () => {
       const error = new Error('Not interactive');
       vi.mocked(checkPolicy).mockRejectedValue(error);
@@ -1131,6 +1155,7 @@ describe('Scheduler (Orchestrator)', () => {
               name: 'tool-b',
               args: { key: 'value' },
               originalRequestName: 'test-tool', // Preserves original name
+              originalRequestArgs: req1.args, // Preserves original args
             }),
             tool: mockToolB,
           }),

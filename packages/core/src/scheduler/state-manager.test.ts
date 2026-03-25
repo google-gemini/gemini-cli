@@ -44,6 +44,8 @@ describe('SchedulerStateManager', () => {
 
   const mockInvocation = {
     shouldConfirmExecute: vi.fn(),
+    execute: vi.fn(),
+    getDescription: vi.fn(),
   } as unknown as AnyToolInvocation;
 
   const createValidatingCall = (
@@ -608,6 +610,19 @@ describe('SchedulerStateManager', () => {
         ),
       ).toBe(true);
       expect(onUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should use originalRequestName when cancelling queued calls', () => {
+      const call = createValidatingCall('tail-1');
+      call.request.originalRequestName = 'original-tool';
+      stateManager.enqueue([call]);
+
+      stateManager.cancelAllQueued('Batch cancel');
+
+      const completed = stateManager.completedBatch[0] as CancelledToolCall;
+      expect(completed.response.responseParts[0]?.functionResponse?.name).toBe(
+        'original-tool',
+      );
     });
 
     it('should not notify if cancelAllQueued is called on an empty queue', () => {

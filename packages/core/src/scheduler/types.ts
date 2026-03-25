@@ -37,10 +37,12 @@ export interface ToolCallRequestInfo {
   name: string;
   args: Record<string, unknown>;
   /**
-   * The original name of the tool requested by the model.
-   * This is used for tail calls to ensure the final response retains the original name.
+   * The original name and arguments of the tool requested by the model.
+   * This is used for tail calls to ensure the final response and log retains
+   * the original values.
    */
   originalRequestName?: string;
+  originalRequestArgs?: Record<string, unknown>;
   isClientInitiated: boolean;
   prompt_id: string;
   checkpoint?: string;
