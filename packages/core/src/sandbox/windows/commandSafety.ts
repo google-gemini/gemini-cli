@@ -48,7 +48,10 @@ export async function isStrictlyApproved(
     const parsedArgs = shellParse(trimmed).map(extractStringFromParseEntry);
     if (parsedArgs.length === 0) return true;
 
-    const root = parsedArgs[0].toLowerCase();
+    let root = parsedArgs[0].toLowerCase();
+    if (root.endsWith('.exe')) {
+      root = root.slice(0, -4);
+    }
     // The segment is approved if the root tool is in the allowlist OR if the whole segment is safe.
     return (
       tools.some((t) => t.toLowerCase() === root) ||
@@ -62,7 +65,10 @@ export async function isStrictlyApproved(
  */
 export function isKnownSafeCommand(args: string[]): boolean {
   if (!args || args.length === 0) return false;
-  const cmd = args[0].toLowerCase();
+  let cmd = args[0].toLowerCase();
+  if (cmd.endsWith('.exe')) {
+    cmd = cmd.slice(0, -4);
+  }
 
   // Native Windows/PowerShell safe commands
   const safeCommands = new Set([
@@ -111,7 +117,10 @@ export function isKnownSafeCommand(args: string[]): boolean {
  */
 export function isDangerousCommand(args: string[]): boolean {
   if (!args || args.length === 0) return false;
-  const cmd = args[0].toLowerCase();
+  let cmd = args[0].toLowerCase();
+  if (cmd.endsWith('.exe')) {
+    cmd = cmd.slice(0, -4);
+  }
 
   const dangerous = new Set([
     'del',

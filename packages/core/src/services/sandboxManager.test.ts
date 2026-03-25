@@ -223,6 +223,24 @@ describe('SandboxManager', () => {
       expect(result.env['SAFE_VAR']).toBe('safe-value');
       expect(result.env['BLOCKED_VAR']).toBeUndefined();
     });
+
+    it('should delegate isKnownSafeCommand to platform specific checkers', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      expect(sandboxManager.isKnownSafeCommand(['ls'])).toBe(true);
+      expect(sandboxManager.isKnownSafeCommand(['dir'])).toBe(false);
+
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      expect(sandboxManager.isKnownSafeCommand(['dir'])).toBe(true);
+    });
+
+    it('should delegate isDangerousCommand to platform specific checkers', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('darwin');
+      expect(sandboxManager.isDangerousCommand(['rm', '-rf', '.'])).toBe(true);
+      expect(sandboxManager.isDangerousCommand(['del'])).toBe(false);
+
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      expect(sandboxManager.isDangerousCommand(['del'])).toBe(true);
+    });
   });
 
   describe('createSandboxManager', () => {

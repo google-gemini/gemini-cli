@@ -7,6 +7,14 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  isKnownSafeCommand as isMacSafeCommand,
+  isDangerousCommand as isMacDangerousCommand,
+} from '../sandbox/macos/commandSafety.js';
+import {
+  isKnownSafeCommand as isWindowsSafeCommand,
+  isDangerousCommand as isWindowsDangerousCommand,
+} from '../sandbox/windows/commandSafety.js';
 import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
@@ -135,12 +143,16 @@ export class NoopSandboxManager implements SandboxManager {
     };
   }
 
-  isKnownSafeCommand(_args: string[]): boolean {
-    return false;
+  isKnownSafeCommand(args: string[]): boolean {
+    return os.platform() === 'win32'
+      ? isWindowsSafeCommand(args)
+      : isMacSafeCommand(args);
   }
 
-  isDangerousCommand(_args: string[]): boolean {
-    return false;
+  isDangerousCommand(args: string[]): boolean {
+    return os.platform() === 'win32'
+      ? isWindowsDangerousCommand(args)
+      : isMacDangerousCommand(args);
   }
 }
 
