@@ -17,13 +17,14 @@ When reviewing code, perform the following steps before finalizing your review:
 Analyze the new code to identify the core algorithms, utility functions, generic data structures, or UI components being introduced. Look beyond the specific business logic to see the underlying mechanics.
 
 ### 2. Hypothesize Existing Locations & Trace Dependencies
-Think about where this type of code *would* live if it already existed in the project.
-- **Utilities:** `utils/`, `helpers/`, `shared/`, `core/`
-- **UI Components:** `components/`, `ui/`, `design-system/`
-- **Data Access:** `api/`, `services/`, `repositories/`
-- **Constants:** `constants/`, `config/`, `types/`
+Think about where this type of code *would* live if it already existed in the project. Provide absolute paths from the repo root to disambiguate.
+- **Utilities:** `packages/core/src/utils/`, `packages/cli/src/utils/`
+- **UI Components:** `packages/cli/src/ui/components/`, `packages/cli/src/ui/`
+- **Services:** `packages/core/src/services/`, `packages/cli/src/services/`
+- **Configuration:** `packages/core/src/config/`, `packages/cli/src/config/`
+- **Core Logic:** Call out `packages/core/` if functionality does not appear React UI specific.
 
-**Trace Third-Party Dependencies:** If the PR introduces a new import for a utility library (e.g., `lodash.merge`, `date-fns`), immediately run a `grep_search` for that import string across the codebase to see how and where the project currently uses that library. Use the `include_pattern` (e.g., `packages/*/src/**`) to narrow your search and save context. There is likely an existing wrapper or shared utility.
+**Trace Third-Party Dependencies:** If the PR introduces a new import for a utility library (e.g., `lodash.merge`, `date-fns`), trace how and where the project currently uses that library. There is likely an existing wrapper or shared utility.
 
 **Check Package Files:** Before flagging a custom implementation of a complex algorithm, check `package.json` to see if a standard library (like `lodash` or `uuid`) is already installed that provides this functionality.
 
@@ -46,7 +47,7 @@ Check if the new code aligns with the project's established conventions.
 - **Error Handling:** Does it use the project's standard error classes or logging mechanisms?
 - **State Management:** Does it bypass established stores or contexts?
 - **Styling:** Does it hardcode colors or spacing instead of using theme variables?
-If the PR introduces a new pattern, aggressively verify if an existing pattern should have been used instead.
+If the PR introduces a new pattern, compare it against the documented standards and explicitly confirm if an existing project pattern should have been used instead.
 
 ### 5. Formulate Constructive Feedback
 If you discover that the PR duplicates existing functionality or ignores a best practice:
