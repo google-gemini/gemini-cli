@@ -130,6 +130,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { usePromptStash } from './hooks/usePromptStash.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -253,17 +254,7 @@ export const AppContainer = (props: AppContainerProps) => {
     QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
 
-  const [stashedPrompt, setStashedPrompt] = useState<string | null>(null);
-  const stashPrompt = useCallback((text: string) => {
-    if (text.length > 0) {
-      setStashedPrompt(text);
-    }
-  }, []);
-  const popStashedPrompt = useCallback(() => {
-    const prompt = stashedPrompt;
-    setStashedPrompt(null);
-    return prompt;
-  }, [stashedPrompt]);
+  const { stashedPrompt, stashPrompt, popStashedPrompt } = usePromptStash();
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);

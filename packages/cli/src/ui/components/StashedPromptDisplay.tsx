@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,7 +18,7 @@ export const StashedPromptDisplay = ({
   }
 
   return (
-    <Box paddingLeft={2} marginTop={1}>
+    <Box paddingLeft={2}>
       <Text dimColor>Stashed (restores after submit)</Text>
     </Box>
   );

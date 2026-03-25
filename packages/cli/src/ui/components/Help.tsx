@@ -190,12 +190,6 @@ export const Help: React.FC<Help> = ({ commands }) => (
       </Text>{' '}
       - Cycle through your prompt history
     </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        {formatCommand(Command.STASH_INPUT)}
-      </Text>{' '}
-      - Stash current prompt (restores on next submit)
-    </Text>
     <Box height={1} />
     <Text color={theme.text.primary}>
       For a full list of shortcuts, see{' '}

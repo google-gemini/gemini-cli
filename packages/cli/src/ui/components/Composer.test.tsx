@@ -1095,5 +1095,14 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState);
       expect(lastFrame()).toMatchSnapshot();
     });
+
+    it('matches snapshot with stashed prompt and queued messages', async () => {
+      const uiState = createMockUIState({
+        stashedPrompt: 'This is a stashed prompt',
+        messageQueue: ['First queued message', 'Second queued message'],
+      });
+      const { lastFrame } = await renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
   });
 });

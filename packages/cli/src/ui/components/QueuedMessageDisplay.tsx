@@ -20,7 +20,7 @@ export const QueuedMessageDisplay = ({
   }
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column">
       <Box paddingLeft={2}>
         <Text dimColor>Queued (press ↑ to edit):</Text>
       </Box>

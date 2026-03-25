@@ -523,13 +523,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         <ConfigInitDisplay message="Resuming session..." />
       )}
 
-      {showUiDetails && (
-        <StashedPromptDisplay stashedPrompt={uiState.stashedPrompt} />
-      )}
-
-      {showUiDetails && (
-        <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
-      )}
+      {showUiDetails &&
+        (uiState.stashedPrompt || uiState.messageQueue.length > 0) && (
+          <Box flexDirection="column" marginTop={1}>
+            <StashedPromptDisplay stashedPrompt={uiState.stashedPrompt} />
+            <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+          </Box>
+        )}
 
       {showUiDetails && <TodoTray />}
 
