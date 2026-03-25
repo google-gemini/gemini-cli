@@ -43,15 +43,13 @@ Learn more at
 
 ### Log in with Gemini API Key (unpaid)
 
-If you are using a Gemini API key, you can also benefit from a free tier. This
-includes:
-
-- 250 model requests / user / day
-- 10 model requests / user / minute
-- Model requests to Flash model only.
+If you are using a Gemini API key, a free tier may be available depending on the
+selected pricing tier and model. Request limits and supported models vary by
+tier and can change over time.
 
 Learn more at
-[Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+[Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits) and
+[Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing).
 
 ### Log in with Vertex AI (Express Mode)
 
@@ -111,6 +109,7 @@ Standard/Plus and AI Expanded, are not supported._
   license seats. For predictable costs, you can sign in with Google.
 
   This includes the following request limits:
+
   - Gemini Code Assist Standard edition:
     - 1500 model requests / user / day
     - 120 model requests / user / minute

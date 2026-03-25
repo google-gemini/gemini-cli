@@ -181,9 +181,11 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
-- **Model selection**: Choose specific Gemini models
-- **Usage-based billing**: Upgrade for higher limits when needed
+- **Free tier**: API key limits vary by model and pricing tier; see
+  [quota and pricing](./docs/resources/quota-and-pricing.md#gemini-api-key) for
+  current limits
+- **Model selection**: Choose specific Gemini models available for your tier
+- **Usage-based billing**: Upgrade for higher limits and broader model access
 
 ```bash
 # Get your key from https://aistudio.google.com/apikey
