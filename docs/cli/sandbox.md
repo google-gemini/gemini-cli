@@ -92,7 +92,7 @@ To set up runsc:
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
 
-### 4. LXC/LXD (Linux only, experimental)
+### 5. LXC/LXD (Linux only, experimental)
 
 Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
 containers run a complete Linux system with `systemd`, `snapd`, and other system
