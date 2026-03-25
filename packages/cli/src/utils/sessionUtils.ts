@@ -12,6 +12,7 @@ import {
   type Config,
   type ConversationRecord,
   type MessageRecord,
+  loadConversationRecord,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -250,23 +251,25 @@ export const getAllSessionFiles = async (
   try {
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
-      .filter((f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'))
+      .filter(
+        (f) =>
+          f.startsWith(SESSION_FILE_PREFIX) &&
+          (f.endsWith('.json') || f.endsWith('.jsonl')),
+      )
       .sort(); // Sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const content: ConversationRecord = JSON.parse(
-            await fs.readFile(filePath, 'utf8'),
-          );
+          const content = await loadConversationRecord(filePath);
+          if (!content) {
+            return { fileName: file, sessionInfo: null };
+          }
 
           // Validate required fields
           if (
             !content.sessionId ||
-            !content.messages ||
-            !Array.isArray(content.messages) ||
             !content.startTime ||
             !content.lastUpdated
           ) {
@@ -514,10 +517,10 @@ export class SessionSelector {
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const sessionData: ConversationRecord = JSON.parse(
-        await fs.readFile(sessionPath, 'utf8'),
-      );
+      const sessionData = await loadConversationRecord(sessionPath);
+      if (!sessionData) {
+        throw new Error('Failed to load session data');
+      }
 
       const displayInfo = `Session ${sessionInfo.index}: ${sessionInfo.firstUserMessage} (${sessionInfo.messageCount} messages, ${formatRelativeTime(sessionInfo.lastUpdated)})`;
 
