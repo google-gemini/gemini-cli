@@ -849,6 +849,12 @@ their corresponding top-level category object in your `settings.json` file.
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
           }
         ]
       },
