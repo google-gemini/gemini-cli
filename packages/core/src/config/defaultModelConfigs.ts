@@ -436,6 +436,15 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'auto-gemini-2.5': {
       default: 'gemini-2.5-pro',
     },
+    'gemini-3.1-flash-lite-preview': {
+      default: 'gemini-3.1-flash-lite-preview',
+      contexts: [
+        {
+          condition: { hasAccessToPreview: false },
+          target: 'gemini-2.5-flash-lite',
+        },
+      ],
+    },
     flash: {
       default: 'gemini-3-flash-preview',
       contexts: [
@@ -447,6 +456,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'flash-lite': {
       default: 'gemini-2.5-flash-lite',
+      contexts: [
+        {
+          condition: { useGemini3_1: true },
+          target: 'gemini-3.1-flash-lite-preview',
+        },
+      ],
     },
   },
   classifierIdResolutions: {

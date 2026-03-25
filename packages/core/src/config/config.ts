@@ -1823,6 +1823,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -1835,6 +1839,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -1847,6 +1855,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -2913,12 +2925,21 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.1 has been launched.
+   * Returns whether Gemini 3.1 Pro has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
   async getGemini31Launched(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
     return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether Gemini 3.1 Flash Lite has been launched.
+   * This method is async and ensures that experiments are loaded before returning the result.
+   */
+  async getGemini31FlashLiteLaunched(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getGemini31FlashLiteLaunchedSync();
   }
 
   /**
@@ -2958,6 +2979,27 @@ export class Config implements McpContext, AgentLoopContext {
     }
     return (
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
+        ?.boolValue ?? false
+    );
+  }
+
+  /**
+   * Returns whether Gemini 3.1 Flash Lite has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   * If you need to call this during startup or from an async context, use
+   * getGemini31FlashLiteLaunched instead.
+   */
+  getGemini31FlashLiteLaunchedSync(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
     );
   }
