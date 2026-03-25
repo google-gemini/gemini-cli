@@ -33,7 +33,13 @@ RUN npm run build:packages
 # --- STAGE 3: Development Environment ---
 FROM base AS development
 
-# Install Build Tools & Utilities
+# Set up npm global package folder early
+RUN mkdir -p /usr/local/share/npm-global \
+  && chown -R node:node /usr/local/share/npm-global
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/share/npm-global/bin
+
+# Install Build Tools, Global Dev Tools, and Release Channels in a single layer to minimize size
 RUN apt-get update && apt-get install -y --no-install-recommends \
   make \
   g++ \
@@ -51,32 +57,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential \
   libsecret-1-dev \
   libkrb5-dev \
+  && npm install -g tsx vitest prettier eslint typescript cross-env \
+  && npm install -g @google/gemini-cli@nightly && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-nightly \
+  && npm install -g @google/gemini-cli@preview && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-preview \
+  && npm install -g @google/gemini-cli@latest  && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-stable \
+  && apt-get purge -y build-essential libsecret-1-dev libkrb5-dev \
+  && apt-get autoremove -y \
   && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* /tmp/* /root/.npm
 
-# Set up npm global package folder
-RUN mkdir -p /usr/local/share/npm-global \
-  && chown -R node:node /usr/local/share/npm-global
-ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV PATH=$PATH:/usr/local/share/npm-global/bin
+# Copy the pre-built main branch and link it as the primary 'gemini' command
+# We only copy the necessary packages to keep the image small
+COPY --from=builder /build/packages /home/node/dev/main/packages
+COPY --from=builder /build/package.json /home/node/dev/main/package.json
+COPY --from=builder /build/tsconfig.json /home/node/dev/main/tsconfig.json
 
-# Install core developer tools
-RUN npm install -g tsx vitest prettier eslint typescript cross-env
-
-# Install specific release channels for testing
-RUN npm install -g @google/gemini-cli@nightly && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-nightly
-RUN npm install -g @google/gemini-cli@preview && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-preview
-RUN npm install -g @google/gemini-cli@latest  && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-stable
-
-# Link the local build (from Stage 2) as the primary 'gemini' command
-COPY --from=builder /build /home/node/dev/main
-RUN cd /home/node/dev/main && npm link
-
-# Ensure node user owns the dev directory
-RUN chown -R node:node /home/node/dev
+RUN cd /home/node/dev/main && npm link && chown -R node:node /home/node/dev
 
 USER node
 WORKDIR /home/node/dev/main
-
-# Default entrypoint
 CMD ["/bin/bash"]
