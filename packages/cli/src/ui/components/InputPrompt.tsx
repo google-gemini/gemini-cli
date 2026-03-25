@@ -690,19 +690,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation;
 
-      // Check if any interactive overlay is active that the user might want
-      // to dismiss with Escape. If so, let the keypress be handled locally
-      // instead of falling through to the global cancellation handler.
-      const isOverlayActive =
-        shellModeActive ||
-        reverseSearchActive ||
-        commandSearchActive ||
-        (completion.showSuggestions && isShellSuggestionsVisible);
-
-      if (key.name === 'escape' && isGenerating && !isOverlayActive) {
-        return false;
-      }
-
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
       const hasTabCompletionInteraction =
@@ -884,6 +871,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShellModeActive(false);
           resetEscapeState();
           return true;
+        }
+
+        // If we're generating and no local overlay consumed Escape, let it
+        // propagate to the global cancellation handler.
+        if (isGenerating) {
+          return false;
         }
 
         handleEscPress();
