@@ -1521,9 +1521,11 @@ describe('useGeminiStream', () => {
     it('should disable loop detection and show message when user selects "disable"', async () => {
       const client = new MockedGeminiClientClass(mockConfig);
       const disableForSessionSpy = vi.fn();
-      (client as unknown as any).getLoopDetectionService = vi.fn().mockReturnValue({
-        disableForSession: disableForSessionSpy,
-      });
+      (client as unknown as any).getLoopDetectionService = vi
+        .fn()
+        .mockReturnValue({
+          disableForSession: disableForSessionSpy,
+        });
 
       const { result } = await renderTestHook([], client);
 
@@ -1744,7 +1746,9 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: expect.stringContaining('Agent execution stopped: Task completed'),
+          text: expect.stringContaining(
+            'Agent execution stopped: Task completed',
+          ),
         }),
         expect.any(Number),
       );
@@ -1769,7 +1773,9 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: expect.stringContaining('Agent execution stopped: INTERNAL_ERROR'),
+          text: expect.stringContaining(
+            'Agent execution stopped: INTERNAL_ERROR',
+          ),
         }),
         expect.any(Number),
       );
@@ -1794,7 +1800,9 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.WARNING,
-          text: expect.stringContaining('Agent execution blocked: Policy violation'),
+          text: expect.stringContaining(
+            'Agent execution blocked: Policy violation',
+          ),
         }),
         expect.any(Number),
       );
@@ -1819,7 +1827,9 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.WARNING,
-          text: expect.stringContaining('Agent execution blocked: ACCESS_DENIED'),
+          text: expect.stringContaining(
+            'Agent execution blocked: ACCESS_DENIED',
+          ),
         }),
         expect.any(Number),
       );
