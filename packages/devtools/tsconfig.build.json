@@ -1,11 +1,12 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist/src",
     "composite": true,
     "declaration": true,
     "sourceMap": true,
     "noEmit": false,
+    "allowImportingTsExtensions": false,
     "incremental": true,
     "verbatimModuleSyntax": false
   },
