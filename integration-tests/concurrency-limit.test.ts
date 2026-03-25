@@ -9,6 +9,13 @@ import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
 
 describe('web-fetch rate limiting', () => {
+  //Generic type guard (strict-safe)
+  function hasError<T extends Record<string, unknown>>(
+    req: T,
+  ): req is T & { error: string } {
+    return typeof req['error'] === 'string';
+  }
+
   let rig: TestRig;
 
   beforeEach(() => {
@@ -36,20 +43,12 @@ describe('web-fetch rate limiting', () => {
 
     // We expect to find at least one tool call that failed with a rate limit error.
     const toolLogs = rig.readToolLogs();
-    function hasError(req: {
-      name: string;
-      args: string;
-      success: boolean;
-      duration_ms: number;
-      error?: string;
-    }): req is typeof req & { error: string } {
-      return 'error' in req && typeof req.error === 'string';
-    }
+
     const rateLimitedCalls = toolLogs.filter(
       (log) =>
         log.toolRequest.name === 'web_fetch' &&
         hasError(log.toolRequest) &&
-        log.toolRequest.error.includes('Rate limit exceeded'),
+        log.toolRequest['error'].includes('Rate limit exceeded'),
     );
 
     expect(rateLimitedCalls.length).toBeGreaterThan(0);
