@@ -134,15 +134,6 @@ Gemini CLI project.
 - **iTerm**: Be aware that `ITERM_SESSION_ID` may be present when users run
   VSCode from within iTerm, even if the terminal is not iTerm.
 
-## UI Text & Telemetry
-
-- **UX Writing Standards**: All user-facing strings, error messages, and status
-  telemetry must adhere to the project's UX writing standards.
-- **Reference**: Follow the rules defined in the [string-reviewer skill](../skills/string-reviewer/SKILL.md).
-- **Core Goal**: Prioritize **Precise Conciseness** (under 5 words) and
-  **Telemetry over Etiquette** (raw data over "Please wait").
-
-
 ## Code Cleanup
 
 - **Refactoring**: Actively clean up code duplication, technical debt, and

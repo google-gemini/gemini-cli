@@ -64,7 +64,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
       : thought?.subject
-        ? (thoughtLabel ?? thought.subject.trim())
+        ? (thoughtLabel ?? thought.subject)
         : currentLoadingPhrase ||
           (streamingState === StreamingState.Responding
             ? 'Thinking...'
