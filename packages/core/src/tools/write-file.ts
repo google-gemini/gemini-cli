@@ -156,16 +156,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     toolName?: string,
     displayName?: string,
   ) {
-    super(
-      params,
-      messageBus,
-      toolName,
-      displayName,
-      undefined,
-      undefined,
-      true,
-      () => this.config.getApprovalMode(),
-    );
+    super(params, messageBus, toolName, displayName, undefined, undefined);
 
     if (this.config.isPlanMode()) {
       const safeFilename = path.basename(this.params.file_path);
