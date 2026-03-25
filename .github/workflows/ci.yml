@@ -67,7 +67,7 @@ jobs:
           cache: 'npm'
 
       - name: 'Cache Linters'
-        uses: 'actions/cache@v4'
+        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
         with:
           path: '${{ env.GEMINI_LINT_TEMP_DIR }}'
           key: "${{ runner.os }}-${{ runner.arch }}-linters-${{ hashFiles('scripts/lint.js') }}"
@@ -76,7 +76,7 @@ jobs:
         run: 'npm ci'
 
       - name: 'Cache ESLint'
-        uses: 'actions/cache@v4'
+        uses: 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' # ratchet:actions/cache@v4
         with:
           path: '.eslintcache'
           key: "${{ runner.os }}-eslint-${{ hashFiles('package-lock.json', 'eslint.config.js') }}"
@@ -113,6 +113,9 @@ jobs:
 
       - name: 'Run sensitive keyword linter'
         run: 'node scripts/lint.js --sensitive-keywords'
+
+      - name: 'Run GitHub Actions pinning linter'
+        run: 'node scripts/lint.js --check-github-actions-pinning'
 
   link_checker:
     name: 'Link Checker'
