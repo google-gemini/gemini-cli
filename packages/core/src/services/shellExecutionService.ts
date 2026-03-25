@@ -1288,7 +1288,7 @@ export class ShellExecutionService {
       >();
 
     if (history.size >= MAX_BACKGROUND_PROCESS_HISTORY_SIZE) {
-      const oldestPid = history.keys().next().value as number | undefined;
+      const oldestPid = history.keys().next().value;
       if (oldestPid !== undefined) {
         history.delete(oldestPid);
       }
