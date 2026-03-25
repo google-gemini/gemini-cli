@@ -136,16 +136,12 @@ Gemini CLI project.
 
 ## UI Text & Telemetry
 
-- **Precise Conciseness**: Keep status and error messages under 5 words whenever
-  possible to prevent "information snowblindness."
-- **Telemetry over Etiquette**: Favor status data and raw telemetry over polite
-  filler. Avoid "Please wait," "I'm sorry," or "We're still on it."
-- **Attribution**: Correctly attribute the source of a delay or error:
-    - Use **Gemini** for generative analysis or thinking latency.
-    - Use **System** or **API** for infrastructure, quota, or network issues.
-- **Tone**: Use a friendly, helpful, and humble tone. Use sentence-style
-  capitalization. Solitary sentences aren't punctuated. Speak to the user
-  ("you"). Avoid first-person pronouns ("I" or "we").
+- **UX Writing Standards**: All user-facing strings, error messages, and status
+  telemetry must adhere to the project's UX writing standards.
+- **Reference**: Follow the rules defined in the [string-reviewer skill](../skills/string-reviewer/SKILL.md).
+- **Core Goal**: Prioritize **Precise Conciseness** (under 5 words) and
+  **Telemetry over Etiquette** (raw data over "Please wait").
+
 
 ## Code Cleanup
 

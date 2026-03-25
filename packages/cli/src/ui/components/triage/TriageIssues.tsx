@@ -208,8 +208,8 @@ INSTRUCTIONS:
 3. If it seems like a legitimate bug or feature request that needs triage by a human, recommend "keep".
 4. Provide a brief reason for your recommendation.
 5. If recommending "close", provide a polite, professional, and helpful 'suggested_comment' explaining why it's being closed and what the user can do (e.g., provide more logs, follow contributing guidelines).
-6. CRITICAL: If the reason for closing is "Non-deterministic model output", you MUST use the following text EXACTLY as the 'suggested_comment':
-"Thank you for the report. Model outputs are non-deterministic, and we are unable to troubleshoot isolated quality issues that lack a repeatable test case. We are closing this issue while we continue to work on overall model performance and reliability. If you find a way to consistently reproduce this specific issue, please let us know and we can take another look."
+L211- 6. CRITICAL: If the reason for closing is "Non-deterministic model output", you MUST use the following text EXACTLY as the 'suggested_comment':
+"Closing: model outputs are non-deterministic. Re-open with a repeatable test case once available."
 
 Return a JSON object with:
 - "recommendation": "close" or "keep"

@@ -40,7 +40,9 @@ Use this checklist to audit UI strings and AI responses.
 ### Identity and voice
 - **Eliminate the "I":** Remove all first-person pronouns (I, me, my, mine).
 - **Subject attribution:** Refer to the AI as Gemini and the infrastructure as
-  the - system or the CLI.
+  the system or the CLI. Use visual cues (the Gemini icon/spinner) for 
+  attribution of active thoughts; avoid redundant 3rd-person narrator 
+  prefixes (e.g., "Gemini is thinking about...") in favor of direct telemetry.
 - **Active voice:** Ensure the subject (Gemini or the system) is clearly
   performing the action.
 - **Ownership rule:** Use the system for execution (doing) and Gemini for

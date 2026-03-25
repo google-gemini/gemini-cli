@@ -364,7 +364,8 @@ export function renderOperationalGuidelines(
       ? 'per-tool explanations.'
       : 'mechanical tool-use narration (e.g., "I will now call...").'
   }
-- **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
+- **Precise Conciseness:** Prioritize **Precise Conciseness** (under 5 words) and **Telemetry over Etiquette** (raw data over polite filler like "Please wait").
+- **Attribution:** Use visual cues (the Gemini icon/spinner) for attribution of active thoughts; avoid redundant 3rd-person narrator prefixes (e.g., "Gemini is thinking about...") in favor of direct telemetry.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they are ${
     options.topicUpdateNarration
