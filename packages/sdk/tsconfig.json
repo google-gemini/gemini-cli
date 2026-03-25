@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "composite": true,
+    "declaration": true,
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "types": ["node", "vitest/globals"]
   },
