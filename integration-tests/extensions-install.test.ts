@@ -34,16 +34,20 @@ describe('extension install', () => {
     writeFileSync(testServerPath, extension);
     try {
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['--debug', 'extensions', 'install', `${rig.testDir!}`],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension-install');
 
-      const listResult = await rig.runCommand(['extensions', 'list']);
+      const listResult = await rig.runCommand([
+        '--debug',
+        'extensions',
+        'list',
+      ]);
       expect(listResult).toContain('test-extension-install');
       writeFileSync(testServerPath, extensionUpdate);
       const updateResult = await rig.runCommand(
-        ['extensions', 'update', `test-extension-install`],
+        ['--debug', 'extensions', 'update', `test-extension-install`],
         { stdin: 'y\n' },
       );
       expect(updateResult).toContain('0.0.2');

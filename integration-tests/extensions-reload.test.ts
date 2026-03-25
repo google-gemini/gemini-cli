@@ -66,7 +66,7 @@ describe('extension reloading', () => {
       }
 
       const result = await rig.runCommand(
-        ['extensions', 'install', `${rig.testDir!}`],
+        ['--debug', 'extensions', 'install', `${rig.testDir!}`],
         { stdin: 'y\n' },
       );
       expect(result).toContain('test-extension');
