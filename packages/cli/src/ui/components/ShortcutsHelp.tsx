@@ -44,6 +44,10 @@ const buildShortcutItems = (): ShortcutItem[] => [
     key: formatCommand(Command.OPEN_EXTERNAL_EDITOR),
     description: 'open external editor',
   },
+  {
+    key: formatCommand(Command.STASH_INPUT),
+    description: 'stash prompt',
+  },
 ];
 
 const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (
@@ -73,8 +77,9 @@ export const ShortcutsHelp: React.FC = () => {
         items[7],
         items[2],
         items[8],
-        items[9],
+        items[10],
         items[3],
+        items[9],
       ];
 
   return (

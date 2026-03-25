@@ -253,6 +253,18 @@ export const AppContainer = (props: AppContainerProps) => {
     QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
 
+  const [stashedPrompt, setStashedPrompt] = useState<string | null>(null);
+  const stashPrompt = useCallback((text: string) => {
+    if (text.length > 0) {
+      setStashedPrompt(text);
+    }
+  }, []);
+  const popStashedPrompt = useCallback(() => {
+    const prompt = stashedPrompt;
+    setStashedPrompt(null);
+    return prompt;
+  }, [stashedPrompt]);
+
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
@@ -2267,6 +2279,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
+      stashedPrompt,
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
@@ -2393,6 +2406,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
+      stashedPrompt,
       showApprovalModeIndicator,
       allowPlanMode,
       userTier,
@@ -2492,6 +2506,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleDeleteSession,
       setQueueErrorMessage,
       popAllMessages,
+      stashPrompt,
+      popStashedPrompt,
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
@@ -2583,6 +2599,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleDeleteSession,
       setQueueErrorMessage,
       popAllMessages,
+      stashPrompt,
+      popStashedPrompt,
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,

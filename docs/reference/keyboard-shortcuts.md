@@ -86,12 +86,13 @@ available combinations.
 
 #### Text Input
 
-| Command                    | Action                                                     | Keys                                                                                |
-| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`             | Submit the current prompt.                                 | `Enter`                                                                             |
-| `input.newline`            | Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor` | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
-| `input.paste`              | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                    | Action                                                                        | Keys                                                                                |
+| -------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`             | Submit the current prompt.                                                    | `Enter`                                                                             |
+| `input.newline`            | Insert a newline without submitting.                                          | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor` | Open the current prompt or the plan in an external editor.                    | `Ctrl+X`                                                                            |
+| `input.paste`              | Paste from the clipboard.                                                     | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| `input.stash`              | Stash the current input to temporarily set it aside. Restores on next submit. | `Alt+S`                                                                             |
 
 #### App Controls
 
@@ -232,6 +233,8 @@ a `key` combination.
 - `Ctrl + X` (while a plan is presented): Open the plan in an external editor to
   [collaboratively edit or comment](../cli/plan-mode.md#collaborative-plan-editing)
   on the implementation strategy.
+- `Alt+S`: Stash the current prompt to temporarily set it aside. The stashed
+  prompt is restored to the input box when you submit your next prompt.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
 

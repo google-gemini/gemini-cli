@@ -202,6 +202,7 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u222B': 'b', // "∫" back one word
   '\u0192': 'f', // "ƒ" forward one word
   '\u00B5': 'm', // "µ" toggle markup view
+  '\u00DF': 's', // "ß" stash prompt
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
   '\u2202': 'd', // "∂" delete word forward

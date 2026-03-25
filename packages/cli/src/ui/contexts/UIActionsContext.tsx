@@ -71,6 +71,8 @@ export interface UIActions {
   handleDeleteSession: (session: SessionInfo) => Promise<void>;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: () => string | undefined;
+  stashPrompt: (text: string) => void;
+  popStashedPrompt: () => string | null;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;

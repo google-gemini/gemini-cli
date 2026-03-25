@@ -39,6 +39,7 @@ import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { StashedPromptDisplay } from './StashedPromptDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
@@ -520,6 +521,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     >
       {uiState.isResuming && (
         <ConfigInitDisplay message="Resuming session..." />
+      )}
+
+      {showUiDetails && (
+        <StashedPromptDisplay stashedPrompt={uiState.stashedPrompt} />
       )}
 
       {showUiDetails && (

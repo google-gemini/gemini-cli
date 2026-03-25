@@ -158,6 +158,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     messageQueue: [],
+    stashedPrompt: null,
     showErrorDetails: false,
     constrainHeight: false,
     isInputActive: true,
