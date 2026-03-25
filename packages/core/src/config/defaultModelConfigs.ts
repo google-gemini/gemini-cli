@@ -218,6 +218,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-3-flash-preview',
       },
     },
+    'chat-compression-3.1-flash-lite': {
+      modelConfig: {
+        model: 'gemini-3.1-flash-lite-preview',
+      },
+    },
     'chat-compression-2.5-pro': {
       modelConfig: {
         model: 'gemini-2.5-pro',
@@ -440,7 +445,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3.1-flash-lite-preview',
       contexts: [
         {
-          condition: { hasAccessToPreview: false },
+          condition: { useGemini3_1FlashLite: false },
           target: 'gemini-2.5-flash-lite',
         },
       ],
@@ -458,7 +463,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-2.5-flash-lite',
       contexts: [
         {
-          condition: { useGemini3_1: true },
+          condition: { useGemini3_1FlashLite: true },
           target: 'gemini-3.1-flash-lite-preview',
         },
       ],
