@@ -993,6 +993,35 @@ export class GeminiClient {
             displayContent,
             true, // stopHookActive: signal retry to AfterAgent hooks
           );
+        } else if (afterAgentOutput?.getFollowUpPrompt()) {
+          const contextCleared = afterAgentOutput.shouldClearContext();
+
+          // Clear context if requested
+          if (contextCleared) {
+            await this.resetChat();
+          }
+
+          const continueRequest = [
+            { text: afterAgentOutput.getFollowUpPrompt() },
+          ];
+
+          // Reset hook state so the continuation fires BeforeAgent fresh
+          // and fireAfterAgentHookSafe sees activeCalls=1, not 2.
+          const contHookState = this.hookStateMap.get(prompt_id);
+          if (contHookState) {
+            contHookState.hasFiredBeforeAgent = false;
+            contHookState.activeCalls--;
+          }
+
+          continuationHandled = true;
+          turn = yield* this.sendMessageStream(
+            continueRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+            false,
+            displayContent,
+          );
         }
       }
     } catch (error) {
