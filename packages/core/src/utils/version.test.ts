@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getVersion, resetVersionCache } from './version.js';
 import { getPackageJson } from './package.js';
+import path from 'node:path';
 
 vi.mock('./package.js', () => ({
   getPackageJson: vi.fn(),
@@ -46,19 +47,44 @@ describe('version', () => {
     expect(version).toBe('unknown');
   });
 
+  it('prefers the repository package version when running from source', async () => {
+    delete process.env['CLI_VERSION'];
+    vi.mocked(getPackageJson).mockImplementation(async (dir) => {
+      const normalizedDir = dir.replace(/\\/g, '/');
+      if (normalizedDir.endsWith('/packages/core')) {
+        return { name: '@google/gemini-cli-core', version: '0.35.0' };
+      }
+      if (
+        normalizedDir.endsWith('/gemini-cli-work') ||
+        normalizedDir.endsWith('/gemini-cli')
+      ) {
+        return { name: '@google/gemini-cli', version: '0.36.0' };
+      }
+      return undefined;
+    });
+
+    const version = await getVersion();
+
+    expect(version).toBe('0.36.0');
+    expect(vi.mocked(getPackageJson)).toHaveBeenCalledWith(
+      expect.stringContaining(['packages', 'core'].join(path.sep)),
+    );
+  });
+
   it('should cache the version and only call getPackageJson once', async () => {
     delete process.env['CLI_VERSION'];
     vi.mocked(getPackageJson).mockResolvedValue({ version: '1.2.3' });
 
     const version1 = await getVersion();
     expect(version1).toBe('1.2.3');
-    expect(getPackageJson).toHaveBeenCalledTimes(1);
+    const callsAfterFirstLookup = vi.mocked(getPackageJson).mock.calls.length;
+    expect(callsAfterFirstLookup).toBeGreaterThan(0);
 
     // Change the mock value to simulate an update on disk
     vi.mocked(getPackageJson).mockResolvedValue({ version: '2.0.0' });
 
     const version2 = await getVersion();
     expect(version2).toBe('1.2.3'); // Should still be the cached version
-    expect(getPackageJson).toHaveBeenCalledTimes(1); // Should not have been called again
+    expect(getPackageJson).toHaveBeenCalledTimes(callsAfterFirstLookup);
   });
 });

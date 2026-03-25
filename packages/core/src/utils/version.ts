@@ -18,8 +18,33 @@ export function getVersion(): Promise<string> {
     return versionPromise;
   }
   versionPromise = (async () => {
-    const pkgJson = await getPackageJson(__dirname);
-    return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+    if (process.env['CLI_VERSION']) {
+      return process.env['CLI_VERSION'];
+    }
+
+    let currentDir = __dirname;
+    let bestVersion = 'unknown';
+
+    while (true) {
+      const pkgJson = await getPackageJson(currentDir);
+      if (pkgJson?.version) {
+        bestVersion = pkgJson.version;
+        if (
+          pkgJson.name === '@google/gemini-cli' ||
+          pkgJson.name === 'gemini-cli'
+        ) {
+          break;
+        }
+      }
+
+      const parentDir = path.dirname(currentDir);
+      if (parentDir === currentDir) {
+        break;
+      }
+      currentDir = parentDir;
+    }
+
+    return bestVersion;
   })();
   return versionPromise;
 }
