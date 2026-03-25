@@ -16,6 +16,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Config } from '../../config/config.js';
+import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import { safeJsonToMarkdown } from '../../utils/markdownUtils.js';
 import {
@@ -29,143 +30,23 @@ import {
   type SubagentActivityEvent,
   type SubagentProgress,
   type SubagentActivityItem,
+  isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { removeInputBlocker } from './inputBlocker.js';
+import {
+  sanitizeThoughtContent,
+  sanitizeToolArgs,
+  sanitizeErrorMessage,
+} from '../../utils/agent-sanitization-utils.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
 const MAX_RECENT_ACTIVITY = 20;
-
-/**
- * Sensitive key patterns used for redaction.
- */
-const SENSITIVE_KEY_PATTERNS = [
-  'password',
-  'pwd',
-  'apikey',
-  'api_key',
-  'api-key',
-  'token',
-  'secret',
-  'credential',
-  'auth',
-  'authorization',
-  'access_token',
-  'access_key',
-  'refresh_token',
-  'session_id',
-  'cookie',
-  'passphrase',
-  'privatekey',
-  'private_key',
-  'private-key',
-  'secret_key',
-  'client_secret',
-  'client_id',
-];
-
-/**
- * Sanitizes tool arguments by recursively redacting sensitive fields.
- * Supports nested objects and arrays.
- */
-function sanitizeToolArgs(args: unknown): unknown {
-  if (typeof args === 'string') {
-    return sanitizeErrorMessage(args);
-  }
-  if (typeof args !== 'object' || args === null) {
-    return args;
-  }
-
-  if (Array.isArray(args)) {
-    return args.map(sanitizeToolArgs);
-  }
-
-  const sanitized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(args)) {
-    // Decode key to handle URL-encoded sensitive keys (e.g., api%5fkey)
-    let decodedKey = key;
-    try {
-      decodedKey = decodeURIComponent(key);
-    } catch {
-      // Ignore decoding errors
-    }
-    const keyNormalized = decodedKey.toLowerCase().replace(/[-_]/g, '');
-    const isSensitive = SENSITIVE_KEY_PATTERNS.some((pattern) =>
-      keyNormalized.includes(pattern.replace(/[-_]/g, '')),
-    );
-    if (isSensitive) {
-      sanitized[key] = '[REDACTED]';
-    } else {
-      sanitized[key] = sanitizeToolArgs(value);
-    }
-  }
-
-  return sanitized;
-}
-
-/**
- * Sanitizes error messages by redacting potential sensitive data patterns.
- * Uses [^\s'"]+ to catch JWTs, tokens with dots/slashes, and other complex values.
- */
-function sanitizeErrorMessage(message: string): string {
-  if (!message) return message;
-
-  let sanitized = message;
-
-  // 1. Redact inline PEM content
-  sanitized = sanitized.replace(
-    /-----BEGIN\s+[\w\s]+-----[\s\S]*?-----END\s+[\w\s]+-----/g,
-    '[REDACTED_PEM]',
-  );
-
-  const unquotedValue = `[^\\s]+(?:\\s+(?![a-zA-Z0-9_.-]+(?:=|:))[^\\s=:<>]+)*`;
-  const valuePattern = `(?:"[^"]*"|'[^']*'|${unquotedValue})`;
-
-  // 2. Handle key-value pairs with delimiters (=, :, space, CLI-style --flag)
-  const urlSafeKeyPatternStr = SENSITIVE_KEY_PATTERNS.map((p) =>
-    p.replace(/[-_]/g, '(?:[-_]|%2D|%5F|%2d|%5f)?'),
-  ).join('|');
-
-  const keyWithDelimiter = new RegExp(
-    `((?:--)?("|')?(${urlSafeKeyPatternStr})\\2\\s*(?:[:=]|%3A|%3D)\\s*)${valuePattern}`,
-    'gi',
-  );
-  sanitized = sanitized.replace(keyWithDelimiter, '$1[REDACTED]');
-
-  // 3. Handle space-separated sensitive keywords (e.g. "password mypass", "--api-key secret")
-  const tokenValuePattern = `[A-Za-z0-9._\\-/+=]{8,}`;
-  const spaceKeywords = [
-    ...SENSITIVE_KEY_PATTERNS.map((p) =>
-      p.replace(/[-_]/g, '(?:[-_]|%2D|%5F|%2d|%5f)?'),
-    ),
-    'bearer',
-  ];
-  const spaceSeparated = new RegExp(
-    `\\b((?:--)?(?:${spaceKeywords.join('|')})(?:\\s*:\\s*bearer)?\\s+)(${tokenValuePattern})`,
-    'gi',
-  );
-  sanitized = sanitized.replace(spaceSeparated, '$1[REDACTED]');
-
-  // 4. Handle file path redaction
-  sanitized = sanitized.replace(
-    /((?:[/\\][a-zA-Z0-9_-]+)*[/\\][a-zA-Z0-9_-]*\.(?:key|pem|p12|pfx))/gi,
-    '/path/to/[REDACTED].key',
-  );
-
-  return sanitized;
-}
-
-/**
- * Sanitizes LLM thought content by redacting sensitive data patterns.
- */
-function sanitizeThoughtContent(text: string): string {
-  return sanitizeErrorMessage(text);
-}
 
 /**
  * Browser agent invocation with async tool setup.
@@ -179,7 +60,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -192,6 +73,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       _toolName ?? 'browser_agent',
       _toolDisplayName ?? 'Browser Agent',
     );
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   /**
@@ -278,14 +163,13 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
           case 'THOUGHT_CHUNK': {
             const text = String(activity.data['text']);
             const lastItem = recentActivity[recentActivity.length - 1];
+
             if (
               lastItem &&
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content = sanitizeThoughtContent(
-                lastItem.content + text,
-              );
+              lastItem.content = sanitizeThoughtContent(text);
             } else {
               recentActivity.push({
                 id: randomUUID(),
@@ -327,8 +211,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const callId = activity.data['id']
               ? String(activity.data['id'])
               : undefined;
-            // Find the tool call by ID
-            // Find the tool call by ID
+            const data = activity.data['data'];
+            const isError = isToolActivityError(data);
+
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
@@ -336,7 +221,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
                 recentActivity[i].id === callId &&
                 recentActivity[i].status === 'running'
               ) {
-                recentActivity[i].status = 'completed';
+                recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
                 break;
               }
@@ -409,7 +294,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       // Create and run executor with the configured definition
       const executor = await LocalAgentExecutor.create(
         definition,
-        this.config,
+        this.context,
         onActivity,
       );
 
@@ -485,6 +370,7 @@ ${displayResult}
     } finally {
       // Always cleanup browser resources
       if (browserManager) {
+        await removeInputBlocker(browserManager);
         await cleanupBrowserAgent(browserManager);
       }
     }

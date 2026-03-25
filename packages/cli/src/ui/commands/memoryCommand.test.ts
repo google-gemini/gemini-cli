@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { memoryCommand } from './memoryCommand.js';
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -103,10 +102,12 @@ describe('memoryCommand', () => {
 
       mockContext = createMockCommandContext({
         services: {
-          config: {
-            getUserMemory: mockGetUserMemory,
-            getGeminiMdFileCount: mockGetGeminiMdFileCount,
-            getExtensionLoader: () => new SimpleExtensionLoader([]),
+          agentContext: {
+            config: {
+              getUserMemory: mockGetUserMemory,
+              getGeminiMdFileCount: mockGetGeminiMdFileCount,
+              getExtensionLoader: () => new SimpleExtensionLoader([]),
+            },
           },
         },
       });
@@ -251,7 +252,7 @@ describe('memoryCommand', () => {
 
       mockContext = createMockCommandContext({
         services: {
-          config: mockConfig,
+          agentContext: { config: mockConfig },
           settings: {
             merged: {
               memoryDiscoveryMaxDirs: 1000,
@@ -269,7 +270,7 @@ describe('memoryCommand', () => {
       if (!reloadCommand.action) throw new Error('Command has no action');
 
       // Enable JIT in mock config
-      const config = mockContext.services.config;
+      const config = mockContext.services.agentContext?.config;
       if (!config) throw new Error('Config is undefined');
 
       vi.mocked(config.isJitContextEnabled).mockReturnValue(true);
@@ -371,7 +372,7 @@ describe('memoryCommand', () => {
       if (!reloadCommand.action) throw new Error('Command has no action');
 
       const nullConfigContext = createMockCommandContext({
-        services: { config: null },
+        services: { agentContext: null },
       });
 
       await expect(
@@ -414,8 +415,10 @@ describe('memoryCommand', () => {
       });
       mockContext = createMockCommandContext({
         services: {
-          config: {
-            getGeminiMdFilePaths: mockGetGeminiMdfilePaths,
+          agentContext: {
+            config: {
+              getGeminiMdFilePaths: mockGetGeminiMdfilePaths,
+            },
           },
         },
       });

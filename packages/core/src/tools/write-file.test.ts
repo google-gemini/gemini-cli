@@ -105,6 +105,7 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
+  isPlanMode: vi.fn(() => false),
   getActiveModel: () => 'test-model',
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -113,6 +114,14 @@ const mockConfigInternal = {
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
+}));
+
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
 }));
 
 // --- END MOCKS ---
@@ -359,6 +368,7 @@ describe('WriteFileTool', () => {
       const abortSignal = new AbortController().signal;
 
       const mockGemini3Config = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...mockConfig,
         getActiveModel: () => 'gemini-3.0-pro',
       } as unknown as Config;
@@ -1063,6 +1073,44 @@ describe('WriteFileTool', () => {
       expect(result.correctedContent).toBe(proposedContent);
       expect(result.originalContent).toBe(originalContent);
       expect(result.fileExists).toBe(true);
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+
+      const filePath = path.join(rootDir, 'jit-write-test.txt');
+      const content = 'JIT test content.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      const filePath = path.join(rootDir, 'jit-disabled-write-test.txt');
+      const content = 'No JIT content.';
+      mockEnsureCorrectFileContent.mockResolvedValue(content);
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
     });
   });
 });

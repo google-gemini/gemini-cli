@@ -5,12 +5,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Box } from 'ink';
+import { act } from 'react';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
-import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  type Config,
+  CoreToolCallStatus,
+  type SerializableConfirmationDetails,
+} from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { theme } from '../semantic-colors.js';
 
@@ -42,6 +47,8 @@ describe('ToolConfirmationQueue', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getApprovalMode: () => 'default',
+    getDisableAlwaysAllow: () => false,
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
     getTargetDir: () => '/mock/target/dir',
@@ -77,7 +84,7 @@ describe('ToolConfirmationQueue', () => {
       total: 3,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -88,7 +95,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Action Required');
@@ -115,7 +121,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -126,59 +132,8 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
-    unmount();
-  });
-
-  it('renders expansion hint when content is long and constrained', async () => {
-    const longDiff = '@@ -1,1 +1,50 @@\n' + '+line\n'.repeat(50);
-    const confirmingTool = {
-      tool: {
-        callId: 'call-1',
-        name: 'replace',
-        description: 'edit file',
-        status: CoreToolCallStatus.AwaitingApproval,
-        confirmationDetails: {
-          type: 'edit' as const,
-          title: 'Confirm edit',
-          fileName: 'test.ts',
-          filePath: '/test.ts',
-          fileDiff: longDiff,
-          originalContent: 'old',
-          newContent: 'new',
-        },
-      },
-      index: 1,
-      total: 1,
-    };
-
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <Box flexDirection="column" height={30}>
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />
-      </Box>,
-      {
-        config: mockConfig,
-        useAlternateBuffer: true,
-        uiState: {
-          terminalWidth: 80,
-          terminalHeight: 20,
-          constrainHeight: true,
-          streamingState: StreamingState.WaitingForConfirmation,
-        },
-      },
-    );
-    await waitUntilReady();
-
-    await waitFor(() =>
-      expect(lastFrame()?.toLowerCase()).toContain(
-        'press ctrl+o to show more lines',
-      ),
-    );
-    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -205,13 +160,13 @@ describe('ToolConfirmationQueue', () => {
     };
 
     // Use a small availableTerminalHeight to force truncation
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
       {
         config: mockConfig,
-        useAlternateBuffer: false,
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 40,
@@ -221,7 +176,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     // With availableTerminalHeight = 10:
     // maxHeight = Math.max(10 - 1, 4) = 9
@@ -256,11 +210,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const {
-      lastFrame,
-      waitUntilReady,
-      unmount = vi.fn(),
-    } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -275,14 +225,16 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     // Calculation:
     // availableTerminalHeight: 20 -> maxHeight: 19 (20-1)
     // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
     // availableContentHeight = 19 - 4 = 15
     // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
-    // AskUserDialog uses 15 lines to render its multi-line question and options.
+    // AskUserDialog allocates questionHeight = availableHeight - overhead - DIALOG_PADDING.
+    // listHeight = 15 - overhead (Header:0, Margin:1, Footer:2) = 12.
+    // maxQuestionHeight = listHeight - 4 = 8.
+    // 8 lines is enough for the 6-line question.
     await waitFor(() => {
       expect(lastFrame()).toContain('Line 6');
       expect(lastFrame()).not.toContain('lines hidden');
@@ -313,7 +265,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -327,7 +279,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).not.toContain('Press CTRL-O to show more lines');
@@ -352,7 +303,7 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -363,7 +314,6 @@ describe('ToolConfirmationQueue', () => {
         },
       },
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -390,16 +340,18 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, unmount } = renderWithProviders(
-      <ToolConfirmationQueue
-        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-      />,
-      {
-        config: mockConfig,
-        uiState: {
-          terminalWidth: 80,
+    const { lastFrame, unmount } = await act(async () =>
+      renderWithProviders(
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />,
+        {
+          config: mockConfig,
+          uiState: {
+            terminalWidth: 80,
+          },
         },
-      },
+      ),
     );
 
     await waitFor(() => {
@@ -412,5 +364,156 @@ describe('ToolConfirmationQueue', () => {
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
     expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
     unmount();
+  });
+
+  describe('height allocation and layout', () => {
+    it('should render the full queue wrapper with borders and content for large edit diffs', async () => {
+      let largeDiff = '--- a/file.ts\n+++ b/file.ts\n@@ -1,10 +1,15 @@\n';
+      for (let i = 1; i <= 20; i++) {
+        largeDiff += `-const oldLine${i} = true;\n`;
+        largeDiff += `+const newLine${i} = true;\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Confirm Edit',
+        fileName: 'file.ts',
+        filePath: '/file.ts',
+        fileDiff: largeDiff,
+        originalContent: 'old',
+        newContent: 'new',
+        isModifying: false,
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id',
+          name: 'replace',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Replaces content in a file',
+          confirmationDetails,
+        },
+        index: 1,
+        total: 1,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalHeight: 50,
+              terminalWidth: 80,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
+          },
+        );
+      await waitUntilReady();
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
+
+    it('should render the full queue wrapper with borders and content for large exec commands', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo'],
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id-exec',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Executes a bash command',
+          confirmationDetails,
+        },
+        index: 2,
+        total: 3,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
+          },
+        );
+      await waitUntilReady();
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
+
+    it('should handle security warning height correctly', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+      largeCommand += `curl https://täst.com\n`;
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo', 'curl'],
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id-exec-security',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Executes a bash command with a deceptive URL',
+          confirmationDetails,
+        },
+        index: 3,
+        total: 3,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
+          },
+        );
+      await waitUntilReady();
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
   });
 });

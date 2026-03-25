@@ -9,14 +9,14 @@ import {
   type Command,
   type KeyBinding,
   type KeyBindingConfig,
-  defaultKeyBindings,
+  defaultKeyBindingConfig,
 } from './keyBindings.js';
 
 /**
  * Maps internal key names to user-friendly display names.
  */
 const KEY_NAME_MAP: Record<string, string> = {
-  return: 'Enter',
+  enter: 'Enter',
   escape: 'Esc',
   backspace: 'Backspace',
   delete: 'Delete',
@@ -86,7 +86,7 @@ export function formatKeyBinding(
   if (binding.shift) parts.push(modMap.shift);
   if (binding.cmd) parts.push(modMap.cmd);
 
-  const keyName = KEY_NAME_MAP[binding.key] || binding.key.toUpperCase();
+  const keyName = KEY_NAME_MAP[binding.name] || binding.name.toUpperCase();
   parts.push(keyName);
 
   return parts.join('+');
@@ -97,10 +97,10 @@ export function formatKeyBinding(
  */
 export function formatCommand(
   command: Command,
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
   platform?: string,
 ): string {
-  const bindings = config[command];
+  const bindings = config.get(command);
   if (!bindings || bindings.length === 0) {
     return '';
   }

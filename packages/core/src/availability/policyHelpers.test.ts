@@ -19,15 +19,24 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from '../config/defaultModelConfigs.js';
 
-const createMockConfig = (overrides: Partial<Config> = {}): Config =>
-  ({
+const createMockConfig = (overrides: Partial<Config> = {}): Config => {
+  const config = {
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
     getGemini31LaunchedSync: () => false,
+    getUseCustomToolModelSync: () => {
+      const useGemini31 = config.getGemini31LaunchedSync();
+      const authType = config.getContentGeneratorConfig().authType;
+      return useGemini31 && authType === AuthType.USE_GEMINI;
+    },
     getContentGeneratorConfig: () => ({ authType: undefined }),
     ...overrides,
-  }) as unknown as Config;
+  } as unknown as Config;
+  return config;
+};
 
 describe('policyHelpers', () => {
   describe('resolvePolicyChain', () => {
@@ -154,6 +163,66 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
       expect(chain[1]?.model).toBe('gemini-3-flash-preview');
     });
+  });
+
+  describe('resolvePolicyChain behavior is identical between dynamic and legacy implementations', () => {
+    const testCases = [
+      { name: 'Default Auto', model: DEFAULT_GEMINI_MODEL_AUTO },
+      { name: 'Gemini 3 Auto', model: 'auto-gemini-3' },
+      { name: 'Flash Lite', model: DEFAULT_GEMINI_FLASH_LITE_MODEL },
+      {
+        name: 'Gemini 3 Auto (3.1 Enabled)',
+        model: 'auto-gemini-3',
+        useGemini31: true,
+      },
+      {
+        name: 'Gemini 3 Auto (3.1 + Custom Tools)',
+        model: 'auto-gemini-3',
+        useGemini31: true,
+        authType: AuthType.USE_GEMINI,
+      },
+      {
+        name: 'Gemini 3 Auto (No Access)',
+        model: 'auto-gemini-3',
+        hasAccess: false,
+      },
+      { name: 'Concrete Model (2.5 Pro)', model: 'gemini-2.5-pro' },
+      { name: 'Custom Model', model: 'my-custom-model' },
+      {
+        name: 'Wrap Around',
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+        wrapsAround: true,
+      },
+    ];
+
+    testCases.forEach(
+      ({ name, model, useGemini31, hasAccess, authType, wrapsAround }) => {
+        it(`achieves parity for: ${name}`, () => {
+          const createBaseConfig = (dynamic: boolean) =>
+            createMockConfig({
+              getExperimentalDynamicModelConfiguration: () => dynamic,
+              getModel: () => model,
+              getGemini31LaunchedSync: () => useGemini31 ?? false,
+              getHasAccessToPreviewModel: () => hasAccess ?? true,
+              getContentGeneratorConfig: () => ({ authType }),
+              modelConfigService: new ModelConfigService(DEFAULT_MODEL_CONFIGS),
+            });
+
+          const legacyChain = resolvePolicyChain(
+            createBaseConfig(false),
+            model,
+            wrapsAround,
+          );
+          const dynamicChain = resolvePolicyChain(
+            createBaseConfig(true),
+            model,
+            wrapsAround,
+          );
+
+          expect(dynamicChain).toEqual(legacyChain);
+        });
+      },
+    );
   });
 
   describe('buildFallbackPolicyContext', () => {

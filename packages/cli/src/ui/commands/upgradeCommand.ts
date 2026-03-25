@@ -7,10 +7,11 @@
 import {
   AuthType,
   openBrowserSecurely,
+  shouldLaunchBrowser,
   UPGRADE_URL_PAGE,
 } from '@google/gemini-cli-core';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { isUltraTier } from '../../utils/tierUtils.js';
+import { CommandKind, type SlashCommand } from './types.js';
 
 /**
  * Command to open the upgrade page for Gemini Code Assist.
@@ -22,8 +23,8 @@ export const upgradeCommand: SlashCommand = {
   description: 'Upgrade your Gemini Code Assist tier for higher limits',
   autoExecute: true,
   action: async (context) => {
-    const authType =
-      context.services.config?.getContentGeneratorConfig()?.authType;
+    const config = context.services.agentContext?.config;
+    const authType = config?.getContentGeneratorConfig()?.authType;
     if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       // This command should ideally be hidden if not logged in with Google,
       // but we add a safety check here just in case.
@@ -32,6 +33,23 @@ export const upgradeCommand: SlashCommand = {
         messageType: 'error',
         content:
           'The /upgrade command is only available when logged in with Google.',
+      };
+    }
+
+    const tierName = config?.getUserTierName();
+    if (isUltraTier(tierName)) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `You are already on the highest tier: ${tierName}.`,
+      };
+    }
+
+    if (!shouldLaunchBrowser()) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Please open this URL in a browser: ${UPGRADE_URL_PAGE}`,
       };
     }
 

@@ -80,7 +80,6 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
         const pathError = await validatePlanPath(
           planPath,
           config.storage.getPlansDir(),
-          config.getTargetDir(),
         );
         if (ignore) return;
         if (pathError) {
@@ -249,6 +248,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             ],
             placeholder: 'Type your feedback...',
             multiSelect: false,
+            unconstrainedHeight: false,
           },
         ]}
         onSubmit={(answers) => {
