@@ -25,7 +25,6 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
     return 'Listing background processes';
   }
 
-   
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     const processes = ShellExecutionService.listBackgroundProcesses();
     if (processes.length === 0) {
@@ -93,12 +92,27 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     return `Reading output for background process ${this.params.pid}`;
   }
 
-   
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     const pid = this.params.pid;
+
+    // Verify process belongs to this session to prevent reading logs of processes from other sessions/users
+    const processes = ShellExecutionService.listBackgroundProcesses();
+    if (!processes.some((p) => p.pid === pid)) {
+      return {
+        llmContent: `Access denied. Background process ID ${pid} not found in this session's history.`,
+        returnDisplay: 'Access denied.',
+        error: {
+          message: `Background process history lookup failed for PID ${pid}`,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
+
     const logPath = ShellExecutionService.getLogFilePath(pid);
 
-    if (!fs.existsSync(logPath)) {
+    try {
+      await fs.promises.access(logPath);
+    } catch {
       return {
         llmContent: `No output log found for process ID ${pid}. It might not have produced output or was cleaned up.`,
         returnDisplay: `No log found for PID ${pid}`,
@@ -110,7 +124,9 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     }
 
     try {
-      const content = fs.readFileSync(logPath, 'utf-8');
+      // Async read to prevent blocking the Node event loop
+      const content = await fs.promises.readFile(logPath, 'utf-8');
+
       if (!content) {
         return {
           llmContent: 'Log is empty.',

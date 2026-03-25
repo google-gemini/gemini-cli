@@ -23,16 +23,9 @@ describe('Background Tools', () => {
     listTool = new ListBackgroundProcessesTool(bus);
     readTool = new ReadBackgroundOutputTool(bus);
 
-    // Clear history before each test
-    // We need to access private static field, or we can just rely on the fact that
-    // each test runs in isolation if we don't mutate state, but we ARE mutating state!
-    // Since it's static, we should reset it if possible.
-    // For now, let's just see if we can access it via any existing method or just let it be.
-    // Actually, let's try to reset it using a dirty trick or just let tests run.
-    // Wait, usually we add a reset method for tests.
-    // Let's look at ShellExecutionService to see if there is any clear method.
-    // There isn't one.
-    // I'll use a unique PID for each test to avoid collisions.
+    // Clear history to avoid state leakage from previous runs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.clear();
   });
 
   it('list_background_processes should return empty message when no processes', async () => {
@@ -67,7 +60,14 @@ describe('Background Tools', () => {
   });
 
   it('read_background_output should return error if log file does not exist', async () => {
-    const invocation = readTool.build({ pid: 12345 });
+    const pid = 12345 + Math.floor(Math.random() * 1000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(pid, {
+      command: 'unknown command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    const invocation = readTool.build({ pid });
     const result = await invocation.execute(new AbortController().signal);
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('No output log found');
@@ -77,6 +77,14 @@ describe('Background Tools', () => {
     const pid = 88888 + Math.floor(Math.random() * 1000);
     const logPath = ShellExecutionService.getLogFilePath(pid);
     const logDir = ShellExecutionService.getLogDir();
+
+    // Add to history to pass access check
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ShellExecutionService as any).backgroundProcessHistory.set(pid, {
+      command: 'unknown command',
+      status: 'running',
+      startTime: Date.now(),
+    });
 
     // Ensure dir exists
     fs.mkdirSync(logDir, { recursive: true });
