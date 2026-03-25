@@ -195,7 +195,7 @@ describe('<SessionSummaryDisplay />', () => {
       unmount();
     });
 
-    it('sanitizes a malicious session ID in the footer', async () => {
+    it('safely quotes a malicious-looking session ID in the footer', async () => {
       const maliciousSessionId = "'; rm -rf / #";
       const { lastFrame, unmount } = await renderWithMockedStats(
         emptyMetrics,
@@ -203,7 +203,8 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // escapeShellArg with bash (shell-quote) wraps special characters in double quotes.
+      // escapeShellArg with bash (shell-quote) keeps this payload as a
+      // single shell argument instead of allowing it to break out.
       expect(output).toContain('gemini --resume "\'; rm -rf / #"');
       unmount();
     });
