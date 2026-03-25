@@ -598,6 +598,7 @@ export interface ConfigParameters {
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
+  forceCompressionRetries?: boolean;
   interactive?: boolean;
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
@@ -792,6 +793,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
+  private readonly forceCompressionRetries: boolean;
   /** Public for testing only */
   readonly interactive: boolean;
   private readonly ptyInfo: string;
@@ -1086,6 +1088,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.importFormat = params.importFormat ?? 'tree';
     this.discoveryMaxDirs = params.discoveryMaxDirs ?? 200;
     this.compressionThreshold = params.compressionThreshold;
+    this.forceCompressionRetries = params.forceCompressionRetries ?? false;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
@@ -2747,6 +2750,10 @@ export class Config implements McpContext, AgentLoopContext {
       return undefined;
     }
     return remoteThreshold;
+  }
+
+  getForceCompressionRetries(): boolean {
+    return this.forceCompressionRetries;
   }
 
   async getUserCaching(): Promise<boolean | undefined> {

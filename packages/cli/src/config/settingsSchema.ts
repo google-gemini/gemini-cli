@@ -970,6 +970,16 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
         unit: '%',
       },
+      forceCompressionRetries: {
+        type: 'boolean',
+        label: 'Force Compression Retries',
+        category: 'Model',
+        requiresRestart: true,
+        default: false as boolean,
+        description:
+          'If true, summarization will be retried even if a previous summarization attempt in the session failed. Useful for aggressive compression experiments.',
+        showInDialog: false,
+      },
       disableLoopDetection: {
         type: 'boolean',
         label: 'Disable Loop Detection',

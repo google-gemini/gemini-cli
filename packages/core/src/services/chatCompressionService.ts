@@ -266,7 +266,11 @@ export class ChatCompressionService {
       const threshold =
         (await config.getCompressionThreshold()) ??
         DEFAULT_COMPRESSION_TOKEN_THRESHOLD;
-      if (originalTokenCount < threshold * tokenLimit(model)) {
+      const calculatedLimit = threshold * tokenLimit(model);
+      debugLogger.log(
+        `Checking compression limit: ${originalTokenCount} / ${calculatedLimit} (Threshold: ${threshold})`,
+      );
+      if (originalTokenCount < calculatedLimit) {
         return {
           newHistory: null,
           info: {
@@ -286,14 +290,22 @@ export class ChatCompressionService {
     );
 
     // If summarization previously failed (and not forced), we only rely on truncation.
-    // We do NOT attempt to invoke the LLM for summarization again to avoid repeated failures/costs.
-    if (hasFailedCompressionAttempt && !force) {
+    // We do NOT attempt to invoke the LLM for summarization again to avoid repeated failures/costs,
+    // unless the 'forceCompressionRetries' config flag is set.
+    if (
+      hasFailedCompressionAttempt &&
+      !force &&
+      !config.getForceCompressionRetries()
+    ) {
       const truncatedTokenCount = estimateTokenCountSync(
         truncatedHistory.flatMap((c) => c.parts || []),
       );
 
       // If truncation reduced the size, we consider it a successful "compression" (truncation only).
       if (truncatedTokenCount < originalTokenCount) {
+        debugLogger.log(
+          `Compression previously failed but truncation succeeded. Reduced ${originalTokenCount} to ${truncatedTokenCount} tokens.`,
+        );
         return {
           newHistory: truncatedHistory,
           info: {
@@ -302,16 +314,19 @@ export class ChatCompressionService {
             compressionStatus: CompressionStatus.CONTENT_TRUNCATED,
           },
         };
+      } else {
+        debugLogger.log(
+          'Compression previously failed and truncation did not reduce size. Bypassing summarization.',
+        );
+        return {
+          newHistory: null,
+          info: {
+            originalTokenCount,
+            newTokenCount: originalTokenCount,
+            compressionStatus: CompressionStatus.NOOP,
+          },
+        };
       }
-
-      return {
-        newHistory: null,
-        info: {
-          originalTokenCount,
-          newTokenCount: originalTokenCount,
-          compressionStatus: CompressionStatus.NOOP,
-        },
-      };
     }
 
     const splitPoint = findCompressSplitPoint(
