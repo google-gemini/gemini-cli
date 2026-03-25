@@ -261,11 +261,18 @@ export async function buildSeatbeltArgs(
  * Escapes a string for use within a Seatbelt regex literal #"..."
  */
 function escapeRegex(str: string): string {
-  // First, escape characters that are special in the regex engine.
-  // We use quadruple backslashes because this string is first parsed as
-  // a Scheme string (where \\ -> \) and then by the regex engine.
-  const regexEscaped = str.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&');
-
-  // Next, escape double quotes which would terminate the #"..." literal.
-  return regexEscaped.replace(/"/g, '\\"');
+  return str.replace(/[.*+?^${}()|[\]\\"]/g, (c) => {
+    if (c === '"') {
+      // Escape double quotes for the Scheme string literal
+      return '\\"';
+    }
+    if (c === '\\') {
+      // A literal backslash needs to be \\ in the regex.
+      // To get \\ in the regex engine, we need \\\\ in the Scheme string literal.
+      return '\\\\\\\\';
+    }
+    // For other regex special characters (like .), we need \c in the regex.
+    // To get \c in the regex engine, we need \\c in the Scheme string literal.
+    return '\\\\' + c;
+  });
 }
