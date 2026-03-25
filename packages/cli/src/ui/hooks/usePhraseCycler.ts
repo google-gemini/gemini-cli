@@ -5,7 +5,6 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { getSecureRandomInt } from '../utils/randomUtils.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
@@ -102,8 +101,9 @@ export const usePhraseCycler = (
           : INFORMATIVE_TIPS;
 
       if (filteredTips.length > 0) {
+        // codeql[js/insecure-randomness] false positive: used for non-sensitive UI flavor text (tips)
         const selected =
-          filteredTips[getSecureRandomInt(0, filteredTips.length)];
+          filteredTips[Math.floor(Math.random() * filteredTips.length)];
         setCurrentTipState(selected);
         lastSelectedTipRef.current = selected;
         lastTipChangeTimeRef.current = now;
@@ -133,8 +133,9 @@ export const usePhraseCycler = (
           : wittyPhrasesList;
 
       if (filteredWitty.length > 0) {
+        // codeql[js/insecure-randomness] false positive: used for non-sensitive UI flavor text (witty phrases)
         const selected =
-          filteredWitty[getSecureRandomInt(0, filteredWitty.length)];
+          filteredWitty[Math.floor(Math.random() * filteredWitty.length)];
         setCurrentWittyPhraseState(selected);
         lastSelectedWittyPhraseRef.current = selected;
         lastWittyChangeTimeRef.current = now;

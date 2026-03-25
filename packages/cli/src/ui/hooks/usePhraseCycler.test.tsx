@@ -57,10 +57,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should initialize with an empty string when not active and not waiting', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min); // Always witty
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { lastFrame, unmount, waitUntilReady } = await render(
       <TestComponent isActive={false} isWaiting={false} />,
     );
@@ -143,10 +140,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should show both a tip and a witty phrase when both are enabled', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min);
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5);
     const { lastFrame, waitUntilReady, unmount } = await render(
       <TestComponent
         isActive={true}
@@ -167,10 +161,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should cycle through phrases when isActive is true and not waiting', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min);
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5);
     const { lastFrame, waitUntilReady, unmount } = await render(
       <TestComponent
         isActive={true}
@@ -197,13 +188,10 @@ describe('usePhraseCycler', () => {
   it('should reset to phrases when isActive becomes true after being false', async () => {
     const customPhrases = ['Phrase A', 'Phrase B'];
     let callCount = 0;
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => {
+    vi.spyOn(Math, 'random').mockImplementation(() => {
       const val = callCount % 2 === 0 ? 0 : 0.99;
       callCount++;
-      return Math.floor(val * (max - min)) + min;
+      return val;
     });
 
     const { lastFrame, rerender, waitUntilReady, unmount } = await render(
@@ -269,10 +257,7 @@ describe('usePhraseCycler', () => {
 
   it('should use custom phrases when provided', async () => {
     const customPhrases = ['Custom Phrase 1', 'Custom Phrase 2'];
-    const randomMock = vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    );
+    const randomMock = vi.spyOn(Math, 'random');
 
     let setStateExternally:
       | React.Dispatch<
@@ -333,10 +318,7 @@ describe('usePhraseCycler', () => {
   });
 
   it('should fall back to witty phrases if custom phrases are an empty array', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min);
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5);
     const { lastFrame, waitUntilReady, unmount } = await render(
       <TestComponent
         isActive={true}

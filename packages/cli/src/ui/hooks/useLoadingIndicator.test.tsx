@@ -103,20 +103,14 @@ describe('useLoadingIndicator', () => {
   };
 
   it('should initialize with default values when Idle', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min); // Always witty
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = await renderLoadingIndicatorHook(StreamingState.Idle);
     expect(result.current.elapsedTime).toBe(0);
     expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 
   it('should show interactive shell waiting phrase when shouldShowFocusHint is true', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min); // Always witty
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = await renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
@@ -135,10 +129,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reflect values when Responding', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min); // Always witty for subsequent phrases
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty for subsequent phrases
     const { result } = await renderLoadingIndicatorHook(
       StreamingState.Responding,
     );
@@ -182,10 +173,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reset elapsedTime and cycle phrases when transitioning from WaitingForConfirmation to Responding', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min); // Always witty
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = await renderLoadingIndicatorHook(
       StreamingState.Responding,
     );
@@ -218,10 +206,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reset timer and phrase when streamingState changes from Responding to Idle', async () => {
-    vi.spyOn(
-      await import('../utils/randomUtils.js'),
-      'getSecureRandomInt',
-    ).mockImplementation((min, max) => Math.floor(0.5 * (max - min)) + min); // Always witty
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = await renderLoadingIndicatorHook(
       StreamingState.Responding,
     );
