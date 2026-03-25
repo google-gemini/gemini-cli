@@ -47,6 +47,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   getDisplayString,
+  processSingleFileContent,
   type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
@@ -73,6 +74,17 @@ import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
 import { CommandHandler } from './commandHandler.js';
+
+const RequestPermissionResponseSchema = z.object({
+  outcome: z.discriminatedUnion('outcome', [
+    z.object({ outcome: z.literal('cancelled') }),
+    z.object({
+      outcome: z.literal('selected'),
+      optionId: z.string(),
+    }),
+  ]),
+});
+
 export async function runAcpClient(
   config: Config,
   settings: LoadedSettings,
@@ -1011,10 +1023,12 @@ export class Session {
           },
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const output = await this.connection.requestPermission(params);
+        const output = RequestPermissionResponseSchema.parse(
+          await this.connection.requestPermission(params),
+        );
+
         const outcome =
-          output.outcome.outcome === CoreToolCallStatus.Cancelled
+          output.outcome.outcome === 'cancelled'
             ? ToolConfirmationOutcome.Cancel
             : z
                 .nativeEnum(ToolConfirmationOutcome)
@@ -1225,6 +1239,11 @@ export class Session {
     const pathSpecsToRead: string[] = [];
     const contentLabelsForDisplay: string[] = [];
     const ignoredPaths: string[] = [];
+    const directContents: Array<{
+      spec: string;
+      content?: string;
+      part?: Part;
+    }> = [];
 
     const toolRegistry = this.context.toolRegistry;
     const readManyFilesTool = new ReadManyFilesTool(
@@ -1247,28 +1266,197 @@ export class Session {
       }
       let currentPathSpec = pathName;
       let resolvedSuccessfully = false;
+      let readDirectly = false;
       try {
         const absolutePath = path.resolve(
           this.context.config.getTargetDir(),
           pathName,
         );
-        if (isWithinRoot(absolutePath, this.context.config.getTargetDir())) {
-          const stats = await fs.stat(absolutePath);
-          if (stats.isDirectory()) {
-            currentPathSpec = pathName.endsWith('/')
-              ? `${pathName}**`
-              : `${pathName}/**`;
+
+        let validationError = this.context.config.validatePathAccess(
+          absolutePath,
+          'read',
+        );
+
+        // We ask the user for explicit permission to read them if outside sandboxed workspace boundaries (and not already authorized).
+        if (
+          validationError &&
+          !isWithinRoot(absolutePath, this.context.config.getTargetDir())
+        ) {
+          try {
+            const stats = await fs.stat(absolutePath);
+            if (stats.isFile()) {
+              const syntheticCallId = `resolve-prompt-${pathName}-${randomUUID()}`;
+              const params = {
+                sessionId: this.id,
+                options: [
+                  {
+                    optionId: ToolConfirmationOutcome.ProceedOnce,
+                    name: 'Allow once',
+                    kind: 'allow_once',
+                  },
+                  {
+                    optionId: ToolConfirmationOutcome.Cancel,
+                    name: 'Deny',
+                    kind: 'reject_once',
+                  },
+                ] as acp.PermissionOption[],
+                toolCall: {
+                  toolCallId: syntheticCallId,
+                  status: 'pending',
+                  title: `Allow access to absolute path: ${pathName}`,
+                  content: [
+                    {
+                      type: 'content',
+                      content: {
+                        type: 'text',
+                        text: `The Agent needs access to read an attached file outside your workspace: ${pathName}`,
+                      },
+                    },
+                  ],
+                  locations: [],
+                  kind: 'read',
+                },
+              };
+
+              const output = RequestPermissionResponseSchema.parse(
+                await this.connection.requestPermission(params),
+              );
+
+              const outcome =
+                output.outcome.outcome === 'cancelled'
+                  ? ToolConfirmationOutcome.Cancel
+                  : z
+                      .nativeEnum(ToolConfirmationOutcome)
+                      .parse(output.outcome.optionId);
+
+              if (outcome === ToolConfirmationOutcome.ProceedOnce) {
+                this.context.config
+                  .getWorkspaceContext()
+                  .addReadOnlyPath(absolutePath);
+                validationError = null;
+              } else {
+                this.debug(
+                  `Direct read authorization denied for absolute path ${pathName}`,
+                );
+                directContents.push({
+                  spec: pathName,
+                  content: `[Warning: Access to absolute path \`${pathName}\` denied by user.]`,
+                });
+                continue;
+              }
+            }
+          } catch (error) {
             this.debug(
-              `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+              `Failed to request permission for absolute attachment ${pathName}: ${getErrorMessage(error)}`,
             );
-          } else {
-            this.debug(`Path ${pathName} resolved to file: ${currentPathSpec}`);
+            await this.sendUpdate({
+              sessionUpdate: 'agent_thought_chunk',
+              content: {
+                type: 'text',
+                text: `Warning: Failed to display permission dialog for \`${absolutePath}\`. Error: ${getErrorMessage(error)}`,
+              },
+            });
           }
-          resolvedSuccessfully = true;
+        }
+
+        if (!validationError) {
+          // If it's an absolute path that is authorized (e.g. added via readOnlyPaths),
+          // read it directly to avoid ReadManyFilesTool absolute path resolution issues.
+          if (
+            (path.isAbsolute(pathName) ||
+              !isWithinRoot(
+                absolutePath,
+                this.context.config.getTargetDir(),
+              )) &&
+            !readDirectly
+          ) {
+            try {
+              const stats = await fs.stat(absolutePath);
+              if (stats.isFile()) {
+                const fileReadResult = await processSingleFileContent(
+                  absolutePath,
+                  this.context.config.getTargetDir(),
+                  this.context.config.getFileSystemService(),
+                );
+
+                if (!fileReadResult.error) {
+                  if (
+                    typeof fileReadResult.llmContent === 'object' &&
+                    'inlineData' in fileReadResult.llmContent
+                  ) {
+                    directContents.push({
+                      spec: pathName,
+                      part: fileReadResult.llmContent,
+                    });
+                  } else if (typeof fileReadResult.llmContent === 'string') {
+                    let contentToPush = fileReadResult.llmContent;
+                    if (fileReadResult.isTruncated) {
+                      contentToPush = `[WARNING: This file was truncated]\n\n${contentToPush}`;
+                    }
+                    directContents.push({
+                      spec: pathName,
+                      content: contentToPush,
+                    });
+                  }
+                  readDirectly = true;
+                  resolvedSuccessfully = true;
+                } else {
+                  this.debug(
+                    `Direct read failed for absolute path ${pathName}: ${fileReadResult.error}`,
+                  );
+                  await this.sendUpdate({
+                    sessionUpdate: 'agent_thought_chunk',
+                    content: {
+                      type: 'text',
+                      text: `Warning: file read failed for \`${pathName}\`. Reason: ${fileReadResult.error}`,
+                    },
+                  });
+                  continue;
+                }
+              }
+            } catch (error) {
+              this.debug(
+                `File stat/access error for absolute path ${pathName}: ${getErrorMessage(error)}`,
+              );
+              await this.sendUpdate({
+                sessionUpdate: 'agent_thought_chunk',
+                content: {
+                  type: 'text',
+                  text: `Warning: file access failed for \`${pathName}\`. Reason: ${getErrorMessage(error)}`,
+                },
+              });
+              continue;
+            }
+          }
+
+          if (!readDirectly) {
+            const stats = await fs.stat(absolutePath);
+            if (stats.isDirectory()) {
+              currentPathSpec = pathName.endsWith('/')
+                ? `${pathName}**`
+                : `${pathName}/**`;
+              this.debug(
+                `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+              );
+            } else {
+              this.debug(
+                `Path ${pathName} resolved to file: ${currentPathSpec}`,
+              );
+            }
+            resolvedSuccessfully = true;
+          }
         } else {
           this.debug(
-            `Path ${pathName} is outside the project directory. Skipping.`,
+            `Path ${pathName} access disallowed: ${validationError}. Skipping.`,
           );
+          await this.sendUpdate({
+            sessionUpdate: 'agent_thought_chunk',
+            content: {
+              type: 'text',
+              text: `Warning: skipping access to \`${pathName}\`. Reason: ${validationError}`,
+            },
+          });
         }
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
@@ -1328,7 +1516,9 @@ export class Session {
         }
       }
       if (resolvedSuccessfully) {
-        pathSpecsToRead.push(currentPathSpec);
+        if (!readDirectly) {
+          pathSpecsToRead.push(currentPathSpec);
+        }
         atPathToResolvedSpecMap.set(pathName, currentPathSpec);
         contentLabelsForDisplay.push(pathName);
       }
@@ -1389,7 +1579,11 @@ export class Session {
 
     const processedQueryParts: Part[] = [{ text: initialQueryText }];
 
-    if (pathSpecsToRead.length === 0 && embeddedContext.length === 0) {
+    if (
+      pathSpecsToRead.length === 0 &&
+      embeddedContext.length === 0 &&
+      directContents.length === 0
+    ) {
       // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
       debugLogger.warn('No valid file paths found in @ commands to read.');
       return [{ text: initialQueryText }];
@@ -1478,6 +1672,30 @@ export class Session {
         });
 
         throw error;
+      }
+    }
+
+    if (directContents.length > 0) {
+      const hasReferenceStart = processedQueryParts.some(
+        (p) =>
+          'text' in p &&
+          typeof p.text === 'string' &&
+          p.text.includes(REFERENCE_CONTENT_START),
+      );
+      if (!hasReferenceStart) {
+        processedQueryParts.push({
+          text: `\n${REFERENCE_CONTENT_START}`,
+        });
+      }
+      for (const item of directContents) {
+        processedQueryParts.push({
+          text: `\nContent from @${item.spec}:\n`,
+        });
+        if (item.content) {
+          processedQueryParts.push({ text: item.content });
+        } else if (item.part) {
+          processedQueryParts.push(item.part);
+        }
       }
     }
 
