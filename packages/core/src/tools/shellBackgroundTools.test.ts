@@ -78,14 +78,19 @@ describe('Background Tools', () => {
       startTime: Date.now(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
 
     const invocation = listTool.build({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
-    expect(result.llmContent).toContain(`- [PID ${pid}] EXITED: \`exited command\` (Exit Code: 1)`);
+    expect(result.llmContent).toContain(
+      `- [PID ${pid}] EXITED: \`exited command\` (Exit Code: 1)`,
+    );
   });
 
   it('read_background_output should return error if log file does not exist', async () => {
@@ -97,7 +102,10 @@ describe('Background Tools', () => {
       startTime: Date.now(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,7 +129,10 @@ describe('Background Tools', () => {
       startTime: Date.now(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
 
     // Ensure dir exists
     fs.mkdirSync(logDir, { recursive: true });
@@ -150,7 +161,10 @@ describe('Background Tools', () => {
       startTime: Date.now(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set('other-session', history);
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'other-session',
+      history,
+    );
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -173,7 +187,10 @@ describe('Background Tools', () => {
       startTime: Date.now(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
 
     fs.mkdirSync(logDir, { recursive: true });
     fs.writeFileSync(logPath, '');
@@ -184,15 +201,15 @@ describe('Background Tools', () => {
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.llmContent).toContain('Log is empty');
-    
+
     fs.unlinkSync(logPath);
   });
-  
+
   it('read_background_output should handle direct tool errors gracefully', async () => {
     const pid = 55555;
     const logPath = ShellExecutionService.getLogFilePath(pid);
     const logDir = ShellExecutionService.getLogDir();
-    
+
     const history = new Map();
     history.set(pid, {
       command: 'fail command',
@@ -200,13 +217,18 @@ describe('Background Tools', () => {
       startTime: Date.now(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+    (ShellExecutionService as any).backgroundProcessHistory.set(
+      'default',
+      history,
+    );
 
     fs.mkdirSync(logDir, { recursive: true });
     fs.writeFileSync(logPath, 'dummy content');
 
     // Mock stat to throw to hit catch block
-    vi.spyOn(fs.promises, 'lstat').mockRejectedValue(new Error('Simulated read error'));
+    vi.spyOn(fs.promises, 'lstat').mockRejectedValue(
+      new Error('Simulated read error'),
+    );
 
     const invocation = readTool.build({ pid });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,7 +237,7 @@ describe('Background Tools', () => {
 
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('Error reading background log');
-    
+
     fs.unlinkSync(logPath);
   });
 });

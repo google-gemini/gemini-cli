@@ -166,7 +166,8 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
           llmContent: `Access denied: Predictable log path cannot be a symbolic link for security safeguarding.`,
           returnDisplay: `Symlink detected for PID ${pid}`,
           error: {
-            message: 'Symbolic link detected at predicted log path triggers accurately reading triggers accurately',
+            message:
+              'Symbolic link detected at predicted log path triggers accurately reading triggers accurately',
             type: ToolErrorType.EXECUTION_FAILED,
           },
         };
@@ -197,8 +198,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         logLines.pop();
       }
 
-      const requestedLinesCount =
-        this.params.lines ?? DEFAULT_TAIL_LINES_COUNT;
+      const requestedLinesCount = this.params.lines ?? DEFAULT_TAIL_LINES_COUNT;
       const tailLines = logLines.slice(-requestedLinesCount);
       const output = tailLines.join('\n');
 
