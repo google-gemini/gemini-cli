@@ -123,7 +123,6 @@ export async function createBrowserAgentDefinition(
     const readOnlyTools = (await browserManager.getDiscoveredTools())
       .filter((t) => !!t.annotations?.readOnlyHint)
       .map((t) => t.name);
-    debugLogger.log(`Mark read-only tools: ${readOnlyTools.join(', ')}`);
     // additional tools that we marked as read-only.
     const allowlistedReadonlyTools = ['take_snapshot', 'take_screenshot'];
 
