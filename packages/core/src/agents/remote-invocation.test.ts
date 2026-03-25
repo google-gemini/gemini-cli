@@ -189,7 +189,7 @@ describe('RemoteAgentInvocation', () => {
 
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
-        'http://test-agent/card',
+        { type: 'url', url: 'http://test-agent/card' },
         undefined,
       );
     });
@@ -240,7 +240,7 @@ describe('RemoteAgentInvocation', () => {
       });
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
-        'http://test-agent/card',
+        { type: 'url', url: 'http://test-agent/card' },
         mockHandler,
       );
     });
@@ -266,11 +266,10 @@ describe('RemoteAgentInvocation', () => {
       );
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.returnDisplay).toMatchObject({
-        result: expect.stringContaining(
-          "Failed to create auth provider for agent 'test-agent'",
-        ),
-      });
+      expect(result.returnDisplay).toMatchObject({ state: 'error' });
+      expect((result.returnDisplay as SubagentProgress).result).toContain(
+        "Failed to create auth provider for agent 'test-agent'",
+      );
     });
 
     it('should not load the agent if already present', async () => {
