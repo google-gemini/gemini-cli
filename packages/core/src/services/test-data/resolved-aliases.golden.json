@@ -237,6 +237,10 @@
     "model": "gemini-3-flash-preview",
     "generateContentConfig": {}
   },
+  "chat-compression-3.1-flash-lite": {
+    "model": "gemini-3.1-flash-lite-preview",
+    "generateContentConfig": {}
+  },
   "chat-compression-2.5-pro": {
     "model": "gemini-2.5-pro",
     "generateContentConfig": {}
