@@ -2126,7 +2126,7 @@ const SETTINGS_SCHEMA = {
         label: 'Topic & Update Narration',
         category: 'Experimental',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
         showInDialog: true,

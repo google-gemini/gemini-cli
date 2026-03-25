@@ -1688,11 +1688,11 @@ describe('Server Config (config.ts)', () => {
       expect(excluded!.has(UPDATE_TOPIC_TOOL_NAME)).toBe(true);
     });
 
-    it('should default to disabled and exclude topic tool', () => {
+    it('should default to enabled and NOT exclude topic tool', () => {
       const config = new Config(baseParams);
-      expect(config.isTopicUpdateNarrationEnabled()).toBe(false);
+      expect(config.isTopicUpdateNarrationEnabled()).toBe(true);
       const excluded = config.getExcludeTools();
-      expect(excluded!.has(UPDATE_TOPIC_TOOL_NAME)).toBe(true);
+      expect(excluded!.has(UPDATE_TOPIC_TOOL_NAME)).toBe(false);
     });
 
     it('should have independent TopicState across instances', () => {

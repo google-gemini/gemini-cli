@@ -1639,7 +1639,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.topicUpdateNarration`** (boolean):
   - **Description:** Enable the experimental Topic & Update communication model
     for reduced chattiness and structured progress reporting.
-  - **Default:** `false`
+  - **Default:** `true`
 
 #### `skills`
 

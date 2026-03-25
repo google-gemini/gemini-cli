@@ -87,6 +87,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       getAllTools: vi.fn().mockReturnValue([]),
     };
     mockConfig = {
+      topicState: {
+        getTopic: vi.fn().mockReturnValue(undefined),
+      },
       getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
@@ -95,7 +98,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
-      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(true),
       isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(true),
@@ -416,6 +419,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         getAllToolNames: vi.fn().mockReturnValue(toolNames),
       };
       const testConfig = {
+        topicState: {
+          getTopic: vi.fn().mockReturnValue(undefined),
+        },
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
         storage: {
@@ -423,7 +429,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
-        isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+        isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(true),
         isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
         isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
