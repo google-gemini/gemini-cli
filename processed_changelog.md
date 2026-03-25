@@ -1,24 +1,4 @@
-# Latest stable release: v0.35.0
-
-Released: March 24, 2026
-
-For most users, our latest stable release is the recommended release. Install
-the latest stable version with:
-
-```
-npm install -g @google/gemini-cli
-```
-
-## Highlights
-
-- **Customizable Keyboard Shortcuts**: Users can now define custom keybindings, including literal character bindings and extended Kitty protocol keys. Support for removing keybindings using a '-' prefix has also been added.
-- **Vim Mode Enhancements**: Significant updates to vim mode, including new motions (X, ~, r, f/F/t/T, df/dt), yank and paste support with an unnamed register, and improved cursor behavior.
-- **Enhanced Security & Sandboxing**: A new SandboxManager has been integrated to sandbox all process-spawning tools, along with a `disableAlwaysAllow` setting to prevent auto-approvals.
-- **Efficiency & Performance Improvements**: JIT context loading is now enabled by default to improve efficiency. Performance has also been boosted through code splitting and deferred UI loading.
-- **Subagent & MCP Improvements**: Subagent success UI and early termination displays have been simplified. MCP tool validation and schema exports have also been improved.
-
 ## What's Changed
-
 * feat(cli): customizable keyboard shortcuts by @scidomino in [#21945](https://github.com/google-gemini/gemini-cli/pull/21945)
 * feat(core): Thread `AgentLoopContext` through core. by @joshualitt in [#21944](https://github.com/google-gemini/gemini-cli/pull/21944)
 * chore(release): bump version to 0.35.0-nightly.20260311.657f19c1f by @gemini-cli-robot in [#21966](https://github.com/google-gemini/gemini-cli/pull/21966)
@@ -169,6 +149,5 @@ npm install -g @google/gemini-cli
 * fix(patch): cherry-pick 4e5dfd0 to release/v0.35.0-preview.1-pr-23074 to patch version v0.35.0-preview.1 and create version 0.35.0-preview.2 by @gemini-cli-robot in [#23134](https://github.com/google-gemini/gemini-cli/pull/23134)
 * fix(patch): cherry-pick daf3691 to release/v0.35.0-preview.2-pr-23558 to patch version v0.35.0-preview.2 and create version 0.35.0-preview.3 by @gemini-cli-robot in [#23565](https://github.com/google-gemini/gemini-cli/pull/23565)
 * fix(patch): cherry-pick b2d6dc4 to release/v0.35.0-preview.4-pr-23546 [CONFLICTS] by @gemini-cli-robot in [#23585](https://github.com/google-gemini/gemini-cli/pull/23585)
-**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.0
 
 **Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.0

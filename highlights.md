@@ -1,0 +1,5 @@
+- **Customizable Keyboard Shortcuts**: Users can now define custom keybindings, including literal character bindings and extended Kitty protocol keys. Support for removing keybindings using a '-' prefix has also been added.
+- **Vim Mode Enhancements**: Significant updates to vim mode, including new motions (X, ~, r, f/F/t/T, df/dt), yank and paste support with an unnamed register, and improved cursor behavior.
+- **Enhanced Security & Sandboxing**: A new SandboxManager has been integrated to sandbox all process-spawning tools, along with a `disableAlwaysAllow` setting to prevent auto-approvals.
+- **Efficiency & Performance Improvements**: JIT context loading is now enabled by default to improve efficiency. Performance has also been boosted through code splitting and deferred UI loading.
+- **Subagent & MCP Improvements**: Subagent success UI and early termination displays have been simplified. MCP tool validation and schema exports have also been improved.

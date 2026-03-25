@@ -18,6 +18,12 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.35.0 - 2026-03-24
+
+- **Customizable Keyboard Shortcuts:** You can now fully customize your terminal experience with user-defined keybindings ([#21945](https://github.com/google-gemini/gemini-cli/pull/21945) by @scidomino).
+- **Vim Mode Expansion:** We've added more motions, yank/paste support, and refined cursor handling to our vim mode ([#21932](https://github.com/google-gemini/gemini-cli/pull/21932), [#22026](https://github.com/google-gemini/gemini-cli/pull/22026) by @aanari).
+- **Enhanced Sandboxing:** Improved security with a new SandboxManager for process-spawning tools ([#21774](https://github.com/google-gemini/gemini-cli/pull/21774), [#22231](https://github.com/google-gemini/gemini-cli/pull/22231) by @galz10).
+
 ## Announcements: v0.34.0 - 2026-03-17
 
 - **Plan Mode Enabled by Default:** Plan Mode is now enabled by default to help
