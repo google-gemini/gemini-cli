@@ -13,15 +13,19 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
+import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the LS tool
@@ -121,6 +125,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       this.config.getTargetDir(),
     );
     return shortenPath(relativePath);
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildDirPathArgsPattern(this.params.dir_path),
+    };
   }
 
   // Helper for consistent error formatting
@@ -257,6 +269,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       let resultMessage = `Directory listing for ${resolvedDirPath}:\n${directoryContent}`;
       if (ignoredCount > 0) {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
+      }
+
+      // Discover JIT subdirectory context for the listed directory
+      const jitContext = await discoverJitContext(this.config, resolvedDirPath);
+      if (jitContext) {
+        resultMessage = appendJitContext(resultMessage, jitContext);
       }
 
       let displayMessage = `Listed ${entries.length} item(s).`;

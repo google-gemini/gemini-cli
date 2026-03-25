@@ -27,7 +27,7 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'named key (return)',
-        binding: new KeyBinding('return'),
+        binding: new KeyBinding('enter'),
         expected: {
           darwin: 'Enter',
           win32: 'Enter',

@@ -193,7 +193,7 @@ runs:
         INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
 
     - name: '📦 Prepare bundled CLI for npm release'
-      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/'"
+      if: "inputs.npm-registry-url != 'https://npm.pkg.github.com/' && inputs.npm-tag != 'latest'"
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |

@@ -36,8 +36,8 @@ exports[`<FooterConfigDialog /> > highlights the active item in the preview 1`] 
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
-│  │ workspace (/directory)     branch      sandbox     /model             /stats      diff     │  │
-│  │ ~/project/path             main        docker      gemini-2.5-pro     97%         +12 -4   │  │
+│  │ workspace (/directory)      branch      sandbox     /model              /stats      diff   │  │
+│  │ ~/project/path              main        docker      gemini-2.5-pro      97%         +12 -4 │  │
 │  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
@@ -79,8 +79,8 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
-│  │ workspace (/directory)        branch       sandbox        /model               /stats      │  │
-│  │ ~/project/path                main         docker         gemini-2.5-pro       97%         │  │
+│  │ workspace (/directory)         branch         sandbox        /model                 /stats │  │
+│  │ ~/project/path                 main           docker         gemini-2.5-pro         97%    │  │
 │  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -123,8 +123,50 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 2`] = 
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
-│  │ workspace (/directory)        branch       sandbox        /model               /stats      │  │
-│  │ ~/project/path                main         docker         gemini-2.5-pro       97%         │  │
+│  │ workspace (/directory)         branch         sandbox        /model                 /stats │  │
+│  │ ~/project/path                 main           docker         gemini-2.5-pro         97%    │  │
+│  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<FooterConfigDialog /> > updates the preview when Show footer labels is toggled off 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Configure Footer                                                                                │
+│                                                                                                  │
+│  Select which items to display in the footer.                                                    │
+│                                                                                                  │
+│    [✓] workspace                                                                                 │
+│     Current working directory                                                                    │
+│    [✓] git-branch                                                                                │
+│     Current git branch name (not shown when unavailable)                                         │
+│    [✓] sandbox                                                                                   │
+│     Sandbox type and trust indicator                                                             │
+│    [✓] model-name                                                                                │
+│     Current model identifier                                                                     │
+│    [✓] quota                                                                                     │
+│     Remaining usage on daily limit (not shown when unavailable)                                  │
+│    [ ] context-used                                                                              │
+│     Percentage of context window used                                                            │
+│    [ ] memory-usage                                                                              │
+│     Memory used by the application                                                               │
+│    [ ] session-id                                                                                │
+│     Unique identifier for the current session                                                    │
+│    [ ] code-changes                                                                              │
+│     Lines added/removed in the session (not shown when zero)                                     │
+│    [ ] token-count                                                                               │
+│     Total tokens used in the session (not shown when zero)                                       │
+│  > [ ] Show footer labels                                                                        │
+│                                                                                                  │
+│    Reset to default footer                                                                       │
+│                                                                                                  │
+│                                                                                                  │
+│  Enter to select · ↑/↓ to navigate · ←/→ to reorder · Esc to close                               │
+│                                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Preview:                                                                                   │  │
+│  │ ~/project/path     ·      main     ·       docker     ·      gemini-2.5-pro     ·      97% │  │
 │  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"

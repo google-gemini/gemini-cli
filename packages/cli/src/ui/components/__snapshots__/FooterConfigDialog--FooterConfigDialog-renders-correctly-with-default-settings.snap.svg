@@ -126,22 +126,21 @@
     <text x="27" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <rect x="45" y="595" width="198" height="17" fill="#001a00" />
     <text x="45" y="597" fill="#ffffff" textLength="198" lengthAdjust="spacingAndGlyphs">workspace (/directory)</text>
-    <rect x="243" y="595" width="45" height="17" fill="#001a00" />
-    <text x="315" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">branch</text>
-    <text x="432" y="597" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">sandbox</text>
-    <text x="567" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/model</text>
-    <text x="756" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/stats</text>
+    <text x="324" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">branch</text>
+    <text x="459" y="597" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">sandbox</text>
+    <text x="594" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/model</text>
+    <text x="801" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/stats</text>
     <text x="864" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="27" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <rect x="45" y="612" width="126" height="17" fill="#001a00" />
     <text x="45" y="614" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">~/project/path</text>
-    <rect x="171" y="612" width="117" height="17" fill="#001a00" />
-    <text x="315" y="614" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
-    <text x="432" y="614" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
-    <text x="567" y="614" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
-    <text x="756" y="614" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">97%</text>
+    <rect x="171" y="612" width="72" height="17" fill="#001a00" />
+    <text x="324" y="614" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
+    <text x="459" y="614" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
+    <text x="594" y="614" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
+    <text x="801" y="614" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">97%</text>
     <text x="864" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

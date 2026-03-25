@@ -33,38 +33,54 @@
 toolName = "enter_plan_mode"
 decision = "ask_user"
 priority = 50
+interactive = true
+
+[[rule]]
+toolName = "enter_plan_mode"
+decision = "allow"
+priority = 50
+interactive = false
 
 [[rule]]
 toolName = "enter_plan_mode"
 decision = "deny"
 priority = 70
 modes = ["plan"]
-deny_message = "You are already in Plan Mode."
+denyMessage = "You are already in Plan Mode."
 
 [[rule]]
 toolName = "exit_plan_mode"
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
+interactive = true
+
+[[rule]]
+toolName = "exit_plan_mode"
+decision = "allow"
+priority = 70
+interactive = false
 
 [[rule]]
 toolName = "exit_plan_mode"
 decision = "deny"
 priority = 50
-deny_message = "You are not currently in Plan Mode. Use enter_plan_mode first to design a plan."
+denyMessage = "You are not currently in Plan Mode. Use enter_plan_mode first to design a plan."
 
 
 # Catch-All: Deny everything by default in Plan mode.
 
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 60
 modes = ["plan"]
-deny_message = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
+denyMessage = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "ask_user"
@@ -80,7 +96,8 @@ toolName = [
   "google_web_search",
   "activate_skill",
   "codebase_investigator",
-  "cli_help"
+  "cli_help",
+  "get_internal_docs"
 ]
 decision = "allow"
 priority = 70
@@ -98,7 +115,7 @@ toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
+argsPattern = "\\x00\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\"\\x00"
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]
@@ -106,4 +123,4 @@ toolName = ["write_file", "replace"]
 decision = "deny"
 priority = 65
 modes = ["plan"]
-deny_message = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."
+denyMessage = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."

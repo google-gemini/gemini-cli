@@ -80,7 +80,7 @@ export interface UIActions {
   revealCleanUiDetailsTemporarily: (durationMs?: number) => void;
   handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
-  dismissBackgroundShell: (pid: number) => void;
+  dismissBackgroundShell: (pid: number) => Promise<void>;
   setActiveBackgroundShellPid: (pid: number) => void;
   setIsBackgroundShellListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;

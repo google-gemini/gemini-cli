@@ -54,7 +54,10 @@ describe('ModelRouterService', () => {
     vi.spyOn(mockConfig, 'getLocalLiteRtLmClient').mockReturnValue(
       mockLocalLiteRtLmClient,
     );
-    vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(false);
+    vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(true);
+    vi.spyOn(mockConfig, 'getResolvedClassifierThreshold').mockResolvedValue(
+      90,
+    );
     vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
     vi.spyOn(mockConfig, 'getGemmaModelRouterSettings').mockReturnValue({
       enabled: false,
@@ -182,8 +185,8 @@ describe('ModelRouterService', () => {
         false,
         undefined,
         ApprovalMode.DEFAULT,
-        false,
-        undefined,
+        true,
+        '90',
       );
       expect(logModelRouting).toHaveBeenCalledWith(
         mockConfig,
@@ -209,8 +212,8 @@ describe('ModelRouterService', () => {
         true,
         'Strategy failed',
         ApprovalMode.DEFAULT,
-        false,
-        undefined,
+        true,
+        '90',
       );
       expect(logModelRouting).toHaveBeenCalledWith(
         mockConfig,

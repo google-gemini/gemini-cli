@@ -25,6 +25,7 @@ import {
   type ChatCompressionInfo,
 } from './turn.js';
 import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -69,7 +70,11 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { resolveModel, isGemini2Model } from '../config/models.js';
+import {
+  getDisplayString,
+  resolveModel,
+  isGemini2Model,
+} from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
@@ -105,17 +110,26 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
-  constructor(private readonly config: Config) {
-    this.loopDetector = new LoopDetectionService(config);
+  constructor(private readonly context: AgentLoopContext) {
+    this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   private handleModelChanged = () => {
     this.currentSequenceModel = null;
+  };
+
+  private handleMemoryChanged = () => {
+    this.updateSystemInstruction();
   };
 
   // Hook state to deduplicate BeforeAgent calls and track response for
@@ -281,7 +295,7 @@ export class GeminiClient {
     }
     this.lastUsedModelId = modelId;
 
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
@@ -290,10 +304,14 @@ export class GeminiClient {
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
+    // Reset JIT context loaded paths so subdirectory context can be
+    // re-discovered in the new session.
+    await this.config.getContextManager()?.refresh();
   }
 
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   async resumeChat(
@@ -332,7 +350,7 @@ export class GeminiClient {
       return;
     }
 
-    const systemMemory = this.config.getUserMemory();
+    const systemMemory = this.config.getSystemInstructionMemory();
     const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
     this.getChat().setSystemInstruction(systemInstruction);
   }
@@ -345,14 +363,14 @@ export class GeminiClient {
     this.hasFailedCompressionAttempt = false;
     this.lastUsedModelId = undefined;
 
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const systemMemory = this.config.getUserMemory();
+      const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       return new GeminiChat(
         this.config,
@@ -362,7 +380,7 @@ export class GeminiClient {
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
-          const toolRegistry = this.config.getToolRegistry();
+          const toolRegistry = this.context.toolRegistry;
           const toolDeclarations =
             toolRegistry.getFunctionDeclarations(modelId);
           return [{ functionDeclarations: toolDeclarations }];
@@ -557,6 +575,9 @@ export class GeminiClient {
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
+      false,
+      this.config.getHasAccessToPreviewModel?.() ?? true,
+      this.config,
     );
   }
 
@@ -857,7 +878,7 @@ export class GeminiClient {
     }
 
     const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context.messageBus;
 
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));
@@ -898,6 +919,7 @@ export class GeminiClient {
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
     let turn = new Turn(this.getChat(), prompt_id);
+    let continuationHandled = false;
 
     try {
       turn = yield* this.processTurn(
@@ -954,7 +976,15 @@ export class GeminiClient {
             await this.resetChat();
           }
           const continueRequest = [{ text: continueReason }];
-          yield* this.sendMessageStream(
+          // Reset hook state so the continuation fires BeforeAgent fresh
+          // and fireAfterAgentHookSafe sees activeCalls=1, not 2.
+          const contHookState = this.hookStateMap.get(prompt_id);
+          if (contHookState) {
+            contHookState.hasFiredBeforeAgent = false;
+            contHookState.activeCalls--;
+          }
+          continuationHandled = true;
+          turn = yield* this.sendMessageStream(
             continueRequest,
             signal,
             prompt_id,
@@ -972,16 +1002,18 @@ export class GeminiClient {
       }
       throw error;
     } finally {
-      const hookState = this.hookStateMap.get(prompt_id);
-      if (hookState) {
-        hookState.activeCalls--;
-        const isPendingTools =
-          turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
-        const isAborted = signal?.aborted;
+      if (!continuationHandled) {
+        const hookState = this.hookStateMap.get(prompt_id);
+        if (hookState) {
+          hookState.activeCalls--;
+          const isPendingTools =
+            turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
+          const isAborted = signal?.aborted;
 
-        if (hookState.activeCalls <= 0) {
-          if (!isPendingTools || isAborted) {
-            this.hookStateMap.delete(prompt_id);
+          if (hookState.activeCalls <= 0) {
+            if (!isPendingTools || isAborted) {
+              this.hookStateMap.delete(prompt_id);
+            }
           }
         }
       }
@@ -1004,7 +1036,7 @@ export class GeminiClient {
     } = desiredModelConfig;
 
     try {
-      const userMemory = this.config.getUserMemory();
+      const userMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
       const {
         model,
@@ -1088,7 +1120,18 @@ export class GeminiClient {
         onValidationRequired: onValidationRequiredCallback,
         authType: this.config.getContentGeneratorConfig()?.authType,
         maxAttempts: availabilityMaxAttempts,
+        retryFetchErrors: this.config.getRetryFetchErrors(),
         getAvailabilityContext,
+        onRetry: (attempt, error, delayMs) => {
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts:
+              availabilityMaxAttempts ?? this.config.getMaxAttempts(),
+            delayMs,
+            error: error instanceof Error ? error.message : String(error),
+            model: getDisplayString(currentAttemptModel),
+          });
+        },
       });
 
       return result;

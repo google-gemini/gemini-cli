@@ -25,7 +25,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -134,7 +133,7 @@ describe('Scheduler (Orchestrator)', () => {
   const req2: ToolCallRequestInfo = {
     callId: 'call-2',
     name: 'test-tool',
-    args: { foo: 'baz' },
+    args: { foo: 'baz', wait_for_previous: true },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -170,10 +169,13 @@ describe('Scheduler (Orchestrator)', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       toolRegistry: mockToolRegistry,
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -182,6 +184,11 @@ describe('Scheduler (Orchestrator)', () => {
       publish: vi.fn(),
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
+
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
 
     getPreferredEditor = vi.fn().mockReturnValue('vim');
 
@@ -306,7 +313,7 @@ describe('Scheduler (Orchestrator)', () => {
 
     // Initialize Scheduler
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'root',
@@ -363,6 +370,32 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should propagate subagent name to checkPolicy', async () => {
+      const { checkPolicy } = await import('./policy.js');
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        schedulerId: 'sub-scheduler',
+        subagent: 'my-agent',
+        getPreferredEditor: () => undefined,
+      });
+
+      const request: ToolCallRequestInfo = {
+        callId: 'call-1',
+        name: 'test-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      };
+
+      await scheduler.schedule([request], new AbortController().signal);
+
+      expect(checkPolicy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'my-agent',
+      );
+    });
+
     it('should correctly build ValidatingToolCalls for happy path', async () => {
       await scheduler.schedule(req1, signal);
 
@@ -389,7 +422,7 @@ describe('Scheduler (Orchestrator)', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata = { attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
       expect(metadata).toMatchObject({
         input: [req1],
       });
@@ -609,6 +642,7 @@ describe('Scheduler (Orchestrator)', () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
         rule: {
+          toolName: '*',
           decision: PolicyDecision.DENY,
           denyMessage: 'Custom denial reason',
         },
@@ -660,7 +694,7 @@ describe('Scheduler (Orchestrator)', () => {
     it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { decision: PolicyDecision.DENY },
+        rule: { toolName: '*', decision: PolicyDecision.DENY },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -689,7 +723,11 @@ describe('Scheduler (Orchestrator)', () => {
       const customMessage = 'Custom Plan Mode Deny';
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { decision: PolicyDecision.DENY, denyMessage: customMessage },
+        rule: {
+          toolName: '*',
+          decision: PolicyDecision.DENY,
+          denyMessage: customMessage,
+        },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -802,7 +840,7 @@ describe('Scheduler (Orchestrator)', () => {
         signal,
         expect.objectContaining({
           config: mockConfig,
-          messageBus: mockMessageBus,
+          messageBus: expect.anything(),
           state: mockStateManager,
           schedulerId: ROOT_SCHEDULER_ID,
         }),
@@ -812,10 +850,9 @@ describe('Scheduler (Orchestrator)', () => {
         mockTool,
         resolution.outcome,
         resolution.lastDetails,
-        expect.objectContaining({
-          config: mockConfig,
-          messageBus: mockMessageBus,
-        }),
+        mockConfig,
+        expect.anything(),
+        expect.anything(),
       );
 
       expect(mockExecutor.execute).toHaveBeenCalled();
@@ -1158,7 +1195,7 @@ describe('Scheduler (Orchestrator)', () => {
       const schedulerId = 'custom-scheduler';
       const parentCallId = 'parent-call';
       const customScheduler = new Scheduler({
-        config: mockConfig,
+        context: mockConfig,
         messageBus: mockMessageBus,
         getPreferredEditor,
         schedulerId,
@@ -1203,7 +1240,7 @@ describe('Scheduler (Orchestrator)', () => {
       const offSpy = vi.spyOn(coreEvents, 'off');
 
       const s = new Scheduler({
-        config: mockConfig,
+        context: mockConfig,
         messageBus: mockMessageBus,
         getPreferredEditor,
         schedulerId: 'cleanup-test',
@@ -1316,10 +1353,12 @@ describe('Scheduler MCP Progress', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -1329,6 +1368,11 @@ describe('Scheduler MCP Progress', () => {
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
 
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
+
     getPreferredEditor = vi.fn().mockReturnValue('vim');
 
     vi.mocked(SchedulerStateManager).mockImplementation(
@@ -1337,7 +1381,7 @@ describe('Scheduler MCP Progress', () => {
     );
 
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'progress-test',

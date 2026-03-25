@@ -14,6 +14,7 @@ import {
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
+  getFsErrorMessage,
   Storage,
   coreEvents,
   homedir,
@@ -479,6 +480,7 @@ export class LoadedSettings {
     admin.mcp = {
       enabled: mcpSetting?.mcpEnabled,
       config: mcpSetting?.mcpConfig?.mcpServers,
+      requiredConfig: mcpSetting?.requiredMcpConfig,
     };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
@@ -628,6 +630,10 @@ const settingsCache = createCache<string, LoadedSettings>({
  */
 export function resetSettingsCacheForTesting() {
   settingsCache.clear();
+}
+
+export function isWorktreeEnabled(settings: LoadedSettings): boolean {
+  return settings.merged.experimental.worktrees;
 }
 
 /**
@@ -1072,9 +1078,10 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your latest settings changes.',
+      `Failed to save settings: ${detailedErrorMessage}`,
       error,
     );
   }
@@ -1087,9 +1094,10 @@ export function saveModelChange(
   try {
     loadedSettings.setValue(SettingScope.User, 'model.name', model);
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your preferred model.',
+      `Failed to save preferred model: ${detailedErrorMessage}`,
       error,
     );
   }

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,6 +21,8 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -29,6 +31,7 @@ import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
+import { buildPatternArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -285,20 +288,54 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
   }
 
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildPatternArgsPattern(this.params.pattern),
+    };
+  }
+
   /**
    * Checks if a command is available in the system's PATH.
    * @param {string} command The command name (e.g., 'git', 'grep').
    * @returns {Promise<boolean>} True if the command is available, false otherwise.
    */
-  private isCommandAvailable(command: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      const checkCommand = process.platform === 'win32' ? 'where' : 'command';
-      const checkArgs =
-        process.platform === 'win32' ? [command] : ['-v', command];
-      try {
-        const child = spawn(checkCommand, checkArgs, {
+  private async isCommandAvailable(command: string): Promise<boolean> {
+    const checkCommand = process.platform === 'win32' ? 'where' : 'command';
+    const checkArgs =
+      process.platform === 'win32' ? [command] : ['-v', command];
+    try {
+      const sandboxManager = this.config.sandboxManager;
+
+      let finalCommand = checkCommand;
+      let finalArgs = checkArgs;
+      let finalEnv = process.env;
+
+      if (sandboxManager) {
+        try {
+          const prepared = await sandboxManager.prepareCommand({
+            command: checkCommand,
+            args: checkArgs,
+            cwd: process.cwd(),
+            env: process.env,
+          });
+          finalCommand = prepared.program;
+          finalArgs = prepared.args;
+          finalEnv = prepared.env;
+        } catch (err) {
+          debugLogger.debug(
+            `[GrepTool] Sandbox preparation failed for '${command}':`,
+            err,
+          );
+        }
+      }
+
+      return await new Promise((resolve) => {
+        const child = spawn(finalCommand, finalArgs, {
           stdio: 'ignore',
           shell: true,
+          env: finalEnv,
         });
         child.on('close', (code) => resolve(code === 0));
         child.on('error', (err) => {
@@ -308,10 +345,10 @@ class GrepToolInvocation extends BaseToolInvocation<
           );
           resolve(false);
         });
-      } catch {
-        resolve(false);
-      }
-    });
+      });
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -370,6 +407,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
+            sandboxManager: this.config.sandboxManager,
           });
 
           const results: GrepMatch[] = [];
@@ -441,6 +479,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
+            sandboxManager: this.config.sandboxManager,
           });
 
           for await (const line of generator) {

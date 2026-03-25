@@ -101,6 +101,13 @@ function parseDurationInSeconds(duration: string): number | null {
 }
 
 /**
+ * Maximum retry delay (in seconds) before a retryable error is treated as terminal.
+ * If the server suggests waiting longer than this, the user is effectively locked out,
+ * so we trigger the fallback/credits flow instead of silently waiting.
+ */
+const MAX_RETRYABLE_DELAY_SECONDS = 300; // 5 minutes
+
+/**
  * Valid Cloud Code API domains for VALIDATION_REQUIRED errors.
  */
 const CLOUDCODE_DOMAINS = [
@@ -248,15 +255,15 @@ export function classifyGoogleError(error: unknown): unknown {
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);
       if (retryDelaySeconds !== null) {
-        return new RetryableQuotaError(
-          errorMessage,
-          googleApiError ?? {
-            code: status ?? 429,
-            message: errorMessage,
-            details: [],
-          },
-          retryDelaySeconds,
-        );
+        const cause = googleApiError ?? {
+          code: status ?? 429,
+          message: errorMessage,
+          details: [],
+        };
+        if (retryDelaySeconds > MAX_RETRYABLE_DELAY_SECONDS) {
+          return new TerminalQuotaError(errorMessage, cause, retryDelaySeconds);
+        }
+        return new RetryableQuotaError(errorMessage, cause, retryDelaySeconds);
       }
     } else if (status === 429 || status === 499) {
       // Fallback: If it is a 429 or 499 but doesn't have a specific "retry in" message,
@@ -325,10 +332,19 @@ export function classifyGoogleError(error: unknown): unknown {
     if (errorInfo.domain) {
       if (isCloudCodeDomain(errorInfo.domain)) {
         if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
+          const effectiveDelay = delaySeconds ?? 10;
+          if (effectiveDelay > MAX_RETRYABLE_DELAY_SECONDS) {
+            return new TerminalQuotaError(
+              `${googleApiError.message}`,
+              googleApiError,
+              effectiveDelay,
+              errorInfo.reason,
+            );
+          }
           return new RetryableQuotaError(
             `${googleApiError.message}`,
             googleApiError,
-            delaySeconds ?? 10,
+            effectiveDelay,
           );
         }
         if (errorInfo.reason === 'QUOTA_EXHAUSTED') {
@@ -345,6 +361,13 @@ export function classifyGoogleError(error: unknown): unknown {
 
   // 2. Check for delays in RetryInfo
   if (retryInfo?.retryDelay && delaySeconds) {
+    if (delaySeconds > MAX_RETRYABLE_DELAY_SECONDS) {
+      return new TerminalQuotaError(
+        `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
+        googleApiError,
+        delaySeconds,
+      );
+    }
     return new RetryableQuotaError(
       `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
       googleApiError,
