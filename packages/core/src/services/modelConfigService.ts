@@ -90,6 +90,7 @@ export interface ModelResolution {
 /** The actual state of the current session. */
 export interface ResolutionContext {
   useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   requestedModel?: string;
@@ -98,6 +99,7 @@ export interface ResolutionContext {
 /** The requirements defined in the registry. */
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
   useCustomTools?: boolean;
   hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
@@ -165,6 +167,8 @@ export class ModelConfigService {
       switch (key) {
         case 'useGemini3_1':
           return value === context.useGemini3_1;
+        case 'useGemini3_1FlashLite':
+          return value === context.useGemini3_1FlashLite;
         case 'useCustomTools':
           return value === context.useCustomTools;
         case 'hasAccessToPreview':

@@ -30,6 +30,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
 
@@ -105,6 +106,8 @@ export function modelStringToModelConfigAlias(model: string): string {
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
       return 'chat-compression-3-flash';
+    case PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL:
+      return 'chat-compression-3.1-flash-lite';
     case DEFAULT_GEMINI_MODEL:
       return 'chat-compression-2.5-pro';
     case DEFAULT_GEMINI_FLASH_MODEL:
