@@ -167,6 +167,12 @@ import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
+import {
+  getLastTurnToolCallIds,
+  isToolExecuting,
+  isToolAwaitingConfirmation,
+  getAllToolCalls,
+} from './utils/historyUtils.js';
 
 interface AppContainerProps {
   config: Config;
@@ -182,12 +188,6 @@ import {
   APPROVAL_MODE_REVEAL_DURATION_MS,
 } from './hooks/useVisibilityToggle.js';
 import { useKeyMatchers } from './hooks/useKeyMatchers.js';
-import {
-  getLastTurnToolCallIds,
-  isToolExecuting,
-  isToolAwaitingConfirmation,
-  getAllToolCalls,
-} from './utils/historyUtils.js';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -1166,6 +1166,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
   );
 
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+  );
+
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
   backgroundShellsRef.current = backgroundShells;
@@ -1187,11 +1192,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   setIsBackgroundShellListOpenRef.current = setIsBackgroundShellListOpen;
-
-  const pendingHistoryItems = useMemo(
-    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
-    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
-  );
 
   const lastOutputTimeRef = useRef(0);
 
@@ -1826,11 +1826,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         toggleLastTurnTools();
 
         // Force layout refresh after a short delay to allow the terminal layout to settle.
-        // This prevents the "blank screen" issue by ensuring Ink re-measures after
-        // any async subview updates are complete.
+        // Minimize "blank screen" issue after any async subview updates are complete.
         setTimeout(() => {
           refreshStatic();
-        }, 500);
+        }, 250);
 
         return true;
       } else if (

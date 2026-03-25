@@ -66,9 +66,9 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
 
   // ToolConfirmationMessage needs to know the height available for its OWN content.
   // We subtract the lines used by the Queue wrapper:
-  // - 2 lines for the rounded border
+  // - 2 lines for the rounded border (top/bottom)
   // - 2 lines for the Header (text + margin)
-  // - 2 lines for Tool Identity (text + margin)
+  // - 2 lines for Tool Identity (text + margin) if shown
   const availableContentHeight = constrainHeight
     ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
     : undefined;
@@ -83,10 +83,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       >
         <Box flexDirection="column" width={mainAreaWidth - 4}>
           {/* Header */}
-          <Box
-            marginBottom={hideToolIdentity ? 0 : 1}
-            justifyContent="space-between"
-          >
+          <Box marginBottom={1} justifyContent="space-between">
             <Text color={borderColor} bold>
               {getConfirmationHeader(tool.confirmationDetails)}
             </Text>
@@ -98,7 +95,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           </Box>
 
           {!hideToolIdentity && (
-            <Box>
+            <Box marginBottom={1}>
               <ToolStatusIndicator status={tool.status} name={tool.name} />
               <ToolInfo
                 name={tool.name}

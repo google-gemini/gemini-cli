@@ -13,6 +13,7 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { getFileExtension } from '../../utils/fileUtils.js';
 
 export interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -150,7 +151,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         .map((line) => line.content)
         .join('\n');
       // Attempt to infer language from filename, default to plain text if no filename
-      const fileExtension = filename?.split('.').pop() || null;
+      const fileExtension = getFileExtension(filename);
       const language = fileExtension
         ? getLanguageFromExtension(fileExtension)
         : null;
@@ -259,7 +260,7 @@ export const renderDiffLines = ({
   );
   const gutterWidth = Math.max(1, maxLineNumber.toString().length);
 
-  const fileExtension = filename?.split('.').pop() || null;
+  const fileExtension = getFileExtension(filename);
   const language = fileExtension
     ? getLanguageFromExtension(fileExtension)
     : null;
