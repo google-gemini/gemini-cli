@@ -74,7 +74,7 @@ primary conditions are the tool's name and its arguments.
 
 The `toolName` in the rule must match the name of the tool being called. For a
 complete list of built-in tool names, see the
-[Tools reference](./tools.md#available-tools).
+[Tools reference](/docs/reference/tools#available-tools).
 
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
@@ -88,7 +88,7 @@ If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
 the arguments don't match the pattern, the rule does not apply. For a list of
 argument keys available for each tool, see the **Parameters** in the
-[Tools reference](./tools.md#available-tools).
+[Tools reference](/docs/reference/tools#available-tools).
 
 ### Decisions
 
@@ -212,7 +212,8 @@ admin directories. If checks fail, system policies are **ignored**.
 This section describes the fields available in a TOML policy rule.
 
 For valid built-in `toolName` values and their argument structures (used by
-`argsPattern`), see the [Tools reference](./tools.md#available-tools).
+`argsPattern`), see the
+[Tools reference](/docs/reference/tools#available-tools).
 
 ```toml
 [[rule]]
@@ -277,8 +278,8 @@ priority = 10
 To simplify writing policies for `run_shell_command`, you can use
 `commandPrefix` or `commandRegex` instead of the more complex `argsPattern`.
 These are policy-rule shorthands, not arguments of the `run_shell_command` tool
-itself. For the tool's invocation arguments, see [Shell tool](../tools/shell.md)
-and [Tools reference](./tools.md#available-tools).
+itself. For the tool's invocation arguments, see [Shell tool](/docs/tools/shell)
+and [Tools reference](/docs/reference/tools#available-tools).
 
 - `commandPrefix`: Matches if the `command` argument starts with the given
   string.
@@ -371,4 +372,4 @@ out-of-the-box experience.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.
 
-[Customizing Plan Mode Policies]: /docs/cli/plan-mode.md#customizing-policies
+[Customizing Plan Mode Policies]: /docs/cli/plan-mode#customizing-policies
