@@ -180,6 +180,9 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
         config.authType === AuthType.USE_VERTEX_AI ||
         ((await gcConfig.getGemini31Launched?.()) ?? false),
+      config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI ||
+        ((await gcConfig.getGemini31FlashLiteLaunched?.()) ?? false),
       false,
       gcConfig.getHasAccessToPreviewModel?.() ?? true,
       gcConfig,

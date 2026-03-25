@@ -686,13 +686,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
-        return false;
-      }
+      const isGenerating =
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation;
 
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
@@ -875,6 +871,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShellModeActive(false);
           resetEscapeState();
           return true;
+        }
+
+        // If we're generating and no local overlay consumed Escape, let it
+        // propagate to the global cancellation handler.
+        if (isGenerating) {
+          return false;
         }
 
         handleEscPress();
