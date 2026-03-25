@@ -12,6 +12,7 @@ import {
 } from './shellBackgroundTools.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { NoopSandboxManager } from '../services/sandboxManager.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 // Integration test simulating model interaction cycle
 describe('Background Tools Integration', () => {
@@ -21,7 +22,9 @@ describe('Background Tools Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const mockContext = { config: { getSessionId: () => 'default' } };
+    const mockContext = {
+      config: { getSessionId: () => 'default' },
+    } as unknown as AgentLoopContext;
     listTool = new ListBackgroundProcessesTool(mockContext, bus);
     readTool = new ReadBackgroundOutputTool(mockContext, bus);
 
