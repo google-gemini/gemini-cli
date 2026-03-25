@@ -120,7 +120,7 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
-    const sandboxArgs = await buildSeatbeltArgs({
+    const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
       forbiddenPaths: req.policy?.forbiddenPaths,
