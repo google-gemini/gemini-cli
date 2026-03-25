@@ -51,12 +51,13 @@ You can place them in:
 
 ### Configuration schema
 
-| Field            | Type   | Required | Description                                                                                                    |
-| :--------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------- |
-| `kind`           | string | Yes      | Must be `remote`.                                                                                              |
-| `name`           | string | Yes      | A unique name for the agent. Must be a valid slug (lowercase letters, numbers, hyphens, and underscores only). |
-| `agent_card_url` | string | Yes      | The URL to the agent's A2A card endpoint.                                                                      |
-| `auth`           | object | No       | Authentication configuration. See [Authentication](#authentication).                                           |
+| Field             | Type   | Required | Description                                                                                                    |
+| :---------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------- |
+| `kind`            | string | Yes      | Must be `remote`.                                                                                              |
+| `name`            | string | Yes      | A unique name for the agent. Must be a valid slug (lowercase letters, numbers, hyphens, and underscores only). |
+| `agent_card_url`  | string | Yes\*    | The URL to the agent's A2A card endpoint. Required if `agent_card_json` is not provided.                       |
+| `agent_card_json` | string | Yes\*    | The inline JSON string of the agent's A2A card. Required if `agent_card_url` is not provided.                  |
+| `auth`            | object | No       | Authentication configuration. See [Authentication](#authentication).                                           |
 
 ### Single-subagent example
 
@@ -87,6 +88,69 @@ Markdown file.
 <!-- prettier-ignore -->
 > [!NOTE] Mixed local and remote agents, or multiple local agents, are not
 > supported in a single file; the list format is currently remote-only.
+
+### Inline Agent Card JSON
+
+<details>
+<summary>View formatting options for JSON strings</summary>
+
+If you don't have an endpoint serving the agent card, you can provide the A2A
+card directly as a JSON string using `agent_card_json`.
+
+When providing a JSON string in YAML, you must properly format it as a string
+scalar. You can use single quotes, a block scalar, or double quotes (which
+require escaping internal double quotes).
+
+#### Using single quotes
+
+Single quotes allow you to embed unescaped double quotes inside the JSON string.
+
+```markdown
+---
+kind: remote
+name: single-quotes-agent
+agent_card_json: '{
+  "a2a": "0.1.0",
+  "routing_id": "single-quotes-agent",
+  "name": "Single Quotes Agent"
+}'
+---
+```
+
+#### Using a block scalar
+
+The literal block scalar (`|`) preserves line breaks and is highly recommended
+for multiline JSON strings as it avoids quote escaping entirely.
+
+```markdown
+---
+kind: remote
+name: block-scalar-agent
+agent_card_json: |
+  {
+    "a2a": "0.1.0",
+    "routing_id": "block-scalar-agent",
+    "name": "Block Scalar Agent"
+  }
+---
+```
+
+#### Using double quotes
+
+Double quotes are also supported, but any internal double quotes in your JSON
+must be escaped with a backslash.
+
+```markdown
+---
+kind: remote
+name: double-quotes-agent
+agent_card_json:
+  '{ "a2a": "0.1.0", "routing_id": "double-quotes-agent", "name": "Double Quotes
+  Agent" }'
+---
+```
+
+</details>
 
 ## Authentication
 
