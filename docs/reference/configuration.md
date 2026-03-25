@@ -143,7 +143,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
-    specified, defaults to the system temporary directory.
+    specified, defaults to the system temporary directory. A custom directory
+    requires a policy to allow write access in Plan Mode.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
