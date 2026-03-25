@@ -287,7 +287,28 @@ describe('BrowserManager', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect((result.content || [])[0]?.text).toContain('blocked.org');
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should block proxy URL with embedded disallowed domain in URL fragment (hash)', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
     });
 
     it('should allow proxy URL when embedded domain is also allowed', async () => {
