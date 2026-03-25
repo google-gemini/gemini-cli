@@ -87,6 +87,7 @@ describe('Plan Mode', () => {
     const planWrite = toolLogs.find(
       (l) =>
         l.toolRequest.name === 'write_file' &&
+        l.toolRequest.args.includes('plans') &&
         l.toolRequest.args.includes('plan.md'),
     );
 
@@ -203,6 +204,7 @@ describe('Plan Mode', () => {
     const planWrite = toolLogs.find(
       (l) =>
         l.toolRequest.name === 'write_file' &&
+        l.toolRequest.args.includes('plans') &&
         l.toolRequest.args.includes('plan-no-session.md'),
     );
 
