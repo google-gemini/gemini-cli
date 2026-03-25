@@ -147,6 +147,51 @@ describe('McpClientManager', () => {
     expect(mockedMcpClient.discoverInto).not.toHaveBeenCalled();
   });
 
+  it('should NOT set COMPLETED prematurely when startConfiguredMcpServers finishes before parallel extensions', async () => {
+    mockConfig.getMcpServers.mockReturnValue({});
+    const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+
+    let resolveExtension: (value: void) => void;
+    const extensionPromise = new Promise<void>((resolve) => {
+      resolveExtension = resolve;
+    });
+
+    mockedMcpClient.connect.mockImplementation(async () => {
+      await extensionPromise;
+    });
+
+    const extensionStartPromise = manager.startExtension({
+      name: 'test-extension',
+      mcpServers: {
+        'extension-server': { command: 'node' },
+      },
+      isActive: true,
+      version: '1.0.0',
+      path: '/some-path',
+      contextFiles: [],
+      id: '123',
+    });
+
+    // Wait for the state to become IN_PROGRESS (since maybeDiscoverMcpServer is async)
+    await vi.waitFor(() => {
+      if (manager.getDiscoveryState() !== MCPDiscoveryState.IN_PROGRESS) {
+        throw new Error('Discovery state is not IN_PROGRESS');
+      }
+    });
+
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+
+    await manager.startConfiguredMcpServers();
+
+    // discoveryState should still be IN_PROGRESS because the extension is still starting
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+
+    resolveExtension!(undefined);
+    await extensionStartPromise;
+
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
+  });
+
   it('should mark discovery completed when all configured servers are blocked', async () => {
     mockConfig.getMcpServers.mockReturnValue({
       'test-server': { command: 'node' },

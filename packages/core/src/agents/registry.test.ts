@@ -596,7 +596,7 @@ describe('AgentRegistry', () => {
       });
       expect(loadAgentSpy).toHaveBeenCalledWith(
         'RemoteAgentWithAuth',
-        'https://example.com/card',
+        { type: 'url', url: 'https://example.com/card' },
         mockHandler,
       );
       expect(registry.getDefinition('RemoteAgentWithAuth')).toEqual(
