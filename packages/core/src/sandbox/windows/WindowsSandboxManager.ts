@@ -15,6 +15,7 @@ import {
   GOVERNANCE_FILES,
   type GlobalSandboxOptions,
   sanitizePaths,
+  tryRealpath,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
@@ -22,6 +23,7 @@ import {
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
+import { isNodeError } from '../../utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +36,8 @@ const __dirname = path.dirname(__filename);
 export class WindowsSandboxManager implements SandboxManager {
   private readonly helperPath: string;
   private initialized = false;
-  private readonly lowIntegrityCache = new Set<string>();
+  private readonly allowedCache = new Set<string>();
+  private readonly deniedCache = new Set<string>();
 
   constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
@@ -185,7 +188,11 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(allowedPath);
     }
 
-    // TODO: handle forbidden paths
+    // Denies access to forbiddenPaths for Low Integrity processes.
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const forbiddenPath of forbiddenPaths) {
+      await this.denyLowIntegrityAccess(forbiddenPath);
+    }
 
     // 2. Protected governance files
     // These must exist on the host before running the sandbox to prevent
@@ -235,8 +242,8 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = path.resolve(targetPath);
-    if (this.lowIntegrityCache.has(resolvedPath)) {
+    const resolvedPath = await tryRealpath(targetPath);
+    if (this.allowedCache.has(resolvedPath)) {
       return;
     }
 
@@ -256,12 +263,62 @@ export class WindowsSandboxManager implements SandboxManager {
 
     try {
       await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
-      this.lowIntegrityCache.add(resolvedPath);
+      this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
         'WindowsSandboxManager: icacls failed for',
         resolvedPath,
         e,
+      );
+    }
+  }
+
+  /**
+   * Explicitly denies access to a path for Low Integrity processes using icacls.
+   */
+  private async denyLowIntegrityAccess(targetPath: string): Promise<void> {
+    if (os.platform() !== 'win32') {
+      return;
+    }
+
+    const resolvedPath = await tryRealpath(targetPath);
+    if (this.deniedCache.has(resolvedPath)) {
+      return;
+    }
+
+    // S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
+    const LOW_INTEGRITY_SID = '*S-1-16-4096';
+
+    // icacls flags: (OI) Object Inherit, (CI) Container Inherit, (F) Full Access Deny.
+    // Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
+    // Windows dynamically evaluates existing items, though deep explicit Allow ACEs
+    // could potentially bypass this inherited Deny rule.
+    const DENY_ALL_INHERIT = '(OI)(CI)(F)';
+
+    // icacls fails on non-existent paths, so we cannot explicitly deny
+    // paths that do not yet exist (unlike macOS/Linux).
+    // Skip to prevent sandbox initialization failure.
+    try {
+      await fs.promises.stat(resolvedPath);
+    } catch (e: unknown) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        return;
+      }
+      throw e;
+    }
+
+    try {
+      await spawnAsync('icacls', [
+        resolvedPath,
+        '/deny',
+        `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
+      ]);
+      this.deniedCache.add(resolvedPath);
+    } catch (e) {
+      throw new Error(
+        `Failed to deny access to forbidden path: ${resolvedPath}. ${
+          e instanceof Error ? e.message : String(e)
+        }`,
       );
     }
   }
