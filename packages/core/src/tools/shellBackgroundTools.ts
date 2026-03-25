@@ -36,7 +36,7 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return 'Listing background processes';
+    return '';
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
