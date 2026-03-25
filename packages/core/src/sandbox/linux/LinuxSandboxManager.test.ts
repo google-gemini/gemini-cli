@@ -497,7 +497,7 @@ describe('LinuxSandboxManager', () => {
 
     expect(binds).toContain(forbiddenPath);
     const forbiddenIndex = binds.indexOf(forbiddenPath);
-    expect(binds[forbiddenIndex - 2]).toBe('--bind-try');
-    expect(binds[forbiddenIndex - 1]).toMatch(/gemini-cli-mask-.*/);
+    expect(binds[forbiddenIndex - 2]).toBe('--ro-bind-try');
+    expect(binds[forbiddenIndex - 1]).toBe('/dev/null');
   });
 });
