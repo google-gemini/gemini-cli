@@ -73,6 +73,7 @@ describe('Background Tools', () => {
       exitCode: 1,
       startTime: Date.now(),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     const invocation = listTool.build({});
@@ -85,13 +86,13 @@ describe('Background Tools', () => {
 
   it('read_background_output should return error if log file does not exist', async () => {
     const pid = 12345 + Math.floor(Math.random() * 1000);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const history = new Map();
     history.set(pid, {
       command: 'unknown command',
       status: 'running',
       startTime: Date.now(),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     const invocation = readTool.build({ pid });
@@ -107,14 +108,15 @@ describe('Background Tools', () => {
     const logPath = ShellExecutionService.getLogFilePath(pid);
     const logDir = ShellExecutionService.getLogDir();
 
+    // Ensure dir exists
     // Add to history to pass access check
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const history = new Map();
     history.set(pid, {
       command: 'unknown command',
       status: 'running',
       startTime: Date.now(),
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     // Ensure dir exists
