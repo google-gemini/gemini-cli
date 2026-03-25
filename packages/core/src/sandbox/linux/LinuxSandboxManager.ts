@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import { join, dirname, normalize } from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
 import {
   type SandboxManager,
   type GlobalSandboxOptions,
@@ -23,6 +22,7 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { isNodeError } from '../../utils/errors.js';
+import { spawnAsync } from '../../utils/shell-utils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -105,21 +105,56 @@ function touch(filePath: string, isDirectory: boolean) {
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 export class LinuxSandboxManager implements SandboxManager {
-  private static maskPath: string | undefined;
+  private static maskFilePath: string | undefined;
+  private static maskDirPath: string | undefined;
 
   constructor(private readonly options: GlobalSandboxOptions) {}
 
-  private getMaskPath(): string {
+  private getMaskFilePath(): string {
     if (
-      LinuxSandboxManager.maskPath &&
-      fs.existsSync(LinuxSandboxManager.maskPath)
+      LinuxSandboxManager.maskFilePath &&
+      fs.existsSync(LinuxSandboxManager.maskFilePath)
     ) {
-      return LinuxSandboxManager.maskPath;
+      return LinuxSandboxManager.maskFilePath;
     }
-    const maskPath = join(os.tmpdir(), `gemini-cli-mask-${process.pid}`);
+    const maskPath = join(os.tmpdir(), `gemini-cli-mask-file-${process.pid}`);
     fs.writeFileSync(maskPath, '');
     fs.chmodSync(maskPath, 0);
-    LinuxSandboxManager.maskPath = maskPath;
+    LinuxSandboxManager.maskFilePath = maskPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.unlinkSync(maskPath);
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    return maskPath;
+  }
+
+  private getMaskDirPath(): string {
+    if (
+      LinuxSandboxManager.maskDirPath &&
+      fs.existsSync(LinuxSandboxManager.maskDirPath)
+    ) {
+      return LinuxSandboxManager.maskDirPath;
+    }
+    const maskPath = join(os.tmpdir(), `gemini-cli-mask-dir-${process.pid}`);
+    fs.mkdirSync(maskPath, { recursive: true });
+    fs.chmodSync(maskPath, 0);
+    LinuxSandboxManager.maskDirPath = maskPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(maskPath, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
     return maskPath;
   }
 
@@ -136,7 +171,7 @@ export class LinuxSandboxManager implements SandboxManager {
       ...this.getGovernanceArgs(),
       ...this.getAllowedPathsArgs(req.policy?.allowedPaths),
       ...(await this.getForbiddenPathsArgs(req.policy?.forbiddenPaths)),
-      ...this.getSecretFilesArgs(req.policy?.allowedPaths),
+      ...(await this.getSecretFilesArgs(req.policy?.allowedPaths)),
     ];
 
     const bpfPath = getSeccompBpfPath();
@@ -274,9 +309,9 @@ export class LinuxSandboxManager implements SandboxManager {
   /**
    * Generates bubblewrap arguments to mask secret files.
    */
-  private getSecretFilesArgs(allowedPaths?: string[]): string[] {
+  private async getSecretFilesArgs(allowedPaths?: string[]): Promise<string[]> {
     const args: string[] = [];
-    const maskPath = this.getMaskPath();
+    const maskPath = this.getMaskFilePath();
     const paths = sanitizePaths(allowedPaths) || [];
     const searchDirs = new Set([this.options.workspace, ...paths]);
     const findPatterns = getSecretFileFindArgs();
@@ -285,27 +320,44 @@ export class LinuxSandboxManager implements SandboxManager {
       try {
         // Use the native 'find' command for performance and to catch nested secrets.
         // We limit depth to 3 to keep it fast while covering common nested structures.
-        const findResult = spawnSync('find', [
+        // We use -prune to skip heavy directories efficiently while matching dotfiles.
+        const findResult = await spawnAsync('find', [
           dir,
           '-maxdepth',
           '3',
-          '-not',
-          '-path',
-          '*/.*', // Skip hidden dirs (like .git)
-          '-not',
-          '-path',
-          '*/node_modules/*',
+          '-type',
+          'd',
+          '(',
+          '-name',
+          '.git',
+          '-o',
+          '-name',
+          'node_modules',
+          '-o',
+          '-name',
+          '.venv',
+          '-o',
+          '-name',
+          '__pycache__',
+          '-o',
+          '-name',
+          'dist',
+          '-o',
+          '-name',
+          'build',
+          ')',
+          '-prune',
+          '-o',
           '-type',
           'f',
           ...findPatterns,
+          '-print',
         ]);
 
-        if (findResult.status === 0) {
-          const files = findResult.stdout.toString().split('\n');
-          for (const file of files) {
-            if (file.trim()) {
-              args.push('--bind', maskPath, file.trim());
-            }
+        const files = findResult.stdout.toString().split('\n');
+        for (const file of files) {
+          if (file.trim()) {
+            args.push('--bind', maskPath, file.trim());
           }
         }
       } catch {
@@ -323,8 +375,8 @@ export class LinuxSandboxManager implements SandboxManager {
       const stats = await fs.promises.stat(path);
 
       if (stats.isDirectory()) {
-        // Directories are masked by mounting an empty, read-only tmpfs.
-        return ['--tmpfs', path, '--remount-ro', path];
+        const maskDirPath = this.getMaskDirPath();
+        return ['--bind-try', maskDirPath, path, '--remount-ro', path];
       }
       // Existing files are masked by binding them to /dev/null.
       return ['--ro-bind-try', '/dev/null', path];

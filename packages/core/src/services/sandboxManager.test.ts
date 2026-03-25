@@ -19,17 +19,24 @@ import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
 import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
-import fs from 'node:fs';
+import type fs from 'node:fs';
 
-vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+vi.mock('node:fs/promises', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises',
+    );
   return {
     ...actual,
     default: {
       ...actual,
-      readdirSync: vi.fn(),
+      readdir: vi.fn(),
+      realpath: vi.fn(),
+      stat: vi.fn(),
     },
-    readdirSync: vi.fn(),
+    readdir: vi.fn(),
+    realpath: vi.fn(),
+    stat: vi.fn(),
   };
 });
 
@@ -53,8 +60,7 @@ describe('isSecretFile', () => {
   });
 
   it('should return false for files starting with .env but not matching pattern', () => {
-    // This depends on the pattern ".env.*". ".env-foo" would match ".env.*" if it was glob,
-    // but our implementation uses startsWith(".env.")
+    // This depends on the pattern ".env.*". ".env-backup" would match ".env*" but not ".env.*"
     expect(isSecretFile('.env-backup')).toBe(false);
   });
 });
@@ -64,10 +70,10 @@ describe('findSecretFiles', () => {
     vi.clearAllMocks();
   });
 
-  it('should find secret files in the root directory', () => {
-    vi.mocked(fs.readdirSync).mockImplementation(((dir: string) => {
+  it('should find secret files in the root directory', async () => {
+    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
       if (dir === '/workspace') {
-        return [
+        return Promise.resolve([
           { name: '.env', isDirectory: () => false, isFile: () => true },
           {
             name: 'package.json',
@@ -75,36 +81,36 @@ describe('findSecretFiles', () => {
             isFile: () => true,
           },
           { name: 'src', isDirectory: () => true, isFile: () => false },
-        ] as unknown as fs.Dirent[];
+        ] as unknown as fs.Dirent[]);
       }
-      return [] as unknown as fs.Dirent[];
-    }) as unknown as typeof fs.readdirSync);
+      return Promise.resolve([] as unknown as fs.Dirent[]);
+    }) as unknown as typeof fsPromises.readdir);
 
-    const secrets = findSecretFiles('/workspace');
+    const secrets = await findSecretFiles('/workspace');
     expect(secrets).toEqual([path.join('/workspace', '.env')]);
   });
 
-  it('should NOT find secret files recursively (shallow scan only)', () => {
-    vi.mocked(fs.readdirSync).mockImplementation(((dir: string) => {
+  it('should NOT find secret files recursively (shallow scan only)', async () => {
+    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
       if (dir === '/workspace') {
-        return [
+        return Promise.resolve([
           { name: '.env', isDirectory: () => false, isFile: () => true },
           { name: 'packages', isDirectory: () => true, isFile: () => false },
-        ] as unknown as fs.Dirent[];
+        ] as unknown as fs.Dirent[]);
       }
       if (dir === path.join('/workspace', 'packages')) {
-        return [
+        return Promise.resolve([
           { name: '.env.local', isDirectory: () => false, isFile: () => true },
-        ] as unknown as fs.Dirent[];
+        ] as unknown as fs.Dirent[]);
       }
-      return [] as unknown as fs.Dirent[];
-    }) as unknown as typeof fs.readdirSync);
+      return Promise.resolve([] as unknown as fs.Dirent[]);
+    }) as unknown as typeof fsPromises.readdir);
 
-    const secrets = findSecretFiles('/workspace');
+    const secrets = await findSecretFiles('/workspace');
     expect(secrets).toEqual([path.join('/workspace', '.env')]);
-    // Should NOT have called readdirSync for subdirectories
-    expect(fs.readdirSync).toHaveBeenCalledTimes(1);
-    expect(fs.readdirSync).not.toHaveBeenCalledWith(
+    // Should NOT have called readdir for subdirectories
+    expect(fsPromises.readdir).toHaveBeenCalledTimes(1);
+    expect(fsPromises.readdir).not.toHaveBeenCalledWith(
       path.join('/workspace', 'packages'),
       expect.anything(),
     );
@@ -135,8 +141,8 @@ describe('tryRealpath', () => {
   });
 
   it('should return the realpath if the file exists', async () => {
-    vi.spyOn(fsPromises, 'realpath').mockResolvedValue(
-      '/real/path/to/file.txt',
+    vi.mocked(fsPromises.realpath).mockResolvedValue(
+      '/real/path/to/file.txt' as never,
     );
     const result = await tryRealpath('/some/symlink/to/file.txt');
     expect(result).toBe('/real/path/to/file.txt');
@@ -146,17 +152,19 @@ describe('tryRealpath', () => {
   });
 
   it('should fallback to parent directory if file does not exist (ENOENT)', async () => {
-    vi.spyOn(fsPromises, 'realpath').mockImplementation(async (p) => {
+    vi.mocked(fsPromises.realpath).mockImplementation(((p: string) => {
       if (p === '/workspace/nonexistent.txt') {
-        throw Object.assign(new Error('ENOENT: no such file or directory'), {
-          code: 'ENOENT',
-        });
+        return Promise.reject(
+          Object.assign(new Error('ENOENT: no such file or directory'), {
+            code: 'ENOENT',
+          }),
+        );
       }
       if (p === '/workspace') {
-        return '/real/workspace';
+        return Promise.resolve('/real/workspace');
       }
-      throw new Error(`Unexpected path: ${p}`);
-    });
+      return Promise.reject(new Error(`Unexpected path: ${p}`));
+    }) as never);
 
     const result = await tryRealpath('/workspace/nonexistent.txt');
 
@@ -165,18 +173,22 @@ describe('tryRealpath', () => {
   });
 
   it('should recursively fallback up the directory tree on multiple ENOENT errors', async () => {
-    vi.spyOn(fsPromises, 'realpath').mockImplementation(async (p) => {
+    vi.mocked(fsPromises.realpath).mockImplementation(((p: string) => {
       if (p === '/workspace/missing_dir/missing_file.txt') {
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        return Promise.reject(
+          Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+        );
       }
       if (p === '/workspace/missing_dir') {
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        return Promise.reject(
+          Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+        );
       }
       if (p === '/workspace') {
-        return '/real/workspace';
+        return Promise.resolve('/real/workspace');
       }
-      throw new Error(`Unexpected path: ${p}`);
-    });
+      return Promise.reject(new Error(`Unexpected path: ${p}`));
+    }) as never);
 
     const result = await tryRealpath('/workspace/missing_dir/missing_file.txt');
 
@@ -188,20 +200,20 @@ describe('tryRealpath', () => {
 
   it('should return the path unchanged if it reaches the root directory and it still does not exist', async () => {
     const rootPath = path.resolve('/');
-    vi.spyOn(fsPromises, 'realpath').mockImplementation(async () => {
-      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-    });
+    vi.mocked(fsPromises.realpath).mockImplementation(() => Promise.reject(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      ));
 
     const result = await tryRealpath(rootPath);
     expect(result).toBe(rootPath);
   });
 
   it('should throw an error if realpath fails with a non-ENOENT error (e.g. EACCES)', async () => {
-    vi.spyOn(fsPromises, 'realpath').mockImplementation(async () => {
-      throw Object.assign(new Error('EACCES: permission denied'), {
-        code: 'EACCES',
-      });
-    });
+    vi.mocked(fsPromises.realpath).mockImplementation(() => Promise.reject(
+        Object.assign(new Error('EACCES: permission denied'), {
+          code: 'EACCES',
+        }),
+      ));
 
     await expect(tryRealpath('/secret/file.txt')).rejects.toThrow(
       'EACCES: permission denied',

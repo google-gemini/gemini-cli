@@ -193,27 +193,45 @@ export class WindowsSandboxManager implements SandboxManager {
     // On Windows, we explicitly deny access to secret files for Low Integrity
     // processes to ensure they cannot be read or written.
     const secretsToBlock: string[] = [];
-    try {
-      const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
-      for (const dir of searchDirs) {
+    const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+    for (const dir of searchDirs) {
+      try {
         // We use maxDepth 3 to catch common nested secrets while keeping performance high.
-        const secretFiles = findSecretFiles(dir, 3);
+        const secretFiles = await findSecretFiles(dir, 3);
         for (const secretFile of secretFiles) {
-          secretsToBlock.push(secretFile);
-          await this.denyLowIntegrityAccess(secretFile);
+          try {
+            secretsToBlock.push(secretFile);
+            await this.denyLowIntegrityAccess(secretFile);
+          } catch (e) {
+            debugLogger.log(
+              `WindowsSandboxManager: Failed to secure secret file ${secretFile}`,
+              e,
+            );
+          }
         }
+      } catch (e) {
+        debugLogger.log(
+          `WindowsSandboxManager: Failed to find secret files in ${dir}`,
+          e,
+        );
       }
-    } catch (e) {
-      debugLogger.log(
-        'WindowsSandboxManager: Failed to secure secret files',
-        e,
-      );
     }
 
     // Denies access to forbiddenPaths for Low Integrity processes.
+    // Note: Denying access to arbitrary paths (like system files) via icacls
+    // is restricted to avoid host corruption. External commands rely on
+    // Low Integrity read/write restrictions, while internal commands
+    // use the manifest for enforcement.
     const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
-      await this.denyLowIntegrityAccess(forbiddenPath);
+      try {
+        await this.denyLowIntegrityAccess(forbiddenPath);
+      } catch (e) {
+        debugLogger.log(
+          `WindowsSandboxManager: Failed to secure forbidden path ${forbiddenPath}`,
+          e,
+        );
+      }
     }
 
     // 3. Protected governance files
@@ -225,22 +243,38 @@ export class WindowsSandboxManager implements SandboxManager {
       this.touch(filePath, file.isDirectory);
     }
 
-    // 4. Forbidden paths
+    // 4. Forbidden paths manifest
+    // We use a manifest file to avoid command-line length limits.
     const allForbidden = Array.from(
       new Set([...secretsToBlock, ...forbiddenPaths]),
     );
+    const manifestPath = path.join(
+      os.tmpdir(),
+      `gemini-cli-forbidden-${process.pid}.txt`,
+    );
+    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.unlinkSync(manifestPath);
+      } catch {
+        // Ignore errors
+      }
+    });
 
     // 5. Construct the helper command
-    // GeminiSandbox.exe <network:0|1> <cwd> [--forbidden <path>...] <command> [args...]
+    // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
-    const args = [req.policy?.networkAccess ? '1' : '0', req.cwd];
-
-    for (const forbidden of allForbidden) {
-      args.push('--forbidden', forbidden);
-    }
-
-    args.push(req.command, ...req.args);
+    const args = [
+      req.policy?.networkAccess ? '1' : '0',
+      req.cwd,
+      '--forbidden-manifest',
+      manifestPath,
+      req.command,
+      ...req.args,
+    ];
 
     return {
       program,
@@ -263,17 +297,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    // Never modify integrity levels for system directories
-    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
-    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
-    const programFilesX86 =
-      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-
-    if (
-      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
-    ) {
+    if (this.isSystemDirectory(resolvedPath)) {
       return;
     }
 
@@ -299,6 +323,11 @@ export class WindowsSandboxManager implements SandboxManager {
 
     const resolvedPath = await tryRealpath(targetPath);
     if (this.deniedCache.has(resolvedPath)) {
+      return;
+    }
+
+    // Never modify ACEs for system directories
+    if (this.isSystemDirectory(resolvedPath)) {
       return;
     }
 
@@ -337,5 +366,18 @@ export class WindowsSandboxManager implements SandboxManager {
         }`,
       );
     }
+  }
+
+  private isSystemDirectory(resolvedPath: string): boolean {
+    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 =
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
+    return (
+      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
+    );
   }
 }

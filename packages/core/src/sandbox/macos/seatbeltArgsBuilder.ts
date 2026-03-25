@@ -92,21 +92,31 @@ export async function buildSeatbeltArgs(
     }
   }
 
-  // Add explicit deny rules for secret files (.env, .env.*) in the workspace.
+  // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
   // We use regex rules to avoid expensive file discovery scans.
-  for (const secret of SECRET_FILES) {
-    // Map pattern to Seatbelt regex
-    let regexPattern: string;
-    if (secret.pattern.endsWith('*')) {
-      // .env.* -> .env\..+ (match .env followed by dot and something)
-      const base = secret.pattern.slice(0, -1).replace(/\./g, '\\.');
-      regexPattern = `.*/${base}[^/]+$`;
-    } else {
-      // .env -> \.env$
-      const base = secret.pattern.replace(/\./g, '\\.');
-      regexPattern = `.*/${base}$`;
+  // Anchoring to workspace/allowed paths to avoid over-blocking.
+  const searchPaths = sanitizePaths([
+    options.workspace,
+    ...(options.allowedPaths || []),
+  ]) || [options.workspace];
+
+  for (const basePath of searchPaths) {
+    const resolvedBase = await tryRealpath(basePath);
+    for (const secret of SECRET_FILES) {
+      // Map pattern to Seatbelt regex
+      let regexPattern: string;
+      const escapedBase = escapeRegex(resolvedBase);
+      if (secret.pattern.endsWith('*')) {
+        // .env.* -> .env\..+ (match .env followed by dot and something)
+        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\.');
+        regexPattern = `^${escapedBase}/.*${basePattern}[^/]+$`;
+      } else {
+        // .env -> \.env$
+        const basePattern = secret.pattern.replace(/\./g, '\\.');
+        regexPattern = `^${escapedBase}/.*${basePattern}$`;
+      }
+      profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
     }
-    profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
   }
 
   // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
@@ -222,9 +232,9 @@ export async function buildSeatbeltArgs(
           // Ignore error
         }
         if (isFile) {
-          profile += `(allow file-read* file-write* (literal (param "${paramName}")))\n`;
+          profile += `(allow file-write* (literal (param "${paramName}")))\n`;
         } else {
-          profile += `(allow file-read* file-write* (subpath (param "${paramName}")))\n`;
+          profile += `(allow file-write* (subpath (param "${paramName}")))\n`;
         }
       }
     }
@@ -245,4 +255,8 @@ export async function buildSeatbeltArgs(
   args.unshift('-p', profile);
 
   return args;
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

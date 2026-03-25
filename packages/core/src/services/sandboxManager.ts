@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs/promises';
-import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
@@ -143,19 +142,32 @@ export function getSecretFileFindArgs(): string[] {
  * Finds all secret files in a directory up to a certain depth.
  * Default is shallow scan (depth 1) for performance.
  */
-export function findSecretFiles(baseDir: string, maxDepth = 1): string[] {
+export async function findSecretFiles(
+  baseDir: string,
+  maxDepth = 1,
+): Promise<string[]> {
   const secrets: string[] = [];
-  const skipDirs = new Set(['node_modules', '.git', '.venv', '__pycache__']);
+  const skipDirs = new Set([
+    'node_modules',
+    '.git',
+    '.venv',
+    '__pycache__',
+    'dist',
+    'build',
+    '.next',
+    '.idea',
+    '.vscode',
+  ]);
 
-  function walk(dir: string, depth: number) {
+  async function walk(dir: string, depth: number) {
     if (depth > maxDepth) return;
     try {
-      const entries = fsSync.readdirSync(dir, { withFileTypes: true });
+      const entries = await fs.readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           if (!skipDirs.has(entry.name)) {
-            walk(fullPath, depth + 1);
+            await walk(fullPath, depth + 1);
           }
         } else if (entry.isFile()) {
           if (isSecretFile(entry.name)) {
@@ -168,7 +180,7 @@ export function findSecretFiles(baseDir: string, maxDepth = 1): string[] {
     }
   }
 
-  walk(baseDir, 1);
+  await walk(baseDir, 1);
   return secrets;
 }
 

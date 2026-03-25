@@ -9,7 +9,7 @@ import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import * as sandboxManager from '../../services/sandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import * as shellUtils from '../../utils/shell-utils.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -26,6 +26,8 @@ vi.mock('node:fs', async () => {
       writeFileSync: vi.fn(),
       readdirSync: vi.fn(() => []),
       chmodSync: vi.fn(),
+      unlinkSync: vi.fn(),
+      rmSync: vi.fn(),
     },
     existsSync: vi.fn(() => true),
     realpathSync: vi.fn((p: string | Buffer) => p.toString()),
@@ -35,11 +37,15 @@ vi.mock('node:fs', async () => {
     writeFileSync: vi.fn(),
     readdirSync: vi.fn(() => []),
     chmodSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    rmSync: vi.fn(),
   };
 });
 
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(() => ({ status: 0, stdout: Buffer.from('') })),
+vi.mock('../../utils/shell-utils.js', () => ({
+  spawnAsync: vi.fn(() =>
+    Promise.resolve({ status: 0, stdout: Buffer.from('') }),
+  ),
 }));
 
 describe('LinuxSandboxManager', () => {
@@ -312,7 +318,8 @@ describe('LinuxSandboxManager', () => {
         });
 
         expectDynamicBinds(bwrapArgs, [
-          '--tmpfs',
+          '--bind-try',
+          expect.stringMatching(/gemini-cli-mask-dir-.*/),
           '/tmp/cache',
           '--remount-ro',
           '/tmp/cache',
@@ -379,7 +386,7 @@ describe('LinuxSandboxManager', () => {
         ]);
       });
 
-      it('masks directory symlinks with tmpfs for both paths', async () => {
+      it('masks directory symlinks with dummy directory for both paths', async () => {
         vi.spyOn(fs.promises, 'stat').mockImplementation(
           async () => ({ isDirectory: () => true }) as fs.Stats,
         );
@@ -401,11 +408,13 @@ describe('LinuxSandboxManager', () => {
         });
 
         expectDynamicBinds(bwrapArgs, [
-          '--tmpfs',
+          '--bind-try',
+          expect.stringMatching(/gemini-cli-mask-dir-.*/),
           '/opt/real-dir',
           '--remount-ro',
           '/opt/real-dir',
-          '--tmpfs',
+          '--bind-try',
+          expect.stringMatching(/gemini-cli-mask-dir-.*/),
           '/tmp/dir-link',
           '--remount-ro',
           '/tmp/dir-link',
@@ -435,7 +444,8 @@ describe('LinuxSandboxManager', () => {
           '--bind-try',
           '/tmp/conflict',
           '/tmp/conflict',
-          '--tmpfs',
+          '--bind-try',
+          expect.stringMatching(/gemini-cli-mask-dir-.*/),
           '/tmp/conflict',
           '--remount-ro',
           '/tmp/conflict',
@@ -445,19 +455,23 @@ describe('LinuxSandboxManager', () => {
   });
 
   it('blocks .env and .env.* files in the workspace root', async () => {
-    vi.mocked(spawnSync).mockImplementation((cmd, args) => {
+    vi.mocked(shellUtils.spawnAsync).mockImplementation((cmd, args) => {
       if (cmd === 'find' && args?.[0] === workspace) {
-        return {
+        // Assert that find is NOT excluding dotfiles
+        expect(args).not.toContain('-not');
+        expect(args).toContain('-prune');
+
+        return Promise.resolve({
           status: 0,
           stdout: Buffer.from(
             `${workspace}/.env\n${workspace}/.env.local\n${workspace}/.env.test\n`,
           ),
-        } as unknown as ReturnType<typeof spawnSync>;
+        } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
       }
-      return {
+      return Promise.resolve({
         status: 0,
         stdout: Buffer.from(''),
-      } as unknown as ReturnType<typeof spawnSync>;
+      } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
     });
 
     const bwrapArgs = await getBwrapArgs({
@@ -474,14 +488,18 @@ describe('LinuxSandboxManager', () => {
     expect(binds).toContain(`${workspace}/.env.local`);
     expect(binds).toContain(`${workspace}/.env.test`);
 
-    // Verify they are bound to a mask file (we will check for --bind or --ro-bind)
+    // Verify they are bound to a mask file
     const envIndex = binds.indexOf(`${workspace}/.env`);
-    expect(['--bind', '--ro-bind']).toContain(binds[envIndex - 2]);
-    expect(binds[envIndex - 1]).toMatch(/gemini-cli-mask-.*/);
+    expect(binds[envIndex - 2]).toBe('--bind');
+    expect(binds[envIndex - 1]).toMatch(/gemini-cli-mask-file-.*/);
   });
 
   it('blocks explicitly forbidden paths', async () => {
     const forbiddenPath = '/etc/passwd';
+    vi.spyOn(fs.promises, 'stat').mockImplementation(
+      async () => ({ isDirectory: () => false }) as fs.Stats,
+    );
+
     const bwrapArgs = await getBwrapArgs({
       command: 'ls',
       args: [],
@@ -497,7 +515,7 @@ describe('LinuxSandboxManager', () => {
 
     expect(binds).toContain(forbiddenPath);
     const forbiddenIndex = binds.indexOf(forbiddenPath);
-    expect(binds[forbiddenIndex - 2]).toBe('--bind-try');
-    expect(binds[forbiddenIndex - 1]).toMatch(/gemini-cli-mask-.*/);
+    expect(binds[forbiddenIndex - 2]).toBe('--ro-bind-try');
+    expect(binds[forbiddenIndex - 1]).toBe('/dev/null');
   });
 });
