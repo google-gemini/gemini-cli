@@ -24,7 +24,7 @@ steps:
     args:
       - '-c'
       - |-
-        IMAGE_BASE="us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer"
+        IMAGE_BASE="us-docker.pkg.dev/gemini-code-dev/gemini-cli/development"
         
         # Determine the primary tag (branch name or 'latest' for main)
         RAW_BRANCH="${_HEAD_BRANCH:-${BRANCH_NAME}}"
