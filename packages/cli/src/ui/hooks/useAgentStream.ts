@@ -23,8 +23,6 @@ import {
   type ThoughtSummary,
   type RetryAttemptPayload,
   type AgentEvent,
-  BaseDeclarativeTool,
-  type ToolResult,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type {
@@ -32,6 +30,8 @@ import type {
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
   SlashCommandProcessorResult,
+  IndividualToolCallDisplay,
+  HistoryItemToolGroup,
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -39,47 +39,11 @@ import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { type BackgroundShell } from './shellCommandProcessor.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
-import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import { useToolScheduler } from './useToolScheduler.js';
-import type { TrackedToolCall } from './useToolScheduler.js';
 
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { useStateAndRef } from './useStateAndRef.js';
-
-class DummyTool extends BaseDeclarativeTool<
-  Record<string, unknown>,
-  ToolResult
-> {
-  constructor(
-    name: string,
-    description: string,
-    displayName: string,
-    isOutputMarkdown: boolean,
-    kind: Kind,
-    messageBus: import('@google/gemini-cli-core').MessageBus,
-  ) {
-    super(
-      name,
-      displayName,
-      description,
-      kind,
-      undefined,
-      messageBus,
-      isOutputMarkdown,
-      false,
-    );
-  }
-  protected createInvocation(params: Record<string, unknown>) {
-    return {
-      getDescription: () => this.description,
-      params,
-      execute: async () => ({ llmContent: [], returnDisplay: '' }),
-      toolLocations: () => [],
-      shouldConfirmExecute: async (): Promise<false> => false,
-    };
-  }
-}
 
 /**
  * useAgentStream implements the interactive agent loop using the LegacyAgentSession (AgentProtocol).
@@ -126,9 +90,9 @@ export const useAgentStream = (
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
 
-  const [trackedTools, , setTrackedTools] = useStateAndRef<TrackedToolCall[]>(
-    [],
-  );
+  const [trackedTools, , setTrackedTools] = useStateAndRef<
+    IndividualToolCallDisplay[]
+  >([]);
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
@@ -247,43 +211,27 @@ export const useAgentStream = (
           const isOutputMarkdown = legacyState?.isOutputMarkdown ?? false;
           const desc = legacyState?.description ?? '';
 
-          const args =
-            event.args && typeof event.args === 'object' ? event.args : {};
           const fallbackKind = Kind.Other;
-          const messageBus = config.getMessageBus();
 
-          const tool =
-            config.getToolRegistry().getTool(event.name) ||
-            new DummyTool(
-              event.name,
-              desc,
-              displayName,
-              isOutputMarkdown,
-              fallbackKind,
-              messageBus,
-            );
-          const invocation = tool.build(args);
-
-          const newCall: TrackedToolCall = {
-            request: {
-              callId: event.requestId,
-              name: event.name,
-              args,
-              isClientInitiated: false,
-              originalRequestName: event.name,
-              prompt_id: '',
-            },
+          const newCall: IndividualToolCallDisplay = {
+            callId: event.requestId,
+            name: displayName,
+            originalRequestName: event.name,
+            description: desc,
             status: CoreToolCallStatus.Scheduled,
-            tool,
-            invocation,
+            isClientInitiated: false,
+            renderOutputAsMarkdown: isOutputMarkdown,
+            kind: legacyState?.kind ?? fallbackKind,
+            confirmationDetails: undefined,
+            resultDisplay: undefined,
           };
           setTrackedTools((prev) => [...prev, newCall]);
           break;
         }
         case 'tool_update': {
           setTrackedTools((prev) =>
-            prev.map((tc): TrackedToolCall => {
-              if (tc.request.callId !== event.requestId) return tc;
+            prev.map((tc): IndividualToolCallDisplay => {
+              if (tc.callId !== event.requestId) return tc;
 
               const legacyState = event._meta?.legacyState;
               const evtStatus = legacyState?.status;
@@ -298,143 +246,54 @@ export const useAgentStream = (
               const liveOutput =
                 event.displayContent?.[0]?.type === 'text'
                   ? event.displayContent[0].text
-                  : 'liveOutput' in tc
-                    ? tc.liveOutput
-                    : undefined;
+                  : tc.resultDisplay;
               const progressMessage =
-                legacyState?.progressMessage ??
-                ('progressMessage' in tc ? tc.progressMessage : undefined);
-              const progress =
-                legacyState?.progress ??
-                ('progress' in tc ? tc.progress : undefined);
+                legacyState?.progressMessage ?? tc.progressMessage;
+              const progress = legacyState?.progress ?? tc.progress;
               const progressTotal =
-                legacyState?.progressTotal ??
-                ('progressTotal' in tc ? tc.progressTotal : undefined);
-              const pid =
-                legacyState?.pid ?? ('pid' in tc ? tc.pid : undefined);
-              const desc =
-                legacyState?.description ??
-                ('invocation' in tc && tc.invocation
-                  ? tc.invocation.getDescription()
-                  : '');
-              const invocation =
-                'invocation' in tc && tc.invocation
-                  ? { ...tc.invocation, getDescription: () => desc }
-                  : undefined;
+                legacyState?.progressTotal ?? tc.progressTotal;
+              const ptyId = legacyState?.pid ?? tc.ptyId;
+              const description = legacyState?.description ?? tc.description;
 
-              const inProgressFields = {
-                pid,
-                liveOutput,
+              return {
+                ...tc,
+                status,
+                resultDisplay: liveOutput,
+                progressMessage,
                 progress,
                 progressTotal,
-                progressMessage,
-                invocation,
+                ptyId,
+                description,
               };
-
-              const response =
-                'response' in tc && tc.response
-                  ? tc.response
-                  : { callId: tc.request.callId, responseParts: [] };
-              const responseSubmittedToGemini =
-                'responseSubmittedToGemini' in tc
-                  ? tc.responseSubmittedToGemini
-                  : false;
-
-              switch (status) {
-                case CoreToolCallStatus.Executing:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.Executing,
-                  };
-                case CoreToolCallStatus.Error:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.Error,
-                    response,
-                    responseSubmittedToGemini,
-                  };
-                case CoreToolCallStatus.Success:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.Success,
-                    response,
-                    responseSubmittedToGemini,
-                  };
-                case CoreToolCallStatus.Scheduled:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.Scheduled,
-                  };
-                case CoreToolCallStatus.Validating:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.Validating,
-                  };
-                case CoreToolCallStatus.AwaitingApproval:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.AwaitingApproval,
-                  };
-                case CoreToolCallStatus.Cancelled:
-                  return {
-                    ...tc,
-                    ...inProgressFields,
-                    status: CoreToolCallStatus.Cancelled,
-                  };
-                default:
-                  return tc;
-              }
             }),
           );
           break;
         }
         case 'tool_response': {
           setTrackedTools((prev) =>
-            prev.map((tc): TrackedToolCall => {
-              if (tc.request.callId !== event.requestId) return tc;
+            prev.map((tc): IndividualToolCallDisplay => {
+              if (tc.callId !== event.requestId) return tc;
 
               const legacyState = event._meta?.legacyState;
               const outputFile = legacyState?.outputFile;
               const resultDisplay =
                 event.displayContent?.[0]?.type === 'text'
                   ? event.displayContent[0].text
-                  : undefined;
+                  : tc.resultDisplay;
 
-              const response = {
-                callId: tc.request.callId,
-                responseParts: [],
+              return {
+                ...tc,
+                status: event.isError
+                  ? CoreToolCallStatus.Error
+                  : CoreToolCallStatus.Success,
                 resultDisplay,
                 outputFile,
-                ...(event.isError
-                  ? { error: 'Tool error', errorType: 'UNKNOWN' }
-                  : {}),
               };
-
-              if (event.isError) {
-                return {
-                  ...tc,
-                  status: CoreToolCallStatus.Error,
-                  response,
-                  responseSubmittedToGemini: true,
-                };
-              } else {
-                return {
-                  ...tc,
-                  status: CoreToolCallStatus.Success,
-                  response,
-                  responseSubmittedToGemini: true,
-                };
-              }
             }),
           );
           break;
         }
+
         case 'error':
           addItem(
             { type: MessageType.ERROR, text: event.message },
@@ -445,7 +304,7 @@ export const useAgentStream = (
           break;
       }
     },
-    [addItem, flushPendingText, setPendingHistoryItem, setTrackedTools, config],
+    [addItem, flushPendingText, setPendingHistoryItem, setTrackedTools],
   );
 
   useEffect(() => {
@@ -507,7 +366,7 @@ export const useAgentStream = (
   useEffect(() => {
     if (trackedTools.length > 0) {
       const isNewBatch = !trackedTools.some((tc) =>
-        pushedToolCallIdsRef.current.has(tc.request.callId),
+        pushedToolCallIdsRef.current.has(tc.callId),
       );
       if (isNewBatch) {
         setPushedToolCallIds(new Set());
@@ -527,10 +386,10 @@ export const useAgentStream = (
 
   // Push completed tools to history
   useEffect(() => {
-    const toolsToPush: TrackedToolCall[] = [];
+    const toolsToPush: IndividualToolCallDisplay[] = [];
     for (let i = 0; i < trackedTools.length; i++) {
       const tc = trackedTools[i];
-      if (pushedToolCallIdsRef.current.has(tc.request.callId)) continue;
+      if (pushedToolCallIdsRef.current.has(tc.callId)) continue;
 
       if (
         tc.status === 'success' ||
@@ -546,24 +405,28 @@ export const useAgentStream = (
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
       for (const tc of toolsToPush) {
-        newPushed.add(tc.request.callId);
+        newPushed.add(tc.callId);
       }
 
       const isLastInBatch =
         toolsToPush[toolsToPush.length - 1] ===
         trackedTools[trackedTools.length - 1];
 
-      const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
+      const appearance = getToolGroupBorderAppearance(
+        { type: 'tool_group', tools: trackedTools },
+        activePtyId,
+        !!_isShellFocused,
+        [],
+        backgroundShells,
+      );
+
+      const historyItem: HistoryItemToolGroup = {
+        type: 'tool_group',
+        tools: toolsToPush,
         borderTop: isFirstToolInGroupRef.current,
         borderBottom: isLastInBatch,
-        ...getToolGroupBorderAppearance(
-          { type: 'tool_group', tools: trackedTools },
-          activePtyId,
-          !!_isShellFocused,
-          [],
-          backgroundShells,
-        ),
-      });
+        ...appearance,
+      };
 
       addItem(historyItem);
       setPushedToolCallIds(newPushed);
@@ -583,7 +446,7 @@ export const useAgentStream = (
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = trackedTools.filter(
-      (tc) => !pushedToolCallIds.has(tc.request.callId),
+      (tc) => !pushedToolCallIds.has(tc.callId),
     );
 
     const items: HistoryItemWithoutId[] = [];
@@ -597,13 +460,13 @@ export const useAgentStream = (
     );
 
     if (remainingTools.length > 0) {
-      items.push(
-        mapTrackedToolCallsToDisplay(remainingTools, {
-          borderTop: pushedToolCallIds.size === 0,
-          borderBottom: false,
-          ...appearance,
-        }),
-      );
+      items.push({
+        type: 'tool_group',
+        tools: remainingTools,
+        borderTop: pushedToolCallIds.size === 0,
+        borderBottom: false,
+        ...appearance,
+      });
     }
 
     const allTerminal =
@@ -617,7 +480,7 @@ export const useAgentStream = (
 
     const allPushed =
       trackedTools.length > 0 &&
-      trackedTools.every((tc) => pushedToolCallIds.has(tc.request.callId));
+      trackedTools.every((tc) => pushedToolCallIds.has(tc.callId));
 
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.length > 0;

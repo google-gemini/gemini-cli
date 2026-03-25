@@ -1093,7 +1093,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
-  const useAgentProtocol = config.getExperimentalUseAgentProtocol();
+  const useAgentProtocol = config?.getExperimentalUseAgentProtocol() || false;
   const useActiveStream = useAgentProtocol ? useAgentStream : useGeminiStream;
 
   const {
