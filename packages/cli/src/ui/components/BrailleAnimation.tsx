@@ -53,6 +53,7 @@ export const BrailleAnimation: React.FC<BrailleAnimationProps> = ({
   interval = 80,
   animate = !process.env['VITEST'],
 }) => {
+  console.error(`DEBUG: BrailleAnimation animate=${animate} VITEST=${process.env['VITEST']} NODE_ENV=${process.env['NODE_ENV']}`); // eslint-disable-line no-console
   const [tick, setTick] = useState(0);
   const settings = useSettings();
   const shouldShow = settings.merged.ui?.showSpinner !== false;
