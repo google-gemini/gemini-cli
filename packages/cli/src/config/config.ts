@@ -105,6 +105,15 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+
+  serverStart: boolean | undefined;
+  serverStop: boolean | undefined;
+  serverSocket: string | undefined;
+  serverPort: number | undefined;
+  client: boolean | undefined;
+  session: string | undefined;
+  serverPing: boolean | undefined;
+  clientListSessions: boolean | undefined;
 }
 
 /**
@@ -442,6 +451,46 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('server-start', {
+          type: 'boolean',
+          description:
+            'Start a persistent Gemini daemon that keeps session state and MCP connections alive.',
+        })
+        .option('server-stop', {
+          type: 'boolean',
+          description: 'Send a graceful shutdown request to a running daemon.',
+        })
+        .option('server-socket', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Path to the Unix-domain socket used by the daemon (default: ~/.gemini/daemon.sock).',
+        })
+        .option('server-port', {
+          type: 'number',
+          nargs: 1,
+          description:
+            'TCP port for the daemon to listen on (use instead of a socket for remote access).',
+        })
+        .option('server-ping', {
+          type: 'boolean',
+          description: 'Ping a running daemon and print its status.',
+        })
+        .option('client', {
+          type: 'boolean',
+          description:
+            'Run as a lightweight client that connects to an existing Gemini daemon.',
+        })
+        .option('session', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Named session to use when talking to the daemon (client mode). Context is preserved across calls.',
+        })
+        .option('client-list-sessions', {
+          type: 'boolean',
+          description: 'List active sessions in the running daemon.',
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
