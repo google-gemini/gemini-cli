@@ -20,8 +20,9 @@ describe('Background Tools', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    listTool = new ListBackgroundProcessesTool(bus);
-    readTool = new ReadBackgroundOutputTool(bus);
+    const mockContext = { config: { getSessionId: () => 'default' } };
+    listTool = new ListBackgroundProcessesTool(mockContext, bus);
+    readTool = new ReadBackgroundOutputTool(mockContext, bus);
 
     // Clear history to avoid state leakage from previous runs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +31,7 @@ describe('Background Tools', () => {
 
   it('list_background_processes should return empty message when no processes', async () => {
     const invocation = listTool.build({});
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
     expect(result.llmContent).toBe('No background processes found.');
   });
@@ -52,6 +54,7 @@ describe('Background Tools', () => {
     ShellExecutionService.background(pid);
 
     const invocation = listTool.build({});
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.llmContent).toContain(
@@ -59,15 +62,37 @@ describe('Background Tools', () => {
     );
   });
 
+  it('list_background_processes should show exited status with code or signal', async () => {
+    const pid = 98989;
+    const history = new Map();
+    history.set(pid, {
+      command: 'exited command',
+      status: 'exited',
+      exitCode: 1,
+      startTime: Date.now(),
+    });
+    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+
+    const invocation = listTool.build({});
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain(`- [PID ${pid}] EXITED: \`exited command\` (Exit Code: 1)`);
+  });
+
   it('read_background_output should return error if log file does not exist', async () => {
     const pid = 12345 + Math.floor(Math.random() * 1000);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set(pid, {
+    const history = new Map();
+    history.set(pid, {
       command: 'unknown command',
       status: 'running',
       startTime: Date.now(),
     });
+    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+
     const invocation = readTool.build({ pid });
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
     expect(result.error).toBeDefined();
     expect(result.llmContent).toContain('No output log found');
@@ -80,11 +105,13 @@ describe('Background Tools', () => {
 
     // Add to history to pass access check
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (ShellExecutionService as any).backgroundProcessHistory.set(pid, {
+    const history = new Map();
+    history.set(pid, {
       command: 'unknown command',
       status: 'running',
       startTime: Date.now(),
     });
+    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     // Ensure dir exists
     fs.mkdirSync(logDir, { recursive: true });
@@ -93,12 +120,85 @@ describe('Background Tools', () => {
     fs.writeFileSync(logPath, 'line 1\nline 2\nline 3\n');
 
     const invocation = readTool.build({ pid, lines: 2 });
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.llmContent).toContain('Showing last 2 of 3 lines');
     expect(result.llmContent).toContain('line 2\nline 3');
 
     // Cleanup
+    fs.unlinkSync(logPath);
+  });
+
+  it('read_background_output should return Access Denied for processes in other sessions', async () => {
+    const pid = 77777;
+    const history = new Map();
+    history.set(pid, {
+      command: 'other command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    (ShellExecutionService as any).backgroundProcessHistory.set('other-session', history);
+
+    const invocation = readTool.build({ pid });
+    (invocation as any).context = { config: { getSessionId: () => 'default' } }; // Asking for PID from another session
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.error).toBeDefined();
+    expect(result.llmContent).toContain('Access denied');
+  });
+
+  it('read_background_output should handle empty log files', async () => {
+    const pid = 66666;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+
+    const history = new Map();
+    history.set(pid, {
+      command: 'empty output command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(logPath, '');
+
+    const invocation = readTool.build({ pid });
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('Log is empty');
+    
+    fs.unlinkSync(logPath);
+  });
+  
+  it('read_background_output should handle direct tool errors gracefully', async () => {
+    const pid = 55555;
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const logDir = ShellExecutionService.getLogDir();
+    
+    const history = new Map();
+    history.set(pid, {
+      command: 'fail command',
+      status: 'running',
+      startTime: Date.now(),
+    });
+    (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(logPath, 'dummy content');
+
+    // Mock stat to throw to hit catch block
+    vi.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('Simulated read error'));
+
+    const invocation = readTool.build({ pid });
+    (invocation as any).context = { config: { getSessionId: () => 'default' } };
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.error).toBeDefined();
+    expect(result.llmContent).toContain('Error reading background log');
+    
     fs.unlinkSync(logPath);
   });
 });
