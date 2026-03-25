@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { WindowsSandboxManager } from './WindowsSandboxManager.js';
+import * as sandboxManager from '../../services/sandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
 
@@ -22,6 +23,9 @@ describe('WindowsSandboxManager', () => {
 
   beforeEach(() => {
     vi.spyOn(os, 'platform').mockReturnValue('win32');
+    vi.spyOn(sandboxManager, 'tryRealpath').mockImplementation(async (p) =>
+      p.toString(),
+    );
     testCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
     manager = new WindowsSandboxManager({ workspace: testCwd });
   });
@@ -133,6 +137,112 @@ describe('WindowsSandboxManager', () => {
       ]);
     } finally {
       fs.rmSync(allowedPath, { recursive: true, force: true });
+    }
+  });
+
+  it('skips denying access to non-existent forbidden paths to prevent icacls failure', async () => {
+    const missingPath = path.join(
+      os.tmpdir(),
+      'gemini-cli-test-missing',
+      'does-not-exist.txt',
+    );
+
+    // Ensure it definitely doesn't exist
+    if (fs.existsSync(missingPath)) {
+      fs.rmSync(missingPath, { recursive: true, force: true });
+    }
+
+    const req: SandboxRequest = {
+      command: 'test',
+      args: [],
+      cwd: testCwd,
+      env: {},
+      policy: {
+        forbiddenPaths: [missingPath],
+      },
+    };
+
+    await manager.prepareCommand(req);
+
+    // Should NOT have called icacls to deny the missing path
+    expect(spawnAsync).not.toHaveBeenCalledWith('icacls', [
+      path.resolve(missingPath),
+      '/deny',
+      '*S-1-16-4096:(OI)(CI)(F)',
+    ]);
+  });
+
+  it('should deny Low Integrity access to forbidden paths', async () => {
+    const forbiddenPath = path.join(os.tmpdir(), 'gemini-cli-test-forbidden');
+    if (!fs.existsSync(forbiddenPath)) {
+      fs.mkdirSync(forbiddenPath);
+    }
+    try {
+      const req: SandboxRequest = {
+        command: 'test',
+        args: [],
+        cwd: testCwd,
+        env: {},
+        policy: {
+          forbiddenPaths: [forbiddenPath],
+        },
+      };
+
+      await manager.prepareCommand(req);
+
+      expect(spawnAsync).toHaveBeenCalledWith('icacls', [
+        path.resolve(forbiddenPath),
+        '/deny',
+        '*S-1-16-4096:(OI)(CI)(F)',
+      ]);
+    } finally {
+      fs.rmSync(forbiddenPath, { recursive: true, force: true });
+    }
+  });
+
+  it('should override allowed paths if a path is also in forbidden paths', async () => {
+    const conflictPath = path.join(os.tmpdir(), 'gemini-cli-test-conflict');
+    if (!fs.existsSync(conflictPath)) {
+      fs.mkdirSync(conflictPath);
+    }
+    try {
+      const req: SandboxRequest = {
+        command: 'test',
+        args: [],
+        cwd: testCwd,
+        env: {},
+        policy: {
+          allowedPaths: [conflictPath],
+          forbiddenPaths: [conflictPath],
+        },
+      };
+
+      await manager.prepareCommand(req);
+
+      const spawnMock = vi.mocked(spawnAsync);
+      const allowCallIndex = spawnMock.mock.calls.findIndex(
+        (call) =>
+          call[1] &&
+          call[1].includes('/setintegritylevel') &&
+          call[0] === 'icacls' &&
+          call[1][0] === path.resolve(conflictPath),
+      );
+      const denyCallIndex = spawnMock.mock.calls.findIndex(
+        (call) =>
+          call[1] &&
+          call[1].includes('/deny') &&
+          call[0] === 'icacls' &&
+          call[1][0] === path.resolve(conflictPath),
+      );
+
+      // Both should have been called
+      expect(allowCallIndex).toBeGreaterThan(-1);
+      expect(denyCallIndex).toBeGreaterThan(-1);
+
+      // Verify order: explicitly denying must happen after the explicit allow
+      expect(allowCallIndex).toBeLessThan(denyCallIndex);
+    } finally {
+      fs.rmSync(conflictPath, { recursive: true, force: true });
     }
   });
 });
