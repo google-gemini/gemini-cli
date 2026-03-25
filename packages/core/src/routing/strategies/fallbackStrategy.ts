@@ -28,6 +28,7 @@ export class FallbackStrategy implements RoutingStrategy {
     const resolvedModel = resolveModel(
       requestedModel,
       config.getGemini31LaunchedSync?.() ?? false,
+      config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       config.getHasAccessToPreviewModel?.() ?? true,
       config,
