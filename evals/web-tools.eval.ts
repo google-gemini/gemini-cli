@@ -5,6 +5,10 @@
  */
 
 import { describe, expect } from 'vitest';
+import {
+  WEB_SEARCH_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+} from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 
 describe('Web Tools', () => {
@@ -22,7 +26,7 @@ describe('Web Tools', () => {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const searchCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'google_web_search',
+        (log) => log.toolRequest.name === WEB_SEARCH_TOOL_NAME,
       );
       expect(
         searchCalls.length,
@@ -31,7 +35,7 @@ describe('Web Tools', () => {
 
       // Agent should not also call web_fetch for the same query (wrong tool)
       const fetchCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'web_fetch',
+        (log) => log.toolRequest.name === WEB_FETCH_TOOL_NAME,
       );
       expect(
         fetchCalls.length,
@@ -63,7 +67,7 @@ describe('Web Tools', () => {
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
       const fetchCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'web_fetch',
+        (log) => log.toolRequest.name === WEB_FETCH_TOOL_NAME,
       );
       expect(
         fetchCalls.length,
@@ -72,7 +76,7 @@ describe('Web Tools', () => {
 
       // Agent should not use google_web_search when a direct URL is given
       const searchCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'google_web_search',
+        (log) => log.toolRequest.name === WEB_SEARCH_TOOL_NAME,
       );
       expect(
         searchCalls.length,
@@ -101,8 +105,8 @@ module.exports = { greeting };
       const toolLogs = rig.readToolLogs();
       const webCalls = toolLogs.filter(
         (log) =>
-          log.toolRequest.name === 'google_web_search' ||
-          log.toolRequest.name === 'web_fetch',
+          log.toolRequest.name === WEB_SEARCH_TOOL_NAME ||
+          log.toolRequest.name === WEB_FETCH_TOOL_NAME,
       );
       expect(
         webCalls.length,
