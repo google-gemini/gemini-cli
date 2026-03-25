@@ -301,7 +301,7 @@ describe('Background Tools', () => {
     // Write 5 lines
     fs.writeFileSync(logPath, 'line1\nline2\nline3\nline4\nline5');
 
-    const invocation = readTool.build({ pid, tailLines: 2 });
+    const invocation = readTool.build({ pid, lines: 2 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
