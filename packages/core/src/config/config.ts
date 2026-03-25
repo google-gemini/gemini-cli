@@ -2262,7 +2262,10 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getExperimentalUseAgentProtocol(): boolean {
-    return this.useAgentProtocol;
+    return (
+      this.useAgentProtocol ||
+      process.env['GEMINI_CLI_USE_AGENT_PROTOCOL'] === 'true'
+    );
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
