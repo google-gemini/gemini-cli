@@ -136,11 +136,16 @@ vi.mock('./QueuedMessageDisplay.js', () => ({
       return null;
     }
     return (
-      <>
+      <Box flexDirection="column">
+        <Box paddingLeft={2}>
+          <Text>Queued (press ↑ to edit):</Text>
+        </Box>
         {messageQueue.map((message, index) => (
-          <Text key={index}>{message}</Text>
+          <Box key={index} paddingLeft={4}>
+            <Text>{message}</Text>
+          </Box>
         ))}
-      </>
+      </Box>
     );
   },
 }));
