@@ -8,7 +8,6 @@ import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 import { coreEvents } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
-import { cleanup } from './src/test-utils/render.js';
 
 // Unset CI environment variable so that ink renders dynamically as it does in a real terminal
 if (process.env.CI !== undefined) {
@@ -80,7 +79,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  cleanup();
   consoleErrorSpy.mockRestore();
 
   vi.unstubAllEnvs();

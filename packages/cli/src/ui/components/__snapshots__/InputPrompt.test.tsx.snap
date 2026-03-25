@@ -78,6 +78,126 @@ exports[`InputPrompt > mouse interaction > should toggle paste expansion on doub
 "
 `;
 
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 4`] = `
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.create
+  rror               (file:///Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/no
+                     de_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+ -Object.ge
+           (file:///Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules
+           /vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-bott
+  m-frame                (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_
+                         modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
+ -renderWithHoo
+  s            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/re
+               act-reconciler/cjs/react-reconciler.development.js:3221:22)
+ -updateFunctionComp
+  nent              (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modul
+                    es/react-reconciler/cjs/react-reconciler.development.js:6475:19)
+ -beginWor
+          (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/react-r
+          econciler/cjs/react-reconciler.development.js:8009:18)
+ -runWithFiberIn
+  EV            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/r
+                eact-reconciler/cjs/react-reconciler.development.js:1738:13)
+ -performUnitOfW
+  rk            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/r
+                eact-reconciler/cjs/react-reconciler.development.js:12834:22)
+ -workLoopSyn
+             (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/reac
+             t-reconciler/cjs/react-reconciler.development.js:12644:41)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 5`] = `
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.create
+  rror               (file:///Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/no
+                     de_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+ -Object.ge
+           (file:///Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules
+           /vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-bott
+  m-frame                (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_
+                         modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
+ -renderWithHoo
+  s            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/re
+               act-reconciler/cjs/react-reconciler.development.js:3221:22)
+ -updateFunctionComp
+  nent              (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modul
+                    es/react-reconciler/cjs/react-reconciler.development.js:6475:19)
+ -beginWor
+          (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/react-r
+          econciler/cjs/react-reconciler.development.js:8009:18)
+ -runWithFiberIn
+  EV            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/r
+                eact-reconciler/cjs/react-reconciler.development.js:1738:13)
+ -performUnitOfW
+  rk            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/r
+                eact-reconciler/cjs/react-reconciler.development.js:12834:22)
+ -workLoopSyn
+             (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/reac
+             t-reconciler/cjs/react-reconciler.development.js:12644:41)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 6`] = `
+"
+  ERROR [vitest] No "isITerm2" export is defined on the "../utils/terminalUtils.js" mock. Did you
+       forget to return it from "vi.mock"?
+       If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+
+ - If you need to partially mock a module, you can use "importOriginal" helper inside:\\t
+ - \\t
+ -VitestMocker.create
+  rror               (file:///Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/no
+                     de_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+ -Object.ge
+           (file:///Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules
+           /vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+ - HalfLinePaddedBoxInternal (src/ui/components/shared/HalfLinePaddedBox.tsx:82:19)
+ -Object.react-stack-bott
+  m-frame                (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_
+                         modules/react-reconciler/cjs/react-reconciler.development.js:15859:20)
+ -renderWithHoo
+  s            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/re
+               act-reconciler/cjs/react-reconciler.development.js:3221:22)
+ -updateFunctionComp
+  nent              (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modul
+                    es/react-reconciler/cjs/react-reconciler.development.js:6475:19)
+ -beginWor
+          (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/react-r
+          econciler/cjs/react-reconciler.development.js:8009:18)
+ -runWithFiberIn
+  EV            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/r
+                eact-reconciler/cjs/react-reconciler.development.js:1738:13)
+ -performUnitOfW
+  rk            (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/r
+                eact-reconciler/cjs/react-reconciler.development.js:12834:22)
+ -workLoopSyn
+             (/Users/keithguerin/Documents/gemini-cli/loader-animation-adjustment/node_modules/reac
+             t-reconciler/cjs/react-reconciler.development.js:12644:41)
+"
+`;
+
 exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  >   Type your message or @path/to/file                                                             

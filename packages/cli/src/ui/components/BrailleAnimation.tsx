@@ -58,7 +58,7 @@ export const BrailleAnimation: React.FC<BrailleAnimationProps> = ({
   const shouldShow = settings.merged.ui?.showSpinner !== false;
 
   useEffect(() => {
-    if (!shouldShow || !animate) return;
+    if (!shouldShow || !animate || variant === 'Static') return;
 
     debugState.debugNumAnimatedComponents++;
 
@@ -70,7 +70,7 @@ export const BrailleAnimation: React.FC<BrailleAnimationProps> = ({
       debugState.debugNumAnimatedComponents--;
       clearInterval(timer);
     };
-  }, [interval, shouldShow, animate]);
+  }, [interval, shouldShow, animate, variant]);
 
   const getLength = () => {
     const cycle = Math.floor(tick / 8);

@@ -9,13 +9,13 @@ import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { BrailleAnimation } from '../BrailleAnimation.js';
-import type {
-  SubagentProgress,
-  SubagentActivityItem,
+import {
+  type SubagentProgress,
+  type SubagentActivityItem,
+  safeJsonToMarkdown,
 } from '@google/gemini-cli-core';
 import { TOOL_STATUS } from '../../constants.js';
 import { STATUS_INDICATOR_WIDTH } from './ToolShared.js';
-import { safeJsonToMarkdown } from '@google/gemini-cli-core';
 
 export interface SubagentProgressDisplayProps {
   progress: SubagentProgress;
