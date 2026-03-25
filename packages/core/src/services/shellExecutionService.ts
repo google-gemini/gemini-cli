@@ -103,6 +103,7 @@ export interface ShellExecutionConfig {
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
   backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
+  originalCommand?: string;
 }
 
 /**
@@ -114,6 +115,7 @@ interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
+  command: string;
 }
 
 interface ActiveChildProcess {
@@ -124,6 +126,7 @@ interface ActiveChildProcess {
     sniffChunks: Buffer[];
     binaryBytesReceived: number;
   };
+  command: string;
 }
 
 const findLastContentLine = (
@@ -235,6 +238,17 @@ export class ShellExecutionService {
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static backgroundLogPids = new Set<number>();
   private static backgroundLogStreams = new Map<number, fs.WriteStream>();
+  private static backgroundProcessHistory = new Map<
+    number,
+    {
+      command: string;
+      status: 'running' | 'exited';
+      exitCode?: number | null;
+      signal?: number | null;
+      startTime: number;
+      endTime?: number;
+    }
+  >();
 
   static getLogDir(): string {
     return path.join(Storage.getGlobalTempDir(), 'background-processes');
@@ -523,6 +537,7 @@ export class ShellExecutionService {
         this.activeChildProcesses.set(child.pid, {
           process: child,
           state,
+          command: shellExecutionConfig.originalCommand ?? commandToExecute,
         });
       }
 
@@ -696,6 +711,15 @@ export class ShellExecutionService {
             exitCode,
             signal: exitSignal,
           };
+
+          const historyItem =
+            ShellExecutionService.backgroundProcessHistory.get(pid);
+          if (historyItem) {
+            historyItem.status = 'exited';
+            historyItem.exitCode = exitCode ?? undefined;
+            historyItem.signal = exitSignal ?? undefined;
+            historyItem.endTime = Date.now();
+          }
           onOutputEvent(event);
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -849,6 +873,7 @@ export class ShellExecutionService {
         ptyProcess,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+        command: shellExecutionConfig.originalCommand ?? commandToExecute,
       });
 
       const result = ExecutionLifecycleService.attachExecution(ptyPid, {
@@ -1116,6 +1141,15 @@ export class ShellExecutionService {
               exitCode,
               signal: signal ?? null,
             };
+
+            const historyItem =
+              ShellExecutionService.backgroundProcessHistory.get(ptyPid);
+            if (historyItem) {
+              historyItem.status = 'exited';
+              historyItem.exitCode = exitCode;
+              historyItem.signal = signal ?? null;
+              historyItem.endTime = Date.now();
+            }
             onOutputEvent(event);
 
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1273,6 +1307,15 @@ export class ShellExecutionService {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
 
+    const command =
+      activePty?.command ?? activeChild?.command ?? 'unknown command';
+
+    this.backgroundProcessHistory.set(pid, {
+      command,
+      status: 'running',
+      startTime: Date.now(),
+    });
+
     // Set up background logging
     const logPath = this.getLogFilePath(pid);
     const logDir = this.getLogDir();
@@ -1390,5 +1433,33 @@ export class ShellExecutionService {
         }
       }
     }
+  }
+
+  static listBackgroundProcesses(): Array<{
+    pid: number;
+    command: string;
+    status: 'running' | 'exited';
+    exitCode?: number | null;
+    signal?: number | null;
+  }> {
+    const list: Array<{
+      pid: number;
+      command: string;
+      status: 'running' | 'exited';
+      exitCode?: number | null;
+      signal?: number | null;
+    }> = [];
+
+    for (const [pid, history] of this.backgroundProcessHistory.entries()) {
+      list.push({
+        pid,
+        command: history.command,
+        status: history.status,
+        exitCode: history.exitCode,
+        signal: history.signal,
+      });
+    }
+
+    return list;
   }
 }

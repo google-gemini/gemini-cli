@@ -483,6 +483,7 @@ describe('ShellExecutionService', () => {
           ptyProcess: mockPtyProcess as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           headlessTerminal: mockHeadlessTerminal as any,
+          command: 'some-command',
         });
     });
 
@@ -753,6 +754,8 @@ describe('ShellExecutionService', () => {
       (ShellExecutionService as any).activePtys.clear();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ShellExecutionService as any).activeChildProcesses.clear();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (ShellExecutionService as any).backgroundProcessHistory.clear();
     });
 
     afterEach(() => {
@@ -871,6 +874,39 @@ describe('ShellExecutionService', () => {
       );
 
       await ShellExecutionService.kill(handle.pid!);
+    });
+
+    it('should track background process history', async () => {
+      await simulateExecution(
+        'history-test-cmd',
+        async (pty) => {
+          ShellExecutionService.background(pty.pid);
+
+          const history = ShellExecutionService.listBackgroundProcesses();
+          expect(history).toHaveLength(1);
+          expect(history[0]).toEqual(
+            expect.objectContaining({
+              pid: pty.pid,
+              command: 'history-test-cmd',
+              status: 'running',
+            }),
+          );
+
+          // Simulate exit
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        { ...shellExecutionConfig, originalCommand: 'history-test-cmd' },
+      );
+
+      const history = ShellExecutionService.listBackgroundProcesses();
+      expect(history[0]).toEqual(
+        expect.objectContaining({
+          pid: mockPtyProcess.pid,
+          command: 'history-test-cmd',
+          status: 'exited',
+          exitCode: 0,
+        }),
+      );
     });
   });
 
