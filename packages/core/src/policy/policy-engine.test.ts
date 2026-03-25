@@ -1227,6 +1227,32 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should allow redirected commands with commandPrefix-style argsPattern when allowRedirection is true', async () => {
+      // Reproduces #23096: commandPrefix = ["echo"] with allow_redirection = true
+      // should not prompt for action when the command contains redirection.
+      const argsPatterns = buildArgsPatterns(undefined, ['echo']);
+      const rules: PolicyRule[] = argsPatterns.map((pattern) => ({
+        toolName: 'run_shell_command',
+        argsPattern: pattern ? new RegExp(pattern) : undefined,
+        decision: PolicyDecision.ALLOW,
+        allowRedirection: true,
+      }));
+
+      engine = new PolicyEngine({ rules });
+
+      expect(
+        (
+          await engine.check(
+            {
+              name: 'run_shell_command',
+              args: { command: 'echo "hello" > test.txt' },
+            },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should NOT downgrade ALLOW to ASK_USER for quoted redirection chars', async () => {
       const rules: PolicyRule[] = [
         {

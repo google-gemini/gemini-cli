@@ -29,6 +29,8 @@ import {
   initializeShellParsers,
   splitCommands,
   hasRedirection,
+  parseCommandDetails,
+  REDIRECTION_NAMES,
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 import {
@@ -352,7 +354,26 @@ export class PolicyEngine {
     }
 
     await initializeShellParsers();
-    const subCommands = splitCommands(command);
+
+    // Filter out redirection entries (e.g. "> file.txt") from the parsed
+    // sub-commands.  Redirection is already handled separately by
+    // shouldDowngradeForRedirection on the full command string.  Without
+    // this filter, redirect entries are recursively checked via this.check()
+    // where they fail to match the user's commandPrefix rule and fall
+    // through to a catch-all ASK_USER, defeating allow_redirection.
+    //
+    // The filter uses tree-sitter AST node types (file_redirect,
+    // heredoc_redirect, herestring_redirect) via REDIRECTION_NAMES, not
+    // string matching on command text, so it cannot be bypassed by naming
+    // an executable after a redirection marker.
+    const parsed = parseCommandDetails(command);
+    const subCommands =
+      parsed && !parsed.hasError
+        ? parsed.details
+            .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+            .map((detail) => detail.text)
+            .filter(Boolean)
+        : splitCommands(command);
 
     if (subCommands.length === 0) {
       // If the matched rule says DENY, we should respect it immediately even if parsing fails.
