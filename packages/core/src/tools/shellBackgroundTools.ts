@@ -163,7 +163,8 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
       const stats = await fs.promises.lstat(logPath);
       if (stats.isSymbolicLink()) {
         return {
-          llmContent: `Access denied: Predictable log path cannot be a symbolic link for security safeguarding.`,
+          llmContent:
+            'Symbolic link detected at predicted log path. Access is denied for security reasons.',
           returnDisplay: `Symlink detected for PID ${pid}`,
           error: {
             message:

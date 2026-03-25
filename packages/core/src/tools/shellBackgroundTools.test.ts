@@ -274,7 +274,7 @@ describe('Background Tools', () => {
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
-    expect(result.llmContent).toContain('Access denied');
+    expect(result.llmContent).toContain('Access is denied');
     expect(result.error?.message).toContain('Symbolic link detected');
 
     fs.unlinkSync(logPath);
