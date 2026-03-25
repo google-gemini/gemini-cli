@@ -6,28 +6,19 @@
 
 const TRUNCATION_SUFFIX = '... (truncated for performance)';
 
-/**
- * Overload signatures: These tell TypeScript exactly what to expect.
- */
 export function safeTruncate(val: string, limit: number): string;
 export function safeTruncate(val: unknown, limit: number): unknown;
-
-/**
- * The actual implementation.
- */
 export function safeTruncate(val: unknown, limit: number): unknown {
-  if (typeof val !== 'string') {
+  if (typeof val !== 'string' || val.length <= limit) {
     return val;
   }
 
-  if (val.length <= limit) {
+  // Use Array.from to count actual characters (graphemes) instead of UTF-16 units
+  const characters = Array.from(val);
+  if (characters.length <= limit) {
     return val;
   }
 
-  if (limit <= TRUNCATION_SUFFIX.length) {
-    return val.substring(0, limit);
-  }
-
-  const truncateAt = limit - TRUNCATION_SUFFIX.length;
-  return val.substring(0, truncateAt) + TRUNCATION_SUFFIX;
+  const truncateAt = Math.max(0, limit - TRUNCATION_SUFFIX.length);
+  return characters.slice(0, truncateAt).join('') + TRUNCATION_SUFFIX;
 }
