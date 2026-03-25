@@ -356,6 +356,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       default: 'gemini-3.1-pro-preview',
       contexts: [
         { condition: { hasAccessToPreview: false }, target: 'gemini-2.5-pro' },
+        {
+          condition: { useCustomTools: true },
+          target: 'gemini-3.1-pro-preview-customtools',
+        },
       ],
     },
     'gemini-3.1-pro-preview-customtools': {
