@@ -518,12 +518,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {(!uiState.slashCommands ||
-        !uiState.isConfigInitialized ||
-        uiState.isResuming) && (
-        <ConfigInitDisplay
-          message={uiState.isResuming ? 'Resuming session...' : undefined}
-        />
+      {uiState.isResuming && (
+        <ConfigInitDisplay message="Resuming session..." />
       )}
 
       {showUiDetails && (
@@ -592,12 +588,15 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
+          copyModeEnabled={uiState.copyModeEnabled}
         />
       )}
 
       {showUiDetails &&
         !settings.merged.ui.hideFooter &&
-        !isScreenReaderEnabled && <Footer />}
+        !isScreenReaderEnabled && (
+          <Footer copyModeEnabled={uiState.copyModeEnabled} />
+        )}
     </Box>
   );
 };

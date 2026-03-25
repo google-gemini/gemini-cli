@@ -12,15 +12,18 @@ import {
   type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
+  GOVERNANCE_FILES,
   type GlobalSandboxOptions,
   sanitizePaths,
-} from './sandboxManager.js';
+  tryRealpath,
+} from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-} from './environmentSanitization.js';
-import { debugLogger } from '../utils/debugLogger.js';
-import { spawnAsync } from '../utils/shell-utils.js';
+} from '../../services/environmentSanitization.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { spawnAsync } from '../../utils/shell-utils.js';
+import { isNodeError } from '../../utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,10 +36,33 @@ const __dirname = path.dirname(__filename);
 export class WindowsSandboxManager implements SandboxManager {
   private readonly helperPath: string;
   private initialized = false;
-  private readonly lowIntegrityCache = new Set<string>();
+  private readonly allowedCache = new Set<string>();
+  private readonly deniedCache = new Set<string>();
 
   constructor(private readonly options: GlobalSandboxOptions) {
-    this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
+    this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+  }
+
+  /**
+   * Ensures a file or directory exists.
+   */
+  private touch(filePath: string, isDirectory: boolean): void {
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      if (fs.lstatSync(filePath)) return;
+    } catch {
+      // Ignore ENOENT
+    }
+
+    if (isDirectory) {
+      fs.mkdirSync(filePath, { recursive: true });
+    } else {
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.closeSync(fs.openSync(filePath, 'a'));
+    }
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -162,9 +188,34 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(allowedPath);
     }
 
-    // TODO: handle forbidden paths
+    // Denies access to forbiddenPaths for Low Integrity processes.
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const forbiddenPath of forbiddenPaths) {
+      await this.denyLowIntegrityAccess(forbiddenPath);
+    }
 
-    // 2. Construct the helper command
+    // 2. Protected governance files
+    // These must exist on the host before running the sandbox to prevent
+    // the sandboxed process from creating them with Low integrity.
+    // By being created as Medium integrity, they are write-protected from Low processes.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = path.join(this.options.workspace, file.path);
+      this.touch(filePath, file.isDirectory);
+
+      // We resolve real paths to ensure protection for both the symlink and its target.
+      try {
+        const realPath = fs.realpathSync(filePath);
+        if (realPath !== filePath) {
+          // If it's a symlink, the target is already implicitly protected
+          // if it's outside the Low integrity workspace (likely Medium).
+          // If it's inside, we ensure it's not accidentally Low.
+        }
+      } catch {
+        // Ignore realpath errors
+      }
+    }
+
+    // 3. Construct the helper command
     // GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]
     const program = this.helperPath;
 
@@ -180,6 +231,7 @@ export class WindowsSandboxManager implements SandboxManager {
       program,
       args,
       env: sanitizedEnv,
+      cwd: req.cwd,
     };
   }
 
@@ -191,8 +243,8 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    const resolvedPath = path.resolve(targetPath);
-    if (this.lowIntegrityCache.has(resolvedPath)) {
+    const resolvedPath = await tryRealpath(targetPath);
+    if (this.allowedCache.has(resolvedPath)) {
       return;
     }
 
@@ -212,12 +264,62 @@ export class WindowsSandboxManager implements SandboxManager {
 
     try {
       await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
-      this.lowIntegrityCache.add(resolvedPath);
+      this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
         'WindowsSandboxManager: icacls failed for',
         resolvedPath,
         e,
+      );
+    }
+  }
+
+  /**
+   * Explicitly denies access to a path for Low Integrity processes using icacls.
+   */
+  private async denyLowIntegrityAccess(targetPath: string): Promise<void> {
+    if (os.platform() !== 'win32') {
+      return;
+    }
+
+    const resolvedPath = await tryRealpath(targetPath);
+    if (this.deniedCache.has(resolvedPath)) {
+      return;
+    }
+
+    // S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
+    const LOW_INTEGRITY_SID = '*S-1-16-4096';
+
+    // icacls flags: (OI) Object Inherit, (CI) Container Inherit, (F) Full Access Deny.
+    // Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
+    // Windows dynamically evaluates existing items, though deep explicit Allow ACEs
+    // could potentially bypass this inherited Deny rule.
+    const DENY_ALL_INHERIT = '(OI)(CI)(F)';
+
+    // icacls fails on non-existent paths, so we cannot explicitly deny
+    // paths that do not yet exist (unlike macOS/Linux).
+    // Skip to prevent sandbox initialization failure.
+    try {
+      await fs.promises.stat(resolvedPath);
+    } catch (e: unknown) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        return;
+      }
+      throw e;
+    }
+
+    try {
+      await spawnAsync('icacls', [
+        resolvedPath,
+        '/deny',
+        `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
+      ]);
+      this.deniedCache.add(resolvedPath);
+    } catch (e) {
+      throw new Error(
+        `Failed to deny access to forbidden path: ${resolvedPath}. ${
+          e instanceof Error ? e.message : String(e)
+        }`,
       );
     }
   }

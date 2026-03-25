@@ -12,8 +12,9 @@ import {
 } from './sandboxManager.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
+import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
+import { type SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 
 /**
  * Creates a sandbox manager based on the provided settings.
@@ -21,7 +22,13 @@ import type { SandboxConfig } from '../config/config.js';
 export function createSandboxManager(
   sandbox: SandboxConfig | undefined,
   workspace: string,
+  policyManager?: SandboxPolicyManager,
+  approvalMode?: string,
 ): SandboxManager {
+  if (approvalMode === 'yolo') {
+    return new NoopSandboxManager();
+  }
+
   const isWindows = os.platform() === 'win32';
 
   if (
@@ -36,7 +43,15 @@ export function createSandboxManager(
       return new LinuxSandboxManager({ workspace });
     }
     if (os.platform() === 'darwin') {
-      return new MacOsSandboxManager({ workspace });
+      const modeConfig =
+        policyManager && approvalMode
+          ? policyManager.getModeConfig(approvalMode)
+          : undefined;
+      return new MacOsSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
     }
     return new LocalSandboxManager();
   }

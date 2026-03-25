@@ -97,6 +97,10 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
+  /** State for action rate limiting */
+  private actionCounter = 0;
+  private readonly maxActionsPerTask: number;
+
   /**
    * Whether to inject the automation overlay.
    * Always false in headless mode (no visible window to decorate).
@@ -108,6 +112,8 @@ export class BrowserManager {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
+    this.maxActionsPerTask =
+      browserConfig?.customConfig.maxActionsPerTask ?? 100;
   }
 
   /**
@@ -150,6 +156,16 @@ export class BrowserManager {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
+
+    // Hard enforcement of per-action rate limit
+    if (this.actionCounter > this.maxActionsPerTask) {
+      const error = new Error(
+        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
+      );
+      throw error;
+    }
+    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
@@ -594,29 +610,65 @@ export class BrowserManager {
 
     try {
       const parsedUrl = new URL(url);
-      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+      const urlHostname = parsedUrl.hostname;
 
-      for (const domainPattern of allowedDomains) {
-        if (domainPattern.startsWith('*.')) {
-          const baseDomain = domainPattern.substring(2);
+      if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
+        // If none matched, then deny
+        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+      }
+
+      // Check query parameters for embedded URLs that could bypass domain
+      // restrictions via proxy services (e.g. translate.google.com/translate?u=BLOCKED).
+      const paramsToCheck = [
+        ...parsedUrl.searchParams.values(),
+        // Also check fragments which might contain query-like params
+        ...new URLSearchParams(parsedUrl.hash.replace(/^#/, '')).values(),
+      ];
+      for (const paramValue of paramsToCheck) {
+        try {
+          const embeddedUrl = new URL(paramValue);
           if (
-            urlHostname === baseDomain ||
-            urlHostname.endsWith(`.${baseDomain}`)
+            embeddedUrl.protocol === 'http:' ||
+            embeddedUrl.protocol === 'https:'
           ) {
-            return undefined;
+            const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
+            if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
+              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
+            }
           }
-        } else {
-          if (urlHostname === domainPattern) {
-            return undefined;
-          }
+        } catch {
+          // Not a valid URL, skip.
         }
       }
+
+      return undefined;
     } catch {
       return `Invalid URL: Malformed URL string.`;
     }
+  }
 
+  /**
+   * Checks whether a hostname matches any pattern in the allowed domains list.
+   */
+  private isDomainAllowed(hostname: string, allowedDomains: string[]): boolean {
+    const normalized = hostname.replace(/\.$/, '');
+    for (const domainPattern of allowedDomains) {
+      if (domainPattern.startsWith('*.')) {
+        const baseDomain = domainPattern.substring(2);
+        if (
+          normalized === baseDomain ||
+          normalized.endsWith(`.${baseDomain}`)
+        ) {
+          return true;
+        }
+      } else {
+        if (normalized === domainPattern) {
+          return true;
+        }
+      }
+    }
     // If none matched, then deny
-    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+    return false;
   }
 
   /**
