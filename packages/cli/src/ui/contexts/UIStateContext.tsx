@@ -166,6 +166,8 @@ export interface UIState {
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
+  currentTip: string | undefined;
+  currentWittyPhrase: string | undefined;
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];
@@ -178,6 +180,7 @@ export interface UIState {
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;
+  stableControlsHeight: number;
   mainAreaWidth: number;
   staticAreaMaxItemHeight: number;
   staticExtraHeight: number;

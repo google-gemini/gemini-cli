@@ -4,13 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+export interface SandboxPermissions {
+  /** Filesystem permissions. */
+  fileSystem?: {
+    /** Paths that should be readable by the command. */
+    read?: string[];
+    /** Paths that should be writable by the command. */
+    write?: string[];
+  };
+  /** Whether the command should have network access. */
+  network?: boolean;
+}
+
 /**
  * Security boundaries and permissions applied to a specific sandboxed execution.
  */
@@ -23,6 +37,8 @@ export interface ExecutionPolicy {
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+  /** Additional granular permissions to grant to this command. */
+  additionalPermissions?: SandboxPermissions;
 }
 
 /**
@@ -75,6 +91,16 @@ export interface SandboxManager {
    */
   prepareCommand(req: SandboxRequest): Promise<SandboxedCommand>;
 }
+
+/**
+ * Files that represent the governance or "constitution" of the repository
+ * and should be write-protected in any sandbox.
+ */
+export const GOVERNANCE_FILES = [
+  { path: '.gitignore', isDirectory: false },
+  { path: '.geminiignore', isDirectory: false },
+  { path: '.git', isDirectory: true },
+] as const;
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands
@@ -140,4 +166,25 @@ export function sanitizePaths(paths?: string[]): string[] | undefined {
 
   return Array.from(uniquePathsMap.values());
 }
+
+/**
+ * Resolves symlinks for a given path to prevent sandbox escapes.
+ * If a file does not exist (ENOENT), it recursively resolves the parent directory.
+ * Other errors (e.g. EACCES) are re-thrown.
+ */
+export async function tryRealpath(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      const parentDir = path.dirname(p);
+      if (parentDir === p) {
+        return p;
+      }
+      return path.join(await tryRealpath(parentDir), path.basename(p));
+    }
+    throw e;
+  }
+}
+
 export { createSandboxManager } from './sandboxManagerFactory.js';

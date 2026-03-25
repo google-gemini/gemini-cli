@@ -71,6 +71,7 @@ denyMessage = "You are not currently in Plan Mode. Use enter_plan_mode first to 
 # Catch-All: Deny everything by default in Plan mode.
 
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 60
 modes = ["plan"]
@@ -79,6 +80,7 @@ denyMessage = "You are in Plan Mode with access to read-only tools. Execution of
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "ask_user"

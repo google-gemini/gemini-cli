@@ -413,6 +413,7 @@ registered MCP server. This is useful for setting category-wide defaults.
 ```toml
 # Ask user for any tool call from any MCP server
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10

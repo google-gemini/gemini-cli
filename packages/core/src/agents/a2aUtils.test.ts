@@ -403,7 +403,7 @@ describe('a2aUtils', () => {
 
       const output = reassembler.toString();
       expect(output).toBe(
-        'Analyzing...\n\nProcessing...\n\nArtifact (Code):\nprint("Done")',
+        'Analyzing...Processing...\n\nArtifact (Code):\nprint("Done")',
       );
     });
 

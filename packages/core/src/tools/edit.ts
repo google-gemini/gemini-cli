@@ -463,7 +463,13 @@ class EditToolInvocation
       true,
       () => this.config.getApprovalMode(),
     );
-    if (!path.isAbsolute(this.params.file_path)) {
+    if (this.config.isPlanMode()) {
+      const safeFilename = path.basename(this.params.file_path);
+      this.resolvedPath = path.join(
+        this.config.storage.getPlansDir(),
+        safeFilename,
+      );
+    } else if (!path.isAbsolute(this.params.file_path)) {
       const result = correctPath(this.params.file_path, this.config);
       if (result.success) {
         this.resolvedPath = result.correctedPath;
@@ -900,11 +906,36 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
+        // Determine the full content as originally proposed by the AI to ensure accurate diff stats.
+        let fullAiProposedContent = editData.newContent;
+        if (
+          this.params.modified_by_user &&
+          this.params.ai_proposed_content !== undefined
+        ) {
+          try {
+            const aiReplacement = await calculateReplacement(this.config, {
+              params: {
+                ...this.params,
+                new_string: this.params.ai_proposed_content,
+              },
+              currentContent: editData.currentContent ?? '',
+              abortSignal: signal,
+            });
+            fullAiProposedContent = aiReplacement.newContent;
+          } catch (error) {
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            debugLogger.log(`AI replacement fallback: ${errorMsg}`);
+            // Fallback to newContent if speculative calculation fails
+            fullAiProposedContent = editData.newContent;
+          }
+        }
+
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
+          fullAiProposedContent,
           editData.newContent,
-          this.params.new_string,
         );
         displayResult = {
           fileDiff,
