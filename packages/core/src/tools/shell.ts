@@ -334,7 +334,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
             sandboxManager: this.context.config.sandboxManager,
             additionalPermissions: this.params[PARAM_ADDITIONAL_PERMISSIONS],
             originalCommand: strippedCommand,
-
           },
         );
 
