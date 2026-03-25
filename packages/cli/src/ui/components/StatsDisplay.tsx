@@ -92,6 +92,7 @@ const buildModelRows = (
   config: Config,
   quotas?: RetrieveUserQuotaResponse,
   useGemini3_1 = false,
+  useGemini3_1FlashLite = false,
   useCustomToolModel = false,
 ) => {
   const getBaseModelName = (name: string) => name.replace('-001', '');
@@ -124,7 +125,12 @@ const buildModelRows = (
       ?.filter(
         (b) =>
           b.modelId &&
-          isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
+          isActiveModel(
+            b.modelId,
+            useGemini3_1,
+            useGemini3_1FlashLite,
+            useCustomToolModel,
+          ) &&
           !usedModelNames.has(getDisplayString(b.modelId, config)),
       )
       .map((bucket) => ({
@@ -152,6 +158,7 @@ const ModelUsageTable: React.FC<{
   pooledLimit?: number;
   pooledResetTime?: string;
   useGemini3_1?: boolean;
+  useGemini3_1FlashLite?: boolean;
   useCustomToolModel?: boolean;
 }> = ({
   models,
@@ -164,6 +171,7 @@ const ModelUsageTable: React.FC<{
   pooledLimit,
   pooledResetTime,
   useGemini3_1,
+  useGemini3_1FlashLite,
   useCustomToolModel,
 }) => {
   const { stdout } = useStdout();
@@ -173,6 +181,7 @@ const ModelUsageTable: React.FC<{
     config,
     quotas,
     useGemini3_1,
+    useGemini3_1FlashLite,
     useCustomToolModel,
   );
 
@@ -541,6 +550,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   const settings = useSettings();
   const config = useConfig();
   const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
+  const useGemini3_1FlashLite =
+    config.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const useCustomToolModel =
     useGemini3_1 &&
     config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
@@ -697,6 +708,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         pooledLimit={pooledLimit}
         pooledResetTime={pooledResetTime}
         useGemini3_1={useGemini3_1}
+        useGemini3_1FlashLite={useGemini3_1FlashLite}
         useCustomToolModel={useCustomToolModel}
       />
       {renderFooter()}
