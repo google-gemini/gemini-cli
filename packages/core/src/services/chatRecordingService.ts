@@ -130,6 +130,7 @@ export interface LoadConversationOptions {
   metadataOnly?: boolean;
 }
 
+<<<<<<< HEAD
 interface RewindRecord {
   $rewindTo: string;
 }
@@ -198,6 +199,8 @@ function isTextPart(part: unknown): part is { text: string } {
   );
 }
 
+=======
+>>>>>>> fa56f2436 (fix(core): address PR comments and optimize jsonl streaming memory)
 export async function loadConversationRecord(
   filePath: string,
   options?: LoadConversationOptions,
@@ -224,9 +227,17 @@ export async function loadConversationRecord(
     for await (const line of rl) {
       if (!line.trim()) continue;
       try {
+<<<<<<< HEAD
         const record = JSON.parse(line) as unknown;
         if (isRewindRecord(record)) {
           const rewindId = record.$rewindTo;
+=======
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const record = JSON.parse(line) as Record<string, unknown>;
+        if (record['$rewindTo']) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const rewindId = record['$rewindTo'] as string;
+>>>>>>> fa56f2436 (fix(core): address PR comments and optimize jsonl streaming memory)
           if (options?.metadataOnly) {
             const idx = messageIds.indexOf(rewindId);
             if (idx !== -1) {
@@ -248,6 +259,7 @@ export async function loadConversationRecord(
             } else {
               messagesMap.clear();
             }
+<<<<<<< HEAD
           }
         } else if (isMessageRecord(record)) {
           const id = record.id;
@@ -275,15 +287,59 @@ export async function loadConversationRecord(
 
           if (!options?.metadataOnly) {
             messagesMap.set(id, record);
+=======
+          }
+        } else if (record['id']) {
+          // Track message count and first user message
+          if (options?.metadataOnly) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            messageIds.push(record['id'] as string);
+          }
+          if (
+            !firstUserMessageStr &&
+            record['type'] === 'user' &&
+            record['content']
+          ) {
+            // Basic extraction of first user message for display
+            const rawContent = record['content'];
+            if (Array.isArray(rawContent)) {
+              firstUserMessageStr = rawContent
+                .map((p: unknown) => {
+                  if (!p || typeof p !== 'object' || !('text' in p)) return '';
+
+                  const text = (p as Record<string, unknown>)['text'];
+                  return typeof text === 'string' ? text : '';
+                })
+                .join('');
+            } else if (typeof rawContent === 'string') {
+              firstUserMessageStr = rawContent;
+            }
+          }
+
+          if (!options?.metadataOnly) {
+            messagesMap.set(
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              record['id'] as string,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              record as unknown as MessageRecord,
+            );
+>>>>>>> fa56f2436 (fix(core): address PR comments and optimize jsonl streaming memory)
             if (
               options?.maxMessages &&
               messagesMap.size > options.maxMessages
             ) {
               const firstKey = messagesMap.keys().next().value;
+<<<<<<< HEAD
               if (typeof firstKey === 'string') messagesMap.delete(firstKey);
             }
           }
         } else if (isMetadataUpdateRecord(record)) {
+=======
+              if (firstKey) messagesMap.delete(firstKey);
+            }
+          }
+        } else if (record['$set']) {
+>>>>>>> fa56f2436 (fix(core): address PR comments and optimize jsonl streaming memory)
           // Metadata update
           metadata = {
             ...metadata,

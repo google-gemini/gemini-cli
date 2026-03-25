@@ -262,7 +262,9 @@ export const getAllSessionFiles = async (
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
-          const content = await loadConversationRecord(filePath);
+          const content = await loadConversationRecord(filePath, {
+            metadataOnly: !options.includeFullContent,
+          });
           if (!content) {
             return { fileName: file, sessionInfo: null };
           }
