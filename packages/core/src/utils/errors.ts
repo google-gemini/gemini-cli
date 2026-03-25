@@ -63,7 +63,7 @@ export function getErrorType(error: unknown): string {
 
   // Strip leading underscore from error names. Bundlers like esbuild sometimes
   // rename classes to avoid scope collisions.
-  return name.startsWith('_') ? name.slice(1) : name;
+  return name.replace(/^_+/, '');
 }
 
 export class FatalError extends Error {
