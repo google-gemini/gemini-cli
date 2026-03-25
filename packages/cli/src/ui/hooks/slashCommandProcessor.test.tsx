@@ -433,7 +433,7 @@ describe('useSlashCommandProcessor', () => {
       );
     });
 
-    it('sets isProcessing to false if the the input is not a command', async () => {
+    it('sets isProcessing to false if the input is not a command', async () => {
       const setMockIsProcessing = vi.fn();
       const result = await setupProcessorHook({
         setIsProcessing: setMockIsProcessing,

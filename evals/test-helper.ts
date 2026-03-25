@@ -110,7 +110,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git config user.name "Test User"', execOptions);
 
         // Temporarily disable the interactive editor and git pager
-        // to avoid hanging the tests. It seems the the agent isn't
+        // to avoid hanging the tests. It seems the agent isn't
         // consistently honoring the instructions to avoid interactive
         // commands.
         execSync('git config core.editor "true"', execOptions);
