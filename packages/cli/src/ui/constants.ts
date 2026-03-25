@@ -58,3 +58,7 @@ export const MIN_TERMINAL_WIDTH_FOR_FULL_LABEL = 100;
 
 /** Default context usage fraction at which to trigger compression */
 export const DEFAULT_COMPRESSION_THRESHOLD = 0.5;
+
+/** Documentation URL for skills setup and configuration */
+export const SKILLS_DOCS_URL =
+  'https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md';
