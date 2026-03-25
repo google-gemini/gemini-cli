@@ -65,6 +65,7 @@ describe('Background Tools Integration', () => {
 
     // 3. Model decides to inspect list
     const listInvocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (listInvocation as any).context = { config: { getSessionId: () => 'default' } };
     const listResult = await listInvocation.execute(
       new AbortController().signal,
@@ -79,6 +80,7 @@ describe('Background Tools Integration', () => {
 
     // 5. Model decides to read logs
     const readInvocation = readTool.build({ pid, lines: 2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (readInvocation as any).context = { config: { getSessionId: () => 'default' } };
     const readResult = await readInvocation.execute(
       new AbortController().signal,

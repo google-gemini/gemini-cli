@@ -1324,7 +1324,19 @@ export class ShellExecutionService {
       activePty?.sessionId ?? activeChild?.sessionId ?? 'default';
 
     const MAX_HISTORY_SIZE = 100;
-    const history = this.backgroundProcessHistory.get(sessionId) ?? new Map();
+    const history =
+      this.backgroundProcessHistory.get(sessionId) ??
+      new Map<
+        number,
+        {
+          command: string;
+          status: 'running' | 'exited';
+          exitCode?: number | null;
+          signal?: number | null;
+          startTime: number;
+          endTime?: number;
+        }
+      >();
 
     if (history.size >= MAX_HISTORY_SIZE) {
       const oldestPid = history.keys().next().value;

@@ -31,6 +31,7 @@ describe('Background Tools', () => {
 
   it('list_background_processes should return empty message when no processes', async () => {
     const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
     expect(result.llmContent).toBe('No background processes found.');
@@ -54,6 +55,7 @@ describe('Background Tools', () => {
     ShellExecutionService.background(pid);
 
     const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
@@ -74,6 +76,7 @@ describe('Background Tools', () => {
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     const invocation = listTool.build({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
@@ -92,6 +95,7 @@ describe('Background Tools', () => {
     (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
 
     const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
     expect(result.error).toBeDefined();
@@ -120,6 +124,7 @@ describe('Background Tools', () => {
     fs.writeFileSync(logPath, 'line 1\nline 2\nline 3\n');
 
     const invocation = readTool.build({ pid, lines: 2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
@@ -141,6 +146,7 @@ describe('Background Tools', () => {
     (ShellExecutionService as any).backgroundProcessHistory.set('other-session', history);
 
     const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } }; // Asking for PID from another session
     const result = await invocation.execute(new AbortController().signal);
 
@@ -165,6 +171,7 @@ describe('Background Tools', () => {
     fs.writeFileSync(logPath, '');
 
     const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 
@@ -193,6 +200,7 @@ describe('Background Tools', () => {
     vi.spyOn(fs.promises, 'stat').mockRejectedValue(new Error('Simulated read error'));
 
     const invocation = readTool.build({ pid });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (invocation as any).context = { config: { getSessionId: () => 'default' } };
     const result = await invocation.execute(new AbortController().signal);
 

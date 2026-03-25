@@ -22,7 +22,8 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly context: any, // AgentLoopContext type could be imported, keep loose for now or typed if imported
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private readonly context: any,
     params: Record<string, never>,
     messageBus: MessageBus,
     _toolName?: string,
@@ -68,6 +69,7 @@ export class ListBackgroundProcessesTool extends BaseDeclarativeTool<
   static readonly Name = 'list_background_processes';
 
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private readonly context: any,
     messageBus: MessageBus,
   ) {
@@ -109,6 +111,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private readonly context: any,
     params: ReadBackgroundOutputParams,
     messageBus: MessageBus,
@@ -169,7 +172,7 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
         await fileHandle.close();
       }
 
-      let content = buffer.toString('utf-8');
+      const content = buffer.toString('utf-8');
 
       if (!content) {
         return {
@@ -220,6 +223,7 @@ export class ReadBackgroundOutputTool extends BaseDeclarativeTool<
   static readonly Name = 'read_background_output';
 
   constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private readonly context: any,
     messageBus: MessageBus,
   ) {
