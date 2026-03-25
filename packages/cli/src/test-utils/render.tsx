@@ -340,9 +340,11 @@ class XtermStdin extends EventEmitter {
   }
 
   write = (data: string) => {
-    this.data = data;
-    this.emit('readable');
-    this.emit('data', data);
+    act(() => {
+      this.data = data;
+      this.emit('readable');
+      this.emit('data', data);
+    });
   };
 
   setEncoding() {}
@@ -798,11 +800,17 @@ export async function renderHook<Result, Props>(
   let waitUntilReady: () => Promise<void> = async () => {};
   let generateSvg: () => string = () => '';
 
-  const renderResult = await render(
-    <Wrapper>
-      <TestComponent renderCallback={renderCallback} props={currentProps} />
-    </Wrapper>,
-  );
+  let renderResult!: Omit<
+    RenderInstance,
+    'capturedOverflowState' | 'capturedOverflowActions'
+  >;
+  await act(async () => {
+    renderResult = await render(
+      <Wrapper>
+        <TestComponent renderCallback={renderCallback} props={currentProps} />
+      </Wrapper>,
+    );
+  });
   inkRerender = renderResult.rerender;
   unmount = renderResult.unmount;
   waitUntilReady = renderResult.waitUntilReady;
