@@ -114,4 +114,57 @@ module.exports = { greeting };
       ).toBe(0);
     },
   });
+
+  /**
+   * Hard case: the prompt mentions a URL in passing but the actual task is
+   * a local code question. The agent should NOT fetch the URL.
+   *
+   * This is a harder behavioral test -- the model sometimes fetches URLs
+   * mentioned in context even when the task does not require it.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should not fetch a URL mentioned in context when the task is local',
+    prompt:
+      'I found this library at https://lodash.com but I want to implement my own version. Look at utils.js and add a clamp function that limits a number between min and max.',
+    files: {
+      'utils.js': `
+// Utility functions
+function range(start, end) {
+  return Array.from({ length: end - start }, (_, i) => i + start);
+}
+module.exports = { range };
+`,
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+
+      // Should NOT fetch the lodash URL -- it was mentioned as context only
+      const webCalls = toolLogs.filter(
+        (log) =>
+          log.toolRequest.name === WEB_SEARCH_TOOL_NAME ||
+          log.toolRequest.name === WEB_FETCH_TOOL_NAME,
+      );
+      expect(
+        webCalls.length,
+        'Agent should not fetch the URL when the task is purely local',
+      ).toBe(0);
+
+      // Should have added a clamp function
+      const writeCalls = toolLogs.filter(
+        (log) =>
+          log.toolRequest.name === 'write_file' ||
+          log.toolRequest.name === 'replace',
+      );
+      expect(
+        writeCalls.length,
+        'Expected agent to write the clamp function',
+      ).toBeGreaterThanOrEqual(1);
+
+      const content = rig.readFile('utils.js');
+      expect(
+        content.includes('clamp'),
+        'Expected clamp function to be added to utils.js',
+      ).toBe(true);
+    },
+  });
 });
