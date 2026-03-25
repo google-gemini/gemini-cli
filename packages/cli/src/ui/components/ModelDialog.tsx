@@ -63,6 +63,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
+  const useGemini31FlashLite =
+    config?.getGemini31FlashLiteLaunchedSync?.() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
@@ -86,6 +88,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       PREVIEW_GEMINI_MODEL,
       PREVIEW_GEMINI_3_1_MODEL,
       PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
       PREVIEW_GEMINI_FLASH_MODEL,
     ];
     if (manualModels.includes(preferredModel)) {
@@ -210,7 +213,10 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
           // Flag Guard: Versioned models only show if their flag is active.
           if (id === PREVIEW_GEMINI_3_1_MODEL && !useGemini31) return false;
-          if (id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL && !useGemini31)
+          if (
+            id === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL &&
+            !useGemini31FlashLite
+          )
             return false;
 
           return true;
@@ -218,11 +224,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         .map(([id, m]) => {
           const resolvedId = config.modelConfigService.resolveModelId(id, {
             useGemini3_1: useGemini31,
+            useGemini3_1FlashLite: useGemini31FlashLite,
             useCustomTools: useCustomToolModel,
           });
           // Title ID is the resolved ID without custom tools flag
           const titleId = config.modelConfigService.resolveModelId(id, {
             useGemini3_1: useGemini31,
+            useGemini3_1FlashLite: useGemini31FlashLite,
           });
           return {
             value: resolvedId,
@@ -284,7 +292,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       ];
 
-      if (isFreeTier) {
+      if (isFreeTier && useGemini31FlashLite) {
         previewOptions.push({
           value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
           title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
@@ -304,6 +312,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [
     shouldShowPreviewModels,
     useGemini31,
+    useGemini31FlashLite,
     useCustomToolModel,
     hasAccessToProModel,
     config,
