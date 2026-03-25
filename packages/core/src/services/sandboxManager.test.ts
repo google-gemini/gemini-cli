@@ -5,12 +5,18 @@
  */
 
 import os from 'node:os';
-import { describe, expect, it, vi } from 'vitest';
-import { NoopSandboxManager, sanitizePaths } from './sandboxManager.js';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import {
+  NoopSandboxManager,
+  sanitizePaths,
+  tryRealpath,
+} from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
+import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
 
 describe('sanitizePaths', () => {
   it('should return undefined if no paths are provided', () => {
@@ -26,6 +32,82 @@ describe('sanitizePaths', () => {
     const paths = ['/workspace/foo', 'relative/path'];
     expect(() => sanitizePaths(paths)).toThrow(
       'Sandbox path must be absolute: relative/path',
+    );
+  });
+});
+
+describe('tryRealpath', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return the realpath if the file exists', async () => {
+    vi.spyOn(fs, 'realpath').mockResolvedValue('/real/path/to/file.txt');
+    const result = await tryRealpath('/some/symlink/to/file.txt');
+    expect(result).toBe('/real/path/to/file.txt');
+    expect(fs.realpath).toHaveBeenCalledWith('/some/symlink/to/file.txt');
+  });
+
+  it('should fallback to parent directory if file does not exist (ENOENT)', async () => {
+    vi.spyOn(fs, 'realpath').mockImplementation(async (p) => {
+      if (p === '/workspace/nonexistent.txt') {
+        throw Object.assign(new Error('ENOENT: no such file or directory'), {
+          code: 'ENOENT',
+        });
+      }
+      if (p === '/workspace') {
+        return '/real/workspace';
+      }
+      throw new Error(`Unexpected path: ${p}`);
+    });
+
+    const result = await tryRealpath('/workspace/nonexistent.txt');
+
+    // It should combine the real path of the parent with the original basename
+    expect(result).toBe(path.join('/real/workspace', 'nonexistent.txt'));
+  });
+
+  it('should recursively fallback up the directory tree on multiple ENOENT errors', async () => {
+    vi.spyOn(fs, 'realpath').mockImplementation(async (p) => {
+      if (p === '/workspace/missing_dir/missing_file.txt') {
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      }
+      if (p === '/workspace/missing_dir') {
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      }
+      if (p === '/workspace') {
+        return '/real/workspace';
+      }
+      throw new Error(`Unexpected path: ${p}`);
+    });
+
+    const result = await tryRealpath('/workspace/missing_dir/missing_file.txt');
+
+    // It should resolve '/workspace' to '/real/workspace' and append the missing parts
+    expect(result).toBe(
+      path.join('/real/workspace', 'missing_dir', 'missing_file.txt'),
+    );
+  });
+
+  it('should return the path unchanged if it reaches the root directory and it still does not exist', async () => {
+    const rootPath = path.resolve('/');
+    vi.spyOn(fs, 'realpath').mockImplementation(async () => {
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    });
+
+    const result = await tryRealpath(rootPath);
+    expect(result).toBe(rootPath);
+  });
+
+  it('should throw an error if realpath fails with a non-ENOENT error (e.g. EACCES)', async () => {
+    vi.spyOn(fs, 'realpath').mockImplementation(async () => {
+      throw Object.assign(new Error('EACCES: permission denied'), {
+        code: 'EACCES',
+      });
+    });
+
+    await expect(tryRealpath('/secret/file.txt')).rejects.toThrow(
+      'EACCES: permission denied',
     );
   });
 });
