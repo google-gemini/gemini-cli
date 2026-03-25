@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as crypto from 'node:crypto';
 import { Storage } from '../config/storage.js';
 import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
+import { getAgentCardLoadOptions, getRemoteAgentTargetUrl } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
@@ -162,7 +164,14 @@ export class AgentRegistry {
           if (!agent.metadata) {
             agent.metadata = {};
           }
-          agent.metadata.hash = agent.agentCardUrl;
+          agent.metadata.hash =
+            agent.agentCardUrl ??
+            (agent.agentCardJson
+              ? crypto
+                  .createHash('sha256')
+                  .update(agent.agentCardJson)
+                  .digest('hex')
+              : undefined);
         }
 
         if (!agent.metadata?.hash) {
@@ -443,12 +452,13 @@ export class AgentRegistry {
         );
         return;
       }
+      const targetUrl = getRemoteAgentTargetUrl(remoteDef);
       let authHandler: AuthenticationHandler | undefined;
       if (definition.auth) {
         const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
-          targetUrl: definition.agentCardUrl,
+          targetUrl,
           agentCardUrl: remoteDef.agentCardUrl,
         });
         if (!provider) {
@@ -461,7 +471,7 @@ export class AgentRegistry {
 
       const agentCard = await clientManager.loadAgent(
         remoteDef.name,
-        remoteDef.agentCardUrl,
+        getAgentCardLoadOptions(remoteDef),
         authHandler,
       );
 
@@ -515,7 +525,7 @@ export class AgentRegistry {
 
       if (this.config.getDebugMode()) {
         debugLogger.log(
-          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
+          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl ?? 'inline JSON'}`,
         );
       }
       this.agents.set(definition.name, definition);

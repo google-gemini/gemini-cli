@@ -12,7 +12,7 @@ import {
 } from './sandboxManager.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
+import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { type SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 
