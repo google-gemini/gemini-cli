@@ -502,7 +502,6 @@ export function useTerminalSetupPrompt({
     if (hasBeenPrompted) {
       return;
     }
-
     let cancelled = false;
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises

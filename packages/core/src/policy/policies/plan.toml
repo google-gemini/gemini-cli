@@ -46,7 +46,7 @@ toolName = "enter_plan_mode"
 decision = "deny"
 priority = 70
 modes = ["plan"]
-deny_message = "You are already in Plan Mode."
+denyMessage = "You are already in Plan Mode."
 
 [[rule]]
 toolName = "exit_plan_mode"
@@ -65,20 +65,22 @@ interactive = false
 toolName = "exit_plan_mode"
 decision = "deny"
 priority = 50
-deny_message = "You are not currently in Plan Mode. Use enter_plan_mode first to design a plan."
+denyMessage = "You are not currently in Plan Mode. Use enter_plan_mode first to design a plan."
 
 
 # Catch-All: Deny everything by default in Plan mode.
 
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 60
 modes = ["plan"]
-deny_message = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
+denyMessage = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "ask_user"
@@ -121,4 +123,4 @@ toolName = ["write_file", "replace"]
 decision = "deny"
 priority = 65
 modes = ["plan"]
-deny_message = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."
+denyMessage = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."

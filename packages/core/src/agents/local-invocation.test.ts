@@ -338,6 +338,42 @@ describe('LocalSubagentInvocation', () => {
       );
     });
 
+    it('should mark tool call as error when TOOL_CALL_END contains isError: true', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_START',
+            data: { name: 'ls', args: {}, callId: 'call1' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'TOOL_CALL_END',
+            data: { name: 'ls', id: 'call1', data: { isError: true } },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalled();
+      const lastCall = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'tool_call',
+          content: 'ls',
+          status: 'error',
+        }),
+      );
+    });
+
     it('should reflect tool rejections in the activity stream as cancelled but not abort the agent', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];

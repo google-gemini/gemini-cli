@@ -1808,7 +1808,11 @@ export interface McpContext {
   setUserInteractedWithMcp?(): void;
   isTrustedFolder(): boolean;
   getPolicyEngine?(): {
-    getRules(): ReadonlyArray<{ toolName?: string; source?: string }>;
+    getRules(): ReadonlyArray<{
+      toolName: string;
+      mcpName?: string;
+      source?: string;
+    }>;
   };
   getChannels?(): string[];
 }

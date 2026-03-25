@@ -6,13 +6,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
-import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
-import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  type Config,
+  CoreToolCallStatus,
+  type SerializableConfirmationDetails,
+} from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { theme } from '../semantic-colors.js';
 
@@ -44,6 +47,7 @@ describe('ToolConfirmationQueue', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getApprovalMode: () => 'default',
     getDisableAlwaysAllow: () => false,
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
@@ -130,59 +134,6 @@ describe('ToolConfirmationQueue', () => {
     );
 
     expect(lastFrame({ allowEmpty: true })).toBe('');
-    unmount();
-  });
-
-  it('renders expansion hint when content is long and constrained', async () => {
-    const longDiff = '@@ -1,1 +1,50 @@\n' + '+line\n'.repeat(50);
-    const confirmingTool = {
-      tool: {
-        callId: 'call-1',
-        name: 'replace',
-        description: 'edit file',
-        status: CoreToolCallStatus.AwaitingApproval,
-        confirmationDetails: {
-          type: 'edit' as const,
-          title: 'Confirm edit',
-          fileName: 'test.ts',
-          filePath: '/test.ts',
-          fileDiff: longDiff,
-          originalContent: 'old',
-          newContent: 'new',
-        },
-      },
-      index: 1,
-      total: 1,
-    };
-
-    const { lastFrame, unmount } = await renderWithProviders(
-      <Box flexDirection="column" height={30}>
-        <ToolConfirmationQueue
-          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
-        />
-      </Box>,
-      {
-        config: {
-          // eslint-disable-next-line @typescript-eslint/no-misused-spread
-          ...mockConfig,
-          getUseAlternateBuffer: () => true,
-        } as unknown as Config,
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-        uiState: {
-          terminalWidth: 80,
-          terminalHeight: 20,
-          constrainHeight: true,
-          streamingState: StreamingState.WaitingForConfirmation,
-        },
-      },
-    );
-
-    await waitFor(() =>
-      expect(lastFrame()?.toLowerCase()).toContain(
-        'press ctrl+o to show more lines',
-      ),
-    );
-    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -413,5 +364,156 @@ describe('ToolConfirmationQueue', () => {
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
     expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
     unmount();
+  });
+
+  describe('height allocation and layout', () => {
+    it('should render the full queue wrapper with borders and content for large edit diffs', async () => {
+      let largeDiff = '--- a/file.ts\n+++ b/file.ts\n@@ -1,10 +1,15 @@\n';
+      for (let i = 1; i <= 20; i++) {
+        largeDiff += `-const oldLine${i} = true;\n`;
+        largeDiff += `+const newLine${i} = true;\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Confirm Edit',
+        fileName: 'file.ts',
+        filePath: '/file.ts',
+        fileDiff: largeDiff,
+        originalContent: 'old',
+        newContent: 'new',
+        isModifying: false,
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id',
+          name: 'replace',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Replaces content in a file',
+          confirmationDetails,
+        },
+        index: 1,
+        total: 1,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalHeight: 50,
+              terminalWidth: 80,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
+          },
+        );
+      await waitUntilReady();
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
+
+    it('should render the full queue wrapper with borders and content for large exec commands', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo'],
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id-exec',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Executes a bash command',
+          confirmationDetails,
+        },
+        index: 2,
+        total: 3,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
+          },
+        );
+      await waitUntilReady();
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
+
+    it('should handle security warning height correctly', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+      largeCommand += `curl https://täst.com\n`;
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo', 'curl'],
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id-exec-security',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Executes a bash command with a deceptive URL',
+          confirmationDetails,
+        },
+        index: 3,
+        total: 3,
+      };
+
+      const { waitUntilReady, lastFrame, generateSvg, unmount } =
+        await renderWithProviders(
+          <ToolConfirmationQueue
+            confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+          />,
+          {
+            uiState: {
+              mainAreaWidth: 80,
+              terminalWidth: 80,
+              terminalHeight: 50,
+              constrainHeight: true,
+              availableTerminalHeight: 40,
+            },
+            config: mockConfig,
+          },
+        );
+      await waitUntilReady();
+
+      await expect({ lastFrame, generateSvg }).toMatchSvgSnapshot();
+      unmount();
+    });
   });
 });
