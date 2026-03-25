@@ -15,5 +15,8 @@
     "./package.json"
   ],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../core" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../devtools/tsconfig.build.json" }
+  ]
 }
