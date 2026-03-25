@@ -44,9 +44,7 @@ export interface SeatbeltArgsOptions {
  * Returns arguments up to the end of sandbox-exec configuration (e.g. ['-p', '<profile>', '-D', ...])
  * Does not include the final '--' separator or the command to run.
  */
-export function buildSeatbeltArgs(
-  options: SeatbeltArgsOptions,
-): string[] {
+export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   let profile = BASE_SEATBELT_PROFILE + '\n';
   const args: string[] = [];
 

@@ -73,10 +73,14 @@ describe('seatbeltArgsBuilder', () => {
 
         expect(args).toContain('-D');
         expect(args).toContain('GOVERNANCE_FILE_0=/test/workspace/.gitignore');
-        expect(profile).toContain('(deny file-write* (literal (param "GOVERNANCE_FILE_0")))');
+        expect(profile).toContain(
+          '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+        );
 
         expect(args).toContain('GOVERNANCE_FILE_2=/test/workspace/.git');
-        expect(profile).toContain('(deny file-write* (subpath (param "GOVERNANCE_FILE_2")))');
+        expect(profile).toContain(
+          '(deny file-write* (subpath (param "GOVERNANCE_FILE_2")))',
+        );
       });
 
       it('should protect both the symlink and the real path if they differ', () => {
@@ -99,8 +103,12 @@ describe('seatbeltArgsBuilder', () => {
 
         expect(args).toContain('GOVERNANCE_FILE_0=/test/workspace/.gitignore');
         expect(args).toContain('REAL_GOVERNANCE_FILE_0=/test/real/.gitignore');
-        expect(profile).toContain('(deny file-write* (literal (param "GOVERNANCE_FILE_0")))');
-        expect(profile).toContain('(deny file-write* (literal (param "REAL_GOVERNANCE_FILE_0")))');
+        expect(profile).toContain(
+          '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+        );
+        expect(profile).toContain(
+          '(deny file-write* (literal (param "REAL_GOVERNANCE_FILE_0")))',
+        );
       });
     });
 
