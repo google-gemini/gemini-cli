@@ -1000,7 +1000,7 @@ export class GeminiClient {
       // Memory consolidation check: after all hooks and continuations,
       // check if the conversation contains soft information worth persisting.
       if (
-        this.config.getExperimentalMemory() &&
+        this.config.isMemoryManagerEnabled() &&
         !continuationHandled &&
         !turn.pendingToolCalls.length &&
         signal &&
