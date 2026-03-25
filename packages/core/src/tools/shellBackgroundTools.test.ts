@@ -12,6 +12,7 @@ import {
 } from './shellBackgroundTools.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import fs from 'node:fs';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 describe('Background Tools', () => {
   let listTool: ListBackgroundProcessesTool;
@@ -20,7 +21,9 @@ describe('Background Tools', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const mockContext = { config: { getSessionId: () => 'default' } };
+    const mockContext = {
+      config: { getSessionId: () => 'default' },
+    } as unknown as AgentLoopContext;
     listTool = new ListBackgroundProcessesTool(mockContext, bus);
     readTool = new ReadBackgroundOutputTool(mockContext, bus);
 
