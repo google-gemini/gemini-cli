@@ -29,6 +29,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    PRIORITY_YOLO_ALLOW_ALL: 998,
     Config: vi.fn().mockImplementation((params) => {
       const mockConfig = {
         ...params,

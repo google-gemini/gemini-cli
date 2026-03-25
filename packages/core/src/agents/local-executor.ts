@@ -323,7 +323,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
-    await this.tryCompressChat(chat, promptId);
+    await this.tryCompressChat(chat, promptId, combinedSignal);
 
     const { functionCalls } = await promptIdContext.run(promptId, async () =>
       this.callModel(chat, currentMessage, combinedSignal, promptId),
@@ -810,6 +810,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private async tryCompressChat(
     chat: GeminiChat,
     prompt_id: string,
+    abortSignal?: AbortSignal,
   ): Promise<void> {
     const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
@@ -820,6 +821,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       model,
       this.context.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (
@@ -1240,6 +1242,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             name: toolName,
             id: call.request.callId,
             output: call.response.resultDisplay,
+            data: call.response.data,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {

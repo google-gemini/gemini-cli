@@ -143,7 +143,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
-    specified, defaults to the system temporary directory.
+    specified, defaults to the system temporary directory. A custom directory
+    requires a policy to allow write access in Plan Mode.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -294,6 +295,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`ui.hideFooter`** (boolean):
   - **Description:** Hide the footer from the UI
   - **Default:** `false`
+
+- **`ui.collapseDrawerDuringApproval`** (boolean):
+  - **Description:** Whether to collapse the UI drawer when a tool is awaiting
+    confirmation.
+  - **Default:** `true`
 
 - **`ui.showMemoryUsage`** (boolean):
   - **Description:** Display memory usage information in the UI
@@ -844,6 +850,12 @@ their corresponding top-level category object in your `settings.json` file.
               "hasAccessToPreview": false
             },
             "target": "gemini-2.5-pro"
+          },
+          {
+            "condition": {
+              "useCustomTools": true
+            },
+            "target": "gemini-3.1-pro-preview-customtools"
           }
         ]
       },
@@ -1209,6 +1221,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`agents.browser.disableUserInput`** (boolean):
   - **Description:** Disable user input on browser window during automation.
   - **Default:** `true`
+
+- **`agents.browser.maxActionsPerTask`** (number):
+  - **Description:** The maximum number of tool calls allowed per browser task.
+    Enforcement is hard: the agent will be terminated when the limit is reached.
+  - **Default:** `100`
 
 - **`agents.browser.confirmSensitiveActions`** (boolean):
   - **Description:** Require manual confirmation for sensitive browser actions
@@ -2336,9 +2353,13 @@ can be based on the base sandbox image:
 ```dockerfile
 FROM gemini-cli-sandbox
 
-# Add your custom dependencies or configurations here
+# Add your custom dependencies or configurations here.
+# Note: The base image runs as the non-root 'node' user.
+# You must switch to 'root' to install system packages.
 # For example:
+# USER root
 # RUN apt-get update && apt-get install -y some-package
+# USER node
 # COPY ./my-config /app/my-config
 ```
 

@@ -379,9 +379,19 @@ describe('browserAgentFactory', () => {
 
     it('should register ALLOW rules for read-only tools', async () => {
       mockBrowserManager.getDiscoveredTools.mockResolvedValue([
-        { name: 'take_snapshot', description: 'Take snapshot' },
-        { name: 'take_screenshot', description: 'Take screenshot' },
-        { name: 'list_pages', description: 'list all pages' },
+        {
+          name: 'take_snapshot',
+          description: 'Take snapshot',
+        },
+        {
+          name: 'take_screenshot',
+          description: 'Take screenshot',
+        },
+        {
+          name: 'list_pages',
+          description: 'list all pages',
+          annotations: { readOnlyHint: true },
+        },
       ]);
 
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
@@ -467,6 +477,7 @@ describe('buildBrowserSystemPrompt', () => {
     expect(prompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
     expect(prompt).toContain('- github.com');
     expect(prompt).toContain('- *.google.com');
+    expect(prompt).toContain('Do NOT use proxy services');
   });
 
   it('should exclude allowed domains restriction when not provided or empty', () => {
