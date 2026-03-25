@@ -1050,6 +1050,7 @@ Would you like to attempt to install via "git clone" instead?`,
         rules,
         checkers,
         plan: config.plan,
+        tracker: config.tracker,
       };
     } catch (e) {
       const extName = path.basename(extensionDir);

@@ -125,6 +125,16 @@ describe('SettingsSchema', () => {
       ).toBe('string');
     });
 
+    it('should have tracker nested properties', () => {
+      expect(
+        getSettingsSchema().general?.properties?.tracker?.properties?.directory,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().general?.properties?.tracker?.properties?.directory
+          .type,
+      ).toBe('string');
+    });
+
     it('should have fileFiltering nested properties', () => {
       expect(
         getSettingsSchema().context.properties.fileFiltering.properties

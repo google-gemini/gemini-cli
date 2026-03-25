@@ -315,6 +315,27 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      tracker: {
+        type: 'object',
+        label: 'Task Tracker',
+        category: 'General',
+        requiresRestart: true,
+        default: {},
+        description: 'Task tracking features configuration.',
+        showInDialog: false,
+        properties: {
+          directory: {
+            type: 'string',
+            label: 'Tracker Directory',
+            category: 'General',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'The directory where task tracking data is stored. If not specified, defaults to the system temporary directory.',
+            showInDialog: true,
+          },
+        },
+      },
       retryFetchErrors: {
         type: 'boolean',
         label: 'Retry Fetch Errors',
