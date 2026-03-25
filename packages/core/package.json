@@ -12,6 +12,7 @@
   "scripts": {
     "bundle:browser-mcp": "node scripts/bundle-browser-mcp.mjs",
     "copy:assets": "node ../../scripts/copy_files.js",
+    "build:client": "npm run bundle:browser-mcp",
     "build": "tsc -b && npm run copy:assets",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
