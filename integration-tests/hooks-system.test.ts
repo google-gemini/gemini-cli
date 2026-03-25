@@ -163,10 +163,7 @@ describe.skipIf(skipFlaky)(
               log.hookCall.stderr.includes('"decision":"deny"')),
         );
         expect(blockHook).toBeDefined();
-        if (!blockHook) {
-          throw new Error('Expected blockHook to be defined');
-        }
-        const output = blockHook.hookCall.stdout + blockHook.hookCall.stderr;
+        const output = blockHook!.hookCall.stdout + blockHook!.hookCall.stderr;
         expect(output).toContain(blockMsg);
       });
 
