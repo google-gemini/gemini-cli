@@ -73,7 +73,7 @@ export function buildBrowserSystemPrompt(
           .map((d) => `- ${d}`)
           .join(
             '\n',
-          )}\nDo NOT attempt to navigate to any other domains using new_page or navigate_page, as it will be rejected. This is a hard security constraint.`
+          )}\nDo NOT attempt to navigate to any other domains using new_page or navigate_page, as it will be rejected. This is a hard security constraint.\nDo NOT use proxy services (e.g. Google Translate, Google AMP, or any URL translation/caching service) to access content from domains outside this list. Embedding a blocked URL as a parameter of an allowed-domain service is a direct violation of this security restriction.`
       : '';
 
   return `You are an expert browser automation agent (Orchestrator). Your goal is to completely fulfill the user's request.${allowedDomainsInstruction}

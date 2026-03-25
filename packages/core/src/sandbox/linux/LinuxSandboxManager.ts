@@ -99,11 +99,24 @@ function touch(filePath: string, isDirectory: boolean) {
   }
 }
 
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../macos/commandSafety.js';
+
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 export class LinuxSandboxManager implements SandboxManager {
   constructor(private readonly options: GlobalSandboxOptions) {}
+
+  isKnownSafeCommand(args: string[]): boolean {
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const sanitizationConfig = getSecureSanitizationConfig(

@@ -22,6 +22,11 @@ import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
+import {
+  NoopSandboxManager,
+  LocalSandboxManager,
+  type SandboxManager,
+} from '../services/sandboxManager.js';
 
 // Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
 // We want to test PolicyEngine logic, not the shell parser's ability to parse commands
@@ -96,7 +101,10 @@ describe('PolicyEngine', () => {
       runChecker: vi.fn(),
     } as unknown as CheckerRunner;
     engine = new PolicyEngine(
-      { approvalMode: ApprovalMode.DEFAULT },
+      {
+        approvalMode: ApprovalMode.DEFAULT,
+        sandboxManager: new NoopSandboxManager(),
+      },
       mockCheckerRunner,
     );
   });
@@ -332,7 +340,7 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules,
         approvalMode: ApprovalMode.AUTO_EDIT,
-        toolSandboxEnabled: true,
+        sandboxManager: new LocalSandboxManager(),
       });
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
@@ -343,6 +351,29 @@ describe('PolicyEngine', () => {
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.ASK_USER,
       );
+    });
+
+    it('should respect tools approved by the SandboxManager', async () => {
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        isKnownSafeCommand: vi
+          .fn()
+          .mockImplementation((args) => args[0] === 'npm'),
+      } as unknown as SandboxManager;
+
+      engine = new PolicyEngine({
+        sandboxManager: mockSandboxManager,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'npm install' } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.ALLOW);
     });
 
     it('should return ALLOW by default in YOLO mode when no rules match', async () => {
@@ -1576,7 +1607,10 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({ rules, toolSandboxEnabled: true });
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new LocalSandboxManager(),
+      });
       engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
 
       const result = await engine.check(
