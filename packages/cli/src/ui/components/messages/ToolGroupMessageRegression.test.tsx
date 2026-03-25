@@ -16,6 +16,7 @@ import {
 } from '@google/gemini-cli-core';
 import os from 'node:os';
 import { createMockSettings } from '../../../test-utils/settings.js';
+import type { IndividualToolCallDisplay } from '../../types.js';
 
 describe('ToolGroupMessage Regression Tests', () => {
   const baseMockConfig = makeFakeConfig({
@@ -26,16 +27,17 @@ describe('ToolGroupMessage Regression Tests', () => {
     ui: { errorVerbosity: 'full' },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const createToolCall = (overrides: any = {}) => ({
-    callId: 'tool-123',
-    name: 'test-tool',
-    status: CoreToolCallStatus.Success,
-    ...overrides,
-  });
+  const createToolCall = (
+    overrides: Partial<IndividualToolCallDisplay> = {},
+  ): IndividualToolCallDisplay =>
+    ({
+      callId: 'tool-123',
+      name: 'test-tool',
+      status: CoreToolCallStatus.Success,
+      ...overrides,
+    }) as IndividualToolCallDisplay;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const createItem = (tools: any[]) => ({
+  const createItem = (tools: IndividualToolCallDisplay[]) => ({
     id: 1,
     type: 'tool_group' as const,
     tools,
@@ -72,11 +74,11 @@ describe('ToolGroupMessage Regression Tests', () => {
         kind: Kind.Agent,
         status: CoreToolCallStatus.Executing,
         resultDisplay: {
+          isSubagentProgress: true,
           agentName: 'TestAgent',
           state: 'running',
           recentActivity: [],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        },
       }),
     ];
     const item = createItem(toolCalls);
@@ -108,11 +110,11 @@ describe('ToolGroupMessage Regression Tests', () => {
         kind: Kind.Agent,
         status: CoreToolCallStatus.Success,
         resultDisplay: {
+          isSubagentProgress: true,
           agentName: 'TestAgent',
           state: 'completed',
           recentActivity: [],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        },
       }),
     ];
     const item = createItem(toolCalls);
@@ -138,8 +140,7 @@ describe('ToolGroupMessage Regression Tests', () => {
   });
 
   it('Bridges: still renders a bridge if it has a top border', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolCalls: any[] = [];
+    const toolCalls: IndividualToolCallDisplay[] = [];
     const item = createItem(toolCalls);
 
     const { lastFrame, unmount } = await renderWithProviders(

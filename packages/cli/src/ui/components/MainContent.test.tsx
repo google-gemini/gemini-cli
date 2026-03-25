@@ -529,7 +529,7 @@ describe('MainContent', () => {
         ],
         state: 'running',
       },
-    } as unknown as IndividualToolCallDisplay;
+    } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay;
 
     const uiState = {
       ...defaultMockUiState,
@@ -620,7 +620,7 @@ describe('MainContent', () => {
         approvalMode: ApprovalMode.PLAN,
         status: CoreToolCallStatus.Success,
         resultDisplay: 'Hidden content',
-      } as unknown as IndividualToolCallDisplay,
+      } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay,
     ];
 
     const confirmingTool = {
@@ -696,7 +696,7 @@ describe('MainContent', () => {
               approvalMode: ApprovalMode.PLAN,
               status: CoreToolCallStatus.Success,
               resultDisplay: 'hidden',
-            } as unknown as IndividualToolCallDisplay,
+            } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay,
           ],
           borderBottom: true,
         },
