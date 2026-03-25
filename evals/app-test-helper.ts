@@ -15,9 +15,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_GEMINI_MODEL } from '@google/gemini-cli-core';
 
+/**
+ * Config overrides for evals, with tool-restriction fields explicitly
+ * forbidden. Evals must test against the full, default tool set to ensure
+ * realistic behavior.
+ */
+interface EvalConfigOverrides {
+  /** Restricting tools via excludeTools in evals is forbidden. */
+  excludeTools?: never;
+  /** Restricting tools via coreTools in evals is forbidden. */
+  coreTools?: never;
+  /** Restricting tools via allowedTools in evals is forbidden. */
+  allowedTools?: never;
+  /** Restricting tools via mainAgentTools in evals is forbidden. */
+  mainAgentTools?: never;
+  [key: string]: unknown;
+}
+
 export interface AppEvalCase {
   name: string;
-  configOverrides?: any;
+  configOverrides?: EvalConfigOverrides;
   prompt: string;
   timeout?: number;
   files?: Record<string, string>;
@@ -62,7 +79,7 @@ export function appEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
       }
 
       // Render the app!
-      rig.render();
+      await rig.render();
 
       // Wait for initial ready state
       await rig.waitForIdle();

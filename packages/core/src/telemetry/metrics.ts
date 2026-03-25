@@ -51,6 +51,9 @@ const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
 const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
 const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
+const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+const EVENT_ONBOARDING_DURATION_MS = 'gemini_cli.onboarding.duration';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -299,6 +302,20 @@ const COUNTER_DEFINITIONS = {
       model: string;
     },
   },
+  [EVENT_ONBOARDING_START]: {
+    description: 'Counts onboarding started',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingStartCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EVENT_ONBOARDING_SUCCESS]: {
+    description: 'Counts onboarding succeeded',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (onboardingSuccessCounter = c),
+    attributes: {} as {
+      user_tier?: string;
+    },
+  },
 } as const;
 
 const HISTOGRAM_DEFINITIONS = {
@@ -412,6 +429,15 @@ const HISTOGRAM_DEFINITIONS = {
       hook_event_name: string;
       hook_name: string;
       success: boolean;
+    },
+  },
+  [EVENT_ONBOARDING_DURATION_MS]: {
+    description: 'Duration of onboarding in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (onboardingDurationHistogram = h),
+    attributes: {} as {
+      user_tier?: string;
     },
   },
 } as const;
@@ -640,6 +666,9 @@ let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
 let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
+let onboardingStartCounter: Counter | undefined;
+let onboardingSuccessCounter: Counter | undefined;
+let onboardingDurationHistogram: Histogram | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -811,6 +840,41 @@ export function recordLinesChanged(
 }
 
 // --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when the Google auth process starts.
+ */
+export function recordOnboardingStart(config: Config): void {
+  if (!onboardingStartCounter || !isMetricsInitialized) return;
+  onboardingStartCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
+}
+
+/**
+ * Records a metric for when the Google auth process ends successfully.
+ */
+export function recordOnboardingSuccess(
+  config: Config,
+  userTier?: string,
+  durationMs?: number,
+): void {
+  if (!isMetricsInitialized) return;
+
+  const attributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...(userTier && { user_tier: userTier }),
+  };
+
+  if (onboardingSuccessCounter) {
+    onboardingSuccessCounter.add(1, attributes);
+  }
+
+  if (durationMs !== undefined && onboardingDurationHistogram) {
+    onboardingDurationHistogram.record(durationMs, attributes);
+  }
+}
 
 /**
  * Records a metric for when a UI frame flickers.
