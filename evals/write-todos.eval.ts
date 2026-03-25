@@ -53,4 +53,46 @@ function processData(data) {
       ).toBeGreaterThanOrEqual(1);
     },
   });
+
+  /**
+   * Hard case: a simple two-step task where write_todos should NOT be used.
+   *
+   * The tool description states write_todos should not be used for tasks
+   * completable in fewer than two steps. This tests that the model correctly
+   * skips write_todos for simple tasks -- a behavioral boundary that is easy
+   * to regress if the model becomes overly eager to use planning tools.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should NOT use write_todos for a simple single-step task',
+    prompt: 'Add a console.log("hello") line to the top of app.js.',
+    files: {
+      'app.js': `
+function main() {
+  return 42;
+}
+module.exports = { main };
+`,
+    },
+    assert: async (rig) => {
+      const toolLogs = rig.readToolLogs();
+      const todoCalls = toolLogs.filter(
+        (log) => log.toolRequest.name === WRITE_TODOS_TOOL_NAME,
+      );
+      expect(
+        todoCalls.length,
+        'Agent should not use write_todos for a simple single-step task',
+      ).toBe(0);
+
+      // But it should have made the edit
+      const writeCalls = toolLogs.filter(
+        (log) =>
+          log.toolRequest.name === 'write_file' ||
+          log.toolRequest.name === 'replace',
+      );
+      expect(
+        writeCalls.length,
+        'Expected agent to edit app.js',
+      ).toBeGreaterThanOrEqual(1);
+    },
+  });
 });
