@@ -6,18 +6,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// --- Fast Path for Version ---
-// We check for version flags at the very top to avoid loading any heavy dependencies.
-// process.env.CLI_VERSION is defined during the build process by esbuild.
-if (process.argv.includes('--version') || process.argv.includes('-v')) {
-  console.log(process.env['CLI_VERSION'] || 'unknown');
-  process.exit(0);
-}
+import { main } from './src/gemini.js';
+import { FatalError, writeToStderr } from '@google/gemini-cli-core';
+import { runExitCleanup } from './src/utils/cleanup.js';
 
 // --- Global Entry Point ---
-
-let writeToStderrFn: (message: string) => void = (msg) =>
-  process.stderr.write(msg);
 
 // Suppress known race condition error in node-pty on Windows
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
@@ -35,21 +28,12 @@ process.on('uncaughtException', (error) => {
   // For other errors, we rely on the default behavior, but since we attached a listener,
   // we must manually replicate it.
   if (error instanceof Error) {
-    writeToStderrFn(error.stack + '\n');
+    writeToStderr(error.stack + '\n');
   } else {
-    writeToStderrFn(String(error) + '\n');
+    writeToStderr(String(error) + '\n');
   }
   process.exit(1);
 });
-
-const [{ main }, { FatalError, writeToStderr }, { runExitCleanup }] =
-  await Promise.all([
-    import('./src/gemini.js'),
-    import('@google/gemini-cli-core'),
-    import('./src/utils/cleanup.js'),
-  ]);
-
-writeToStderrFn = writeToStderr;
 
 main().catch(async (error) => {
   // Set a timeout to force exit if cleanup hangs
