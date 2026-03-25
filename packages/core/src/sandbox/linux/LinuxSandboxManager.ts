@@ -23,6 +23,7 @@ import {
 } from '../../services/environmentSanitization.js';
 import { isNodeError } from '../../utils/errors.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
@@ -385,8 +386,11 @@ export class LinuxSandboxManager implements SandboxManager {
             args.push('--bind', maskPath, file.trim());
           }
         }
-      } catch {
-        // Ignore errors finding secrets
+      } catch (e) {
+        debugLogger.log(
+          `LinuxSandboxManager: Failed to find or mask secret files in ${dir}`,
+          e,
+        );
       }
     }
     return args;
