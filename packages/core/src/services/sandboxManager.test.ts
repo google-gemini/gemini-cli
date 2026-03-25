@@ -209,20 +209,22 @@ describe('SandboxManager', () => {
 
     it('should return the path unchanged if it reaches the root directory and it still does not exist', async () => {
       const rootPath = path.resolve('/');
-      vi.mocked(fsPromises.realpath).mockImplementation(() => Promise.reject(
-          Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-        ));
+      vi.mocked(fsPromises.realpath).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+      );
 
       const result = await tryRealpath(rootPath);
       expect(result).toBe(rootPath);
     });
 
     it('should throw an error if realpath fails with a non-ENOENT error (e.g. EACCES)', async () => {
-      vi.mocked(fsPromises.realpath).mockImplementation(() => Promise.reject(
+      vi.mocked(fsPromises.realpath).mockImplementation(() =>
+        Promise.reject(
           Object.assign(new Error('EACCES: permission denied'), {
             code: 'EACCES',
           }),
-        ));
+        ),
+      );
 
       await expect(tryRealpath('/secret/file.txt')).rejects.toThrow(
         'EACCES: permission denied',
