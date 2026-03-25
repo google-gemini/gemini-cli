@@ -104,15 +104,17 @@ require escaping internal double quotes).
 #### Using single quotes
 
 Single quotes allow you to embed unescaped double quotes inside the JSON string.
+The following example shows a basic agent card configuration.
 
 ```markdown
 ---
 kind: remote
 name: single-quotes-agent
 agent_card_json: '{
-  "a2a": "0.1.0",
-  "routing_id": "single-quotes-agent",
-  "name": "Single Quotes Agent"
+  "protocolVersion": "0.3.0",
+  "name": "Example Agent",
+  "version": "1.0.0",
+  "url": "https://example.com/a2a"
 }'
 ---
 ```
@@ -120,7 +122,8 @@ agent_card_json: '{
 #### Using a block scalar
 
 The literal block scalar (`|`) preserves line breaks and is highly recommended
-for multiline JSON strings as it avoids quote escaping entirely.
+for multiline JSON strings as it avoids quote escaping entirely. This example
+demonstrates a more detailed agent card using dummy values.
 
 ```markdown
 ---
@@ -128,9 +131,35 @@ kind: remote
 name: block-scalar-agent
 agent_card_json: |
   {
-    "a2a": "0.1.0",
-    "routing_id": "block-scalar-agent",
-    "name": "Block Scalar Agent"
+    "url": "https://api.example.com/v1/a2a",
+    "preferredTransport": "HTTP+JSON",
+    "capabilities": {
+      "streaming": false
+    },
+    "version": "1.0.0",
+    "defaultOutputModes": [
+      "application/json"
+    ],
+    "defaultInputModes": [
+      "text/plain"
+    ],
+    "description": "An example agent description for documentation purposes.",
+    "skills": [
+      {
+        "id": "ExampleSkill",
+        "name": "Example Skill Assistant",
+        "tags": [
+          "example-tag"
+        ],
+        "examples": [
+          "Show me an example."
+        ],
+        "description": "A description of what this example skill does."
+      }
+    ],
+    "supportsAuthenticatedExtendedCard": true,
+    "name": "Example Agent Name",
+    "protocolVersion": "0.3.0"
   }
 ---
 ```
@@ -144,9 +173,7 @@ must be escaped with a backslash.
 ---
 kind: remote
 name: double-quotes-agent
-agent_card_json:
-  '{ "a2a": "0.1.0", "routing_id": "double-quotes-agent", "name": "Double Quotes
-  Agent" }'
+agent_card_json: "{\"protocolVersion\": \"0.3.0\", \"name\": \"Example Agent\", \"version\": \"1.0.0\", \"url\": \"https://example.com/a2a\"}"
 ---
 ```
 
