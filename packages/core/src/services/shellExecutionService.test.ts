@@ -908,6 +908,26 @@ describe('ShellExecutionService', () => {
         }),
       );
     });
+
+    it('should evict oldest process history when exceeding max size', () => {
+      const MAX = 100;
+      const history = new Map();
+      for (let i = 1; i <= MAX; i++) {
+        history.set(i, {
+          command: `cmd-${i}`,
+          status: 'running',
+          startTime: Date.now(),
+        });
+      }
+      (ShellExecutionService as any).backgroundProcessHistory.set('default', history);
+
+      ShellExecutionService.background(101);
+      
+      const processes = ShellExecutionService.listBackgroundProcesses('default');
+      expect(processes).toHaveLength(MAX);
+      expect(processes.some((p) => p.pid === 1)).toBe(false);
+      expect(processes.some((p) => p.pid === 101)).toBe(true);
+    });
   });
 
   describe('Binary Output', () => {

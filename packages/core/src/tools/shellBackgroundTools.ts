@@ -21,12 +21,24 @@ class ListBackgroundProcessesInvocation extends BaseToolInvocation<
   Record<string, never>,
   ToolResult
 > {
+  constructor(
+    private readonly context: any, // AgentLoopContext type could be imported, keep loose for now or typed if imported
+    params: Record<string, never>,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
   getDescription(): string {
     return 'Listing background processes';
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const processes = ShellExecutionService.listBackgroundProcesses();
+    const processes = ShellExecutionService.listBackgroundProcesses(
+      this.context.config.getSessionId(),
+    );
     if (processes.length === 0) {
       return {
         llmContent: 'No background processes found.',
@@ -55,7 +67,10 @@ export class ListBackgroundProcessesTool extends BaseDeclarativeTool<
 > {
   static readonly Name = 'list_background_processes';
 
-  constructor(messageBus: MessageBus) {
+  constructor(
+    private readonly context: any,
+    messageBus: MessageBus,
+  ) {
     super(
       ListBackgroundProcessesTool.Name,
       'List Background Processes',
@@ -73,7 +88,12 @@ export class ListBackgroundProcessesTool extends BaseDeclarativeTool<
     params: Record<string, never>,
     messageBus: MessageBus,
   ) {
-    return new ListBackgroundProcessesInvocation(params, messageBus, this.name);
+    return new ListBackgroundProcessesInvocation(
+      this.context,
+      params,
+      messageBus,
+      this.name,
+    );
   }
 }
 
@@ -88,6 +108,16 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
   ReadBackgroundOutputParams,
   ToolResult
 > {
+  constructor(
+    private readonly context: any,
+    params: ReadBackgroundOutputParams,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+  ) {
+    super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
   getDescription(): string {
     return `Reading output for background process ${this.params.pid}`;
   }
@@ -96,7 +126,9 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     const pid = this.params.pid;
 
     // Verify process belongs to this session to prevent reading logs of processes from other sessions/users
-    const processes = ShellExecutionService.listBackgroundProcesses();
+    const processes = ShellExecutionService.listBackgroundProcesses(
+      this.context.config.getSessionId(),
+    );
     if (!processes.some((p) => p.pid === pid)) {
       return {
         llmContent: `Access denied. Background process ID ${pid} not found in this session's history.`,
@@ -124,8 +156,20 @@ class ReadBackgroundOutputInvocation extends BaseToolInvocation<
     }
 
     try {
-      // Async read to prevent blocking the Node event loop
-      const content = await fs.promises.readFile(logPath, 'utf-8');
+      const stats = await fs.promises.stat(logPath);
+      const maxBytes = 64 * 1024; // Safe buffer load Cap
+      const readSize = Math.min(stats.size, maxBytes);
+      const position = Math.max(0, stats.size - readSize);
+
+      const buffer = Buffer.alloc(readSize);
+      const fileHandle = await fs.promises.open(logPath, 'r');
+      try {
+        await fileHandle.read(buffer, 0, readSize, position);
+      } finally {
+        await fileHandle.close();
+      }
+
+      let content = buffer.toString('utf-8');
 
       if (!content) {
         return {
@@ -175,7 +219,10 @@ export class ReadBackgroundOutputTool extends BaseDeclarativeTool<
 > {
   static readonly Name = 'read_background_output';
 
-  constructor(messageBus: MessageBus) {
+  constructor(
+    private readonly context: any,
+    messageBus: MessageBus,
+  ) {
     super(
       ReadBackgroundOutputTool.Name,
       'Read Background Output',
@@ -205,6 +252,11 @@ export class ReadBackgroundOutputTool extends BaseDeclarativeTool<
     params: ReadBackgroundOutputParams,
     messageBus: MessageBus,
   ) {
-    return new ReadBackgroundOutputInvocation(params, messageBus, this.name);
+    return new ReadBackgroundOutputInvocation(
+      this.context,
+      params,
+      messageBus,
+      this.name,
+    );
   }
 }

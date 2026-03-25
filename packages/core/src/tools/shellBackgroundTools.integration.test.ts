@@ -21,8 +21,9 @@ describe('Background Tools Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    listTool = new ListBackgroundProcessesTool(bus);
-    readTool = new ReadBackgroundOutputTool(bus);
+    const mockContext = { config: { getSessionId: () => 'default' } };
+    listTool = new ListBackgroundProcessesTool(mockContext, bus);
+    readTool = new ReadBackgroundOutputTool(mockContext, bus);
 
     // Clear history to avoid state leakage from previous runs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,6 +65,7 @@ describe('Background Tools Integration', () => {
 
     // 3. Model decides to inspect list
     const listInvocation = listTool.build({});
+    (listInvocation as any).context = { config: { getSessionId: () => 'default' } };
     const listResult = await listInvocation.execute(
       new AbortController().signal,
     );
@@ -77,6 +79,7 @@ describe('Background Tools Integration', () => {
 
     // 5. Model decides to read logs
     const readInvocation = readTool.build({ pid, lines: 2 });
+    (readInvocation as any).context = { config: { getSessionId: () => 'default' } };
     const readResult = await readInvocation.execute(
       new AbortController().signal,
     );
