@@ -467,6 +467,7 @@ describe('buildBrowserSystemPrompt', () => {
     expect(prompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
     expect(prompt).toContain('- github.com');
     expect(prompt).toContain('- *.google.com');
+    expect(prompt).toContain('Do NOT use proxy services');
   });
 
   it('should exclude allowed domains restriction when not provided or empty', () => {
