@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Kind } from 'src/tools/tools.js';
+
 export type WithMeta = { _meta?: Record<string, unknown> };
 
 export type Unsubscribe = () => void;
@@ -188,7 +190,7 @@ export interface ToolRequest {
       displayName?: string;
       isOutputMarkdown?: boolean;
       description?: string;
-      kind?: string;
+      kind?: Kind;
     };
     [key: string]: unknown;
   };
