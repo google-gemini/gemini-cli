@@ -4,6 +4,57 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { parse as shellParse } from 'shell-quote';
+import {
+  extractStringFromParseEntry,
+  initializeShellParsers,
+  splitCommands,
+  stripShellWrapper,
+} from '../../utils/shell-utils.js';
+
+/**
+ * Determines if a command is strictly approved for execution on macOS.
+ * A command is approved if it's composed entirely of tools explicitly listed in `approvedTools`
+ * OR if it's composed of known safe, read-only POSIX commands.
+ *
+ * @param command - The full command string to execute.
+ * @param args - The arguments for the command.
+ * @param approvedTools - A list of explicitly approved tool names (e.g., ['npm', 'git']).
+ * @returns true if the command is strictly approved, false otherwise.
+ */
+export async function isStrictlyApproved(
+  command: string,
+  args: string[],
+  approvedTools?: string[],
+): Promise<boolean> {
+  const tools = approvedTools ?? [];
+
+  await initializeShellParsers();
+
+  const fullCmd = [command, ...args].join(' ');
+  const stripped = stripShellWrapper(fullCmd);
+
+  const pipelineCommands = splitCommands(stripped);
+
+  // Fallback for simple commands or parsing failures
+  if (pipelineCommands.length === 0) {
+    // For simple commands, we check the root command.
+    // If it's explicitly approved OR it's a known safe POSIX command, we allow it.
+    return tools.includes(command) || isKnownSafeCommand([command, ...args]);
+  }
+
+  // Check every segment of the pipeline
+  return pipelineCommands.every((cmdString) => {
+    const trimmed = cmdString.trim();
+    if (!trimmed) return true;
+
+    const parsedArgs = shellParse(trimmed).map(extractStringFromParseEntry);
+    if (parsedArgs.length === 0) return true;
+
+    const root = parsedArgs[0];
+    // The segment is approved if the root tool is in the allowlist OR if the whole segment is safe.
+    return tools.includes(root) || isKnownSafeCommand(parsedArgs);
+  });
+}
 
 /**
  * Checks if a command with its arguments is known to be safe to execute
@@ -45,25 +96,18 @@ export function isKnownSafeCommand(args: string[]): boolean {
         return false;
       }
 
-      const commands = script.split(/&&|\|\||\||;/);
+      const commands = splitCommands(script);
+      if (commands.length === 0) return false;
 
-      let allSafe = true;
-      for (const cmd of commands) {
+      return commands.every((cmd) => {
         const trimmed = cmd.trim();
-        if (!trimmed) continue;
+        if (!trimmed) return true;
 
-        const parsed = shellParse(trimmed).map(String);
-        if (parsed.length === 0) continue;
+        const parsed = shellParse(trimmed).map(extractStringFromParseEntry);
+        if (parsed.length === 0) return true;
 
-        if (!isSafeToCallWithExec(parsed)) {
-          allSafe = false;
-          break;
-        }
-      }
-
-      if (allSafe && commands.length > 0) {
-        return true;
-      }
+        return isSafeToCallWithExec(parsed);
+      });
     } catch {
       return false;
     }

@@ -17,17 +17,36 @@ import {
   type GlobalSandboxOptions,
   sanitizePaths,
   tryRealpath,
+  type SandboxPermissions,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { spawnAsync } from '../../utils/shell-utils.js';
+import { spawnAsync, getCommandName } from '../../utils/shell-utils.js';
 import { isNodeError } from '../../utils/errors.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+  isStrictlyApproved,
+} from './commandSafety.js';
+import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+export interface WindowsSandboxOptions extends GlobalSandboxOptions {
+  /** The current sandbox mode behavior from config. */
+  modeConfig?: {
+    readonly?: boolean;
+    network?: boolean;
+    approvedTools?: string[];
+    allowOverrides?: boolean;
+  };
+  /** The policy manager for persistent approvals. */
+  policyManager?: SandboxPolicyManager;
+}
 
 /**
  * A SandboxManager implementation for Windows that uses Restricted Tokens,
@@ -40,8 +59,21 @@ export class WindowsSandboxManager implements SandboxManager {
   private readonly allowedCache = new Set<string>();
   private readonly deniedCache = new Set<string>();
 
-  constructor(private readonly options: GlobalSandboxOptions) {
+  constructor(private readonly options: WindowsSandboxOptions) {
     this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+  }
+
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0]?.toLowerCase();
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.some((t) => t.toLowerCase() === toolName)) {
+      return true;
+    }
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
   }
 
   /**
@@ -179,14 +211,72 @@ export class WindowsSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
+    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
+
+    // Reject override attempts in plan mode
+    if (!allowOverrides && req.policy?.additionalPermissions) {
+      const perms = req.policy.additionalPermissions;
+      if (
+        perms.network ||
+        (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
+      ) {
+        throw new Error(
+          'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
+        );
+      }
+    }
+
+    // Fetch persistent approvals for this command
+    const commandName = await getCommandName(req.command, req.args);
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
+
+    // Merge all permissions
+    const mergedAdditional: SandboxPermissions = {
+      fileSystem: {
+        read: [
+          ...(persistentPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
+        ],
+        write: [
+          ...(persistentPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
+        ],
+      },
+      network:
+        persistentPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
+        false,
+    };
+
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the workspace.
-    await this.grantLowIntegrityAccess(this.options.workspace);
+    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(
+          req.command,
+          req.args,
+          this.options.modeConfig?.approvedTools,
+        )
+      : false;
+
+    if (!isReadonlyMode || isApproved) {
+      await this.grantLowIntegrityAccess(this.options.workspace);
+    }
 
     // Grant "Low Mandatory Level" read access to allowedPaths.
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       await this.grantLowIntegrityAccess(allowedPath);
+    }
+
+    // Grant "Low Mandatory Level" write access to additional permissions write paths.
+    const additionalWritePaths =
+      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    for (const writePath of additionalWritePaths) {
+      await this.grantLowIntegrityAccess(writePath);
     }
 
     // 2. Collect secret files and apply protective ACLs
@@ -248,16 +338,16 @@ export class WindowsSandboxManager implements SandboxManager {
     const allForbidden = Array.from(
       new Set([...secretsToBlock, ...forbiddenPaths]),
     );
-    const manifestPath = path.join(
-      os.tmpdir(),
-      `gemini-cli-forbidden-${process.pid}.txt`,
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
     );
+    const manifestPath = path.join(tempDir, 'manifest.txt');
     fs.writeFileSync(manifestPath, allForbidden.join('\n'));
 
     // Cleanup on exit
     process.on('exit', () => {
       try {
-        fs.unlinkSync(manifestPath);
+        fs.rmSync(tempDir, { recursive: true, force: true });
       } catch {
         // Ignore errors
       }
@@ -267,8 +357,12 @@ export class WindowsSandboxManager implements SandboxManager {
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
+    const defaultNetwork =
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+    const networkAccess = defaultNetwork || mergedAdditional.network;
+
     const args = [
-      req.policy?.networkAccess ? '1' : '0',
+      networkAccess ? '1' : '0',
       req.cwd,
       '--forbidden-manifest',
       manifestPath,
@@ -294,6 +388,20 @@ export class WindowsSandboxManager implements SandboxManager {
 
     const resolvedPath = await tryRealpath(targetPath);
     if (this.allowedCache.has(resolvedPath)) {
+      return;
+    }
+
+    // Explicitly reject UNC paths to prevent credential theft/SSRF,
+    // but allow local extended-length and device paths.
+    if (
+      resolvedPath.startsWith('\\\\') &&
+      !resolvedPath.startsWith('\\\\?\\') &&
+      !resolvedPath.startsWith('\\\\.\\')
+    ) {
+      debugLogger.log(
+        'WindowsSandboxManager: Rejecting UNC path for Low Integrity grant:',
+        resolvedPath,
+      );
       return;
     }
 

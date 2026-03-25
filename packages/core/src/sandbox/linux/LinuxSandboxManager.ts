@@ -23,6 +23,10 @@ import {
 } from '../../services/environmentSanitization.js';
 import { isNodeError } from '../../utils/errors.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../macos/commandSafety.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -121,6 +125,14 @@ export class LinuxSandboxManager implements SandboxManager {
 
   constructor(private readonly options: GlobalSandboxOptions) {}
 
+  isKnownSafeCommand(args: string[]): boolean {
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
+
   private getMaskFilePath(): string {
     if (
       LinuxSandboxManager.maskFilePath &&
@@ -128,7 +140,8 @@ export class LinuxSandboxManager implements SandboxManager {
     ) {
       return LinuxSandboxManager.maskFilePath;
     }
-    const maskPath = join(os.tmpdir(), `gemini-cli-mask-file-${process.pid}`);
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
+    const maskPath = join(tempDir, 'mask');
     fs.writeFileSync(maskPath, '');
     fs.chmodSync(maskPath, 0);
     LinuxSandboxManager.maskFilePath = maskPath;
@@ -136,7 +149,7 @@ export class LinuxSandboxManager implements SandboxManager {
     // Cleanup on exit
     process.on('exit', () => {
       try {
-        fs.unlinkSync(maskPath);
+        fs.rmSync(tempDir, { recursive: true, force: true });
       } catch {
         // Ignore errors
       }
@@ -152,7 +165,8 @@ export class LinuxSandboxManager implements SandboxManager {
     ) {
       return LinuxSandboxManager.maskDirPath;
     }
-    const maskPath = join(os.tmpdir(), `gemini-cli-mask-dir-${process.pid}`);
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-dir-'));
+    const maskPath = join(tempDir, 'mask');
     fs.mkdirSync(maskPath, { recursive: true });
     fs.chmodSync(maskPath, 0);
     LinuxSandboxManager.maskDirPath = maskPath;
@@ -160,7 +174,7 @@ export class LinuxSandboxManager implements SandboxManager {
     // Cleanup on exit
     process.on('exit', () => {
       try {
-        fs.rmSync(maskPath, { recursive: true, force: true });
+        fs.rmSync(tempDir, { recursive: true, force: true });
       } catch {
         // Ignore errors
       }
