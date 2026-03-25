@@ -245,7 +245,7 @@ export const AppContainer = (props: AppContainerProps) => {
       config.getScreenReader(),
     ),
   );
-  const [isTransitioningAltBuffer, setIsTransitioningAltBuffer] =
+  const [isExitingAlternateBuffer, setIsExitingAlternateBuffer] =
     useState(false);
   const isAlternateBufferRef = useRef(isAlternateBuffer);
   useEffect(() => {
@@ -1724,19 +1724,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   useEffect(() => {
-    if (isTransitioningAltBuffer) {
+    if (isExitingAlternateBuffer) {
       const timer = setTimeout(() => {
-        const next = !isAlternateBufferRef.current;
-        isAlternateBufferRef.current = next;
-
-        applyAlternateBufferMode(next);
-        setIsAlternateBuffer(next);
-        setIsTransitioningAltBuffer(false);
+        isAlternateBufferRef.current = false;
+        applyAlternateBufferMode(false);
+        setIsAlternateBuffer(false);
+        setIsExitingAlternateBuffer(false);
       }, 15);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [isTransitioningAltBuffer, applyAlternateBufferMode]);
+  }, [isExitingAlternateBuffer, applyAlternateBufferMode]);
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
@@ -1749,7 +1747,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
           return true;
         }
 
-        setIsTransitioningAltBuffer(true);
+        const next = !isAlternateBufferRef.current;
+        if (next) {
+          // Entering alternate buffer mode: Safe to do synchronously as we won't erase scrollback
+          isAlternateBufferRef.current = true;
+          applyAlternateBufferMode(true);
+          setIsAlternateBuffer(true);
+        } else {
+          // Exiting alternate buffer mode: Trigger a delay to let Ink clear its 40-line alternate buffer frame
+          // to 0 lines *before* swapping the terminal, otherwise it will erase normal scrollback.
+          setIsExitingAlternateBuffer(true);
+        }
         return true;
       }
 
@@ -1935,6 +1943,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCopyModeEnabled,
       tabFocusTimeoutRef,
       shortcutsHelpVisible,
+      applyAlternateBufferMode,
       backgroundCurrentShell,
       toggleBackgroundShell,
       backgroundShells,
@@ -2242,7 +2251,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       history: historyManager.history,
       historyManager,
       isAlternateBuffer,
-      isTransitioningAltBuffer,
+      isExitingAlternateBuffer,
       isThemeDialogOpen,
 
       themeError,
@@ -2491,7 +2500,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       showIsExpandableHint,
       isAlternateBuffer,
-      isTransitioningAltBuffer,
+      isExitingAlternateBuffer,
     ],
   );
 

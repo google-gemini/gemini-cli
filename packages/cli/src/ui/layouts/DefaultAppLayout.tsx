@@ -21,7 +21,7 @@ export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
-  const { rootUiRef, terminalHeight, isTransitioningAltBuffer } = uiState;
+  const { rootUiRef, terminalHeight, isExitingAlternateBuffer } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
   // If in alternate buffer mode, need to leave room to draw the scrollbar on
   // the right side of the terminal.
@@ -30,14 +30,14 @@ export const DefaultAppLayout: React.FC = () => {
       flexDirection="column"
       width={uiState.terminalWidth}
       height={
-        isTransitioningAltBuffer
+        isExitingAlternateBuffer
           ? 0
           : isAlternateBuffer
             ? terminalHeight
             : undefined
       }
       paddingBottom={
-        !isTransitioningAltBuffer &&
+        !isExitingAlternateBuffer &&
         isAlternateBuffer &&
         !uiState.copyModeEnabled
           ? 1
@@ -48,7 +48,7 @@ export const DefaultAppLayout: React.FC = () => {
       overflow="hidden"
       ref={uiState.rootUiRef}
     >
-      {!isTransitioningAltBuffer && (
+      {!isExitingAlternateBuffer && (
         <>
           <MainContent />
 

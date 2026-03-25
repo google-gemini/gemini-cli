@@ -212,7 +212,7 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   isAlternateBuffer: boolean;
-  isTransitioningAltBuffer: boolean;
+  isExitingAlternateBuffer: boolean;
   settingsNonce: number;
   backgroundShells: Map<number, BackgroundShell>;
   activeBackgroundShellPid: number | null;

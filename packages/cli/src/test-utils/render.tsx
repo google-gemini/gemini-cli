@@ -497,7 +497,7 @@ export const mockSettings = createMockSettings();
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
   isAlternateBuffer: false,
-  isTransitioningAltBuffer: false,
+  isExitingAlternateBuffer: false,
   history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
