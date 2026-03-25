@@ -8,25 +8,30 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   getErrorMessage,
   MessageSenderType,
-  ApprovalMode,
   debugLogger,
   LegacyAgentSession,
   geminiPartsToContentParts,
   parseThought,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
-import type {
-  Config,
-  EditorType,
-  GeminiClient,
-  ThoughtSummary,
-  RetryAttemptPayload,
-  AgentEvent,
+import {
+  type Config,
+  type GeminiClient,
+  type ApprovalMode,
+  Kind,
+  type EditorType,
+  type ThoughtSummary,
+  type RetryAttemptPayload,
+  type AgentEvent,
+  BaseDeclarativeTool,
+  type ToolResult,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type {
   HistoryItem,
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
+  SlashCommandProcessorResult,
 } from '../types.js';
 import { StreamingState, MessageType } from '../types.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -35,17 +40,46 @@ import { type BackgroundShell } from './shellCommandProcessor.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
-import {
-  useToolScheduler,
-} from './useToolScheduler.js';
-import type {
-  TrackedToolCall,
-} from './useToolScheduler.js';
+import { useToolScheduler } from './useToolScheduler.js';
+import type { TrackedToolCall } from './useToolScheduler.js';
 
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import type { SlashCommandProcessorResult } from '../types.js';
 import { useStateAndRef } from './useStateAndRef.js';
+
+class DummyTool extends BaseDeclarativeTool<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    name: string,
+    description: string,
+    displayName: string,
+    isOutputMarkdown: boolean,
+    kind: Kind,
+    messageBus: import('@google/gemini-cli-core').MessageBus,
+  ) {
+    super(
+      name,
+      displayName,
+      description,
+      kind,
+      undefined,
+      messageBus,
+      isOutputMarkdown,
+      false,
+    );
+  }
+  protected createInvocation(params: Record<string, unknown>) {
+    return {
+      getDescription: () => this.description,
+      params,
+      execute: async () => ({ llmContent: [], returnDisplay: '' }),
+      toolLocations: () => [],
+      shouldConfirmExecute: async (): Promise<false> => false,
+    };
+  }
+}
 
 /**
  * useAgentStream implements the interactive agent loop using the LegacyAgentSession (AgentProtocol).
@@ -67,7 +101,9 @@ export const useAgentStream = (
   _onAuthError: (error: string) => void,
   _performMemoryRefresh: () => Promise<void>,
   _modelSwitchedFromQuotaError: boolean,
-  _setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
+  _setModelSwitchedFromQuotaError: React.Dispatch<
+    React.SetStateAction<boolean>
+  >,
   onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
   _setShellInputFocused: (value: boolean) => void,
   _terminalWidth: number,
@@ -76,9 +112,7 @@ export const useAgentStream = (
   _consumeUserHint?: () => string | null,
 ) => {
   const [initError] = useState<string | null>(null);
-  const [retryStatus] = useState<RetryAttemptPayload | null>(
-    null,
-  );
+  const [retryStatus] = useState<RetryAttemptPayload | null>(null);
   const [streamingState, setStreamingState] = useState<StreamingState>(
     StreamingState.Idle,
   );
@@ -92,8 +126,9 @@ export const useAgentStream = (
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
 
-  const [trackedTools, , setTrackedTools] =
-    useStateAndRef<TrackedToolCall[]>([]);
+  const [trackedTools, , setTrackedTools] = useStateAndRef<TrackedToolCall[]>(
+    [],
+  );
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
@@ -123,20 +158,19 @@ export const useAgentStream = (
   const isBackgroundShellVisible = false;
   const toggleBackgroundShell = useCallback(() => {}, []);
   const backgroundCurrentShell = undefined;
-  const backgroundShells = new Map<number, BackgroundShell>();
+  const backgroundShells = useMemo(
+    () => new Map<number, BackgroundShell>(),
+    [],
+  );
   const dismissBackgroundShell = useCallback(async (_pid: number) => {}, []);
 
   // TODO: Support LoopDetection confirmation requests
-  const [
-    loopDetectionConfirmationRequest,
-  ] = useState<LoopDetectionConfirmationRequest | null>(null);
+  const [loopDetectionConfirmationRequest] =
+    useState<LoopDetectionConfirmationRequest | null>(null);
 
   const flushPendingText = useCallback(() => {
     if (pendingHistoryItemRef.current) {
-      addItem(
-        pendingHistoryItemRef.current,
-        userMessageTimestampRef.current,
-      );
+      addItem(pendingHistoryItemRef.current, userMessageTimestampRef.current);
       setPendingHistoryItem(null);
       geminiMessageBufferRef.current = '';
     }
@@ -206,84 +240,201 @@ export const useAgentStream = (
             }
           }
           break;
-        case 'tool_request':
+        case 'tool_request': {
           flushPendingText();
-          setTrackedTools((prev) => [
-            ...prev,
-            {
-              request: {
-                callId: event.requestId,
-                name: event.name,
-                args: event.args,
-                isClientInitiated: false,
-                originalRequestName: event.name,
-              },
-              status: 'scheduled',
-              tool: {
-                displayName: (event._meta?.['displayName'] as string) ?? event.name,
-                isOutputMarkdown: (event._meta?.['isOutputMarkdown'] as boolean) ?? false,
-                kind: event._meta?.['kind'] as any,
-              },
-              invocation: {
-                getDescription: () => (event._meta?.['description'] as string) ?? '',
-              },
-            } as unknown as TrackedToolCall,
-          ]);
+          const legacyState = event._meta?.legacyState;
+          const displayName = legacyState?.displayName ?? event.name;
+          const isOutputMarkdown = legacyState?.isOutputMarkdown ?? false;
+          const desc = legacyState?.description ?? '';
+
+          const args =
+            event.args && typeof event.args === 'object' ? event.args : {};
+          const fallbackKind = Kind.Other;
+          const messageBus = config.getMessageBus();
+
+          const tool =
+            config.getToolRegistry().getTool(event.name) ||
+            new DummyTool(
+              event.name,
+              desc,
+              displayName,
+              isOutputMarkdown,
+              fallbackKind,
+              messageBus,
+            );
+          const invocation = tool.build(args);
+
+          const newCall: TrackedToolCall = {
+            request: {
+              callId: event.requestId,
+              name: event.name,
+              args,
+              isClientInitiated: false,
+              originalRequestName: event.name,
+              prompt_id: '',
+            },
+            status: CoreToolCallStatus.Scheduled,
+            tool,
+            invocation,
+          };
+          setTrackedTools((prev) => [...prev, newCall]);
           break;
-        case 'tool_update':
+        }
+        case 'tool_update': {
           setTrackedTools((prev) =>
-            prev.map((tc) =>
-              tc.request.callId === event.requestId
-                ? ({
+            prev.map((tc): TrackedToolCall => {
+              if (tc.request.callId !== event.requestId) return tc;
+
+              const legacyState = event._meta?.legacyState;
+              const evtStatus = legacyState?.status;
+
+              let status = tc.status;
+              if (evtStatus === 'executing')
+                status = CoreToolCallStatus.Executing;
+              else if (evtStatus === 'error') status = CoreToolCallStatus.Error;
+              else if (evtStatus === 'success')
+                status = CoreToolCallStatus.Success;
+
+              const liveOutput =
+                event.displayContent?.[0]?.type === 'text'
+                  ? event.displayContent[0].text
+                  : 'liveOutput' in tc
+                    ? tc.liveOutput
+                    : undefined;
+              const progressMessage =
+                legacyState?.progressMessage ??
+                ('progressMessage' in tc ? tc.progressMessage : undefined);
+              const progress =
+                legacyState?.progress ??
+                ('progress' in tc ? tc.progress : undefined);
+              const progressTotal =
+                legacyState?.progressTotal ??
+                ('progressTotal' in tc ? tc.progressTotal : undefined);
+              const pid =
+                legacyState?.pid ?? ('pid' in tc ? tc.pid : undefined);
+              const desc =
+                legacyState?.description ??
+                ('invocation' in tc && tc.invocation
+                  ? tc.invocation.getDescription()
+                  : '');
+              const invocation =
+                'invocation' in tc && tc.invocation
+                  ? { ...tc.invocation, getDescription: () => desc }
+                  : undefined;
+
+              const inProgressFields = {
+                pid,
+                liveOutput,
+                progress,
+                progressTotal,
+                progressMessage,
+                invocation,
+              };
+
+              const response =
+                'response' in tc && tc.response
+                  ? tc.response
+                  : { callId: tc.request.callId, responseParts: [] };
+              const responseSubmittedToGemini =
+                'responseSubmittedToGemini' in tc
+                  ? tc.responseSubmittedToGemini
+                  : false;
+
+              switch (status) {
+                case CoreToolCallStatus.Executing:
+                  return {
                     ...tc,
-                    status: (event.data?.['status'] as any) ?? tc.status,
-                    liveOutput:
-                      event.displayContent?.[0]?.type === 'text'
-                        ? event.displayContent[0].text
-                        : (tc as any).liveOutput,
-                    progressMessage:
-                      (event.data?.['progressMessage'] as string | undefined) ??
-                      (tc as any).progressMessage,
-                    progress:
-                      (event.data?.['progress'] as number | undefined) ??
-                      (tc as any).progress,
-                    progressTotal:
-                      (event.data?.['progressTotal'] as number | undefined) ??
-                      (tc as any).progressTotal,
-                    pid:
-                      (event.data?.['pid'] as number | undefined) ??
-                      (tc as any).pid,
-                    invocation: {
-                      getDescription: () =>
-                        (event._meta?.['description'] as string) ??
-                        (tc as any).invocation?.getDescription(),
-                    },
-                  } as unknown as TrackedToolCall)
-                : tc,
-            ),
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.Executing,
+                  };
+                case CoreToolCallStatus.Error:
+                  return {
+                    ...tc,
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.Error,
+                    response,
+                    responseSubmittedToGemini,
+                  };
+                case CoreToolCallStatus.Success:
+                  return {
+                    ...tc,
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.Success,
+                    response,
+                    responseSubmittedToGemini,
+                  };
+                case CoreToolCallStatus.Scheduled:
+                  return {
+                    ...tc,
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.Scheduled,
+                  };
+                case CoreToolCallStatus.Validating:
+                  return {
+                    ...tc,
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.Validating,
+                  };
+                case CoreToolCallStatus.AwaitingApproval:
+                  return {
+                    ...tc,
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.AwaitingApproval,
+                  };
+                case CoreToolCallStatus.Cancelled:
+                  return {
+                    ...tc,
+                    ...inProgressFields,
+                    status: CoreToolCallStatus.Cancelled,
+                  };
+                default:
+                  return tc;
+              }
+            }),
           );
           break;
-        case 'tool_response':
+        }
+        case 'tool_response': {
           setTrackedTools((prev) =>
-            prev.map((tc) =>
-              tc.request.callId === event.requestId
-                ? ({
-                    ...tc,
-                    status: event.isError ? 'error' : 'success',
-                    response: {
-                      resultDisplay:
-                        event._meta?.['resultDisplay'] ??
-                        (event.displayContent?.[0]?.type === 'text'
-                          ? event.displayContent[0].text
-                          : undefined),
-                      outputFile: event._meta?.['outputFile'] as string | undefined,
-                    },
-                    responseSubmittedToGemini: true,
-                  } as unknown as TrackedToolCall)
-                : tc,
-            ),
+            prev.map((tc): TrackedToolCall => {
+              if (tc.request.callId !== event.requestId) return tc;
+
+              const legacyState = event._meta?.legacyState;
+              const outputFile = legacyState?.outputFile;
+              const resultDisplay =
+                event.displayContent?.[0]?.type === 'text'
+                  ? event.displayContent[0].text
+                  : undefined;
+
+              const response = {
+                callId: tc.request.callId,
+                responseParts: [],
+                resultDisplay,
+                outputFile,
+                ...(event.isError
+                  ? { error: 'Tool error', errorType: 'UNKNOWN' }
+                  : {}),
+              };
+
+              if (event.isError) {
+                return {
+                  ...tc,
+                  status: CoreToolCallStatus.Error,
+                  response,
+                  responseSubmittedToGemini: true,
+                };
+              } else {
+                return {
+                  ...tc,
+                  status: CoreToolCallStatus.Success,
+                  response,
+                  responseSubmittedToGemini: true,
+                };
+              }
+            }),
           );
           break;
+        }
         case 'error':
           addItem(
             { type: MessageType.ERROR, text: event.message },
@@ -294,7 +445,7 @@ export const useAgentStream = (
           break;
       }
     },
-    [addItem, flushPendingText, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, flushPendingText, setPendingHistoryItem, setTrackedTools, config],
   );
 
   useEffect(() => {
@@ -316,7 +467,7 @@ export const useAgentStream = (
 
   const submitQuery = useCallback(
     async (
-      query: PartListUnion,
+      query: Array<import('@google/gemini-cli-core').Part> | string,
       options?: { isContinuation: boolean },
       _prompt_id?: string,
     ) => {
@@ -335,7 +486,7 @@ export const useAgentStream = (
       }
 
       const parts = geminiPartsToContentParts(
-        typeof query === 'string' ? [{ text: query }] : (query as any[]),
+        typeof query === 'string' ? [{ text: query }] : query,
       );
 
       try {
@@ -399,13 +550,14 @@ export const useAgentStream = (
       }
 
       const isLastInBatch =
-        toolsToPush[toolsToPush.length - 1] === trackedTools[trackedTools.length - 1];
+        toolsToPush[toolsToPush.length - 1] ===
+        trackedTools[trackedTools.length - 1];
 
       const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
         borderTop: isFirstToolInGroupRef.current,
         borderBottom: isLastInBatch,
         ...getToolGroupBorderAppearance(
-          { type: 'tool_group', tools: trackedTools as any[] },
+          { type: 'tool_group', tools: trackedTools },
           activePtyId,
           !!_isShellFocused,
           [],
@@ -437,7 +589,7 @@ export const useAgentStream = (
     const items: HistoryItemWithoutId[] = [];
 
     const appearance = getToolGroupBorderAppearance(
-      { type: 'tool_group', tools: trackedTools as any[] },
+      { type: 'tool_group', tools: trackedTools },
       activePtyId,
       !!_isShellFocused,
       [],
@@ -488,17 +640,18 @@ export const useAgentStream = (
   }, [
     trackedTools,
     pushedToolCallIds,
-    isFirstToolInGroupRef,
     activePtyId,
     _isShellFocused,
     backgroundShells,
   ]);
 
-  const pendingHistoryItems = useMemo(() => {
-    return [pendingHistoryItem, ...pendingToolGroupItems].filter(
-      (i): i is HistoryItemWithoutId => i !== undefined && i !== null,
-    );
-  }, [pendingHistoryItem, pendingToolGroupItems]);
+  const pendingHistoryItems = useMemo(
+    () =>
+      [pendingHistoryItem, ...pendingToolGroupItems].filter(
+        (i): i is HistoryItemWithoutId => i !== undefined && i !== null,
+      ),
+    [pendingHistoryItem, pendingToolGroupItems],
+  );
 
   return {
     streamingState,

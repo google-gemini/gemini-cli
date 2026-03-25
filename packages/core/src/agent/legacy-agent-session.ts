@@ -211,7 +211,9 @@ class LegacyAgentProtocol implements AgentProtocol {
       this._emit(toolUpdates);
     };
 
-    this._config.getMessageBus().subscribe(MessageBusType.TOOL_CALLS_UPDATE, handleToolCallsUpdate);
+    this._config
+      .getMessageBus()
+      .subscribe(MessageBusType.TOOL_CALLS_UPDATE, handleToolCallsUpdate);
 
     try {
       while (true) {
@@ -246,17 +248,23 @@ class LegacyAgentProtocol implements AgentProtocol {
             toolCallRequests.push(event.value);
           }
 
-          const translatedEvents = translateEvent(event, this._translationState);
+          const translatedEvents = translateEvent(
+            event,
+            this._translationState,
+          );
 
           for (const ev of translatedEvents) {
             if (ev.type === 'tool_request') {
               const tool = this._config.getToolRegistry().getTool(ev.name);
               const invocation = tool?.build(ev.args);
               ev._meta = {
-                displayName: tool?.displayName ?? ev.name,
-                description: invocation?.getDescription() ?? tool?.description ?? '',
-                isOutputMarkdown: tool?.isOutputMarkdown ?? false,
-                kind: tool?.kind,
+                legacyState: {
+                  displayName: tool?.displayName ?? ev.name,
+                  description:
+                    invocation?.getDescription() ?? tool?.description ?? '',
+                  isOutputMarkdown: tool?.isOutputMarkdown ?? false,
+                  kind: tool?.kind,
+                },
               };
             }
           }
@@ -371,7 +379,9 @@ class LegacyAgentProtocol implements AgentProtocol {
         currentParts = toolResponseParts;
       }
     } finally {
-      this._config.getMessageBus().unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, handleToolCallsUpdate);
+      this._config
+        .getMessageBus()
+        .unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, handleToolCallsUpdate);
     }
   }
 
