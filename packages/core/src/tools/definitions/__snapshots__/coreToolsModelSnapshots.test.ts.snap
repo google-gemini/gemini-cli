@@ -169,13 +169,13 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -583,6 +583,35 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
@@ -958,13 +987,13 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -1348,6 +1377,35 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",

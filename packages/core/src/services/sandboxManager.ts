@@ -4,11 +4,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+export interface SandboxPermissions {
+  /** Filesystem permissions. */
+  fileSystem?: {
+    /** Paths that should be readable by the command. */
+    read?: string[];
+    /** Paths that should be writable by the command. */
+    write?: string[];
+  };
+  /** Whether the command should have network access. */
+  network?: boolean;
+}
+
+/**
+ * Security boundaries and permissions applied to a specific sandboxed execution.
+ */
+export interface ExecutionPolicy {
+  /** Additional absolute paths to grant full read/write access to. */
+  allowedPaths?: string[];
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
+  /** Whether network access is allowed. */
+  networkAccess?: boolean;
+  /** Rules for scrubbing sensitive environment variables. */
+  sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+  /** Additional granular permissions to grant to this command. */
+  additionalPermissions?: SandboxPermissions;
+}
+
+/**
+ * Global configuration options used to initialize a SandboxManager.
+ */
+export interface GlobalSandboxOptions {
+  /**
+   * The primary workspace path the sandbox is anchored to.
+   * This directory is granted full read and write access.
+   */
+  workspace: string;
+}
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -22,12 +64,8 @@ export interface SandboxRequest {
   cwd: string;
   /** Environment variables to be passed to the program. */
   env: NodeJS.ProcessEnv;
-  /** Optional sandbox-specific configuration. */
-  config?: {
-    sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
-    allowedPaths?: string[];
-    networkAccess?: boolean;
-  };
+  /** Policy to use for this request. */
+  policy?: ExecutionPolicy;
 }
 
 /**
@@ -55,6 +93,16 @@ export interface SandboxManager {
 }
 
 /**
+ * Files that represent the governance or "constitution" of the repository
+ * and should be write-protected in any sandbox.
+ */
+export const GOVERNANCE_FILES = [
+  { path: '.gitignore', isDirectory: false },
+  { path: '.geminiignore', isDirectory: false },
+  { path: '.git', isDirectory: true },
+] as const;
+
+/**
  * A no-op implementation of SandboxManager that silently passes commands
  * through while applying environment sanitization.
  */
@@ -65,7 +113,7 @@ export class NoopSandboxManager implements SandboxManager {
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
     const sanitizationConfig = getSecureSanitizationConfig(
-      req.config?.sanitizationConfig,
+      req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
@@ -84,6 +132,58 @@ export class NoopSandboxManager implements SandboxManager {
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
+  }
+}
+
+/**
+ * Sanitizes an array of paths by deduplicating them and ensuring they are absolute.
+ */
+export function sanitizePaths(paths?: string[]): string[] | undefined {
+  if (!paths) return undefined;
+
+  // We use a Map to deduplicate paths based on their normalized,
+  // platform-specific identity e.g. handling case-insensitivity on Windows)
+  // while preserving the original string casing.
+  const uniquePathsMap = new Map<string, string>();
+  for (const p of paths) {
+    if (!path.isAbsolute(p)) {
+      throw new Error(`Sandbox path must be absolute: ${p}`);
+    }
+
+    // Normalize the path (resolves slashes and redundant components)
+    let key = path.normalize(p);
+
+    // Windows file systems are case-insensitive, so we lowercase the key for
+    // deduplication
+    if (os.platform() === 'win32') {
+      key = key.toLowerCase();
+    }
+
+    if (!uniquePathsMap.has(key)) {
+      uniquePathsMap.set(key, p);
+    }
+  }
+
+  return Array.from(uniquePathsMap.values());
+}
+
+/**
+ * Resolves symlinks for a given path to prevent sandbox escapes.
+ * If a file does not exist (ENOENT), it recursively resolves the parent directory.
+ * Other errors (e.g. EACCES) are re-thrown.
+ */
+export async function tryRealpath(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      const parentDir = path.dirname(p);
+      if (parentDir === p) {
+        return p;
+      }
+      return path.join(await tryRealpath(parentDir), path.basename(p));
+    }
+    throw e;
   }
 }
 

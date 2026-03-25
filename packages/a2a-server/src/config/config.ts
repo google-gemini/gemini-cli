@@ -87,6 +87,7 @@ export async function loadConfig(
         approvalMode === ApprovalMode.YOLO
           ? [
               {
+                toolName: '*',
                 decision: PolicyDecision.ALLOW,
                 priority: PRIORITY_YOLO_ALLOW_ALL,
                 modes: [ApprovalMode.YOLO],

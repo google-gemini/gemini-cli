@@ -21,6 +21,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
@@ -96,6 +97,10 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
+  /** State for action rate limiting */
+  private actionCounter = 0;
+  private readonly maxActionsPerTask: number;
+
   /**
    * Whether to inject the automation overlay.
    * Always false in headless mode (no visible window to decorate).
@@ -107,6 +112,8 @@ export class BrowserManager {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
+    this.maxActionsPerTask =
+      browserConfig?.customConfig.maxActionsPerTask ?? 100;
   }
 
   /**
@@ -149,6 +156,16 @@ export class BrowserManager {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
+
+    // Hard enforcement of per-action rate limit
+    if (this.actionCounter > this.maxActionsPerTask) {
+      const error = new Error(
+        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
+      );
+      throw error;
+    }
+    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
@@ -346,6 +363,10 @@ export class BrowserManager {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
       mcpArgs.push('--autoConnect');
+      const message =
+        '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
+      coreEvents.emitFeedback('info', message);
+      coreEvents.emitConsoleLog('info', message);
     }
 
     // Add optional settings from config

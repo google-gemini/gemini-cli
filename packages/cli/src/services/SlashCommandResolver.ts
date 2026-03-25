@@ -47,7 +47,17 @@ export class SlashCommandResolver {
       const originalName = cmd.name;
       let finalName = originalName;
 
-      if (registry.firstEncounters.has(originalName)) {
+      const shouldAlwaysPrefix =
+        cmd.kind === CommandKind.SKILL && !!cmd.extensionName;
+
+      if (shouldAlwaysPrefix) {
+        finalName = this.getRenamedName(
+          originalName,
+          this.getPrefix(cmd),
+          registry.commandMap,
+          cmd.kind,
+        );
+      } else if (registry.firstEncounters.has(originalName)) {
         // We've already seen a command with this name, so resolve the conflict.
         finalName = this.handleConflict(cmd, registry);
       } else {
@@ -93,6 +103,7 @@ export class SlashCommandResolver {
       incoming.name,
       this.getPrefix(incoming),
       registry.commandMap,
+      incoming.kind,
     );
     this.trackConflict(
       registry.conflictsMap,
@@ -132,6 +143,7 @@ export class SlashCommandResolver {
       currentOwner.name,
       this.getPrefix(currentOwner),
       registry.commandMap,
+      currentOwner.kind,
     );
 
     // Update the registry: remove the old name and add the owner under the new name.
@@ -156,8 +168,12 @@ export class SlashCommandResolver {
     name: string,
     prefix: string | undefined,
     commandMap: Map<string, SlashCommand>,
+    kind?: CommandKind,
   ): string {
-    const base = prefix ? `${prefix}.${name}` : name;
+    const isExtensionPrefix =
+      kind === CommandKind.SKILL || kind === CommandKind.EXTENSION_FILE;
+    const separator = isExtensionPrefix ? ':' : '.';
+    const base = prefix ? `${prefix}${separator}${name}` : name;
     let renamedName = base;
     let suffix = 1;
 
