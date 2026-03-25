@@ -1,0 +1,54 @@
+# --- STAGE 1: Base Runtime ---
+FROM docker.io/library/node:20-slim AS base
+
+ARG CLI_VERSION_ARG
+ENV CLI_VERSION=$CLI_VERSION_ARG
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  python3 \
+  curl \
+  dnsutils \
+  less \
+  jq \
+  ca-certificates \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+# --- STAGE 2: Maintainer ---
+FROM base AS maintainer
+
+# Install "Maintainer Bloat" - tools needed for development and offloading
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  make \
+  g++ \
+  gh \
+  git \
+  unzip \
+  rsync \
+  ripgrep \
+  procps \
+  psmisc \
+  lsof \
+  socat \
+  tmux \
+  docker.io \
+  build-essential \
+  libsecret-1-dev \
+  libkrb5-dev \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install global dev tools
+RUN npm install -g tsx vitest @google/gemini-cli@nightly prettier eslint typescript cross-env
+
+# Set up npm global package folder
+RUN mkdir -p /usr/local/share/npm-global \
+  && chown -R node:node /usr/local/share/npm-global
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/share/npm-global/bin
+
+# Switch to non-root user node
+USER node
+
+# Default entrypoint
+CMD ["/bin/bash"]
