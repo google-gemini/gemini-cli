@@ -124,8 +124,8 @@
           "properties": {
             "directory": {
               "title": "Plan Directory",
-              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.",
-              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.\n\n- Category: `General`\n- Requires restart: `yes`",
+              "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.",
+              "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.\n\n- Category: `General`\n- Requires restart: `yes`",
               "type": "string"
             },
             "modelRouting": {
