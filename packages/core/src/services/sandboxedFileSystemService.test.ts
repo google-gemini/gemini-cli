@@ -35,6 +35,14 @@ class MockSandboxManager implements SandboxManager {
       env: req.env || {},
     };
   }
+
+  isKnownSafeCommand(): boolean {
+    return false;
+  }
+
+  isDangerousCommand(): boolean {
+    return false;
+  }
 }
 
 describe('SandboxedFileSystemService', () => {
