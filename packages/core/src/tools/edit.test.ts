@@ -33,6 +33,14 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+}));
+
 import {
   describe,
   it,
@@ -123,8 +131,10 @@ describe('EditTool', () => {
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
+      isPlanMode: vi.fn(() => false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        getPlansDir: vi.fn().mockReturnValue('/tmp/plans'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
         const workspaceContext = this.getWorkspaceContext();
@@ -1229,6 +1239,104 @@ function doIt() {
       await invocation.execute(new AbortController().signal);
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-disabled-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
+    });
+  });
+
+  describe('plan mode', () => {
+    it('should allow edits to plans directory when isPlanMode is true', async () => {
+      const mockProjectTempDir = path.join(tempDir, 'project');
+      fs.mkdirSync(mockProjectTempDir);
+      vi.mocked(mockConfig.storage.getProjectTempDir).mockReturnValue(
+        mockProjectTempDir,
+      );
+
+      const plansDir = path.join(mockProjectTempDir, 'plans');
+      fs.mkdirSync(plansDir);
+
+      vi.mocked(mockConfig.isPlanMode).mockReturnValue(true);
+      vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue(plansDir);
+
+      const filePath = path.join(rootDir, 'test-file.txt');
+      const planFilePath = path.join(plansDir, 'test-file.txt');
+      const initialContent = 'some initial content';
+      fs.writeFileSync(planFilePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace initial with new',
+        old_string: 'initial',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+
+      // Verify plan file is written with new content
+      expect(fs.readFileSync(planFilePath, 'utf8')).toBe('some new content');
+
+      fs.rmSync(plansDir, { recursive: true, force: true });
     });
   });
 });

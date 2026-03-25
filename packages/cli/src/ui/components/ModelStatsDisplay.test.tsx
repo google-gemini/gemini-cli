@@ -9,8 +9,8 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import * as SettingsContext from '../contexts/SettingsContext.js';
-import type { LoadedSettings } from '../../config/settings.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { type LoadedSettings } from '../../config/settings.js';
+import { type SessionMetrics } from '../contexts/SessionContext.js';
 import { ToolCallDecision, LlmRole } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
@@ -59,11 +59,10 @@ const renderWithMockedStats = async (
     },
   } as unknown as LoadedSettings);
 
-  const result = render(
+  const result = await render(
     <ModelStatsDisplay currentModel={currentModel} />,
     width,
   );
-  await result.waitUntilReady();
   return result;
 };
 
@@ -410,6 +409,7 @@ describe('<ModelStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain('gemini-3-pro-');
     expect(output).toContain('gemini-3-flash-');
+    expect(output).toMatchSnapshot();
     unmount();
   });
 
@@ -528,18 +528,17 @@ describe('<ModelStatsDisplay />', () => {
       startNewPrompt: vi.fn(),
     });
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, unmount } = await render(
       <ModelStatsDisplay
         selectedAuthType="oauth"
         userEmail="test@example.com"
         tier="Pro"
       />,
     );
-    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Auth Method:');
-    expect(output).toContain('Logged in with Google');
+    expect(output).toContain('Signed in with Google');
     expect(output).toContain('(test@example.com)');
     expect(output).toContain('Tier:');
     expect(output).toContain('Pro');

@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import type React from 'react';
 import { Text } from 'ink';
 import { AsyncFzf } from 'fzf';
-import type { Key } from '../hooks/useKeypress.js';
+import { type Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
-import type { LoadableSettingScope, Settings } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
+import {
+  SettingScope,
+  type LoadableSettingScope,
+  type Settings,
+} from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import {
   getDialogSettingKeys,
@@ -40,6 +43,8 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { Command, KeyBinding } from '../key/keyBindings.js';
 
 interface FzfResult {
   item: string;
@@ -56,6 +61,11 @@ interface SettingsDialogProps {
 }
 
 const MAX_ITEMS_TO_SHOW = 8;
+
+const KEY_UP = new KeyBinding('up');
+const KEY_CTRL_P = new KeyBinding('ctrl+p');
+const KEY_DOWN = new KeyBinding('down');
+const KEY_CTRL_N = new KeyBinding('ctrl+n');
 
 // Create a snapshot of the initial per-scope state of Restart Required Settings
 // This creates a nested map of the form
@@ -333,6 +343,18 @@ export function SettingsDialog({
     onSelect(undefined, selectedScope as SettingScope);
   }, [onSelect, selectedScope]);
 
+  const globalKeyMatchers = useKeyMatchers();
+  const settingsKeyMatchers = useMemo(
+    () => ({
+      ...globalKeyMatchers,
+      [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
+        KEY_UP.matches(key) || KEY_CTRL_P.matches(key),
+      [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
+        KEY_DOWN.matches(key) || KEY_CTRL_N.matches(key),
+    }),
+    [globalKeyMatchers],
+  );
+
   // Custom key handler for restart key
   const handleKeyPress = useCallback(
     (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
@@ -368,6 +390,7 @@ export function SettingsDialog({
       onItemClear={handleItemClear}
       onClose={handleClose}
       onKeyPress={handleKeyPress}
+      keyMatchers={settingsKeyMatchers}
       footer={
         showRestartPrompt
           ? {
