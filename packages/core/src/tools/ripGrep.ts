@@ -250,9 +250,14 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
+      const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      const timeoutMs =
+        configTimeout && configTimeout > 5000
+          ? configTimeout
+          : DEFAULT_SEARCH_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
         timeoutController.abort();
-      }, DEFAULT_SEARCH_TIMEOUT_MS);
+      }, timeoutMs);
 
       // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
@@ -279,6 +284,13 @@ class GrepToolInvocation extends BaseToolInvocation<
           max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
+      } catch (error) {
+        if (timeoutController.signal.aborted) {
+          throw new Error(
+            `Operation timed out after ${timeoutMs}ms. In large repositories, consider narrowing your search scope by specifying a 'dir_path' or an 'include_pattern'.`,
+          );
+        }
+        throw error;
       } finally {
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
