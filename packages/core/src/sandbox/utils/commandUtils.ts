@@ -61,3 +61,22 @@ export async function getCommandName(req: SandboxRequest): Promise<string> {
   }
   return path.basename(req.command);
 }
+
+export function verifySandboxOverrides(
+  allowOverrides: boolean,
+  policy: SandboxRequest['policy'],
+) {
+  if (!allowOverrides) {
+    if (
+      policy?.networkAccess ||
+      policy?.allowedPaths?.length ||
+      policy?.additionalPermissions?.network ||
+      policy?.additionalPermissions?.fileSystem?.read?.length ||
+      policy?.additionalPermissions?.fileSystem?.write?.length
+    ) {
+      throw new Error(
+        'Sandbox request rejected: Cannot override readonly/network/filesystem restrictions in Plan mode.',
+      );
+    }
+  }
+}

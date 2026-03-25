@@ -42,7 +42,11 @@ export function createSandboxManager(
         policyManager,
       });
     } else if (os.platform() === 'linux') {
-      return new LinuxSandboxManager({ workspace });
+      return new LinuxSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
     } else if (os.platform() === 'darwin') {
       return new MacOsSandboxManager({
         workspace,

@@ -170,7 +170,7 @@ describe('LinuxSandboxManager', () => {
           policy: { additionalPermissions: { network: true } },
         }),
       ).rejects.toThrow(
-        /Cannot override readonly\/network restrictions in Plan mode/,
+        /Cannot override readonly\/network\/filesystem restrictions in Plan mode/,
       );
     });
 
@@ -291,6 +291,25 @@ describe('LinuxSandboxManager', () => {
         expect(bwrapArgs[bwrapArgs.indexOf('/opt/tools') - 1]).toBe(
           '--bind-try',
         );
+      });
+
+      it('should not grant read-write access to allowedPaths inside the workspace when readonly mode is active', async () => {
+        const manager = new LinuxSandboxManager({
+          workspace,
+          modeConfig: { readonly: true },
+        });
+        const result = await manager.prepareCommand({
+          command: 'ls',
+          args: [],
+          cwd: workspace,
+          env: {},
+          policy: {
+            allowedPaths: [workspace + '/subdirectory'],
+          },
+        });
+        const bwrapArgs = result.args;
+        const bindIndex = bwrapArgs.indexOf(workspace + '/subdirectory');
+        expect(bwrapArgs[bindIndex - 1]).toBe('--ro-bind-try');
       });
 
       it('should not bind the workspace twice even if it has a trailing slash in allowedPaths', async () => {

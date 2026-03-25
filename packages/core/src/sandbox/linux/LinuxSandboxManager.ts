@@ -20,10 +20,13 @@ import {
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-  type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
-import { isStrictlyApproved, getCommandName } from '../utils/commandUtils.js';
+import {
+  isStrictlyApproved,
+  verifySandboxOverrides,
+  getCommandName,
+} from '../utils/commandUtils.js';
 import {
   tryRealpath,
   resolveGitWorktreePaths,
@@ -117,7 +120,6 @@ import {
  */
 
 export interface LinuxSandboxOptions extends GlobalSandboxOptions {
-  sanitizationConfig?: EnvironmentSanitizationConfig;
   modeConfig?: {
     readonly?: boolean;
     network?: boolean;
@@ -142,17 +144,7 @@ export class LinuxSandboxManager implements SandboxManager {
     const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
     const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
-    if (!allowOverrides && req.policy?.additionalPermissions) {
-      const perms = req.policy.additionalPermissions;
-      if (
-        perms.network ||
-        (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
-      ) {
-        throw new Error(
-          'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
-        );
-      }
-    }
+    verifySandboxOverrides(allowOverrides, req.policy);
 
     const commandName = await getCommandName(req);
     const isApproved = allowOverrides
@@ -238,7 +230,14 @@ export class LinuxSandboxManager implements SandboxManager {
       if (!fs.existsSync(resolved)) continue;
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
-        bwrapArgs.push('--bind-try', resolved, resolved);
+        if (
+          !workspaceWrite &&
+          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
+        ) {
+          bwrapArgs.push('--ro-bind-try', resolved, resolved);
+        } else {
+          bwrapArgs.push('--bind-try', resolved, resolved);
+        }
       }
     }
 

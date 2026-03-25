@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
 import * as fsUtils from '../utils/fsUtils.js';
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ vi.mock('../utils/fsUtils.js', async () => {
 });
 
 describe('seatbeltArgsBuilder', () => {
-  beforeEach(() => {
+  afterEach(() => {
     vi.restoreAllMocks();
   });
 

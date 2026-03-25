@@ -31,6 +31,7 @@ import {
   isStrictlyApproved,
 } from './commandSafety.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
+import { verifySandboxOverrides } from '../utils/commandUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -214,17 +215,7 @@ export class WindowsSandboxManager implements SandboxManager {
     const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
     // Reject override attempts in plan mode
-    if (!allowOverrides && req.policy?.additionalPermissions) {
-      const perms = req.policy.additionalPermissions;
-      if (
-        perms.network ||
-        (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
-      ) {
-        throw new Error(
-          'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
-        );
-      }
-    }
+    verifySandboxOverrides(allowOverrides, req.policy);
 
     // Fetch persistent approvals for this command
     const commandName = await getCommandName(req.command, req.args);
