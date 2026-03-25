@@ -2,10 +2,13 @@
 
 exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v1.2.3
+
 
 
 Tips for getting started:
@@ -34,11 +37,8 @@ Tips for getting started:
 
 
 
-
-
-
-
 Notifications
+
 Composer
 "
 `;
@@ -47,10 +47,13 @@ exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
 "Notifications
 Footer
 
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v1.2.3
+
 
 
 Tips for getting started:
@@ -64,13 +67,12 @@ Composer
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
 
-
-
+ Gemini CLI v1.2.3
 
 
 
@@ -101,16 +103,20 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 
 
 Notifications
+
 DialogManager
 "
 `;
 
 exports[`App > should render ToolConfirmationQueue along with Composer when tool is confirming and experiment is on 1`] = `
 "
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+ ▝▜▄      ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛
+   ▝▜▄    █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌
+  ▗▟▀     ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█ ▝██▌ █▌
+ ▝▀        ▀▀▀▀▘▝▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀
+
+ Gemini CLI v1.2.3
+
 
 
 Tips for getting started:
@@ -139,11 +145,8 @@ HistoryItemDisplay
 
 
 
-
-
-
-
 Notifications
+
 Composer
 "
 `;
