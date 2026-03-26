@@ -21,6 +21,7 @@ import {
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -119,6 +120,87 @@ export const GOVERNANCE_FILES = [
   { path: '.geminiignore', isDirectory: false },
   { path: '.git', isDirectory: true },
 ] as const;
+
+/**
+ * Files that contain sensitive secrets or credentials and should be
+ * completely hidden (deny read/write) in any sandbox.
+ */
+export const SECRET_FILES = [
+  { pattern: '.env' },
+  { pattern: '.env.*' },
+] as const;
+
+/**
+ * Checks if a given file name matches any of the secret file patterns.
+ */
+export function isSecretFile(fileName: string): boolean {
+  return SECRET_FILES.some((s) => {
+    if (s.pattern.endsWith('*')) {
+      const prefix = s.pattern.slice(0, -1);
+      return fileName.startsWith(prefix);
+    }
+    return fileName === s.pattern;
+  });
+}
+
+/**
+ * Returns arguments for the Linux 'find' command to locate secret files.
+ */
+export function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s, i) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
+  return args;
+}
+
+/**
+ * Finds all secret files in a directory up to a certain depth.
+ * Default is shallow scan (depth 1) for performance.
+ */
+export async function findSecretFiles(
+  baseDir: string,
+  maxDepth = 1,
+): Promise<string[]> {
+  const secrets: string[] = [];
+  const skipDirs = new Set([
+    'node_modules',
+    '.git',
+    '.venv',
+    '__pycache__',
+    'dist',
+    'build',
+    '.next',
+    '.idea',
+    '.vscode',
+  ]);
+
+  async function walk(dir: string, depth: number) {
+    if (depth > maxDepth) return;
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!skipDirs.has(entry.name)) {
+            await walk(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          if (isSecretFile(entry.name)) {
+            secrets.push(fullPath);
+          }
+        }
+      }
+    } catch {
+      // Ignore read errors
+    }
+  }
+
+  await walk(baseDir, 1);
+  return secrets;
+}
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands

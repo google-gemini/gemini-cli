@@ -3,20 +3,120 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
 import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs/promises';
+import fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   NoopSandboxManager,
   LocalSandboxManager,
   sanitizePaths,
+  findSecretFiles,
+  isSecretFile,
   tryRealpath,
 } from './sandboxManager.js';
 import { createSandboxManager } from './sandboxManagerFactory.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
 import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
+import type fs from 'node:fs';
+
+vi.mock('node:fs/promises', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises',
+    );
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      readdir: vi.fn(),
+      realpath: vi.fn(),
+      stat: vi.fn(),
+    },
+    readdir: vi.fn(),
+    realpath: vi.fn(),
+    stat: vi.fn(),
+  };
+});
+
+describe('isSecretFile', () => {
+  it('should return true for .env', () => {
+    expect(isSecretFile('.env')).toBe(true);
+  });
+
+  it('should return true for .env.local', () => {
+    expect(isSecretFile('.env.local')).toBe(true);
+  });
+
+  it('should return true for .env.production', () => {
+    expect(isSecretFile('.env.production')).toBe(true);
+  });
+
+  it('should return false for regular files', () => {
+    expect(isSecretFile('package.json')).toBe(false);
+    expect(isSecretFile('index.ts')).toBe(false);
+    expect(isSecretFile('.gitignore')).toBe(false);
+  });
+
+  it('should return false for files starting with .env but not matching pattern', () => {
+    // This depends on the pattern ".env.*". ".env-backup" would match ".env*" but not ".env.*"
+    expect(isSecretFile('.env-backup')).toBe(false);
+  });
+});
+
+describe('findSecretFiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should find secret files in the root directory', async () => {
+    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
+      if (dir === '/workspace') {
+        return Promise.resolve([
+          { name: '.env', isDirectory: () => false, isFile: () => true },
+          {
+            name: 'package.json',
+            isDirectory: () => false,
+            isFile: () => true,
+          },
+          { name: 'src', isDirectory: () => true, isFile: () => false },
+        ] as unknown as fs.Dirent[]);
+      }
+      return Promise.resolve([] as unknown as fs.Dirent[]);
+    }) as unknown as typeof fsPromises.readdir);
+
+    const secrets = await findSecretFiles('/workspace');
+    expect(secrets).toEqual([path.join('/workspace', '.env')]);
+  });
+
+  it('should NOT find secret files recursively (shallow scan only)', async () => {
+    vi.mocked(fsPromises.readdir).mockImplementation(((dir: string) => {
+      if (dir === '/workspace') {
+        return Promise.resolve([
+          { name: '.env', isDirectory: () => false, isFile: () => true },
+          { name: 'packages', isDirectory: () => true, isFile: () => false },
+        ] as unknown as fs.Dirent[]);
+      }
+      if (dir === path.join('/workspace', 'packages')) {
+        return Promise.resolve([
+          { name: '.env.local', isDirectory: () => false, isFile: () => true },
+        ] as unknown as fs.Dirent[]);
+      }
+      return Promise.resolve([] as unknown as fs.Dirent[]);
+    }) as unknown as typeof fsPromises.readdir);
+
+    const secrets = await findSecretFiles('/workspace');
+    expect(secrets).toEqual([path.join('/workspace', '.env')]);
+    // Should NOT have called readdir for subdirectories
+    expect(fsPromises.readdir).toHaveBeenCalledTimes(1);
+    expect(fsPromises.readdir).not.toHaveBeenCalledWith(
+      path.join('/workspace', 'packages'),
+      expect.anything(),
+    );
+  });
+});
 
 describe('SandboxManager', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -48,24 +148,30 @@ describe('SandboxManager', () => {
     });
 
     it('should return the realpath if the file exists', async () => {
-      vi.spyOn(fs, 'realpath').mockResolvedValue('/real/path/to/file.txt');
+      vi.mocked(fsPromises.realpath).mockResolvedValue(
+        '/real/path/to/file.txt' as never,
+      );
       const result = await tryRealpath('/some/symlink/to/file.txt');
       expect(result).toBe('/real/path/to/file.txt');
-      expect(fs.realpath).toHaveBeenCalledWith('/some/symlink/to/file.txt');
+      expect(fsPromises.realpath).toHaveBeenCalledWith(
+        '/some/symlink/to/file.txt',
+      );
     });
 
     it('should fallback to parent directory if file does not exist (ENOENT)', async () => {
-      vi.spyOn(fs, 'realpath').mockImplementation(async (p) => {
+      vi.mocked(fsPromises.realpath).mockImplementation(((p: string) => {
         if (p === '/workspace/nonexistent.txt') {
-          throw Object.assign(new Error('ENOENT: no such file or directory'), {
-            code: 'ENOENT',
-          });
+          return Promise.reject(
+            Object.assign(new Error('ENOENT: no such file or directory'), {
+              code: 'ENOENT',
+            }),
+          );
         }
         if (p === '/workspace') {
-          return '/real/workspace';
+          return Promise.resolve('/real/workspace');
         }
-        throw new Error(`Unexpected path: ${p}`);
-      });
+        return Promise.reject(new Error(`Unexpected path: ${p}`));
+      }) as never);
 
       const result = await tryRealpath('/workspace/nonexistent.txt');
 
@@ -74,18 +180,22 @@ describe('SandboxManager', () => {
     });
 
     it('should recursively fallback up the directory tree on multiple ENOENT errors', async () => {
-      vi.spyOn(fs, 'realpath').mockImplementation(async (p) => {
+      vi.mocked(fsPromises.realpath).mockImplementation(((p: string) => {
         if (p === '/workspace/missing_dir/missing_file.txt') {
-          throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+          return Promise.reject(
+            Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+          );
         }
         if (p === '/workspace/missing_dir') {
-          throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+          return Promise.reject(
+            Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+          );
         }
         if (p === '/workspace') {
-          return '/real/workspace';
+          return Promise.resolve('/real/workspace');
         }
-        throw new Error(`Unexpected path: ${p}`);
-      });
+        return Promise.reject(new Error(`Unexpected path: ${p}`));
+      }) as never);
 
       const result = await tryRealpath(
         '/workspace/missing_dir/missing_file.txt',
@@ -99,20 +209,22 @@ describe('SandboxManager', () => {
 
     it('should return the path unchanged if it reaches the root directory and it still does not exist', async () => {
       const rootPath = path.resolve('/');
-      vi.spyOn(fs, 'realpath').mockImplementation(async () => {
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-      });
+      vi.mocked(fsPromises.realpath).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' })),
+      );
 
       const result = await tryRealpath(rootPath);
       expect(result).toBe(rootPath);
     });
 
     it('should throw an error if realpath fails with a non-ENOENT error (e.g. EACCES)', async () => {
-      vi.spyOn(fs, 'realpath').mockImplementation(async () => {
-        throw Object.assign(new Error('EACCES: permission denied'), {
-          code: 'EACCES',
-        });
-      });
+      vi.mocked(fsPromises.realpath).mockImplementation(() =>
+        Promise.reject(
+          Object.assign(new Error('EACCES: permission denied'), {
+            code: 'EACCES',
+          }),
+        ),
+      );
 
       await expect(tryRealpath('/secret/file.txt')).rejects.toThrow(
         'EACCES: permission denied',
