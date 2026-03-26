@@ -286,6 +286,7 @@ describe('loggers', () => {
 
     it('should set worktree_active to true when worktree settings are present', async () => {
       const mockConfig = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...baseMockConfig,
         getWorktreeSettings: () => ({
           name: 'test-worktree',
@@ -556,6 +557,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_API_RESPONSE,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -715,6 +717,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_API_ERROR,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1285,6 +1288,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1422,6 +1426,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1502,6 +1507,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1581,6 +1587,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1661,6 +1668,7 @@ describe('loggers', () => {
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -1955,6 +1963,7 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'installation.id': 'test-installation-id',
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
           interactive: false,
@@ -1992,6 +2001,7 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'installation.id': 'test-installation-id',
+          // eslint-disable-next-line @typescript-eslint/no-misused-spread
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
           interactive: false,
@@ -2556,7 +2566,7 @@ describe('loggers', () => {
     });
 
     it('should log onboarding success event to Clearcut and OTEL, and record metrics', () => {
-      const event = new OnboardingSuccessEvent('standard-tier');
+      const event = new OnboardingSuccessEvent('standard-tier', 100);
 
       logOnboardingSuccess(mockConfig, event);
 
@@ -2565,7 +2575,7 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Onboarding succeeded. Tier: standard-tier',
+        body: 'Onboarding succeeded. Tier: standard-tier. Duration: 100ms',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
@@ -2574,12 +2584,14 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           interactive: false,
           user_tier: 'standard-tier',
+          duration_ms: 100,
         },
       });
 
       expect(metrics.recordOnboardingSuccess).toHaveBeenCalledWith(
         mockConfig,
         'standard-tier',
+        100,
       );
     });
   });

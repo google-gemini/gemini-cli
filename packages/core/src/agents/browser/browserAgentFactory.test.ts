@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createBrowserAgentDefinition,
-  cleanupBrowserAgent,
+  resetBrowserSession,
 } from './browserAgentFactory.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
@@ -40,9 +40,17 @@ const mockBrowserManager = {
 };
 
 // Mock dependencies
-vi.mock('./browserManager.js', () => ({
-  BrowserManager: vi.fn(() => mockBrowserManager),
-}));
+vi.mock('./browserManager.js', () => {
+  const instancesMap = new Map();
+  const MockBrowserManager = vi.fn() as unknown as Record<string, unknown>;
+  // Add static methods — use mockImplementation for lazy eval (hoisting-safe)
+  MockBrowserManager['getInstance'] = vi.fn();
+  MockBrowserManager['resetAll'] = vi.fn().mockResolvedValue(undefined);
+  MockBrowserManager['instances'] = instancesMap;
+  return {
+    BrowserManager: MockBrowserManager,
+  };
+});
 
 vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
@@ -71,8 +79,15 @@ describe('browserAgentFactory', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Set up getInstance to return mockBrowserManager
+    // (Can't do this in vi.mock factory due to hoisting)
+    const { BrowserManager: MockBM } = await import('./browserManager.js');
+    (MockBM as unknown as Record<string, ReturnType<typeof vi.fn>>)[
+      'getInstance'
+    ].mockReturnValue(mockBrowserManager);
 
     vi.mocked(injectAutomationOverlay).mockClear();
 
@@ -110,7 +125,7 @@ describe('browserAgentFactory', () => {
     } as unknown as MessageBus;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
   });
 
@@ -359,6 +374,23 @@ describe('browserAgentFactory', () => {
     });
   });
 
+  describe('resetBrowserSession', () => {
+    it('should delegate to BrowserManager.resetAll', async () => {
+      const { BrowserManager: MockBrowserManager } = await import(
+        './browserManager.js'
+      );
+      await resetBrowserSession();
+      expect(
+        (
+          MockBrowserManager as unknown as Record<
+            string,
+            ReturnType<typeof vi.fn>
+          >
+        )['resetAll'],
+      ).toHaveBeenCalled();
+    });
+  });
+
   describe('Policy Registration', () => {
     let mockPolicyEngine: {
       addRule: ReturnType<typeof vi.fn>;
@@ -436,9 +468,19 @@ describe('browserAgentFactory', () => {
 
     it('should register ALLOW rules for read-only tools', async () => {
       mockBrowserManager.getDiscoveredTools.mockResolvedValue([
-        { name: 'take_snapshot', description: 'Take snapshot' },
-        { name: 'take_screenshot', description: 'Take screenshot' },
-        { name: 'list_pages', description: 'list all pages' },
+        {
+          name: 'take_snapshot',
+          description: 'Take snapshot',
+        },
+        {
+          name: 'take_screenshot',
+          description: 'Take screenshot',
+        },
+        {
+          name: 'list_pages',
+          description: 'list all pages',
+          annotations: { readOnlyHint: true },
+        },
       ]);
 
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
@@ -571,6 +613,7 @@ describe('buildBrowserSystemPrompt', () => {
     expect(prompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
     expect(prompt).toContain('- github.com');
     expect(prompt).toContain('- *.google.com');
+    expect(prompt).toContain('Do NOT use proxy services');
   });
 
   it('should exclude allowed domains restriction when not provided or empty', () => {

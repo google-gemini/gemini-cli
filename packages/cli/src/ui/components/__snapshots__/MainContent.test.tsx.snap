@@ -6,12 +6,11 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 9                                                                                       │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
-│ Line 14                                                                                    █ │
+│ Line 14                                                                                      │
 │ Line 15                                                                                    █ │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
@@ -28,12 +27,11 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 9                                                                                       │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
-│ Line 14                                                                                    █ │
+│ Line 14                                                                                      │
 │ Line 15                                                                                    █ │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
@@ -49,8 +47,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 9 lines hidden (Ctrl+O to show) ...                                                │
-│ Line 10                                                                                      │
+│ ... first 10 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
@@ -94,17 +91,54 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 "
 `;
 
+exports[`MainContent > renders a ToolConfirmationQueue without an extra line when preceded by hidden tools 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Apply plan                                                                   
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Ready to start implementation?                                               │
+│                                                                              │
+│  Error reading plan: Storage must be initialized before use                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`MainContent > renders a split tool group without a gap between static and pending areas 1`] = `
 "AppHeader(full)
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
-│ Part 1                                                                                       │
-│                                                                                              │
-│ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
-│ Part 2                                                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Part 1                                                                   │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Part 2                                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`MainContent > renders a spurious line when a tool group has only hidden tools and borderBottom true 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Apply plan                                                                   
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+"
+`;
+
+exports[`MainContent > renders a subagent with a complete box including bottom border 1`] = `
+"AppHeader(full)
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Investigate                                                                  
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ≡ Running Agent... (ctrl+o to collapse)                                  │
+│                                                                          │
+│ Running subagent codebase_investigator...                                │
+│                                                                          │
+│ ⠋  run_shell_command echo hello                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
@@ -163,16 +197,16 @@ AppHeader(full)
  Thinking... 
  │
  │ Initial analysis
- │ This is a multiple line paragraph for the first thinking message of how the model analyzes the
- │ problem.
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
  │
  │ Planning execution
- │ This a second multiple line paragraph for the second thinking message explaining the plan in
- │ detail so that it wraps around the terminal display.
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
  │
  │ Refining approach
- │ And finally a third multiple line paragraph for the third thinking message to refine the
- │ solution.
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution.
 "
 `;
 
@@ -185,14 +219,14 @@ AppHeader(full)
  Thinking... 
  │
  │ Initial analysis
- │ This is a multiple line paragraph for the first thinking message of how the model analyzes the
- │ problem.
+ │ This is a multiple line paragraph for the first thinking message of how the
+ │ model analyzes the problem.
  │
  │ Planning execution
- │ This a second multiple line paragraph for the second thinking message explaining the plan in
- │ detail so that it wraps around the terminal display.
+ │ This a second multiple line paragraph for the second thinking message
+ │ explaining the plan in detail so that it wraps around the terminal display.
  │
  │ Refining approach
- │ And finally a third multiple line paragraph for the third thinking message to refine the
- │ solution."
+ │ And finally a third multiple line paragraph for the third thinking message to
+ │ refine the solution."
 `;

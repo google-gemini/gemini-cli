@@ -79,8 +79,8 @@ export async function createBrowserAgentDefinition(
     'Creating browser agent definition with isolated MCP tools...',
   );
 
-  // Create and initialize browser manager with isolated MCP client
-  const browserManager = new BrowserManager(config);
+  // Get or create browser manager singleton for this session mode/profile
+  const browserManager = BrowserManager.getInstance(config);
   await browserManager.ensureConnection();
 
   if (printOutput) {
@@ -137,13 +137,12 @@ export async function createBrowserAgentDefinition(
     }
 
     // Reduce noise for read-only tools in default mode
-    const readOnlyTools = [
-      'take_snapshot',
-      'take_screenshot',
-      'list_pages',
-      'list_network_requests',
-    ];
-    for (const toolName of readOnlyTools) {
+    const readOnlyTools = (await browserManager.getDiscoveredTools())
+      .filter((t) => !!t.annotations?.readOnlyHint)
+      .map((t) => t.name);
+    const allowlistedReadonlyTools = ['take_snapshot', 'take_screenshot'];
+
+    for (const toolName of [...readOnlyTools, ...allowlistedReadonlyTools]) {
       if (availableToolNames.includes(toolName)) {
         const rule = generateAllowRules(toolName);
         if (!existingRules.some((r) => isRuleEqual(r, rule))) {
@@ -292,7 +291,7 @@ export async function createBrowserAgentDefinition(
 }
 
 /**
- * Cleans up browser resources after agent execution.
+ * Closes all persistent browser sessions and cleans up resources.
  *
  * @param browserManager The browser manager to clean up
  * @param config Runtime configuration
@@ -320,4 +319,8 @@ export async function cleanupBrowserAgent(
       `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+ * Call this on /clear commands and CLI exit to reset browser state.
+ */
+export async function resetBrowserSession(): Promise<void> {
+  await BrowserManager.resetAll();
 }

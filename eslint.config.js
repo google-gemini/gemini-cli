@@ -158,6 +158,7 @@ export default tseslint.config(
       '@typescript-eslint/await-thenable': ['error'],
       '@typescript-eslint/no-floating-promises': ['error'],
       '@typescript-eslint/no-unnecessary-type-assertion': ['error'],
+      '@typescript-eslint/no-misused-spread': ['error'],
       'no-restricted-imports': [
         'error',
         {

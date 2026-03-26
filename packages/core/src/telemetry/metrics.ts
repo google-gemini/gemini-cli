@@ -53,6 +53,7 @@ const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
 const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
 const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
 const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+const EVENT_ONBOARDING_DURATION_MS = 'gemini_cli.onboarding.duration';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -546,6 +547,13 @@ const HISTOGRAM_DEFINITIONS = {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     attributes: {} as {
       session_mode: 'persistent' | 'isolated' | 'existing';
+  [EVENT_ONBOARDING_DURATION_MS]: {
+    description: 'Duration of onboarding in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (onboardingDurationHistogram = h),
+    attributes: {} as {
+      user_tier?: string;
     },
   },
 } as const;
@@ -776,6 +784,7 @@ let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
 let onboardingStartCounter: Counter | undefined;
 let onboardingSuccessCounter: Counter | undefined;
+let onboardingDurationHistogram: Histogram | undefined;
 
 let browserAgentConnectionDurationHistogram: Histogram | undefined;
 let browserAgentConnectionFailureCounter: Counter | undefined;
@@ -975,12 +984,22 @@ export function recordOnboardingStart(config: Config): void {
 export function recordOnboardingSuccess(
   config: Config,
   userTier?: string,
+  durationMs?: number,
 ): void {
-  if (!onboardingSuccessCounter || !isMetricsInitialized) return;
-  onboardingSuccessCounter.add(1, {
+  if (!isMetricsInitialized) return;
+
+  const attributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     ...(userTier && { user_tier: userTier }),
-  });
+  };
+
+  if (onboardingSuccessCounter) {
+    onboardingSuccessCounter.add(1, attributes);
+  }
+
+  if (durationMs !== undefined && onboardingDurationHistogram) {
+    onboardingDurationHistogram.record(durationMs, attributes);
+  }
 }
 
 /**
