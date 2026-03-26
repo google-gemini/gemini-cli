@@ -89,7 +89,7 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
 } from './base-declarations.js';
 
@@ -233,21 +233,27 @@ export {
 export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  enableToolSandboxing: boolean = false,
 ): ToolDefinition {
   return {
-    base: getShellDeclaration(enableInteractiveShell, enableEfficiency),
+    base: getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
     overrides: (modelId) =>
       getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
+        enableToolSandboxing,
       ),
   };
 }
 
-export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+export function getExitPlanModeDefinition(): ToolDefinition {
   return {
-    base: getExitPlanModeDeclaration(plansDir),
-    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(plansDir),
+    base: getExitPlanModeDeclaration(),
+    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(),
   };
 }
 

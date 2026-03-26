@@ -80,7 +80,37 @@ export function truncateString(
   if (str.length <= maxLength) {
     return str;
   }
-  return str.slice(0, maxLength) + suffix;
+
+  // This regex matches a "Grapheme Cluster" manually:
+  // 1. A surrogate pair OR a single character...
+  // 2. Followed by any number of "Combining Marks" (\p{M})
+  // 'u' flag is required for Unicode property escapes
+  const graphemeRegex = /(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|.)\p{M}*/gu;
+
+  let truncatedStr = '';
+  let match: RegExpExecArray | null;
+
+  while ((match = graphemeRegex.exec(str)) !== null) {
+    const segment = match[0];
+
+    // If adding the whole cluster (base char + accent) exceeds maxLength, stop.
+    if (truncatedStr.length + segment.length > maxLength) {
+      break;
+    }
+
+    truncatedStr += segment;
+    if (truncatedStr.length >= maxLength) break;
+  }
+
+  // Final safety check for dangling high surrogates
+  if (truncatedStr.length > 0) {
+    const lastCode = truncatedStr.charCodeAt(truncatedStr.length - 1);
+    if (lastCode >= 0xd800 && lastCode <= 0xdbff) {
+      truncatedStr = truncatedStr.slice(0, -1);
+    }
+  }
+
+  return truncatedStr + suffix;
 }
 
 /**

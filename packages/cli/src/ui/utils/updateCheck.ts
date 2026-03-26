@@ -27,6 +27,7 @@ export interface UpdateInfo {
 export interface UpdateObject {
   message: string;
   update: UpdateInfo;
+  isUpdating?: boolean;
 }
 
 /**

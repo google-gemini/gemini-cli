@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -138,8 +139,9 @@ Implement a comprehensive authentication system with multiple providers.
     vi.restoreAllMocks();
   });
 
-  const renderDialog = (options?: { useAlternateBuffer?: boolean }) =>
-    renderWithProviders(
+  const renderDialog = async (options?: { useAlternateBuffer?: boolean }) => {
+    const useAlternateBuffer = options?.useAlternateBuffer ?? true;
+    return renderWithProviders(
       <ExitPlanModeDialog
         planPath={mockPlanFullPath}
         onApprove={onApprove}
@@ -163,16 +165,20 @@ Implement a comprehensive authentication system with multiple providers.
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
           }),
-          getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
+          getUseAlternateBuffer: () => useAlternateBuffer,
         } as unknown as import('@google/gemini-cli-core').Config,
+        settings: createMockSettings({ ui: { useAlternateBuffer } }),
       },
     );
+  };
 
   describe.each([{ useAlternateBuffer: true }, { useAlternateBuffer: false }])(
     'useAlternateBuffer: $useAlternateBuffer',
     ({ useAlternateBuffer }) => {
       it('renders correctly with plan content', async () => {
-        const { lastFrame } = renderDialog({ useAlternateBuffer });
+        const { lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         // Advance timers to pass the debounce period
         await act(async () => {
@@ -195,7 +201,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('calls onApprove with AUTO_EDIT when first option is selected', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -213,7 +221,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('calls onApprove with DEFAULT when second option is selected', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -232,7 +242,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('calls onFeedback when feedback is typed and submitted', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -263,7 +275,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('calls onCancel when Esc is pressed', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -289,7 +303,9 @@ Implement a comprehensive authentication system with multiple providers.
           error: 'File not found',
         });
 
-        const { lastFrame } = renderDialog({ useAlternateBuffer });
+        const { lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -305,7 +321,9 @@ Implement a comprehensive authentication system with multiple providers.
       it('displays error state when plan file is empty', async () => {
         vi.mocked(validatePlanContent).mockResolvedValue('Plan file is empty.');
 
-        const { lastFrame } = renderDialog({ useAlternateBuffer });
+        const { lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -324,7 +342,9 @@ Implement a comprehensive authentication system with multiple providers.
           returnDisplay: 'Read file',
         });
 
-        const { lastFrame } = renderDialog({ useAlternateBuffer });
+        const { lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -340,7 +360,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('allows number key quick selection', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -359,7 +381,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('clears feedback text when Ctrl+C is pressed while editing', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -416,34 +440,38 @@ Implement a comprehensive authentication system with multiple providers.
           return <>{children}</>;
         };
 
-        const { stdin, lastFrame } = renderWithProviders(
-          <BubbleListener>
-            <ExitPlanModeDialog
-              planPath={mockPlanFullPath}
-              onApprove={onApprove}
-              onFeedback={onFeedback}
-              onCancel={onCancel}
-              getPreferredEditor={vi.fn()}
-              width={80}
-              availableHeight={24}
-            />
-          </BubbleListener>,
-          {
-            useAlternateBuffer,
-            config: {
-              getTargetDir: () => mockTargetDir,
-              getIdeMode: () => false,
-              isTrustedFolder: () => true,
-              storage: {
-                getPlansDir: () => mockPlansDir,
-              },
-              getFileSystemService: (): FileSystemService => ({
-                readTextFile: vi.fn(),
-                writeTextFile: vi.fn(),
+        const { stdin, lastFrame } = await act(async () =>
+          renderWithProviders(
+            <BubbleListener>
+              <ExitPlanModeDialog
+                planPath={mockPlanFullPath}
+                onApprove={onApprove}
+                onFeedback={onFeedback}
+                onCancel={onCancel}
+                getPreferredEditor={vi.fn()}
+                width={80}
+                availableHeight={24}
+              />
+            </BubbleListener>,
+            {
+              config: {
+                getTargetDir: () => mockTargetDir,
+                getIdeMode: () => false,
+                isTrustedFolder: () => true,
+                storage: {
+                  getPlansDir: () => mockPlansDir,
+                },
+                getFileSystemService: (): FileSystemService => ({
+                  readTextFile: vi.fn(),
+                  writeTextFile: vi.fn(),
+                }),
+                getUseAlternateBuffer: () => useAlternateBuffer ?? true,
+              } as unknown as import('@google/gemini-cli-core').Config,
+              settings: createMockSettings({
+                ui: { useAlternateBuffer: useAlternateBuffer ?? true },
               }),
-              getUseAlternateBuffer: () => useAlternateBuffer ?? true,
-            } as unknown as import('@google/gemini-cli-core').Config,
-          },
+            },
+          ),
         );
 
         await act(async () => {
@@ -485,7 +513,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('does not submit empty feedback when Enter is pressed', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -512,7 +542,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('allows arrow navigation while typing feedback to change selection', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();
@@ -544,7 +576,9 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+        const { stdin, lastFrame } = await act(async () =>
+          renderDialog({ useAlternateBuffer }),
+        );
 
         await act(async () => {
           vi.runAllTimers();

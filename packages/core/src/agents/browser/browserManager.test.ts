@@ -9,6 +9,8 @@ import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { injectInputBlocker } from './inputBlocker.js';
+import { coreEvents } from '../../utils/events.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -44,8 +46,20 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+// Mock browser consent to always grant consent by default
+vi.mock('../../utils/browserConsent.js', () => ({
+  getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./inputBlocker.js', () => ({
+  injectInputBlocker: vi.fn().mockResolvedValue(undefined),
+  removeInputBlocker: vi.fn().mockResolvedValue(undefined),
+  suspendInputBlocker: vi.fn().mockResolvedValue(undefined),
+  resumeInputBlocker: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -64,6 +78,7 @@ vi.mock('node:fs', async (importOriginal) => {
 import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 
 describe('BrowserManager', () => {
   let mockConfig: Config;
@@ -71,6 +86,11 @@ describe('BrowserManager', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(injectAutomationOverlay).mockClear();
+    vi.mocked(injectInputBlocker).mockClear();
+    vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
+
+    // Re-establish consent mock after resetAllMocks
+    vi.mocked(getBrowserConsentIfNeeded).mockResolvedValue(true);
 
     // Setup mock config
     mockConfig = makeFakeConfig({
@@ -261,6 +281,76 @@ describe('BrowserManager', () => {
       expect(result.isError).toBe(true);
       expect((result.content || [])[0]?.text).toContain('not permitted');
     });
+
+    it('should block proxy URL with embedded disallowed domain in query params', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should block proxy URL with embedded disallowed domain in URL fragment (hash)', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should allow proxy URL when embedded domain is also allowed', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com', 'github.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?u=https://github.com/repo',
+      });
+
+      expect(result.isError).toBe(false);
+    });
+
+    it('should allow navigation to allowed domain without proxy params', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/?sl=en&tl=zh',
+      });
+
+      expect(result.isError).toBe(false);
+    });
   });
 
   describe('MCP connection', () => {
@@ -418,6 +508,11 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).toContain('--autoConnect');
       expect(args).not.toContain('--isolated');
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('saved logins will be visible'),
+      );
     });
 
     it('should throw actionable error when existing mode connection fails', async () => {
@@ -527,6 +622,41 @@ describe('BrowserManager', () => {
         /sessionMode: persistent/,
       );
     });
+
+    it('should pass --no-usage-statistics and --no-performance-crux when privacy is disabled', async () => {
+      const privacyDisabledConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+          },
+        },
+        usageStatisticsEnabled: false,
+      });
+
+      const manager = new BrowserManager(privacyDisabledConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain('--no-usage-statistics');
+      expect(args).toContain('--no-performance-crux');
+    });
+
+    it('should NOT pass privacy flags when usage statistics are enabled', async () => {
+      // Default config has usageStatisticsEnabled: true (or undefined)
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).not.toContain('--no-usage-statistics');
+      expect(args).not.toContain('--no-performance-crux');
+    });
   });
 
   describe('MCP isolation', () => {
@@ -571,21 +701,66 @@ describe('BrowserManager', () => {
   });
 
   describe('overlay re-injection in callTool', () => {
-    it('should re-inject overlay after click in non-headless mode', async () => {
+    it('should re-inject overlay and input blocker after click in non-headless mode when input disabling is enabled', async () => {
+      // Enable input disabling in config
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: '1_2' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
     });
 
-    it('should re-inject overlay after navigate_page in non-headless mode', async () => {
+    it('should re-inject overlay and input blocker after navigate_page in non-headless mode when input disabling is enabled', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('navigate_page', { url: 'https://example.com' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
     });
 
-    it('should re-inject overlay after click_at, new_page, press_key, handle_dialog', async () => {
+    it('should re-inject overlay and input blocker after click_at, new_page, press_key, handle_dialog when input disabling is enabled', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       for (const tool of [
         'click_at',
@@ -594,12 +769,15 @@ describe('BrowserManager', () => {
         'handle_dialog',
       ]) {
         vi.mocked(injectAutomationOverlay).mockClear();
+        vi.mocked(injectInputBlocker).mockClear();
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).toHaveBeenCalledTimes(1);
+        expect(injectInputBlocker).toHaveBeenCalledTimes(1);
+        expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
       }
     });
 
-    it('should NOT re-inject overlay after read-only tools', async () => {
+    it('should NOT re-inject overlay or input blocker after read-only tools', async () => {
       const manager = new BrowserManager(mockConfig);
       for (const tool of [
         'take_snapshot',
@@ -608,8 +786,10 @@ describe('BrowserManager', () => {
         'fill',
       ]) {
         vi.mocked(injectAutomationOverlay).mockClear();
+        vi.mocked(injectInputBlocker).mockClear();
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).not.toHaveBeenCalled();
+        expect(injectInputBlocker).not.toHaveBeenCalled();
       }
     });
 
@@ -644,6 +824,30 @@ describe('BrowserManager', () => {
       await manager.callTool('click', { uid: 'bad' });
 
       expect(injectAutomationOverlay).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Rate limiting', () => {
+    it('should terminate task when maxActionsPerTask is reached', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 3,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // First 3 calls should succeed
+      await manager.callTool('take_snapshot', {});
+      await manager.callTool('take_snapshot', { some: 'args' });
+      await manager.callTool('take_snapshot', { other: 'args' });
+      await manager.callTool('take_snapshot', { other: 'new args' });
+
+      // 4th call should throw
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(3\)/,
+      );
     });
   });
 });

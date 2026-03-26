@@ -123,6 +123,7 @@ priority = 70
     it('should transform mcpName = "*" to wildcard toolName', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10
@@ -263,6 +264,20 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse and transform allowRedirection property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "echo"
+decision = "allow"
+priority = 100
+allowRedirection = true
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].allowRedirection).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
     it('should parse deny_message property', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -273,7 +288,21 @@ deny_message = "Deletion is permanent"
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should parse denyMessage property (camelCase)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+denyMessage = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
       expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
       expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
       expect(getErrors(result)).toHaveLength(0);
@@ -448,6 +477,21 @@ name = "allowed-path"
   });
 
   describe('Negative Tests', () => {
+    it('should return a schema_validation error if toolName is missing in safety_checker', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[safety_checker]]
+priority = 100
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolName');
+      expect(error.details).toContain('Invalid input');
+    });
+
     it('should return a schema_validation error if priority is missing', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -541,6 +585,19 @@ priority = 100
       const error = result.errors[0];
       expect(error.errorType).toBe('schema_validation');
       expect(error.details).toContain('decision');
+    });
+
+    it('should return a schema_validation error if toolName is missing', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+decision = "allow"
+priority = 100
+`);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolName');
+      expect(error.details).toContain('Invalid input');
     });
 
     it('should return a schema_validation error if toolName is not a string or array', async () => {
@@ -767,9 +824,10 @@ priority = 100
       expect(result.rules).toHaveLength(2);
     });
 
-    it('should not warn for catch-all rules (no toolName)', async () => {
+    it('should not warn for catch-all rules (toolName = "*")', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
+toolName = "*"
 decision = "deny"
 priority = 100
 `);
@@ -827,6 +885,7 @@ priority = 100
           'Should have loaded a rule with toolAnnotations',
         ).toBeDefined();
         expect(annotationRule!.toolName).toBe('mcp_*');
+        expect(annotationRule!.mcpName).toBe('*');
         expect(annotationRule!.toolAnnotations).toEqual({
           readOnlyHint: true,
         });
@@ -838,7 +897,7 @@ priority = 100
         const denyRule = result.rules.find(
           (r) =>
             r.decision === PolicyDecision.DENY &&
-            r.toolName === undefined &&
+            r.toolName === '*' &&
             r.denyMessage?.includes('Plan Mode'),
         );
         expect(
@@ -1061,13 +1120,12 @@ priority = 100
       expect(warnings).toHaveLength(0);
     });
 
-    it('should skip rules without toolName', () => {
+    it('should skip wildcard rules (matching all tools)', () => {
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1'],
-        [{ toolName: undefined }],
+        [{ toolName: '*', mcpName: 'my-server' }],
       );
-
       expect(warnings).toHaveLength(0);
     });
 

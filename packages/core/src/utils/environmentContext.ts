@@ -57,11 +57,15 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     ? await getDirectoryContextString(config)
     : '';
   const tempDir = config.storage.getProjectTempDir();
-  // When JIT context is enabled, project memory is already included in the
-  // system instruction via renderUserMemory(). Skip it here to avoid sending
-  // the same GEMINI.md content twice.
+  // Tiered context model (see issue #11488):
+  // - Tier 1 (global): system instruction only
+  // - Tier 2 (extension + project): first user message (here)
+  // - Tier 3 (subdirectory): tool output (JIT)
+  // When JIT is enabled, Tier 2 memory is provided by getSessionMemory().
+  // When JIT is disabled, all memory is in the system instruction and
+  // getEnvironmentMemory() provides the project memory for this message.
   const environmentMemory = config.isJitContextEnabled?.()
-    ? ''
+    ? config.getSessionMemory()
     : config.getEnvironmentMemory();
 
   const context = `

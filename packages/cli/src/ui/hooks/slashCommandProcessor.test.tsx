@@ -187,7 +187,7 @@ describe('useSlashCommandProcessor', () => {
     let rerender!: (props?: unknown) => void;
 
     await act(async () => {
-      const hook = renderHook(() =>
+      const hook = await renderHook(() =>
         useSlashCommandProcessor(
           mockConfig,
           mockSettings,
@@ -423,7 +423,7 @@ describe('useSlashCommandProcessor', () => {
       expect(childAction).toHaveBeenCalledWith(
         expect.objectContaining({
           services: expect.objectContaining({
-            config: mockConfig,
+            agentContext: mockConfig,
           }),
           ui: expect.objectContaining({
             addItem: mockAddItem,
