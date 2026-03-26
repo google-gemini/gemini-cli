@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, getWorkspaceDirs } from './config.js';
+import { CoderAgentEvent, type AgentSettings } from '../types.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -613,5 +614,71 @@ describe('loadConfig', () => {
         );
       });
     });
+  });
+});
+
+describe('getWorkspaceDirs', () => {
+  const originalCwd = process.cwd();
+
+  beforeEach(() => {
+    delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+    delete process.env['CODER_AGENT_WORKSPACE_PATHS'];
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns cwd when no paths are set', () => {
+    const dirs = getWorkspaceDirs(undefined);
+    expect(dirs).toEqual([originalCwd]);
+  });
+
+  it('returns single path from CODER_AGENT_WORKSPACE_PATH', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/single-path';
+    const dirs = getWorkspaceDirs(undefined);
+    expect(dirs).toEqual([path.resolve('/tmp/single-path')]);
+  });
+
+  it('returns multiple paths from CODER_AGENT_WORKSPACE_PATHS', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATHS'] =
+      `/tmp/path1${path.delimiter}/tmp/path2`;
+    const dirs = getWorkspaceDirs(undefined);
+    expect(dirs).toEqual([
+      path.resolve('/tmp/path1'),
+      path.resolve('/tmp/path2'),
+    ]);
+  });
+
+  it('returns paths from AgentSettings', () => {
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: '/tmp/agent-single',
+      workspacePaths: ['/tmp/agent-target1', '/tmp/agent-target2'],
+    };
+    const dirs = getWorkspaceDirs(settings);
+    // order: envPaths, envPath, agentSettings.workspacePaths, agentSettings.workspacePath
+    expect(dirs).toEqual([
+      path.resolve('/tmp/agent-target1'),
+      path.resolve('/tmp/agent-target2'),
+      path.resolve('/tmp/agent-single'),
+    ]);
+  });
+
+  it('deduplicates paths', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATHS'] =
+      `/tmp/path1${path.delimiter}/tmp/path2${path.delimiter}/tmp/path1`;
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/path2';
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePaths: ['/tmp/path1', '/tmp/path3'],
+      workspacePath: '/tmp/path3',
+    };
+    const dirs = getWorkspaceDirs(settings);
+    expect(dirs).toEqual([
+      path.resolve('/tmp/path1'),
+      path.resolve('/tmp/path2'),
+      path.resolve('/tmp/path3'),
+    ]);
   });
 });

@@ -41,8 +41,10 @@ export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  agentSettings?: AgentSettings,
 ): Promise<Config> {
-  const workspaceDir = process.cwd();
+  const workspaceDirs = getWorkspaceDirs(agentSettings);
+  const primaryWorkspaceDir = workspaceDirs[0] ?? process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
   const folderTrust =
@@ -73,7 +75,7 @@ export async function loadConfig(
     model: PREVIEW_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
-    targetDir: workspaceDir, // Or a specific directory the agent operates on
+    targetDir: primaryWorkspaceDir, // Or a specific directory the agent operates on
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
@@ -97,7 +99,7 @@ export async function loadConfig(
           : [],
     },
     mcpServers: settings.mcpServers,
-    cwd: workspaceDir,
+    cwd: primaryWorkspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -131,15 +133,15 @@ export async function loadConfig(
     enableAgents: settings.experimental?.enableAgents ?? true,
   };
 
-  const fileService = new FileDiscoveryService(workspaceDir, {
+  const fileService = new FileDiscoveryService(primaryWorkspaceDir, {
     respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
     respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
     customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
   });
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
-      workspaceDir,
-      [workspaceDir],
+      primaryWorkspaceDir,
+      workspaceDirs,
       fileService,
       extensionLoader,
       folderTrust,
@@ -197,31 +199,75 @@ export async function loadConfig(
   return config;
 }
 
-export function setTargetDir(agentSettings: AgentSettings | undefined): string {
-  const originalCWD = process.cwd();
-  const targetDir =
-    process.env['CODER_AGENT_WORKSPACE_PATH'] ??
-    (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent
-      ? agentSettings.workspacePath
-      : undefined);
+export function getWorkspaceDirs(
+  agentSettings: AgentSettings | undefined,
+): string[] {
+  const currentCwd = process.cwd();
+  const dirs = new Set<string>();
 
-  if (!targetDir) {
-    return originalCWD;
+  const envPaths = process.env['CODER_AGENT_WORKSPACE_PATHS'];
+  if (envPaths) {
+    envPaths.split(path.delimiter).forEach((p) => {
+      if (p.trim()) dirs.add(path.resolve(p.trim()));
+    });
+  }
+
+  const envPath = process.env['CODER_AGENT_WORKSPACE_PATH'];
+  if (envPath && envPath.trim()) {
+    dirs.add(path.resolve(envPath.trim()));
+  }
+
+  if (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent) {
+    if (agentSettings.workspacePaths) {
+      agentSettings.workspacePaths.forEach((p) => {
+        if (p.trim()) dirs.add(path.resolve(p.trim()));
+      });
+    }
+    if (agentSettings.workspacePath && agentSettings.workspacePath.trim()) {
+      dirs.add(path.resolve(agentSettings.workspacePath.trim()));
+    }
+  }
+
+  const resolvedDirs = Array.from(dirs);
+  if (resolvedDirs.length === 0) {
+    return [currentCwd];
   }
 
   logger.info(
-    `[CoderAgentExecutor] Overriding workspace path to: ${targetDir}`,
+    `[CoderAgentExecutor] Resolved workspace directories: ${resolvedDirs.join(', ')}`,
   );
+  return resolvedDirs;
+}
+
+export function setTargetDir(
+  agentSettings: AgentSettings | undefined,
+): string[] {
+  const originalCWD = process.cwd();
+  const targetDirs = getWorkspaceDirs(agentSettings);
+
+  if (targetDirs.length === 0 || targetDirs[0] === originalCWD) {
+    return [originalCWD];
+  }
+
+  const primaryDir = targetDirs[0];
+
+  logger.info(
+    `[CoderAgentExecutor] Overriding primary workspace path to: ${primaryDir}`,
+  );
+  if (targetDirs.length > 1) {
+    logger.info(
+      `[CoderAgentExecutor] Additional workspace paths: ${targetDirs.slice(1).join(', ')}`,
+    );
+  }
 
   try {
-    const resolvedPath = path.resolve(targetDir);
-    process.chdir(resolvedPath);
-    return resolvedPath;
+    process.chdir(primaryDir);
+    return targetDirs;
   } catch (e) {
     logger.error(
       `[CoderAgentExecutor] Error resolving workspace path: ${e}, returning original os.cwd()`,
     );
-    return originalCWD;
+    return [originalCWD];
   }
 }
 

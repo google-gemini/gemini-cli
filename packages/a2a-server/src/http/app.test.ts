@@ -1026,7 +1026,7 @@ describe('E2E Tests', () => {
       expect(response.body.data).toBe('success');
     });
 
-    it('should return 400 for a command that requires a workspace when CODER_AGENT_WORKSPACE_PATH is not set', async () => {
+    it('should return 400 when neither env var is set', async () => {
       const mockWorkspaceCommand = {
         name: 'workspace-command',
         description: 'A command that requires a workspace',
@@ -1038,13 +1038,14 @@ describe('E2E Tests', () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
       delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      delete process.env['CODER_AGENT_WORKSPACE_PATHS'];
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe(
-        'Command "workspace-command" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.',
+        'Command "workspace-command" requires a workspace, but neither CODER_AGENT_WORKSPACE_PATH nor CODER_AGENT_WORKSPACE_PATHS is set.',
       );
     });
 
@@ -1060,6 +1061,29 @@ describe('E2E Tests', () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
       process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/test-workspace';
+      const response = await request(app)
+        .post('/executeCommand')
+        .send({ command: 'workspace-command', args: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toBe('success');
+    });
+
+    it('should execute a command that requires workspace when CODER_AGENT_WORKSPACE_PATHS is set', async () => {
+      const mockWorkspaceCommand = {
+        name: 'workspace-command',
+        description: 'A command that requires a workspace',
+        requiresWorkspace: true,
+        execute: vi
+          .fn()
+          .mockResolvedValue({ name: 'workspace-command', data: 'success' }),
+      };
+      vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
+
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      // Using a path.delimiter equivalent, we can use ":" for linux or ";" for windows. Since we're in linux OS, ":" works, but let's test it generically by just string concatenation
+      process.env['CODER_AGENT_WORKSPACE_PATHS'] =
+        `/tmp/test-workspace1:/tmp/test-workspace2`;
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });

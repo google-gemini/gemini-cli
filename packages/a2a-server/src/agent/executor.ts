@@ -92,7 +92,8 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettings: AgentSettings,
     taskId: string,
   ): Promise<Config> {
-    const workspaceRoot = setTargetDir(agentSettings);
+    const workspaceRoots = setTargetDir(agentSettings);
+    const workspaceRoot = workspaceRoots[0] ?? process.cwd();
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);

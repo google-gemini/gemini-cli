@@ -21,6 +21,7 @@ import type {
 } from '@a2a-js/sdk/server';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
+import { getWorkspaceDirs } from '../config/config.js';
 
 export class InitCommand implements Command {
   name = 'init';
@@ -88,9 +89,12 @@ export class InitCommand implements Command {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const agentExecutor = context.agentExecutor as CoderAgentExecutor;
 
+    const workspaceDirs = getWorkspaceDirs(undefined);
+
     const agentSettings: AgentSettings = {
       kind: CoderAgentEvent.StateAgentSettingsEvent,
-      workspacePath: process.env['CODER_AGENT_WORKSPACE_PATH']!,
+      workspacePath: workspaceDirs[0] ?? process.cwd(),
+      workspacePaths: workspaceDirs,
       autoExecute: true,
     };
 
@@ -135,10 +139,9 @@ export class InitCommand implements Command {
       };
     }
 
-    const geminiMdPath = path.join(
-      process.env['CODER_AGENT_WORKSPACE_PATH']!,
-      'GEMINI.md',
-    );
+    const workspaceDirs = getWorkspaceDirs(undefined);
+    const primaryDir = workspaceDirs[0] ?? process.cwd();
+    const geminiMdPath = path.join(primaryDir, 'GEMINI.md');
     const result = performInit(fs.existsSync(geminiMdPath));
 
     const taskId = uuidv4();
