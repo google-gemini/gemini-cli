@@ -34,6 +34,17 @@ describe('ignorePathUtils', () => {
     ).toBeNull();
   });
 
+  it('should return null for sibling directories with matching prefixes', () => {
+    // If projectRoot is /work/project, /work/project-other should be null
+    expect(
+      getNormalizedRelativePath(
+        projectRoot,
+        '/work/project-other/file.txt',
+        false,
+      ),
+    ).toBeNull();
+  });
+
   it('should normalize basic relative paths', () => {
     expect(getNormalizedRelativePath(projectRoot, 'src/index.ts', false)).toBe(
       'src/index.ts',

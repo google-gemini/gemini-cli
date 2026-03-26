@@ -15,6 +15,7 @@ import {
 import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { isNodeError } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -105,27 +106,33 @@ export class FileDiscoveryService {
           (error.code === 'EACCES' || error.code === 'ENOENT')
         ) {
           // Stop if the directory is inaccessible or doesn't exist
+          debugLogger.debug(
+            `Skipping directory ${currentDir} due to ${error.code}`,
+          );
           return;
         }
         throw error;
       }
 
-      for (const entry of dirEntries) {
-        const fullPath = path.join(currentDir, entry.name);
+      // Traverse sibling directories concurrently to improve performance.
+      await Promise.all(
+        dirEntries.map(async (entry) => {
+          const fullPath = path.join(currentDir, entry.name);
 
-        if (entry.isDirectory()) {
-          // Optimization: If a directory is ignored, its contents are not traversed.
-          if (this.shouldIgnoreDirectory(fullPath, options)) {
-            ignoredPaths.push(fullPath);
+          if (entry.isDirectory()) {
+            // Optimization: If a directory is ignored, its contents are not traversed.
+            if (this.shouldIgnoreDirectory(fullPath, options)) {
+              ignoredPaths.push(fullPath);
+            } else {
+              await walk(fullPath);
+            }
           } else {
-            await walk(fullPath);
+            if (this.shouldIgnoreFile(fullPath, options)) {
+              ignoredPaths.push(fullPath);
+            }
           }
-        } else {
-          if (this.shouldIgnoreFile(fullPath, options)) {
-            ignoredPaths.push(fullPath);
-          }
-        }
-      }
+        }),
+      );
     };
 
     await walk(this.projectRoot);
@@ -149,7 +156,10 @@ export class FileDiscoveryService {
   }
 
   /**
-   * Filters a list of file paths based on ignore rules
+   * Filters a list of file paths based on ignore rules.
+   *
+   * NOTE: Directory paths must include a trailing slash to be correctly identified and
+   * matched against directory-specific ignore patterns (e.g., 'dist/').
    */
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
     return filePaths.filter((filePath) => {

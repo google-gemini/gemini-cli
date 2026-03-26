@@ -21,13 +21,12 @@ export function getNormalizedRelativePath(
   }
 
   const absoluteFilePath = path.resolve(projectRoot, filePath);
+  const relativePath = path.relative(projectRoot, absoluteFilePath);
 
   // Ensure the path is within the project root
-  if (!absoluteFilePath.startsWith(projectRoot)) {
+  if (relativePath.startsWith(`..${path.sep}`) || relativePath === '..') {
     return null;
   }
-
-  const relativePath = path.relative(projectRoot, absoluteFilePath);
 
   // Convert Windows backslashes to forward slashes for the 'ignore' library
   let normalized = relativePath.replace(/\\/g, '/');
