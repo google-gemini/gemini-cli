@@ -1,0 +1,10 @@
+node_modules
+.git
+.gemini/workspaces
+dist
+!packages/*/dist/*.tgz
+bundle
+out
+*.log
+.env
+.DS_Store
