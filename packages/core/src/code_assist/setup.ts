@@ -251,6 +251,7 @@ async function _doSetupUser(
   }
 
   logOnboardingStart(config, new OnboardingStartEvent());
+  const onboardingStartTime = Date.now();
 
   let lroRes = await caServer.onboardUser(onboardReq);
   if (!lroRes.done && lroRes.name) {
@@ -261,8 +262,10 @@ async function _doSetupUser(
     }
   }
 
-  const userTier = tier.id ?? UserTierId.STANDARD;
-  logOnboardingSuccess(config, new OnboardingSuccessEvent(userTier));
+  logOnboardingSuccess(
+    config,
+    new OnboardingSuccessEvent(tier.name, Date.now() - onboardingStartTime),
+  );
 
   if (!lroRes.response?.cloudaicompanionProject?.id) {
     if (projectId) {

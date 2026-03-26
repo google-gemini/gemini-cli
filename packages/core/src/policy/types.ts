@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -309,6 +310,11 @@ export interface PolicyEngineConfig {
    * Used to filter rules that have specific 'modes' defined.
    */
   approvalMode?: ApprovalMode;
+
+  /**
+   * The sandbox manager instance.
+   */
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {

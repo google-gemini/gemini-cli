@@ -5,10 +5,12 @@
  */
 
 import fsPromises from 'node:fs/promises';
+import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { debugLogger } from '../index.js';
+import type { SandboxPermissions } from '../services/sandboxManager.js';
 import { ToolErrorType } from './tool-error.js';
 import {
   BaseDeclarativeTool,
@@ -41,6 +43,7 @@ import {
   hasRedirection,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
+import { PARAM_ADDITIONAL_PERMISSIONS } from './definitions/base-declarations.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -56,6 +59,7 @@ export interface ShellToolParams {
   description?: string;
   dir_path?: string;
   is_background?: boolean;
+  [PARAM_ADDITIONAL_PERMISSIONS]?: SandboxPermissions;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -72,23 +76,35 @@ export class ShellToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  getDescription(): string {
-    let description = `${this.params.command}`;
+  private getContextualDetails(): string {
+    let details = '';
     // append optional [in directory]
-    // note description is needed even if validation fails due to absolute path
+    // note explanation is needed even if validation fails due to absolute path
     if (this.params.dir_path) {
-      description += ` [in ${this.params.dir_path}]`;
+      details += `[in ${this.params.dir_path}]`;
     } else {
-      description += ` [current working directory ${process.cwd()}]`;
+      details += `[current working directory ${process.cwd()}]`;
     }
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
-      description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+      details += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     if (this.params.is_background) {
-      description += ' [background]';
+      details += ' [background]';
     }
-    return description;
+    return details;
+  }
+
+  getDescription(): string {
+    return `${this.params.command} ${this.getContextualDetails()}`;
+  }
+
+  override getDisplayTitle(): string {
+    return this.params.command;
+  }
+
+  override getExplanation(): string {
+    return this.getContextualDetails().trim();
   }
 
   override getPolicyUpdateOptions(
@@ -108,6 +124,15 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return { commandPrefix: this.params.command, allowRedirection };
     }
     return undefined;
+  }
+
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
+      return this.getConfirmationDetails(abortSignal);
+    }
+    return super.shouldConfirmExecute(abortSignal);
   }
 
   protected override async getConfirmationDetails(
@@ -136,6 +161,32 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
     // so we must provide confirmation details.
+    // If additional_permissions are provided, it's an expansion request
+    if (this.params[PARAM_ADDITIONAL_PERMISSIONS]) {
+      return {
+        type: 'sandbox_expansion',
+        title: 'Sandbox Expansion Request',
+        command: this.params.command,
+        rootCommand: rootCommandDisplay,
+        additionalPermissions: this.params[PARAM_ADDITIONAL_PERMISSIONS],
+        onConfirm: async (outcome: ToolConfirmationOutcome) => {
+          if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+            const commandName = rootCommands[0] || 'shell';
+            this.context.config.sandboxPolicyManager.addPersistentApproval(
+              commandName,
+              this.params[PARAM_ADDITIONAL_PERMISSIONS]!,
+            );
+          } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+            const commandName = rootCommands[0] || 'shell';
+            this.context.config.sandboxPolicyManager.addSessionApproval(
+              commandName,
+              this.params[PARAM_ADDITIONAL_PERMISSIONS]!,
+            );
+          }
+        },
+      };
+    }
+
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
@@ -281,6 +332,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
               shellExecutionConfig?.sanitizationConfig ??
               this.context.config.sanitizationConfig,
             sandboxManager: this.context.config.sandboxManager,
+            additionalPermissions: this.params[PARAM_ADDITIONAL_PERMISSIONS],
           },
         );
 
@@ -314,6 +366,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
           const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
+              if (
+                line.includes('sysmond service not found') ||
+                line.includes('Cannot get process list') ||
+                line.includes('sysmon request failed')
+              ) {
+                continue;
+              }
               debugLogger.error(`pgrep: ${line}`);
             }
             const pid = Number(line);
@@ -369,6 +428,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (result.exitCode !== null && result.exitCode !== 0) {
           llmContentParts.push(`Exit Code: ${result.exitCode}`);
+          data = {
+            exitCode: result.exitCode,
+            isError: true,
+          };
         }
 
         if (result.signal) {
@@ -412,6 +475,165 @@ export class ShellToolInvocation extends BaseToolInvocation<
           // If output is empty and command succeeded (code 0, no error/signal/abort),
           // returnDisplayMessage will remain empty, which is fine.
         }
+      }
+
+      // Heuristic Sandbox Denial Detection
+      const lowerOutput = (
+        (result.output || '') +
+        ' ' +
+        (result.error?.message || '')
+      ).toLowerCase();
+      const isFileDenial = [
+        'operation not permitted',
+        'vim:e303',
+        'should be read/write',
+        'sandbox_apply',
+        'sandbox: ',
+      ].some((keyword) => lowerOutput.includes(keyword));
+
+      const isNetworkDenial = [
+        'error connecting to',
+        'network is unreachable',
+        'could not resolve host',
+        'connection refused',
+        'no address associated with hostname',
+      ].some((keyword) => lowerOutput.includes(keyword));
+
+      // Only trigger heuristic if the command actually failed (exit code != 0 or aborted)
+      const failed =
+        !!result.error ||
+        !!result.signal ||
+        (result.exitCode !== undefined && result.exitCode !== 0) ||
+        result.aborted;
+
+      if (failed && (isFileDenial || isNetworkDenial)) {
+        const strippedCommand = stripShellWrapper(this.params.command);
+        const rootCommands = getCommandRoots(strippedCommand).filter(
+          (r) => r !== 'shopt',
+        );
+        const rootCommandDisplay =
+          rootCommands.length > 0 ? rootCommands[0] : 'shell';
+        // Extract denied paths
+        const deniedPaths = new Set<string>();
+        const regex =
+          /(?:^|\s)['"]?(\/[\w.-/]+)['"]?:\s*[Oo]peration not permitted/gi;
+        let match;
+        while ((match = regex.exec(result.output || '')) !== null) {
+          deniedPaths.add(match[1]);
+        }
+        while ((match = regex.exec(result.error?.message || '')) !== null) {
+          deniedPaths.add(match[1]);
+        }
+
+        if (isFileDenial && deniedPaths.size === 0) {
+          // Fallback heuristic: look for any absolute path in the output
+          // Avoid matching simple commands like /bin/sh
+          const fallbackRegex =
+            /(?:^|[\s"'[\]])(\/[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+)(?:$|[\s"'[\]:])/gi;
+          let m;
+          while ((m = fallbackRegex.exec(result.output || '')) !== null) {
+            const p = m[1];
+            if (p && !p.startsWith('/bin/') && !p.startsWith('/usr/bin/')) {
+              deniedPaths.add(p);
+            }
+          }
+          while (
+            (m = fallbackRegex.exec(result.error?.message || '')) !== null
+          ) {
+            const p = m[1];
+            if (p && !p.startsWith('/bin/') && !p.startsWith('/usr/bin/')) {
+              deniedPaths.add(p);
+            }
+          }
+        }
+
+        const readPaths = new Set(
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read || [],
+        );
+        const writePaths = new Set(
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.write || [],
+        );
+
+        for (const p of deniedPaths) {
+          try {
+            // Find an existing parent directory to add instead of a non-existent file
+            let currentPath = p;
+            try {
+              if (
+                fs.existsSync(currentPath) &&
+                fs.statSync(currentPath).isFile()
+              ) {
+                currentPath = path.dirname(currentPath);
+              }
+            } catch (_e) {
+              /* ignore */
+            }
+            while (currentPath.length > 1) {
+              if (fs.existsSync(currentPath)) {
+                writePaths.add(currentPath);
+                readPaths.add(currentPath);
+                break;
+              }
+              currentPath = path.dirname(currentPath);
+            }
+          } catch (_e) {
+            // ignore
+          }
+        }
+
+        const additionalPermissions = {
+          network:
+            isNetworkDenial ||
+            this.params[PARAM_ADDITIONAL_PERMISSIONS]?.network ||
+            undefined,
+          fileSystem:
+            isFileDenial || writePaths.size > 0
+              ? {
+                  read: Array.from(readPaths),
+                  write: Array.from(writePaths),
+                }
+              : undefined,
+        };
+
+        const originalReadSize =
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.read?.length ||
+          0;
+        const originalWriteSize =
+          this.params[PARAM_ADDITIONAL_PERMISSIONS]?.fileSystem?.write
+            ?.length || 0;
+        const originalNetwork =
+          !!this.params[PARAM_ADDITIONAL_PERMISSIONS]?.network;
+
+        const newReadSize = additionalPermissions.fileSystem?.read?.length || 0;
+        const newWriteSize =
+          additionalPermissions.fileSystem?.write?.length || 0;
+        const newNetwork = !!additionalPermissions.network;
+
+        const hasNewPermissions =
+          newReadSize > originalReadSize ||
+          newWriteSize > originalWriteSize ||
+          (!originalNetwork && newNetwork);
+
+        if (hasNewPermissions) {
+          const confirmationDetails = {
+            type: 'sandbox_expansion',
+            title: 'Sandbox Expansion Request',
+            command: this.params.command,
+            rootCommand: rootCommandDisplay,
+            additionalPermissions,
+          };
+
+          return {
+            llmContent: 'Sandbox expansion required',
+            returnDisplay: returnDisplayMessage,
+            error: {
+              type: ToolErrorType.SANDBOX_EXPANSION_REQUIRED,
+              message: JSON.stringify(confirmationDetails),
+            },
+          };
+        }
+        // If no new permissions were found by heuristic, do not intercept.
+        // Just return the normal execution error so the LLM can try providing explicit paths itself.
       }
 
       const summarizeConfig =
@@ -474,6 +696,7 @@ export class ShellTool extends BaseDeclarativeTool<
     const definition = getShellDefinition(
       context.config.getEnableInteractiveShell(),
       context.config.getEnableShellOutputEfficiency(),
+      context.config.getSandboxEnabled(),
     );
     super(
       ShellTool.Name,
@@ -523,6 +746,7 @@ export class ShellTool extends BaseDeclarativeTool<
     const definition = getShellDefinition(
       this.context.config.getEnableInteractiveShell(),
       this.context.config.getEnableShellOutputEfficiency(),
+      this.context.config.getSandboxEnabled(),
     );
     return resolveToolDeclaration(definition, modelId);
   }

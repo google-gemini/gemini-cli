@@ -12,7 +12,6 @@
             "label": "Authentication",
             "slug": "docs/get-started/authentication"
           },
-          { "label": "Examples", "slug": "docs/get-started/examples" },
           { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
           {
             "label": "Gemini 3 on Gemini CLI",
