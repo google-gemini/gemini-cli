@@ -242,16 +242,16 @@ supports NORMAL and INSERT modes.
 
 ### Mode switching
 
-| Action                                       | Keys      |
-| -------------------------------------------- | --------- |
-| Enter NORMAL mode from INSERT mode           | `Esc`     |
-| Enter INSERT mode at the cursor              | `i`       |
-| Enter INSERT mode after the cursor           | `a`       |
-| Enter INSERT mode at the first non-whitespace character | `I` |
-| Enter INSERT mode at the end of the line     | `A`       |
-| Insert a new line below and switch to INSERT | `o`       |
-| Insert a new line above and switch to INSERT | `O`       |
-| Clear input in NORMAL mode                   | `Esc Esc` |
+| Action                                                  | Keys      |
+| ------------------------------------------------------- | --------- |
+| Enter NORMAL mode from INSERT mode                      | `Esc`     |
+| Enter INSERT mode at the cursor                         | `i`       |
+| Enter INSERT mode after the cursor                      | `a`       |
+| Enter INSERT mode at the first non-whitespace character | `I`       |
+| Enter INSERT mode at the end of the line                | `A`       |
+| Insert a new line below and switch to INSERT            | `o`       |
+| Insert a new line above and switch to INSERT            | `O`       |
+| Clear input in NORMAL mode                              | `Esc Esc` |
 
 ### Navigation in NORMAL mode
 
@@ -314,23 +314,23 @@ lines and `2cw` changes two words.
 
 ### Find, replace, yank, and paste in NORMAL mode
 
-| Action                                    | Keys          |
-| ----------------------------------------- | ------------- |
-| Find next matching character              | `f{char}`     |
-| Find previous matching character          | `F{char}`     |
-| Move until before next matching character | `t{char}`     |
-| Move until after previous matching char   | `T{char}`     |
-| Repeat latest character find              | `;`           |
-| Repeat latest character find in reverse   | `,`           |
-| Delete character before cursor            | `X`           |
-| Toggle case under cursor                  | `~`           |
-| Replace character under cursor            | `r{char}`     |
-| Yank line                                 | `yy`          |
-| Yank to end of line                       | `Y` or `y$`   |
-| Yank word / WORD                          | `yw`, `yW`    |
-| Yank to end of word / WORD                | `ye`, `yE`    |
-| Paste after cursor                        | `p`           |
-| Paste before cursor                       | `P`           |
+| Action                                    | Keys        |
+| ----------------------------------------- | ----------- |
+| Find next matching character              | `f{char}`   |
+| Find previous matching character          | `F{char}`   |
+| Move until before next matching character | `t{char}`   |
+| Move until after previous matching char   | `T{char}`   |
+| Repeat latest character find              | `;`         |
+| Repeat latest character find in reverse   | `,`         |
+| Delete character before cursor            | `X`         |
+| Toggle case under cursor                  | `~`         |
+| Replace character under cursor            | `r{char}`   |
+| Yank line                                 | `yy`        |
+| Yank to end of line                       | `Y` or `y$` |
+| Yank word / WORD                          | `yw`, `yW`  |
+| Yank to end of word / WORD                | `ye`, `yE`  |
+| Paste after cursor                        | `p`         |
+| Paste before cursor                       | `P`         |
 
 Delete and change operators also compose with character-find motions, so
 commands such as `dfx`, `dtx`, `cFx`, and `cTx` are supported.

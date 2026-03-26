@@ -355,11 +355,7 @@ custom tools:
      "mcpServers": {
        "sqlite": {
          "command": "uvx",
-         "args": [
-           "mcp-server-sqlite",
-           "--db-path",
-           "/path/to/your.db"
-         ]
+         "args": ["mcp-server-sqlite", "--db-path", "/path/to/your.db"]
        }
      }
    }
