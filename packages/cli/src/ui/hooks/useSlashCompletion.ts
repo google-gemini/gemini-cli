@@ -272,13 +272,45 @@ function useCommandSuggestions(
         }
 
         if (!signal.aborted) {
-          // Sort potentialSuggestions so that exact match (by name or altName) comes first
+          // Sort potentialSuggestions so that exact name/prefix match comes first,
+          // prioritizing primary name over altNames.
+          const lowerPartial = partial.toLowerCase();
           const sortedSuggestions = [...potentialSuggestions].sort((a, b) => {
-            const aIsExact = matchesCommand(a, partial);
-            const bIsExact = matchesCommand(b, partial);
-            if (aIsExact && !bIsExact) return -1;
-            if (!aIsExact && bIsExact) return 1;
-            return 0;
+            // 1. Exact name match
+            const aNameExact = a.name.toLowerCase() === lowerPartial;
+            const bNameExact = b.name.toLowerCase() === lowerPartial;
+            if (aNameExact && !bNameExact) return -1;
+            if (!aNameExact && bNameExact) return 1;
+
+            // 2. Exact altName match
+            const aAltExact =
+              a.altNames?.some((alt) => alt.toLowerCase() === lowerPartial) ||
+              false;
+            const bAltExact =
+              b.altNames?.some((alt) => alt.toLowerCase() === lowerPartial) ||
+              false;
+            if (aAltExact && !bAltExact) return -1;
+            if (!aAltExact && bAltExact) return 1;
+
+            // 3. Prefix name match
+            const aNamePrefix = a.name.toLowerCase().startsWith(lowerPartial);
+            const bNamePrefix = b.name.toLowerCase().startsWith(lowerPartial);
+            if (aNamePrefix && !bNamePrefix) return -1;
+            if (!aNamePrefix && bNamePrefix) return 1;
+
+            // 4. Prefix altName match
+            const aAltPrefix =
+              a.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(lowerPartial),
+              ) || false;
+            const bAltPrefix =
+              b.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(lowerPartial),
+              ) || false;
+            if (aAltPrefix && !bAltPrefix) return -1;
+            if (!aAltPrefix && bAltPrefix) return 1;
+
+            return 0; // Maintain FZF score order for other matches
           });
 
           const finalSuggestions = sortedSuggestions.map((cmd) => {
