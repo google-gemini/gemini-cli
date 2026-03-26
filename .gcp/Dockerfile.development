@@ -70,8 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && export PRETTIER_VER=$(node -p "require('/tmp/package.json').devDependencies.prettier") \
   && export ESLINT_VER=$(node -p "require('/tmp/package.json').devDependencies.eslint") \
   && export CROSS_ENV_VER=$(node -p "require('/tmp/package.json').devDependencies['cross-env']") \
-  && export TS_VER=$(node -p "require('/tmp/package.json').devDependencies.typescript") \
-  && npm install -g tsx@$TSX_VER vitest@$VITEST_VER prettier@$PRETTIER_VER eslint@$ESLINT_VER cross-env@$CROSS_ENV_VER typescript@$TS_VER \
+  && npm install -g tsx@$TSX_VER vitest@$VITEST_VER prettier@$PRETTIER_VER eslint@$ESLINT_VER cross-env@$CROSS_ENV_VER typescript@5.3.3 \
   && npm install -g @google/gemini-cli@nightly && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-nightly \
   && npm install -g @google/gemini-cli@preview && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-preview \
   && npm install -g @google/gemini-cli@latest  && mv /usr/local/share/npm-global/bin/gemini /usr/local/share/npm-global/bin/g-stable \

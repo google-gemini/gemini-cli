@@ -131,7 +131,6 @@
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
     "tsx": "^4.20.3",
-    "typescript": "^5.3.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
