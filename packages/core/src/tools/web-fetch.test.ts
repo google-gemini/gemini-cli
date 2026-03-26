@@ -752,6 +752,24 @@ describe('WebFetchTool', () => {
     });
   });
 
+  describe('getPolicyUpdateOptions', () => {
+    it('should return empty object for any outcome to allow global approval', () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ prompt: 'fetch https://example.com' });
+
+      expect(
+        invocation.getPolicyUpdateOptions!(
+          ToolConfirmationOutcome.ProceedAlways,
+        ),
+      ).toEqual({});
+      expect(
+        invocation.getPolicyUpdateOptions!(
+          ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        ),
+      ).toEqual({});
+    });
+  });
+
   describe('Message Bus Integration', () => {
     let policyEngine: PolicyEngine;
     let messageBus: MessageBus;

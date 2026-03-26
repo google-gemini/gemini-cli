@@ -29,6 +29,15 @@ export enum ConfigSource {
 }
 
 /**
+ * Returns true if a hook source implies it is a user-visible hook.
+ * Only System hooks are hidden by default to reduce noise.
+ */
+export function isUserVisibleHook(source?: string | ConfigSource): boolean {
+  if (!source) return true; // Treat unknown/legacy hooks as user-visible
+  return source !== ConfigSource.System;
+}
+
+/**
  * Event names for the hook system
  */
 export enum HookEventName {

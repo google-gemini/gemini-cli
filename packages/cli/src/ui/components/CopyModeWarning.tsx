@@ -12,16 +12,14 @@ import { theme } from '../semantic-colors.js';
 export const CopyModeWarning: React.FC = () => {
   const { copyModeEnabled } = useUIState();
 
-  if (!copyModeEnabled) {
-    return null;
-  }
-
   return (
-    <Box>
-      <Text color={theme.status.warning}>
-        In Copy Mode. Use Page Up/Down to scroll. Press Ctrl+S or any other key
-        to exit.
-      </Text>
+    <Box height={1}>
+      {copyModeEnabled && (
+        <Text color={theme.status.warning}>
+          In Copy Mode. Use Page Up/Down to scroll. Press Ctrl+S or any other
+          key to exit.
+        </Text>
+      )}
     </Box>
   );
 };
