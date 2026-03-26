@@ -43,6 +43,10 @@ class MockSandboxManager implements SandboxManager {
   isDangerousCommand(): boolean {
     return false;
   }
+
+  parseDenials(): undefined {
+    return undefined;
+  }
 }
 
 describe('SandboxedFileSystemService', () => {

@@ -375,6 +375,7 @@ describe('PolicyEngine', () => {
         isKnownSafeCommand: vi
           .fn()
           .mockImplementation((args) => args[0] === 'npm'),
+        parseDenials: vi.fn().mockReturnValue(undefined),
       } as unknown as SandboxManager;
 
       engine = new PolicyEngine({
