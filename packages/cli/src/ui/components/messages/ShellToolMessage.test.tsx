@@ -184,28 +184,28 @@ describe('<ShellToolMessage />', () => {
       [
         'respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES',
         10,
-        8,
+        7,
         false,
         true,
       ],
       [
         'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
         100,
-        ACTIVE_SHELL_MAX_LINES - 3,
+        ACTIVE_SHELL_MAX_LINES - 4,
         false,
         true,
       ],
       [
         'uses full availableTerminalHeight when focused in alternate buffer mode',
         100,
-        98,
+        97,
         true,
         false,
       ],
       [
         'defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined',
         undefined,
-        ACTIVE_SHELL_MAX_LINES - 3,
+        ACTIVE_SHELL_MAX_LINES - 4,
         false,
         false,
       ],
@@ -323,8 +323,8 @@ describe('<ShellToolMessage />', () => {
 
       await waitFor(() => {
         const frame = lastFrame();
-        // Should still be constrained to 12 (15 - 3) because isExpandable is false
-        expect(frame.match(/Line \d+/g)?.length).toBe(12);
+        // Should still be constrained to 11 (15 - 4) because isExpandable is false
+        expect(frame.match(/Line \d+/g)?.length).toBe(11);
       });
       expect(lastFrame()).toMatchSnapshot();
       unmount();

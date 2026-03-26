@@ -31,7 +31,11 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-import { NoopSandboxManager, type SandboxManager } from './sandboxManager.js';
+import {
+  NoopSandboxManager,
+  type SandboxManager,
+  type SandboxPermissions,
+} from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
@@ -84,6 +88,7 @@ export type ShellExecutionResult = ExecutionResult;
 export type ShellExecutionHandle = ExecutionHandle;
 
 export interface ShellExecutionConfig {
+  additionalPermissions?: SandboxPermissions;
   terminalWidth?: number;
   terminalHeight?: number;
   pager?: string;
@@ -437,10 +442,11 @@ export class ShellExecutionService {
       args: spawnArgs,
       env: baseEnv,
       cwd,
-      config: {
+      policy: {
         ...shellExecutionConfig,
         ...(shellExecutionConfig.sandboxConfig || {}),
         sanitizationConfig,
+        additionalPermissions: shellExecutionConfig.additionalPermissions,
       },
     });
 

@@ -51,12 +51,13 @@ You can place them in:
 
 ### Configuration schema
 
-| Field            | Type   | Required | Description                                                                                                    |
-| :--------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------- |
-| `kind`           | string | Yes      | Must be `remote`.                                                                                              |
-| `name`           | string | Yes      | A unique name for the agent. Must be a valid slug (lowercase letters, numbers, hyphens, and underscores only). |
-| `agent_card_url` | string | Yes      | The URL to the agent's A2A card endpoint.                                                                      |
-| `auth`           | object | No       | Authentication configuration. See [Authentication](#authentication).                                           |
+| Field             | Type   | Required | Description                                                                                                    |
+| :---------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------- |
+| `kind`            | string | Yes      | Must be `remote`.                                                                                              |
+| `name`            | string | Yes      | A unique name for the agent. Must be a valid slug (lowercase letters, numbers, hyphens, and underscores only). |
+| `agent_card_url`  | string | Yes\*    | The URL to the agent's A2A card endpoint. Required if `agent_card_json` is not provided.                       |
+| `agent_card_json` | string | Yes\*    | The inline JSON string of the agent's A2A card. Required if `agent_card_url` is not provided.                  |
+| `auth`            | object | No       | Authentication configuration. See [Authentication](#authentication).                                           |
 
 ### Single-subagent example
 
@@ -88,6 +89,95 @@ Markdown file.
 > [!NOTE] Mixed local and remote agents, or multiple local agents, are not
 > supported in a single file; the list format is currently remote-only.
 
+### Inline Agent Card JSON
+
+<details>
+<summary>View formatting options for JSON strings</summary>
+
+If you don't have an endpoint serving the agent card, you can provide the A2A
+card directly as a JSON string using `agent_card_json`.
+
+When providing a JSON string in YAML, you must properly format it as a string
+scalar. You can use single quotes, a block scalar, or double quotes (which
+require escaping internal double quotes).
+
+#### Using single quotes
+
+Single quotes allow you to embed unescaped double quotes inside the JSON string.
+This format is useful for shorter, single-line JSON strings.
+
+```markdown
+---
+kind: remote
+name: single-quotes-agent
+agent_card_json:
+  '{ "protocolVersion": "0.3.0", "name": "Example Agent", "version": "1.0.0",
+  "url": "dummy-url" }'
+---
+```
+
+#### Using a block scalar
+
+The literal block scalar (`|`) preserves line breaks and is highly recommended
+for multiline JSON strings as it avoids quote escaping entirely. The following
+is a complete, valid Agent Card configuration using dummy values.
+
+```markdown
+---
+kind: remote
+name: block-scalar-agent
+agent_card_json: |
+  {
+    "protocolVersion": "0.3.0",
+    "name": "Example Agent Name",
+    "description": "An example agent description for documentation purposes.",
+    "version": "1.0.0",
+    "url": "dummy-url",
+    "preferredTransport": "HTTP+JSON",
+    "capabilities": {
+      "streaming": true,
+      "extendedAgentCard": false
+    },
+    "defaultInputModes": [
+      "text/plain"
+    ],
+    "defaultOutputModes": [
+      "application/json"
+    ],
+    "skills": [
+      {
+        "id": "ExampleSkill",
+        "name": "Example Skill Assistant",
+        "description": "A description of what this example skill does.",
+        "tags": [
+          "example-tag"
+        ],
+        "examples": [
+          "Show me an example."
+        ]
+      }
+    ]
+  }
+---
+```
+
+#### Using double quotes
+
+Double quotes are also supported, but any internal double quotes in your JSON
+must be escaped with a backslash.
+
+```markdown
+---
+kind: remote
+name: double-quotes-agent
+agent_card_json:
+  '{ "protocolVersion": "0.3.0", "name": "Example Agent", "version": "1.0.0",
+  "url": "dummy-url" }'
+---
+```
+
+</details>
+
 ## Authentication
 
 Many remote agents require authentication. Gemini CLI supports several
@@ -104,7 +194,7 @@ Gemini CLI supports the following authentication types:
 | `apiKey`             | Send a static API key as an HTTP header.                                                       |
 | `http`               | HTTP authentication (Bearer token, Basic credentials, or any IANA-registered scheme).          |
 | `google-credentials` | Google Application Default Credentials (ADC). Automatically selects access or identity tokens. |
-| `oauth2`             | OAuth 2.0 Authorization Code flow with PKCE. Opens a browser for interactive sign-in.          |
+| `oauth`              | OAuth 2.0 Authorization Code flow with PKCE. Opens a browser for interactive sign-in.          |
 
 ### Dynamic values
 
@@ -263,7 +353,7 @@ hosts:
 
 Requests to any other host will be rejected with an error. If your agent is
 hosted on a different domain, use one of the other auth types (`apiKey`, `http`,
-or `oauth2`).
+or `oauth`).
 
 #### Examples
 
@@ -297,7 +387,7 @@ auth:
 ---
 ```
 
-### OAuth 2.0 (`oauth2`)
+### OAuth 2.0 (`oauth`)
 
 Performs an interactive OAuth 2.0 Authorization Code flow with PKCE. On first
 use, Gemini CLI opens your browser for sign-in and persists the resulting tokens
@@ -305,7 +395,7 @@ for subsequent requests.
 
 | Field               | Type     | Required | Description                                                                                                                                        |
 | :------------------ | :------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`              | string   | Yes      | Must be `oauth2`.                                                                                                                                  |
+| `type`              | string   | Yes      | Must be `oauth`.                                                                                                                                   |
 | `client_id`         | string   | Yes\*    | OAuth client ID. Required for interactive auth.                                                                                                    |
 | `client_secret`     | string   | No\*     | OAuth client secret. Required by most authorization servers (confidential clients). Can be omitted for public clients that don't require a secret. |
 | `scopes`            | string[] | No       | Requested scopes. Can also be discovered from the agent card.                                                                                      |
@@ -318,7 +408,7 @@ kind: remote
 name: oauth-agent
 agent_card_url: https://example.com/.well-known/agent.json
 auth:
-  type: oauth2
+  type: oauth
   client_id: my-client-id.apps.example.com
 ---
 ```
