@@ -128,6 +128,13 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
   2. If checks fail, fetch the failure logs, diagnose the issue, apply a fix, push the update, and loop back to step 1.
   3. Once you verify that ALL checks have passed, you must ask the user if they want to mark the PR as ready for review (or remind them to do so themselves). Do not mark it ready without explicit user verification.
 
+#### 11. Requesting Review (Google Chat)
+- **Context**: The engineering manager requests that all PRs passing checks and ready for review be posted to a specific Google Chat space so reviewers can pick them up.
+- **Action**: After the PR is marked ready for review:
+  1. Prepare a draft message summarizing the PR (e.g., "Hi team, PR #<number> is ready for review: <Title> - <Link>").
+  2. Present the draft message to the user along with a direct link to the chat space: [Gemini CLI PR Review Requests](https://chat.google.com/room/AAQAKYbF9sM?cls=7).
+  3. If the user has the Google Workspace CLI (`gws`) or relevant MCP installed, proactively offer to post the message to the space on their behalf.
+
 **Note**: If any step fails, do NOT claim completion. Fix the issue and restart from Step 1.
 
 ---
