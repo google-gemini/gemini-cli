@@ -13,6 +13,7 @@ import {
   type SandboxRequest,
   type SandboxedCommand,
   GOVERNANCE_FILES,
+  findSecretFiles,
   type GlobalSandboxOptions,
   sanitizePaths,
   tryRealpath,
@@ -269,43 +270,96 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(writePath);
     }
 
-    // Denies access to forbiddenPaths for Low Integrity processes.
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
-    for (const forbiddenPath of forbiddenPaths) {
-      await this.denyLowIntegrityAccess(forbiddenPath);
+    // 2. Collect secret files and apply protective ACLs
+    // On Windows, we explicitly deny access to secret files for Low Integrity
+    // processes to ensure they cannot be read or written.
+    const secretsToBlock: string[] = [];
+    const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+    for (const dir of searchDirs) {
+      try {
+        // We use maxDepth 3 to catch common nested secrets while keeping performance high.
+        const secretFiles = await findSecretFiles(dir, 3);
+        for (const secretFile of secretFiles) {
+          try {
+            secretsToBlock.push(secretFile);
+            await this.denyLowIntegrityAccess(secretFile);
+          } catch (e) {
+            debugLogger.log(
+              `WindowsSandboxManager: Failed to secure secret file ${secretFile}`,
+              e,
+            );
+          }
+        }
+      } catch (e) {
+        debugLogger.log(
+          `WindowsSandboxManager: Failed to find secret files in ${dir}`,
+          e,
+        );
+      }
     }
 
-    // 2. Protected governance files
+    // Denies access to forbiddenPaths for Low Integrity processes.
+    // Note: Denying access to arbitrary paths (like system files) via icacls
+    // is restricted to avoid host corruption. External commands rely on
+    // Low Integrity read/write restrictions, while internal commands
+    // use the manifest for enforcement.
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const forbiddenPath of forbiddenPaths) {
+      try {
+        await this.denyLowIntegrityAccess(forbiddenPath);
+      } catch (e) {
+        debugLogger.log(
+          `WindowsSandboxManager: Failed to secure forbidden path ${forbiddenPath}`,
+          e,
+        );
+      }
+    }
+
+    // 3. Protected governance files
     // These must exist on the host before running the sandbox to prevent
     // the sandboxed process from creating them with Low integrity.
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
       const filePath = path.join(this.options.workspace, file.path);
       this.touch(filePath, file.isDirectory);
-
-      // We resolve real paths to ensure protection for both the symlink and its target.
-      try {
-        const realPath = fs.realpathSync(filePath);
-        if (realPath !== filePath) {
-          // If it's a symlink, the target is already implicitly protected
-          // if it's outside the Low integrity workspace (likely Medium).
-          // If it's inside, we ensure it's not accidentally Low.
-        }
-      } catch {
-        // Ignore realpath errors
-      }
     }
 
-    // 3. Construct the helper command
-    // GeminiSandbox.exe <network:0|1> <cwd> <command> [args...]
+    // 4. Forbidden paths manifest
+    // We use a manifest file to avoid command-line length limits.
+    const allForbidden = Array.from(
+      new Set([...secretsToBlock, ...forbiddenPaths]),
+    );
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
+    );
+    const manifestPath = path.join(tempDir, 'manifest.txt');
+    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    // 5. Construct the helper command
+    // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
     const defaultNetwork =
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
-    // If the command starts with __, it's an internal command for the sandbox helper itself.
-    const args = [networkAccess ? '1' : '0', req.cwd, req.command, ...req.args];
+    const args = [
+      networkAccess ? '1' : '0',
+      req.cwd,
+      '--forbidden-manifest',
+      manifestPath,
+      req.command,
+      ...req.args,
+    ];
 
     return {
       program,
@@ -342,17 +396,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    // Never modify integrity levels for system directories
-    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
-    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
-    const programFilesX86 =
-      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-
-    if (
-      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
-      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
-    ) {
+    if (this.isSystemDirectory(resolvedPath)) {
       return;
     }
 
@@ -378,6 +422,11 @@ export class WindowsSandboxManager implements SandboxManager {
 
     const resolvedPath = await tryRealpath(targetPath);
     if (this.deniedCache.has(resolvedPath)) {
+      return;
+    }
+
+    // Never modify ACEs for system directories
+    if (this.isSystemDirectory(resolvedPath)) {
       return;
     }
 
@@ -416,5 +465,18 @@ export class WindowsSandboxManager implements SandboxManager {
         }`,
       );
     }
+  }
+
+  private isSystemDirectory(resolvedPath: string): boolean {
+    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 =
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
+    return (
+      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
+    );
   }
 }

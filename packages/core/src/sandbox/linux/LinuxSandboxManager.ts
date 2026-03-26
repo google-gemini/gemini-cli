@@ -5,7 +5,6 @@
  */
 
 import fs from 'node:fs';
-import { debugLogger } from '../../utils/debugLogger.js';
 import { join, dirname, normalize } from 'node:path';
 import os from 'node:os';
 import {
@@ -15,12 +14,15 @@ import {
   type SandboxedCommand,
   type SandboxPermissions,
   GOVERNANCE_FILES,
+  getSecretFileFindArgs,
   sanitizePaths,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { spawnAsync } from '../../utils/shell-utils.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import {
   isStrictlyApproved,
@@ -32,6 +34,10 @@ import {
   resolveGitWorktreePaths,
   isErrnoException,
 } from '../utils/fsUtils.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../utils/commandSafety.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -85,9 +91,20 @@ function getSeccompBpfPath(): string {
     buf.writeUInt32LE(inst.k, offset + 4);
   }
 
-  const bpfPath = join(os.tmpdir(), `gemini-cli-seccomp-${process.pid}.bpf`);
+  const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
+  const bpfPath = join(tempDir, 'seccomp.bpf');
   fs.writeFileSync(bpfPath, buf);
   cachedBpfPath = bpfPath;
+
+  // Cleanup on exit
+  process.on('exit', () => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore errors
+    }
+  });
+
   return bpfPath;
 }
 
@@ -110,11 +127,6 @@ function touch(filePath: string, isDirectory: boolean) {
   }
 }
 
-import {
-  isKnownSafeCommand,
-  isDangerousCommand,
-} from '../utils/commandSafety.js';
-
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
@@ -130,6 +142,8 @@ export interface LinuxSandboxOptions extends GlobalSandboxOptions {
 }
 
 export class LinuxSandboxManager implements SandboxManager {
+  private static maskFilePath: string | undefined;
+
   constructor(private readonly options: LinuxSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
@@ -138,6 +152,31 @@ export class LinuxSandboxManager implements SandboxManager {
 
   isDangerousCommand(args: string[]): boolean {
     return isDangerousCommand(args);
+  }
+
+  private getMaskFilePath(): string {
+    if (
+      LinuxSandboxManager.maskFilePath &&
+      fs.existsSync(LinuxSandboxManager.maskFilePath)
+    ) {
+      return LinuxSandboxManager.maskFilePath;
+    }
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
+    const maskPath = join(tempDir, 'mask');
+    fs.writeFileSync(maskPath, '');
+    fs.chmodSync(maskPath, 0);
+    LinuxSandboxManager.maskFilePath = maskPath;
+
+    // Cleanup on exit
+    process.on('exit', () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    });
+
+    return maskPath;
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
@@ -319,6 +358,11 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
+    // Mask secret files (.env, .env.*)
+    bwrapArgs.push(
+      ...(await this.getSecretFilesArgs(req.policy?.allowedPaths)),
+    );
+
     const bpfPath = getSeccompBpfPath();
 
     bwrapArgs.push('--seccomp', '9');
@@ -338,5 +382,69 @@ export class LinuxSandboxManager implements SandboxManager {
       env: sanitizedEnv,
       cwd: req.cwd,
     };
+  }
+
+  /**
+   * Generates bubblewrap arguments to mask secret files.
+   */
+  private async getSecretFilesArgs(allowedPaths?: string[]): Promise<string[]> {
+    const args: string[] = [];
+    const maskPath = this.getMaskFilePath();
+    const paths = sanitizePaths(allowedPaths) || [];
+    const searchDirs = new Set([this.options.workspace, ...paths]);
+    const findPatterns = getSecretFileFindArgs();
+
+    for (const dir of searchDirs) {
+      try {
+        // Use the native 'find' command for performance and to catch nested secrets.
+        // We limit depth to 3 to keep it fast while covering common nested structures.
+        // We use -prune to skip heavy directories efficiently while matching dotfiles.
+        const findResult = await spawnAsync('find', [
+          dir,
+          '-maxdepth',
+          '3',
+          '-type',
+          'd',
+          '(',
+          '-name',
+          '.git',
+          '-o',
+          '-name',
+          'node_modules',
+          '-o',
+          '-name',
+          '.venv',
+          '-o',
+          '-name',
+          '__pycache__',
+          '-o',
+          '-name',
+          'dist',
+          '-o',
+          '-name',
+          'build',
+          ')',
+          '-prune',
+          '-o',
+          '-type',
+          'f',
+          ...findPatterns,
+          '-print0',
+        ]);
+
+        const files = findResult.stdout.toString().split('\0');
+        for (const file of files) {
+          if (file.trim()) {
+            args.push('--bind', maskPath, file.trim());
+          }
+        }
+      } catch (e) {
+        debugLogger.log(
+          `LinuxSandboxManager: Failed to find or mask secret files in ${dir}`,
+          e,
+        );
+      }
+    }
+    return args;
   }
 }
