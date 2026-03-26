@@ -50,6 +50,16 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 
 ### **Mandatory Submission Protocol**
 
+#### **0. PR Size Audit (500 LOC Limit)**
+- **Context**: Engineering management requires all PRs to be under 500 lines of code (LOC) changed. This ensures PRs remain reviewable and atomic.
+- **Action**: Before beginning the submission process, calculate the total lines changed (added + removed) relative to `origin/main`.
+  - Use `git diff --shortstat origin/main...HEAD` to verify the total size.
+  - Exclude snapshot updates (e.g., `*.snap` or text snapshots) from this calculation.
+- **Constraint**: If the PR exceeds 500 LOC:
+  1. STOP the submission process.
+  2. Inform the user that the PR is too large.
+  3. Offer strategies: simplify the code, cut scope, or split the changes into multiple smaller PRs. Do not proceed without explicit user override or restructuring.
+
 #### **1. Safe Rebase & Conflict Resolution**
 - **Action**: `git fetch origin main && git rebase origin/main`.
 - **Constraint**: NEVER use `git merge -X ours` or `git checkout --ours`. 
