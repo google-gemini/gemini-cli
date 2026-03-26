@@ -300,7 +300,10 @@ export async function runNonInteractive({
 
       // Start the agentic loop (runs in background)
       const { streamId } = await session.send({
-        message: geminiPartsToContentParts(query),
+        message: {
+          content: geminiPartsToContentParts(query),
+          displayContent: input,
+        },
       });
       if (streamId === null) {
         throw new Error(
@@ -464,18 +467,17 @@ export async function runNonInteractive({
               }
 
               if (event.data?.['errorType'] === ToolErrorType.NO_SPACE_LEFT) {
-                runTerminalExitHandler(() =>
-                  handleToolError(
-                    event.name,
-                    new Error(errorMsg),
-                    config,
-                    typeof event.data?.['errorType'] === 'string'
-                      ? event.data['errorType']
-                      : undefined,
-                    displayText,
-                  ),
+                terminalProcessExitHandled = true;
+                handleToolError(
+                  event.name,
+                  new Error(errorMsg),
+                  config,
+                  typeof event.data?.['errorType'] === 'string'
+                    ? event.data['errorType']
+                    : undefined,
+                  displayText,
                 );
-                break;
+                return;
               }
               handleToolError(
                 event.name,
@@ -527,7 +529,9 @@ export async function runNonInteractive({
                 typeof event.data?.['turnCount'] === 'number';
 
               if (isConfiguredTurnLimit) {
-                runTerminalExitHandler(() => handleMaxTurnsExceededError(config));
+                runTerminalExitHandler(() =>
+                  handleMaxTurnsExceededError(config),
+                );
               } else if (streamFormatter) {
                 streamFormatter.emitEvent({
                   type: JsonStreamEventType.ERROR,

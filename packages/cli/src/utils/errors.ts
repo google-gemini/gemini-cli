@@ -18,6 +18,7 @@ import {
   isFatalToolError,
   debugLogger,
   coreEvents,
+  getErrorType,
   getErrorMessage,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
@@ -82,7 +83,7 @@ export function handleError(
       timestamp: new Date().toISOString(),
       status: 'error',
       error: {
-        type: error instanceof Error ? error.constructor.name : 'Error',
+        type: getErrorType(error),
         message: errorMessage,
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),
