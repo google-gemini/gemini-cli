@@ -18,6 +18,7 @@ import {
   isFatalToolError,
   debugLogger,
   coreEvents,
+  getErrorType,
   getErrorMessage,
   getErrorType,
 } from '@google/gemini-cli-core';
