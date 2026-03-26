@@ -1,6 +1,6 @@
-# Preview release: v0.36.0-preview.0
+# Preview release: v0.36.0-preview.3
 
-Released: March 24, 2026
+Released: March 25, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -31,6 +31,10 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 055ff92 to release/v0.36.0-preview.0-pr-23672 to patch
+  version v0.36.0-preview.0 and create version 0.36.0-preview.1 by
+  @gemini-cli-robot in
+  [#23723](https://github.com/google-gemini/gemini-cli/pull/23723)
 - Changelog for v0.33.2 by @gemini-cli-robot in
   [#22730](https://github.com/google-gemini/gemini-cli/pull/22730)
 - feat(core): multi-registry architecture and tool filtering for subagents by
@@ -375,4 +379,4 @@ npm install -g @google/gemini-cli@preview
   [#23666](https://github.com/google-gemini/gemini-cli/pull/23666)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.3

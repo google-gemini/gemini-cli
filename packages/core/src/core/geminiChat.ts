@@ -1032,8 +1032,8 @@ export class GeminiChat {
 
       return {
         id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),
