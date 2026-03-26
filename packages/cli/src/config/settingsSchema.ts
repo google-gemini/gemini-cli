@@ -300,7 +300,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description:
-              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.',
             showInDialog: true,
           },
           modelRouting: {
@@ -3024,6 +3024,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {
