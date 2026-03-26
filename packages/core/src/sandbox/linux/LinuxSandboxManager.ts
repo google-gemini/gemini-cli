@@ -143,7 +143,6 @@ export interface LinuxSandboxOptions extends GlobalSandboxOptions {
 
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
-  private static maskDirPath: string | undefined;
 
   constructor(private readonly options: LinuxSandboxOptions) {}
 
@@ -167,31 +166,6 @@ export class LinuxSandboxManager implements SandboxManager {
     fs.writeFileSync(maskPath, '');
     fs.chmodSync(maskPath, 0);
     LinuxSandboxManager.maskFilePath = maskPath;
-
-    // Cleanup on exit
-    process.on('exit', () => {
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        // Ignore errors
-      }
-    });
-
-    return maskPath;
-  }
-
-  private getMaskDirPath(): string {
-    if (
-      LinuxSandboxManager.maskDirPath &&
-      fs.existsSync(LinuxSandboxManager.maskDirPath)
-    ) {
-      return LinuxSandboxManager.maskDirPath;
-    }
-    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-dir-'));
-    const maskPath = join(tempDir, 'mask');
-    fs.mkdirSync(maskPath, { recursive: true });
-    fs.chmodSync(maskPath, 0);
-    LinuxSandboxManager.maskDirPath = maskPath;
 
     // Cleanup on exit
     process.on('exit', () => {
