@@ -354,4 +354,13 @@ describe('getErrorType', () => {
     expect(getErrorType(null)).toBe('unknown');
     expect(getErrorType(undefined)).toBe('unknown');
   });
+
+  it('should strip leading underscores from error names', () => {
+    class _GaxiosError extends Error {}
+    expect(getErrorType(new _GaxiosError('test'))).toBe('GaxiosError');
+
+    const errorWithUnderscoreName = new Error('test');
+    errorWithUnderscoreName.name = '_CodeBuddyError';
+    expect(getErrorType(errorWithUnderscoreName)).toBe('CodeBuddyError');
+  });
 });

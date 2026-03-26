@@ -19,6 +19,7 @@ import { isDirectorySecure } from '../utils/security.js';
 import {
   createPolicyEngineConfig,
   clearEmittedPolicyWarnings,
+  getPolicyDirectories,
 } from './config.js';
 import { Storage } from '../config/storage.js';
 import * as tomlLoader from './toml-loader.js';
@@ -313,7 +314,7 @@ describe('createPolicyEngineConfig', () => {
   it('should allow all tools in YOLO mode', async () => {
     const config = await createPolicyEngineConfig({}, ApprovalMode.YOLO);
     const rule = config.rules?.find(
-      (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
+      (r) => r.decision === PolicyDecision.ALLOW && r.toolName === '*',
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBeCloseTo(1.998, 5);
@@ -512,7 +513,7 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const wildcardRule = config.rules?.find(
-      (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
+      (r) => r.toolName === '*' && r.decision === PolicyDecision.ALLOW,
     );
     const writeToolRules = config.rules?.filter(
       (r) =>
@@ -627,6 +628,34 @@ name = "invalid-name"
     expect(
       config.rules?.find((r) => r.toolName === 'write_file'),
     ).toBeUndefined();
+  });
+
+  it('should support mcpName in policy rules from TOML', async () => {
+    mockPolicyFile(
+      nodePath.join(MOCK_DEFAULT_DIR, 'mcp.toml'),
+      `
+  [[rule]]
+  toolName = "my-tool"
+  mcpName = "my-server"
+  decision = "allow"
+  priority = 150
+  `,
+    );
+
+    const config = await createPolicyEngineConfig(
+      {},
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    const rule = config.rules?.find(
+      (r) =>
+        r.toolName === 'mcp_my-server_my-tool' &&
+        r.mcpName === 'my-server' &&
+        r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeDefined();
+    expect(rule?.priority).toBeCloseTo(1.15, 5);
   });
 
   it('should have default ASK_USER rule for discovered tools', async () => {
@@ -744,5 +773,54 @@ modes = ["plan"]
     expect(feedbackSpy.mock.calls.length).toBe(count);
 
     feedbackSpy.mockRestore();
+  });
+});
+
+describe('getPolicyDirectories', () => {
+  const USER_POLICIES_DIR = '/mock/user/policies';
+  const SYSTEM_POLICIES_DIR = '/mock/system/policies';
+
+  beforeEach(() => {
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(USER_POLICIES_DIR);
+    vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
+      SYSTEM_POLICIES_DIR,
+    );
+  });
+
+  it('should include default user policies directory when policyPaths is undefined', () => {
+    const dirs = getPolicyDirectories();
+    expect(dirs).toContain(USER_POLICIES_DIR);
+  });
+
+  it('should include default user policies directory when policyPaths is an empty array', () => {
+    // This is the specific case that regressed
+    const dirs = getPolicyDirectories(undefined, []);
+    expect(dirs).toContain(USER_POLICIES_DIR);
+  });
+
+  it('should replace default user policies directory when policyPaths has entries', () => {
+    const customPath = '/custom/policies';
+    const dirs = getPolicyDirectories(undefined, [customPath]);
+    expect(dirs).toContain(customPath);
+    expect(dirs).not.toContain(USER_POLICIES_DIR);
+  });
+
+  it('should include all tiers in correct order', () => {
+    const defaultDir = '/default/policies';
+    const workspaceDir = '/workspace/policies';
+    const adminPath = '/admin/extra/policies';
+    const userPath = '/user/custom/policies';
+
+    const dirs = getPolicyDirectories(defaultDir, [userPath], workspaceDir, [
+      adminPath,
+    ]);
+
+    // Order should be Admin -> User -> Workspace -> Default
+    // getPolicyDirectories returns them in that order (which is then reversed by the loader)
+    expect(dirs[0]).toBe(SYSTEM_POLICIES_DIR);
+    expect(dirs[1]).toBe(adminPath);
+    expect(dirs[2]).toBe(userPath);
+    expect(dirs[3]).toBe(workspaceDir);
+    expect(dirs[4]).toBe(defaultDir);
   });
 });

@@ -11,6 +11,7 @@ import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import { escapeAtSymbols } from '../hooks/atCommandProcessor.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
@@ -58,6 +59,7 @@ import {
   isAutoExecutableCommand,
   isSlashCommand,
 } from '../utils/commandUtils.js';
+import { parseSlashCommand } from '../../utils/commands.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
@@ -117,6 +119,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  copyModeEnabled?: boolean;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -210,6 +213,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  copyModeEnabled = false,
 }) => {
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
@@ -329,7 +333,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     isShellSuggestionsVisible,
   } = completion;
 
-  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+  const showCursor =
+    focus && isShellFocused && !isEmbeddedShellFocused && !copyModeEnabled;
 
   // Notify parent component about escape prompt state changes
   useEffect(() => {
@@ -408,6 +413,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         (isSlash || isShell) &&
         streamingState === StreamingState.Responding
       ) {
+        if (isSlash) {
+          const { commandToExecute } = parseSlashCommand(
+            trimmedMessage,
+            slashCommands,
+          );
+          if (commandToExecute?.isSafeConcurrent) {
+            inputHistory.handleSubmit(trimmedMessage);
+            return;
+          }
+        }
+
         setQueueErrorMessage(
           `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
         );
@@ -415,7 +431,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       inputHistory.handleSubmit(trimmedMessage);
     },
-    [inputHistory, shellModeActive, streamingState, setQueueErrorMessage],
+    [
+      inputHistory,
+      shellModeActive,
+      streamingState,
+      setQueueErrorMessage,
+      slashCommands,
+    ],
   );
 
   // Effect to reset completion if history navigation just occurred and set the text
@@ -497,7 +519,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        buffer.insert(textToInsert, { paste: true });
+        const escapedText = settings.ui?.escapePastedAtSymbols
+          ? escapeAtSymbols(textToInsert)
+          : textToInsert;
+        buffer.insert(escapedText, { paste: true });
+
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
             message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
@@ -660,13 +686,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
-        return false;
-      }
+      const isGenerating =
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation;
 
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
@@ -732,8 +754,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
+        if (settings.ui?.escapePastedAtSymbols) {
+          buffer.handleInput({
+            ...key,
+            sequence: escapeAtSymbols(key.sequence || ''),
+          });
+        } else {
+          buffer.handleInput(key);
+        }
+
         if (key.sequence && isLargePaste(key.sequence)) {
           appEvents.emit(AppEvent.TransientMessage, {
             message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
@@ -842,6 +871,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShellModeActive(false);
           resetEscapeState();
           return true;
+        }
+
+        // If we're generating and no local overlay consumed Escape, let it
+        // propagate to the global cancellation handler.
+        if (isGenerating) {
+          return false;
         }
 
         handleEscPress();
@@ -1273,6 +1308,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       forceShowShellSuggestions,
       keyMatchers,
       isHelpDismissKey,
+      settings,
     ],
   );
 

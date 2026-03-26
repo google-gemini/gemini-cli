@@ -43,8 +43,7 @@ describe('ShowMoreLines layout and padding', () => {
       </Box>
     );
 
-    const { lastFrame, waitUntilReady, unmount } = render(<TestComponent />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<TestComponent />);
 
     // lastFrame() strips some formatting but keeps layout
     const output = lastFrame({ allowEmpty: true });
@@ -76,8 +75,7 @@ describe('ShowMoreLines layout and padding', () => {
       </Box>
     );
 
-    const { lastFrame, waitUntilReady, unmount } = render(<TestComponent />);
-    await waitUntilReady();
+    const { lastFrame, unmount } = await render(<TestComponent />);
 
     const output = lastFrame({ allowEmpty: true });
     const lines = output.split('\n');

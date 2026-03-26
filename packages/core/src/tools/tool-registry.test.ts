@@ -284,6 +284,26 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('removeMcpToolsByServer', () => {
+    it('should remove all tools from a specific server', () => {
+      const serverName = 'test-server';
+      const mcpTool1 = createMCPTool(serverName, 'tool1', 'desc1');
+      const mcpTool2 = createMCPTool(serverName, 'tool2', 'desc2');
+      const otherTool = createMCPTool('other-server', 'tool3', 'desc3');
+
+      toolRegistry.registerTool(mcpTool1);
+      toolRegistry.registerTool(mcpTool2);
+      toolRegistry.registerTool(otherTool);
+
+      expect(toolRegistry.getToolsByServer(serverName)).toHaveLength(2);
+
+      toolRegistry.removeMcpToolsByServer(serverName);
+
+      expect(toolRegistry.getToolsByServer(serverName)).toHaveLength(0);
+      expect(toolRegistry.getToolsByServer('other-server')).toHaveLength(1);
+    });
+  });
+
   describe('excluded tools', () => {
     const simpleTool = new MockTool({
       name: 'tool-a',
@@ -310,13 +330,13 @@ describe('ToolRegistry', () => {
         excludedTools: ['tool-a'],
       },
       {
-        name: 'should match simple MCP tool names, when qualified or unqualified',
-        tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
+        name: 'should match simple MCP tool names',
+        tools: [mcpTool],
         excludedTools: [mcpTool.name],
       },
       {
-        name: 'should match qualified MCP tool names when qualified or unqualified',
-        tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
+        name: 'should match qualified MCP tool names',
+        tools: [mcpTool],
         excludedTools: [mcpTool.name],
       },
       {
@@ -414,9 +434,9 @@ describe('ToolRegistry', () => {
       const toolName = 'my-tool';
       const mcpTool = createMCPTool(serverName, toolName, 'desc');
 
-      // Register same MCP tool twice (one as alias, one as qualified)
+      // Register same MCP tool twice
       toolRegistry.registerTool(mcpTool);
-      toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
+      toolRegistry.registerTool(mcpTool);
 
       const toolNames = toolRegistry.getAllToolNames();
       expect(toolNames).toEqual([`mcp_${serverName}_${toolName}`]);
@@ -540,6 +560,11 @@ describe('ToolRegistry', () => {
           some_string: {
             type: 'string',
             format: 'uuid',
+          },
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
           },
         },
       });
@@ -698,9 +723,8 @@ describe('ToolRegistry', () => {
       const toolName = 'my-tool';
       const mcpTool = createMCPTool(serverName, toolName, 'description');
 
-      // Register both alias and qualified
       toolRegistry.registerTool(mcpTool);
-      toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
+      toolRegistry.registerTool(mcpTool);
 
       const declarations = toolRegistry.getFunctionDeclarations();
       expect(declarations).toHaveLength(1);
