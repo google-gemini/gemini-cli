@@ -487,7 +487,7 @@ describe('LinuxSandboxManager', () => {
         return Promise.resolve({
           status: 0,
           stdout: Buffer.from(
-            `${workspace}/.env\n${workspace}/.env.local\n${workspace}/.env.test\n`,
+            `${workspace}/.env\0${workspace}/.env.local\0${workspace}/.env.test\0`,
           ),
         } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
       }
