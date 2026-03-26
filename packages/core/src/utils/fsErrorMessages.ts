@@ -15,12 +15,12 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
     (path
       ? `Permission denied: cannot access '${path}'. `
       : 'Permission denied. ') +
-    'Check file permissions or run with elevated privileges.',
+    'Check file permissions or run with elevated privileges.\nSuggestions: Verify file ownership and system-level access rights.',
   ENOENT: (path) =>
     (path
       ? `File or directory not found: '${path}'. `
       : 'File or directory not found. ') +
-    'Check if the path exists and is spelled correctly.',
+    'Check if the path exists and is spelled correctly.\nSuggestions: Verify the file path and ensure all environment variables are correctly resolved.',
   ENOSPC: () =>
     'No space left on device. Free up some disk space and try again.',
   EISDIR: (path) =>
@@ -48,6 +48,20 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
   EMFILE: () => 'Too many open files. Close some unused files or applications.',
   ENFILE: () =>
     'Too many open files in system. Close some unused files or applications.',
+  ENOTDIR: (path) =>
+    (path ? `Not a directory: '${path}'. ` : 'Not a directory. ') +
+    'Check if the path is correct and all parent directories exist.',
+  ENOTEMPTY: (path) =>
+    (path ? `Directory not empty: '${path}'. ` : 'Directory not empty. ') +
+    'Ensure the directory is empty before deleting it or use a recursive option.',
+  ECONNRESET: (path) =>
+    (path
+      ? `Connection reset by peer: '${path}'. `
+      : 'Connection reset by peer. ') +
+    'This could be a temporary network issue or a problem with a remote file system.',
+  ETIMEDOUT: (path) =>
+    (path ? `Operation timed out: '${path}'. ` : 'Operation timed out. ') +
+    'Check your network connection or try again later.',
 };
 
 /**
@@ -76,7 +90,7 @@ export function getFsErrorMessage(
     // For unknown error codes, include the code in the message
     if (code) {
       const baseMessage = error.message || defaultMessage;
-      return `${baseMessage} (${code})`;
+      return `${baseMessage} (${code}). This error code is not recognized. Please check system logs or documentation.`;
     }
   }
 
