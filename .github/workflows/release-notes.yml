@@ -43,8 +43,8 @@ jobs:
       - name: 'Get release information'
         id: 'release_info'
         run: |
-          VERSION="${{ github.event.inputs.version || github.event.release.tag_name }}"
-          TIME="${{ github.event.inputs.time || github.event.release.created_at }}"
+          VERSION="${INPUT_VERSION}"
+          TIME="${INPUT_TIME}"
 
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "TIME=${TIME}" >> "$GITHUB_OUTPUT"
@@ -56,6 +56,8 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           BODY: '${{ github.event.inputs.body || github.event.release.body }}'
+          INPUT_VERSION: ${{ github.event.inputs.version || github.event.release.tag_name }}
+          INPUT_TIME: ${{ github.event.inputs.time || github.event.release.created_at }}
 
       - name: 'Validate version'
         id: 'validate_version'
