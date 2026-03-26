@@ -120,7 +120,8 @@ export function getInstallationInfo(
     if (
       realPath.includes('/.pnpm/global') ||
       realPath.includes('/.local/share/pnpm') ||
-      realPath.includes('/Library/pnpm/global')
+      realPath.includes('/Library/pnpm/global/') ||
+      realPath.includes('/AppData/Local/pnpm/global/')
     ) {
       const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
       return {
