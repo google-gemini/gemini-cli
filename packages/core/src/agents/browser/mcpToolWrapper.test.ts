@@ -300,6 +300,64 @@ describe('mcpToolWrapper', () => {
       // Should still try to resume
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
     });
+
+    it('should resume blocker even when Chrome fatal connection error is thrown', async () => {
+      vi.mocked(mockBrowserManager.callTool)
+        .mockResolvedValueOnce({ content: [] }) // suspend blocker succeeds
+        .mockRejectedValueOnce(new Error('Could not connect to Chrome')) // fatal error
+        .mockResolvedValueOnce({ content: [] }); // resume blocker in finally
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-99' });
+
+      // The fatal error must still propagate — caller needs to know Chrome is dead
+      await expect(
+        invocation.execute(new AbortController().signal),
+      ).rejects.toThrow('Could not connect to Chrome');
+
+      // The critical assertion: resume blocker was called in finally,
+      // even though the Chrome error was re-thrown. This is the exact
+      // bug from issue #22159 — without try/finally the blocker stays
+      // suspended and the tab is permanently frozen.
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        3,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+      );
+    });
+
+    it('should resume blocker when Chrome fatal error occurs and resume itself fails', async () => {
+      vi.mocked(mockBrowserManager.callTool)
+        .mockResolvedValueOnce({ content: [] }) // suspend blocker succeeds
+        .mockRejectedValueOnce(new Error('Could not connect to Chrome')) // fatal error
+        .mockRejectedValueOnce(new Error('Could not connect to Chrome')); // resume also fails (Chrome is dead)
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-99' });
+
+      // Must throw the original fatal error, NOT the resume failure
+      await expect(
+        invocation.execute(new AbortController().signal),
+      ).rejects.toThrow('Could not connect to Chrome');
+
+      // Resume was attempted (3 calls), even though it also failed
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('Hard Block: upload_file', () => {
