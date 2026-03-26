@@ -639,6 +639,7 @@ export interface ConfigParameters {
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
+  ptyBackend?: string;
   disableYoloMode?: boolean;
   disableAlwaysAllow?: boolean;
   rawOutput?: boolean;
@@ -811,6 +812,7 @@ export class Config implements McpContext, AgentLoopContext {
   /** Public for testing only */
   readonly interactive: boolean;
   private readonly ptyInfo: string;
+  private readonly ptyBackend: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
@@ -1129,6 +1131,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
+    this.ptyBackend = params.ptyBackend ?? 'native';
     this.trustedFolder = params.trustedFolder;
     this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
@@ -1144,6 +1147,7 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig: this.sanitizationConfig,
       sandboxManager: this._sandboxManager,
       sandboxConfig: this.sandbox,
+      ptyBackend: this.ptyBackend,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -3013,6 +3017,7 @@ export class Config implements McpContext, AgentLoopContext {
     return (
       this.interactive &&
       this.ptyInfo !== 'child_process' &&
+      this.ptyBackend !== 'none' &&
       this.enableInteractiveShell
     );
   }

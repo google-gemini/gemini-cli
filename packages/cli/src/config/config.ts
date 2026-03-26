@@ -23,7 +23,7 @@ import {
   FileDiscoveryService,
   resolveTelemetrySettings,
   FatalConfigError,
-  getPty,
+  resolveConfiguredPtyBackend,
   debugLogger,
   loadServerHierarchicalMemory,
   ASK_USER_TOOL_NAME,
@@ -822,7 +822,10 @@ export async function loadCliConfig(
       ? argv.screenReader
       : (settings.ui?.accessibility?.screenReader ?? false);
 
-  const ptyInfo = await getPty();
+  const configuredPtyBackend = settings.tools?.shell?.ptyBackend;
+  const resolvedPtyBackend =
+    await resolveConfiguredPtyBackend(configuredPtyBackend);
+  const ptyInfo = resolvedPtyBackend === 'none' ? 'child_process' : 'auto';
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
@@ -1007,7 +1010,8 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
     maxAttempts: settings.general?.maxAttempts,
-    ptyInfo: ptyInfo?.name,
+    ptyInfo,
+    ptyBackend: resolvedPtyBackend,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,

@@ -5,14 +5,17 @@
  */
 
 import stripAnsi from 'strip-ansi';
-import { getPty, type PtyImplementation } from '../utils/getPty.js';
+import {
+  getPty,
+  type PtyImplementation,
+  type PtyProcess,
+} from '../utils/getPty.js';
 import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import type { Writable } from 'node:stream';
 import os from 'node:os';
 import fs, { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
@@ -102,6 +105,7 @@ export interface ShellExecutionConfig {
   scrollback?: number;
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
+  ptyBackend?: string;
 }
 
 /**
@@ -110,7 +114,7 @@ export interface ShellExecutionConfig {
 export type ShellOutputEvent = ExecutionOutputEvent;
 
 interface ActivePty {
-  ptyProcess: IPty;
+  ptyProcess: PtyProcess;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
 }
@@ -283,7 +287,9 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
     if (shouldUseNodePty) {
-      const ptyInfo = await getPty();
+      const ptyInfo = await getPty({
+        configuredBackend: shellExecutionConfig.ptyBackend,
+      });
       if (ptyInfo) {
         try {
           return await this.executeWithPty(
@@ -769,7 +775,7 @@ export class ShellExecutionService {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
     }
-    let spawnedPty: IPty | undefined;
+    let spawnedPty: PtyProcess | undefined;
 
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
@@ -787,7 +793,6 @@ export class ShellExecutionService {
         true,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
         cwd: finalCwd,
         name: 'xterm-256color',
@@ -797,8 +802,7 @@ export class ShellExecutionService {
         handleFlowControl: true,
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      spawnedPty = ptyProcess as IPty;
+      spawnedPty = ptyProcess;
       const ptyPid = Number(ptyProcess.pid);
 
       const headlessTerminal = new Terminal({
@@ -810,7 +814,6 @@ export class ShellExecutionService {
       headlessTerminal.scrollToTop();
 
       this.activePtys.set(ptyPid, {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         ptyProcess,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
@@ -827,12 +830,10 @@ export class ShellExecutionService {
         kill: () => {
           killProcessGroup({
             pid: ptyPid,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             pty: ptyProcess,
           }).catch(() => {});
           try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
+            ptyProcess.destroy?.();
           } catch {
             // Ignore errors during cleanup
           }
@@ -1048,67 +1049,65 @@ export class ShellExecutionService {
         handleOutput(bufferData);
       });
 
-      ptyProcess.onExit(
-        ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
-          exited = true;
-          abortSignal.removeEventListener('abort', abortHandler);
-          // Attempt to destroy the PTY to ensure FD is closed
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
-          } catch {
-            // Ignore errors during cleanup
-          }
+      ptyProcess.onExit(({ exitCode, signal }) => {
+        const normalizedSignal = typeof signal === 'number' ? signal : null;
+        exited = true;
+        abortSignal.removeEventListener('abort', abortHandler);
+        // Attempt to destroy the PTY to ensure FD is closed
+        try {
+          ptyProcess.destroy?.();
+        } catch {
+          // Ignore errors during cleanup
+        }
 
-          const finalize = () => {
-            render(true);
+        const finalize = () => {
+          render(true);
 
-            const event: ShellOutputEvent = {
-              type: 'exit',
-              exitCode,
-              signal: signal ?? null,
-            };
-            onOutputEvent(event);
-
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
-              ShellExecutionService.activePtys.delete(ptyPid);
-            });
-
-            ExecutionLifecycleService.completeWithResult(ptyPid, {
-              rawOutput: Buffer.concat(outputChunks),
-              output: getFullBufferText(headlessTerminal),
-              exitCode,
-              signal: signal ?? null,
-              error,
-              aborted: abortSignal.aborted,
-              pid: ptyPid,
-              executionMethod: ptyInfo?.name ?? 'node-pty',
-            });
+          const event: ShellOutputEvent = {
+            type: 'exit',
+            exitCode,
+            signal: normalizedSignal,
           };
-
-          if (abortSignal.aborted) {
-            finalize();
-            return;
-          }
-
-          const processingComplete = processingChain.then(() => 'processed');
-          const abortFired = new Promise<'aborted'>((res) => {
-            if (abortSignal.aborted) {
-              res('aborted');
-              return;
-            }
-            abortSignal.addEventListener('abort', () => res('aborted'), {
-              once: true,
-            });
-          });
+          onOutputEvent(event);
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          Promise.race([processingComplete, abortFired]).then(() => {
-            finalize();
+          ShellExecutionService.cleanupLogStream(ptyPid).then(() => {
+            ShellExecutionService.activePtys.delete(ptyPid);
           });
-        },
-      );
+
+          ExecutionLifecycleService.completeWithResult(ptyPid, {
+            rawOutput: Buffer.concat(outputChunks),
+            output: getFullBufferText(headlessTerminal),
+            exitCode,
+            signal: normalizedSignal,
+            error,
+            aborted: abortSignal.aborted,
+            pid: ptyPid,
+            executionMethod: ptyInfo?.name ?? 'node-pty',
+          });
+        };
+
+        if (abortSignal.aborted) {
+          finalize();
+          return;
+        }
+
+        const processingComplete = processingChain.then(() => 'processed');
+        const abortFired = new Promise<'aborted'>((res) => {
+          if (abortSignal.aborted) {
+            res('aborted');
+            return;
+          }
+          abortSignal.addEventListener('abort', () => res('aborted'), {
+            once: true,
+          });
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        Promise.race([processingComplete, abortFired]).then(() => {
+          finalize();
+        });
+      });
 
       const abortHandler = async () => {
         if (ptyProcess.pid && !exited) {
@@ -1116,7 +1115,6 @@ export class ShellExecutionService {
             pid: ptyPid,
             escalate: true,
             isExited: () => exited,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             pty: ptyProcess,
           });
         }
@@ -1131,7 +1129,7 @@ export class ShellExecutionService {
 
       if (spawnedPty) {
         try {
-          (spawnedPty as IPty & { destroy?: () => void }).destroy?.();
+          spawnedPty.destroy?.();
         } catch {
           // Ignore errors during cleanup
         }
@@ -1263,7 +1261,7 @@ export class ShellExecutionService {
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
-        activePty.ptyProcess.resize(cols, rows);
+        activePty.ptyProcess.resize?.(cols, rows);
         activePty.headlessTerminal.resize(cols, rows);
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen

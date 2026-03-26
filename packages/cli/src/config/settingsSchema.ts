@@ -1445,6 +1445,30 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
+          ptyBackend: {
+            type: 'enum',
+            label: 'PTY Backend',
+            category: 'Tools',
+            requiresRestart: true,
+            default: undefined as
+              | 'external'
+              | 'script'
+              | 'proxy'
+              | 'none'
+              | undefined,
+            description: oneLine`
+              Optional PTY backend override for environments where native node-pty addons are unavailable.
+              Allowed values are 'external', 'script', 'proxy', or 'none'.
+              Environment variable GEMINI_PTY_BACKEND takes precedence.
+            `,
+            showInDialog: false,
+            options: [
+              { value: 'external', label: 'External (auto)' },
+              { value: 'script', label: 'script(1)' },
+              { value: 'proxy', label: 'pty-proxy' },
+              { value: 'none', label: 'None' },
+            ],
+          },
           pager: {
             type: 'string',
             label: 'Pager',
