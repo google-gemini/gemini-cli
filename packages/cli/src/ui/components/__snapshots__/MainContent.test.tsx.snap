@@ -136,7 +136,7 @@ exports[`MainContent > renders a subagent with a complete box including bottom b
 │                                                                          │
 │ Running subagent codebase_investigator...                                │
 │                                                                          │
-│ ⊶  run_shell_command echo hello                                          │
+│ ⠋  run_shell_command echo hello                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
 "
