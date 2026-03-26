@@ -112,7 +112,10 @@ describe('MacOsSandboxManager', () => {
           SAFE_VAR: '1',
           GITHUB_TOKEN: 'sensitive',
         },
-        policy: mockPolicy,
+        policy: {
+          ...mockPolicy,
+          sanitizationConfig: { enableEnvironmentVariableRedaction: true },
+        },
       });
 
       expect(result.env['SAFE_VAR']).toBe('1');
