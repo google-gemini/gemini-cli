@@ -1,0 +1,19 @@
+[modes.plan]
+network = false
+readonly = true
+approvedTools = []
+allowOverrides = false
+
+[modes.default]
+network = false
+readonly = true
+approvedTools = []
+allowOverrides = true
+
+[modes.accepting_edits]
+network = false
+readonly = false
+approvedTools = ['sed', 'grep', 'awk', 'perl', 'cat', 'echo']
+allowOverrides = true
+
+[commands]

@@ -43,6 +43,13 @@ describe('ChatRecordingService', () => {
     );
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
+      promptId: 'test-session-id',
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -432,6 +439,7 @@ describe('ChatRecordingService', () => {
   describe('deleteSession', () => {
     it('should delete the session file, tool outputs, session directory, and logs if they exist', () => {
       const sessionId = 'test-session-id';
+      const shortId = '12345678';
       const chatsDir = path.join(testTempDir, 'chats');
       const logsDir = path.join(testTempDir, 'logs');
       const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
@@ -442,8 +450,12 @@ describe('ChatRecordingService', () => {
       fs.mkdirSync(toolOutputsDir, { recursive: true });
       fs.mkdirSync(sessionDir, { recursive: true });
 
-      const sessionFile = path.join(chatsDir, `${sessionId}.json`);
-      fs.writeFileSync(sessionFile, '{}');
+      // Create main session file with timestamp
+      const sessionFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }));
 
       const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
       fs.writeFileSync(logFile, '{}');
@@ -451,12 +463,100 @@ describe('ChatRecordingService', () => {
       const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
-      chatRecordingService.deleteSession(sessionId);
+      // Call with shortId
+      chatRecordingService.deleteSession(shortId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
       expect(fs.existsSync(toolOutputDir)).toBe(false);
       expect(fs.existsSync(sessionDir)).toBe(false);
+    });
+
+    it('should delete subagent files and their logs when parent is deleted', () => {
+      const parentSessionId = '12345678-session-id';
+      const shortId = '12345678';
+      const subagentSessionId = 'subagent-session-id';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+
+      // Create parent session file
+      const parentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        parentFile,
+        JSON.stringify({ sessionId: parentSessionId }),
+      );
+
+      // Create subagent session file
+      const subagentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-01-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        subagentFile,
+        JSON.stringify({ sessionId: subagentSessionId, kind: 'subagent' }),
+      );
+
+      // Create logs for both
+      const parentLog = path.join(logsDir, `session-${parentSessionId}.jsonl`);
+      fs.writeFileSync(parentLog, '{}');
+      const subagentLog = path.join(
+        logsDir,
+        `session-${subagentSessionId}.jsonl`,
+      );
+      fs.writeFileSync(subagentLog, '{}');
+
+      // Create tool outputs for both
+      const parentToolOutputDir = path.join(
+        toolOutputsDir,
+        `session-${parentSessionId}`,
+      );
+      fs.mkdirSync(parentToolOutputDir, { recursive: true });
+      const subagentToolOutputDir = path.join(
+        toolOutputsDir,
+        `session-${subagentSessionId}`,
+      );
+      fs.mkdirSync(subagentToolOutputDir, { recursive: true });
+
+      // Call with parent sessionId
+      chatRecordingService.deleteSession(parentSessionId);
+
+      expect(fs.existsSync(parentFile)).toBe(false);
+      expect(fs.existsSync(subagentFile)).toBe(false);
+      expect(fs.existsSync(parentLog)).toBe(false);
+      expect(fs.existsSync(subagentLog)).toBe(false);
+      expect(fs.existsSync(parentToolOutputDir)).toBe(false);
+      expect(fs.existsSync(subagentToolOutputDir)).toBe(false);
+    });
+
+    it('should delete by basename', () => {
+      const sessionId = 'test-session-id';
+      const shortId = '12345678';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+
+      const basename = `session-2023-01-01T00-00-${shortId}`;
+      const sessionFile = path.join(chatsDir, `${basename}.json`);
+      fs.writeFileSync(sessionFile, JSON.stringify({ sessionId }));
+
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+
+      // Call with basename
+      chatRecordingService.deleteSession(basename);
+
+      expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
     });
 
     it('should not throw if session file does not exist', () => {

@@ -338,6 +338,8 @@ describe('loadSandboxConfig', () => {
             sandbox: {
               enabled: true,
               command: 'podman',
+              allowedPaths: [],
+              networkAccess: false,
             },
           },
         },
@@ -353,6 +355,8 @@ describe('loadSandboxConfig', () => {
             sandbox: {
               enabled: true,
               image: 'custom/image',
+              allowedPaths: [],
+              networkAccess: false,
             },
           },
         },
@@ -367,6 +371,8 @@ describe('loadSandboxConfig', () => {
           tools: {
             sandbox: {
               enabled: false,
+              allowedPaths: [],
+              networkAccess: false,
             },
           },
         },
@@ -382,6 +388,7 @@ describe('loadSandboxConfig', () => {
             sandbox: {
               enabled: true,
               allowedPaths: ['/settings-path'],
+              networkAccess: false,
             },
           },
         },
