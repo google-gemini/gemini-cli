@@ -423,6 +423,52 @@ describe('HookAggregator', () => {
       const llmRequest = output.hookSpecificOutput?.llm_request;
       expect(llmRequest?.['model']).toBe('model2'); // Later value wins
     });
+
+    it('should aggregate additionalContext for BeforeModel hooks', () => {
+      const results: HookExecutionResult[] = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'h1',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeModel,
+          success: true,
+          output: {
+            hookSpecificOutput: {
+              hookEventName: 'BeforeModel',
+              additionalContext: 'Context 1',
+            },
+          },
+          duration: 10,
+        },
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'h2',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeModel,
+          success: true,
+          output: {
+            hookSpecificOutput: {
+              hookEventName: 'BeforeModel',
+              additionalContext: 'Context 2',
+            },
+          },
+          duration: 10,
+        },
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.BeforeModel,
+      );
+
+      expect(
+        aggregated.finalOutput?.hookSpecificOutput?.['additionalContext'],
+      ).toBe('Context 1\nContext 2');
+    });
   });
 
   describe('extractAdditionalContext', () => {

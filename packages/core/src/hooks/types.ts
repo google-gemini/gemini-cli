@@ -7,6 +7,7 @@
 import type {
   GenerateContentResponse,
   GenerateContentParameters,
+  Content,
   ToolConfig as GenAIToolConfig,
   ToolListUnion,
 } from '@google/genai';
@@ -374,6 +375,8 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
   override applyLLMRequestModifications(
     target: GenerateContentParameters,
   ): GenerateContentParameters {
+    let resultTarget = target;
+
     if (this.hookSpecificOutput && 'llm_request' in this.hookSpecificOutput) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const hookRequest = this.hookSpecificOutput[
@@ -386,13 +389,62 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
           hookRequest as LLMRequest,
           target,
         );
-        return {
+        resultTarget = {
           ...target,
           ...sdkRequest,
         };
       }
     }
-    return target;
+
+    const additionalContext = this.getAdditionalContext();
+    if (additionalContext) {
+      const originalContents = resultTarget.contents;
+      let contents: Content[];
+
+      if (Array.isArray(originalContents)) {
+        contents = (originalContents as unknown[]).map((c) => {
+          if (typeof c === 'string') {
+            return { role: 'user', parts: [{ text: c }] };
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const content = c as Content;
+          return { ...content, parts: [...(content.parts || [])] };
+        });
+      } else if (typeof originalContents === 'string') {
+        contents = [{ role: 'user', parts: [{ text: originalContents }] }];
+      } else if (originalContents && 'role' in originalContents) {
+        const c = originalContents;
+        contents = [{ ...c, parts: [...(c.parts || [])] }];
+      } else {
+        contents = [];
+      }
+
+      const wrappedContext = `\n\n<hook_context>${additionalContext}</hook_context>`;
+
+      let lastUserMessageIndex = -1;
+      for (let i = contents.length - 1; i >= 0; i--) {
+        if (contents[i].role === 'user') {
+          lastUserMessageIndex = i;
+          break;
+        }
+      }
+
+      if (lastUserMessageIndex !== -1) {
+        if (!contents[lastUserMessageIndex].parts) {
+          contents[lastUserMessageIndex].parts = [];
+        }
+        contents[lastUserMessageIndex].parts!.push({ text: wrappedContext });
+      } else {
+        contents.push({ role: 'user', parts: [{ text: wrappedContext }] });
+      }
+
+      resultTarget = {
+        ...resultTarget,
+        contents,
+      };
+    }
+
+    return resultTarget;
   }
 }
 
@@ -683,6 +735,7 @@ export interface BeforeModelOutput extends HookOutput {
     hookEventName: 'BeforeModel';
     llm_request?: Partial<LLMRequest>;
     llm_response?: LLMResponse;
+    additionalContext?: string;
   };
 }
 

@@ -221,8 +221,12 @@ export class HookAggregator {
    */
   private mergeWithFieldReplacement(outputs: HookOutput[]): HookOutput {
     let merged: HookOutput = {};
+    const additionalContexts: string[] = [];
 
     for (const output of outputs) {
+      // Collect additional context
+      this.extractAdditionalContext(output, additionalContexts);
+
       // Later outputs override earlier ones
       merged = {
         ...merged,
@@ -231,6 +235,14 @@ export class HookAggregator {
           ...merged.hookSpecificOutput,
           ...output.hookSpecificOutput,
         },
+      };
+    }
+
+    // Add merged additional context
+    if (additionalContexts.length > 0) {
+      merged.hookSpecificOutput = {
+        ...(merged.hookSpecificOutput || {}),
+        additionalContext: additionalContexts.join('\n'),
       };
     }
 

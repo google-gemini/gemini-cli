@@ -24,6 +24,7 @@ import {
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
+  Content,
   ToolConfig,
 } from '@google/genai';
 
@@ -270,6 +271,66 @@ describe('Hook Output Classes', () => {
       };
       const output = new BeforeModelHookOutput({});
       expect(output.applyLLMRequestModifications(target)).toBe(target);
+    });
+
+    it('applyLLMRequestModifications should append additionalContext to contents', () => {
+      const target: GenerateContentParameters = {
+        model: 'gemini-pro',
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+      };
+      const output = new BeforeModelHookOutput({
+        hookSpecificOutput: { additionalContext: 'New Context' },
+      });
+      const result = output.applyLLMRequestModifications(target);
+      expect(result.contents).toHaveLength(1);
+      const contents = result.contents as Content[];
+      expect(contents[0].parts!).toHaveLength(2);
+      expect(contents[0].parts![1]).toEqual({
+        text: '\n\n<hook_context>New Context</hook_context>',
+      });
+    });
+
+    it('applyLLMRequestModifications should create new user message if none exists', () => {
+      const target: GenerateContentParameters = {
+        model: 'gemini-pro',
+        contents: [{ role: 'model', parts: [{ text: 'Hi' }] }],
+      };
+      const output = new BeforeModelHookOutput({
+        hookSpecificOutput: { additionalContext: 'New Context' },
+      });
+      const result = output.applyLLMRequestModifications(target);
+      expect(result.contents).toHaveLength(2);
+      const contents = result.contents as Content[];
+      expect(contents[1].role).toBe('user');
+      expect(contents[1].parts![0]).toEqual({
+        text: '\n\n<hook_context>New Context</hook_context>',
+      });
+    });
+
+    it('applyLLMRequestModifications should handle both llm_request and additionalContext', () => {
+      const target: GenerateContentParameters = {
+        model: 'gemini-pro',
+        contents: [{ role: 'user', parts: [{ text: 'original' }] }],
+      };
+      const mockRequest = {
+        // Our mock fromHookLLMRequest just spreads the request, so we can use contents here for convenience in tests
+        // even though LLMRequest uses messages.
+        contents: [{ role: 'user', parts: [{ text: 'modified' }] }],
+      } as unknown as Partial<LLMRequest>;
+      const output = new BeforeModelHookOutput({
+        hookSpecificOutput: {
+          llm_request: mockRequest as LLMRequest,
+          additionalContext: 'New Context',
+        },
+      });
+      const result = output.applyLLMRequestModifications(target);
+      expect(result.contents).toHaveLength(1);
+      const contents = result.contents as Content[];
+      expect(contents[0].parts!).toHaveLength(2);
+      expect(contents[0].parts![0]).toEqual({ text: 'modified' });
+      expect(contents[0].parts![1]).toEqual({
+        text: '\n\n<hook_context>New Context</hook_context>',
+      });
     });
   });
 
