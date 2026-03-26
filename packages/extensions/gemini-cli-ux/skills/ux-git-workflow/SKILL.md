@@ -115,7 +115,15 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
   3.  **Tier 3 (Latest Feedback)**: Separate, granular commits addressing only the **very last** round of reviewer feedback.
   - **Action**: Use `git rebase -i` or `git reset --soft` to organize commits into these tiers. Ensure refactors are ALWAYS isolated from logic.
 - **Push**: `git push origin HEAD --force-with-lease`.
+- **Draft PR**: If creating a new PR, you MUST create it as a draft by default (e.g., `gh pr create --draft`).
 - **Link**: You MUST provide the full, clickable GitHub PR link (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`) as the final output of this skill. This allows the user to immediately verify the update.
+
+#### 10. CI Verification & Remediation Loop (The Slog)
+- **Context**: Getting PRs ready for review is typically a "slog" due to CI checks failing in the GitHub environment even after passing local presubmit tests.
+- **Action**: You MUST assume that CI checks have failed until you explicitly verify they have passed on the PR.
+  1. Run `gh pr checks` to monitor the status of the GitHub CI pipeline.
+  2. If checks fail, fetch the failure logs, diagnose the issue, apply a fix, push the update, and loop back to step 1.
+  3. Once you verify that ALL checks have passed, you must ask the user if they want to mark the PR as ready for review (or remind them to do so themselves). Do not mark it ready without explicit user verification.
 
 **Note**: If any step fails, do NOT claim completion. Fix the issue and restart from Step 1.
 
