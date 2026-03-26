@@ -8,6 +8,7 @@ import type {
   GenerateContentResponse,
   GenerateContentParameters,
   Content,
+  Part,
   ToolConfig as GenAIToolConfig,
   ToolListUnion,
 } from '@google/genai';
@@ -400,20 +401,72 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
       const originalContents = resultTarget.contents;
       let contents: Content[];
 
+      const isPart = (obj: unknown): obj is Part =>
+        typeof obj === 'object' &&
+        obj !== null &&
+        !('role' in obj) &&
+        !('parts' in obj);
+
       if (Array.isArray(originalContents)) {
-        contents = (originalContents as unknown[]).map((c) => {
-          if (typeof c === 'string') {
-            return { role: 'user', parts: [{ text: c }] };
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const content = c as Content;
-          return { ...content, parts: [...(content.parts || [])] };
-        });
+        const first = originalContents[0];
+        if (
+          first &&
+          typeof first !== 'string' &&
+          ('role' in first || 'parts' in first)
+        ) {
+          // It's already Content[]
+          contents = originalContents.map((c) => {
+            const contentObj =
+              typeof c === 'string'
+                ? { role: 'user', parts: [{ text: c }] }
+                : c;
+            if (
+              typeof contentObj === 'object' &&
+              contentObj !== null &&
+              ('role' in contentObj || 'parts' in contentObj)
+            ) {
+              return {
+                role:
+                  'role' in contentObj && typeof contentObj.role === 'string'
+                    ? contentObj.role
+                    : 'user',
+                parts:
+                  'parts' in contentObj && Array.isArray(contentObj.parts)
+                    ? [...contentObj.parts]
+                    : [],
+              };
+            }
+            return { role: 'user', parts: [] };
+          });
+        } else {
+          // It's Part[] or (Part | string)[]
+          const parts: Part[] = originalContents.reduce((acc, c) => {
+            if (typeof c === 'string') {
+              acc.push({ text: c });
+            } else if (isPart(c)) {
+              acc.push(c); // Safe because it lacks Content fields
+            }
+            return acc;
+          }, [] as Part[]);
+          contents = [{ role: 'user', parts }];
+        }
       } else if (typeof originalContents === 'string') {
         contents = [{ role: 'user', parts: [{ text: originalContents }] }];
-      } else if (originalContents && 'role' in originalContents) {
+      } else if (
+        originalContents &&
+        typeof originalContents === 'object' &&
+        ('role' in originalContents || 'parts' in originalContents)
+      ) {
         const c = originalContents;
-        contents = [{ ...c, parts: [...(c.parts || [])] }];
+        contents = [
+          {
+            role: 'role' in c && typeof c.role === 'string' ? c.role : 'user',
+            parts: 'parts' in c && Array.isArray(c.parts) ? [...c.parts] : [],
+          },
+        ];
+      } else if (isPart(originalContents)) {
+        // It's a single Part
+        contents = [{ role: 'user', parts: [originalContents] }]; // Safe because it lacks Content fields
       } else {
         contents = [];
       }
