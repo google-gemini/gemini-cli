@@ -44,10 +44,10 @@ steps:
         echo "📦 Building Development Image for: $${RAW_BRANCH} -> $${TAG_PRIMARY}"
         
         docker build -f .gcp/Dockerfile.development \
-          -t "$${IMAGE_BASE}:$${TAG_SHA}" \
+          -t "$${IMAGE_BASE}:${SHORT_SHA}" \
           -t "$${IMAGE_BASE}:$${TAG_PRIMARY}" .
           
-        docker push "$${IMAGE_BASE}:$${TAG_SHA}"
+        docker push "$${IMAGE_BASE}:${SHORT_SHA}"
         docker push "$${IMAGE_BASE}:$${TAG_PRIMARY}"
 
 options:
