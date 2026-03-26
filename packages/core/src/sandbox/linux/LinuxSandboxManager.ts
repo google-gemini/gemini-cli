@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import { debugLogger } from '../../utils/debugLogger.js';
 import { join, dirname, normalize } from 'node:path';
 import os from 'node:os';
 import {
@@ -12,6 +13,7 @@ import {
   type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
+  type SandboxPermissions,
   GOVERNANCE_FILES,
   sanitizePaths,
 } from '../../services/sandboxManager.js';
@@ -19,6 +21,17 @@ import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
+import {
+  isStrictlyApproved,
+  verifySandboxOverrides,
+  getCommandName,
+} from '../utils/commandUtils.js';
+import {
+  tryRealpath,
+  resolveGitWorktreePaths,
+  isErrnoException,
+} from '../utils/fsUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -97,13 +110,72 @@ function touch(filePath: string, isDirectory: boolean) {
   }
 }
 
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+} from '../utils/commandSafety.js';
+
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
+
+export interface LinuxSandboxOptions extends GlobalSandboxOptions {
+  modeConfig?: {
+    readonly?: boolean;
+    network?: boolean;
+    approvedTools?: string[];
+    allowOverrides?: boolean;
+  };
+  policyManager?: SandboxPolicyManager;
+}
+
 export class LinuxSandboxManager implements SandboxManager {
-  constructor(private readonly options: GlobalSandboxOptions) {}
+  constructor(private readonly options: LinuxSandboxOptions) {}
+
+  isKnownSafeCommand(args: string[]): boolean {
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
+
+    verifySandboxOverrides(allowOverrides, req.policy);
+
+    const commandName = await getCommandName(req);
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(req, this.options.modeConfig?.approvedTools)
+      : false;
+    const workspaceWrite = !isReadonlyMode || isApproved;
+    const networkAccess =
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
+
+    const mergedAdditional: SandboxPermissions = {
+      fileSystem: {
+        read: [
+          ...(persistentPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
+        ],
+        write: [
+          ...(persistentPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
+        ],
+      },
+      network:
+        networkAccess ||
+        persistentPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
+        false,
+    };
+
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );
@@ -114,6 +186,13 @@ export class LinuxSandboxManager implements SandboxManager {
       '--unshare-all',
       '--new-session', // Isolate session
       '--die-with-parent', // Prevent orphaned runaway processes
+    ];
+
+    if (mergedAdditional.network) {
+      bwrapArgs.push('--share-net');
+    }
+
+    bwrapArgs.push(
       '--ro-bind',
       '/',
       '/',
@@ -123,40 +202,122 @@ export class LinuxSandboxManager implements SandboxManager {
       '/proc',
       '--tmpfs', // Provides an isolated, writable /tmp directory
       '/tmp',
-      // Note: --dev /dev sets up /dev/pts automatically
-      '--bind',
-      this.options.workspace,
-      this.options.workspace,
-    ];
+    );
 
-    // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
-    // We ensure they exist on the host and resolve real paths to prevent symlink bypasses.
-    // In bwrap, later binds override earlier ones for the same path.
+    const workspacePath = tryRealpath(this.options.workspace);
+
+    const bindFlag = workspaceWrite ? '--bind-try' : '--ro-bind-try';
+
+    if (workspaceWrite) {
+      bwrapArgs.push(
+        '--bind-try',
+        this.options.workspace,
+        this.options.workspace,
+      );
+      if (workspacePath !== this.options.workspace) {
+        bwrapArgs.push('--bind-try', workspacePath, workspacePath);
+      }
+    } else {
+      bwrapArgs.push(
+        '--ro-bind-try',
+        this.options.workspace,
+        this.options.workspace,
+      );
+      if (workspacePath !== this.options.workspace) {
+        bwrapArgs.push('--ro-bind-try', workspacePath, workspacePath);
+      }
+    }
+
+    const { worktreeGitDir, mainGitDir } =
+      resolveGitWorktreePaths(workspacePath);
+    if (worktreeGitDir) {
+      bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
+    }
+    if (mainGitDir) {
+      bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
+    }
+
+    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+    const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
+    for (const allowedPath of allowedPaths) {
+      const resolved = tryRealpath(allowedPath);
+      if (!fs.existsSync(resolved)) continue;
+      const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
+      if (normalizedAllowedPath !== normalizedWorkspace) {
+        if (
+          !workspaceWrite &&
+          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
+        ) {
+          bwrapArgs.push('--ro-bind-try', resolved, resolved);
+        } else {
+          bwrapArgs.push('--bind-try', resolved, resolved);
+        }
+      }
+    }
+
+    const additionalReads =
+      sanitizePaths(mergedAdditional.fileSystem?.read) || [];
+    for (const p of additionalReads) {
+      try {
+        const safeResolvedPath = tryRealpath(p);
+        bwrapArgs.push('--ro-bind-try', safeResolvedPath, safeResolvedPath);
+      } catch (e: unknown) {
+        debugLogger.warn(e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    const additionalWrites =
+      sanitizePaths(mergedAdditional.fileSystem?.write) || [];
+    for (const p of additionalWrites) {
+      try {
+        const safeResolvedPath = tryRealpath(p);
+        bwrapArgs.push('--bind-try', safeResolvedPath, safeResolvedPath);
+      } catch (e: unknown) {
+        debugLogger.warn(e instanceof Error ? e.message : String(e));
+      }
+    }
+
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file.path);
       touch(filePath, file.isDirectory);
-
-      const realPath = fs.realpathSync(filePath);
-
+      const realPath = tryRealpath(filePath);
       bwrapArgs.push('--ro-bind', filePath, filePath);
       if (realPath !== filePath) {
         bwrapArgs.push('--ro-bind', realPath, realPath);
       }
     }
 
-    const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(this.options.workspace).replace(
-      /\/$/,
-      '',
-    );
-    for (const allowedPath of allowedPaths) {
-      const normalizedAllowedPath = normalize(allowedPath).replace(/\/$/, '');
-      if (normalizedAllowedPath !== normalizedWorkspace) {
-        bwrapArgs.push('--bind-try', allowedPath, allowedPath);
+    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    for (const p of forbiddenPaths) {
+      let resolved: string;
+      try {
+        resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
+        if (!fs.existsSync(resolved)) continue;
+      } catch (e: unknown) {
+        debugLogger.warn(
+          `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        bwrapArgs.push('--ro-bind', '/dev/null', p);
+        continue;
+      }
+      try {
+        const stat = fs.statSync(resolved);
+        if (stat.isDirectory()) {
+          bwrapArgs.push('--tmpfs', resolved, '--remount-ro', resolved);
+        } else {
+          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
+        }
+      } catch (e: unknown) {
+        if (isErrnoException(e) && e.code === 'ENOENT') {
+          bwrapArgs.push('--symlink', '/dev/null', resolved);
+        } else {
+          debugLogger.warn(
+            `Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`,
+          );
+          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
+        }
       }
     }
-
-    // TODO: handle forbidden paths
 
     const bpfPath = getSeccompBpfPath();
 
@@ -175,6 +336,7 @@ export class LinuxSandboxManager implements SandboxManager {
       program: 'sh',
       args: shArgs,
       env: sanitizedEnv,
+      cwd: req.cwd,
     };
   }
 }

@@ -233,13 +233,19 @@ export {
 export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  enableToolSandboxing: boolean = false,
 ): ToolDefinition {
   return {
-    base: getShellDeclaration(enableInteractiveShell, enableEfficiency),
+    base: getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
     overrides: (modelId) =>
       getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
+        enableToolSandboxing,
       ),
   };
 }
