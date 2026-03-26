@@ -7,7 +7,6 @@
 import type React from 'react';
 import { useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
@@ -165,9 +164,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         disableColor,
       });
     } else {
-      const key = filename
-        ? `diff-box-${filename}`
-        : `diff-box-${crypto.createHash('sha1').update(JSON.stringify(parsedLines)).digest('hex')}`;
+      const key = filename ? `diff-box-${filename}` : undefined;
 
       return (
         <MaxSizedBox

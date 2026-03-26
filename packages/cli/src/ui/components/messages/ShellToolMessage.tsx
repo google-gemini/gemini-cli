@@ -190,7 +190,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         borderLeft={true}
         borderRight={true}
         paddingX={1}
-        paddingTop={1}
         flexDirection="column"
       >
         <ToolResultDisplay
