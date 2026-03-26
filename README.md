@@ -367,6 +367,9 @@ custom tools:
 
 3. Use it in the CLI: `> @sqlite list the tables in this database`
 
+Use a database path for your platform, such as `/path/to/your.db` on macOS or
+Linux, or `C:\\path\\to\\your.db` on Windows.
+
 See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup
 instructions.
 

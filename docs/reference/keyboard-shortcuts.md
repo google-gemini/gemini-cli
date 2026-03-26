@@ -247,7 +247,7 @@ supports NORMAL and INSERT modes.
 | Enter NORMAL mode from INSERT mode           | `Esc`     |
 | Enter INSERT mode at the cursor              | `i`       |
 | Enter INSERT mode after the cursor           | `a`       |
-| Enter INSERT mode at the start of the line   | `I`       |
+| Enter INSERT mode at the first non-whitespace character | `I` |
 | Enter INSERT mode at the end of the line     | `A`       |
 | Insert a new line below and switch to INSERT | `o`       |
 | Insert a new line above and switch to INSERT | `O`       |
