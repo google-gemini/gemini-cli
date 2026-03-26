@@ -61,6 +61,8 @@ describe('sessionSummaryUtils', () => {
     // Setup mock config
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getSessionId: vi.fn().mockReturnValue('current-session-id'),
+      getGeminiClient: vi.fn().mockReturnValue(undefined),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },

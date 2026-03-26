@@ -591,6 +591,18 @@ export class ChatRecordingService {
   }
 
   /**
+   * Sets the summary and alias for the current active conversation.
+   * Updates both the in-memory cache and writes the changes to disk.
+   */
+  setSummaryAndAlias(summary: string, alias: string): void {
+    if (!this.conversationFile) return;
+    this.updateConversation((conversation) => {
+      conversation.summary = summary;
+      conversation.alias = alias;
+    });
+  }
+
+  /**
    * Deletes a session file by sessionId, filename, or basename.
    * Derives an 8-character shortId to find and delete all associated files
    * (parent and subagents).

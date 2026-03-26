@@ -135,19 +135,35 @@ async function generateAndSaveSummary(
     return;
   }
 
-  // Add summary and alias, then write back
-  freshConversation.summary = summary;
-  freshConversation.alias = alias;
-  freshConversation.lastUpdated = new Date().toISOString();
-  await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
+  // Update live telemetry and use ChatRecordingService if this is the current active session
+  if (freshConversation.sessionId === config.getSessionId()) {
+    const chatRecordingService = config
+      .getGeminiClient()
+      ?.getChatRecordingService();
+
+    if (chatRecordingService) {
+      chatRecordingService.setSummaryAndAlias(summary, alias);
+    } else {
+      freshConversation.summary = summary;
+      freshConversation.alias = alias;
+      freshConversation.lastUpdated = new Date().toISOString();
+      await fs.writeFile(
+        sessionPath,
+        JSON.stringify(freshConversation, null, 2),
+      );
+    }
+    uiTelemetryService.setAlias(alias);
+  } else {
+    // Add summary and alias, then write back
+    freshConversation.summary = summary;
+    freshConversation.alias = alias;
+    freshConversation.lastUpdated = new Date().toISOString();
+    await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
+  }
+
   debugLogger.debug(
     `[SessionSummary] Saved summary for ${sessionPath}: "${summary}", alias: "${alias}"`,
   );
-
-  // Update live telemetry if this is the current active session
-  if (freshConversation.sessionId === config.getSessionId()) {
-    uiTelemetryService.setAlias(alias);
-  }
 }
 
 /**
