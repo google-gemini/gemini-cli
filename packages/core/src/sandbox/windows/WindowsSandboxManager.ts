@@ -18,7 +18,9 @@ import {
   sanitizePaths,
   tryRealpath,
   type SandboxPermissions,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -75,6 +77,10 @@ export class WindowsSandboxManager implements SandboxManager {
 
   isDangerousCommand(args: string[]): boolean {
     return isDangerousCommand(args);
+  }
+
+  parseDenials(_result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return undefined; // TODO: Implement Windows-specific denial parsing
   }
 
   /**

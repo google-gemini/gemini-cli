@@ -16,7 +16,9 @@ import {
   GOVERNANCE_FILES,
   getSecretFileFindArgs,
   sanitizePaths,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -38,6 +40,7 @@ import {
   isKnownSafeCommand,
   isDangerousCommand,
 } from '../utils/commandSafety.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -152,6 +155,10 @@ export class LinuxSandboxManager implements SandboxManager {
 
   isDangerousCommand(args: string[]): boolean {
     return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
   }
 
   private getMaskFilePath(): string {
