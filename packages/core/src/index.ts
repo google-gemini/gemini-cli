@@ -83,6 +83,7 @@ export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/googleErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/sessionOperations.js';
 export * from './utils/planUtils.js';
 export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
