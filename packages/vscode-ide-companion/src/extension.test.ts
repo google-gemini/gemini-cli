@@ -151,6 +151,30 @@ describe('activate', () => {
       vi.mocked(context.globalState.get).mockReturnValue(true);
     });
 
+    it('should not fetch marketplace when packageJSON version is missing', async () => {
+      const contextWithBadPackageJson = {
+        ...context,
+        extension: { packageJSON: {} },
+      } as unknown as vscode.ExtensionContext;
+      const fetchSpy = vi
+        .spyOn(global, 'fetch')
+        .mockResolvedValue({} as Response);
+      await activate(contextWithBadPackageJson);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not show notification when marketplace response has unexpected shape', async () => {
+      const showInformationMessageMock = vi.mocked(
+        vscode.window.showInformationMessage,
+      );
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: 'invalid result' }),
+      } as Response);
+      await activate(context);
+      expect(showInformationMessageMock).not.toHaveBeenCalled();
+    });
+
     it('should show an update notification if a newer version is available', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
