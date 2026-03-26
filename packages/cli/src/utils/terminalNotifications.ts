@@ -81,6 +81,8 @@ export function isNotificationsEnabled(settings: LoadedSettings): boolean {
       }
     | undefined;
 
+  // This only reflects user preference. Capability detection and OSC9/BEL
+  // fallback are handled at emit-time in emitOsc9Notification().
   return (
     (general?.enableNotifications === true ||
       general?.enableMacOsNotifications === true)

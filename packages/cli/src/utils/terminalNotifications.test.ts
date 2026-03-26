@@ -7,11 +7,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildRunEventNotificationContent,
+  isNotificationsEnabled,
   MAX_NOTIFICATION_BODY_CHARS,
   MAX_NOTIFICATION_SUBTITLE_CHARS,
   MAX_NOTIFICATION_TITLE_CHARS,
   notifyViaTerminal,
 } from './terminalNotifications.js';
+import type { LoadedSettings } from '../config/settings.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
 const debugLogger = vi.hoisted(() => ({
@@ -54,6 +56,18 @@ describe('terminal notifications', () => {
 
     expect(shown).toBe(false);
     expect(writeToStdout).not.toHaveBeenCalled();
+  });
+
+  it('treats enabled notifications as user preference only', () => {
+    const settings = {
+      merged: {
+        general: {
+          enableNotifications: true,
+        },
+      },
+    } as LoadedSettings;
+
+    expect(isNotificationsEnabled(settings)).toBe(true);
   });
 
   it('emits OSC 9 notification when supported terminal is detected', async () => {
