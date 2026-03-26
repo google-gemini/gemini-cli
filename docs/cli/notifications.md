@@ -15,14 +15,16 @@ CLI works in the background.
 
 ## Requirements
 
-Currently, system notifications are only supported on macOS.
+System notifications are supported on all platforms (macOS, Linux, and Windows).
 
 ### Terminal support
 
 The CLI uses the OSC 9 terminal escape sequence to trigger system notifications.
-This is supported by several modern terminal emulators. If your terminal does
-not support OSC 9 notifications, Gemini CLI falls back to a system alert sound
-to get your attention.
+This is supported by several modern terminal emulators (WezTerm, Ghostty, iTerm2,
+Kitty). If your terminal does not support OSC 9 notifications, Gemini CLI falls
+back to a terminal bell (BEL) to get your attention. On Windows Terminal, this
+causes taskbar flashing; on most Linux terminals, it triggers a visual or audio
+alert depending on your terminal configuration.
 
 ## Enable notifications
 

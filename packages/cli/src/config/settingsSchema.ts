@@ -261,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion. Supports OSC 9 rich notifications on compatible terminals (WezTerm, Ghostty, iTerm2, Kitty) and falls back to a terminal bell (BEL) on all other platforms.',
         showInDialog: true,
       },
       checkpointing: {

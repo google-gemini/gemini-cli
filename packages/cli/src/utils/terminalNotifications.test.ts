@@ -7,11 +7,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildRunEventNotificationContent,
+  isNotificationsEnabled,
   MAX_NOTIFICATION_BODY_CHARS,
   MAX_NOTIFICATION_SUBTITLE_CHARS,
   MAX_NOTIFICATION_TITLE_CHARS,
   notifyViaTerminal,
 } from './terminalNotifications.js';
+import type { LoadedSettings } from '../config/settings.js';
 
 const writeToStdout = vi.hoisted(() => vi.fn());
 const debugLogger = vi.hoisted(() => ({
@@ -24,38 +26,26 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 
 describe('terminal notifications', () => {
-  const originalPlatform = process.platform;
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.unstubAllEnvs();
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-      configurable: true,
-    });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-      configurable: true,
-    });
   });
 
-  it('returns false without writing on non-macOS platforms', async () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'linux',
-      configurable: true,
-    });
+  it('emits BEL on Linux when OSC 9 is not supported', async () => {
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('TERM', '');
 
     const shown = await notifyViaTerminal(true, {
       title: 't',
       body: 'b',
     });
 
-    expect(shown).toBe(false);
-    expect(writeToStdout).not.toHaveBeenCalled();
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
   });
 
   it('returns false without writing when disabled', async () => {
@@ -66,6 +56,18 @@ describe('terminal notifications', () => {
 
     expect(shown).toBe(false);
     expect(writeToStdout).not.toHaveBeenCalled();
+  });
+
+  it('treats enabled notifications as user preference only', () => {
+    const settings = {
+      merged: {
+        general: {
+          enableNotifications: true,
+        },
+      },
+    } as LoadedSettings;
+
+    expect(isNotificationsEnabled(settings)).toBe(true);
   });
 
   it('emits OSC 9 notification when supported terminal is detected', async () => {

@@ -81,8 +81,9 @@ export function isNotificationsEnabled(settings: LoadedSettings): boolean {
       }
     | undefined;
 
+  // This only reflects user preference. Capability detection and OSC9/BEL
+  // fallback are handled at emit-time in emitOsc9Notification().
   return (
-    process.platform === 'darwin' &&
     (general?.enableNotifications === true ||
       general?.enableMacOsNotifications === true)
   );
@@ -112,7 +113,7 @@ export async function notifyViaTerminal(
   notificationsEnabled: boolean,
   content: RunEventNotificationContent,
 ): Promise<boolean> {
-  if (!notificationsEnabled || process.platform !== 'darwin') {
+  if (!notificationsEnabled) {
     return false;
   }
 
