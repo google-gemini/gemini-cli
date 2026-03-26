@@ -75,17 +75,10 @@ export function buildRunEventNotificationContent(
 
 export function isNotificationsEnabled(settings: LoadedSettings): boolean {
   const general = settings.merged.general as
-    | {
-        enableNotifications?: boolean;
-        enableMacOsNotifications?: boolean;
-      }
+    | { enableNotifications?: boolean }
     | undefined;
 
-  return (
-    process.platform === 'darwin' &&
-    (general?.enableNotifications === true ||
-      general?.enableMacOsNotifications === true)
-  );
+  return general?.enableNotifications === true;
 }
 
 function buildTerminalNotificationMessage(
@@ -112,7 +105,7 @@ export async function notifyViaTerminal(
   notificationsEnabled: boolean,
   content: RunEventNotificationContent,
 ): Promise<boolean> {
-  if (!notificationsEnabled || process.platform !== 'darwin') {
+  if (!notificationsEnabled) {
     return false;
   }
 
