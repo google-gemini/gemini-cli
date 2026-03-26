@@ -25,6 +25,8 @@ steps:
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Build Development Image'
     entrypoint: 'bash'
+    env:
+      - 'RAW_BRANCH_VALUE=${_HEAD_BRANCH:-${BRANCH_NAME}}'
     args:
       - '-c'
       - |-
@@ -32,7 +34,7 @@ steps:
         
         # Determine the primary tag (branch name or 'latest' for main)
         # Use $$ for shell variables to avoid Cloud Build attempting premature substitution
-        RAW_BRANCH="${_HEAD_BRANCH:-${BRANCH_NAME}}"
+        RAW_BRANCH="$$RAW_BRANCH_VALUE"
         if [ "$${RAW_BRANCH}" == "main" ]; then
           TAG_PRIMARY="latest"
         else
