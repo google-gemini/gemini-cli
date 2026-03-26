@@ -14,7 +14,11 @@ import {
   resolveColor,
   getSafeLowColorBackground,
 } from '../../themes/color-utils.js';
-import { isLowColorDepth, isITerm2 } from '../../utils/terminalUtils.js';
+import {
+  isLowColorDepth,
+  isITerm2,
+  isAppleTerminal,
+} from '../../utils/terminalUtils.js';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -103,6 +107,33 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
         </Box>
         <Box width={terminalWidth} flexDirection="row">
           <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  const isMacOSTerminal = isAppleTerminal();
+
+  if (isMacOSTerminal) {
+    return (
+      <Box
+        width={terminalWidth}
+        flexDirection="column"
+        alignItems="stretch"
+        minHeight={1}
+        flexShrink={0}
+        backgroundColor={backgroundColor}
+      >
+        <Box width={terminalWidth} flexDirection="row">
+          <Text backgroundColor={terminalBg} color={backgroundColor}>
+            {'▅'.repeat(terminalWidth)}
+          </Text>
+        </Box>
+        {children}
+        <Box width={terminalWidth} flexDirection="row">
+          <Text color={terminalBg} backgroundColor={backgroundColor}>
+            {'▄'.repeat(terminalWidth)}
+          </Text>
         </Box>
       </Box>
     );

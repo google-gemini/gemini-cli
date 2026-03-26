@@ -37,6 +37,13 @@ export function isITerm2(): boolean {
 }
 
 /**
+ * Returns true if the current terminal is macOS Terminal.
+ */
+export function isAppleTerminal(): boolean {
+  return process.env['TERM_PROGRAM'] === 'Apple_Terminal';
+}
+
+/**
  * Resets the cached iTerm2 detection value.
  * Primarily used for testing.
  */
