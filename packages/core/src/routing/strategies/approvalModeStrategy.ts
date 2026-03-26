@@ -6,7 +6,8 @@
 
 import type { Config } from '../../config/config.js';
 import {
-  isAutoModel, isProModel,
+  isAutoModel,
+  isProModel,
   resolveClassifierModel,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_PRO,

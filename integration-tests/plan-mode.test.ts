@@ -232,7 +232,7 @@ describe('Plan Mode', () => {
   it('should switch from a pro model to a flash model after exiting plan mode', async () => {
     const plansDir = 'plans-folder';
     const planFilename = 'my-plan.md';
-    
+
     await rig.setup('should-switch-to-flash', {
       settings: {
         model: {
@@ -270,15 +270,27 @@ describe('Plan Mode', () => {
     expect(exitCallFound, 'Expected exit_plan_mode to be called').toBe(true);
 
     const shellCallFound = await rig.waitForToolCall('run_shell_command');
-    expect(shellCallFound, 'Expected run_shell_command to be called').toBe(true);
+    expect(shellCallFound, 'Expected run_shell_command to be called').toBe(
+      true,
+    );
 
     const apiRequests = rig.readAllApiRequest();
-    const modelNames = apiRequests.map(r => r.attributes?.model || 'unknown');
-    
-    const proRequests = apiRequests.filter(r => r.attributes?.model?.includes('pro'));
-    const flashRequests = apiRequests.filter(r => r.attributes?.model?.includes('flash'));
+    const modelNames = apiRequests.map((r) => r.attributes?.model || 'unknown');
 
-    expect(proRequests.length, `Expected at least one Pro request. Models used: ${modelNames.join(', ')}`).toBeGreaterThanOrEqual(1);
-    expect(flashRequests.length, `Expected at least one Flash request after mode switch. Models used: ${modelNames.join(', ')}`).toBeGreaterThanOrEqual(1);
+    const proRequests = apiRequests.filter((r) =>
+      r.attributes?.model?.includes('pro'),
+    );
+    const flashRequests = apiRequests.filter((r) =>
+      r.attributes?.model?.includes('flash'),
+    );
+
+    expect(
+      proRequests.length,
+      `Expected at least one Pro request. Models used: ${modelNames.join(', ')}`,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      flashRequests.length,
+      `Expected at least one Flash request after mode switch. Models used: ${modelNames.join(', ')}`,
+    ).toBeGreaterThanOrEqual(1);
   });
 });
