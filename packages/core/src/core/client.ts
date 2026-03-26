@@ -29,7 +29,7 @@ import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
-import { GeminiChat } from './geminiChat.js';
+import { GeminiChat, StreamEventType } from './geminiChat.js';
 import {
   retryWithBackoff,
   type RetryAvailabilityContext,
@@ -57,7 +57,7 @@ import type {
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
-  type LlmRole,
+  LlmRole,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -71,8 +71,13 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { getDisplayString, resolveModel } from '../config/models.js';
-import { partToString } from '../utils/partUtils.js';
+import {
+  getDisplayString,
+  resolveModel,
+  isGemini2Model,
+} from '../config/models.js';
+import { getResponseText, partToString } from '../utils/partUtils.js';
+import { parseThought } from '../utils/thoughtUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const MAX_TURNS = 100;
@@ -1225,6 +1230,81 @@ export class GeminiClient {
     }
 
     return info;
+  }
+
+  async *sendBtwStream(
+    request: PartListUnion,
+    signal: AbortSignal,
+    prompt_id: string,
+  ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    const turn = new Turn(this.getChat(), prompt_id);
+
+    // Availability/Routing logic simplified for BTW
+    const modelToUse = this._getActiveModelForCurrentTurn();
+    const modelConfigKey: ModelConfigKey = {
+      model: modelToUse,
+      isChatModel: true,
+    };
+
+    yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+
+    // Use a custom role for BTW to avoid side-effects in telemetry if needed,
+    // but for now LlmRole.MAIN is fine as it's the primary model talking.
+    const btwStream = this.getChat().sendBtwStream(
+      modelConfigKey,
+      request,
+      prompt_id,
+      signal,
+      LlmRole.MAIN,
+    );
+
+    for await (const streamEvent of btwStream) {
+      if (signal?.aborted) {
+        yield { type: GeminiEventType.UserCancelled };
+        return turn;
+      }
+
+      if (streamEvent.type === 'retry') {
+        yield { type: GeminiEventType.Retry };
+        continue;
+      }
+
+      if (streamEvent.type === StreamEventType.CHUNK) {
+        const resp = streamEvent.value;
+        if (!resp) continue;
+
+        const traceId = resp.responseId;
+        const parts = resp.candidates?.[0]?.content?.parts ?? [];
+        for (const part of parts) {
+          if (part.thought) {
+            const thought = parseThought(part.text ?? '');
+            yield {
+              type: GeminiEventType.Thought,
+              value: thought,
+              traceId,
+            };
+          }
+        }
+
+        const text = getResponseText(resp);
+        if (text) {
+          yield { type: GeminiEventType.Content, value: text, traceId };
+        }
+
+        const finishReason = resp.candidates?.[0]?.finishReason;
+        if (finishReason) {
+          yield {
+            type: GeminiEventType.Finished,
+            value: {
+              reason: finishReason,
+              usageMetadata: resp.usageMetadata,
+            },
+          };
+        }
+      }
+    }
+
+    return turn;
   }
 
   /**

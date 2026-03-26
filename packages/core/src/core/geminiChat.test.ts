@@ -2616,4 +2616,138 @@ describe('GeminiChat', () => {
       ]);
     });
   });
+
+  describe('sendBtwStream', () => {
+    it('should reuse history but not update it', async () => {
+      // 1. Setup initial history
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Main question' }] },
+        { role: 'model', parts: [{ text: 'Main answer' }] },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Mock API response for BTW
+      const btwResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Side answer' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        btwResponse,
+      );
+
+      // 3. Call sendBtwStream
+      const stream = chat.sendBtwStream(
+        { model: 'test-model' },
+        'Side question',
+        'btw-prompt-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        /* consume */
+      }
+
+      // 4. Verify API was called with current history + side question
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: [
+            ...initialHistory,
+            { role: 'user', parts: [{ text: 'Side question' }] },
+          ],
+          config: expect.objectContaining({
+            tools: [], // Should be empty for BTW
+          }),
+        }),
+        'btw-prompt-id',
+        LlmRole.MAIN,
+      );
+
+      // 5. CRITICAL: Verify persistent history was NOT updated
+      const persistentHistory = chat.getHistory();
+      expect(persistentHistory.length).toBe(2);
+      expect(persistentHistory).toEqual(initialHistory);
+    });
+
+    it('should not block or be blocked by a main sendMessageStream call if called concurrently', async () => {
+      // This is a simplified test for concurrency logic within GeminiChat
+      // Since sendBtwStream does not await this.sendPromise (unlike sendMessageStream),
+      // it should be able to start even if a sendMessageStream call is in progress.
+
+      let resolveMain: (value: unknown) => void;
+      const mainPromise = new Promise((resolve) => {
+        resolveMain = resolve;
+      });
+
+      // Mock main stream to hang
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            await mainPromise;
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Main done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'BTW done' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as GenerateContentResponse;
+          })(),
+        );
+
+      // Start main stream (will hang during iteration)
+      const mainStreamGen = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'Main prompt',
+        'main-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      const mainStreamNextPromise = mainStreamGen.next();
+
+      // Attempt BTW stream immediately - it should NOT block on mainPromise
+      const btwStream = chat.sendBtwStream(
+        { model: 'test-model' },
+        'BTW prompt',
+        'btw-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      const btwEvents = [];
+      for await (const event of btwStream) {
+        btwEvents.push(event);
+      }
+
+      // Assert BTW finished while Main is still hanging
+      expect(btwEvents.length).toBeGreaterThan(0);
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // Clean up
+      resolveMain!(null);
+      await mainStreamNextPromise; // Finish the one we started
+      while (!(await mainStreamGen.next()).done) {
+        // drain rest
+      }
+    });
+  });
 });
