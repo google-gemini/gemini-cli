@@ -22,8 +22,11 @@ external GUI applications.
 
 ## 📸 Demo
 
-_(Add your terminal screenshot or API GIF here)_
-![Dashboard Screenshot](./assets/dashboard.png)
+![System Dashboard](./assets/system.png)
+![Memory Dashboard](./assets/memory.png)
+![Startup Dashboard](./assets/startup.png)
+![Tools Dashboard](./assets/tools.png) ![Model Dashboard](./assets/model.png)
+![Session Dashboard](./assets/session.png)
 
 ## ✨ Features
 

@@ -38,7 +38,7 @@ describe('MacOsSandboxManager', () => {
     manager = new MacOsSandboxManager({ workspace: mockWorkspace });
 
     // Mock the seatbelt args builder to isolate manager tests
-    vi.spyOn(seatbeltArgsBuilder, 'buildSeatbeltArgs').mockResolvedValue([
+    vi.spyOn(seatbeltArgsBuilder, 'buildSeatbeltArgs').mockReturnValue([
       '-p',
       '(mock profile)',
       '-D',
@@ -69,7 +69,7 @@ describe('MacOsSandboxManager', () => {
         allowedPaths: mockAllowedPaths,
         networkAccess: mockNetworkAccess,
         forbiddenPaths: undefined,
-        workspaceWrite: false,
+        workspaceWrite: true,
         additionalPermissions: {
           fileSystem: {
             read: [],

@@ -244,11 +244,6 @@ export async function main() {
       cleanupOpsHandle?.end();
     });
 
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argvPromise = parseArguments(settings.merged).finally(() => {
-    parseArgsHandle?.end();
-  });
-
   const rawStartupWarningsPromise = getStartupWarnings();
 
   // Report settings errors once during startup
@@ -639,6 +634,14 @@ export async function main() {
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
+      // Earlier initialization phases (like TerminalCapabilityManager resolving
+      // or authWithWeb) may have added and removed 'data' listeners on process.stdin.
+      // When the listener count drops to 0, Node.js implicitly pauses the stream buffer.
+      // React Ink's useInput hooks will silently fail to receive keystrokes if the stream remains paused.
+      if (process.stdin.isTTY) {
+        process.stdin.resume();
+      }
+
       await startInteractiveUI(
         config,
         settings,
