@@ -48,6 +48,11 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
   EMFILE: () => 'Too many open files. Close some unused files or applications.',
   ENFILE: () =>
     'Too many open files in system. Close some unused files or applications.',
+  ECONNRESET: (path) =>
+    (path
+      ? `Connection reset while accessing '${path}'. `
+      : 'Connection reset. ') +
+    'The network connection was closed unexpectedly.',
 };
 
 /**

@@ -140,6 +140,19 @@ describe('getFsErrorMessage', () => {
         expected:
           'Too many open files in system. Close some unused files or applications.',
       },
+      {
+        code: 'ECONNRESET',
+        message: 'ECONNRESET: connection reset',
+        path: '/some/remote/file',
+        expected:
+          "Connection reset while accessing '/some/remote/file'. The network connection was closed unexpectedly.",
+      },
+      {
+        code: 'ECONNRESET',
+        message: 'ECONNRESET: connection reset',
+        expected:
+          'Connection reset. The network connection was closed unexpectedly.',
+      },
     ];
 
     it.each(testCases)(
