@@ -26,7 +26,7 @@ steps:
     id: 'Build Development Image'
     entrypoint: 'bash'
     env:
-      - 'RAW_BRANCH_VALUE=${_HEAD_BRANCH:-${BRANCH_NAME}}'
+      - 'RAW_BRANCH_VALUE=${BRANCH_NAME}'
     args:
       - '-c'
       - |-
