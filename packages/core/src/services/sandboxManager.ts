@@ -10,7 +10,7 @@ import path from 'node:path';
 import {
   isKnownSafeCommand as isMacSafeCommand,
   isDangerousCommand as isMacDangerousCommand,
-} from '../sandbox/macos/commandSafety.js';
+} from '../sandbox/utils/commandSafety.js';
 import {
   isKnownSafeCommand as isWindowsSafeCommand,
   isDangerousCommand as isWindowsDangerousCommand,

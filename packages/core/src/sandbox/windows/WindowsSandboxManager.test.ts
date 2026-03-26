@@ -111,7 +111,7 @@ describe('WindowsSandboxManager', () => {
     };
 
     await expect(planManager.prepareCommand(req)).rejects.toThrow(
-      'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
+      'Sandbox request rejected: Cannot override readonly/network/filesystem restrictions in Plan mode.',
     );
   });
 

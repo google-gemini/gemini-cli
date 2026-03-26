@@ -21,7 +21,10 @@ import {
   type UIState,
 } from '../contexts/UIStateContext.js';
 import { type IndividualToolCallDisplay } from '../types.js';
-import { type ConfirmingToolState } from '../hooks/useConfirmingTool.js';
+import {
+  type ConfirmingToolState,
+  useConfirmingTool,
+} from '../hooks/useConfirmingTool.js';
 
 // Mock dependencies
 const mockUseSettings = vi.fn().mockReturnValue({
@@ -548,10 +551,11 @@ describe('MainContent', () => {
       config: makeFakeConfig({ useAlternateBuffer: false }),
     });
 
-    const output = lastFrame();
+    await waitFor(() => {
+      expect(lastFrame()).toContain('codebase_investigator');
+    });
 
-    expect(output).toContain('codebase_investigator');
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -599,13 +603,124 @@ describe('MainContent', () => {
     const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
       uiState: uiState as Partial<UIState>,
     });
-    const output = lastFrame();
-    // Verify Part 1 and Part 2 are rendered.
-    expect(output).toContain('Part 1');
-    expect(output).toContain('Part 2');
+
+    await waitFor(() => {
+      const output = lastFrame();
+      // Verify Part 1 and Part 2 are rendered.
+      expect(output).toContain('Part 1');
+      expect(output).toContain('Part 2');
+    });
 
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a ToolConfirmationQueue without an extra line when preceded by hidden tools', async () => {
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
+    const hiddenToolCalls = [
+      {
+        callId: 'tool-hidden',
+        name: WRITE_FILE_DISPLAY_NAME,
+        approvalMode: ApprovalMode.PLAN,
+        status: CoreToolCallStatus.Success,
+        resultDisplay: 'Hidden content',
+      } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay,
+    ];
+
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'exit_plan_mode',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'exit_plan_mode' as const,
+          planPath: '/path/to/plan',
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Apply plan' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: hiddenToolCalls,
+          borderBottom: true,
+        },
+      ],
+    };
+
+    // We need to mock useConfirmingTool to return our confirmingTool
+    vi.mocked(useConfirmingTool).mockReturnValue(
+      confirmingTool as unknown as ConfirmingToolState,
+    );
+
+    mockUseSettings.mockReturnValue(
+      createMockSettings({
+        security: { enablePermanentToolApproval: true },
+        ui: { errorVerbosity: 'full' },
+      }),
+    );
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      // The output should NOT contain 'Hidden content'
+      expect(output).not.toContain('Hidden content');
+      // The output should contain the confirmation header
+      expect(output).toContain('Ready to start implementation?');
+    });
+
+    // Snapshot will reveal if there are extra blank lines
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a spurious line when a tool group has only hidden tools and borderBottom true', async () => {
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Apply plan' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: [
+            {
+              callId: 'tool-1',
+              name: WRITE_FILE_DISPLAY_NAME,
+              approvalMode: ApprovalMode.PLAN,
+              status: CoreToolCallStatus.Success,
+              resultDisplay: 'hidden',
+            } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay,
+          ],
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Apply plan');
+    });
+
+    // This snapshot will show no spurious line because the group is now correctly suppressed.
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
