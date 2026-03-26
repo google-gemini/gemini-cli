@@ -109,6 +109,11 @@ export class GeminiClient {
    * being forced and did it fail?
    */
   private hasFailedCompressionAttempt = false;
+  /**
+   * Prevents compression from firing more than once per user turn.
+   * Resets when a new user message is processed.
+   */
+  private hasCompressedThisTurn = false;
 
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
@@ -361,6 +366,7 @@ export class GeminiClient {
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
+    this.hasCompressedThisTurn = false;
     this.lastUsedModelId = undefined;
 
     const toolRegistry = this.context.toolRegistry;
@@ -609,10 +615,28 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false, signal);
+    // Guard: only compress once per user turn to prevent endless loop.
+    // See: https://github.com/google-gemini/gemini-cli/issues/23907
+    if (this.hasCompressedThisTurn) {
+      debugLogger.debug(
+        '[compression] Skipping auto-compression: already compressed this turn.',
+      );
+    }
+    const compressed = this.hasCompressedThisTurn
+      ? {
+          compressionStatus: CompressionStatus.NOOP,
+          originalTokenCount: 0,
+          newTokenCount: 0,
+        }
+      : await this.tryCompressChat(prompt_id, false, signal);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+      this.hasCompressedThisTurn = true;
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
+    } else if (
+      compressed.compressionStatus === CompressionStatus.CONTENT_TRUNCATED
+    ) {
+      this.hasCompressedThisTurn = true;
     }
 
     const remainingTokenCount =
