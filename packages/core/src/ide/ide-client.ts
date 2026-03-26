@@ -99,7 +99,7 @@ export class IdeClient {
         const timeoutPromise: Promise<{ pid: number; command: string }> =
           new Promise((resolve) =>
             setTimeout(
-              () => resolve({ pid: process.pid, command: '' }),
+              () => resolve({ pid: 0, command: '' }),
               IDE_PROCESS_DETECTION_TIMEOUT_MS,
             ),
           );
