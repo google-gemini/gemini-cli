@@ -223,6 +223,9 @@ export class Storage {
         return;
       }
 
+      if (!fs.existsSync(Storage.getGlobalGeminiDir())) {
+        fs.mkdirSync(Storage.getGlobalGeminiDir(), { recursive: true });
+      }
       const registryPath = path.join(
         Storage.getGlobalGeminiDir(),
         'projects.json',
