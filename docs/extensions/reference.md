@@ -258,8 +258,8 @@ but lower priority than user or admin policies.
 
 <!-- prettier-ignore -->
 > [!WARNING]
-> For security, Gemini CLI ignores any `allow` decisions or `yolo`
-> mode configurations in extension policies. This ensures that an extension
+> For security, Gemini CLI ignores any `allow` decisions or `allow-all`
+> wildcard configurations in extension policies. This ensures that an extension
 > cannot automatically approve tool calls or bypass security measures without
 > your confirmation.
 

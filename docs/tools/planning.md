@@ -13,7 +13,8 @@ and planning.
 
 <!-- prettier-ignore -->
 > [!NOTE]
-> This tool is not available when the CLI is in YOLO mode.
+> This tool is disabled when all tools are auto-approved via `--yolo`
+> or wildcard policies.
 
 - **Tool name:** `enter_plan_mode`
 - **Display name:** Enter Plan Mode

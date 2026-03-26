@@ -30,12 +30,6 @@ describe('approvalModeUtils', () => {
         'Plan mode (read-only planning)',
       );
     });
-
-    it('should return correct description for YOLO mode', () => {
-      expect(getApprovalModeDescription(ApprovalMode.YOLO)).toBe(
-        'YOLO mode (all tool calls auto-approved)',
-      );
-    });
   });
 
   describe('getPlanModeExitMessage', () => {
@@ -48,12 +42,6 @@ describe('approvalModeUtils', () => {
     it('should return manual message when manual is true', () => {
       expect(getPlanModeExitMessage(ApprovalMode.AUTO_EDIT, true)).toBe(
         'User has manually exited Plan Mode. Switching to Auto-Edit mode (edits will be applied automatically).',
-      );
-    });
-
-    it('should default to non-manual message', () => {
-      expect(getPlanModeExitMessage(ApprovalMode.YOLO)).toBe(
-        'Plan approved. Switching to YOLO mode (all tool calls auto-approved).',
       );
     });
   });

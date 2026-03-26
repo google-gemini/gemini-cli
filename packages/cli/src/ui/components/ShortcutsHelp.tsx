@@ -23,7 +23,6 @@ const buildShortcutItems = (): ShortcutItem[] => [
   { key: '@', description: 'select file or folder' },
   { key: 'Double Esc', description: 'clear & rewind' },
   { key: formatCommand(Command.FOCUS_SHELL_INPUT), description: 'focus UI' },
-  { key: formatCommand(Command.TOGGLE_YOLO), description: 'YOLO mode' },
   {
     key: formatCommand(Command.CYCLE_APPROVAL_MODE),
     description: 'cycle mode',
@@ -64,16 +63,14 @@ export const ShortcutsHelp: React.FC = () => {
   const itemsForDisplay = isNarrow
     ? items
     : [
-        // Keep first column stable: !, @, Esc Esc, Tab Tab.
         items[0],
-        items[5],
-        items[6],
-        items[1],
         items[4],
-        items[7],
+        items[5],
+        items[1],
+        items[6],
         items[2],
+        items[7],
         items[8],
-        items[9],
         items[3],
       ];
 

@@ -659,10 +659,13 @@ export async function loadCliConfig(
       ? settings.general?.defaultApprovalMode
       : undefined);
 
+  let isYoloRequested = false;
+
   if (rawApprovalMode) {
     switch (rawApprovalMode) {
       case 'yolo':
-        approvalMode = ApprovalMode.YOLO;
+        approvalMode = ApprovalMode.DEFAULT;
+        isYoloRequested = true;
         break;
       case 'auto_edit':
         approvalMode = ApprovalMode.AUTO_EDIT;
@@ -682,33 +685,37 @@ export async function loadCliConfig(
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: auto_edit, plan, default`,
         );
     }
   } else {
     approvalMode = ApprovalMode.DEFAULT;
   }
 
-  // Override approval mode if disableYoloMode is set.
+  let allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+
   if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
-    if (approvalMode === ApprovalMode.YOLO) {
+    if (isYoloRequested || allowedTools.includes('*')) {
       if (settings.admin?.secureModeEnabled) {
         debugLogger.error(
-          'YOLO mode is disabled by "secureModeEnabled" setting.',
+          'Wildcard policies are disabled by "secureModeEnabled" setting.',
         );
       } else {
         debugLogger.error(
-          'YOLO mode is disabled by the "disableYolo" setting.',
+          'Wildcard policies are disabled by the "disableYolo" setting.',
         );
       }
       throw new FatalConfigError(
-        getAdminErrorMessage('YOLO mode', undefined /* config */),
+        getAdminErrorMessage('Wildcard policies', undefined /* config */),
       );
     }
-  } else if (approvalMode === ApprovalMode.YOLO) {
+  } else if (isYoloRequested) {
     debugLogger.warn(
-      'YOLO mode is enabled. All tool calls will be automatically approved.',
+      'Wildcard policy is enabled via flag or setting. All tool calls will be automatically approved.',
     );
+    if (!allowedTools.includes('*')) {
+      allowedTools = [...allowedTools, '*'];
+    }
   }
 
   // Force approval mode to default if the folder is not trusted.
@@ -744,10 +751,7 @@ export async function loadCliConfig(
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
-
   const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
-
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive || isAcpMode) {

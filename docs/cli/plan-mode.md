@@ -44,8 +44,13 @@ To start Plan Mode while using Gemini CLI:
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode) tool
-  to switch modes. This tool is not available when Gemini CLI is in
-  [YOLO mode](../reference/configuration.md#command-line-arguments).
+  to switch modes.
+
+  <!-- prettier-ignore -->
+  > [!NOTE]
+  > This tool is not available when Gemini CLI has been instructed to
+  > [auto-approve all actions](../reference/configuration.md#command-line-arguments)
+  > (e.g. via `--yolo`).
 
 ## How to use Plan Mode
 

@@ -33,7 +33,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain('Hello, World!');
@@ -54,7 +54,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -77,7 +77,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -100,7 +100,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -121,7 +121,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -144,7 +144,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -166,7 +166,7 @@ describe('<MaxSizedBox />', () => {
     );
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain('This is a');
@@ -186,7 +186,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain('Line 1');
@@ -201,7 +201,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })?.trim()).equals('');
@@ -223,7 +223,7 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain('Line 1 from Fragment');
@@ -247,7 +247,7 @@ describe('<MaxSizedBox />', () => {
     );
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -273,7 +273,7 @@ describe('<MaxSizedBox />', () => {
     );
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
@@ -300,7 +300,7 @@ describe('<MaxSizedBox />', () => {
     );
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(500);
     });
     await waitUntilReady();
     expect(lastFrame()).toContain('... last');

@@ -10,7 +10,6 @@ import {
   type GeminiClient,
   GeminiEventType,
   ToolConfirmationOutcome,
-  ApprovalMode,
   getAllMCPServerStatuses,
   MCPServerStatus,
   isNodeError,
@@ -89,7 +88,8 @@ export class Task {
   autoExecute: boolean;
   private get isYoloMatch(): boolean {
     return (
-      this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO
+      this.autoExecute ||
+      (this.config.getAllowedTools()?.includes('*') ?? false)
     );
   }
 
