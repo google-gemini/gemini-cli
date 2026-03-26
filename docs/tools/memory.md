@@ -1,35 +1,52 @@
-# Memory tool (`save_memory`)
+# 🧠 Gemini Memory Tool (`save_memory`)
 
-The `save_memory` tool allows the Gemini agent to persist specific facts, user
-preferences, and project details across sessions.
+The `save_memory` tool enables the Gemini agent to persist important information across sessions, such as user preferences, project decisions, and reusable context.
 
-## Technical reference
+---
 
-This tool appends information to the `## Gemini Added Memories` section of your
-global `GEMINI.md` file (typically located at `~/.gemini/GEMINI.md`).
+## 📌 Overview
 
-### Arguments
+This tool stores structured memory entries in a global context file (`GEMINI.md`), allowing future sessions to automatically access previously saved information.
 
-- `fact` (string, required): A clear, self-contained statement in natural
-  language.
+It is designed to improve:
+- 🔁 Continuity across sessions  
+- 🎯 Personalization  
+- ⚡ Developer efficiency  
 
-## Technical behavior
+---
 
-- **Storage:** Appends to the global context file in the user's home directory.
-- **Loading:** The stored facts are automatically included in the hierarchical
-  context system for all future sessions.
-- **Format:** Saves data as a bulleted list item within a dedicated Markdown
-  section.
+## ⚙️ How It Works
 
-## Use cases
+### 📍 Storage Location
+- File: `~/.gemini/GEMINI.md`
+- Section: `## Gemini Added Memories`
+- Format: Markdown bullet list
 
-- Persisting user preferences (for example, "I prefer functional programming").
-- Saving project-wide architectural decisions.
-- Storing frequently used aliases or system configurations.
+### 🔄 Behavior
+- **Append-only** → Each memory is added as a new bullet point  
+- **Persistent** → Data survives across sessions  
+- **Auto-loaded** → Included in context for future interactions  
 
-## Next steps
+---
 
-- Follow the [Memory management guide](../cli/tutorials/memory-management.md)
-  for practical examples.
-- Learn how the [Project context (GEMINI.md)](../cli/gemini-md.md) system loads
-  this information.
+## 🧾 API Reference
+
+### Function: `save_memory`
+
+#### Parameters
+
+| Name  | Type   | Required | Description |
+|-------|--------|----------|------------|
+| fact  | string | ✅ Yes   | A clear, self-contained statement in natural language |
+
+---
+
+## ✅ Best Practices
+
+✔ Keep statements concise and unambiguous  
+✔ Write context-independent facts  
+✔ Store only long-term useful information  
+
+### ✔ Good Example
+```text
+"I prefer using Python for backend development."
