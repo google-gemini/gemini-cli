@@ -51,7 +51,15 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
   StartupStatsEvent,
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../types.js';
+import type {
+  CreditsUsedEvent,
+  OverageOptionSelectedEvent,
+  EmptyWalletMenuShownEvent,
+  CreditPurchaseClickEvent,
+} from '../billingEvents.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -118,9 +126,15 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  ONBOARDING_START = 'onboarding_start',
+  ONBOARDING_SUCCESS = 'onboarding_success',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
   STARTUP_STATS = 'startup_stats',
+  CREDITS_USED = 'credits_used',
+  OVERAGE_OPTION_SELECTED = 'overage_option_selected',
+  EMPTY_WALLET_MENU_SHOWN = 'empty_wallet_menu_shown',
+  CREDIT_PURCHASE_CLICK = 'credit_purchase_click',
 }
 
 export interface LogResponse {
@@ -536,7 +550,6 @@ export class ClearcutLogger {
     let result: LogResponse = {};
 
     try {
-      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(CLEARCUT_URL, {
         method: 'POST',
         body: safeJsonStringify(request),
@@ -677,6 +690,11 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
         value: event.extension_ids.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE,
+        value: event.worktree_active.toString(),
       },
     ];
 
@@ -1782,6 +1800,39 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logOnboardingStartEvent(_event: OnboardingStartEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_START,
+        value: 'true',
+      },
+    ];
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_START, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logOnboardingSuccessEvent(event: OnboardingSuccessEvent): void {
+    const data: EventValue[] = [];
+    if (event.userTier) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
+        value: event.userTier,
+      });
+    }
+    if (event.duration_ms !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_DURATION_MS,
+        value: event.duration_ms.toString(),
+      });
+    }
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.ONBOARDING_SUCCESS, data),
+    );
+    this.flushIfNeeded();
+  }
+
   logStartupStatsEvent(event: StartupStatsEvent): void {
     const data: EventValue[] = [
       {
@@ -1803,6 +1854,84 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.STARTUP_STATS, data));
+    this.flushIfNeeded();
+  }
+
+  // ==========================================================================
+  // Billing / AI Credits Events
+  // ==========================================================================
+
+  logCreditsUsedEvent(event: CreditsUsedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_CONSUMED,
+        value: JSON.stringify(event.credits_consumed),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_REMAINING,
+        value: JSON.stringify(event.credits_remaining),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.CREDITS_USED, data));
+    this.flushIfNeeded();
+  }
+
+  logOverageOptionSelectedEvent(event: OverageOptionSelectedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_SELECTED_OPTION,
+        value: JSON.stringify(event.selected_option),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_CREDIT_BALANCE,
+        value: JSON.stringify(event.credit_balance),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.OVERAGE_OPTION_SELECTED, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logEmptyWalletMenuShownEvent(event: EmptyWalletMenuShownEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EMPTY_WALLET_MENU_SHOWN, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logCreditPurchaseClickEvent(event: CreditPurchaseClickEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        value: JSON.stringify(event.model),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_BILLING_PURCHASE_SOURCE,
+        value: JSON.stringify(event.source),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.CREDIT_PURCHASE_CLICK, data),
+    );
     this.flushIfNeeded();
   }
 

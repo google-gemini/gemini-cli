@@ -54,6 +54,7 @@ export async function getMcpServersFromConfig(
         return;
       }
       mcpServers[key] = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...server,
         extension,
       };

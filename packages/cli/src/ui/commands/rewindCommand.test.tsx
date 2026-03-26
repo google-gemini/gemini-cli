@@ -38,6 +38,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     coreEvents: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.coreEvents,
       emitFeedback: vi.fn(),
     },
@@ -97,15 +98,17 @@ describe('rewindCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({
+        agentContext: {
+          geminiClient: {
             getChatRecordingService: mockGetChatRecordingService,
             setHistory: mockSetHistory,
             sendMessageStream: mockSendMessageStream,
-          }),
-          getSessionId: () => 'test-session-id',
-          getContextManager: () => ({ refresh: mockResetContext }),
-          getProjectRoot: mockGetProjectRoot,
+          },
+          config: {
+            getSessionId: () => 'test-session-id',
+            getContextManager: () => ({ refresh: mockResetContext }),
+            getProjectRoot: mockGetProjectRoot,
+          },
         },
       },
       ui: {
@@ -293,7 +296,12 @@ describe('rewindCommand', () => {
   it('should fail if client is not initialized', () => {
     const context = createMockCommandContext({
       services: {
-        config: { getGeminiClient: () => undefined },
+        agentContext: {
+          geminiClient: undefined,
+          get config() {
+            return this;
+          },
+        },
       },
     }) as unknown as CommandContext;
 
@@ -309,8 +317,11 @@ describe('rewindCommand', () => {
   it('should fail if recording service is unavailable', () => {
     const context = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({ getChatRecordingService: () => undefined }),
+        agentContext: {
+          geminiClient: { getChatRecordingService: () => undefined },
+          get config() {
+            return this;
+          },
         },
       },
     }) as unknown as CommandContext;

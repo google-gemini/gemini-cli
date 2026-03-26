@@ -15,6 +15,7 @@ export const settingsCommand: SlashCommand = {
   description: 'View and edit Gemini CLI settings',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  isSafeConcurrent: true,
   action: (_context, _args): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'settings',
