@@ -10,18 +10,18 @@ There are two primary ways to integrate Gemini CLI with an IDE:
     extension on [Antigravity](https://antigravity.google),
     [Visual Studio Code](https://code.visualstudio.com/), or other VS Code
     compatible editors.
-2.  **Agent Client Protocol (ACP)**: An open protocol for
-    interoperability between AI coding agents and IDEs. This method is used for
-    integrations with tools like JetBrains and Zed, which leverage the ACP Agent
-    Registry for easy discovery and installation of compatible agents like
-    Gemini CLI.
+2.  **Agent Client Protocol (ACP)**: An open protocol for interoperability
+    between AI coding agents and IDEs. This method is used for integrations with
+    tools like JetBrains and Zed, which leverage the ACP Agent Registry for easy
+    discovery and installation of compatible agents like Gemini CLI.
 
 ## VS Code Companion Extension
 
-This is the most straightforward way to integrate Gemini CLI. It is recommended
-for users of [Antigravity](https://antigravity.google),
-[Visual Studio Code](https://code.visualstudio.com/), and other editors that
-support VS Code extensions (like VSCodium).
+The **Gemini CLI Companion extension** grants Gemini CLI direct access to your
+VS Code compatible IDEs and improves your experience by providing real-time
+context such as open files, cursor positions, and text selection. The extension
+also enables a native diffing interface so you can seamlessly review and apply
+AI-generated code changes directly within your editor.
 
 ### Features
 
@@ -162,23 +162,21 @@ documentation.
 
 ### The ACP Agent Registry
 
-The ACP Agent Registry simplifies the discovery, installation, and management of
-ACP-compatible agents directly within supported IDEs. Instead of manual
-installation or per-IDE extensions, agents registered here are instantly
-available to all supporting clients.
+Gemini CLI is officially available in the **ACP Agent Registry**. This allows
+you to install and update Gemini CLI directly within supporting IDEs and
+eliminates the need for manual downloads or IDE-specific extensions.
 
-This means:
+Using the registry ensures:
 
-- **Unified Distribution**: Register your agent once, and it's available
-  everywhere.
-- **Latest Versions**: Ensures users always have access to the most up-to-date
-  agent implementations.
 - **Ease of Use**: Discover and install agents directly within your IDE
   settings.
+- **Latest Versions**: Ensures users always have access to the most up-to-date
+  agent implementations.
 
-You can explore the full list of available agents and learn how to register your
-own on the official
+For more details on how the registry works, visit the official
 [ACP Agent Registry](https://agentclientprotocol.com/get-started/registry) page.
+You can learn about how specific IDEs leverage this integration in the following
+section.
 
 ### IDE-Specific Integration
 
