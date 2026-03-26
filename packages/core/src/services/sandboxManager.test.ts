@@ -41,6 +41,11 @@ describe('NoopSandboxManager', () => {
         MY_SECRET: 'super-secret',
         SAFE_VAR: 'is-safe',
       },
+      config: {
+        sanitizationConfig: {
+          enableEnvironmentVariableRedaction: true,
+        },
+      },
     };
 
     const result = await sandboxManager.prepareCommand(req);
@@ -51,7 +56,7 @@ describe('NoopSandboxManager', () => {
     expect(result.env['MY_SECRET']).toBeUndefined();
   });
 
-  it('should NOT allow disabling environment variable redaction if requested in config (vulnerability fix)', async () => {
+  it('should allow disabling environment variable redaction if requested in config', async () => {
     const req = {
       command: 'echo',
       args: ['hello'],
@@ -68,8 +73,8 @@ describe('NoopSandboxManager', () => {
 
     const result = await sandboxManager.prepareCommand(req);
 
-    // API_KEY should be redacted because SandboxManager forces redaction and API_KEY matches NEVER_ALLOWED_NAME_PATTERNS
-    expect(result.env['API_KEY']).toBeUndefined();
+    // API_KEY should be preserved because redaction was explicitly disabled
+    expect(result.env['API_KEY']).toBe('sensitive-key');
   });
 
   it('should respect allowedEnvironmentVariables in config but filter sensitive ones', async () => {
@@ -84,6 +89,7 @@ describe('NoopSandboxManager', () => {
       config: {
         sanitizationConfig: {
           allowedEnvironmentVariables: ['MY_SAFE_VAR', 'MY_TOKEN'],
+          enableEnvironmentVariableRedaction: true,
         },
       },
     };
@@ -107,6 +113,7 @@ describe('NoopSandboxManager', () => {
       config: {
         sanitizationConfig: {
           blockedEnvironmentVariables: ['BLOCKED_VAR'],
+          enableEnvironmentVariableRedaction: true,
         },
       },
     };
