@@ -180,6 +180,7 @@ export interface UIState {
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;
+  stableControlsHeight: number;
   mainAreaWidth: number;
   staticAreaMaxItemHeight: number;
   staticExtraHeight: number;
@@ -190,7 +191,7 @@ export interface UIState {
   sessionStats: SessionStatsState;
   terminalWidth: number;
   terminalHeight: number;
-  mainControlsRef: React.MutableRefObject<DOMElement | null>;
+  mainControlsRef: React.RefCallback<DOMElement | null>;
   // NOTE: This is for performance profiling only.
   rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
