@@ -79,11 +79,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /root/.npm
 
-# Copy and Install the locally bundled CLI package
-# This ensures perfect parity with an NPM release
-COPY --from=builder /build/packages/cli /tmp/cli-package
-RUN npm install -g /tmp/cli-package \
-    && rm -rf /tmp/cli-package
+# Copy the bundled CLI package to a permanent location and install it
+# We MUST not delete this source folder as 'npm install -g <folder>' 
+# often symlinks to it for local folder installs.
+COPY --from=builder /build/packages/cli /usr/local/lib/gemini-cli
+RUN npm install -g /usr/local/lib/gemini-cli
 
 USER node
 CMD ["/bin/bash"]
