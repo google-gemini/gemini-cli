@@ -96,17 +96,20 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
 - **Logic Commit**: Apply logic changes or new features in a separate, follow-up commit.
 - **Goal**: Ensure the diff for the refactor commit is purely about movement, and the diff for the logic commit is purely about behavior.
 
-#### 8. Proactive Issue Linking (Mandatory)
-- **Context**: The project enforces a strict policy where PRs without a linked issue are automatically closed.
+#### 8. Proactive Issue Linking & Project Board (Mandatory)
+- **Context**: The project enforces a strict policy where PRs without a linked issue are automatically closed. Additionally, engineering management requires all issues to be tracked on the designated GitHub Project board following an Epic -> Issue -> PR hierarchy.
 - **Action**: Before creating a PR, you MUST:
   1. Search existing open issues using `gh issue list --search "<keywords>"` to find a relevant issue.
-  2. If an issue is found with **HIGH CONFIDENCE** that it matches the PR's intent:
+  2. Ensure the issue logic matches the "Epic as parent, PRs linked to specific child Issues" structure.
+  3. If an issue is found with **HIGH CONFIDENCE** that it matches the PR's intent:
      - Assign the issue to the current user (e.g., `gh issue edit <number> --add-assignee "@me"`).
      - Link the issue in the PR description (e.g., `Fixes #<number>`).
-  3. If **NO** high-confidence match is found:
+  4. If **NO** high-confidence match is found:
      - Create a new issue using `gh issue create` detailing the bug or feature.
      - Assign it to the user and link it in the PR description.
-- **Constraint**: NEVER open a new PR without resolving the issue linkage first.
+  5. **Project Board Requirement**: You MUST ensure the chosen or created issue is added to the UX engineering board.
+     - Add it to the project: `gh project item-add 33 --owner google-gemini --url <issue-url>` (Targeting: https://github.com/orgs/google-gemini/projects/33/views/5).
+- **Constraint**: NEVER open a new PR without resolving the issue linkage and project board assignment first.
 
 #### 9. Final Submission
 - **Commit Strategy**: Maintain a structured commit history to optimize for reviewer speed (30s vs 10m):
