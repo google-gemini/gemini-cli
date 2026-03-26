@@ -81,7 +81,7 @@ export function getFsErrorMessage(
     // For unknown error codes, include the code in the message
     if (code) {
       const baseMessage = error.message || defaultMessage;
-      return `${baseMessage} (${code})`;
+      return `${baseMessage} (${code}). This error code is not recognized. Please check system logs or documentation.`;
     }
   }
 

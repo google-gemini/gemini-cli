@@ -169,13 +169,15 @@ describe('getFsErrorMessage', () => {
       {
         code: 'EUNKNOWN',
         message: 'Some unknown error occurred',
-        expected: 'Some unknown error occurred (EUNKNOWN)',
+        expected:
+          'Some unknown error occurred (EUNKNOWN). This error code is not recognized. Please check system logs or documentation.',
       },
       {
         code: 'toString',
         message: 'Unexpected error',
         path: '/some/path',
-        expected: 'Unexpected error (toString)',
+        expected:
+          'Unexpected error (toString). This error code is not recognized. Please check system logs or documentation.',
       },
     ];
 
