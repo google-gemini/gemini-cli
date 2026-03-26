@@ -15,7 +15,7 @@ npm install -g @google/gemini-cli
 Jump in to Gemini CLI.
 
 - **[Quickstart](./get-started/index.md):** Your first session with Gemini CLI.
-- **[Installation](./get-started/installation):** How to install Gemini CLI on
+- **[Installation](./get-started/installation/):** How to install Gemini CLI on
   your system.
 - **[Authentication](./get-started/authentication.md):** Setup instructions for
   personal and enterprise accounts.
