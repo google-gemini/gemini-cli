@@ -16,6 +16,7 @@ import type {
 } from '@a2a-js/sdk';
 import express from 'express';
 import type { Server } from 'node:http';
+import * as path from 'node:path';
 import request from 'supertest';
 import {
   afterAll,
@@ -1081,9 +1082,8 @@ describe('E2E Tests', () => {
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
       delete process.env['CODER_AGENT_WORKSPACE_PATH'];
-      // Using a path.delimiter equivalent, we can use ":" for linux or ";" for windows. Since we're in linux OS, ":" works, but let's test it generically by just string concatenation
       process.env['CODER_AGENT_WORKSPACE_PATHS'] =
-        `/tmp/test-workspace1:/tmp/test-workspace2`;
+        `/tmp/test-workspace1${path.delimiter}/tmp/test-workspace2`;
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });

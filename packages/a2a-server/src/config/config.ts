@@ -31,6 +31,7 @@ import {
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
+  isSubpath,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -202,39 +203,63 @@ export async function loadConfig(
 export function getWorkspaceDirs(
   agentSettings: AgentSettings | undefined,
 ): string[] {
-  const currentCwd = process.cwd();
   const dirs = new Set<string>();
 
+  // Use environment variables as the source of truth for "trusted roots".
+  // If none are set, the server's current working directory is the only trusted root.
+  const trustedRoots: string[] = [];
   const envPaths = process.env['CODER_AGENT_WORKSPACE_PATHS'];
   if (envPaths) {
     envPaths.split(path.delimiter).forEach((p) => {
-      if (p.trim()) dirs.add(path.resolve(p.trim()));
+      if (p.trim()) trustedRoots.push(path.resolve(p.trim()));
     });
   }
-
   const envPath = process.env['CODER_AGENT_WORKSPACE_PATH'];
   if (envPath && envPath.trim()) {
-    dirs.add(path.resolve(envPath.trim()));
+    trustedRoots.push(path.resolve(envPath.trim()));
   }
 
+  if (trustedRoots.length === 0) {
+    trustedRoots.push(process.cwd());
+  }
+
+  const isPathTrusted = (p: string) => {
+    const resolvedPath = path.resolve(p);
+    return trustedRoots.some(
+      (root) => resolvedPath === root || isSubpath(root, resolvedPath),
+    );
+  };
+
+  // agentSettings paths take precedence but MUST be within trusted roots.
   if (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent) {
+    const candidatePaths: string[] = [];
     if (agentSettings.workspacePaths) {
       agentSettings.workspacePaths.forEach((p) => {
-        if (p.trim()) dirs.add(path.resolve(p.trim()));
+        if (p.trim()) candidatePaths.push(p.trim());
       });
     }
     if (agentSettings.workspacePath && agentSettings.workspacePath.trim()) {
-      dirs.add(path.resolve(agentSettings.workspacePath.trim()));
+      candidatePaths.push(agentSettings.workspacePath.trim());
     }
+
+    candidatePaths.forEach((p) => {
+      const resolvedPath = path.resolve(p);
+      if (isPathTrusted(resolvedPath)) {
+        dirs.add(resolvedPath);
+      } else {
+        logger.warn(
+          `[getWorkspaceDirs] Discarding unauthorized workspace path: ${p}`,
+        );
+      }
+    });
   }
+
+  // Ensure trusted roots are included in discovery
+  trustedRoots.forEach((root) => dirs.add(root));
 
   const resolvedDirs = Array.from(dirs);
-  if (resolvedDirs.length === 0) {
-    return [currentCwd];
-  }
-
   logger.info(
-    `[CoderAgentExecutor] Resolved workspace directories: ${resolvedDirs.join(', ')}`,
+    `[getWorkspaceDirs] Resolved workspace directories: ${resolvedDirs.join(', ')}`,
   );
   return resolvedDirs;
 }
@@ -242,33 +267,15 @@ export function getWorkspaceDirs(
 export function setTargetDir(
   agentSettings: AgentSettings | undefined,
 ): string[] {
-  const originalCWD = process.cwd();
   const targetDirs = getWorkspaceDirs(agentSettings);
 
-  if (targetDirs.length === 0 || targetDirs[0] === originalCWD) {
-    return [originalCWD];
-  }
-
-  const primaryDir = targetDirs[0];
-
-  logger.info(
-    `[CoderAgentExecutor] Overriding primary workspace path to: ${primaryDir}`,
-  );
   if (targetDirs.length > 1) {
     logger.info(
-      `[CoderAgentExecutor] Additional workspace paths: ${targetDirs.slice(1).join(', ')}`,
+      `[setTargetDir] Additional workspace paths: ${targetDirs.slice(1).join(', ')}`,
     );
   }
 
-  try {
-    process.chdir(primaryDir);
-    return targetDirs;
-  } catch (e) {
-    logger.error(
-      `[CoderAgentExecutor] Error resolving workspace path: ${e}, returning original os.cwd()`,
-    );
-    return [originalCWD];
-  }
+  return targetDirs;
 }
 
 export function loadEnvironment(): void {
