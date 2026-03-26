@@ -58,9 +58,14 @@ export function getErrorType(error: unknown): string {
   if (!(error instanceof Error)) return 'unknown';
 
   // Use the constructor name if the standard error name is missing or generic.
-  return error.name && error.name !== 'Error'
-    ? error.name
-    : (error.constructor?.name ?? 'Error');
+  const name =
+    error.name && error.name !== 'Error'
+      ? error.name
+      : (error.constructor?.name ?? 'Error');
+
+  // Strip leading underscore from error names. Bundlers like esbuild sometimes
+  // rename classes to avoid scope collisions.
+  return name.replace(/^_+/, '');
 }
 
 export class FatalError extends Error {
