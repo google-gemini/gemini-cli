@@ -3,7 +3,10 @@ name: 'Evals: PR Guidance'
 on:
   pull_request:
     paths:
-      - 'packages/core/src/**/*.ts'
+      - 'packages/core/src/prompts/**'
+      - 'packages/core/src/tools/**'
+      - 'packages/core/src/agents/**'
+      - 'evals/**'
       - '!**/*.test.ts'
       - '!**/*.test.tsx'
 
