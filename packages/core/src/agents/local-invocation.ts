@@ -35,7 +35,6 @@ import {
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
-const MAX_RECENT_ACTIVITY = 3;
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -113,7 +112,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
-    let recentActivity: SubagentActivityItem[] = [];
+    const recentActivity: SubagentActivityItem[] = [];
 
     try {
       if (updateOutput) {
@@ -268,11 +267,6 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         }
 
         if (updated) {
-          // Keep only the last N items
-          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
-            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
-          }
-
           const progress: SubagentProgress = {
             isSubagentProgress: true,
             agentName: this.definition.name,
@@ -358,9 +352,7 @@ ${output.result}`;
             status: 'error',
           });
           // Maintain size limit
-          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
-            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
-          }
+          // No limit on UI events sent via bus
         }
       }
 

@@ -242,11 +242,35 @@ export function useToolScheduler(
   // Flatten the map for the UI components that expect a single list of tools.
   const toolCalls = useMemo(() => {
     const flattened = Object.values(toolCallsMap).flat();
-    return flattened.map((tc) => ({
-      ...tc,
-      subagentHistory:
-        subagentHistoryMap[tc.request.name] ?? tc.subagentHistory,
-    }));
+    return flattened.map((tc) => {
+      let subagentName = tc.request.name;
+      if (tc.request.name === 'invoke_subagent') {
+        const argsObj = tc.request.args;
+        let parsedArgs: unknown = argsObj;
+
+        if (typeof argsObj === 'string') {
+          try {
+            parsedArgs = JSON.parse(argsObj);
+          } catch {
+            parsedArgs = null;
+          }
+        }
+
+        if (typeof parsedArgs === 'object' && parsedArgs !== null) {
+          for (const [key, value] of Object.entries(parsedArgs)) {
+            if (key === 'subagent_name' && typeof value === 'string') {
+              subagentName = value;
+              break;
+            }
+          }
+        }
+      }
+
+      return {
+        ...tc,
+        subagentHistory: subagentHistoryMap[subagentName] ?? tc.subagentHistory,
+      };
+    });
   }, [toolCallsMap, subagentHistoryMap]);
 
   // Provide a setter that maintains compatibility with legacy [].
