@@ -208,7 +208,6 @@ const remoteAgentSchema = z.union([
   remoteAgentUrlSchema,
   remoteAgentJsonSchema,
 ]);
-
 type FrontmatterRemoteAgentDefinition = z.infer<typeof remoteAgentSchema>;
 
 type FrontmatterAgentDefinition =
