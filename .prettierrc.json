@@ -1,14 +1,16 @@
 {
   "semi": true,
-  "trailingComma": "all",
   "singleQuote": true,
+  "trailingComma": "all",
   "printWidth": 80,
   "tabWidth": 2,
+  "arrowParens": "always",
+  "bracketSpacing": true,
+  "endOfLine": "lf",
   "overrides": [
     {
-      "files": ["**/*.md"],
+      "files": "*.md",
       "options": {
-        "tabWidth": 2,
         "printWidth": 80,
         "proseWrap": "always"
       }
