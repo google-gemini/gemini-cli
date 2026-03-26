@@ -58,9 +58,12 @@ jobs:
       - name: 'Check Secrets'
         id: 'check_secrets'
         run: |
-          echo "has_win_cert=${{ secrets.WINDOWS_PFX_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
-          echo "has_mac_cert=${{ secrets.MACOS_CERT_P12_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_win_cert=${WINDOWS_PFX_BASE64}" >> "$GITHUB_OUTPUT"
+          echo "has_mac_cert=${MACOS_CERT_P12_BASE64}" >> "$GITHUB_OUTPUT"
 
+        env:
+          WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 != '' }}
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 != '' }}
       - name: 'Setup Windows SDK (Windows)'
         if: "matrix.os == 'windows-latest'"
         uses: 'microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce' # ratchet:microsoft/setup-msbuild@v2
@@ -79,6 +82,7 @@ jobs:
           BUILD_CERTIFICATE_BASE64: '${{ secrets.MACOS_CERT_P12_BASE64 }}'
           P12_PASSWORD: '${{ secrets.MACOS_CERT_PASSWORD }}'
           KEYCHAIN_PASSWORD: 'temp-password'
+          MACOS_CERT_IDENTITY: ${{ secrets.MACOS_CERT_IDENTITY }}
         run: |
           # Create the P12 file
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
@@ -95,7 +99,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
           # Set Identity for build script
-          echo "APPLE_IDENTITY=${{ secrets.MACOS_CERT_IDENTITY }}" >> "$GITHUB_ENV"
+          echo "APPLE_IDENTITY=${MACOS_CERT_IDENTITY}" >> "$GITHUB_ENV"
 
       - name: 'Setup Windows Certificate'
         if: "matrix.os == 'windows-latest' && steps.check_secrets.outputs.has_win_cert == 'true' && github.event_name != 'pull_request'"

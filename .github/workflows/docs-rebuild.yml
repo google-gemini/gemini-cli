@@ -15,4 +15,7 @@ jobs:
           curl -X POST \
             -H "Content-Type: application/json" \
             -d '{}' \
-            "${{ secrets.DOCS_REBUILD_URL }}"
+            "${DOCS_REBUILD_URL}"
+
+        env:
+          DOCS_REBUILD_URL: ${{ secrets.DOCS_REBUILD_URL }}
