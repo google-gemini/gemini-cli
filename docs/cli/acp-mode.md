@@ -58,8 +58,7 @@ ACP can be used with the Model Context Protocol (MCP). This lets an ACP client
 (like an IDE) expose its own functionality as "tools" that the Gemini model can
 use.
 
-1.  The client implements an **MCP server** that advertises its tools (e.g.,
-    `goToDefinition`, `findReferences`).
+1.  The client implements an **MCP server** that advertises its tools.
 2.  During the ACP `initialize` handshake, the client provides the connection
     details for its MCP server.
 3.  Gemini CLI connects to the MCP server, discovers the available tools, and
