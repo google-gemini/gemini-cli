@@ -156,7 +156,6 @@ export async function internalEvalTest(evalCase: EvalCase) {
           console.warn(
             `[Eval] Attempt ${attempt} failed with ${errorCode} Error. Retrying...`,
           );
-          await rig.cleanup();
           continue; // Retry
         }
 
@@ -192,8 +191,7 @@ function getApiErrorCode(message: string): '500' | '503' | undefined {
   if (
     message.includes('status: UNAVAILABLE') ||
     message.includes('code: 503') ||
-    message.includes('Service Unavailable') ||
-    message.includes('Simulated 503 error')
+    message.includes('Service Unavailable')
   ) {
     return '503';
   }
