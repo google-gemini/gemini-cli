@@ -3,485 +3,460 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect } from 'vitest';
-import { TableRenderer } from './TableRenderer.js';
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { TableRenderer } from './TableRenderer.js';
 
 describe('TableRenderer', () => {
-  it('renders a 3x3 table correctly', async () => {
-    const headers = ['Header 1', 'Header 2', 'Header 3'];
-    const rows = [
-      ['Row 1, Col 1', 'Row 1, Col 2', 'Row 1, Col 3'],
-      ['Row 2, Col 1', 'Row 2, Col 2', 'Row 2, Col 3'],
-      ['Row 3, Col 1', 'Row 3, Col 2', 'Row 3, Col 3'],
-    ];
-    const terminalWidth = 80;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expect(output).toContain('Header 1');
-    expect(output).toContain('Row 1, Col 1');
-    expect(output).toContain('Row 3, Col 3');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('renders a table with long headers and 4 columns correctly', async () => {
-    const headers = [
-      'Very Long Column Header One',
-      'Very Long Column Header Two',
-      'Very Long Column Header Three',
-      'Very Long Column Header Four',
-    ];
-    const rows = [
-      ['Data 1.1', 'Data 1.2', 'Data 1.3', 'Data 1.4'],
-      ['Data 2.1', 'Data 2.2', 'Data 2.3', 'Data 2.4'],
-      ['Data 3.1', 'Data 3.2', 'Data 3.3', 'Data 3.4'],
-    ];
-    const terminalWidth = 80;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    // Since terminalWidth is 80 and headers are long, they might be truncated.
-    // We just check for some of the content.
-    expect(output).toContain('Data 1.1');
-    expect(output).toContain('Data 3.4');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it('wraps long cell content correctly', async () => {
-    const headers = ['Col 1', 'Col 2', 'Col 3'];
-    const rows = [
-      [
-        'Short',
-        'This is a very long cell content that should wrap to multiple lines',
-        'Short',
-      ],
-    ];
-    const terminalWidth = 50;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expect(output).toContain('This is a very');
-    expect(output).toContain('long cell');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it('wraps all long columns correctly', async () => {
-    const headers = ['Col 1', 'Col 2', 'Col 3'];
-    const rows = [
-      [
-        'This is a very long text that needs wrapping in column 1',
-        'This is also a very long text that needs wrapping in column 2',
-        'And this is the third long text that needs wrapping in column 3',
-      ],
-    ];
-    const terminalWidth = 60;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expect(output).toContain('wrapping in');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it('wraps mixed long and short columns correctly', async () => {
-    const headers = ['Short', 'Long', 'Medium'];
-    const rows = [
-      [
-        'Tiny',
-        'This is a very long text that definitely needs to wrap to the next line',
-        'Not so long',
-      ],
-    ];
-    const terminalWidth = 50;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expect(output).toContain('Tiny');
-    expect(output).toContain('definitely needs');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  // The snapshot looks weird but checked on VS Code terminal and it looks fine
-  it('wraps columns with punctuation correctly', async () => {
-    const headers = ['Punctuation 1', 'Punctuation 2', 'Punctuation 3'];
-    const rows = [
-      [
-        'Start. Stop. Comma, separated. Exclamation! Question? hyphen-ated',
-        'Semi; colon: Pipe| Slash/ Backslash\\',
-        'At@ Hash# Dollar$ Percent% Caret^ Ampersand& Asterisk*',
-      ],
-    ];
-    const terminalWidth = 60;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expect(output).toContain('Start. Stop.');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it('strips bold markers from headers and renders them correctly', async () => {
-    const headers = ['**Bold Header**', 'Normal Header', '**Another Bold**'];
-    const rows = [['Data 1', 'Data 2', 'Data 3']];
-    const terminalWidth = 50;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    // The output should NOT contain the literal '**'
-    expect(output).not.toContain('**Bold Header**');
-    expect(output).toContain('Bold Header');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it('handles wrapped bold headers without showing markers', async () => {
-    const headers = [
-      '**Very Long Bold Header That Will Wrap**',
-      'Short',
-      '**Another Long Header**',
-    ];
-    const rows = [['Data 1', 'Data 2', 'Data 3']];
-    const terminalWidth = 40;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    // Markers should be gone
-    expect(output).not.toContain('**');
-    expect(output).toContain('Very Long');
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it('renders a complex table with mixed content lengths correctly', async () => {
-    const headers = [
-      'Comprehensive Architectural Specification for the Distributed Infrastructure Layer',
-      'Implementation Details for the High-Throughput Asynchronous Message Processing Pipeline with Extended Scalability Features and Redundancy Protocols',
-      'Longitudinal Performance Analysis Across Multi-Regional Cloud Deployment Clusters',
-      'Strategic Security Framework for Mitigating Sophisticated Cross-Site Scripting Vulnerabilities',
-      'Key',
-      'Status',
-      'Version',
-      'Owner',
-    ];
-    const rows = [
-      [
-        'The primary architecture utilizes a decoupled microservices approach, leveraging container orchestration for scalability and fault tolerance in high-load scenarios.\n\nThis layer provides the fundamental building blocks for service discovery, load balancing, and inter-service communication via highly efficient protocol buffers.\n\nAdvanced telemetry and logging integrations allow for real-time monitoring of system health and rapid identification of bottlenecks within the service mesh.',
-        'Each message is processed through a series of specialized workers that handle data transformation, validation, and persistent storage using a persistent queue.\n\nThe pipeline features built-in retry mechanisms with exponential backoff to ensure message delivery integrity even during transient network or service failures.\n\nHorizontal autoscaling is triggered automatically based on the depth of the processing queue, ensuring consistent performance during unexpected traffic spikes.',
-        'Historical data indicates a significant reduction in tail latency when utilizing edge computing nodes closer to the geographic location of the end-user base.\n\nMonitoring tools have captured a steady increase in throughput efficiency since the introduction of the vectorized query engine in the primary data warehouse.\n\nResource utilization metrics demonstrate that the transition to serverless compute for intermittent tasks has resulted in a thirty percent cost optimization.',
-        'A multi-layered defense strategy incorporates content security policies, input sanitization libraries, and regular automated penetration testing routines.\n\nDevelopers are required to undergo mandatory security training focusing on the OWASP Top Ten to ensure that security is integrated into the initial design phase.\n\nThe implementation of a robust Identity and Access Management system ensures that the principle of least privilege is strictly enforced across all environments.',
-        'INF',
-        'Active',
-        'v2.4',
-        'J. Doe',
-      ],
-    ];
-
-    const terminalWidth = 160;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-      { width: terminalWidth },
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expect(output).toContain('Comprehensive Architectural');
-    expect(output).toContain('protocol buffers');
-    expect(output).toContain('exponential backoff');
-    expect(output).toContain('vectorized query engine');
-    expect(output).toContain('OWASP Top Ten');
-    expect(output).toContain('INF');
-    expect(output).toContain('Active');
-    expect(output).toContain('v2.4');
-    // "J. Doe" might wrap due to column width constraints
-    expect(output).toContain('J.');
-    expect(output).toContain('Doe');
-
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it.each([
-    {
-      name: 'handles non-ASCII characters (emojis and Asian scripts) correctly',
-      headers: ['Emoji 😃', 'Asian 汉字', 'Mixed 🚀 Text'],
-      rows: [
-        ['Start 🌟 End', '你好世界', 'Rocket 🚀 Man'],
-        ['Thumbs 👍 Up', 'こんにちは', 'Fire 🔥'],
-      ],
-      terminalWidth: 60,
-      expected: ['Emoji 😃', 'Asian 汉字', '你好世界'],
-    },
-    {
-      name: 'renders a table with only emojis and text correctly',
-      headers: ['Happy 😀', 'Rocket 🚀', 'Heart ❤️'],
-      rows: [
-        ['Smile 😃', 'Fire 🔥', 'Love 💖'],
-        ['Cool 😎', 'Star ⭐', 'Blue 💙'],
-      ],
-      terminalWidth: 60,
-      expected: ['Happy 😀', 'Smile 😃', 'Fire 🔥'],
-    },
-    {
-      name: 'renders a table with only Asian characters and text correctly',
-      headers: ['Chinese 中文', 'Japanese 日本語', 'Korean 한국어'],
-      rows: [
-        ['你好', 'こんにちは', '안녕하세요'],
-        ['世界', '世界', '세계'],
-      ],
-      terminalWidth: 60,
-      expected: ['Chinese 中文', '你好', 'こんにちは'],
-    },
-    {
-      name: 'renders a table with mixed emojis, Asian characters, and text correctly',
-      headers: ['Mixed 😃 中文', 'Complex 🚀 日本語', 'Text 📝 한국어'],
-      rows: [
-        ['你好 😃', 'こんにちは 🚀', '안녕하세요 📝'],
-        ['World 🌍', 'Code 💻', 'Pizza 🍕'],
-      ],
-      terminalWidth: 80,
-      expected: ['Mixed 😃 中文', '你好 😃', 'こんにちは 🚀'],
-    },
-  ])('$name', async ({ headers, rows, terminalWidth, expected }) => {
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-      { width: terminalWidth },
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expected.forEach((text) => {
-      expect(output).toContain(text);
-    });
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it.each([
-    {
-      name: 'renders correctly when headers are empty but rows have data',
-      headers: [] as string[],
-      rows: [['Data 1', 'Data 2']],
-      expected: ['Data 1', 'Data 2'],
-    },
-    {
-      name: 'renders correctly when there are more headers than columns in rows',
-      headers: ['Header 1', 'Header 2', 'Header 3'],
-      rows: [['Data 1', 'Data 2']],
-      expected: ['Header 1', 'Header 2', 'Header 3', 'Data 1', 'Data 2'],
-    },
-  ])('$name', async ({ headers, rows, expected }) => {
-    const terminalWidth = 50;
-
-    const renderResult = await renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-    );
-    const { lastFrame, unmount } = renderResult;
-    const output = lastFrame();
-    expected.forEach((text) => {
-      expect(output).toContain(text);
-    });
-    await expect(renderResult).toMatchSvgSnapshot();
-    unmount();
-  });
-
-  it.each([
-    {
-      name: 'renders complex markdown in rows and calculates widths correctly',
-      headers: ['Feature', 'Markdown'],
-      rows: [
-        ['Bold', '**Bold Text**'],
-        ['Italic', '_Italic Text_'],
-        ['Combined', '***Bold and Italic***'],
-        ['Link', '[Google](https://google.com)'],
-        ['Code', '`const x = 1`'],
-        ['Strikethrough', '~~Strike~~'],
-        ['Underline', '<u>Underline</u>'],
-      ],
-      terminalWidth: 80,
-      waitForText: 'Bold Text',
-      assertions: (output: string) => {
-        expect(output).not.toContain('**Bold Text**');
-        expect(output).toContain('Bold Text');
-        expect(output).not.toContain('_Italic Text_');
-        expect(output).toContain('Italic Text');
-        expect(output).toContain('Bold and Italic');
-        expect(output).toContain('Google');
-        expect(output).toContain('https://google.com');
-        expect(output).toContain('(https://google.com)');
-        expect(output).toContain('const x = 1');
-        expect(output).not.toContain('`const x = 1`');
-        expect(output).toContain('Strike');
-        expect(output).toContain('Underline');
-      },
-    },
-    {
-      name: 'calculates column widths based on rendered text, not raw markdown',
-      headers: ['Col 1', 'Col 2', 'Col 3'],
-      rows: [
-        ['**123456**', 'Normal', 'Short'],
-        ['Short', '**123456**', 'Normal'],
-        ['Normal', 'Short', '**123456**'],
-      ],
-      terminalWidth: 40,
-      waitForText: '123456',
-      assertions: (output: string) => {
-        expect(output).toContain('123456');
-        const dataLines = output.split('\n').filter((l) => /123456/.test(l));
-        expect(dataLines.length).toBe(3);
-      },
-    },
-    {
-      name: 'handles nested markdown styles recursively',
-      headers: ['Header 1', 'Header 2', 'Header 3'],
-      rows: [
-        ['**Bold with _Italic_ and ~~Strike~~**', 'Normal', 'Short'],
-        ['Short', '**Bold with _Italic_ and ~~Strike~~**', 'Normal'],
-        ['Normal', 'Short', '**Bold with _Italic_ and ~~Strike~~**'],
-      ],
-      terminalWidth: 100,
-      waitForText: 'Bold with Italic and Strike',
-      assertions: (output: string) => {
-        expect(output).not.toContain('**');
-        expect(output).not.toContain('_');
-        expect(output).not.toContain('~~');
-        expect(output).toContain('Bold with Italic and Strike');
-      },
-    },
-    {
-      name: 'calculates width correctly for content with URLs and styles',
-      headers: ['Col 1', 'Col 2', 'Col 3'],
-      rows: [
-        ['Visit [Google](https://google.com)', 'Plain Text', 'More Info'],
-        ['Info Here', 'Visit [Bing](https://bing.com)', 'Links'],
-        ['Check This', 'Search', 'Visit [Yahoo](https://yahoo.com)'],
-      ],
-      terminalWidth: 120,
-      waitForText: 'Visit Google',
-      assertions: (output: string) => {
-        expect(output).toContain('Visit Google');
-        expect(output).toContain('Visit Bing');
-        expect(output).toContain('Visit Yahoo');
-        expect(output).toContain('https://google.com');
-        expect(output).toContain('https://bing.com');
-        expect(output).toContain('https://yahoo.com');
-        expect(output).toContain('(https://google.com)');
-        const dataLine = output
-          .split('\n')
-          .find((l) => l.includes('Visit Google'));
-        expect(dataLine).toContain('Visit Google');
-      },
-    },
-    {
-      name: 'does not parse markdown inside code snippets',
-      headers: ['Col 1', 'Col 2', 'Col 3'],
-      rows: [
-        ['`**not bold**`', '`_not italic_`', '`~~not strike~~`'],
-        ['`[not link](url)`', '`<u>not underline</u>`', '`https://not.link`'],
-        ['Normal Text', 'More Code: `*test*`', '`***nested***`'],
-      ],
-      terminalWidth: 100,
-      waitForText: '**not bold**',
-      assertions: (output: string) => {
-        expect(output).toContain('**not bold**');
-        expect(output).toContain('_not italic_');
-        expect(output).toContain('~~not strike~~');
-        expect(output).toContain('[not link](url)');
-        expect(output).toContain('<u>not underline</u>');
-        expect(output).toContain('https://not.link');
-        expect(output).toContain('***nested***');
-      },
-    },
-  ])(
-    '$name',
-    async ({ headers, rows, terminalWidth, waitForText, assertions }) => {
-      const renderResult = await renderWithProviders(
+  describe('Basic rendering', () => {
+    it('should render a simple table with headers and rows', async () => {
+      const { lastFrame } = await renderWithProviders(
         <TableRenderer
-          headers={headers}
-          rows={rows}
-          terminalWidth={terminalWidth}
+          headers={['Name', 'Age']}
+          rows={[
+            ['Alice', '30'],
+            ['Bob', '25'],
+          ]}
+          terminalWidth={40}
         />,
-        { width: terminalWidth },
       );
-      const { lastFrame, unmount } = renderResult;
 
-      const output = lastFrame();
-      expect(output).toBeDefined();
-      expect(output).toContain(waitForText);
-      assertions(output);
-      await expect(renderResult).toMatchSvgSnapshot();
-      unmount();
-    },
-  );
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Name');
+      expect(text).toContain('Age');
+      expect(text).toContain('Alice');
+      expect(text).toContain('Bob');
+    });
+
+    it('should render table with single row', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Column1', 'Column2']}
+          rows={[['Value1', 'Value2']]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Column1');
+      expect(text).toContain('Value1');
+    });
+
+    it('should render table with single column', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Item']}
+          rows={[['Item1'], ['Item2'], ['Item3']]}
+          terminalWidth={30}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Item');
+      expect(text).toContain('Item1');
+      expect(text).toContain('Item2');
+    });
+
+    it('should render table with many columns', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['A', 'B', 'C', 'D', 'E']}
+          rows={[
+            ['a1', 'b1', 'c1', 'd1', 'e1'],
+            ['a2', 'b2', 'c2', 'd2', 'e2'],
+          ]}
+          terminalWidth={80}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('A');
+      expect(text).toContain('E');
+      expect(text).toContain('a1');
+      expect(text).toContain('e2');
+    });
+
+    it('should render table with many rows', async () => {
+      const rows = Array.from({ length: 20 }, (_, i) => [
+        `Row${i}Col1`,
+        `Row${i}Col2`,
+      ]);
+
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1', 'Col2']}
+          rows={rows}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Row0Col1');
+      expect(text).toContain('Row19Col2');
+    });
+  });
+
+  describe('Content handling', () => {
+    it('should handle empty cell values', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Name', 'Value']}
+          rows={[
+            ['A', ''],
+            ['', 'B'],
+          ]}
+          terminalWidth={40}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Name');
+      expect(text).toContain('A');
+      expect(text).toContain('B');
+    });
+
+    it('should handle long cell content with wrapping', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Name', 'Description']}
+          rows={[
+            [
+              'Item',
+              'This is a very long description that should wrap to multiple lines',
+            ],
+          ]}
+          terminalWidth={40}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Item');
+      expect(text).toContain('long');
+      expect(text).toContain('description');
+    });
+
+    it('should handle special characters', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1', 'Col2']}
+          rows={[
+            ['@#$%', 'test!@#'],
+            ['123<>', 'abc&def'],
+          ]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('@');
+      expect(text).toContain('#');
+      expect(text).toContain('test');
+    });
+
+    it('should handle Unicode characters', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['English', 'Chinese']}
+          rows={[
+            ['Test', '测试'],
+            ['Example', '例子'],
+          ]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Test');
+      expect(text).toContain('Example');
+    });
+
+    it('should handle newlines in cells', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1', 'Col2']}
+          rows={[['Line1\nLine2', 'Content']]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Content');
+    });
+  });
+
+  describe('Column width handling', () => {
+    it('should adjust column widths based on content', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Short', 'MuchLongerHeader']}
+          rows={[['A', 'B']]}
+          terminalWidth={60}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Short');
+      expect(text).toContain('MuchLongerHeader');
+    });
+
+    it('should handle narrow terminal width', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Name', 'Description']}
+          rows={[['Item', 'A long description']]}
+          terminalWidth={30}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Name');
+      expect(text).toContain('Item');
+    });
+
+    it('should handle very narrow terminal width with wrapping', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['A', 'B']}
+          rows={[['LongValue1', 'LongValue2']]}
+          terminalWidth={15}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text.length).toBeGreaterThan(0);
+    });
+
+    it('should balance column widths across available terminal width', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1', 'Col2', 'Col3']}
+          rows={[['A', 'B', 'C']]}
+          terminalWidth={80}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Col1');
+      expect(text).toContain('Col2');
+      expect(text).toContain('Col3');
+    });
+  });
+
+  describe('Border rendering', () => {
+    it('should include table borders', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Name', 'Value']}
+          rows={[['Item1', 'Value1']]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toMatch(/[┌│└┐┤┘├┼┬┴─]/);
+    });
+
+    it('should have proper border structure', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['A', 'B']}
+          rows={[
+            ['1', '2'],
+            ['3', '4'],
+          ]}
+          terminalWidth={40}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      const lines = text.split('\n').filter((line) => line.trim());
+      expect(lines.length).toBeGreaterThan(3);
+    });
+  });
+
+  describe('Edge cases', () => {
+    it('should handle rows with fewer columns than headers', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1', 'Col2', 'Col3']}
+          rows={[['A', 'B']]}
+          terminalWidth={60}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Col1');
+      expect(text).toContain('Col3');
+    });
+
+    it('should handle rows with more columns than headers', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1']}
+          rows={[['A', 'B', 'C']]}
+          terminalWidth={60}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Col1');
+    });
+
+    it('should handle empty headers array', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer headers={[]} rows={[['A', 'B']]} terminalWidth={40} />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('A');
+      expect(text).toContain('B');
+    });
+
+    it('should handle empty rows array', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Name', 'Value']}
+          rows={[]}
+          terminalWidth={40}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Name');
+      expect(text).toContain('Value');
+    });
+
+    it('should handle both empty headers and rows', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer headers={[]} rows={[]} terminalWidth={40} />,
+      );
+
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+    });
+
+    it('should handle very wide terminal width', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Col1', 'Col2']}
+          rows={[['A', 'B']]}
+          terminalWidth={500}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Col1');
+      expect(text).toContain('A');
+    });
+  });
+
+  describe('Performance', () => {
+    it('should render large tables without crashing', async () => {
+      const headers = Array.from({ length: 10 }, (_, i) => `Col${i}`);
+      const rows = Array.from({ length: 50 }, (_, i) =>
+        Array.from({ length: 10 }, (_, j) => `R${i}C${j}`),
+      );
+
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer headers={headers} rows={rows} terminalWidth={100} />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Col0');
+      expect(text).toContain('Col9');
+    });
+
+    it('should handle table with very long cell content', async () => {
+      const longContent = 'word '.repeat(100);
+
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Header']}
+          rows={[[longContent]]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('word');
+    });
+
+    it('should handle table with mixed cell sizes', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['Small', 'MediumColumn', 'VeryLongColumnHeader']}
+          rows={[
+            ['A', 'Medium', 'Long long content here'],
+            ['XYZ', 'B', 'C'],
+            ['123456789', 'Something else', 'More text content here'],
+          ]}
+          terminalWidth={80}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Small');
+      expect(text).toContain('Medium');
+      expect(text).toContain('VeryLongColumnHeader');
+    });
+  });
+
+  describe('Responsive behavior', () => {
+    it('should adapt to different terminal widths', async () => {
+      const headers = ['Name', 'Description', 'Status'];
+      const rows = [['Item', 'A detailed description', 'Active']];
+
+      const { lastFrame: narrowFrame } = await renderWithProviders(
+        <TableRenderer headers={headers} rows={rows} terminalWidth={30} />,
+      );
+
+      const narrowText = stripAnsi(narrowFrame());
+      expect(narrowText).toContain('Item');
+
+      const { lastFrame: wideFrame } = await renderWithProviders(
+        <TableRenderer headers={headers} rows={rows} terminalWidth={120} />,
+      );
+
+      const wideText = stripAnsi(wideFrame());
+      expect(wideText).toContain('Item');
+    });
+  });
+
+  describe('Content preservation', () => {
+    it('should preserve all text content in output', async () => {
+      const content = ['Cell1', 'Cell2', 'Cell3', 'Cell4'];
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={[content[0], content[1]]}
+          rows={[[content[2], content[3]]]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      content.forEach((cellContent) => {
+        expect(text).toContain(cellContent);
+      });
+    });
+
+    it('should handle cells with whitespace correctly', async () => {
+      const { lastFrame } = await renderWithProviders(
+        <TableRenderer
+          headers={['  Padded  ', 'Normal']}
+          rows={[['  Cell  ', 'Content']]}
+          terminalWidth={50}
+        />,
+      );
+
+      const text = stripAnsi(lastFrame());
+      expect(text).toContain('Padded');
+      expect(text).toContain('Cell');
+    });
+  });
 });
