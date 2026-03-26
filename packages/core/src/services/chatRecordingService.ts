@@ -20,6 +20,7 @@ import type {
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ToolResultDisplay } from '../tools/tools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { Config } from '../config/config.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -597,20 +598,37 @@ export class ChatRecordingService {
    * @throws {Error} If shortId validation fails.
    */
   deleteSession(sessionIdOrBasename: string): void {
+    ChatRecordingService.deleteSessionFiles(
+      this.context.config,
+      sessionIdOrBasename,
+    );
+  }
+
+  /**
+   * Deletes a session and all associated artifacts given only a `Config`.
+   * Use this when no active `AgentLoopContext` is available (e.g. CLI management
+   * commands that operate outside an agent loop).
+   *
+   * @throws {Error} If shortId validation fails.
+   */
+  static deleteSessionFiles(config: Config, sessionIdOrBasename: string): void {
     try {
-      const tempDir = this.context.config.storage.getProjectTempDir();
+      const tempDir = config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
 
-      const shortId = this.deriveShortId(sessionIdOrBasename);
+      const shortId = ChatRecordingService.deriveShortId(sessionIdOrBasename);
 
       if (!fs.existsSync(chatsDir)) {
         return; // Nothing to delete
       }
 
-      const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
+      const matchingFiles = ChatRecordingService.getMatchingSessionFiles(
+        chatsDir,
+        shortId,
+      );
 
       for (const file of matchingFiles) {
-        this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+        ChatRecordingService.deleteSessionAndArtifacts(chatsDir, file, tempDir);
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
@@ -621,7 +639,7 @@ export class ChatRecordingService {
   /**
    * Derives an 8-character shortId from a sessionId, filename, or basename.
    */
-  private deriveShortId(sessionIdOrBasename: string): string {
+  private static deriveShortId(sessionIdOrBasename: string): string {
     let shortId = sessionIdOrBasename;
     if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
       const withoutExt = sessionIdOrBasename.replace('.json', '');
@@ -643,7 +661,10 @@ export class ChatRecordingService {
   /**
    * Finds all session files matching the pattern session-*-<shortId>.json
    */
-  private getMatchingSessionFiles(chatsDir: string, shortId: string): string[] {
+  private static getMatchingSessionFiles(
+    chatsDir: string,
+    shortId: string,
+  ): string[] {
     const files = fs.readdirSync(chatsDir);
     return files.filter(
       (f) =>
@@ -654,7 +675,7 @@ export class ChatRecordingService {
   /**
    * Deletes a single session file and its associated logs, tool-outputs, and directory.
    */
-  private deleteSessionAndArtifacts(
+  private static deleteSessionAndArtifacts(
     chatsDir: string,
     file: string,
     tempDir: string,
@@ -676,9 +697,9 @@ export class ChatRecordingService {
       fs.unlinkSync(filePath);
 
       if (fullSessionId) {
-        this.deleteSessionLogs(fullSessionId, tempDir);
-        this.deleteSessionToolOutputs(fullSessionId, tempDir);
-        this.deleteSessionDirectory(fullSessionId, tempDir);
+        ChatRecordingService.deleteSessionLogs(fullSessionId, tempDir);
+        ChatRecordingService.deleteSessionToolOutputs(fullSessionId, tempDir);
+        ChatRecordingService.deleteSessionDirectory(fullSessionId, tempDir);
       }
     } catch (error) {
       debugLogger.error(`Error deleting associated file ${file}:`, error);
@@ -688,7 +709,7 @@ export class ChatRecordingService {
   /**
    * Cleans up activity logs for a session.
    */
-  private deleteSessionLogs(sessionId: string, tempDir: string): void {
+  private static deleteSessionLogs(sessionId: string, tempDir: string): void {
     const logsDir = path.join(tempDir, 'logs');
     const safeSessionId = sanitizeFilenamePart(sessionId);
     const logPath = path.join(logsDir, `session-${safeSessionId}.jsonl`);
@@ -700,7 +721,10 @@ export class ChatRecordingService {
   /**
    * Cleans up tool outputs for a session.
    */
-  private deleteSessionToolOutputs(sessionId: string, tempDir: string): void {
+  private static deleteSessionToolOutputs(
+    sessionId: string,
+    tempDir: string,
+  ): void {
     const safeSessionId = sanitizeFilenamePart(sessionId);
     const toolOutputDir = path.join(
       tempDir,
@@ -719,7 +743,10 @@ export class ChatRecordingService {
   /**
    * Cleans up the session-specific directory.
    */
-  private deleteSessionDirectory(sessionId: string, tempDir: string): void {
+  private static deleteSessionDirectory(
+    sessionId: string,
+    tempDir: string,
+  ): void {
     const safeSessionId = sanitizeFilenamePart(sessionId);
     const sessionDir = path.join(tempDir, safeSessionId);
     if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {

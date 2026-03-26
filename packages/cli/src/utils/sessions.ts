@@ -95,9 +95,7 @@ export async function deleteSession(
   }
 
   try {
-    // Use ChatRecordingService to delete the session
-    const chatRecordingService = new ChatRecordingService(config);
-    chatRecordingService.deleteSession(sessionToDelete.file);
+    ChatRecordingService.deleteSessionFiles(config, sessionToDelete.file);
 
     const time = formatRelativeTime(sessionToDelete.lastUpdated);
     writeToStdout(
