@@ -501,13 +501,14 @@ describe('useSlashCompletion', () => {
       });
 
       const chatCheckpointLabels = chatResult.current.suggestions
-        .slice(1)
+        .slice(0)
         .map((s) => s.label);
       const resumeCheckpointLabels = resumeResult.current.suggestions
-        .slice(1)
+        .slice(0)
         .map((s) => s.label);
 
-      expect(chatCheckpointLabels).toEqual(resumeCheckpointLabels);
+      expect(chatCheckpointLabels).toEqual(['list', 'chat', 'save']);
+      expect(resumeCheckpointLabels).toEqual(['list', 'resume', 'save']);
 
       unmountChat();
       unmountResume();
@@ -769,6 +770,46 @@ describe('useSlashCompletion', () => {
             },
           ]),
         );
+      });
+      unmount();
+    });
+
+    it('should suggest the parent command itself at the top when a trailing space is present (if it has an action)', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'stats',
+          description: 'Check session stats',
+          action: vi.fn(),
+          subCommands: [
+            createTestCommand({
+              name: 'session',
+              description: 'Show session-specific usage statistics',
+            }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/stats ',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // Should show "stats" as the first suggestion, followed by its subcommands
+        expect(result.current.suggestions.length).toBe(2);
+        expect(result.current.suggestions[0]).toMatchObject({
+          label: 'stats',
+          sectionTitle: 'command',
+        });
+        expect(result.current.suggestions[1]).toMatchObject({
+          label: 'session',
+        });
       });
       unmount();
     });
