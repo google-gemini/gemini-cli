@@ -61,6 +61,10 @@ vi.mock('../hooks/useConfirmingTool.js', () => ({
   useConfirmingTool: vi.fn(),
 }));
 
+vi.mock('ink-spinner', () => ({
+  default: () => <Text>-</Text>,
+}));
+
 vi.mock('./AppHeader.js', () => ({
   AppHeader: ({ showDetails = true }: { showDetails?: boolean }) => (
     <Text>{showDetails ? 'AppHeader(full)' : 'AppHeader(minimal)'}</Text>
