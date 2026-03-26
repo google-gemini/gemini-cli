@@ -129,7 +129,7 @@ class McpToolInvocation extends BaseToolInvocation<
       // chrome-devtools-mcp's interactability checks pass.
       // Only toggles pointer-events CSS — no DOM change, no flicker.
       if (this.needsBlockerSuspend) {
-        await suspendInputBlocker(this.browserManager);
+        await suspendInputBlocker(this.browserManager, signal);
       }
 
       const result: McpToolCallResult = await this.browserManager.callTool(
@@ -155,7 +155,7 @@ class McpToolInvocation extends BaseToolInvocation<
 
       // Resume input blocker after interactive tool completes.
       if (this.needsBlockerSuspend) {
-        await resumeInputBlocker(this.browserManager);
+        await resumeInputBlocker(this.browserManager, signal);
       }
 
       if (result.isError) {
@@ -181,7 +181,7 @@ class McpToolInvocation extends BaseToolInvocation<
 
       // Resume on error path too so the blocker is always restored
       if (this.needsBlockerSuspend) {
-        await resumeInputBlocker(this.browserManager).catch(() => {});
+        await resumeInputBlocker(this.browserManager, signal).catch(() => {});
       }
 
       debugLogger.error(`MCP tool ${this.toolName} failed: ${errorMsg}`);

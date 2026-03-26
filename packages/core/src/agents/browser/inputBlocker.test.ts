@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { injectInputBlocker, removeInputBlocker } from './inputBlocker.js';
+import {
+  injectInputBlocker,
+  removeInputBlocker,
+  suspendInputBlocker,
+  resumeInputBlocker,
+} from './inputBlocker.js';
 import type { BrowserManager } from './browserManager.js';
 
 describe('inputBlocker', () => {
@@ -28,6 +33,7 @@ describe('inputBlocker', () => {
         {
           function: expect.stringContaining('__gemini_input_blocker'),
         },
+        undefined,
       );
     });
 
@@ -77,6 +83,29 @@ describe('inputBlocker', () => {
         injectInputBlocker(mockBrowserManager),
       ).resolves.toBeUndefined();
     });
+
+    it('should be safe to call multiple times (idempotent injection)', async () => {
+      await injectInputBlocker(mockBrowserManager);
+      await injectInputBlocker(mockBrowserManager);
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+        undefined,
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+        undefined,
+      );
+    });
   });
 
   describe('removeInputBlocker', () => {
@@ -88,6 +117,7 @@ describe('inputBlocker', () => {
         {
           function: expect.stringContaining('__gemini_input_blocker'),
         },
+        undefined,
       );
     });
 
@@ -108,6 +138,40 @@ describe('inputBlocker', () => {
       await expect(
         removeInputBlocker(mockBrowserManager),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('suspendInputBlocker and resumeInputBlocker', () => {
+    it('should not throw when blocker element is missing', async () => {
+      // Simulate evaluate_script resolving successfully even if the DOM element is absent.
+      mockBrowserManager.callTool = vi.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'Script ran on page and returned:' }],
+      });
+
+      await expect(
+        suspendInputBlocker(mockBrowserManager),
+      ).resolves.toBeUndefined();
+      await expect(
+        resumeInputBlocker(mockBrowserManager),
+      ).resolves.toBeUndefined();
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+        undefined,
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+        undefined,
+      );
     });
   });
 });
