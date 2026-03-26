@@ -101,6 +101,17 @@ async function deleteSessionArtifactsAsync(
   if (safeSessionId && sessionDir.startsWith(tempDir + path.sep)) {
     await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
   }
+
+  // Cleanup subagent chats directory
+  const subagentChatsDir = path.join(tempDir, 'chats', safeSessionId);
+  if (
+    safeSessionId &&
+    subagentChatsDir.startsWith(path.join(tempDir, 'chats') + path.sep)
+  ) {
+    await fs
+      .rm(subagentChatsDir, { recursive: true, force: true })
+      .catch(() => {});
+  }
 }
 
 /**

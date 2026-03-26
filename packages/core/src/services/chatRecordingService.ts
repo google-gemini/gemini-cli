@@ -172,20 +172,31 @@ export class ChatRecordingService {
       } else {
         // Create new session
         this.sessionId = this.context.promptId;
-        const chatsDir = path.join(
+        let chatsDir = path.join(
           this.context.config.storage.getProjectTempDir(),
           'chats',
         );
+
+        // subagents are nested under the complete parent session id
+        if (this.kind === 'subagent' && this.context.parentSessionId) {
+          chatsDir = path.join(chatsDir, this.context.parentSessionId);
+        }
+
         fs.mkdirSync(chatsDir, { recursive: true });
 
         const timestamp = new Date()
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
-        const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
-          0,
-          8,
-        )}.json`;
+        let filename: string;
+        if (this.kind === 'subagent') {
+          filename = `${this.sessionId}.json`;
+        } else {
+          filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
+            0,
+            8,
+          )}.json`;
+        }
         this.conversationFile = path.join(chatsDir, filename);
 
         this.writeConversation({
@@ -679,6 +690,26 @@ export class ChatRecordingService {
         this.deleteSessionLogs(fullSessionId, tempDir);
         this.deleteSessionToolOutputs(fullSessionId, tempDir);
         this.deleteSessionDirectory(fullSessionId, tempDir);
+
+        // Wipe the subagents subdirectory if it exists
+        const subagentDir = path.join(chatsDir, fullSessionId);
+        if (fs.existsSync(subagentDir) && subagentDir.startsWith(chatsDir)) {
+          // Clean up logs and tool outputs for subagents before deleting the directory
+          try {
+            const subagentFiles = fs.readdirSync(subagentDir);
+            for (const saFile of subagentFiles) {
+              if (saFile.endsWith('.json')) {
+                const saSessionId = path.basename(saFile, '.json');
+                this.deleteSessionLogs(saSessionId, tempDir);
+                this.deleteSessionToolOutputs(saSessionId, tempDir);
+                this.deleteSessionDirectory(saSessionId, tempDir);
+              }
+            }
+          } catch (error) {
+            debugLogger.error('Error cleaning up subagent artifacts', error);
+          }
+          fs.rmSync(subagentDir, { recursive: true, force: true });
+        }
       }
     } catch (error) {
       debugLogger.error(`Error deleting associated file ${file}:`, error);
