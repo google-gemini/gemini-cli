@@ -400,6 +400,8 @@ function truncateLargeToolResults(message: MessageRecord): MessageRecord {
             },
           },
         ],
+        resultDisplay:
+          '[Output truncated for memory: full content saved to disk]',
       };
     }
     return tc;
