@@ -44,7 +44,6 @@ import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 import { LlmRole } from './llmRole.js';
 export { LlmRole };
 import type { HookType } from '../hooks/types.js';
-import type { UserTierId } from '../code_assist/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -2184,7 +2183,8 @@ export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: EVENT_APPROVAL_MODE_SWITCH,
+      'event.name': EVENT_APPROVAL_MODE_SWITCH,
+      'event.timestamp': this['event.timestamp'],
       from_mode: this.from_mode,
       to_mode: this.to_mode,
     };
@@ -2214,7 +2214,8 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: EVENT_APPROVAL_MODE_DURATION,
+      'event.name': EVENT_APPROVAL_MODE_DURATION,
+      'event.timestamp': this['event.timestamp'],
       mode: this.mode,
       duration_ms: this.duration_ms,
     };
@@ -2388,12 +2389,14 @@ export const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
 export class OnboardingSuccessEvent implements BaseTelemetryEvent {
   'event.name': 'onboarding_success';
   'event.timestamp': string;
-  userTier?: UserTierId;
+  userTier?: string;
+  duration_ms?: number;
 
-  constructor(userTier?: UserTierId) {
+  constructor(userTier?: string, duration_ms?: number) {
     this['event.name'] = 'onboarding_success';
     this['event.timestamp'] = new Date().toISOString();
     this.userTier = userTier;
+    this.duration_ms = duration_ms;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -2402,11 +2405,12 @@ export class OnboardingSuccessEvent implements BaseTelemetryEvent {
       'event.name': EVENT_ONBOARDING_SUCCESS,
       'event.timestamp': this['event.timestamp'],
       user_tier: this.userTier ?? '',
+      duration_ms: this.duration_ms ?? 0,
     };
   }
 
   toLogBody(): string {
-    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}`;
+    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}${this.duration_ms !== undefined ? `. Duration: ${this.duration_ms}ms` : ''}`;
   }
 }
 
