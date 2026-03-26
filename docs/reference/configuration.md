@@ -2428,7 +2428,7 @@ conventions and context.
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
   - See the [Commands documentation](./commands.md#memory) for full details on
-    the `/memory` command and its sub-commands (`show` and `refresh`).
+    the `/memory` command and its sub-commands (`show` and `reload`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor

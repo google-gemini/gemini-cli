@@ -179,11 +179,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
     // Final render based on session mode
     if (isAlternateBuffer) {
-      // If availableTerminalHeight is undefined, we don't have a fixed budget,
-      // so if maxLines is also undefined, we shouldn't cap the height at all.
-      const effectiveMaxHeight =
-        maxLines ??
-        (availableTerminalHeight !== undefined ? availableHeight : undefined);
+      // Use maxLines if provided, otherwise fall back to the calculated available height
+      const effectiveMaxHeight = maxLines ?? availableHeight;
 
       return (
         <Scrollable

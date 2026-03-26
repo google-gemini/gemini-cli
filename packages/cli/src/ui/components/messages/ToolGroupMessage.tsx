@@ -41,6 +41,10 @@ import {
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import {
+  TOOL_RESULT_STATIC_HEIGHT,
+  TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
+} from '../../utils/toolLayoutUtils.js';
 
 const COMPACT_OUTPUT_ALLOWLIST = new Set([
   EDIT_DISPLAY_NAME,
@@ -74,6 +78,7 @@ export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
   const res = tool.resultDisplay;
   if (!res) return false;
 
+  // TODO(24053): Usage of type guards makes this class too aware of internals
   if (isFileDiff(res)) return true;
   if (tool.confirmationDetails?.type === 'edit') return true;
   if (isGrepResult(res) && res.matches.length > 0) return true;
@@ -217,25 +222,30 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     for (let i = 0; i < groupedTools.length; i++) {
       const group = groupedTools[i];
       const isFirst = i === 0;
+      const isLast = i === groupedTools.length - 1;
       const prevGroup = i > 0 ? groupedTools[i - 1] : null;
       const prevIsCompact =
         prevGroup &&
         !Array.isArray(prevGroup) &&
         isCompactTool(prevGroup, isCompactModeEnabled);
 
+      const nextGroup = !isLast ? groupedTools[i + 1] : null;
+      const nextIsCompact =
+        nextGroup &&
+        !Array.isArray(nextGroup) &&
+        isCompactTool(nextGroup, isCompactModeEnabled);
+
       const isAgentGroup = Array.isArray(group);
       const isCompact =
         !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
 
+      const showClosingBorder = !isCompact && (nextIsCompact || isLast);
+
       if (isFirst) {
-        height += (borderTopOverride ?? false) ? 1 : 0;
-      } else if (isCompact && prevIsCompact) {
-        height += 0;
-      } else if (isCompact || prevIsCompact) {
+        height += borderTopOverride ? 1 : 0;
+      } else if (isCompact !== prevIsCompact) {
+        // Add a 1-line gap when transitioning between compact and standard tools (or vice versa)
         height += 1;
-      } else {
-        // Gap is provided by StickyHeader's paddingTop=1
-        height += 0;
       }
 
       const isFirstProp = !!(isFirst
@@ -247,17 +257,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         height += 1; // Header
         height += group.length; // 1 line per agent
         if (isFirstProp) height += 1; // Top border
+        if (showClosingBorder) height += 1; // Bottom border
       } else {
         if (isCompact) {
           height += 1; // Base height for compact tool
         } else {
           // Static overhead for standard tool header:
-          // 1 line for header text
-          // 1 line for dark separator
-          // 1 line for tool body internal paddingTop=1
-          // 1 line for top border (if isFirstProp) OR StickyHeader paddingTop=1 (if !isFirstProp)
-          height += 3;
-          height += isFirstProp ? 1 : 1; // Either top border or paddingTop
+          height +=
+            TOOL_RESULT_STATIC_HEIGHT +
+            TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
         }
       }
     }
@@ -317,13 +325,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      // When border will be present, add margin of 1 to create spacing from the
+      // previous message.
       marginBottom={(borderBottomOverride ?? true) ? 1 : 0}
     >
       {visibleToolCalls.length === 0 &&
         isExplicitClosingSlice &&
         borderBottomOverride === true && (
           <Box
-            height={0}
             width={contentWidth}
             borderLeft={true}
             borderRight={true}
@@ -368,6 +377,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           !isAgentGroup && isCompactTool(group, isCompactModeEnabled);
         const isTopicToolCall = !isAgentGroup && isTopicTool(group.name);
 
+        // When border is present, add margin of 1 to create spacing from the
+        // previous message.
         let marginTop = 0;
         if (isFirst) {
           marginTop = (borderTopOverride ?? false) ? 1 : 0;
@@ -376,7 +387,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         } else if (isCompact || prevIsCompact) {
           marginTop = 1;
         } else {
-          // Subsequent standard tools: StickyHeader's paddingTop=1 provides the gap.
+          // For subsequent standard tools scenarios, the ToolMessage and
+          // ShellToolMessage components manage their own top spacing by passing
+          // `isFirst=false` to their internal StickyHeader which then applies
+          // a paddingTop=1 to create desired gap between standard tool outputs.
           marginTop = 0;
         }
 
@@ -406,7 +420,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               />
               {showClosingBorder && (
                 <Box
-                  height={0}
                   width={contentWidth}
                   borderLeft={true}
                   borderRight={true}
@@ -475,7 +488,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             </Box>
             {showClosingBorder && (
               <Box
-                height={0}
                 width={contentWidth}
                 borderLeft={true}
                 borderRight={true}

@@ -119,7 +119,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         borderLeft={true}
         borderRight={true}
         paddingX={1}
-        paddingTop={1}
         flexDirection="column"
       >
         {status === CoreToolCallStatus.Executing && progress !== undefined && (

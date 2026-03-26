@@ -1757,7 +1757,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const toggleLastTurnTools = () => {
-        // If the user manually collapses/expands the view, show the hint and reset the x-second timer.
         triggerExpandHint(true);
 
         const targetToolCallIds = getLastTurnToolCallIds(
@@ -1824,13 +1823,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         setConstrainHeight(false);
         toggleLastTurnTools();
-
-        // Force layout refresh after a short delay to allow the terminal layout to settle.
-        // Minimize "blank screen" issue after any async subview updates are complete.
-        setTimeout(() => {
-          refreshStatic();
-        }, 250);
-
+        refreshStatic();
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||

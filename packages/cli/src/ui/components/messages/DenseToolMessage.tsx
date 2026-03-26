@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,7 +18,11 @@ import {
   isListResult,
   isReadManyFilesResult,
 } from '@google/gemini-cli-core';
-import { type IndividualToolCallDisplay, isTodoList } from '../../types.js';
+import {
+  type IndividualToolCallDisplay,
+  type ToolResultDisplay,
+  isTodoList,
+} from '../../types.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { ToolStatusIndicator } from './ToolShared.js';
 import { theme } from '../../semantic-colors.js';
@@ -36,8 +40,13 @@ import { colorizeCode } from '../../utils/CodeColorizer.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { getFileExtension } from '../../utils/fileUtils.js';
 
+const PAYLOAD_MARGIN_LEFT = 6;
+const PAYLOAD_BORDER_CHROME_WIDTH = 4; // paddingX=1 (2 cols) + borders (2 cols)
+const PAYLOAD_SCROLL_GUTTER = 4;
+const PAYLOAD_MAX_WIDTH = 120 + PAYLOAD_SCROLL_GUTTER;
+
 interface DenseToolMessageProps extends IndividualToolCallDisplay {
-  terminalWidth?: number;
+  terminalWidth: number;
   availableTerminalHeight?: number;
 }
 
@@ -63,10 +72,6 @@ const hasPayload = (res: unknown): res is PayloadResult => {
   return typeof value === 'string';
 };
 
-/**
- * --- RENDER HELPERS ---
- */
-
 const RenderItemsList: React.FC<{
   items?: string[];
   maxVisible?: number;
@@ -88,17 +93,13 @@ const RenderItemsList: React.FC<{
   );
 };
 
-/**
- * --- SCENARIO LOGIC (Pure Functions) ---
- */
-
 function getFileOpData(
   diff: FileDiff,
   status: CoreToolCallStatus,
-  resultDisplay: unknown,
-  terminalWidth?: number,
-  availableTerminalHeight?: number,
-  isClickable?: boolean,
+  resultDisplay: ToolResultDisplay | undefined,
+  terminalWidth: number,
+  availableTerminalHeight: number | undefined,
+  isClickable: boolean,
 ): ViewParts {
   const added =
     (diff.diffStat?.model_added_lines ?? 0) +
@@ -177,7 +178,7 @@ function getFileOpData(
     <DiffRenderer
       diffContent={diff.fileDiff}
       filename={diff.fileName}
-      terminalWidth={terminalWidth ? terminalWidth - 6 : 80}
+      terminalWidth={terminalWidth - PAYLOAD_MARGIN_LEFT}
       availableTerminalHeight={availableTerminalHeight}
       disableColor={status === CoreToolCallStatus.Cancelled}
     />
@@ -201,26 +202,12 @@ function getReadManyFilesData(result: ReadManyFilesResult): ViewParts {
     skippedCount > 0 ? ` (${skippedCount} ignored)` : ''
   }`;
   const summary = <Text color={theme.text.accent}>→ {summaryStr}</Text>;
-
-  const excludedText =
-    result.excludes && result.excludes.length > 0
-      ? `Excluded patterns: ${result.excludes.slice(0, 3).join(', ')}${
-          result.excludes.length > 3 ? '...' : ''
-        }`
-      : undefined;
-
   const hasItems = items.length > 0;
-  const payload =
-    hasItems || excludedText ? (
-      <Box flexDirection="column" marginLeft={2}>
-        {hasItems && <RenderItemsList items={items} maxVisible={maxVisible} />}
-        {excludedText && (
-          <Text color={theme.text.secondary} dimColor>
-            {excludedText}
-          </Text>
-        )}
-      </Box>
-    ) : undefined;
+  const payload = hasItems ? (
+    <Box flexDirection="column" marginLeft={2}>
+      {hasItems && <RenderItemsList items={items} maxVisible={maxVisible} />}
+    </Box>
+  ) : undefined;
 
   return { description, summary, payload };
 }
@@ -309,10 +296,6 @@ function getGenericSuccessData(
   return { description, summary, payload };
 }
 
-/**
- * --- MAIN COMPONENT ---
- */
-
 export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
     callId,
@@ -339,7 +322,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const [isFocused, setIsFocused] = useState(false);
   const toggleRef = useRef<DOMElement>(null);
 
-  // 1. Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
+  // Unified File Data Extraction (Safely bridge resultDisplay and confirmationDetails)
   const diff = useMemo((): FileDiff | undefined => {
     if (isFileDiff(resultDisplay)) return resultDisplay;
     if (confirmationDetails?.type === 'edit') {
@@ -375,7 +358,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     isActive: isAlternateBuffer && !!diff,
   });
 
-  // 2. State-to-View Coordination
+  // State-to-View Coordination
   const viewParts = useMemo((): ViewParts => {
     if (diff) {
       return getFileOpData(
@@ -459,7 +442,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       return colorizeCode({
         code: addedContent,
         language: fileExtension,
-        maxWidth: terminalWidth ? terminalWidth - 6 : 80,
+        maxWidth: terminalWidth - PAYLOAD_MARGIN_LEFT,
         settings,
         disableColor: status === CoreToolCallStatus.Cancelled,
         returnLines: true,
@@ -468,7 +451,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       return renderDiffLines({
         parsedLines,
         filename: diff.fileName,
-        terminalWidth: terminalWidth ? terminalWidth - 6 : 80,
+        terminalWidth: terminalWidth - PAYLOAD_MARGIN_LEFT,
         disableColor: status === CoreToolCallStatus.Cancelled,
       });
     }
@@ -502,7 +485,6 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     <Box minHeight={1}>{item}</Box>
   );
 
-  // 3. Final Layout
   return (
     <Box flexDirection="column">
       <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
@@ -529,7 +511,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
       {showPayload && isAlternateBuffer && diffLines.length > 0 && (
         <Box
-          marginLeft={6}
+          marginLeft={PAYLOAD_MARGIN_LEFT}
           marginTop={1}
           marginBottom={1}
           paddingX={1}
@@ -541,7 +523,10 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           borderStyle="round"
           borderColor={theme.border.default}
           borderDimColor={true}
-          maxWidth={terminalWidth ? Math.min(124, terminalWidth - 6) : 124}
+          maxWidth={Math.min(
+            PAYLOAD_MAX_WIDTH,
+            terminalWidth - PAYLOAD_MARGIN_LEFT,
+          )}
         >
           <ScrollableList
             data={diffLines}
@@ -549,22 +534,25 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
             keyExtractor={keyExtractor}
             estimatedItemHeight={() => 1}
             hasFocus={isFocused}
-            width={
-              // adjustment: 6 margin - 4 padding/border - 4 right-scroll-gutter
-              terminalWidth ? Math.min(120, terminalWidth - 6 - 4 - 4) : 70
-            }
+            width={Math.min(
+              PAYLOAD_MAX_WIDTH,
+              terminalWidth -
+                PAYLOAD_MARGIN_LEFT -
+                PAYLOAD_BORDER_CHROME_WIDTH -
+                PAYLOAD_SCROLL_GUTTER,
+            )}
           />
         </Box>
       )}
 
       {showPayload && (!isAlternateBuffer || !diff) && viewParts.payload && (
-        <Box marginLeft={6} marginTop={1} marginBottom={1}>
+        <Box marginLeft={PAYLOAD_MARGIN_LEFT} marginTop={1} marginBottom={1}>
           {viewParts.payload}
         </Box>
       )}
 
       {showPayload && outputFile && (
-        <Box marginLeft={6} marginTop={1} marginBottom={1}>
+        <Box marginLeft={PAYLOAD_MARGIN_LEFT} marginTop={1} marginBottom={1}>
           <Text color={theme.text.secondary}>
             (Output saved to: {outputFile})
           </Text>
