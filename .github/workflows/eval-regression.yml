@@ -1,0 +1,104 @@
+name: 'Evals: PR Regression Check'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'packages/core/src/prompts/**'
+      - 'packages/core/src/tools/**'
+      - 'packages/core/src/agents/**'
+      - 'evals/**'
+      - '!**/*.test.ts'
+      - '!**/*.test.tsx'
+  workflow_dispatch:
+
+# Prevents multiple runs for the same PR simultaneously (saves tokens)
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: 'write'
+  contents: 'read'
+  actions: 'read'
+
+jobs:
+  regression-check:
+    name: 'Check for Eval Regressions'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli' && github.event.pull_request.draft == false"
+    # External contributors' PRs will wait for approval in this environment
+    environment: |-
+      ${{ (github.event.pull_request.head.repo.full_name == github.repository) && 'internal' || 'external-evals' }}
+    env:
+      # CENTRALIZED MODEL LIST
+      MODEL_LIST: 'gemini-3-flash-preview'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Detect Steering Changes'
+        id: 'detect'
+        run: |
+          SHOULD_RUN=$(node scripts/changed_prompt.js)
+          echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: 'Execute Regression Check for each model'
+        if: "steps.detect.outputs.SHOULD_RUN == 'true'"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          IFS=',' read -ra MODELS <<< "${{ env.MODEL_LIST }}"
+          COMBINED_REPORT=""
+
+          for MODEL in "${MODELS[@]}"; do
+            echo "--- Processing Model: $MODEL ---"
+            
+            # 1. Identify Trustworthy Evals (Returns: FILE_LIST --test-pattern TEST_PATTERN)
+            OUTPUT=$(node scripts/get_trustworthy_evals.js "$MODEL")
+            
+            if [[ -z "$OUTPUT" ]]; then
+              echo "No trustworthy tests found for $MODEL. Skipping."
+              continue
+            fi
+
+            # 2. Run Frugal Regression Check
+            node scripts/run_regression_check.js "$MODEL" "$OUTPUT"
+
+            # 3. Generate Report
+            REPORT=$(node scripts/compare_evals.js "$MODEL")
+            
+            if [[ -n "$REPORT" ]]; then
+              COMBINED_REPORT="${COMBINED_REPORT}${REPORT}\n\n---\n\n"
+            fi
+          done
+
+          echo "FINAL_REPORT<<EOF" >> "$GITHUB_ENV"
+          echo -e "$COMBINED_REPORT" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+
+      - name: 'Comment on PR'
+        if: "always() && env.FINAL_REPORT != ''"
+        uses: 'thollander/actions-comment-pull-request@65f9e5c9a1f2cd378bd74b2e057c9736982a8e74' # ratchet:thollander/actions-comment-pull-request@v3
+        with:
+          comment-tag: 'eval-regression-report'
+          message: |
+            ${{ env.FINAL_REPORT }}
+
+            *This check analyzes only "Trustworthy" evaluations (those that scored ≥60% in at least 3 of the last 4 nightly runs).*
