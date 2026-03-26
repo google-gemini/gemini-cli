@@ -213,7 +213,7 @@ export class BrowserManager {
           await injectAutomationOverlay(this, signal);
         }
         if (this.shouldDisableInput) {
-          await injectInputBlocker(this);
+          await injectInputBlocker(this, signal);
         }
       } catch {
         // Never let overlay/blocker failures interrupt the tool result

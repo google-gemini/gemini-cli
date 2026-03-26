@@ -33,6 +33,7 @@ describe('inputBlocker', () => {
         {
           function: expect.stringContaining('__gemini_input_blocker'),
         },
+        undefined,
       );
     });
 
@@ -94,6 +95,7 @@ describe('inputBlocker', () => {
         expect.objectContaining({
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
+        undefined,
       );
       expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
         2,
@@ -101,6 +103,7 @@ describe('inputBlocker', () => {
         expect.objectContaining({
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
+        undefined,
       );
     });
   });
@@ -114,6 +117,7 @@ describe('inputBlocker', () => {
         {
           function: expect.stringContaining('__gemini_input_blocker'),
         },
+        undefined,
       );
     });
 
@@ -158,6 +162,7 @@ describe('inputBlocker', () => {
         expect.objectContaining({
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
+        undefined,
       );
       expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
         2,
@@ -165,6 +170,7 @@ describe('inputBlocker', () => {
         expect.objectContaining({
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
+        undefined,
       );
     });
   });

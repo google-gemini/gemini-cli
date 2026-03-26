@@ -55,6 +55,13 @@ vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('./inputBlocker.js', () => ({
+  injectInputBlocker: vi.fn().mockResolvedValue(undefined),
+  removeInputBlocker: vi.fn().mockResolvedValue(undefined),
+  suspendInputBlocker: vi.fn().mockResolvedValue(undefined),
+  resumeInputBlocker: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
@@ -79,6 +86,7 @@ describe('BrowserManager', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(injectAutomationOverlay).mockClear();
+    vi.mocked(injectInputBlocker).mockClear();
     vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
 
     // Re-establish consent mock after resetAllMocks
@@ -643,7 +651,7 @@ describe('BrowserManager', () => {
       await manager.callTool('click', { uid: '1_2' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
-      expect(injectInputBlocker).toHaveBeenCalledWith(manager);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
     });
 
     it('should re-inject overlay and input blocker after navigate_page in non-headless mode when input disabling is enabled', async () => {
@@ -665,7 +673,7 @@ describe('BrowserManager', () => {
       await manager.callTool('navigate_page', { url: 'https://example.com' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
-      expect(injectInputBlocker).toHaveBeenCalledWith(manager);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
     });
 
     it('should re-inject overlay and input blocker after click_at, new_page, press_key, handle_dialog when input disabling is enabled', async () => {
@@ -695,6 +703,7 @@ describe('BrowserManager', () => {
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).toHaveBeenCalledTimes(1);
         expect(injectInputBlocker).toHaveBeenCalledTimes(1);
+        expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
       }
     });
 
