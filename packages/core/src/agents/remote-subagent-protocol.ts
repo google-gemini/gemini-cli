@@ -180,6 +180,9 @@ class RemoteSubagentProtocol implements AgentProtocol {
     try {
       await this._runStream(query);
     } catch (err: unknown) {
+      // Save state before rejecting so callers see updated contextId/taskId
+      // immediately after the returned promise settles.
+      this._saveSessionState();
       if (this._abortController.signal.aborted || isAbortLikeError(err)) {
         this._ensureAgentEnd('aborted');
         this._resultReject(err);
@@ -188,12 +191,14 @@ class RemoteSubagentProtocol implements AgentProtocol {
         this._resultReject(err);
       }
       this._clearActiveStream();
-    } finally {
-      RemoteSubagentProtocol._sessionState.set(this.definition.name, {
-        contextId: this.contextId,
-        taskId: this.taskId,
-      });
     }
+  }
+
+  private _saveSessionState(): void {
+    RemoteSubagentProtocol._sessionState.set(this.definition.name, {
+      contextId: this.contextId,
+      taskId: this.taskId,
+    });
   }
 
   private async _runStream(query: string): Promise<void> {
@@ -228,6 +233,7 @@ class RemoteSubagentProtocol implements AgentProtocol {
 
     for await (const chunk of stream) {
       if (this._abortController.signal.aborted) {
+        this._saveSessionState();
         this._finishStream('aborted');
         this._resultReject(new Error('Operation aborted'));
         this._clearActiveStream();
@@ -283,6 +289,9 @@ class RemoteSubagentProtocol implements AgentProtocol {
 
     this._finishStream('completed');
 
+    // Save state before resolving so callers see updated contextId/taskId
+    // immediately after the returned promise settles.
+    this._saveSessionState();
     this._resultResolve({
       llmContent: [{ text: finalOutput }],
       returnDisplay: finalProgress,
