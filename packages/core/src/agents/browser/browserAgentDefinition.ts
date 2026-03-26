@@ -189,7 +189,7 @@ export const BrowserAgentDefinition = (
 \${task}
 </task>
 
-If a relevant page is already open in the browser, call take_snapshot to observe the current state and continue from there. Otherwise, use new_page to open the relevant URL, then call take_snapshot to see the page and proceed with your task.`,
+First, use new_page to open the relevant URL. Then call take_snapshot to see the page and proceed with your task.`,
       systemPrompt: buildBrowserSystemPrompt(
         visionEnabled,
         config.getBrowserAgentConfig().customConfig.allowedDomains,

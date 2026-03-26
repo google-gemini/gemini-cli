@@ -149,7 +149,6 @@ export class BrowserManager {
       }
     }
     BrowserManager.instances.clear();
-    debugLogger.log('All BrowserManager instances reset.');
   }
 
   /**
@@ -388,6 +387,15 @@ export class BrowserManager {
    * Connects to chrome-devtools-mcp with exponential backoff retry.
    */
   private async connectWithRetry(): Promise<void> {
+    // Request browser consent if needed (first-run privacy notice)
+    const consentGranted = await getBrowserConsentIfNeeded();
+    if (!consentGranted) {
+      throw new Error(
+        'Browser agent requires user consent to proceed. ' +
+          'Please re-run and accept the privacy notice.',
+      );
+    }
+
     let lastError: Error | undefined;
     for (let attempt = 0; attempt < MAX_RECONNECT_RETRIES; attempt++) {
       try {
@@ -405,17 +413,6 @@ export class BrowserManager {
       }
     }
     throw lastError!;
-
-    // Request browser consent if needed (first-run privacy notice)
-    const consentGranted = await getBrowserConsentIfNeeded();
-    if (!consentGranted) {
-      throw new Error(
-        'Browser agent requires user consent to proceed. ' +
-          'Please re-run and accept the privacy notice.',
-      );
-    }
-
-    await this.connectMcp();
   }
 
   /**

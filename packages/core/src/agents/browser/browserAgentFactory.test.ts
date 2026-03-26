@@ -15,7 +15,6 @@ import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../../policy/policy-engine.js';
-import type { BrowserManager } from './browserManager.js';
 
 // Create mock browser manager
 const mockBrowserManager = {
@@ -321,6 +320,19 @@ describe('browserAgentFactory', () => {
     it('should delegate to BrowserManager.resetAll', async () => {
       const { BrowserManager: MockBrowserManager } = await import(
         './browserManager.js'
+      );
+      await resetBrowserSession();
+      expect(
+        (
+          MockBrowserManager as unknown as Record<
+            string,
+            ReturnType<typeof vi.fn>
+          >
+        )['resetAll'],
+      ).toHaveBeenCalled();
+    });
+  });
+
   describe('Policy Registration', () => {
     let mockPolicyEngine: {
       addRule: ReturnType<typeof vi.fn>;
@@ -438,25 +450,6 @@ describe('browserAgentFactory', () => {
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
       );
-    });
-  });
-
-  describe('cleanupBrowserAgent', () => {
-    it('should call close on browser manager', async () => {
-      await cleanupBrowserAgent(
-        mockBrowserManager as unknown as BrowserManager,
-      );
-
-      await resetBrowserSession();
-
-      expect(
-        (
-          MockBrowserManager as unknown as Record<
-            string,
-            ReturnType<typeof vi.fn>
-          >
-        )['resetAll'],
-      ).toHaveBeenCalled();
     });
   });
 });
