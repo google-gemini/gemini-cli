@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -54,8 +54,6 @@ interface CommandParserResult {
   partial: string;
   currentLevel: readonly SlashCommand[] | undefined;
   leafCommand: SlashCommand | null;
-  exactMatchAsParent: SlashCommand | undefined;
-  usedPrefixParentDescent: boolean;
   isArgumentCompletion: boolean;
 }
 
@@ -71,8 +69,6 @@ function useCommandParser(
         partial: '',
         currentLevel: slashCommands,
         leafCommand: null,
-        exactMatchAsParent: undefined,
-        usedPrefixParentDescent: false,
         isArgumentCompletion: false,
       };
     }
@@ -90,7 +86,6 @@ function useCommandParser(
 
     let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
     let leafCommand: SlashCommand | null = null;
-    let usedPrefixParentDescent = false;
 
     for (const part of commandPathParts) {
       if (!currentLevel) {
@@ -115,60 +110,6 @@ function useCommandParser(
       }
     }
 
-    let exactMatchAsParent: SlashCommand | undefined;
-    if (!hasTrailingSpace && currentLevel) {
-      exactMatchAsParent = currentLevel.find(
-        (cmd) => matchesCommand(cmd, partial) && cmd.subCommands,
-      );
-
-      if (exactMatchAsParent) {
-        // Only descend if there are NO other matches for the partial at this level.
-        // This ensures that typing "/memory" still shows "/memory-leak" if it exists.
-        const otherMatches = currentLevel.filter(
-          (cmd) =>
-            cmd !== exactMatchAsParent &&
-            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
-              cmd.altNames?.some((alt) =>
-                alt.toLowerCase().startsWith(partial.toLowerCase()),
-              )),
-        );
-
-        if (otherMatches.length === 0) {
-          leafCommand = exactMatchAsParent;
-          currentLevel = exactMatchAsParent.subCommands as
-            | readonly SlashCommand[]
-            | undefined;
-          partial = '';
-        }
-      }
-
-      // Phase-one alias UX: allow unique prefix descent for /chat and /resume
-      // so `/cha` and `/resum` expose the same grouped menu immediately.
-      if (!exactMatchAsParent && partial && currentLevel) {
-        const prefixParentMatches = currentLevel.filter(
-          (cmd) =>
-            !!cmd.subCommands &&
-            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
-              cmd.altNames?.some((alt) =>
-                alt.toLowerCase().startsWith(partial.toLowerCase()),
-              )),
-        );
-
-        if (prefixParentMatches.length === 1) {
-          const candidate = prefixParentMatches[0];
-          if (candidate.name === 'chat' || candidate.name === 'resume') {
-            exactMatchAsParent = candidate;
-            leafCommand = candidate;
-            usedPrefixParentDescent = true;
-            currentLevel = candidate.subCommands as
-              | readonly SlashCommand[]
-              | undefined;
-            partial = '';
-          }
-        }
-      }
-    }
-
     const depth = commandPathParts.length;
     const isArgumentCompletion = !!(
       leafCommand?.completion &&
@@ -182,8 +123,6 @@ function useCommandParser(
       partial,
       currentLevel,
       leafCommand,
-      exactMatchAsParent,
-      usedPrefixParentDescent,
       isArgumentCompletion,
     };
   }, [query, slashCommands]);
@@ -343,19 +282,9 @@ function useCommandSuggestions(
           });
 
           const finalSuggestions = sortedSuggestions.map((cmd) => {
-            const canonicalParentName =
-              parserResult.usedPrefixParentDescent &&
-              leafCommand &&
-              (leafCommand.name === 'chat' || leafCommand.name === 'resume')
-                ? leafCommand.name
-                : undefined;
-
             const suggestion: Suggestion = {
               label: cmd.name,
               value: cmd.name,
-              insertValue: canonicalParentName
-                ? `${canonicalParentName} ${cmd.name}`
-                : undefined,
               description: cmd.description,
               commandKind: cmd.kind,
             };
@@ -384,7 +313,7 @@ function useCommandSuggestions(
               description: 'Browse auto-saved chats',
               commandKind: CommandKind.BUILT_IN,
               sectionTitle: 'auto',
-              submitValue: `/${leafCommand.name}`,
+              submitValue: `/${canonicalParentName}`,
             };
             setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
             return;
@@ -427,12 +356,10 @@ function useCompletionPositions(
       return { start: -1, end: -1 };
     }
 
-    const { hasTrailingSpace, partial, exactMatchAsParent } = parserResult;
+    const { hasTrailingSpace, partial } = parserResult;
 
     // Set completion start/end positions
-    if (parserResult.usedPrefixParentDescent) {
-      return { start: 1, end: query.length };
-    } else if (hasTrailingSpace || exactMatchAsParent) {
+    if (hasTrailingSpace) {
       return { start: query.length, end: query.length };
     } else if (partial) {
       if (parserResult.isArgumentCompletion) {
@@ -461,12 +388,7 @@ function usePerfectMatch(
       return { isPerfectMatch: false };
     }
 
-    if (
-      leafCommand &&
-      partial === '' &&
-      leafCommand.action &&
-      !parserResult.usedPrefixParentDescent
-    ) {
+    if (leafCommand && partial === '' && leafCommand.action) {
       return { isPerfectMatch: true };
     }
 

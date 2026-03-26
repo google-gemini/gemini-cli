@@ -171,14 +171,17 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
-      const [useGemini3_1, useCustomToolModel] = await Promise.all([
-        config.getGemini31Launched(),
-        config.getUseCustomToolModel(),
-      ]);
+      const [useGemini3_1, useGemini3_1FlashLite, useCustomToolModel] =
+        await Promise.all([
+          config.getGemini31Launched(),
+          config.getGemini31FlashLiteLaunched(),
+          config.getUseCustomToolModel(),
+        ]);
       const selectedModel = resolveClassifierModel(
         model,
         routerResponse.model_choice,
         useGemini3_1,
+        useGemini3_1FlashLite,
         useCustomToolModel,
         config.getHasAccessToPreviewModel?.() ?? true,
         config,

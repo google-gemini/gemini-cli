@@ -6,15 +6,28 @@
 
 import { renderHook } from '../../test-utils/render.js';
 import { act } from 'react';
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { useInlineEditBuffer } from './useInlineEditBuffer.js';
 
 describe('useEditBuffer', () => {
   let mockOnCommit: Mock;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockOnCommit = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should initialize with empty state', async () => {
