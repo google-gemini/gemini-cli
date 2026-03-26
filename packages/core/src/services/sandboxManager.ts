@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -164,4 +166,25 @@ export function sanitizePaths(paths?: string[]): string[] | undefined {
 
   return Array.from(uniquePathsMap.values());
 }
+
+/**
+ * Resolves symlinks for a given path to prevent sandbox escapes.
+ * If a file does not exist (ENOENT), it recursively resolves the parent directory.
+ * Other errors (e.g. EACCES) are re-thrown.
+ */
+export async function tryRealpath(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      const parentDir = path.dirname(p);
+      if (parentDir === p) {
+        return p;
+      }
+      return path.join(await tryRealpath(parentDir), path.basename(p));
+    }
+    throw e;
+  }
+}
+
 export { createSandboxManager } from './sandboxManagerFactory.js';

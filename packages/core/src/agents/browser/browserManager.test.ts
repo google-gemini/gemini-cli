@@ -697,4 +697,28 @@ describe('BrowserManager', () => {
       expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
   });
+
+  describe('Rate limiting', () => {
+    it('should terminate task when maxActionsPerTask is reached', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 3,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // First 3 calls should succeed
+      await manager.callTool('take_snapshot', {});
+      await manager.callTool('take_snapshot', { some: 'args' });
+      await manager.callTool('take_snapshot', { other: 'args' });
+      await manager.callTool('take_snapshot', { other: 'new args' });
+
+      // 4th call should throw
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(3\)/,
+      );
+    });
+  });
 });

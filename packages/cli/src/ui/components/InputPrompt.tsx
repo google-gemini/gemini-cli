@@ -119,6 +119,7 @@ export interface InputPromptProps {
   popAllMessages?: () => string | undefined;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
+  copyModeEnabled?: boolean;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -212,6 +213,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   popAllMessages,
   suggestionsPosition = 'below',
   setBannerVisible,
+  copyModeEnabled = false,
 }) => {
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
@@ -331,7 +333,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     isShellSuggestionsVisible,
   } = completion;
 
-  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+  const showCursor =
+    focus && isShellFocused && !isEmbeddedShellFocused && !copyModeEnabled;
 
   // Notify parent component about escape prompt state changes
   useEffect(() => {
