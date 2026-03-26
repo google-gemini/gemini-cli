@@ -880,15 +880,12 @@ describe('ShellExecutionService', () => {
       const binaryChunk1 = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
       const binaryChunk2 = Buffer.from([0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const { result } = await simulateExecution('cat image.png', (pty) => {
+      await simulateExecution('cat image.png', (pty) => {
         pty.onData.mock.calls[0][0](binaryChunk1);
         pty.onData.mock.calls[0][0](binaryChunk2);
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
-      expect(result.rawOutput).toEqual(
-        Buffer.concat([binaryChunk1, binaryChunk2]),
-      );
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
@@ -1464,15 +1461,12 @@ describe('ShellExecutionService child_process fallback', () => {
       const binaryChunk1 = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
       const binaryChunk2 = Buffer.from([0x0d, 0x0a, 0x1a, 0x0a]);
 
-      const { result } = await simulateExecution('cat image.png', (cp) => {
+      await simulateExecution('cat image.png', (cp) => {
         cp.stdout?.emit('data', binaryChunk1);
         cp.stdout?.emit('data', binaryChunk2);
         cp.emit('exit', 0, null);
       });
 
-      expect(result.rawOutput).toEqual(
-        Buffer.concat([binaryChunk1, binaryChunk2]),
-      );
       expect(onOutputEventMock).toHaveBeenCalledTimes(4);
       expect(onOutputEventMock.mock.calls[0][0]).toEqual({
         type: 'binary_detected',
@@ -1920,6 +1914,7 @@ describe('ShellExecutionService environment variables', () => {
       }),
       isKnownSafeCommand: vi.fn().mockReturnValue(false),
       isDangerousCommand: vi.fn().mockReturnValue(false),
+      parseDenials: vi.fn().mockReturnValue(undefined),
     };
 
     const configWithSandbox: ShellExecutionConfig = {

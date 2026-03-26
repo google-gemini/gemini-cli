@@ -108,7 +108,18 @@ function ensureSandboxAvailable(): boolean {
 
   if (platform === 'darwin') {
     if (fs.existsSync('/usr/bin/sandbox-exec')) {
-      return true;
+      try {
+        execSync('sandbox-exec -p "(version 1)(allow default)" echo test', {
+          stdio: 'ignore',
+        });
+        return true;
+      } catch {
+        // eslint-disable-next-line no-console
+        console.warn(
+          'sandbox-exec is present but cannot be used (likely running inside a sandbox already). Skipping sandbox tests.',
+        );
+        return false;
+      }
     }
     throw new Error(
       'Sandboxing tests on macOS require /usr/bin/sandbox-exec to be present.',
