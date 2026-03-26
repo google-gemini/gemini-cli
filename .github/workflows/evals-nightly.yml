@@ -61,6 +61,8 @@ jobs:
           GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          # Disable Vitest internal retries to avoid double-retrying;
+          # custom retry logic is handled in evals/test-helper.ts
           VITEST_RETRY: 0
         run: |
           CMD="npm run test:all_evals"

@@ -334,7 +334,19 @@ jobs:
         if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_MODEL: 'gemini-3-pro-preview'
+          # Disable Vitest internal retries to avoid double-retrying;
+          # custom retry logic is handled in evals/test-helper.ts
+          VITEST_RETRY: 0
         run: 'npm run test:always_passing_evals'
+
+      - name: 'Upload Reliability Logs'
+        if: "always() && steps.check_evals.outputs.should_run == 'true'"
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'eval-logs-${{ github.run_id }}-${{ github.run_attempt }}'
+          path: 'evals/logs/api-reliability.jsonl'
+          retention-days: 7
 
   e2e:
     name: 'E2E'
