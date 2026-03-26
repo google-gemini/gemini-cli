@@ -124,6 +124,20 @@ topics on:
     `advanced.excludedEnvVars` setting in your `settings.json` to exclude fewer
     variables.
 
+- **Error: `Automatic update failed. Please try updating manually`**
+  - **Cause:** The background auto-update process failed (for example, due to
+    insufficient permissions on the global `npm` prefix directory).
+  - **Solution:** The CLI will display the exact command to run for your package
+    manager. Run it manually in your terminal. For example, for a global `npm`
+    install:
+    ```bash
+    npm install -g @google/gemini-cli@latest
+    ```
+    If you see a permission error, you may need to prefix the command with
+    `sudo` (macOS/Linux) or run your terminal as Administrator (Windows). To
+    avoid needing `sudo` in the future, consider
+    [configuring npm to use a different global directory](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
+
 - **Warning: `npm WARN deprecated node-domexception@1.0.0` or
   `npm WARN deprecated glob` during install/update**
   - **Issue:** When installing or updating the Gemini CLI globally via
