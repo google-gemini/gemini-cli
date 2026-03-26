@@ -3,5 +3,8 @@
   "contextFileName": "GEMINI.md",
   "plan": {
     "directory": ".gemini/specs"
+  },
+  "tracker": {
+    "directory": ".gemini/tracker"
   }
 }
