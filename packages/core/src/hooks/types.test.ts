@@ -188,14 +188,14 @@ describe('Hook Output Classes', () => {
       expect(output.getAdditionalContext()).toBe('some context');
     });
 
-    it('getAdditionalContext should sanitize context by escaping <', () => {
+    it('getAdditionalContext should return raw context without sanitization (handled by aggregator)', () => {
       const output = new DefaultHookOutput({
         hookSpecificOutput: {
           additionalContext: 'context with <tag> and </hook_context>',
         },
       });
       expect(output.getAdditionalContext()).toBe(
-        'context with &lt;tag&gt; and &lt;/hook_context&gt;',
+        'context with <tag> and </hook_context>',
       );
     });
 
@@ -279,14 +279,17 @@ describe('Hook Output Classes', () => {
         contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
       };
       const output = new BeforeModelHookOutput({
-        hookSpecificOutput: { additionalContext: 'New Context' },
+        hookSpecificOutput: {
+          additionalContext:
+            '<hook_context hook="test">\nNew Context\n</hook_context>',
+        },
       });
       const result = output.applyLLMRequestModifications(target);
       expect(result.contents).toHaveLength(1);
       const contents = result.contents as Content[];
       expect(contents[0].parts!).toHaveLength(2);
       expect(contents[0].parts![1]).toEqual({
-        text: '\n\n<hook_context>New Context</hook_context>',
+        text: '\n\n<hook_context hook="test">\nNew Context\n</hook_context>',
       });
     });
 
@@ -296,14 +299,17 @@ describe('Hook Output Classes', () => {
         contents: [{ role: 'model', parts: [{ text: 'Hi' }] }],
       };
       const output = new BeforeModelHookOutput({
-        hookSpecificOutput: { additionalContext: 'New Context' },
+        hookSpecificOutput: {
+          additionalContext:
+            '<hook_context hook="test">\nNew Context\n</hook_context>',
+        },
       });
       const result = output.applyLLMRequestModifications(target);
       expect(result.contents).toHaveLength(2);
       const contents = result.contents as Content[];
       expect(contents[1].role).toBe('user');
       expect(contents[1].parts![0]).toEqual({
-        text: '\n\n<hook_context>New Context</hook_context>',
+        text: '\n\n<hook_context hook="test">\nNew Context\n</hook_context>',
       });
     });
 
@@ -320,7 +326,8 @@ describe('Hook Output Classes', () => {
       const output = new BeforeModelHookOutput({
         hookSpecificOutput: {
           llm_request: mockRequest as LLMRequest,
-          additionalContext: 'New Context',
+          additionalContext:
+            '<hook_context hook="test">\nNew Context\n</hook_context>',
         },
       });
       const result = output.applyLLMRequestModifications(target);
@@ -329,7 +336,7 @@ describe('Hook Output Classes', () => {
       expect(contents[0].parts!).toHaveLength(2);
       expect(contents[0].parts![0]).toEqual({ text: 'modified' });
       expect(contents[0].parts![1]).toEqual({
-        text: '\n\n<hook_context>New Context</hook_context>',
+        text: '\n\n<hook_context hook="test">\nNew Context\n</hook_context>',
       });
     });
   });

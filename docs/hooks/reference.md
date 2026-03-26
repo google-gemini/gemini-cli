@@ -198,9 +198,8 @@ request format.
   - `hookSpecificOutput.llm_response`: A **Synthetic Response** object. If
     provided, the CLI skips the LLM call entirely and uses this as the response.
   - `hookSpecificOutput.additionalContext`: (`string`) Text that is **appended**
-    to the end of the user message (wrapped in `<hook_context>` tags). If
-    `llm_request` also modifies contents, it will be appended to the modified
-    contents.
+    to the end of the user message. If `llm_request` also modifies contents, it
+    will be appended to the modified contents.
   - `decision`: Set to `"deny"` to block the request and abort the turn.
 - **Exit Code 2 (Block Turn)**: Aborts the turn and skips the LLM call. Uses
   `stderr` as the error message.

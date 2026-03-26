@@ -220,7 +220,7 @@ export async function executeToolWithHooks(
     // Add additional context from hooks to the tool result
     const additionalContext = afterOutput?.getAdditionalContext();
     if (additionalContext) {
-      const wrappedContext = `\n\n<hook_context>${additionalContext}</hook_context>`;
+      const wrappedContext = `\n\n${additionalContext}`;
       if (typeof toolResult.llmContent === 'string') {
         toolResult.llmContent += wrappedContext;
       } else if (Array.isArray(toolResult.llmContent)) {

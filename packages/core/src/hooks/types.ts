@@ -271,8 +271,7 @@ export class DefaultHookOutput implements HookOutput {
         return undefined;
       }
 
-      // Sanitize by escaping < and > to prevent tag injection
-      return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return context;
     }
     return undefined;
   }
@@ -419,7 +418,7 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
         contents = [];
       }
 
-      const wrappedContext = `\n\n<hook_context>${additionalContext}</hook_context>`;
+      const wrappedContext = `\n\n${additionalContext}`;
 
       let lastUserMessageIndex = -1;
       for (let i = contents.length - 1; i >= 0; i--) {
