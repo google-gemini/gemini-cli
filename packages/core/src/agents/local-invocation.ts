@@ -5,6 +5,8 @@
  */
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import {
   BaseToolInvocation,
@@ -87,6 +89,18 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     return description.slice(0, DESCRIPTION_MAX_LENGTH);
   }
 
+  private publishActivity(activity: SubagentActivityItem, label: string): void {
+    this.messageBus
+      .publish({
+        type: MessageBusType.SUBAGENT_ACTIVITY,
+        subagentName: this.definition.displayName ?? this.definition.name,
+        activity,
+      })
+      .catch((err: unknown) =>
+        debugLogger.error(`Failed to publish ${label}: ${err}`),
+      );
+  }
+
   /**
    * Executes the subagent.
    *
@@ -140,6 +154,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               });
             }
             updated = true;
+
+            const latestThought = recentActivity[recentActivity.length - 1];
+            if (latestThought) {
+              this.publishActivity(latestThought, 'thought chunk');
+            }
             break;
           }
           case 'TOOL_CALL_START': {
@@ -163,6 +182,11 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               status: 'running',
             });
             updated = true;
+
+            const latestTool = recentActivity[recentActivity.length - 1];
+            if (latestTool) {
+              this.publishActivity(latestTool, 'tool start');
+            }
             break;
           }
           case 'TOOL_CALL_END': {
@@ -178,6 +202,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               ) {
                 recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
+
+                this.publishActivity(recentActivity[i], 'tool end');
                 break;
               }
             }
