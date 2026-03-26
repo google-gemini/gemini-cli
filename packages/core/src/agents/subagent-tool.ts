@@ -19,6 +19,7 @@ import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
+import type { AgentEvent } from '../agent/types.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -33,6 +34,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
     private readonly definition: AgentDefinition,
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     const inputSchema = definition.inputConfig.inputSchema;
 
@@ -116,6 +118,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       messageBus,
       _toolName,
       _toolDisplayName,
+      this.onAgentEvent,
     );
   }
 }
@@ -130,6 +133,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     super(
       params,
@@ -229,6 +233,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       definition,
       this.context,
       this.messageBus,
+      this.onAgentEvent,
     );
 
     return wrapper.build(agentArgs);

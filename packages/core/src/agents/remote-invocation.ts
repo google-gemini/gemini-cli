@@ -9,6 +9,7 @@ import {
   type ToolConfirmationOutcome,
   type ToolResult,
   type ToolCallConfirmationDetails,
+  type ToolLiveOutput,
 } from '../tools/tools.js';
 import {
   DEFAULT_QUERY_STRING,
@@ -16,44 +17,23 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
   type SubagentProgress,
-  getAgentCardLoadOptions,
-  getRemoteAgentTargetUrl,
 } from './types.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type {
-  A2AClientManager,
-  SendMessageResult,
-} from './a2a-client-manager.js';
-import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
-import type { AuthenticationHandler } from '@a2a-js/sdk/client';
-import { debugLogger } from '../utils/debugLogger.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import { A2AAgentError } from './a2a-errors.js';
+import { RemoteSubagentSession } from './remote-subagent-protocol.js';
+import type { AgentEvent } from '../agent/types.js';
 
 /**
  * A tool invocation that proxies to a remote A2A agent.
  *
- * This implementation bypasses the local `LocalAgentExecutor` loop and directly
- * invokes the configured A2A tool.
+ * This implementation delegates execution to {@link RemoteSubagentSession},
+ * which wraps the A2A client streaming behind the AgentProtocol interface.
  */
 export class RemoteAgentInvocation extends BaseToolInvocation<
   RemoteAgentInputs,
   ToolResult
 > {
-  // Persist state across ephemeral invocation instances.
-  private static readonly sessionState = new Map<
-    string,
-    { contextId?: string; taskId?: string }
-  >();
-  // State for the ongoing conversation with the remote agent
-  private contextId: string | undefined;
-  private taskId: string | undefined;
-
-  private readonly clientManager: A2AClientManager;
-  private authHandler: AuthenticationHandler | undefined;
-
   constructor(
     private readonly definition: RemoteAgentDefinition,
     private readonly context: AgentLoopContext,
@@ -61,6 +41,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    private readonly _onAgentEvent?: (event: AgentEvent) => void,
   ) {
     const query = params['query'] ?? DEFAULT_QUERY_STRING;
     if (typeof query !== 'string') {
@@ -75,41 +56,17 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
     );
-    const clientManager = this.context.config.getA2AClientManager();
-    if (!clientManager) {
+
+    // Validate that A2AClientManager is available at construction time
+    if (!this.context.config.getA2AClientManager()) {
       throw new Error(
         `Failed to initialize RemoteAgentInvocation for '${definition.name}': A2AClientManager is not available.`,
       );
     }
-    this.clientManager = clientManager;
   }
 
   getDescription(): string {
     return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
-  }
-
-  private async getAuthHandler(): Promise<AuthenticationHandler | undefined> {
-    if (this.authHandler) {
-      return this.authHandler;
-    }
-
-    if (this.definition.auth) {
-      const targetUrl = getRemoteAgentTargetUrl(this.definition);
-      const provider = await A2AAuthProviderFactory.create({
-        authConfig: this.definition.auth,
-        agentName: this.definition.name,
-        targetUrl,
-        agentCardUrl: this.definition.agentCardUrl,
-      });
-      if (!provider) {
-        throw new Error(
-          `Failed to create auth provider for agent '${this.definition.name}'`,
-        );
-      }
-      this.authHandler = provider;
-    }
-
-    return this.authHandler;
   }
 
   protected override async getConfirmationDetails(
@@ -128,13 +85,33 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
   async execute(
     _signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput | SubagentProgress) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
-    // 1. Ensure the agent is loaded (cached by manager)
-    // We assume the user has provided an access token via some mechanism (TODO),
-    // or we rely on ADC.
-    const reassembler = new A2AResultReassembler();
     const agentName = this.definition.displayName ?? this.definition.name;
+    const session = new RemoteSubagentSession(
+      this.definition,
+      this.context,
+      this.messageBus,
+    );
+
+    // Wire external abort signal to session abort
+    const abortListener = () => void session.abort();
+    _signal.addEventListener('abort', abortListener, { once: true });
+
+    // Subscribe for parent session observability (future use)
+    let unsubscribeParent: (() => void) | undefined;
+    if (this._onAgentEvent) {
+      unsubscribeParent = session.subscribe(this._onAgentEvent);
+    }
+
+    // Subscribe to message events for live SubagentProgress updates
+    const unsubscribeProgress = session.subscribe((event: AgentEvent) => {
+      if (event.type === 'message' && updateOutput) {
+        const currentProgress = session.getLatestProgress();
+        if (currentProgress) updateOutput(currentProgress);
+      }
+    });
+
     try {
       if (updateOutput) {
         updateOutput({
@@ -152,97 +129,25 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         });
       }
 
-      const priorState = RemoteAgentInvocation.sessionState.get(
-        this.definition.name,
-      );
-      if (priorState) {
-        this.contextId = priorState.contextId;
-        this.taskId = priorState.taskId;
-      }
+      await session.send({
+        message: [{ type: 'text', text: this.params.query }],
+      });
 
-      const authHandler = await this.getAuthHandler();
+      const result = await session.getResult();
 
-      if (!this.clientManager.getClient(this.definition.name)) {
-        await this.clientManager.loadAgent(
-          this.definition.name,
-          getAgentCardLoadOptions(this.definition),
-          authHandler,
-        );
-      }
-
-      const message = this.params.query;
-
-      const stream = this.clientManager.sendMessageStream(
-        this.definition.name,
-        message,
-        {
-          contextId: this.contextId,
-          taskId: this.taskId,
-          signal: _signal,
-        },
-      );
-
-      let finalResponse: SendMessageResult | undefined;
-
-      for await (const chunk of stream) {
-        if (_signal.aborted) {
-          throw new Error('Operation aborted');
-        }
-        finalResponse = chunk;
-        reassembler.update(chunk);
-
-        if (updateOutput) {
-          updateOutput({
-            isSubagentProgress: true,
-            agentName,
-            state: 'running',
-            recentActivity: reassembler.toActivityItems(),
-            result: reassembler.toString(),
-          });
-        }
-
-        const {
-          contextId: newContextId,
-          taskId: newTaskId,
-          clearTaskId,
-        } = extractIdsFromResponse(chunk);
-
-        if (newContextId) {
-          this.contextId = newContextId;
-        }
-
-        this.taskId = clearTaskId ? undefined : (newTaskId ?? this.taskId);
-      }
-
-      if (!finalResponse) {
-        throw new Error('No response from remote agent.');
-      }
-
-      const finalOutput = reassembler.toString();
-
-      debugLogger.debug(
-        `[RemoteAgent] Final response from ${this.definition.name}:\n${JSON.stringify(finalResponse, null, 2)}`,
-      );
-
-      const finalProgress: SubagentProgress = {
-        isSubagentProgress: true,
-        agentName,
-        state: 'completed',
-        result: finalOutput,
-        recentActivity: reassembler.toActivityItems(),
-      };
-
+      // Emit final completed progress
       if (updateOutput) {
-        updateOutput(finalProgress);
+        const finalProgress = session.getLatestProgress();
+        if (finalProgress) updateOutput(finalProgress);
       }
 
-      return {
-        llmContent: [{ text: finalOutput }],
-        returnDisplay: finalProgress,
-      };
+      return result;
     } catch (error: unknown) {
-      const partialOutput = reassembler.toString();
-      // Surface structured, user-friendly error messages.
+      const partialProgress = session.getLatestProgress();
+      const partialOutput =
+        typeof partialProgress?.result === 'string'
+          ? partialProgress.result
+          : '';
       const errorMessage = this.formatExecutionError(error);
       const fullDisplay = partialOutput
         ? `${partialOutput}\n\n${errorMessage}`
@@ -253,7 +158,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         agentName,
         state: 'error',
         result: fullDisplay,
-        recentActivity: reassembler.toActivityItems(),
+        recentActivity: partialProgress?.recentActivity ?? [],
       };
 
       if (updateOutput) {
@@ -265,11 +170,9 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         returnDisplay: errorProgress,
       };
     } finally {
-      // Persist state even on partial failures or aborts to maintain conversational continuity.
-      RemoteAgentInvocation.sessionState.set(this.definition.name, {
-        contextId: this.contextId,
-        taskId: this.taskId,
-      });
+      _signal.removeEventListener('abort', abortListener);
+      unsubscribeProgress();
+      unsubscribeParent?.();
     }
   }
 

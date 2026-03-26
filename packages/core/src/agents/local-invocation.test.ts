@@ -200,7 +200,10 @@ describe('LocalSubagentInvocation', () => {
         }),
       );
 
-      expect(mockExecutorInstance.run).toHaveBeenCalledWith(params, signal);
+      expect(mockExecutorInstance.run).toHaveBeenCalledWith(
+        params,
+        expect.any(AbortSignal),
+      );
 
       expect(result.llmContent).toEqual([
         {
@@ -495,7 +498,7 @@ describe('LocalSubagentInvocation', () => {
 
       expect(mockExecutorInstance.run).toHaveBeenCalledWith(
         params,
-        controller.signal,
+        expect.any(AbortSignal),
       );
     });
 

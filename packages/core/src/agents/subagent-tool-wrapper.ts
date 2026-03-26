@@ -18,6 +18,7 @@ import { RemoteAgentInvocation } from './remote-invocation.js';
 import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
 import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { AgentEvent } from '../agent/types.js';
 
 /**
  * A tool wrapper that dynamically exposes a subagent as a standard,
@@ -41,6 +42,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     private readonly definition: AgentDefinition,
     private readonly context: AgentLoopContext,
     messageBus: MessageBus,
+    private readonly onAgentEvent?: (event: AgentEvent) => void,
   ) {
     super(
       definition.name,
@@ -80,6 +82,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
         effectiveMessageBus,
         _toolName,
         _toolDisplayName,
+        this.onAgentEvent,
       );
     }
 
@@ -101,6 +104,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       effectiveMessageBus,
       _toolName,
       _toolDisplayName,
+      this.onAgentEvent,
     );
   }
 }

@@ -187,6 +187,8 @@ export * from './agents/agent-scheduler.js';
 // Export agent session interface
 export * from './agent/agent-session.js';
 export * from './agent/legacy-agent-session.js';
+export { LocalSubagentSession } from './agents/local-subagent-protocol.js';
+export { RemoteSubagentSession } from './agents/remote-subagent-protocol.js';
 export * from './agent/event-translator.js';
 export * from './agent/content-utils.js';
 // Agent event types — namespaced to avoid collisions with existing exports

@@ -139,6 +139,7 @@ describe('SubagentToolWrapper', () => {
         mockMessageBus,
         mockDefinition.name,
         mockDefinition.displayName,
+        undefined, // onAgentEvent (not set when wrapper has no onAgentEvent)
       );
     });
 
@@ -164,6 +165,7 @@ describe('SubagentToolWrapper', () => {
         specificMessageBus,
         mockDefinition.name,
         mockDefinition.displayName,
+        undefined, // onAgentEvent (not set when wrapper has no onAgentEvent)
       );
     });
 

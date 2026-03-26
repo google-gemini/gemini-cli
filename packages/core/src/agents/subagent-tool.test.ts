@@ -121,6 +121,7 @@ describe('SubAgentInvocation', () => {
       testDefinition,
       mockConfig,
       mockMessageBus,
+      undefined, // onAgentEvent (not set on SubAgentInvocation)
     );
   });
 
@@ -165,6 +166,7 @@ describe('SubAgentInvocation', () => {
       testRemoteDefinition,
       mockConfig,
       mockMessageBus,
+      undefined, // onAgentEvent (not set on SubAgentInvocation)
     );
   });
 
