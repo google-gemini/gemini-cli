@@ -166,6 +166,11 @@ export interface LogoutActionReturn {
   type: 'logout';
 }
 
+export interface BtwActionReturn {
+  type: 'btw';
+  query: string;
+}
+
 export type SlashCommandActionReturn =
   | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
@@ -173,7 +178,8 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
-  | LogoutActionReturn;
+  | LogoutActionReturn
+  | BtwActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
