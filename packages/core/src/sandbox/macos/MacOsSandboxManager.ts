@@ -10,7 +10,9 @@ import {
   type SandboxedCommand,
   type SandboxPermissions,
   type GlobalSandboxOptions,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
@@ -27,6 +29,7 @@ import {
 } from '../utils/commandSafety.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 export interface MacOsSandboxOptions extends GlobalSandboxOptions {
   /** The current sandbox mode behavior from config. */
@@ -57,6 +60,10 @@ export class MacOsSandboxManager implements SandboxManager {
 
   isDangerousCommand(args: string[]): boolean {
     return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
