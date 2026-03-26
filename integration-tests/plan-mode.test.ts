@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, checkModelOutputContent, GEMINI_DIR } from './test-helper.js';
+import { TestRig, checkModelOutputContent } from './test-helper.js';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
@@ -36,27 +34,23 @@ describe('Plan Mode', () => {
       },
     );
 
-    // We use a prompt that asks for both a read-only action and a write action.
-    // "List files" (read-only) followed by "touch denied.txt" (write).
     const result = await rig.run({
       approvalMode: 'plan',
-      stdin:
-        'Please list the files in the current directory, and then attempt to create a new file named "denied.txt" using a shell command.',
+      args: 'Please list the files in the current directory, and then attempt to create a new file named "denied.txt" using a shell command.',
     });
-
-    const lsCallFound = await rig.waitForToolCall('list_directory');
-    expect(lsCallFound, 'Expected list_directory to be called').toBe(true);
-
-    const shellCallFound = await rig.waitForToolCall('run_shell_command');
-    expect(shellCallFound, 'Expected run_shell_command to fail').toBe(false);
 
     const toolLogs = rig.readToolLogs();
     const lsLog = toolLogs.find((l) => l.toolRequest.name === 'list_directory');
-    expect(
-      toolLogs.find((l) => l.toolRequest.name === 'run_shell_command'),
-    ).toBeUndefined();
+    const shellLog = toolLogs.find(
+      (l) => l.toolRequest.name === 'run_shell_command',
+    );
 
+    expect(lsLog, 'Expected list_directory to be called').toBeDefined();
     expect(lsLog?.toolRequest.success).toBe(true);
+    expect(
+      shellLog,
+      'Expected run_shell_command to be blocked (not even called)',
+    ).toBeUndefined();
 
     checkModelOutputContent(result, {
       expectedContent: ['Plan Mode', 'read-only'],
@@ -84,22 +78,10 @@ describe('Plan Mode', () => {
       },
     });
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
-    const run = await rig.runInteractive({
+    await rig.run({
       approvalMode: 'plan',
+      args: 'Create a file called plan.md in the plans directory.',
     });
-
-    await run.type('Create a file called plan.md in the plans directory.');
-    await run.type('\r');
-
-    await rig.expectToolCallSuccess(['write_file'], 30000, (args) =>
-      args.includes('plan.md'),
-    );
 
     const toolLogs = rig.readToolLogs();
     const planWrite = toolLogs.find(
@@ -108,7 +90,25 @@ describe('Plan Mode', () => {
         l.toolRequest.args.includes('plans') &&
         l.toolRequest.args.includes('plan.md'),
     );
-    expect(planWrite?.toolRequest.success).toBe(true);
+
+    if (!planWrite) {
+      console.error(
+        'All tool calls found:',
+        toolLogs.map((l) => ({
+          name: l.toolRequest.name,
+          args: l.toolRequest.args,
+        })),
+      );
+    }
+
+    expect(
+      planWrite,
+      'Expected write_file to be called for plan.md',
+    ).toBeDefined();
+    expect(
+      planWrite?.toolRequest.success,
+      `Expected write_file to succeed, but it failed with error: ${planWrite?.toolRequest.error}`,
+    ).toBe(true);
   });
 
   it('should deny write_file to non-plans directory in plan mode', async () => {
@@ -131,18 +131,10 @@ describe('Plan Mode', () => {
       },
     });
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
-    const run = await rig.runInteractive({
+    await rig.run({
       approvalMode: 'plan',
+      args: 'Create a file called hello.txt in the current directory.',
     });
-
-    await run.type('Create a file called hello.txt in the current directory.');
-    await run.type('\r');
 
     const toolLogs = rig.readToolLogs();
     const writeLog = toolLogs.find(
@@ -151,10 +143,11 @@ describe('Plan Mode', () => {
         l.toolRequest.args.includes('hello.txt'),
     );
 
-    // In Plan Mode, writes outside the plans directory should be blocked.
-    // Model is undeterministic, sometimes it doesn't even try, but if it does, it must fail.
     if (writeLog) {
-      expect(writeLog.toolRequest.success).toBe(false);
+      expect(
+        writeLog.toolRequest.success,
+        'Expected write_file to non-plans dir to fail',
+      ).toBe(false);
     }
   });
 
@@ -169,28 +162,69 @@ describe('Plan Mode', () => {
       },
     });
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
-    // Start in default mode and ask to enter plan mode.
     await rig.run({
       approvalMode: 'default',
-      stdin:
-        'I want to perform a complex refactoring. Please enter plan mode so we can design it first.',
+      args: 'I want to perform a complex refactoring. Please enter plan mode so we can design it first.',
     });
-
-    const enterPlanCallFound = await rig.waitForToolCall('enter_plan_mode');
-    expect(enterPlanCallFound, 'Expected enter_plan_mode to be called').toBe(
-      true,
-    );
 
     const toolLogs = rig.readToolLogs();
     const enterLog = toolLogs.find(
       (l) => l.toolRequest.name === 'enter_plan_mode',
     );
+    expect(enterLog, 'Expected enter_plan_mode to be called').toBeDefined();
     expect(enterLog?.toolRequest.success).toBe(true);
+  });
+
+  it('should allow write_file to the plans directory in plan mode even without a session ID', async () => {
+    const plansDir = '.gemini/tmp/foo/plans';
+    const testName =
+      'should allow write_file to the plans directory in plan mode even without a session ID';
+
+    await rig.setup(testName, {
+      settings: {
+        experimental: { plan: true },
+        tools: {
+          core: ['write_file', 'read_file', 'list_directory'],
+        },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: {
+            directory: plansDir,
+          },
+        },
+      },
+    });
+
+    await rig.run({
+      approvalMode: 'plan',
+      args: 'Create a file called plan-no-session.md in the plans directory.',
+    });
+
+    const toolLogs = rig.readToolLogs();
+    const planWrite = toolLogs.find(
+      (l) =>
+        l.toolRequest.name === 'write_file' &&
+        l.toolRequest.args.includes('plans') &&
+        l.toolRequest.args.includes('plan-no-session.md'),
+    );
+
+    if (!planWrite) {
+      console.error(
+        'All tool calls found:',
+        toolLogs.map((l) => ({
+          name: l.toolRequest.name,
+          args: l.toolRequest.args,
+        })),
+      );
+    }
+
+    expect(
+      planWrite,
+      'Expected write_file to be called for plan-no-session.md',
+    ).toBeDefined();
+    expect(
+      planWrite?.toolRequest.success,
+      `Expected write_file to succeed, but it failed with error: ${planWrite?.toolRequest.error}`,
+    ).toBe(true);
   });
 });

@@ -691,6 +691,40 @@ describe('useSlashCompletion', () => {
       });
       unmount();
     });
+
+    it('should rank primary name prefix matches higher than alias prefix matches', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'footer',
+          altNames: ['statusline'],
+          description: 'Configure footer',
+        }),
+        createTestCommand({
+          name: 'stats',
+          altNames: ['usage'],
+          description: 'Check stats',
+        }),
+      ];
+
+      const { result, unmount } = await renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/stat',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await resolveMatch();
+
+      await waitFor(() => {
+        // 'stats' should be first because 'stat' is a prefix match on its name
+        // while 'footer' only matches 'stat' via its alias 'statusline'
+        expect(result.current.suggestions[0].label).toBe('stats');
+        expect(result.current.suggestions[1].label).toBe('footer');
+      });
+      unmount();
+    });
   });
 
   describe('Sub-Commands', () => {

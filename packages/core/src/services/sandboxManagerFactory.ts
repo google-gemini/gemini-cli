@@ -29,24 +29,25 @@ export function createSandboxManager(
     return new NoopSandboxManager();
   }
 
-  const isWindows = os.platform() === 'win32';
-
-  if (
-    isWindows &&
-    (sandbox?.enabled || sandbox?.command === 'windows-native')
-  ) {
-    return new WindowsSandboxManager({ workspace });
-  }
+  const modeConfig =
+    policyManager && approvalMode
+      ? policyManager.getModeConfig(approvalMode)
+      : undefined;
 
   if (sandbox?.enabled) {
-    if (os.platform() === 'linux') {
-      return new LinuxSandboxManager({ workspace });
-    }
-    if (os.platform() === 'darwin') {
-      const modeConfig =
-        policyManager && approvalMode
-          ? policyManager.getModeConfig(approvalMode)
-          : undefined;
+    if (os.platform() === 'win32' && sandbox?.command === 'windows-native') {
+      return new WindowsSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
+    } else if (os.platform() === 'linux') {
+      return new LinuxSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
+    } else if (os.platform() === 'darwin') {
       return new MacOsSandboxManager({
         workspace,
         modeConfig,

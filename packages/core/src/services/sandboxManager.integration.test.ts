@@ -95,26 +95,34 @@ async function runCommand(command: SandboxedCommand) {
 
 /**
  * Determines if the system has the necessary binaries to run the sandbox.
+ * Throws an error if a supported platform is missing its required tools.
  */
-function isSandboxAvailable(): boolean {
-  if (os.platform() === 'win32') {
+function ensureSandboxAvailable(): boolean {
+  const platform = os.platform();
+
+  if (platform === 'win32') {
     // Windows sandboxing relies on icacls, which is a core system utility and
     // always available.
     return true;
   }
 
-  if (os.platform() === 'darwin') {
-    return fs.existsSync('/usr/bin/sandbox-exec');
+  if (platform === 'darwin') {
+    if (fs.existsSync('/usr/bin/sandbox-exec')) {
+      return true;
+    }
+    throw new Error(
+      'Sandboxing tests on macOS require /usr/bin/sandbox-exec to be present.',
+    );
   }
 
-  if (os.platform() === 'linux') {
-    // TODO: Install bubblewrap (bwrap) in Linux CI environments to enable full
-    // integration testing.
+  if (platform === 'linux') {
     try {
       execSync('which bwrap', { stdio: 'ignore' });
       return true;
     } catch {
-      return false;
+      throw new Error(
+        'Sandboxing tests on Linux require bubblewrap (bwrap) to be installed.',
+      );
     }
   }
 
@@ -129,7 +137,7 @@ describe('SandboxManager Integration', () => {
   const shouldSkip =
     manager instanceof NoopSandboxManager ||
     manager instanceof LocalSandboxManager ||
-    !isSandboxAvailable();
+    !ensureSandboxAvailable();
 
   describe.skipIf(shouldSkip)('Cross-platform Sandbox Behavior', () => {
     describe('Basic Execution', () => {
