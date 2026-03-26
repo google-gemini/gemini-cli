@@ -30,12 +30,12 @@
 
 # Ask-user tool always requires user interaction, even in YOLO mode.
 # This ensures the model can gather user preferences/decisions when needed.
-# Note: In non-interactive mode, this decision is converted to DENY by the policy engine.
 [[rule]]
 toolName = "ask_user"
 decision = "ask_user"
 priority = 999
 modes = ["yolo"]
+interactive = true
 
 # Plan mode transitions are blocked in YOLO mode to maintain state consistency
 # and because planning currently requires human interaction (plan approval),
