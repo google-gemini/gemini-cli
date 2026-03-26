@@ -429,10 +429,10 @@ export class LinuxSandboxManager implements SandboxManager {
           '-type',
           'f',
           ...findPatterns,
-          '-print',
+          '-print0',
         ]);
 
-        const files = findResult.stdout.toString().split('\n');
+        const files = findResult.stdout.toString().split('\0');
         for (const file of files) {
           if (file.trim()) {
             args.push('--bind', maskPath, file.trim());

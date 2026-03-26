@@ -124,6 +124,26 @@ public class GeminiSandbox {
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     static extern uint GetLongPathName(string lpszShortPath, [Out] StringBuilder lpszLongPath, uint cchBuffer);
 
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern bool ConvertStringSidToSid(string StringSid, out IntPtr ptrSid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool SetTokenInformation(IntPtr TokenHandle, int TokenInformationClass, IntPtr TokenInformation, uint TokenInformationLength);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct SID_AND_ATTRIBUTES {
+        public IntPtr Sid;
+        public uint Attributes;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct TOKEN_MANDATORY_LABEL {
+        public SID_AND_ATTRIBUTES Label;
+    }
+
+    private const int TokenIntegrityLevel = 25;
+    private const uint SE_GROUP_INTEGRITY = 0x00000020;
+
     static int Main(string[] args) {
         if (args.Length < 3) {
             Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
@@ -159,6 +179,7 @@ public class GeminiSandbox {
 
         IntPtr hToken = IntPtr.Zero;
         IntPtr hRestrictedToken = IntPtr.Zero;
+        IntPtr lowIntegritySid = IntPtr.Zero;
 
         try {
             // 1. Create Restricted Token
@@ -173,7 +194,26 @@ public class GeminiSandbox {
                 return 1;
             }
 
-            // 2. Setup Job Object for cleanup
+            // 2. Lower Integrity Level to Low
+            // S-1-16-4096 is the SID for "Low Mandatory Level"
+            if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySid)) {
+                TOKEN_MANDATORY_LABEL tml = new TOKEN_MANDATORY_LABEL();
+                tml.Label.Sid = lowIntegritySid;
+                tml.Label.Attributes = SE_GROUP_INTEGRITY;
+                int tmlSize = Marshal.SizeOf(tml);
+                IntPtr pTml = Marshal.AllocHGlobal(tmlSize);
+                try {
+                    Marshal.StructureToPtr(tml, pTml, false);
+                    if (!SetTokenInformation(hRestrictedToken, TokenIntegrityLevel, pTml, (uint)tmlSize)) {
+                        Console.WriteLine("Error: SetTokenInformation failed (" + Marshal.GetLastWin32Error() + ")");
+                        return 1;
+                    }
+                } finally {
+                    Marshal.FreeHGlobal(pTml);
+                }
+            }
+
+            // 3. Setup Job Object for cleanup
             IntPtr hJob = CreateJobObject(IntPtr.Zero, null);
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
             jobLimits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION;
@@ -183,7 +223,7 @@ public class GeminiSandbox {
             SetInformationJobObject(hJob, 9 /* JobObjectExtendedLimitInformation */, lpJobLimits, (uint)Marshal.SizeOf(jobLimits));
             Marshal.FreeHGlobal(lpJobLimits);
 
-            // 3. Handle Internal Commands or External Process
+            // 4. Handle Internal Commands or External Process
             if (command == "__read") {
                 if (argIndex + 1 >= args.Length) {
                     Console.WriteLine("Error: Missing path for __read");

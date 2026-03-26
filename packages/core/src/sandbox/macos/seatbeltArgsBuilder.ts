@@ -106,12 +106,13 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
       const escapedBase = escapeRegex(resolvedBase);
       if (secret.pattern.endsWith('*')) {
         // .env.* -> .env\..+ (match .env followed by dot and something)
+        // We anchor the secret file name to either a directory separator or the start of the relative path.
         const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\\\.');
-        regexPattern = `^${escapedBase}/.*${basePattern}[^/]+$`;
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}[^/]+$`;
       } else {
         // .env -> \.env$
         const basePattern = secret.pattern.replace(/\./g, '\\\\.');
-        regexPattern = `^${escapedBase}/.*${basePattern}$`;
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
       }
       profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
     }
@@ -210,9 +211,9 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
           // Ignore error
         }
         if (isFile) {
-          profile += `(allow file-write* (literal (param "${paramName}")))\n`;
+          profile += `(allow file-read* file-write* (literal (param "${paramName}")))\n`;
         } else {
-          profile += `(allow file-write* (subpath (param "${paramName}")))\n`;
+          profile += `(allow file-read* file-write* (subpath (param "${paramName}")))\n`;
         }
       }
     }
