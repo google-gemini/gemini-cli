@@ -502,6 +502,46 @@ describe('LocalSubagentInvocation', () => {
       );
     });
 
+    it('external AbortSignal propagates through session to abort executor', async () => {
+      // This test validates the wiring: caller signal → abortListener → session.abort()
+      // → internal AbortController → executor's signal aborts.
+      // The previous test mocks the executor to always reject, so it would pass even
+      // if the abort wiring was broken. This test requires the signal to actually fire.
+      const controller = new AbortController();
+      let executorSignal: AbortSignal | undefined;
+
+      mockExecutorInstance.run.mockImplementation(
+        (_p: unknown, sig: AbortSignal) => {
+          executorSignal = sig;
+          return new Promise((_resolve, reject) => {
+            sig.addEventListener('abort', () => {
+              const err = new Error('AbortError');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          });
+        },
+      );
+
+      const executePromise = invocation.execute(
+        controller.signal,
+        updateOutput,
+      );
+
+      // Wait for the executor to start so executorSignal is populated
+      await vi.waitFor(() => {
+        expect(executorSignal).toBeDefined();
+      });
+
+      expect(executorSignal!.aborted).toBe(false);
+
+      // Fire the external signal — this must propagate through to abort the executor
+      controller.abort();
+
+      await expect(executePromise).rejects.toThrow();
+      expect(executorSignal!.aborted).toBe(true);
+    });
+
     it('should throw an error and bubble cancellation when execution returns ABORTED', async () => {
       const mockOutput = {
         result: 'Cancelled by user',
