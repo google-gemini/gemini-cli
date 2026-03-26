@@ -6,6 +6,14 @@
 
 import { type FunctionCall } from '@google/genai';
 import {
+  SHELL_TOOL_NAMES,
+  initializeShellParsers,
+  splitCommands,
+  hasRedirection,
+  extractStringFromParseEntry,
+} from '../utils/shell-utils.js';
+import { parse as shellParse } from 'shell-quote';
+import {
   PolicyDecision,
   type PolicyEngineConfig,
   type PolicyRule,
@@ -19,18 +27,18 @@ import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import {
-  SHELL_TOOL_NAMES,
-  initializeShellParsers,
-  splitCommands,
-  hasRedirection,
-} from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 import {
   MCP_TOOL_PREFIX,
   isMcpToolAnnotation,
   parseMcpToolName,
+  formatMcpToolName,
+  isMcpToolName,
 } from '../tools/mcp-tool.js';
+import {
+  type SandboxManager,
+  NoopSandboxManager,
+} from '../services/sandboxManager.js';
 
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
@@ -74,6 +82,7 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
+  nonInteractive: boolean,
   toolAnnotations?: Record<string, unknown>,
   subagent?: string,
 ): boolean {
@@ -85,14 +94,14 @@ function ruleMatches(
   }
 
   // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
-  if ('subagent' in rule && rule.subagent) {
+  if ('subagent' in rule && rule.subagent !== undefined) {
     if (rule.subagent !== subagent) {
       return false;
     }
   }
 
   // Strictly enforce mcpName identity if the rule dictates it
-  if (rule.mcpName) {
+  if (rule.mcpName !== undefined) {
     if (rule.mcpName === '*') {
       // Rule requires it to be ANY MCP tool
       if (serverName === undefined) return false;
@@ -103,7 +112,7 @@ function ruleMatches(
   }
 
   // Check tool name if specified
-  if (rule.toolName) {
+  if (rule.toolName !== undefined) {
     // Support wildcard patterns: "mcp_serverName_*" matches "mcp_serverName_anyTool"
     if (rule.toolName === '*') {
       // Match all tools
@@ -115,7 +124,28 @@ function ruleMatches(
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
-      return false;
+      // If names don't match exactly, check for MCP short/full name mismatches
+      let mcpMatch = false;
+      if (serverName && toolCall.name) {
+        // Case 1: Rule uses short name + mcpName -> match FQN tool call
+        if (rule.mcpName && !isMcpToolName(rule.toolName)) {
+          if (
+            toolCall.name === formatMcpToolName(rule.mcpName, rule.toolName)
+          ) {
+            mcpMatch = true;
+          }
+        }
+        // Case 2: Rule uses FQN -> match short tool call (qualified by serverName)
+        if (!mcpMatch && isMcpToolName(rule.toolName)) {
+          if (rule.toolName === formatMcpToolName(serverName, toolCall.name)) {
+            mcpMatch = true;
+          }
+        }
+      }
+
+      if (!mcpMatch) {
+        return false;
+      }
     }
   }
 
@@ -146,6 +176,16 @@ function ruleMatches(
     }
   }
 
+  // Check interactive if specified
+  if ('interactive' in rule && rule.interactive !== undefined) {
+    if (rule.interactive && nonInteractive) {
+      return false;
+    }
+    if (!rule.interactive && !nonInteractive) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -158,6 +198,7 @@ export class PolicyEngine {
   private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
+  private readonly sandboxManager: SandboxManager;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -169,11 +210,46 @@ export class PolicyEngine {
     this.hookCheckers = (config.hookCheckers ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
+
+    // Validate rules
+    for (const rule of this.rules) {
+      if (rule.toolName === undefined || rule.toolName === '') {
+        throw new Error(
+          `Invalid policy rule: toolName is required. Use '*' for all tools. Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+      if (rule.mcpName === '') {
+        throw new Error(
+          `Invalid policy rule: mcpName is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+      if (rule.subagent === '') {
+        throw new Error(
+          `Invalid policy rule: subagent is required if specified (cannot be empty). Rule source: ${rule.source || 'unknown'}`,
+        );
+      }
+    }
+
+    // Validate checkers
+    for (const checker of this.checkers) {
+      if (checker.toolName === undefined || checker.toolName === '') {
+        throw new Error(
+          `Invalid safety checker rule: toolName is required. Use '*' for all tools. Checker source: ${checker.source || 'unknown'}`,
+        );
+      }
+      if (checker.mcpName === '') {
+        throw new Error(
+          `Invalid safety checker rule: mcpName is required if specified (cannot be empty). Checker source: ${checker.source || 'unknown'}`,
+        );
+      }
+    }
+
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
     this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+    this.sandboxManager = config.sandboxManager ?? new NoopSandboxManager();
   }
 
   /**
@@ -201,17 +277,56 @@ export class PolicyEngine {
     command: string,
     allowRedirection?: boolean,
   ): boolean {
-    return (
-      !allowRedirection &&
-      hasRedirection(command) &&
-      this.approvalMode !== ApprovalMode.AUTO_EDIT &&
-      this.approvalMode !== ApprovalMode.YOLO
-    );
+    if (allowRedirection) return false;
+    if (!hasRedirection(command)) return false;
+
+    // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT or YOLO
+    const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
+    if (
+      sandboxEnabled &&
+      (this.approvalMode === ApprovalMode.AUTO_EDIT ||
+        this.approvalMode === ApprovalMode.YOLO)
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
    * Check if a shell command is allowed.
    */
+  private async applyShellHeuristics(
+    command: string,
+    decision: PolicyDecision,
+  ): Promise<PolicyDecision> {
+    await initializeShellParsers();
+    try {
+      const parsedObjArgs = shellParse(command);
+      const parsedArgs = parsedObjArgs.map(extractStringFromParseEntry);
+
+      if (this.sandboxManager.isDangerousCommand(parsedArgs)) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as dangerous, forcing ASK_USER: ${command}`,
+        );
+        return PolicyDecision.ASK_USER;
+      }
+
+      if (
+        this.sandboxManager.isKnownSafeCommand(parsedArgs) &&
+        decision === PolicyDecision.ASK_USER
+      ) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Command evaluated as known safe, overriding ASK_USER to ALLOW: ${command}`,
+        );
+        return PolicyDecision.ALLOW;
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return decision;
+  }
+
   private async checkShellCommand(
     toolName: string,
     command: string | undefined,
@@ -443,6 +558,7 @@ export class PolicyEngine {
           stringifiedArgs,
           serverName,
           this.approvalMode,
+          this.nonInteractive,
           toolAnnotations,
           subagent,
         ),
@@ -453,11 +569,21 @@ export class PolicyEngine {
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
+        let ruleDecision = rule.decision;
+        if (
+          isShellCommand &&
+          command &&
+          !('commandPrefix' in rule) &&
+          !rule.argsPattern
+        ) {
+          ruleDecision = await this.applyShellHeuristics(command, ruleDecision);
+        }
+
         if (isShellCommand && toolName) {
           const shellResult = await this.checkShellCommand(
             toolName,
             command,
-            rule.decision,
+            ruleDecision,
             serverName,
             shellDirPath,
             rule.allowRedirection,
@@ -493,10 +619,18 @@ export class PolicyEngine {
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
       if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+        let heuristicDecision = this.defaultDecision;
+        if (command) {
+          heuristicDecision = await this.applyShellHeuristics(
+            command,
+            heuristicDecision,
+          );
+        }
+
         const shellResult = await this.checkShellCommand(
           toolName,
           command,
-          this.defaultDecision,
+          heuristicDecision,
           serverName,
           shellDirPath,
           false,
@@ -521,6 +655,7 @@ export class PolicyEngine {
             stringifiedArgs,
             serverName,
             this.approvalMode,
+            this.nonInteractive,
             toolAnnotations,
             subagent,
           )
@@ -713,6 +848,7 @@ export class PolicyEngine {
           undefined, // stringifiedArgs
           serverName,
           this.approvalMode,
+          this.nonInteractive,
           annotations,
         );
 

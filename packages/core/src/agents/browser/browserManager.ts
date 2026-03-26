@@ -21,14 +21,18 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { coreEvents } from '../../utils/events.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
+import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
 
-// Pin chrome-devtools-mcp version for reproducibility.
-const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
@@ -93,6 +97,10 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
+  /** State for action rate limiting */
+  private actionCounter = 0;
+  private readonly maxActionsPerTask: number;
+
   /**
    * Whether to inject the automation overlay.
    * Always false in headless mode (no visible window to decorate).
@@ -104,6 +112,8 @@ export class BrowserManager {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
     this.shouldDisableInput = config.shouldDisableBrowserUserInput();
+    this.maxActionsPerTask =
+      browserConfig?.customConfig.maxActionsPerTask ?? 100;
   }
 
   /**
@@ -146,6 +156,16 @@ export class BrowserManager {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
+
+    // Hard enforcement of per-action rate limit
+    if (this.actionCounter > this.maxActionsPerTask) {
+      const error = new Error(
+        `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
+          `Task terminated to prevent runaway execution. To config the limit, use maxActionsPerTask in the settings.`,
+      );
+      throw error;
+    }
+    this.actionCounter++;
 
     const errorMessage = this.checkNavigationRestrictions(toolName, args);
     if (errorMessage) {
@@ -195,6 +215,10 @@ export class BrowserManager {
     // Re-inject the automation overlay and input blocker after tools that
     // can cause a full-page navigation. chrome-devtools-mcp emits no MCP
     // notifications, so callTool() is the only interception point.
+    //
+    // The input blocker injection is idempotent: the injected function
+    // reuses the existing DOM element when present and only recreates
+    // it when navigation has actually replaced the page DOM.
     if (
       !result.isError &&
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
@@ -204,17 +228,8 @@ export class BrowserManager {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
         }
-        // Only re-inject the input blocker for tools that *reliably*
-        // replace the page DOM (navigate_page, new_page, select_page).
-        // click/click_at are handled by pointer-events suspend/resume
-        // in mcpToolWrapper — no full re-inject roundtrip needed.
-        // press_key/handle_dialog only sometimes navigate.
-        const reliableNavigation =
-          toolName === 'navigate_page' ||
-          toolName === 'new_page' ||
-          toolName === 'select_page';
-        if (this.shouldDisableInput && reliableNavigation) {
-          await injectInputBlocker(this);
+        if (this.shouldDisableInput) {
+          await injectInputBlocker(this, signal);
         }
       } catch {
         // Never let overlay/blocker failures interrupt the tool result
@@ -258,6 +273,16 @@ export class BrowserManager {
     if (this.rawMcpClient) {
       return;
     }
+
+    // Request browser consent if needed (first-run privacy notice)
+    const consentGranted = await getBrowserConsentIfNeeded();
+    if (!consentGranted) {
+      throw new Error(
+        'Browser agent requires user consent to proceed. ' +
+          'Please re-run and accept the privacy notice.',
+      );
+    }
+
     await this.connectMcp();
   }
 
@@ -279,7 +304,7 @@ export class BrowserManager {
       this.rawMcpClient = undefined;
     }
 
-    // Close transport (this terminates the npx process and browser)
+    // Close transport (this terminates the browser)
     if (this.mcpTransport) {
       try {
         await this.mcpTransport.close();
@@ -297,8 +322,7 @@ export class BrowserManager {
   /**
    * Connects to chrome-devtools-mcp which manages the browser process.
    *
-   * Spawns npx chrome-devtools-mcp with:
-   * - --isolated: Manages its own browser instance
+   * Spawns node with the bundled chrome-devtools-mcp.mjs.
    * - --experimental-vision: Enables visual tools (click_at, etc.)
    *
    * IMPORTANT: This does NOT use McpClientManager and does NOT register
@@ -323,11 +347,7 @@ export class BrowserManager {
     const browserConfig = this.config.getBrowserAgentConfig();
     const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
 
-    const mcpArgs = [
-      '-y',
-      `chrome-devtools-mcp@${CHROME_DEVTOOLS_MCP_VERSION}`,
-      '--experimental-vision',
-    ];
+    const mcpArgs = ['--experimental-vision'];
 
     // Session mode determines how the browser is managed:
     // - "isolated": Temp profile, cleaned up after session (--isolated)
@@ -338,6 +358,10 @@ export class BrowserManager {
       mcpArgs.push('--isolated');
     } else if (sessionMode === 'existing') {
       mcpArgs.push('--autoConnect');
+      const message =
+        '🔒 Browsing with your signed-in Chrome profile — cookies and saved logins will be visible to the agent.';
+      coreEvents.emitFeedback('info', message);
+      coreEvents.emitConsoleLog('info', message);
     }
 
     // Add optional settings from config
@@ -353,6 +377,11 @@ export class BrowserManager {
         BROWSER_PROFILE_DIR,
       );
       mcpArgs.push('--userDataDir', defaultProfilePath);
+    }
+
+    // Respect the user's privacy.usageStatisticsEnabled setting
+    if (!this.config.getUsageStatisticsEnabled()) {
+      mcpArgs.push('--no-usage-statistics', '--no-performance-crux');
     }
 
     if (
@@ -373,15 +402,28 @@ export class BrowserManager {
     }
 
     debugLogger.log(
-      `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
+      `Launching bundled chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
 
-    // Create stdio transport to npx chrome-devtools-mcp.
+    // Create stdio transport to the bundled chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
+    let bundleMcpPath = path.resolve(
+      __dirname,
+      'bundled/chrome-devtools-mcp.mjs',
+    );
+    if (!fs.existsSync(bundleMcpPath)) {
+      bundleMcpPath = path.resolve(
+        __dirname,
+        __dirname.includes(`${path.sep}dist${path.sep}`)
+          ? '../../../bundled/chrome-devtools-mcp.mjs'
+          : '../../../dist/bundled/chrome-devtools-mcp.mjs',
+      );
+    }
+
     this.mcpTransport = new StdioClientTransport({
-      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      args: mcpArgs,
+      command: 'node',
+      args: [bundleMcpPath, ...mcpArgs],
       stderr: 'pipe',
     });
 
@@ -492,8 +534,7 @@ export class BrowserManager {
         `Timed out connecting to Chrome: ${message}\n\n` +
           `Possible causes:\n` +
           `  1. Chrome is not installed or not in PATH\n` +
-          `  2. npx cannot download chrome-devtools-mcp (check network/proxy)\n` +
-          `  3. Chrome failed to start (try setting headless: true in settings.json)`,
+          `  2. Chrome failed to start (try setting headless: true in settings.json)`,
       );
     }
 
@@ -564,29 +605,65 @@ export class BrowserManager {
 
     try {
       const parsedUrl = new URL(url);
-      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+      const urlHostname = parsedUrl.hostname;
 
-      for (const domainPattern of allowedDomains) {
-        if (domainPattern.startsWith('*.')) {
-          const baseDomain = domainPattern.substring(2);
+      if (!this.isDomainAllowed(urlHostname, allowedDomains)) {
+        // If none matched, then deny
+        return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+      }
+
+      // Check query parameters for embedded URLs that could bypass domain
+      // restrictions via proxy services (e.g. translate.google.com/translate?u=BLOCKED).
+      const paramsToCheck = [
+        ...parsedUrl.searchParams.values(),
+        // Also check fragments which might contain query-like params
+        ...new URLSearchParams(parsedUrl.hash.replace(/^#/, '')).values(),
+      ];
+      for (const paramValue of paramsToCheck) {
+        try {
+          const embeddedUrl = new URL(paramValue);
           if (
-            urlHostname === baseDomain ||
-            urlHostname.endsWith(`.${baseDomain}`)
+            embeddedUrl.protocol === 'http:' ||
+            embeddedUrl.protocol === 'https:'
           ) {
-            return undefined;
+            const embeddedHostname = embeddedUrl.hostname.replace(/\.$/, '');
+            if (!this.isDomainAllowed(embeddedHostname, allowedDomains)) {
+              return `Tool '${toolName}' is not permitted: an embedded URL targets a disallowed domain.`;
+            }
           }
-        } else {
-          if (urlHostname === domainPattern) {
-            return undefined;
-          }
+        } catch {
+          // Not a valid URL, skip.
         }
       }
+
+      return undefined;
     } catch {
       return `Invalid URL: Malformed URL string.`;
     }
+  }
 
+  /**
+   * Checks whether a hostname matches any pattern in the allowed domains list.
+   */
+  private isDomainAllowed(hostname: string, allowedDomains: string[]): boolean {
+    const normalized = hostname.replace(/\.$/, '');
+    for (const domainPattern of allowedDomains) {
+      if (domainPattern.startsWith('*.')) {
+        const baseDomain = domainPattern.substring(2);
+        if (
+          normalized === baseDomain ||
+          normalized.endsWith(`.${baseDomain}`)
+        ) {
+          return true;
+        }
+      } else {
+        if (normalized === domainPattern) {
+          return true;
+        }
+      }
+    }
     // If none matched, then deny
-    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+    return false;
   }
 
   /**

@@ -186,17 +186,60 @@ describe('Tracker Tools Integration', () => {
 
       expect(display.todos).toEqual([
         {
-          description: `[p1] [TASK] Parent`,
+          description: `task: Parent (p1)`,
           status: 'in_progress',
         },
         {
-          description: `  [c1] [EPIC] Child`,
+          description: `  epic: Child (c1)`,
           status: 'pending',
         },
         {
-          description: `    [leaf] [BUG] Closed Leaf`,
+          description: `    bug: Closed Leaf (leaf)`,
           status: 'completed',
         },
+      ]);
+    });
+
+    it('sorts tasks by status', async () => {
+      const t1 = {
+        id: 't1',
+        title: 'T1',
+        type: TaskType.TASK,
+        status: TaskStatus.CLOSED,
+        dependencies: [],
+      };
+      const t2 = {
+        id: 't2',
+        title: 'T2',
+        type: TaskType.TASK,
+        status: TaskStatus.OPEN,
+        dependencies: [],
+      };
+      const t3 = {
+        id: 't3',
+        title: 'T3',
+        type: TaskType.TASK,
+        status: TaskStatus.IN_PROGRESS,
+        dependencies: [],
+      };
+      const t4 = {
+        id: 't4',
+        title: 'T4',
+        type: TaskType.TASK,
+        status: TaskStatus.BLOCKED,
+        dependencies: [],
+      };
+
+      const mockService = {
+        listTasks: async () => [t1, t2, t3, t4],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      expect(display.todos).toEqual([
+        { description: `task: T3 (t3)`, status: 'in_progress' },
+        { description: `task: T2 (t2)`, status: 'pending' },
+        { description: `task: T4 (t4)`, status: 'blocked' },
+        { description: `task: T1 (t1)`, status: 'completed' },
       ]);
     });
 
@@ -220,7 +263,7 @@ describe('Tracker Tools Integration', () => {
 
       expect(display.todos).toEqual([
         {
-          description: `[p1] [TASK] Parent`,
+          description: `task: Parent (p1)`,
           status: 'pending',
         },
         {

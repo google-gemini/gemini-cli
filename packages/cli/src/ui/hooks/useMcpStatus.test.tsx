@@ -33,13 +33,13 @@ describe('useMcpStatus', () => {
     } as unknown as Config;
   });
 
-  const renderMcpStatusHook = (config: Config) => {
+  const renderMcpStatusHook = async (config: Config) => {
     let hookResult: ReturnType<typeof useMcpStatus>;
     function TestComponent({ config }: { config: Config }) {
       hookResult = useMcpStatus(config);
       return null;
     }
-    render(<TestComponent config={config} />);
+    await render(<TestComponent config={config} />);
     return {
       result: {
         get current() {
@@ -49,37 +49,37 @@ describe('useMcpStatus', () => {
     };
   };
 
-  it('should initialize with correct values (no servers)', () => {
-    const { result } = renderMcpStatusHook(mockConfig);
+  it('should initialize with correct values (no servers)', async () => {
+    const { result } = await renderMcpStatusHook(mockConfig);
 
     expect(result.current.discoveryState).toBe(MCPDiscoveryState.NOT_STARTED);
     expect(result.current.mcpServerCount).toBe(0);
     expect(result.current.isMcpReady).toBe(true);
   });
 
-  it('should initialize with correct values (with servers, not started)', () => {
+  it('should initialize with correct values (with servers, not started)', async () => {
     mockMcpClientManager.getMcpServerCount.mockReturnValue(1);
-    const { result } = renderMcpStatusHook(mockConfig);
+    const { result } = await renderMcpStatusHook(mockConfig);
 
     expect(result.current.isMcpReady).toBe(false);
   });
 
-  it('should not be ready while in progress', () => {
+  it('should not be ready while in progress', async () => {
     mockMcpClientManager.getDiscoveryState.mockReturnValue(
       MCPDiscoveryState.IN_PROGRESS,
     );
     mockMcpClientManager.getMcpServerCount.mockReturnValue(1);
-    const { result } = renderMcpStatusHook(mockConfig);
+    const { result } = await renderMcpStatusHook(mockConfig);
 
     expect(result.current.isMcpReady).toBe(false);
   });
 
-  it('should update state when McpClientUpdate is emitted', () => {
+  it('should update state when McpClientUpdate is emitted', async () => {
     mockMcpClientManager.getMcpServerCount.mockReturnValue(1);
     mockMcpClientManager.getDiscoveryState.mockReturnValue(
       MCPDiscoveryState.IN_PROGRESS,
     );
-    const { result } = renderMcpStatusHook(mockConfig);
+    const { result } = await renderMcpStatusHook(mockConfig);
 
     expect(result.current.isMcpReady).toBe(false);
 
