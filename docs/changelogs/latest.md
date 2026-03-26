@@ -1,6 +1,6 @@
-# Latest stable release: v0.35.0
+# Latest stable release: v0.35.1
 
-Released: March 24, 2026
+Released: March 26, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -380,4 +380,4 @@ npm install -g @google/gemini-cli
   [#23585](https://github.com/google-gemini/gemini-cli/pull/23585)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.0
+https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.1
