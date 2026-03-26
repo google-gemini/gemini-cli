@@ -39,15 +39,16 @@ steps:
           TAG_PRIMARY=$$(echo "$${RAW_BRANCH}" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
         fi
         
-        TAG_SHA="${SHORT_SHA}"
+        # Use SHORT_SHA if available (Cloud Build) or fallback to latest-dev
+        TAG_SHA="$${SHORT_SHA:-latest-dev}"
         
-        echo "📦 Building Development Image for: $${RAW_BRANCH} -> $${TAG_PRIMARY}"
+        echo "📦 Building Development Image for: $${RAW_BRANCH} -> $${TAG_PRIMARY} ($${TAG_SHA})"
         
         docker build -f .gcp/Dockerfile.development \
-          -t "$${IMAGE_BASE}:${SHORT_SHA}" \
+          -t "$${IMAGE_BASE}:$${TAG_SHA}" \
           -t "$${IMAGE_BASE}:$${TAG_PRIMARY}" .
           
-        docker push "$${IMAGE_BASE}:${SHORT_SHA}"
+        docker push "$${IMAGE_BASE}:$${TAG_SHA}"
         docker push "$${IMAGE_BASE}:$${TAG_PRIMARY}"
 
 options:
