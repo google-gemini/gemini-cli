@@ -346,18 +346,18 @@ custom tools:
 
 #### Quick start: SQLite
 
-1. Install an MCP server: `npm install -g @modelcontextprotocol/server-sqlite`
-2. Add it to `~/.gemini/settings.json`:
+1. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) so
+   you can run Python MCP servers with `uvx`.
+2. Add the SQLite reference server to `~/.gemini/settings.json`:
 
    ```json
    {
      "mcpServers": {
        "sqlite": {
-         "command": "npx",
+         "command": "uvx",
          "args": [
-           "-y",
-           "@modelcontextprotocol/server-sqlite",
-           "--db",
+           "mcp-server-sqlite",
+           "--db-path",
            "/path/to/your.db"
          ]
        }
@@ -365,7 +365,7 @@ custom tools:
    }
    ```
 
-3. Use it in the CLI: `> @sqlite show tables`
+3. Use it in the CLI: `> @sqlite list the tables in this database`
 
 See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup
 instructions.

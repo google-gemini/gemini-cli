@@ -312,6 +312,29 @@ lines and `3w` moves forward three words.
 Counts are also supported for editing commands. For example, `3dd` deletes three
 lines and `2cw` changes two words.
 
+### Find, replace, yank, and paste in NORMAL mode
+
+| Action                                    | Keys          |
+| ----------------------------------------- | ------------- |
+| Find next matching character              | `f{char}`     |
+| Find previous matching character          | `F{char}`     |
+| Move until before next matching character | `t{char}`     |
+| Move until after previous matching char   | `T{char}`     |
+| Repeat latest character find              | `;`           |
+| Repeat latest character find in reverse   | `,`           |
+| Delete character before cursor            | `X`           |
+| Toggle case under cursor                  | `~`           |
+| Replace character under cursor            | `r{char}`     |
+| Yank line                                 | `yy`          |
+| Yank to end of line                       | `Y` or `y$`   |
+| Yank word / WORD                          | `yw`, `yW`    |
+| Yank to end of word / WORD                | `ye`, `yE`    |
+| Paste after cursor                        | `p`           |
+| Paste before cursor                       | `P`           |
+
+Delete and change operators also compose with character-find motions, so
+commands such as `dfx`, `dtx`, `cFx`, and `cTx` are supported.
+
 ## Limitations
 
 - On [Windows Terminal](https://en.wikipedia.org/wiki/Windows_Terminal):
