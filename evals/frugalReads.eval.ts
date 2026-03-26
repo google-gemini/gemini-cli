@@ -6,274 +6,220 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import { READ_FILE_TOOL_NAME, EDIT_TOOL_NAME } from '@google/gemini-cli-core';
+import {
+  READ_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+} from '@google/gemini-cli-core';
+
+/* -------------------------------------------------------------------------- */
+/*                                🧰 Helpers                                  */
+/* -------------------------------------------------------------------------- */
+
+const parseArgs = (call: any) => {
+  try {
+    return JSON.parse(call.toolRequest.args);
+  } catch {
+    throw new Error('Invalid JSON in toolRequest.args');
+  }
+};
+
+const filterToolCalls = (logs: any[], toolName: string, file: string) =>
+  logs.filter((log) => {
+    if (log.toolRequest?.name !== toolName) return false;
+    const args = parseArgs(log);
+    return args.file_path?.includes(file);
+  });
+
+const generateMessFile = (
+  size: number,
+  errorIndices: number[],
+): string => {
+  return Array.from({ length: size }, (_, i) =>
+    errorIndices.includes(i)
+      ? `var oldVar${i} = "needs fix";`
+      : `const goodVar${i} = "clean";`,
+  ).join('\n');
+};
+
+/* -------------------------------------------------------------------------- */
+/*                              🧪 Test Suite                                 */
+/* -------------------------------------------------------------------------- */
 
 describe('Frugal reads eval', () => {
   /**
-   * Ensures that the agent is frugal in its use of context by relying
-   * primarily on ranged reads when the line number is known, and combining
-   * nearby ranges into a single contiguous read to save tool calls.
+   * 🧠 Goal:
+   * Ensure agent groups nearby reads into minimal ranged reads
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should use ranged read when nearby lines are targeted',
+    name: 'uses minimal ranged reads for nearby errors',
+
     files: {
       'package.json': JSON.stringify({
         name: 'test-project',
         version: '1.0.0',
         type: 'module',
       }),
-      'eslint.config.mjs': `export default [
-        {
-          files: ["**/*.ts"],
-          rules: {
-            "no-var": "error"
-          }
-        }
-      ];`,
-      'linter_mess.ts': (() => {
-        const lines = [];
-        for (let i = 0; i < 1000; i++) {
-          if (i === 500 || i === 510 || i === 520) {
-            lines.push(`var oldVar${i} = "needs fix";`);
-          } else {
-            lines.push(`const goodVar${i} = "clean";`);
-          }
-        }
-        return lines.join('\n');
-      })(),
+
+      'eslint.config.mjs': `export default [{
+        files: ["**/*.ts"],
+        rules: { "no-var": "error" }
+      }];`,
+
+      'linter_mess.ts': generateMessFile(1000, [500, 510, 520]),
     },
+
     prompt:
-      'Fix all linter errors in linter_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
+      'Fix all linter errors in linter_mess.ts manually. Use eslint (npx --yes eslint). Do not execute the file.',
+
     assert: async (rig) => {
       const logs = rig.readToolLogs();
 
-      // Check if the agent read the whole file
-      const readCalls = logs.filter(
-        (log) => log.toolRequest?.name === READ_FILE_TOOL_NAME,
-      );
+      const reads = filterToolCalls(logs, READ_FILE_TOOL_NAME, 'linter_mess.ts');
+      const edits = filterToolCalls(logs, EDIT_TOOL_NAME, 'linter_mess.ts');
 
-      const targetFileReads = readCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('linter_mess.ts');
-      });
+      /* ---------- Read Assertions ---------- */
+
+      expect(reads.length).toBeGreaterThan(0);
+      expect(reads.length).toBeLessThanOrEqual(3); // frugal grouping
+
+      const promptId = reads[0].toolRequest.prompt_id;
+      expect(promptId).toBeDefined();
 
       expect(
-        targetFileReads.length,
-        'Agent should have used read_file to check context',
-      ).toBeGreaterThan(0);
-
-      // We expect 1-3 ranges in a single turn.
-      expect(
-        targetFileReads.length,
-        'Agent should have used 1-3 ranged reads for near errors',
-      ).toBeLessThanOrEqual(3);
-
-      const firstPromptId = targetFileReads[0].toolRequest.prompt_id;
-      expect(firstPromptId, 'Prompt ID should be defined').toBeDefined();
-      expect(
-        targetFileReads.every(
-          (call) => call.toolRequest.prompt_id === firstPromptId,
-        ),
-        'All reads should have happened in the same turn',
+        reads.every((r) => r.toolRequest.prompt_id === promptId),
       ).toBe(true);
 
-      let totalLinesRead = 0;
-      const readRanges: { start_line: number; end_line: number }[] = [];
+      let totalLines = 0;
+      const ranges: { start: number; end: number }[] = [];
 
-      for (const call of targetFileReads) {
-        const args = JSON.parse(call.toolRequest.args);
+      for (const call of reads) {
+        const args = parseArgs(call);
 
-        expect(
-          args.end_line,
-          'Agent read the entire file (missing end_line) instead of using ranged read',
-        ).toBeDefined();
+        expect(args.end_line).toBeDefined(); // must use ranged read
 
-        const end_line = args.end_line;
-        const start_line = args.start_line ?? 1;
-        const linesRead = end_line - start_line + 1;
-        totalLinesRead += linesRead;
-        readRanges.push({ start_line, end_line });
+        const start = args.start_line ?? 1;
+        const end = args.end_line;
 
-        expect(linesRead, 'Agent read too many lines at once').toBeLessThan(
-          1001,
-        );
+        const lines = end - start + 1;
+        totalLines += lines;
+
+        ranges.push({ start, end });
+
+        expect(lines).toBeLessThan(1001); // not whole file
       }
 
-      // Ranged read shoud be frugal and just enough to satisfy the task at hand.
-      expect(
-        totalLinesRead,
-        'Agent read more of the file than expected',
-      ).toBeLessThan(1000);
+      expect(totalLines).toBeLessThan(1000);
 
-      // Check that we read around the error lines
+      /* ---------- Coverage Check ---------- */
+
       const errorLines = [500, 510, 520];
+
       for (const line of errorLines) {
-        const covered = readRanges.some(
-          (range) => line >= range.start_line && line <= range.end_line,
+        const covered = ranges.some(
+          (r) => line >= r.start && line <= r.end,
         );
-        expect(covered, `Agent should have read around line ${line}`).toBe(
-          true,
-        );
+        expect(covered).toBe(true);
       }
 
-      const editCalls = logs.filter(
-        (log) => log.toolRequest?.name === EDIT_TOOL_NAME,
-      );
-      const targetEditCalls = editCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('linter_mess.ts');
-      });
-      expect(
-        targetEditCalls.length,
-        'Agent should have made replacement calls on the target file',
-      ).toBeGreaterThanOrEqual(3);
+      /* ---------- Edit Assertions ---------- */
+
+      expect(edits.length).toBeGreaterThanOrEqual(3);
     },
   });
 
   /**
-   * Ensures the agent uses multiple ranged reads when the targets are far
-   * apart to avoid the need to read the whole file.
+   * 🧠 Goal:
+   * Ensure agent uses multiple ranged reads when targets are far apart
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should use ranged read when targets are far apart',
+    name: 'uses separate ranged reads for distant errors',
+
     files: {
       'package.json': JSON.stringify({
         name: 'test-project',
         version: '1.0.0',
         type: 'module',
       }),
-      'eslint.config.mjs': `export default [
-        {
-          files: ["**/*.ts"],
-          rules: {
-            "no-var": "error"
-          }
-        }
-      ];`,
-      'far_mess.ts': (() => {
-        const lines = [];
-        for (let i = 0; i < 1000; i++) {
-          if (i === 100 || i === 900) {
-            lines.push(`var oldVar${i} = "needs fix";`);
-          } else {
-            lines.push(`const goodVar${i} = "clean";`);
-          }
-        }
-        return lines.join('\n');
-      })(),
+
+      'eslint.config.mjs': `export default [{
+        files: ["**/*.ts"],
+        rules: { "no-var": "error" }
+      }];`,
+
+      'far_mess.ts': generateMessFile(1000, [100, 900]),
     },
+
     prompt:
-      'Fix all linter errors in far_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
+      'Fix all linter errors in far_mess.ts manually. Use eslint (npx --yes eslint). Do not execute the file.',
+
     assert: async (rig) => {
       const logs = rig.readToolLogs();
 
-      const readCalls = logs.filter(
-        (log) => log.toolRequest?.name === READ_FILE_TOOL_NAME,
-      );
+      const reads = filterToolCalls(logs, READ_FILE_TOOL_NAME, 'far_mess.ts');
 
-      const targetFileReads = readCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('far_mess.ts');
-      });
+      expect(reads.length).toBeGreaterThan(0);
+      expect(reads.length).toBeLessThanOrEqual(4);
 
-      // The agent should use ranged reads to be frugal with context tokens,
-      // even if it requires multiple calls for far-apart errors.
-      expect(
-        targetFileReads.length,
-        'Agent should have used read_file to check context',
-      ).toBeGreaterThan(0);
-
-      // We allow multiple calls since the errors are far apart.
-      expect(
-        targetFileReads.length,
-        'Agent should have used separate reads for far apart errors',
-      ).toBeLessThanOrEqual(4);
-
-      for (const call of targetFileReads) {
-        const args = JSON.parse(call.toolRequest.args);
-        expect(
-          args.end_line,
-          'Agent should have used ranged read (end_line) to save tokens',
-        ).toBeDefined();
+      for (const call of reads) {
+        const args = parseArgs(call);
+        expect(args.end_line).toBeDefined();
       }
     },
   });
 
   /**
-   * Validates that the agent reads the entire file if there are lots of matches
-   * (e.g.: 10), as it's more efficient than many small ranged reads.
+   * 🧠 Goal:
+   * Ensure agent reads full file when many scattered matches exist
    */
   evalTest('USUALLY_PASSES', {
-    name: 'should read the entire file when there are many matches',
+    name: 'reads entire file for many scattered errors',
+
     files: {
       'package.json': JSON.stringify({
         name: 'test-project',
         version: '1.0.0',
         type: 'module',
       }),
-      'eslint.config.mjs': `export default [
-        {
-          files: ["**/*.ts"],
-          rules: {
-            "no-var": "error"
-          }
-        }
-      ];`,
-      'many_mess.ts': (() => {
-        const lines = [];
-        for (let i = 0; i < 1000; i++) {
-          if (i % 100 === 0) {
-            lines.push(`var oldVar${i} = "needs fix";`);
-          } else {
-            lines.push(`const goodVar${i} = "clean";`);
-          }
-        }
-        return lines.join('\n');
-      })(),
+
+      'eslint.config.mjs': `export default [{
+        files: ["**/*.ts"],
+        rules: { "no-var": "error" }
+      }];`,
+
+      'many_mess.ts': generateMessFile(
+        1000,
+        Array.from({ length: 10 }, (_, i) => i * 100),
+      ),
     },
+
     prompt:
-      'Fix all linter errors in many_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
+      'Fix all linter errors in many_mess.ts manually. Use eslint (npx --yes eslint). Do not execute the file.',
+
     assert: async (rig) => {
       const logs = rig.readToolLogs();
 
-      const readCalls = logs.filter(
-        (log) => log.toolRequest?.name === READ_FILE_TOOL_NAME,
+      const reads = filterToolCalls(
+        logs,
+        READ_FILE_TOOL_NAME,
+        'many_mess.ts',
       );
 
-      const targetFileReads = readCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('many_mess.ts');
-      });
+      const edits = filterToolCalls(
+        logs,
+        EDIT_TOOL_NAME,
+        'many_mess.ts',
+      );
 
-      expect(
-        targetFileReads.length,
-        'Agent should have used read_file to check context',
-      ).toBeGreaterThan(0);
+      expect(reads.length).toBeGreaterThan(0);
 
-      // In this case, we expect the agent to realize there are many scattered errors
-      // and just read the whole file to be efficient with tool calls.
-      const readEntireFile = targetFileReads.some((call) => {
-        const args = JSON.parse(call.toolRequest.args);
+      const readFullFile = reads.some((call) => {
+        const args = parseArgs(call);
         return args.end_line === undefined;
       });
 
-      expect(
-        readEntireFile,
-        'Agent should have read the entire file because of the high number of scattered matches',
-      ).toBe(true);
+      expect(readFullFile).toBe(true);
 
-      // Check that the agent actually fixed the errors
-      const editCalls = logs.filter(
-        (log) => log.toolRequest?.name === EDIT_TOOL_NAME,
-      );
-      const targetEditCalls = editCalls.filter((call) => {
-        const args = JSON.parse(call.toolRequest.args);
-        return args.file_path.includes('many_mess.ts');
-      });
-      expect(
-        targetEditCalls.length,
-        'Agent should have made replacement calls on the target file',
-      ).toBeGreaterThanOrEqual(1);
+      expect(edits.length).toBeGreaterThanOrEqual(1);
     },
   });
 });
