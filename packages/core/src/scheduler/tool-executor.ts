@@ -307,7 +307,7 @@ export class ToolExecutor {
 
       outputFile = truncatedOutputFile;
       responseParts = convertToFunctionResponse(
-        call.request.name,
+        call.request.originalRequestName ?? call.request.name,
         call.request.callId,
         output,
         this.config.getActiveModel(),
@@ -325,7 +325,7 @@ export class ToolExecutor {
         {
           functionResponse: {
             id: call.request.callId,
-            name: call.request.name,
+            name: call.request.originalRequestName ?? call.request.name,
             response: { error: errorMessage },
           },
         },
