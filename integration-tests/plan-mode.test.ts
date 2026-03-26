@@ -7,7 +7,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, checkModelOutputContent } from './test-helper.js';
+import { GEMINI_DIR, TestRig, checkModelOutputContent } from './test-helper.js';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
