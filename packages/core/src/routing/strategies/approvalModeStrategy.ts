@@ -7,7 +7,6 @@
 import type { Config } from '../../config/config.js';
 import {
   isAutoModel,
-  isProModel,
   resolveClassifierModel,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_PRO,
@@ -36,8 +35,8 @@ export class ApprovalModeStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const model = context.requestedModel ?? config.getModel();
 
-    // This strategy only applies to "auto" or "pro" models.
-    if (!isAutoModel(model, config) && !isProModel(model, config)) {
+    // This strategy only applies to "auto" models.
+    if (!isAutoModel(model, config)) {
       return null;
     }
 
