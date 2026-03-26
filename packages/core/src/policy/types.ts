@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -311,13 +312,9 @@ export interface PolicyEngineConfig {
   approvalMode?: ApprovalMode;
 
   /**
-   * Whether tool sandboxing is enabled.
+   * The sandbox manager instance.
    */
-  toolSandboxEnabled?: boolean;
-  /**
-   * List of tools approved by the sandbox policy for the current mode.
-   */
-  sandboxApprovedTools?: string[];
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {
