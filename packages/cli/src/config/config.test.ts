@@ -226,6 +226,51 @@ afterEach(() => {
 });
 
 describe('parseArguments', () => {
+  describe('worktree', () => {
+    it('should parse --worktree flag when provided with a name', async () => {
+      process.argv = ['node', 'script.js', '--worktree', 'my-feature'];
+      const settings = createTestMergedSettings();
+      settings.experimental.worktrees = true;
+      const argv = await parseArguments(settings);
+      expect(argv.worktree).toBe('my-feature');
+    });
+
+    it('should generate a random name when --worktree is provided without a name', async () => {
+      process.argv = ['node', 'script.js', '--worktree'];
+      const settings = createTestMergedSettings();
+      settings.experimental.worktrees = true;
+      const argv = await parseArguments(settings);
+      expect(argv.worktree).toBeDefined();
+      expect(argv.worktree).not.toBe('');
+      expect(typeof argv.worktree).toBe('string');
+    });
+
+    it('should throw an error when --worktree is used but experimental.worktrees is not enabled', async () => {
+      process.argv = ['node', 'script.js', '--worktree', 'feature'];
+      const settings = createTestMergedSettings();
+      settings.experimental.worktrees = false;
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(parseArguments(settings)).rejects.toThrow(
+        'process.exit called',
+      );
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'The --worktree flag is only available when experimental.worktrees is enabled in your settings.',
+        ),
+      );
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+  });
+
   it.each([
     {
       description: 'long flags',
@@ -276,6 +321,41 @@ describe('parseArguments', () => {
       mockConsoleError.mockRestore();
     },
   );
+
+  describe('isCommand middleware', () => {
+    it.each([
+      { cmd: 'mcp list', expected: true },
+      { cmd: 'extensions list', expected: true },
+      { cmd: 'extension list', expected: true },
+      { cmd: 'skills list', expected: true },
+      { cmd: 'skill list', expected: true },
+      { cmd: 'hooks migrate', expected: true },
+      { cmd: 'hook migrate', expected: true },
+      { cmd: 'some query', expected: undefined },
+      { cmd: 'hello world', expected: undefined },
+    ])(
+      'should set isCommand to $expected for "$cmd"',
+      async ({ cmd, expected }) => {
+        process.argv = ['node', 'script.js', ...cmd.split(' ')];
+        const settings = createTestMergedSettings({
+          admin: {
+            mcp: { enabled: true },
+          },
+          experimental: {
+            extensionManagement: true,
+          },
+          skills: {
+            enabled: true,
+          },
+          hooksConfig: {
+            enabled: true,
+          },
+        });
+        const parsedArgs = await parseArguments(settings);
+        expect(parsedArgs.isCommand).toBe(expected);
+      },
+    );
+  });
 
   it.each([
     {
@@ -763,6 +843,48 @@ describe('loadCliConfig', () => {
     });
   });
 
+  it('should add IDE workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH to include directories', async () => {
+    vi.stubEnv(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      ['/project/folderA', '/project/folderB'].join(path.delimiter),
+    );
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const dirs = config.getPendingIncludeDirectories();
+    expect(dirs).toContain('/project/folderA');
+    expect(dirs).toContain('/project/folderB');
+  });
+
+  it('should skip inaccessible workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH', async () => {
+    const resolveToRealPathSpy = vi
+      .spyOn(ServerConfig, 'resolveToRealPath')
+      .mockImplementation((p) => {
+        if (p.toString().includes('restricted')) {
+          const err = new Error('EACCES: permission denied');
+          (err as NodeJS.ErrnoException).code = 'EACCES';
+          throw err;
+        }
+        return p.toString();
+      });
+    vi.stubEnv(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      ['/project/folderA', '/nonexistent/restricted/folder'].join(
+        path.delimiter,
+      ),
+    );
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const dirs = config.getPendingIncludeDirectories();
+    expect(dirs).toContain('/project/folderA');
+    expect(dirs).not.toContain('/nonexistent/restricted/folder');
+
+    resolveToRealPathSpy.mockRestore();
+  });
+
   it('should use default fileFilter options when unconfigured', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -798,6 +920,7 @@ describe('loadCliConfig', () => {
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
     // Restore ExtensionManager mocks that were reset
     ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
     ExtensionManager.prototype.loadExtensions = vi
@@ -809,12 +932,15 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
     process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings();
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
@@ -865,6 +991,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     process.argv = ['node', 'script.js'];
     const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: [includeDir],
         loadMemoryFromIncludeDirectories: true,
@@ -892,6 +1019,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: ['/path/to/include'],
         loadMemoryFromIncludeDirectories: false,
@@ -1623,6 +1751,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
 
     const serverA = config.getMcpServers()?.['serverA'];
     expect(serverA).toEqual({
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...localMcpServers['serverA'],
       type: 'sse',
       url: 'https://admin-server-a.com/sse',
@@ -1673,6 +1802,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     };
     const localMcpServersWithTools: Record<string, MCPServerConfig> = {
       serverA: {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localMcpServers['serverA'],
         includeTools: ['local_tool'],
         timeout: 1234,
@@ -1715,6 +1845,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     };
     const localMcpServersWithTools: Record<string, MCPServerConfig> = {
       serverA: {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...localMcpServers['serverA'],
         includeTools: ['local_tool'],
       },
@@ -1773,7 +1904,7 @@ describe('loadCliConfig model selection', () => {
   });
 
   it('always prefers model from argv', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings({
@@ -1785,11 +1916,11 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-flash');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the model from argv if provided', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings({
@@ -1799,7 +1930,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-flash');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the default auto model if provided via auto alias', async () => {
@@ -2174,6 +2305,30 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
+    expect(config.getExcludeTools()).toContain('ask_user');
+  });
+
+  it('should exclude ask_user in interactive mode when --acp is provided', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getExcludeTools()).toContain('ask_user');
+  });
+
+  it('should exclude ask_user in interactive mode when --experimental-acp is provided', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
     expect(config.getExcludeTools()).toContain('ask_user');
   });
 
@@ -3343,7 +3498,10 @@ describe('Policy Engine Integration in loadCliConfig', () => {
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
+        policyPaths: [
+          path.normalize('/path/to/policy1.toml'),
+          path.normalize('/path/to/policy2.toml'),
+        ],
       }),
       expect.anything(),
     );
@@ -3632,6 +3790,8 @@ describe('loadCliConfig acpMode and clientName', () => {
   it('should set acpMode to true and detect clientName when --acp flag is used', async () => {
     process.argv = ['node', 'script.js', '--acp'];
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings(),
@@ -3645,6 +3805,8 @@ describe('loadCliConfig acpMode and clientName', () => {
   it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
     process.argv = ['node', 'script.js', '--acp'];
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings(),

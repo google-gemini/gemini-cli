@@ -332,8 +332,9 @@ async function initOauthClient(
 
     // Add timeout to prevent infinite waiting when browser tab gets stuck
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(
           new FatalAuthenticationError(
             'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
@@ -371,6 +372,9 @@ async function initOauthClient(
         cancellationPromise,
       ]);
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (sigIntHandler) {
         process.removeListener('SIGINT', sigIntHandler);
       }
@@ -700,7 +704,6 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
-    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(
       'https://www.googleapis.com/oauth2/v2/userinfo',
       {

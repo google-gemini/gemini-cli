@@ -139,7 +139,7 @@ export class ClassifierStrategy implements RoutingStrategy {
       const model = context.requestedModel ?? config.getModel();
       if (
         (await config.getNumericalRoutingEnabled()) &&
-        isGemini3Model(model)
+        isGemini3Model(model, config)
       ) {
         return null;
       }
@@ -171,15 +171,20 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
-      const [useGemini3_1, useCustomToolModel] = await Promise.all([
-        config.getGemini31Launched(),
-        config.getUseCustomToolModel(),
-      ]);
+      const [useGemini3_1, useGemini3_1FlashLite, useCustomToolModel] =
+        await Promise.all([
+          config.getGemini31Launched(),
+          config.getGemini31FlashLiteLaunched(),
+          config.getUseCustomToolModel(),
+        ]);
       const selectedModel = resolveClassifierModel(
         model,
         routerResponse.model_choice,
         useGemini3_1,
+        useGemini3_1FlashLite,
         useCustomToolModel,
+        config.getHasAccessToPreviewModel?.() ?? true,
+        config,
       );
 
       return {

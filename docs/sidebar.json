@@ -12,7 +12,6 @@
             "label": "Authentication",
             "slug": "docs/get-started/authentication"
           },
-          { "label": "Examples", "slug": "docs/get-started/examples" },
           { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
           {
             "label": "Gemini 3 on Gemini CLI",
@@ -99,6 +98,11 @@
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
+          {
+            "label": "Git worktrees",
+            "badge": "🔬",
+            "slug": "docs/cli/git-worktrees"
+          },
           {
             "label": "Hooks",
             "collapsed": true,

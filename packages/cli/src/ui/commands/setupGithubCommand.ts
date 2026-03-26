@@ -123,7 +123,6 @@ async function downloadFiles({
     downloads.push(
       (async () => {
         const endpoint = `${REPO_DOWNLOAD_URL}/refs/tags/${releaseTag}/${SOURCE_DIR}/${fileBasename}`;
-        // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
         const response = await fetch(endpoint, {
           method: 'GET',
           dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
@@ -231,7 +230,7 @@ export const setupGithubCommand: SlashCommand = {
     }
 
     // Get the latest release tag from GitHub
-    const proxy = context?.services?.config?.getProxy();
+    const proxy = context?.services?.agentContext?.config.getProxy();
     const releaseTag = await getLatestGitHubRelease(proxy);
     const readmeUrl = `https://github.com/google-github-actions/run-gemini-cli/blob/${releaseTag}/README.md#quick-start`;
 

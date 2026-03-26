@@ -18,7 +18,7 @@ describe('useTimer', () => {
     vi.restoreAllMocks();
   });
 
-  const renderTimerHook = (
+  const renderTimerHook = async (
     initialIsActive: boolean,
     initialResetKey: number,
   ) => {
@@ -33,7 +33,7 @@ describe('useTimer', () => {
       hookResult = useTimer(isActive, resetKey);
       return null;
     }
-    const { rerender, unmount } = render(
+    const { rerender, unmount } = await render(
       <TestComponent isActive={initialIsActive} resetKey={initialResetKey} />,
     );
     return {
@@ -48,21 +48,21 @@ describe('useTimer', () => {
     };
   };
 
-  it('should initialize with 0', () => {
-    const { result } = renderTimerHook(false, 0);
+  it('should initialize with 0', async () => {
+    const { result } = await renderTimerHook(false, 0);
     expect(result.current).toBe(0);
   });
 
-  it('should not increment time if isActive is false', () => {
-    const { result } = renderTimerHook(false, 0);
+  it('should not increment time if isActive is false', async () => {
+    const { result } = await renderTimerHook(false, 0);
     act(() => {
       vi.advanceTimersByTime(5000);
     });
     expect(result.current).toBe(0);
   });
 
-  it('should increment time every second if isActive is true', () => {
-    const { result } = renderTimerHook(true, 0);
+  it('should increment time every second if isActive is true', async () => {
+    const { result } = await renderTimerHook(true, 0);
     act(() => {
       vi.advanceTimersByTime(1000);
     });
@@ -73,8 +73,8 @@ describe('useTimer', () => {
     expect(result.current).toBe(3);
   });
 
-  it('should reset to 0 and start incrementing when isActive becomes true from false', () => {
-    const { result, rerender } = renderTimerHook(false, 0);
+  it('should reset to 0 and start incrementing when isActive becomes true from false', async () => {
+    const { result, rerender } = await renderTimerHook(false, 0);
     expect(result.current).toBe(0);
 
     act(() => {
@@ -88,8 +88,8 @@ describe('useTimer', () => {
     expect(result.current).toBe(1);
   });
 
-  it('should reset to 0 when resetKey changes while active', () => {
-    const { result, rerender } = renderTimerHook(true, 0);
+  it('should reset to 0 when resetKey changes while active', async () => {
+    const { result, rerender } = await renderTimerHook(true, 0);
     act(() => {
       vi.advanceTimersByTime(3000); // 3s
     });
@@ -106,8 +106,8 @@ describe('useTimer', () => {
     expect(result.current).toBe(1); // Starts incrementing from 0
   });
 
-  it('should be 0 if isActive is false, regardless of resetKey changes', () => {
-    const { result, rerender } = renderTimerHook(false, 0);
+  it('should be 0 if isActive is false, regardless of resetKey changes', async () => {
+    const { result, rerender } = await renderTimerHook(false, 0);
     expect(result.current).toBe(0);
 
     act(() => {
@@ -116,15 +116,15 @@ describe('useTimer', () => {
     expect(result.current).toBe(0);
   });
 
-  it('should clear timer on unmount', () => {
-    const { unmount } = renderTimerHook(true, 0);
+  it('should clear timer on unmount', async () => {
+    const { unmount } = await renderTimerHook(true, 0);
     const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
     unmount();
     expect(clearIntervalSpy).toHaveBeenCalledOnce();
   });
 
-  it('should preserve elapsedTime when isActive becomes false, and reset to 0 when it becomes active again', () => {
-    const { result, rerender } = renderTimerHook(true, 0);
+  it('should preserve elapsedTime when isActive becomes false, and reset to 0 when it becomes active again', async () => {
+    const { result, rerender } = await renderTimerHook(true, 0);
 
     act(() => {
       vi.advanceTimersByTime(3000); // Advance to 3 seconds
