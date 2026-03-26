@@ -6,7 +6,7 @@ workspace better and enables powerful features like native in-editor diffing.
 
 There are two primary ways to integrate Gemini CLI with an IDE:
 
-1.  **VS Code Companion Extension**: Install the "Gemini CLI Companion"
+1.  **VS Code companion extension**: Install the "Gemini CLI Companion"
     extension on [Antigravity](https://antigravity.google),
     [Visual Studio Code](https://code.visualstudio.com/), or other VS Code
     compatible editors.
@@ -15,7 +15,7 @@ There are two primary ways to integrate Gemini CLI with an IDE:
     tools like JetBrains and Zed, which leverage the ACP Agent Registry for easy
     discovery and installation of compatible agents like Gemini CLI.
 
-## VS Code Companion Extension
+## VS Code companion extension
 
 The **Gemini CLI Companion extension** grants Gemini CLI direct access to your
 VS Code compatible IDEs and improves your experience by providing real-time
@@ -46,7 +46,7 @@ AI-generated code changes directly within your editor.
   - `Gemini CLI: View Third-Party Notices`: Displays the third-party notices for
     the extension.
 
-### Installation and Setup
+### Installation and setup
 
 There are three ways to set up the IDE integration:
 
@@ -122,7 +122,7 @@ recently opened files it is aware of.
 <!-- prettier-ignore -->
 > [!NOTE]
 > The file list is limited to 10 recently accessed files within your
-> workspace and only includes local files on disk.)
+> workspace and only includes local files on disk.
 
 #### Working with diffs
 
@@ -170,9 +170,9 @@ eliminates the need for manual downloads or IDE-specific extensions.
 
 Using the registry ensures:
 
-- **Ease of Use**: Discover and install agents directly within your IDE
+- **Ease of use**: Discover and install agents directly within your IDE
   settings.
-- **Latest Versions**: Ensures users always have access to the most up-to-date
+- **Latest versions**: Ensures users always have access to the most up-to-date
   agent implementations.
 
 For more details on how the registry works, visit the official
@@ -180,7 +180,7 @@ For more details on how the registry works, visit the official
 You can learn about how specific IDEs leverage this integration in the following
 section.
 
-### IDE-Specific Integration
+### IDE-specific integration
 
 Gemini CLI is an ACP-compatible agent available in the ACP Agent Registry.
 Here’s how different IDEs leverage the ACP and the registry:
@@ -206,7 +206,7 @@ Learn more about Zed's integration with the ACP Registry in their
 Any other IDE that supports the ACP Agent Registry can install Gemini CLI
 directly through their in-built registry features.
 
-## Using with Sandboxing
+## Using with sandboxing
 
 If you are using Gemini CLI within a sandbox, please be aware of the following:
 
