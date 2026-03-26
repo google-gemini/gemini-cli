@@ -1,8 +1,8 @@
 # ACP Mode
 
-ACP (Agent Client Protocol) mode is a special operational mode of Gemini
-CLI designed for programmatic control, primarily for IDE and other developer
-tool integrations. It uses a JSON-RPC protocol over stdio to communicate between
+ACP (Agent Client Protocol) mode is a special operational mode of Gemini CLI
+designed for programmatic control, primarily for IDE and other developer tool
+integrations. It uses a JSON-RPC protocol over stdio to communicate between
 Gemini CLI agent and a client.
 
 To start Gemini CLI in ACP mode, use the `--acp` flag:
@@ -54,9 +54,9 @@ The core of the ACP implementation can be found in
 
 ### Extending with MCP
 
-ACP can be used with the Model Context Protocol
-(MCP). This lets an ACP client (like an IDE) expose its own functionality as
-"tools" that the Gemini model can use.
+ACP can be used with the Model Context Protocol (MCP). This lets an ACP client
+(like an IDE) expose its own functionality as "tools" that the Gemini model can
+use.
 
 1.  The client implements an **MCP server** that advertises its tools (e.g.,
     `goToDefinition`, `findReferences`).
@@ -73,7 +73,8 @@ leverage the IDE's capabilities to perform tasks. The MCP client logic is in
 
 ## Capabilities and supported methods
 
-The ACP protocol exposes a number of methods for ACP clients (e.g. IDEs) to control Gemini CLI.
+The ACP protocol exposes a number of methods for ACP clients (e.g. IDEs) to
+control Gemini CLI.
 
 ### Core methods
 
