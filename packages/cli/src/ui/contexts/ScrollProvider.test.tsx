@@ -85,6 +85,7 @@ describe('ScrollProvider', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
