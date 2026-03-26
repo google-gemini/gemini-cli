@@ -215,6 +215,10 @@ export class BrowserManager {
     // Re-inject the automation overlay and input blocker after tools that
     // can cause a full-page navigation. chrome-devtools-mcp emits no MCP
     // notifications, so callTool() is the only interception point.
+    //
+    // The input blocker injection is idempotent: the injected function
+    // reuses the existing DOM element when present and only recreates
+    // it when navigation has actually replaced the page DOM.
     if (
       !result.isError &&
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
@@ -224,17 +228,8 @@ export class BrowserManager {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
         }
-        // Only re-inject the input blocker for tools that *reliably*
-        // replace the page DOM (navigate_page, new_page, select_page).
-        // click/click_at are handled by pointer-events suspend/resume
-        // in mcpToolWrapper — no full re-inject roundtrip needed.
-        // press_key/handle_dialog only sometimes navigate.
-        const reliableNavigation =
-          toolName === 'navigate_page' ||
-          toolName === 'new_page' ||
-          toolName === 'select_page';
-        if (this.shouldDisableInput && reliableNavigation) {
-          await injectInputBlocker(this);
+        if (this.shouldDisableInput) {
+          await injectInputBlocker(this, signal);
         }
       } catch {
         // Never let overlay/blocker failures interrupt the tool result

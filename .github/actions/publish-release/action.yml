@@ -221,7 +221,9 @@ runs:
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} false
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} false
+        fi
 
     - name: 'Get a2a-server Token'
       uses: './.github/actions/npm-auth-token'
