@@ -137,6 +137,10 @@ export class GeminiClient {
     this.updateSystemInstruction();
   };
 
+  clearCurrentSequenceModel(): void {
+    this.currentSequenceModel = null;
+  }
+
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
   private hookStateMap = new Map<
