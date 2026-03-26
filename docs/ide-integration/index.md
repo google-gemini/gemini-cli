@@ -10,7 +10,7 @@ There are two primary ways to integrate Gemini CLI with an IDE:
     extension on [Antigravity](https://antigravity.google),
     [Visual Studio Code](https://code.visualstudio.com/), or other VS Code
     compatible editors.
-2.  **Agent Communication Protocol (ACP)**: An open protocol for
+2.  **Agent Client Protocol (ACP)**: An open protocol for
     interoperability between AI coding agents and IDEs. This method is used for
     integrations with tools like JetBrains and Zed, which leverage the ACP Agent
     Registry for easy discovery and installation of compatible agents like
@@ -147,7 +147,7 @@ accepting them.
 If you select ‘Allow for this session’ in the CLI, changes will no longer show
 up in the IDE as they will be auto-accepted.
 
-## Agent Communication Protocol (ACP)
+## Agent Client Protocol (ACP)
 
 ACP is an open protocol that standardizes how AI coding agents communicate with
 code editors and IDEs. It addresses the challenge of fragmented distribution,
@@ -165,7 +165,7 @@ documentation.
 The ACP Agent Registry simplifies the discovery, installation, and management of
 ACP-compatible agents directly within supported IDEs. Instead of manual
 installation or per-IDE extensions, agents registered here are instantly
-available to all integrated clients.
+available to all supporting clients.
 
 This means:
 

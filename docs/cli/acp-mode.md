@@ -1,17 +1,17 @@
 # ACP Mode
 
-ACP (Agent Communication Protocol) mode is a special operational mode of Gemini
+ACP (Agent Client Protocol) mode is a special operational mode of Gemini
 CLI designed for programmatic control, primarily for IDE and other developer
 tool integrations. It uses a JSON-RPC protocol over stdio to communicate between
 Gemini CLI agent and a client.
 
-To start Gemini CLI in ACP mode, use the `--acp` or `--experimental-acp` flag:
+To start Gemini CLI in ACP mode, use the `--acp` flag:
 
 ```bash
 gemini --acp
 ```
 
-## Agent Communication Protocol (ACP)
+## Agent Client Protocol (ACP)
 
 ACP is an open protocol that standardizes how AI coding agents communicate with
 code editors and IDEs. It addresses the challenge of fragmented distribution,
@@ -54,8 +54,8 @@ The core of the ACP implementation can be found in
 
 ### Extending with MCP
 
-A key feature of ACP is its extensibility through the Model Context Protocol
-(MCP). This lets an ACP client (like an IDE) to expose its own functionality as
+ACP can be used with the Model Context Protocol
+(MCP). This lets an ACP client (like an IDE) expose its own functionality as
 "tools" that the Gemini model can use.
 
 1.  The client implements an **MCP server** that advertises its tools (e.g.,
@@ -63,7 +63,7 @@ A key feature of ACP is its extensibility through the Model Context Protocol
 2.  During the ACP `initialize` handshake, the client provides the connection
     details for its MCP server.
 3.  Gemini CLI connects to the MCP server, discovers the available tools, and
-    makes them available to the language model.
+    makes them available to the AI model.
 4.  When the model decides to use one of these tools, Gemini CLI sends a tool
     call request to the MCP server.
 
@@ -73,7 +73,7 @@ leverage the IDE's capabilities to perform tasks. The MCP client logic is in
 
 ## Capabilities and supported methods
 
-The ACP protocol exposes a number of methods to control the agent.
+The ACP protocol exposes a number of methods for ACP clients (e.g. IDEs) to control Gemini CLI.
 
 ### Core methods
 
