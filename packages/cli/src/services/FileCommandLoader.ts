@@ -301,7 +301,6 @@ export class FileCommandLoader implements ICommandLoader {
       extensionId,
       action: async (
         context: CommandContext,
-        _args: string,
       ): Promise<SlashCommandActionReturn> => {
         if (!context.invocation) {
           coreEvents.emitFeedback(
