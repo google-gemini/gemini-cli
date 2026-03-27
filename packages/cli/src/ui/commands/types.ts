@@ -11,11 +11,11 @@ import type {
   ConfirmationRequest,
 } from '../types.js';
 import type {
-  Config,
   GitService,
   Logger,
   CommandActionReturn,
   AgentDefinition,
+  AgentLoopContext,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -39,7 +39,7 @@ export interface CommandContext {
   // Core services and configuration
   services: {
     // TODO(abhipatel12): Ensure that config is never null.
-    config: Config | null;
+    agentContext: AgentLoopContext | null;
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;
@@ -177,9 +177,12 @@ export type SlashCommandActionReturn =
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
-  FILE = 'file',
+  USER_FILE = 'user-file',
+  WORKSPACE_FILE = 'workspace-file',
+  EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
+  SKILL = 'skill',
 }
 
 // The standardized contract for any command in the system.
@@ -188,6 +191,11 @@ export interface SlashCommand {
   altNames?: string[];
   description: string;
   hidden?: boolean;
+  /**
+   * Optional grouping label for slash completion UI sections.
+   * Commands with the same label are rendered under one separator.
+   */
+  suggestionGroup?: string;
 
   kind: CommandKind;
 
@@ -199,9 +207,17 @@ export interface SlashCommand {
    */
   autoExecute?: boolean;
 
+  /**
+   * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
+   */
+  isSafeConcurrent?: boolean;
+
   // Optional metadata for extension commands
   extensionName?: string;
   extensionId?: string;
+
+  // Optional metadata for MCP commands
+  mcpServerName?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
@@ -212,7 +228,7 @@ export interface SlashCommand {
     | SlashCommandActionReturn
     | Promise<void | SlashCommandActionReturn>;
 
-  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  // Provides argument completion (e.g., completing a tag for `/resume resume <tag>`).
   completion?: (
     context: CommandContext,
     partialArg: string,

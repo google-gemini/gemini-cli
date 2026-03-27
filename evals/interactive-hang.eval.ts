@@ -56,7 +56,7 @@ describe('interactive_commands', () => {
       const scaffoldCall = logs.find(
         (l) =>
           l.toolRequest.name === 'run_shell_command' &&
-          /npm (init|create)|npx create-|yarn create|pnpm create/.test(
+          /npm (init|create)|npx (.*)?create-|yarn create|pnpm create/.test(
             l.toolRequest.args,
           ),
       );

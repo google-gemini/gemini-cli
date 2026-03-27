@@ -52,6 +52,7 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import { SkillCommandLoader } from '../../services/SkillCommandLoader.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 import {
   type ExtensionUpdateAction,
@@ -208,7 +209,7 @@ export const useSlashCommandProcessor = (
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
-        config,
+        agentContext: config,
         settings,
         git: gitService,
         logger,
@@ -324,8 +325,9 @@ export const useSlashCommandProcessor = (
     (async () => {
       const commandService = await CommandService.create(
         [
-          new McpPromptLoader(config),
           new BuiltinCommandLoader(config),
+          new SkillCommandLoader(config),
+          new McpPromptLoader(config),
           new FileCommandLoader(config),
         ],
         controller.signal,
@@ -445,6 +447,7 @@ export const useSlashCommandProcessor = (
                     type: 'schedule_tool',
                     toolName: result.toolName,
                     toolArgs: result.toolArgs,
+                    postSubmitPrompt: result.postSubmitPrompt,
                   };
                 case 'message':
                   addItem(
@@ -502,7 +505,9 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['name'] !== 'string' ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
                       ) {
@@ -581,6 +586,7 @@ export const useSlashCommandProcessor = (
                       name: 'Expansion',
                       description: 'Command expansion needs shell access',
                       status: CoreToolCallStatus.AwaitingApproval,
+                      isClientInitiated: true,
                       resultDisplay: undefined,
                       confirmationDetails,
                     };

@@ -7,7 +7,7 @@ exports[`SuggestionsDisplay > handles scrolling 1`] = `
  Cmd 7   Description 7
  Cmd 8   Description 8
  Cmd 9   Description 9
- Cmd 10   Description 10
+ Cmd 10   Description 10                                                       
  Cmd 11   Description 11
  Cmd 12   Description 12
  ▼
@@ -17,13 +17,13 @@ exports[`SuggestionsDisplay > handles scrolling 1`] = `
 
 exports[`SuggestionsDisplay > highlights active item 1`] = `
 " command1   Description 1
- command2   Description 2
+ command2   Description 2                                                      
  command3   Description 3
 "
 `;
 
 exports[`SuggestionsDisplay > renders MCP tag for MCP prompts 1`] = `
-" mcp-tool [MCP]
+" mcp-tool [MCP]                                                                
 "
 `;
 
@@ -33,7 +33,7 @@ exports[`SuggestionsDisplay > renders loading state 1`] = `
 `;
 
 exports[`SuggestionsDisplay > renders suggestions list 1`] = `
-" command1   Description 1
+" command1   Description 1                                                      
  command2   Description 2
  command3   Description 3
 "

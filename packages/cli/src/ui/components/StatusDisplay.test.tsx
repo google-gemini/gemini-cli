@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { StatusDisplay } from './StatusDisplay.js';
@@ -75,7 +75,7 @@ const renderStatusDisplay = async (
   settings = createMockSettings(),
   config = createMockConfig(),
 ) => {
-  const result = render(
+  const result = await render(
     <ConfigContext.Provider value={config as unknown as Config}>
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
@@ -84,16 +84,16 @@ const renderStatusDisplay = async (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-  await result.waitUntilReady();
   return result;
 };
 
 describe('StatusDisplay', () => {
-  const originalEnv = process.env;
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
+  });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    delete process.env['GEMINI_SYSTEM_MD'];
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -112,7 +112,7 @@ describe('StatusDisplay', () => {
   });
 
   it('renders system md indicator if env var is set', async () => {
-    process.env['GEMINI_SYSTEM_MD'] = 'true';
+    vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
     const { lastFrame, unmount } = await renderStatusDisplay();
     expect(lastFrame()).toMatchSnapshot();
     unmount();

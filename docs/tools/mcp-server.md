@@ -163,7 +163,8 @@ Each server configuration supports the following properties:
 - **`args`** (string[]): Command-line arguments for Stdio transport
 - **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can
-  reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax
+  reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax (all
+  platforms), or `%VAR_NAME%` (Windows only).
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms =
   10 minutes)
@@ -175,14 +176,73 @@ Each server configuration supports the following properties:
   enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP
   server. Tools listed here will not be available to the model, even if they are
-  exposed by the server. **Note:** `excludeTools` takes precedence over
-  `includeTools` - if a tool is in both lists, it will be excluded.
+  exposed by the server. `excludeTools` takes precedence over `includeTools`. If
+  a tool is in both lists, it will be excluded.
 - **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access. Used with
   `authProviderType: 'service_account_impersonation'`.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate. Used with
   `authProviderType: 'service_account_impersonation'`.
+
+### Environment variable expansion
+
+Gemini CLI automatically expands environment variables in the `env` block of
+your MCP server configuration. This allows you to securely reference variables
+defined in your shell or environment without hardcoding sensitive information
+directly in your `settings.json` file.
+
+The expansion utility supports:
+
+- **POSIX/Bash syntax:** `$VARIABLE_NAME` or `${VARIABLE_NAME}` (supported on
+  all platforms)
+- **Windows syntax:** `%VARIABLE_NAME%` (supported only when running on Windows)
+
+If a variable is not defined in the current environment, it resolves to an empty
+string.
+
+**Example:**
+
+```json
+"env": {
+  "API_KEY": "$MY_EXTERNAL_TOKEN",
+  "LOG_LEVEL": "$LOG_LEVEL",
+  "TEMP_DIR": "%TEMP%"
+}
+```
+
+### Security and environment sanitization
+
+To protect your credentials, Gemini CLI performs environment sanitization when
+spawning MCP server processes.
+
+#### Automatic redaction
+
+By default, the CLI redacts sensitive environment variables from the base
+environment (inherited from the host process) to prevent unintended exposure to
+third-party MCP servers. This includes:
+
+- Core project keys: `GEMINI_API_KEY`, `GOOGLE_API_KEY`, etc.
+- Variables matching sensitive patterns: `*TOKEN*`, `*SECRET*`, `*PASSWORD*`,
+  `*KEY*`, `*AUTH*`, `*CREDENTIAL*`.
+- Certificates and private key patterns.
+
+#### Explicit overrides
+
+If an environment variable must be passed to an MCP server, you must explicitly
+state it in the `env` property of the server configuration in `settings.json`.
+Explicitly defined variables (including those from extensions) are trusted and
+are **not** subjected to the automatic redaction process.
+
+This follows the security principle that if a variable is explicitly configured
+by the user for a specific server, it constitutes informed consent to share that
+specific data with that server.
+
+<!-- prettier-ignore -->
+> [!NOTE]
+> Even when explicitly defined, you should avoid hardcoding secrets.
+> Instead, use environment variable expansion (e.g., `"MY_KEY": "$MY_KEY"`) to
+> securely pull the value from your host environment at runtime.
 
 ### OAuth support for remote MCP servers
 
@@ -225,10 +285,12 @@ When connecting to an OAuth-enabled server:
 
 #### Browser redirect requirements
 
-**Important:** OAuth authentication requires that your local machine can:
-
-- Open a web browser for authentication
-- Receive redirects on `http://localhost:7777/oauth/callback`
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> OAuth authentication requires that your local machine can:
+>
+> - Open a web browser for authentication
+> - Receive redirects on `http://localhost:7777/oauth/callback`
 
 This feature will not work in:
 
@@ -314,7 +376,7 @@ To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
 following properties:
 
-- **`targetAudience`** (string): The OAuth Client ID allowslisted on the
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
@@ -497,21 +559,36 @@ Upon successful connection:
    `excludeTools` configuration
 4. **Name sanitization:** Tool names are cleaned to meet Gemini API
    requirements:
-   - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced
-     with underscores
+   - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
+     (`.`), and colon (`:`) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement
-     (`___`)
+     (`...`)
 
-### 3. Conflict resolution
+### 3. Tool naming and namespaces
 
-When multiple servers expose tools with the same name:
+To prevent collisions across multiple servers or conflicting built-in tools,
+every discovered MCP tool is assigned a strict namespace.
 
-1. **First registration wins:** The first server to register a tool name gets
-   the unprefixed name
-2. **Automatic prefixing:** Subsequent servers get prefixed names:
-   `serverName__toolName`
-3. **Registry tracking:** The tool registry maintains mappings between server
-   names and their tools
+1. **Automatic FQN:** All MCP tools are unconditionally assigned a fully
+   qualified name (FQN) using the format `mcp_{serverName}_{toolName}`.
+2. **Registry tracking:** The tool registry maintains metadata mappings between
+   these FQNs and their original server identities.
+3. **Overwrites:** If two servers share the exact same alias in your
+   configuration and provide tools with the exact same name, the last registered
+   tool overwrites the previous one.
+4. **Policies:** To configure permissions (like auto-approval or denial) for MCP
+   tools, see
+   [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
+   in the Policy Engine documentation.
+
+<!-- prettier-ignore -->
+> [!WARNING]
+> Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 ### 4. Schema processing
 
@@ -637,7 +714,7 @@ MCP Servers Status:
 
 🐳 dockerizedServer (CONNECTED)
   Command: docker run -i --rm -e API_KEY my-mcp-server:latest
-  Tools: docker__deploy, docker__status
+  Tools: mcp_dockerizedServer_docker_deploy, mcp_dockerizedServer_docker_status
 
 Discovery State: COMPLETED
 ```
@@ -657,6 +734,43 @@ tools. The model will automatically:
 ### Connection states
 
 The MCP integration tracks several states:
+
+#### Overriding extension configurations
+
+If an MCP server is provided by an extension (for example, the
+`google-workspace` extension), you can still override its settings in your local
+`settings.json`. Gemini CLI merges your local configuration with the extension's
+defaults:
+
+- **Tool lists:** Tool lists are merged securely to ensure the most restrictive
+  policy wins:
+  - **Exclusions (`excludeTools`):** Arrays are combined (unioned). If either
+    source blocks a tool, it remains disabled.
+  - **Inclusions (`includeTools`):** Arrays are intersected. If both sources
+    provide an allowlist, only tools present in **both** lists are enabled. If
+    only one source provides an allowlist, that list is respected.
+  - **Precedence:** `excludeTools` always takes precedence over `includeTools`.
+
+  This ensures you always have veto power over tools provided by an extension
+  and that an extension cannot re-enable tools you have omitted from your
+  personal allowlist.
+
+- **Environment variables:** The `env` objects are merged. If the same variable
+  is defined in both places, your local value takes precedence.
+- **Scalar properties:** Properties like `command`, `url`, and `timeout` are
+  replaced by your local values if provided.
+
+**Example override:**
+
+```json
+{
+  "mcpServers": {
+    "google-workspace": {
+      "excludeTools": ["gmail.send"]
+    }
+  }
+}
+```
 
 #### Server status (`MCPServerStatus`)
 
@@ -738,7 +852,9 @@ The MCP integration tracks several states:
 - **Trust settings:** The `trust` option bypasses all confirmation dialogs. Use
   cautiously and only for servers you completely control
 - **Access tokens:** Be security-aware when configuring environment variables
-  containing API keys or tokens
+  containing API keys or tokens. See
+  [Security and environment sanitization](#security-and-environment-sanitization)
+  for details on how Gemini CLI protects your credentials.
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
   available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
@@ -1006,6 +1122,13 @@ command has no flags.
 gemini mcp list
 ```
 
+<!-- prettier-ignore -->
+> [!NOTE]
+> For security, `stdio` MCP servers (those using the
+> `command` property) are only tested and displayed as "Connected" if the
+> current folder is trusted. If the folder is untrusted, they will show as
+> "Disconnected". Use `gemini trust` to trust the current folder.
+
 **Example output:**
 
 ```sh
@@ -1013,6 +1136,23 @@ gemini mcp list
 ✓ http-server: https://api.example.com/mcp (http) - Connected
 ✗ sse-server: https://api.example.com/sse (sse) - Disconnected
 ```
+
+## Troubleshooting and Diagnostics
+
+To minimize noise during startup, MCP connection errors for background servers
+are "silent by default." If issues are detected during startup, a single
+informational hint will be shown: _"MCP issues detected. Run /mcp list for
+status."_
+
+Detailed, actionable diagnostics for a specific server are automatically
+re-enabled when:
+
+1.  You run an interactive command like `/mcp list`, `/mcp auth`, etc.
+2.  The model attempts to execute a tool from that server.
+3.  You invoke an MCP prompt from that server.
+
+You can also use `gemini mcp list` from your shell to see connection errors for
+all configured servers.
 
 ### Removing a server (`gemini mcp remove`)
 

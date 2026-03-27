@@ -11,13 +11,12 @@ import {
 } from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
-import type React from 'react';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
+import type React from 'react';
 import { act, useState } from 'react';
-import os from 'node:os';
-import { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -35,15 +34,24 @@ import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
+import {
+  OverflowProvider,
+  useOverflowActions,
+  useOverflowState,
+  type OverflowActions,
+  type OverflowState,
+} from '../ui/contexts/OverflowContext.js';
 
-import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
 import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
-import { DefaultLight } from '../ui/themes/default-light.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
+import { generateSvgForTerminal } from './svg.js';
+import { loadCliConfig, type CliArgs } from '../config/config.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -57,7 +65,9 @@ if (process.env['NODE_ENV'] === 'test') {
 }
 
 vi.mock('../utils/persistentState.js', () => ({
-  persistentState: persistentStateMock,
+  get persistentState() {
+    return persistentStateMock;
+  },
 }));
 
 vi.mock('../ui/utils/terminalUtils.js', () => ({
@@ -87,6 +97,7 @@ function isInkRenderMetrics(
     typeof m === 'object' &&
     m !== null &&
     'output' in m &&
+    // eslint-disable-next-line no-restricted-syntax
     typeof m['output'] === 'string'
   );
 }
@@ -98,7 +109,12 @@ class XtermStdout extends EventEmitter {
   private queue: { promise: Promise<void> };
   isTTY = true;
 
+  getColorDepth(): number {
+    return 24;
+  }
+
   private lastRenderOutput: string | undefined = undefined;
+  private lastRenderStaticContent: string | undefined = undefined;
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -131,6 +147,7 @@ class XtermStdout extends EventEmitter {
   clear = () => {
     this.state.terminal.reset();
     this.lastRenderOutput = undefined;
+    this.lastRenderStaticContent = undefined;
   };
 
   dispose = () => {
@@ -139,8 +156,30 @@ class XtermStdout extends EventEmitter {
 
   onRender = (staticContent: string, output: string) => {
     this.renderCount++;
+    this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
     this.emit('render');
+  };
+
+  private normalizeFrame = (text: string): string =>
+    text.replace(/\r\n/g, '\n');
+
+  generateSvg = (): string => generateSvgForTerminal(this.state.terminal);
+
+  lastFrameRaw = (options: { allowEmpty?: boolean } = {}) => {
+    const result =
+      (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? '');
+
+    const normalized = this.normalizeFrame(result);
+
+    if (normalized === '' && !options.allowEmpty) {
+      throw new Error(
+        'lastFrameRaw() returned an empty string. If this is intentional, use lastFrameRaw({ allowEmpty: true }). ' +
+          'Otherwise, ensure you are calling await waitUntilReady() and that the component is rendering correctly.',
+      );
+    }
+
+    return normalized;
   };
 
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
@@ -156,9 +195,7 @@ class XtermStdout extends EventEmitter {
     }
     const result = trimmed.join('\n');
 
-    // Normalize for cross-platform snapshot stability:
-    // Normalize any \r\n to \n
-    const normalized = result.replace(/\r\n/g, '\n');
+    const normalized = this.normalizeFrame(result);
 
     if (normalized === '' && !options.allowEmpty) {
       throw new Error(
@@ -206,9 +243,11 @@ class XtermStdout extends EventEmitter {
       const currentFrame = stripAnsi(
         this.lastFrame({ allowEmpty: true }),
       ).trim();
-      const expectedFrame = stripAnsi(this.lastRenderOutput ?? '')
-        .trim()
-        .replace(/\r\n/g, '\n');
+      const expectedFrame = this.normalizeFrame(
+        stripAnsi(
+          (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
+        ),
+      ).trim();
 
       lastCurrent = currentFrame;
       lastExpected = expectedFrame;
@@ -218,13 +257,9 @@ class XtermStdout extends EventEmitter {
           return currentFrame !== '';
         }
 
-        // If both are empty, it's a match.
-        // We consider undefined lastRenderOutput as effectively empty for this check
-        // to support hook testing where Ink may skip rendering completely.
-        if (
-          (this.lastRenderOutput === undefined || expectedFrame === '') &&
-          currentFrame === ''
-        ) {
+        // If Ink expects nothing (no new static content and no dynamic output),
+        // we consider it a match because the terminal buffer will just hold the historical static content.
+        if (expectedFrame === '') {
           return true;
         }
 
@@ -232,8 +267,8 @@ class XtermStdout extends EventEmitter {
           return false;
         }
 
-        // If Ink expects nothing but terminal has content, or vice-versa, it's NOT a match.
-        if (expectedFrame === '' || currentFrame === '') {
+        // If the terminal is empty but Ink expects something, it's not a match.
+        if (currentFrame === '') {
           return false;
         }
 
@@ -333,17 +368,30 @@ export type RenderInstance = {
   stdin: XtermStdin;
   frames: string[];
   lastFrame: (options?: { allowEmpty?: boolean }) => string;
+  lastFrameRaw: (options?: { allowEmpty?: boolean }) => string;
+  generateSvg: () => string;
   terminal: Terminal;
   waitUntilReady: () => Promise<void>;
+  capturedOverflowState: OverflowState | undefined;
+  capturedOverflowActions: OverflowActions | undefined;
+};
+
+export type RenderWithProvidersInstance = RenderInstance & {
+  simulateClick: (
+    col: number,
+    row: number,
+    button?: 0 | 1 | 2,
+  ) => Promise<void>;
 };
 
 const instances: InkInstance[] = [];
 
-// Wrapper around ink's render that ensures act() is called and uses Xterm for output
-export const render = (
+export const render = async (
   tree: React.ReactElement,
   terminalWidth?: number,
-): RenderInstance => {
+): Promise<
+  Omit<RenderInstance, 'capturedOverflowState' | 'capturedOverflowActions'>
+> => {
   const cols = terminalWidth ?? 100;
   // We use 1000 rows to avoid windows with incorrect snapshots if a correct
   // value was used (e.g. 40 rows). The alternatives to make things worse are
@@ -371,24 +419,27 @@ export const render = (
   stdout.clear();
   act(() => {
     instance = inkRenderDirect(tree, {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       stdout: stdout as unknown as NodeJS.WriteStream,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
       stderr: stderr as unknown as NodeJS.WriteStream,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
       stdin: stdin as unknown as NodeJS.ReadStream,
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
       onRender: (metrics: RenderMetrics) => {
-        if (isInkRenderMetrics(metrics)) {
-          stdout.onRender(metrics.staticOutput ?? '', metrics.output);
-        }
+        const output = isInkRenderMetrics(metrics) ? metrics.output : '...';
+        const staticOutput = isInkRenderMetrics(metrics)
+          ? (metrics.staticOutput ?? '')
+          : '';
+        stdout.onRender(staticOutput, output);
       },
     });
   });
 
   instances.push(instance);
+
+  await stdout.waitUntilReady();
 
   return {
     rerender: (newTree: React.ReactElement) => {
@@ -410,6 +461,8 @@ export const render = (
     stdin,
     frames: stdout.frames,
     lastFrame: stdout.lastFrame,
+    lastFrameRaw: stdout.lastFrameRaw,
+    generateSvg: stdout.generateSvg,
     terminal: state.terminal,
     waitUntilReady: () => stdout.waitUntilReady(),
   };
@@ -438,55 +491,18 @@ export const simulateClick = async (
   });
 };
 
-let mockConfigInternal: Config | undefined;
-
-const getMockConfigInternal = (): Config => {
-  if (!mockConfigInternal) {
-    mockConfigInternal = makeFakeConfig({
-      targetDir: os.tmpdir(),
-      enableEventDrivenScheduler: true,
-    });
-  }
-  return mockConfigInternal;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-const configProxy = new Proxy({} as Config, {
-  get(_target, prop) {
-    if (prop === 'getTargetDir') {
-      return () =>
-        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
-    }
-    if (prop === 'getUseBackgroundColor') {
-      return () => true;
-    }
-    const internal = getMockConfigInternal();
-    if (prop in internal) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return internal[prop as keyof typeof internal];
-    }
-    throw new Error(`mockConfig does not have property ${String(prop)}`);
-  },
-});
-
-export const mockSettings = new LoadedSettings(
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  true,
-  [],
-);
+export const mockSettings = createMockSettings();
 
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
+  history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
   terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: 'black',
+  terminalBackgroundColor: 'black' as const,
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
   activePtyId: undefined,
@@ -500,6 +516,16 @@ const baseMockUiState = {
   },
   hintMode: false,
   hintBuffer: '',
+  bannerData: {
+    defaultText: '',
+    warningText: '',
+  },
+  bannerVisible: false,
+  nightly: false,
+  updateInfo: null,
+  pendingHistoryItems: [],
+  mainControlsRef: () => {},
+  rootUiRef: { current: null },
 };
 
 export const mockAppState: AppState = {
@@ -539,6 +565,8 @@ const mockUIActions: UIActions = {
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),
   handleValidationChoice: vi.fn(),
+  handleOverageMenuChoice: vi.fn(),
+  handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
@@ -560,9 +588,21 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+  getPreferredEditor: vi.fn(),
+  clearAccountSuspension: vi.fn(),
 };
 
-export const renderWithProviders = (
+let capturedOverflowState: OverflowState | undefined;
+let capturedOverflowActions: OverflowActions | undefined;
+const ContextCapture: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  capturedOverflowState = useOverflowState();
+  capturedOverflowActions = useOverflowActions();
+  return <>{children}</>;
+};
+
+export const renderWithProviders = async (
   component: React.ReactElement,
   {
     shellFocus = true,
@@ -570,9 +610,7 @@ export const renderWithProviders = (
     uiState: providedUiState,
     width,
     mouseEventsEnabled = false,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    config = configProxy as unknown as Config,
-    useAlternateBuffer = true,
+    config,
     uiActions,
     persistentState,
     appState = mockAppState,
@@ -583,7 +621,6 @@ export const renderWithProviders = (
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
-    useAlternateBuffer?: boolean;
     uiActions?: Partial<UIActions>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
@@ -591,27 +628,18 @@ export const renderWithProviders = (
     };
     appState?: AppState;
   } = {},
-): RenderInstance & {
-  simulateClick: (
-    col: number,
-    row: number,
-    button?: 0 | 1 | 2,
-  ) => Promise<void>;
-} => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+): Promise<RenderWithProvidersInstance> => {
   const baseState: UIState = new Proxy(
     { ...baseMockUiState, ...providedUiState },
     {
       get(target, prop) {
         if (prop in target) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return target[prop as keyof typeof target];
         }
         // For properties not in the base mock or provided state,
         // we'll check the original proxy to see if it's a defined but
         // unprovided property, and if not, throw.
         if (prop in baseMockUiState) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return baseMockUiState[prop as keyof typeof baseMockUiState];
         }
         throw new Error(`mockUiState does not have property ${String(prop)}`);
@@ -629,18 +657,17 @@ export const renderWithProviders = (
   persistentStateMock.mockClear();
 
   const terminalWidth = width ?? baseState.terminalWidth;
-  let finalSettings = settings;
-  if (useAlternateBuffer !== undefined) {
-    finalSettings = createMockSettings({
-      ...settings.merged,
-      ui: {
-        ...settings.merged.ui,
-        useAlternateBuffer,
-      },
-    });
+
+  if (!config) {
+    config = await loadCliConfig(
+      settings.merged,
+      'random-session-id',
+      {} as unknown as CliArgs,
+      { cwd: '/' },
+    );
   }
 
-  const mainAreaWidth = terminalWidth;
+  const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
   const finalUiState = {
     ...baseState,
@@ -663,47 +690,54 @@ export const renderWithProviders = (
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
     .flatMap((item) => item.tools);
 
-  const renderResult = render(
+  capturedOverflowState = undefined;
+  capturedOverflowActions = undefined;
+
+  const wrapWithProviders = (comp: React.ReactElement) => (
     <AppContext.Provider value={appState}>
       <ConfigContext.Provider value={config}>
-        <SettingsContext.Provider value={finalSettings}>
+        <SettingsContext.Provider value={settings}>
           <UIStateContext.Provider value={finalUiState}>
-            <VimModeProvider settings={finalSettings}>
+            <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
                 <SessionStatsProvider>
                   <StreamingContext.Provider
                     value={finalUiState.streamingState}
                   >
                     <UIActionsContext.Provider value={finalUIActions}>
-                      <ToolActionsProvider
-                        config={config}
-                        toolCalls={allToolCalls}
-                      >
-                        <AskUserActionsProvider
-                          request={null}
-                          onSubmit={vi.fn()}
-                          onCancel={vi.fn()}
+                      <OverflowProvider>
+                        <ToolActionsProvider
+                          config={config}
+                          toolCalls={allToolCalls}
                         >
-                          <KeypressProvider>
-                            <MouseProvider
-                              mouseEventsEnabled={mouseEventsEnabled}
-                            >
-                              <TerminalProvider>
-                                <ScrollProvider>
-                                  <Box
-                                    width={terminalWidth}
-                                    flexShrink={0}
-                                    flexGrow={0}
-                                    flexDirection="column"
-                                  >
-                                    {component}
-                                  </Box>
-                                </ScrollProvider>
-                              </TerminalProvider>
-                            </MouseProvider>
-                          </KeypressProvider>
-                        </AskUserActionsProvider>
-                      </ToolActionsProvider>
+                          <AskUserActionsProvider
+                            request={null}
+                            onSubmit={vi.fn()}
+                            onCancel={vi.fn()}
+                          >
+                            <KeypressProvider>
+                              <MouseProvider
+                                mouseEventsEnabled={mouseEventsEnabled}
+                              >
+                                <TerminalProvider>
+                                  <ScrollProvider>
+                                    <ContextCapture>
+                                      <Box
+                                        width={terminalWidth}
+                                        flexShrink={0}
+                                        flexGrow={0}
+                                        flexDirection="column"
+                                      >
+                                        {comp}
+                                      </Box>
+                                    </ContextCapture>
+                                  </ScrollProvider>
+                                </TerminalProvider>
+                              </MouseProvider>
+                            </KeypressProvider>
+                          </AskUserActionsProvider>
+                        </ToolActionsProvider>
+                      </OverflowProvider>
                     </UIActionsContext.Provider>
                   </StreamingContext.Provider>
                 </SessionStatsProvider>
@@ -712,32 +746,40 @@ export const renderWithProviders = (
           </UIStateContext.Provider>
         </SettingsContext.Provider>
       </ConfigContext.Provider>
-    </AppContext.Provider>,
+    </AppContext.Provider>
+  );
+
+  const renderResult = await render(
+    wrapWithProviders(component),
     terminalWidth,
   );
 
   return {
     ...renderResult,
+    rerender: (newComponent: React.ReactElement) => {
+      renderResult.rerender(wrapWithProviders(newComponent));
+    },
+    capturedOverflowState,
+    capturedOverflowActions,
     simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
       simulateClick(renderResult.stdin, col, row, button),
   };
 };
 
-export function renderHook<Result, Props>(
+export async function renderHook<Result, Props>(
   renderCallback: (props: Props) => Result,
   options?: {
     initialProps?: Props;
     wrapper?: React.ComponentType<{ children: React.ReactNode }>;
   },
-): {
+): Promise<{
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
-} {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  generateSvg: () => string;
+}> {
   const result = { current: undefined as unknown as Result };
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   let currentProps = options?.initialProps as Props;
 
   function TestComponent({
@@ -756,21 +798,20 @@ export function renderHook<Result, Props>(
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
   let waitUntilReady: () => Promise<void> = async () => {};
+  let generateSvg: () => string = () => '';
 
-  act(() => {
-    const renderResult = render(
-      <Wrapper>
-        <TestComponent renderCallback={renderCallback} props={currentProps} />
-      </Wrapper>,
-    );
-    inkRerender = renderResult.rerender;
-    unmount = renderResult.unmount;
-    waitUntilReady = renderResult.waitUntilReady;
-  });
+  const renderResult = await render(
+    <Wrapper>
+      <TestComponent renderCallback={renderCallback} props={currentProps} />
+    </Wrapper>,
+  );
+  inkRerender = renderResult.rerender;
+  unmount = renderResult.unmount;
+  waitUntilReady = renderResult.waitUntilReady;
+  generateSvg = renderResult.generateSvg;
 
   function rerender(props?: Props) {
     if (arguments.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       currentProps = props as Props;
     }
     act(() => {
@@ -782,10 +823,10 @@ export function renderHook<Result, Props>(
     });
   }
 
-  return { result, rerender, unmount, waitUntilReady };
+  return { result, rerender, unmount, waitUntilReady, generateSvg };
 }
 
-export function renderHookWithProviders<Result, Props>(
+export async function renderHookWithProviders<Result, Props>(
   renderCallback: (props: Props) => Result,
   options: {
     initialProps?: Props;
@@ -797,15 +838,14 @@ export function renderHookWithProviders<Result, Props>(
     width?: number;
     mouseEventsEnabled?: boolean;
     config?: Config;
-    useAlternateBuffer?: boolean;
   } = {},
-): {
+): Promise<{
   result: { current: Result };
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
-} {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  generateSvg: () => string;
+}> {
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
@@ -822,12 +862,12 @@ export function renderHookWithProviders<Result, Props>(
 
   const Wrapper = options.wrapper || (({ children }) => <>{children}</>);
 
-  let renderResult: ReturnType<typeof render>;
+  let renderResult: RenderWithProvidersInstance;
 
-  act(() => {
-    renderResult = renderWithProviders(
+  await act(async () => {
+    renderResult = await renderWithProviders(
       <Wrapper>
-        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
+        {}
         <TestComponent initialProps={options.initialProps as Props} />
       </Wrapper>,
       options,
@@ -837,7 +877,6 @@ export function renderHookWithProviders<Result, Props>(
   function rerender(newProps?: Props) {
     act(() => {
       if (arguments.length > 0 && setPropsFn) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         setPropsFn(newProps as Props);
       } else if (forceUpdateFn) {
         forceUpdateFn();
@@ -854,5 +893,6 @@ export function renderHookWithProviders<Result, Props>(
       });
     },
     waitUntilReady: () => renderResult.waitUntilReady(),
+    generateSvg: () => renderResult.generateSvg(),
   };
 }

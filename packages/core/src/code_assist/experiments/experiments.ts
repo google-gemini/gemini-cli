@@ -35,6 +35,7 @@ export async function getExperiments(
         const expPath = process.env['GEMINI_EXP'];
         debugLogger.debug('Reading experiments from', expPath);
         const content = await fs.promises.readFile(expPath, 'utf8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const response: ListExperimentsResponse = JSON.parse(content);
         if (
           (response.flags && !Array.isArray(response.flags)) ||

@@ -189,8 +189,16 @@ Custom commands create shortcuts for complex prompts.
 
 1.  Create a `commands` directory and a subdirectory for your command group:
 
+    **macOS/Linux**
+
     ```bash
     mkdir -p commands/fs
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "commands\fs"
     ```
 
 2.  Create a file named `commands/fs/grep-code.toml`:
@@ -252,8 +260,16 @@ Skills are activated only when needed, which saves context tokens.
 
 1.  Create a `skills` directory and a subdirectory for your skill:
 
+    **macOS/Linux**
+
     ```bash
     mkdir -p skills/security-audit
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "skills\security-audit"
     ```
 
 2.  Create a `skills/security-audit/SKILL.md` file:

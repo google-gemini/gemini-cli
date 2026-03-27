@@ -5,8 +5,10 @@
  */
 
 import type { Config } from '../config/config.js';
-import { AuthType } from '../core/contentGenerator.js';
-import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
+import {
+  openBrowserSecurely,
+  shouldLaunchBrowser,
+} from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
@@ -18,7 +20,7 @@ import {
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
 
-const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
+export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
 export async function handleFallback(
   config: Config,
@@ -26,10 +28,6 @@ export async function handleFallback(
   authType?: string,
   error?: unknown,
 ): Promise<string | boolean | null> {
-  if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
-    return null;
-  }
-
   const chain = resolvePolicyChain(config);
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
     chain,
@@ -112,6 +110,12 @@ export async function handleFallback(
 }
 
 async function handleUpgrade() {
+  if (!shouldLaunchBrowser()) {
+    debugLogger.log(
+      `Cannot open browser in this environment. Please visit: ${UPGRADE_URL_PAGE}`,
+    );
+    return;
+  }
   try {
     await openBrowserSecurely(UPGRADE_URL_PAGE);
   } catch (error) {
@@ -138,6 +142,9 @@ async function processIntent(
       // For distinct retry (retry_once), we do NOT set the active model permanently.
       // The FallbackStrategy will handle routing to the available model for this turn
       // based on the availability service state (which is updated before this).
+      return true;
+
+    case 'retry_with_credits':
       return true;
 
     case 'stop':

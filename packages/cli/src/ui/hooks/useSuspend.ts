@@ -20,6 +20,8 @@ import {
   terminalCapabilityManager,
 } from '../utils/terminalCapabilityManager.js';
 import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 interface UseSuspendProps {
   handleWarning: (message: string) => void;
@@ -59,10 +61,11 @@ export function useSuspend({
       clearTimeout(ctrlZTimerRef.current);
       ctrlZTimerRef.current = null;
     }
+    const suspendKey = formatCommand(Command.SUSPEND_APP);
     if (ctrlZPressCount > 1) {
       setCtrlZPressCount(0);
       if (process.platform === 'win32') {
-        handleWarning('Ctrl+Z suspend is not supported on Windows.');
+        handleWarning(`${suspendKey} suspend is not supported on Windows.`);
         return;
       }
 
@@ -130,8 +133,9 @@ export function useSuspend({
 
       process.kill(0, 'SIGTSTP');
     } else if (ctrlZPressCount > 0) {
+      const undoKey = formatCommand(Command.UNDO);
       handleWarning(
-        'Press Ctrl+Z again to suspend. Undo has moved to Cmd + Z or Alt/Opt + Z.',
+        `Press ${suspendKey} again to suspend. Undo has moved to ${undoKey}.`,
       );
       ctrlZTimerRef.current = setTimeout(() => {
         setCtrlZPressCount(0);

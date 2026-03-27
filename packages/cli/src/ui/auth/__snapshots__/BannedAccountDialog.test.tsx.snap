@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BannedAccountDialog > renders snapshot correctly 1`] = `
+"
+ Error: Account Suspended
+
+ This service has been disabled in this account for violation of Terms of Service. Please submit an
+ appeal to continue using this product.
+
+ Appeal URL:
+ [https://example.com/appeal]
+
+ Appeal HereChange authenticationExit
+
+ Escape to exit
+"
+`;

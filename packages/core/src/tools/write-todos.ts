@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolInvocation } from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ToolInvocation,
   type Todo,
   type ToolResult,
 } from './tools.js';
@@ -22,6 +22,7 @@ const TODO_STATUSES = [
   'in_progress',
   'completed',
   'cancelled',
+  'blocked',
 ] as const;
 
 export interface WriteTodosToolParams {

@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { WebFetchTool, parsePrompt } from './web-fetch.js';
+import {
+  WebFetchTool,
+  parsePrompt,
+  convertGithubUrlToRaw,
+  normalizeUrl,
+} from './web-fetch.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -39,7 +44,7 @@ vi.mock('html-to-text', () => ({
 
 vi.mock('../telemetry/index.js', () => ({
   logWebFetchFallbackAttempt: vi.fn(),
-  WebFetchFallbackAttemptEvent: vi.fn(),
+  WebFetchFallbackAttemptEvent: vi.fn((reason) => ({ reason })),
 }));
 
 vi.mock('../utils/fetch.js', async (importOriginal) => {
@@ -54,6 +59,101 @@ vi.mock('../utils/fetch.js', async (importOriginal) => {
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
+
+/**
+ * Helper to mock fetchWithTimeout with URL matching.
+ */
+const mockFetch = (url: string, response: Partial<Response> | Error) =>
+  vi
+    .spyOn(fetchUtils, 'fetchWithTimeout')
+    .mockImplementation(async (actualUrl) => {
+      if (actualUrl !== url) {
+        throw new Error(
+          `Unexpected fetch URL: expected "${url}", got "${actualUrl}"`,
+        );
+      }
+      if (response instanceof Error) {
+        throw response;
+      }
+
+      const headers = response.headers || new Headers();
+
+      // If we have text/arrayBuffer but no body, create a body mock
+      let body = response.body;
+      if (!body) {
+        let content: Uint8Array | undefined;
+        if (response.text) {
+          const text = await response.text();
+          content = new TextEncoder().encode(text);
+        } else if (response.arrayBuffer) {
+          const ab = await response.arrayBuffer();
+          content = new Uint8Array(ab);
+        }
+
+        if (content) {
+          body = {
+            getReader: () => {
+              let sent = false;
+              return {
+                read: async () => {
+                  if (sent) return { done: true, value: undefined };
+                  sent = true;
+                  return { done: false, value: content };
+                },
+                releaseLock: () => {},
+                cancel: async () => {},
+              };
+            },
+          } as unknown as ReadableStream;
+        }
+      }
+
+      return {
+        ok: response.status ? response.status < 400 : true,
+        status: 200,
+        headers,
+        text: response.text || (() => Promise.resolve('')),
+        arrayBuffer:
+          response.arrayBuffer || (() => Promise.resolve(new ArrayBuffer(0))),
+        body: body || {
+          getReader: () => ({
+            read: async () => ({ done: true, value: undefined }),
+            releaseLock: () => {},
+            cancel: async () => {},
+          }),
+        },
+        ...response,
+      } as unknown as Response;
+    });
+
+describe('normalizeUrl', () => {
+  it('should lowercase hostname', () => {
+    expect(normalizeUrl('https://EXAMPLE.com/Path')).toBe(
+      'https://example.com/Path',
+    );
+  });
+
+  it('should remove trailing slash except for root', () => {
+    expect(normalizeUrl('https://example.com/path/')).toBe(
+      'https://example.com/path',
+    );
+    expect(normalizeUrl('https://example.com/')).toBe('https://example.com/');
+  });
+
+  it('should remove default ports', () => {
+    expect(normalizeUrl('http://example.com:80/')).toBe('http://example.com/');
+    expect(normalizeUrl('https://example.com:443/')).toBe(
+      'https://example.com/',
+    );
+    expect(normalizeUrl('https://example.com:8443/')).toBe(
+      'https://example.com:8443/',
+    );
+  });
+
+  it('should handle invalid URLs gracefully', () => {
+    expect(normalizeUrl('not-a-url')).toBe('not-a-url');
+  });
+});
 
 describe('parsePrompt', () => {
   it('should extract valid URLs separated by whitespace', () => {
@@ -128,6 +228,42 @@ describe('parsePrompt', () => {
   });
 });
 
+describe('convertGithubUrlToRaw', () => {
+  it('should convert valid github blob urls', () => {
+    expect(
+      convertGithubUrlToRaw('https://github.com/user/repo/blob/main/README.md'),
+    ).toBe('https://raw.githubusercontent.com/user/repo/main/README.md');
+  });
+
+  it('should not convert non-blob github urls', () => {
+    expect(convertGithubUrlToRaw('https://github.com/user/repo')).toBe(
+      'https://github.com/user/repo',
+    );
+  });
+
+  it('should not convert urls with similar domain names', () => {
+    expect(
+      convertGithubUrlToRaw('https://mygithub.com/user/repo/blob/main'),
+    ).toBe('https://mygithub.com/user/repo/blob/main');
+  });
+
+  it('should only replace the /blob/ that separates repo from branch', () => {
+    expect(
+      convertGithubUrlToRaw('https://github.com/blob/repo/blob/main/test.ts'),
+    ).toBe('https://raw.githubusercontent.com/blob/repo/main/test.ts');
+  });
+
+  it('should not convert urls if blob is not in path', () => {
+    expect(
+      convertGithubUrlToRaw('https://github.com/user/repo/tree/main'),
+    ).toBe('https://github.com/user/repo/tree/main');
+  });
+
+  it('should handle invalid urls gracefully', () => {
+    expect(convertGithubUrlToRaw('not-a-url')).toBe('not-a-url');
+  });
+});
+
 describe('WebFetchTool', () => {
   let mockConfig: Config;
   let bus: MessageBus;
@@ -141,7 +277,15 @@ describe('WebFetchTool', () => {
       setApprovalMode: vi.fn(),
       getProxy: vi.fn(),
       getGeminiClient: mockGetGeminiClient,
+      get config() {
+        return this;
+      },
+      get geminiClient() {
+        return mockGetGeminiClient();
+      },
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getMaxAttempts: vi.fn().mockReturnValue(3),
+      getDirectWebFetch: vi.fn().mockReturnValue(false),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
           model,
@@ -153,32 +297,79 @@ describe('WebFetchTool', () => {
   });
 
   describe('validateToolParamValues', () => {
-    it.each([
-      {
-        name: 'empty prompt',
-        prompt: '',
-        expectedError: "The 'prompt' parameter cannot be empty",
-      },
-      {
-        name: 'prompt with no URLs',
-        prompt: 'hello world',
-        expectedError: "The 'prompt' must contain at least one valid URL",
-      },
-      {
-        name: 'prompt with malformed URLs',
-        prompt: 'fetch httpshttps://example.com',
-        expectedError: 'Error(s) in prompt URLs:',
-      },
-    ])('should throw if $name', ({ prompt, expectedError }) => {
-      const tool = new WebFetchTool(mockConfig, bus);
-      expect(() => tool.build({ prompt })).toThrow(expectedError);
+    describe('standard mode', () => {
+      it.each([
+        {
+          name: 'empty prompt',
+          prompt: '',
+          expectedError: "The 'prompt' parameter cannot be empty",
+        },
+        {
+          name: 'prompt with no URLs',
+          prompt: 'hello world',
+          expectedError: "The 'prompt' must contain at least one valid URL",
+        },
+        {
+          name: 'prompt with malformed URLs',
+          prompt: 'fetch httpshttps://example.com',
+          expectedError: 'Error(s) in prompt URLs:',
+        },
+      ])('should throw if $name', ({ prompt, expectedError }) => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ prompt })).toThrow(expectedError);
+      });
+
+      it('should pass if prompt contains at least one valid URL', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() =>
+          tool.build({ prompt: 'fetch https://example.com' }),
+        ).not.toThrow();
+      });
     });
 
-    it('should pass if prompt contains at least one valid URL', () => {
+    describe('experimental mode', () => {
+      beforeEach(() => {
+        vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
+      });
+
+      it('should throw if url is missing', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ prompt: 'foo' })).toThrow(
+          "params must have required property 'url'",
+        );
+      });
+
+      it('should throw if url is invalid', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'not-a-url' })).toThrow(
+          'Invalid URL: "not-a-url"',
+        );
+      });
+
+      it('should pass if url is valid', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'https://example.com' })).not.toThrow();
+      });
+    });
+  });
+
+  describe('getSchema', () => {
+    it('should return standard schema by default', () => {
       const tool = new WebFetchTool(mockConfig, bus);
-      expect(() =>
-        tool.build({ prompt: 'fetch https://example.com' }),
-      ).not.toThrow();
+      const schema = tool.getSchema();
+      expect(schema.parametersJsonSchema).toHaveProperty('properties.prompt');
+      expect(schema.parametersJsonSchema).not.toHaveProperty('properties.url');
+    });
+
+    it('should return experimental schema when enabled', () => {
+      vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
+      const tool = new WebFetchTool(mockConfig, bus);
+      const schema = tool.getSchema();
+      expect(schema.parametersJsonSchema).toHaveProperty('properties.url');
+      expect(schema.parametersJsonSchema).not.toHaveProperty(
+        'properties.prompt',
+      );
+      expect(schema.parametersJsonSchema).toHaveProperty('required', ['url']);
     });
   });
 
@@ -200,52 +391,154 @@ describe('WebFetchTool', () => {
       // The 11th time should fail due to rate limit
       const result = await invocation.execute(new AbortController().signal);
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
-      expect(result.error?.message).toContain('Rate limit exceeded for host');
-    });
-
-    it('should return WEB_FETCH_FALLBACK_FAILED on fallback fetch failure', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockRejectedValue(
-        new Error('fetch failed'),
+      expect(result.error?.message).toContain(
+        'All requested URLs were skipped',
       );
-      const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://private.ip' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_FALLBACK_FAILED);
     });
 
-    it('should return WEB_FETCH_PROCESSING_ERROR on general processing failure', async () => {
+    it('should skip rate-limited URLs but fetch others', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
-      mockGenerateContent.mockRejectedValue(new Error('API error'));
+
       const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://public.ip' };
+      const params = {
+        prompt: 'fetch https://ratelimit-multi.com and https://healthy.com',
+      };
       const invocation = tool.build(params);
+
+      // Hit rate limit for one host
+      for (let i = 0; i < 10; i++) {
+        mockGenerateContent.mockResolvedValueOnce({
+          candidates: [{ content: { parts: [{ text: 'response' }] } }],
+        });
+        await tool
+          .build({ prompt: 'fetch https://ratelimit-multi.com' })
+          .execute(new AbortController().signal);
+      }
+      // 11th call - should be rate limited and not use a mock
+      await tool
+        .build({ prompt: 'fetch https://ratelimit-multi.com' })
+        .execute(new AbortController().signal);
+
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: 'healthy response' }] } }],
+      });
+
       const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
+      expect(result.llmContent).toContain('healthy response');
+      expect(result.llmContent).toContain(
+        '[Warning] The following URLs were skipped:',
+      );
+      expect(result.llmContent).toContain(
+        '[Rate limit exceeded] https://ratelimit-multi.com/',
+      );
     });
 
-    it('should log telemetry when falling back due to private IP', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
-      // Mock fetchWithTimeout to succeed so fallback proceeds
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-        ok: true,
-        text: () => Promise.resolve('some content'),
-      } as Response);
-      mockGenerateContent.mockResolvedValue({
+    it('should skip private or local URLs but fetch others and log telemetry', async () => {
+      vi.mocked(fetchUtils.isPrivateIp).mockImplementation(
+        (url) => url === 'https://private.com/',
+      );
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = {
+        prompt:
+          'fetch https://private.com and https://healthy.com and http://localhost',
+      };
+      const invocation = tool.build(params);
+
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [{ content: { parts: [{ text: 'healthy response' }] } }],
+      });
+
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(logWebFetchFallbackAttempt).toHaveBeenCalledTimes(2);
+      expect(logWebFetchFallbackAttempt).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ reason: 'private_ip_skipped' }),
+      );
+
+      expect(result.llmContent).toContain('healthy response');
+      expect(result.llmContent).toContain(
+        '[Warning] The following URLs were skipped:',
+      );
+      expect(result.llmContent).toContain(
+        '[Blocked Host] https://private.com/',
+      );
+      expect(result.llmContent).toContain('[Blocked Host] http://localhost');
+    });
+
+    it('should fallback to all public URLs if primary fails', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+
+      // Primary fetch fails
+      mockGenerateContent.mockRejectedValueOnce(new Error('primary fail'));
+
+      // Mock fallback fetch for BOTH URLs
+      mockFetch('https://url1.com/', {
+        text: () => Promise.resolve('content 1'),
+      });
+      mockFetch('https://url2.com/', {
+        text: () => Promise.resolve('content 2'),
+      });
+
+      // Mock fallback LLM call
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [
+          { content: { parts: [{ text: 'fallback processed response' }] } },
+        ],
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = {
+        prompt: 'fetch https://url1.com and https://url2.com/',
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toBe('fallback processed response');
+      expect(result.returnDisplay).toContain(
+        'URL(s) processed using fallback fetch',
+      );
+    });
+
+    it('should NOT include private URLs in fallback', async () => {
+      vi.mocked(fetchUtils.isPrivateIp).mockImplementation(
+        (url) => url === 'https://private.com/',
+      );
+
+      // Primary fetch fails
+      mockGenerateContent.mockRejectedValueOnce(new Error('primary fail'));
+
+      // Mock fallback fetch only for public URL
+      mockFetch('https://public.com/', {
+        text: () => Promise.resolve('public content'),
+      });
+
+      // Mock fallback LLM call
+      mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: 'fallback response' }] } }],
       });
 
       const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://private.ip' };
+      const params = {
+        prompt: 'fetch https://public.com/ and https://private.com',
+      };
       const invocation = tool.build(params);
-      await invocation.execute(new AbortController().signal);
+      const result = await invocation.execute(new AbortController().signal);
 
-      expect(logWebFetchFallbackAttempt).toHaveBeenCalledWith(
-        mockConfig,
-        expect.any(WebFetchFallbackAttemptEvent),
-      );
-      expect(WebFetchFallbackAttemptEvent).toHaveBeenCalledWith('private_ip');
+      expect(result.llmContent).toBe('fallback response');
+      // Verify private URL was NOT fetched (mockFetch would throw if it was called for private.com)
+    });
+
+    it('should return WEB_FETCH_FALLBACK_FAILED on total failure', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      mockGenerateContent.mockRejectedValue(new Error('primary fail'));
+      mockFetch('https://public.ip/', new Error('fallback fetch failed'));
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { prompt: 'fetch https://public.ip' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_FALLBACK_FAILED);
     });
 
     it('should log telemetry when falling back due to primary fetch failure', async () => {
@@ -255,10 +548,9 @@ describe('WebFetchTool', () => {
         candidates: [],
       });
       // Mock fetchWithTimeout to succeed so fallback proceeds
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-        ok: true,
+      mockFetch('https://public.ip/', {
         text: () => Promise.resolve('some content'),
-      } as Response);
+      });
       // Mock fallback LLM call
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: 'fallback response' }] } }],
@@ -271,7 +563,7 @@ describe('WebFetchTool', () => {
 
       expect(logWebFetchFallbackAttempt).toHaveBeenCalledWith(
         mockConfig,
-        expect.any(WebFetchFallbackAttemptEvent),
+        expect.objectContaining({ reason: 'primary_failed' }),
       );
       expect(WebFetchFallbackAttemptEvent).toHaveBeenCalledWith(
         'primary_failed',
@@ -320,11 +612,10 @@ describe('WebFetchTool', () => {
           ? new Headers({ 'content-type': contentType })
           : new Headers();
 
-        vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
-          ok: true,
+        mockFetch('https://example.com/', {
           headers,
           text: () => Promise.resolve(content),
-        } as Response);
+        });
 
         // Mock fallback LLM call to return the content passed to it
         mockGenerateContent.mockImplementationOnce(async (_, req) => ({
@@ -338,6 +629,14 @@ describe('WebFetchTool', () => {
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
 
+        const sanitizeXml = (text: string) =>
+          text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+
         if (shouldConvert) {
           expect(convert).toHaveBeenCalledWith(content, {
             wordwrap: false,
@@ -346,10 +645,12 @@ describe('WebFetchTool', () => {
               { selector: 'img', format: 'skip' },
             ],
           });
-          expect(result.llmContent).toContain(`Converted: ${content}`);
+          expect(result.llmContent).toContain(
+            `Converted: ${sanitizeXml(content)}`,
+          );
         } else {
           expect(convert).not.toHaveBeenCalled();
-          expect(result.llmContent).toContain(content);
+          expect(result.llmContent).toContain(sanitizeXml(content));
         }
       },
     );
@@ -369,6 +670,24 @@ describe('WebFetchTool', () => {
         title: 'Confirm Web Fetch',
         prompt: 'fetch https://example.com',
         urls: ['https://example.com/'],
+        onConfirm: expect.any(Function),
+      });
+    });
+
+    it('should handle URL param in confirmation details', async () => {
+      vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { url: 'https://example.com' };
+      const invocation = tool.build(params);
+      const confirmationDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmationDetails).toEqual({
+        type: 'info',
+        title: 'Confirm Web Fetch',
+        prompt: 'Fetch https://example.com',
+        urls: ['https://example.com'],
         onConfirm: expect.any(Function),
       });
     });
@@ -430,6 +749,24 @@ describe('WebFetchTool', () => {
 
       // Schedulers are now responsible for mode transitions via updatePolicy
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPolicyUpdateOptions', () => {
+    it('should return empty object for any outcome to allow global approval', () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ prompt: 'fetch https://example.com' });
+
+      expect(
+        invocation.getPolicyUpdateOptions!(
+          ToolConfirmationOutcome.ProceedAlways,
+        ),
+      ).toEqual({});
+      expect(
+        invocation.getPolicyUpdateOptions!(
+          ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        ),
+      ).toEqual({});
     });
   });
 
@@ -599,6 +936,187 @@ describe('WebFetchTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       expect(result.error).toBeUndefined();
       expect(result.llmContent).toContain('Fetched content');
+    });
+  });
+
+  describe('execute (experimental)', () => {
+    beforeEach(() => {
+      vi.spyOn(mockConfig, 'getDirectWebFetch').mockReturnValue(true);
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+    });
+
+    it('should perform direct fetch and return text for plain text content', async () => {
+      const content = 'Plain text content';
+      mockFetch('https://example.com/', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(content),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { url: 'https://example.com' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toBe(content);
+      expect(result.returnDisplay).toContain('Fetched text/plain content');
+      expect(fetchUtils.fetchWithTimeout).toHaveBeenCalledWith(
+        'https://example.com/',
+        expect.any(Number),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Accept: expect.stringContaining('text/plain'),
+          }),
+        }),
+      );
+    });
+
+    it('should use html-to-text and preserve links for HTML content', async () => {
+      const content =
+        '<html><body><a href="https://link.com">Link</a></body></html>';
+      mockFetch('https://example.com/', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html' }),
+        text: () => Promise.resolve(content),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { url: 'https://example.com' };
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      expect(convert).toHaveBeenCalledWith(
+        content,
+        expect.objectContaining({
+          selectors: [
+            expect.objectContaining({
+              selector: 'a',
+              options: { ignoreHref: false, baseUrl: 'https://example.com/' },
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('should return base64 for image content', async () => {
+      const buffer = Buffer.from('fake-image-data');
+      mockFetch('https://example.com/image.png', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'image/png' }),
+        arrayBuffer: () =>
+          Promise.resolve(
+            buffer.buffer.slice(
+              buffer.byteOffset,
+              buffer.byteOffset + buffer.byteLength,
+            ),
+          ),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { url: 'https://example.com/image.png' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toEqual({
+        inlineData: {
+          data: buffer.toString('base64'),
+          mimeType: 'image/png',
+        },
+      });
+    });
+
+    it('should return raw response info for 4xx/5xx errors', async () => {
+      const errorBody = 'Not Found';
+      mockFetch('https://example.com/404', {
+        status: 404,
+        headers: new Headers({ 'x-test': 'val' }),
+        text: () => Promise.resolve(errorBody),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const params = { url: 'https://example.com/404' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Request failed with status 404');
+      expect(result.llmContent).toContain('val');
+      expect(result.llmContent).toContain(errorBody);
+      expect(result.returnDisplay).toContain('Failed to fetch');
+    });
+
+    it('should throw error if Content-Length exceeds limit', async () => {
+      mockFetch('https://example.com/large', {
+        headers: new Headers({
+          'content-length': (11 * 1024 * 1024).toString(),
+        }),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://example.com/large' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error');
+      expect(result.llmContent).toContain('exceeds size limit');
+    });
+
+    it('should throw error if stream exceeds limit', async () => {
+      const large_chunk = new Uint8Array(11 * 1024 * 1024);
+      mockFetch('https://example.com/large-stream', {
+        body: {
+          getReader: () => ({
+            read: vi
+              .fn()
+              .mockResolvedValueOnce({ done: false, value: large_chunk })
+              .mockResolvedValueOnce({ done: true }),
+            releaseLock: vi.fn(),
+            cancel: vi.fn().mockResolvedValue(undefined),
+          }),
+        } as unknown as ReadableStream,
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({
+        url: 'https://example.com/large-stream',
+      });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error');
+      expect(result.llmContent).toContain('exceeds size limit');
+    });
+
+    it('should return error if url is missing (experimental)', async () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      // Manually bypass build() validation to test executeExperimental safety check
+      const invocation = tool['createInvocation']({}, bus);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error: No URL provided.');
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    });
+
+    it('should return error if url is invalid (experimental)', async () => {
+      const tool = new WebFetchTool(mockConfig, bus);
+      // Manually bypass build() validation to test executeExperimental safety check
+      const invocation = tool['createInvocation']({ url: 'not-a-url' }, bus);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain('Error: Invalid URL "not-a-url"');
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    });
+
+    it('should block private IP (experimental)', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool['createInvocation'](
+        { url: 'http://localhost' },
+        bus,
+      );
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).toContain(
+        'Error: Access to blocked or private host http://localhost/ is not allowed.',
+      );
+      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
     });
   });
 });

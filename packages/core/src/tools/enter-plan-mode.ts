@@ -27,12 +27,14 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
   EnterPlanModeParams,
   ToolResult
 > {
+  static readonly Name = ENTER_PLAN_MODE_TOOL_NAME;
+
   constructor(
     private config: Config,
     messageBus: MessageBus,
   ) {
     super(
-      ENTER_PLAN_MODE_TOOL_NAME,
+      EnterPlanModeTool.Name,
       'Enter Plan Mode',
       ENTER_PLAN_MODE_DEFINITION.base.description!,
       Kind.Plan,
@@ -85,11 +87,11 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     abortSignal: AbortSignal,
   ): Promise<ToolInfoConfirmationDetails | false> {
     const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       return false;
     }
 
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -97,7 +99,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    // ASK_USER
+    // ask_user
     return {
       type: 'info',
       title: 'Enter Plan Mode',
