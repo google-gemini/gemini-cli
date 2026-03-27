@@ -175,7 +175,7 @@ runs:
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CORE_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} false --silent
+        npm dist-tag rm ${INPUTS_CORE_PACKAGE_NAME} false
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -221,7 +221,9 @@ runs:
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_CLI_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} false --silent
+        if [[ "${INPUTS_DRY_RUN}" == "false" ]]; then
+          npm dist-tag rm ${INPUTS_CLI_PACKAGE_NAME} false
+        fi
 
     - name: 'Get a2a-server Token'
       uses: './.github/actions/npm-auth-token'
@@ -246,7 +248,7 @@ runs:
           --dry-run="${INPUTS_DRY_RUN}" \
           --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
           --no-tag
-        npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} false --silent
+        npm dist-tag rm ${INPUTS_A2A_PACKAGE_NAME} false
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'

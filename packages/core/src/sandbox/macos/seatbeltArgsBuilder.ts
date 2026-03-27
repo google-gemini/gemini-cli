@@ -15,7 +15,9 @@ import {
   type SandboxPermissions,
   sanitizePaths,
   GOVERNANCE_FILES,
+  SECRET_FILES,
 } from '../../services/sandboxManager.js';
+import { tryRealpath, resolveGitWorktreePaths } from '../utils/fsUtils.js';
 
 /**
  * Options for building macOS Seatbelt arguments.
@@ -33,26 +35,6 @@ export interface SeatbeltArgsOptions {
   additionalPermissions?: SandboxPermissions;
   /** Whether to allow write access to the workspace. */
   workspaceWrite?: boolean;
-}
-
-/**
- * Resolves symlinks for a given path to prevent sandbox escapes.
- * If a file does not exist (ENOENT), it recursively resolves the parent directory.
- * Other errors (e.g. EACCES) are re-thrown.
- */
-function tryRealpath(p: string): string {
-  try {
-    return fs.realpathSync(p);
-  } catch (e) {
-    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-      const parentDir = path.dirname(p);
-      if (parentDir === p) {
-        return p;
-      }
-      return path.join(tryRealpath(parentDir), path.basename(p));
-    }
-    throw e;
-  }
 }
 
 /**
@@ -108,37 +90,43 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     }
   }
 
-  // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
-  try {
-    const gitPath = path.join(workspacePath, '.git');
-    const gitStat = fs.lstatSync(gitPath);
-    if (gitStat.isFile()) {
-      const gitContent = fs.readFileSync(gitPath, 'utf8');
-      const match = gitContent.match(/^gitdir:\s*(.+)$/m);
-      if (match && match[1]) {
-        let worktreeGitDir = match[1].trim();
-        if (!path.isAbsolute(worktreeGitDir)) {
-          worktreeGitDir = path.resolve(workspacePath, worktreeGitDir);
-        }
-        const resolvedWorktreeGitDir = tryRealpath(worktreeGitDir);
+  // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
+  // We use regex rules to avoid expensive file discovery scans.
+  // Anchoring to workspace/allowed paths to avoid over-blocking.
+  const searchPaths = sanitizePaths([
+    options.workspace,
+    ...(options.allowedPaths || []),
+  ]) || [options.workspace];
 
-        // Grant write access to the worktree's specific .git directory
-        args.push('-D', `WORKTREE_GIT_DIR=${resolvedWorktreeGitDir}`);
-        profile += `(allow file-read* file-write* (subpath (param "WORKTREE_GIT_DIR")))\n`;
-
-        // Grant write access to the main repository's .git directory (objects, refs, etc. are shared)
-        // resolvedWorktreeGitDir is usually like: /path/to/main-repo/.git/worktrees/worktree-name
-        const mainGitDir = tryRealpath(
-          path.dirname(path.dirname(resolvedWorktreeGitDir)),
-        );
-        if (mainGitDir && mainGitDir.endsWith('.git')) {
-          args.push('-D', `MAIN_GIT_DIR=${mainGitDir}`);
-          profile += `(allow file-read* file-write* (subpath (param "MAIN_GIT_DIR")))\n`;
-        }
+  for (const basePath of searchPaths) {
+    const resolvedBase = tryRealpath(basePath);
+    for (const secret of SECRET_FILES) {
+      // Map pattern to Seatbelt regex
+      let regexPattern: string;
+      const escapedBase = escapeRegex(resolvedBase);
+      if (secret.pattern.endsWith('*')) {
+        // .env.* -> .env\..+ (match .env followed by dot and something)
+        // We anchor the secret file name to either a directory separator or the start of the relative path.
+        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\\\.');
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}[^/]+$`;
+      } else {
+        // .env -> \.env$
+        const basePattern = secret.pattern.replace(/\./g, '\\\\.');
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
       }
+      profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
     }
-  } catch (_e) {
-    // Ignore if .git doesn't exist, isn't readable, etc.
+  }
+
+  // Auto-detect and support git worktrees by granting read and write access to the underlying git directory
+  const { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(workspacePath);
+  if (worktreeGitDir) {
+    args.push('-D', `WORKTREE_GIT_DIR=${worktreeGitDir}`);
+    profile += `(allow file-read* file-write* (subpath (param "WORKTREE_GIT_DIR")))\n`;
+  }
+  if (mainGitDir) {
+    args.push('-D', `MAIN_GIT_DIR=${mainGitDir}`);
+    profile += `(allow file-read* file-write* (subpath (param "MAIN_GIT_DIR")))\n`;
   }
 
   const tmpPath = tryRealpath(os.tmpdir());
@@ -182,8 +170,10 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
   // Handle allowedPaths
   const allowedPaths = sanitizePaths(options.allowedPaths) || [];
+  const resolvedAllowedPaths: string[] = [];
   for (let i = 0; i < allowedPaths.length; i++) {
     const allowedPath = tryRealpath(allowedPaths[i]);
+    resolvedAllowedPaths.push(allowedPath);
     args.push('-D', `ALLOWED_PATH_${i}=${allowedPath}`);
     profile += `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))\n`;
   }
@@ -192,8 +182,8 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   if (options.additionalPermissions?.fileSystem) {
     const { read, write } = options.additionalPermissions.fileSystem;
     if (read) {
-      read.forEach((p, i) => {
-        const resolved = tryRealpath(p);
+      for (let i = 0; i < read.length; i++) {
+        const resolved = tryRealpath(read[i]);
         const paramName = `ADDITIONAL_READ_${i}`;
         args.push('-D', `${paramName}=${resolved}`);
         let isFile = false;
@@ -207,11 +197,11 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
         } else {
           profile += `(allow file-read* (subpath (param "${paramName}")))\n`;
         }
-      });
+      }
     }
     if (write) {
-      write.forEach((p, i) => {
-        const resolved = tryRealpath(p);
+      for (let i = 0; i < write.length; i++) {
+        const resolved = tryRealpath(write[i]);
         const paramName = `ADDITIONAL_WRITE_${i}`;
         args.push('-D', `${paramName}=${resolved}`);
         let isFile = false;
@@ -225,7 +215,7 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
         } else {
           profile += `(allow file-read* file-write* (subpath (param "${paramName}")))\n`;
         }
-      });
+      }
     }
   }
 
@@ -244,4 +234,24 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   args.unshift('-p', profile);
 
   return args;
+}
+
+/**
+ * Escapes a string for use within a Seatbelt regex literal #"..."
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\"]/g, (c) => {
+    if (c === '"') {
+      // Escape double quotes for the Scheme string literal
+      return '\\"';
+    }
+    if (c === '\\') {
+      // A literal backslash needs to be \\ in the regex.
+      // To get \\ in the regex engine, we need \\\\ in the Scheme string literal.
+      return '\\\\\\\\';
+    }
+    // For other regex special characters (like .), we need \c in the regex.
+    // To get \c in the regex engine, we need \\c in the Scheme string literal.
+    return '\\\\' + c;
+  });
 }
