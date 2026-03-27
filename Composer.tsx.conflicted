@@ -1,0 +1,457 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+<<<<<<< HEAD
+import { Box, useIsScreenReaderEnabled } from 'ink';
+import { useState, useEffect } from 'react';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+=======
+import { useState, useEffect, useMemo } from 'react';
+import { Box, useIsScreenReaderEnabled } from 'ink';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { LoadingIndicator } from './LoadingIndicator.js';
+import { StatusDisplay } from './StatusDisplay.js';
+>>>>>>> 96b0876e6 (feat(cli): unify session modes in footer and reorganize composer layout)
+import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
+import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
+import { ShortcutsHelp } from './ShortcutsHelp.js';
+import { ShortcutsHint } from './ShortcutsHint.js';
+import { InputPrompt } from './InputPrompt.js';
+import { Footer } from './Footer.js';
+import { StatusRow } from './StatusRow.js';
+import { ShowMoreLines } from './ShowMoreLines.js';
+import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { HorizontalLine } from './shared/HorizontalLine.js';
+import { OverflowProvider } from '../contexts/OverflowContext.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { StreamingState, type HistoryItemToolGroup } from '../types.js';
+import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
+import { TodoTray } from './messages/Todo.js';
+<<<<<<< HEAD
+import { useComposerStatus } from '../hooks/useComposerStatus.js';
+=======
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { isContextUsageHigh } from '../utils/contextUsage.js';
+>>>>>>> 96b0876e6 (feat(cli): unify session modes in footer and reorganize composer layout)
+
+export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
+  const config = useConfig();
+  const settings = useSettings();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const uiState = useUIState();
+  const uiActions = useUIActions();
+  const { vimEnabled, vimMode } = useVimMode();
+  const inlineThinkingMode = getInlineThinkingMode(settings);
+  const terminalWidth = uiState.terminalWidth;
+  const isNarrow = isNarrowWidth(terminalWidth);
+  const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
+  const [suggestionsVisible, setSuggestionsVisible] = useState(false);
+
+  const isAlternateBuffer = useAlternateBuffer();
+<<<<<<< HEAD
+=======
+  const { showApprovalModeIndicator } = uiState;
+>>>>>>> 96b0876e6 (feat(cli): unify session modes in footer and reorganize composer layout)
+  const showUiDetails = uiState.cleanUiDetailsVisible;
+  const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
+  const hideContextSummary =
+    suggestionsVisible && suggestionsPosition === 'above';
+
+  const { hasPendingActionRequired, shouldCollapseDuringApproval } =
+    useComposerStatus();
+
+  const isPassiveShortcutsHelpState =
+    uiState.isInputActive &&
+    uiState.streamingState === 'idle' &&
+    !hasPendingActionRequired;
+
+  const { setShortcutsHelpVisible } = uiActions;
+
+  useEffect(() => {
+    if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
+      setShortcutsHelpVisible(false);
+    }
+  }, [
+    uiState.shortcutsHelpVisible,
+    isPassiveShortcutsHelpState,
+    setShortcutsHelpVisible,
+  ]);
+
+<<<<<<< HEAD
+  const showShortcutsHelp =
+    uiState.shortcutsHelpVisible &&
+    uiState.streamingState === 'idle' &&
+    !hasPendingActionRequired;
+
+=======
+  const hideUiDetailsForSuggestions =
+    suggestionsVisible && suggestionsPosition === 'above';
+  const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
+  const isModelIdle = uiState.streamingState === StreamingState.Idle;
+  const isModelResponding =
+    uiState.streamingState === StreamingState.Responding;
+  const isBufferEmpty = uiState.buffer.text.length === 0;
+  const canShowShortcutsHint =
+    (isModelIdle || isModelResponding) &&
+    isBufferEmpty &&
+    !hasPendingActionRequired;
+
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(canShowShortcutsHint);
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
+
+  /**
+   * Use the setting if provided, otherwise default to true for the new UX.
+   * This allows tests to override the collapse behavior.
+   */
+  const shouldCollapseDuringApproval =
+    settings.merged.ui.collapseDrawerDuringApproval !== false;
+
+>>>>>>> 96b0876e6 (feat(cli): unify session modes in footer and reorganize composer layout)
+  if (hasPendingActionRequired && shouldCollapseDuringApproval) {
+    return null;
+  }
+
+  const showShortcutsHelp =
+    uiState.shortcutsHelpVisible &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+  const hasToast = shouldShowToast(uiState);
+<<<<<<< HEAD
+  const hideUiDetailsForSuggestions =
+    suggestionsVisible && suggestionsPosition === 'above';
+
+  // Mini Mode VIP Flags (Pure Content Triggers)
+  const showMinimalToast = hasToast;
+=======
+  const showLoadingIndicator =
+    (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
+    uiState.streamingState === StreamingState.Responding &&
+    !hasPendingActionRequired;
+
+  const hasMinimalStatusBleedThrough = shouldShowToast(uiState);
+
+  const showMinimalContextBleedThrough =
+    !settings.merged.ui.footer.hideContextPercentage &&
+    isContextUsageHigh(
+      uiState.sessionStats.lastPromptTokenCount,
+      typeof uiState.currentModel === 'string'
+        ? uiState.currentModel
+        : undefined,
+    );
+
+  const shouldReserveSpaceForShortcutsHint =
+    settings.merged.ui.showShortcutsHint &&
+    !hideShortcutsHintForSuggestions &&
+    !hasPendingActionRequired;
+  const showShortcutsHint =
+    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
+  const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
+  const showMinimalBleedThroughRow =
+    !showUiDetails &&
+    (hasMinimalStatusBleedThrough || showMinimalContextBleedThrough);
+  const showMinimalMetaRow =
+    !showUiDetails &&
+    (showMinimalInlineLoading ||
+      showMinimalBleedThroughRow ||
+      shouldReserveSpaceForShortcutsHint);
+
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+  const showWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
+>>>>>>> 96b0876e6 (feat(cli): unify session modes in footer and reorganize composer layout)
+
+  return (
+    <Box
+      flexDirection="column"
+      width={uiState.terminalWidth}
+      flexGrow={0}
+      flexShrink={0}
+    >
+      {(!uiState.slashCommands ||
+        !uiState.isConfigInitialized ||
+        uiState.isResuming) && (
+        <ConfigInitDisplay
+          message={uiState.isResuming ? 'Resuming session...' : undefined}
+        />
+      )}
+
+      {showUiDetails && (
+        <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+      )}
+
+      {showUiDetails && <TodoTray />}
+
+<<<<<<< HEAD
+      {showShortcutsHelp && <ShortcutsHelp />}
+
+      {(showUiDetails || showMinimalToast) && (
+        <Box minHeight={1} marginLeft={isNarrow ? 0 : 1}>
+          <ToastDisplay />
+        </Box>
+      )}
+
+      <Box width="100%" flexDirection="column">
+        <StatusRow
+          showUiDetails={showUiDetails}
+          isNarrow={isNarrow}
+          terminalWidth={terminalWidth}
+          hideContextSummary={hideContextSummary}
+          hideUiDetailsForSuggestions={hideUiDetailsForSuggestions}
+          hasPendingActionRequired={hasPendingActionRequired}
+        />
+=======
+      <Box width="100%" flexDirection="column">
+        <Box
+          width="100%"
+          flexDirection={isNarrow ? 'column' : 'row'}
+          alignItems={isNarrow ? 'flex-start' : 'center'}
+          justifyContent={isNarrow ? 'flex-start' : 'space-between'}
+        >
+          <Box
+            marginLeft={1}
+            marginRight={isNarrow ? 0 : 1}
+            flexDirection="row"
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+            flexGrow={1}
+          >
+            {showUiDetails && (hasToast ? <ToastDisplay /> : null)}
+          </Box>
+          <Box
+            marginTop={isNarrow ? 1 : 0}
+            flexDirection="column"
+            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            minHeight={
+              showUiDetails && shouldReserveSpaceForShortcutsHint ? 1 : 0
+            }
+          >
+            {showUiDetails && showShortcutsHint && <ShortcutsHint />}
+          </Box>
+        </Box>
+        {showMinimalMetaRow && (
+          <Box
+            justifyContent="space-between"
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+          >
+            <Box
+              marginLeft={1}
+              marginRight={isNarrow ? 0 : 1}
+              flexDirection="row"
+              alignItems={isNarrow ? 'flex-start' : 'center'}
+              flexGrow={1}
+            >
+              {showMinimalInlineLoading && (
+                <LoadingIndicator
+                  inline
+                  thought={
+                    uiState.streamingState ===
+                      StreamingState.WaitingForConfirmation ||
+                    inlineThinkingMode === 'full'
+                      ? undefined
+                      : uiState.thought
+                  }
+                  currentLoadingPhrase={
+                    loadingPhrases === 'off'
+                      ? undefined
+                      : uiState.currentLoadingPhrase
+                  }
+                  thoughtLabel={
+                    inlineThinkingMode === 'full'
+                      ? typeof uiState.thought === 'string'
+                        ? uiState.thought
+                        : uiState.thought?.subject || 'Thinking...'
+                      : undefined
+                  }
+                  elapsedTime={uiState.elapsedTime}
+                  showTips={showTips}
+                  showWit={showWit}
+                  wittyPhrase={uiState.currentWittyPhrase}
+                  errorVerbosity={settings.merged.ui.errorVerbosity}
+                />
+              )}
+              {hasMinimalStatusBleedThrough && (
+                <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
+                  <ToastDisplay />
+                </Box>
+              )}
+            </Box>
+            {(showMinimalContextBleedThrough ||
+              shouldReserveSpaceForShortcutsHint) && (
+              <Box
+                marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
+                flexDirection={isNarrow ? 'column' : 'row'}
+                alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+                minHeight={1}
+              >
+                {showMinimalContextBleedThrough && (
+                  <ContextUsageDisplay
+                    promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
+                    model={uiState.currentModel}
+                    terminalWidth={uiState.terminalWidth}
+                  />
+                )}
+                <Box
+                  marginLeft={
+                    showMinimalContextBleedThrough && !isNarrow ? 1 : 0
+                  }
+                  marginTop={showMinimalContextBleedThrough && isNarrow ? 1 : 0}
+                >
+                  {showShortcutsHint && <ShortcutsHint />}
+                </Box>
+              </Box>
+            )}
+          </Box>
+        )}
+        {showShortcutsHelp && <ShortcutsHelp />}
+        {showUiDetails && <HorizontalLine />}
+        {showUiDetails && (
+          <Box
+            justifyContent={
+              settings.merged.ui.hideContextSummary
+                ? 'flex-start'
+                : 'space-between'
+            }
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+          >
+            <Box
+              marginLeft={1}
+              marginRight={isNarrow ? 0 : 1}
+              flexDirection="row"
+              alignItems="center"
+              flexGrow={1}
+            >
+              {showLoadingIndicator && (
+                <LoadingIndicator
+                  inline
+                  thought={
+                    uiState.streamingState ===
+                      StreamingState.WaitingForConfirmation ||
+                    inlineThinkingMode === 'full'
+                      ? undefined
+                      : uiState.thought
+                  }
+                  currentLoadingPhrase={
+                    loadingPhrases === 'off'
+                      ? undefined
+                      : uiState.currentLoadingPhrase
+                  }
+                  thoughtLabel={
+                    inlineThinkingMode === 'full'
+                      ? typeof uiState.thought === 'string'
+                        ? uiState.thought
+                        : uiState.thought?.subject || 'Thinking...'
+                      : undefined
+                  }
+                  elapsedTime={uiState.elapsedTime}
+                  showTips={showTips}
+                  showWit={showWit}
+                  wittyPhrase={uiState.currentWittyPhrase}
+                  errorVerbosity={settings.merged.ui.errorVerbosity}
+                />
+              )}
+            </Box>
+
+            <Box
+              marginTop={isNarrow ? 1 : 0}
+              flexDirection="column"
+              alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            >
+              {!showLoadingIndicator && (
+                <StatusDisplay hideContextSummary={hideContextSummary} />
+              )}
+            </Box>
+          </Box>
+        )}
+>>>>>>> 96b0876e6 (feat(cli): unify session modes in footer and reorganize composer layout)
+      </Box>
+
+      {showUiDetails && uiState.showErrorDetails && (
+        <OverflowProvider>
+          <Box flexDirection="column">
+            <DetailedMessagesDisplay
+              maxHeight={
+                uiState.constrainHeight ? debugConsoleMaxHeight : undefined
+              }
+              width={uiState.terminalWidth}
+              hasFocus={uiState.showErrorDetails}
+            />
+            <ShowMoreLines constrainHeight={uiState.constrainHeight} />
+          </Box>
+        </OverflowProvider>
+      )}
+
+      {uiState.isInputActive && (
+        <InputPrompt
+          buffer={uiState.buffer}
+          inputWidth={uiState.inputWidth}
+          suggestionsWidth={uiState.suggestionsWidth}
+          onSubmit={uiActions.handleFinalSubmit}
+          userMessages={uiState.userMessages}
+          setBannerVisible={uiActions.setBannerVisible}
+          onClearScreen={uiActions.handleClearScreen}
+          config={config}
+          slashCommands={uiState.slashCommands || []}
+          commandContext={uiState.commandContext}
+          shellModeActive={uiState.shellModeActive}
+          setShellModeActive={uiActions.setShellModeActive}
+          approvalMode={uiState.showApprovalModeIndicator}
+          onEscapePromptChange={uiActions.onEscapePromptChange}
+          focus={isFocused}
+          vimHandleInput={uiActions.vimHandleInput}
+          isEmbeddedShellFocused={uiState.embeddedShellFocused}
+          popAllMessages={uiActions.popAllMessages}
+          placeholder={
+            vimEnabled
+              ? vimMode === 'INSERT'
+                ? "  Press 'Esc' for NORMAL mode."
+                : "  Press 'i' for INSERT mode."
+              : uiState.shellModeActive
+                ? '  Type your shell command'
+                : '  Type your message or @path/to/file'
+          }
+          setQueueErrorMessage={uiActions.setQueueErrorMessage}
+          streamingState={uiState.streamingState}
+          suggestionsPosition={suggestionsPosition}
+          onSuggestionsVisibilityChange={setSuggestionsVisible}
+        />
+      )}
+
+      {showUiDetails &&
+        !settings.merged.ui.hideFooter &&
+        !isScreenReaderEnabled && <Footer />}
+    </Box>
+  );
+};

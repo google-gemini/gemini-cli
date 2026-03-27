@@ -6,7 +6,28 @@
 
 import type { MergedSettings } from './settings.js';
 
-export const ALL_ITEMS = [
+export const ALL_ITEMS: ReadonlyArray<{
+  id:
+    | 'mode'
+    | 'workspace'
+    | 'git-branch'
+    | 'sandbox'
+    | 'model-name'
+    | 'context-used'
+    | 'quota'
+    | 'memory-usage'
+    | 'session-id'
+    | 'code-changes'
+    | 'token-count';
+  header: string;
+  description: string;
+}> = [
+  {
+    id: 'mode',
+    header: 'mode (Shift+Tab)',
+    description:
+      'Current session state: approval mode, shell mode, markdown mode',
+  },
   {
     id: 'workspace',
     header: 'workspace (/directory)',
@@ -57,11 +78,12 @@ export const ALL_ITEMS = [
     header: 'tokens',
     description: 'Total tokens used in the session (not shown when zero)',
   },
-] as const;
+];
 
 export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
 
-export const DEFAULT_ORDER = [
+export const DEFAULT_ORDER: FooterItemId[] = [
+  'mode',
   'workspace',
   'git-branch',
   'sandbox',
@@ -77,7 +99,8 @@ export const DEFAULT_ORDER = [
 export function deriveItemsFromLegacySettings(
   settings: MergedSettings,
 ): string[] {
-  const defaults = [
+  const defaults: string[] = [
+    'mode',
     'workspace',
     'git-branch',
     'sandbox',
