@@ -140,8 +140,8 @@ describe('<SessionSummaryDisplay />', () => {
     unmount();
   });
 
-  describe('Session ID escaping', () => {
-    it('renders a standard UUID-formatted session ID in the footer (bash)', async () => {
+  describe('Session ID in footer', () => {
+    it('renders session ID without quotes (bash)', async () => {
       const uuidSessionId = '1234-abcd-5678-efgh';
       const { lastFrame, unmount } = await renderWithMockedStats(
         emptyMetrics,
@@ -149,25 +149,14 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // Standard UUID characters should not be escaped/quoted by default for bash.
+      // Session IDs are UUIDs and should never be quoted, as quoting
+      // style differences across shells (e.g., single quotes in cmd.exe)
+      // cause the resume command to fail.
       expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
 
-    it('sanitizes a malicious session ID in the footer (bash)', async () => {
-      const maliciousSessionId = "'; rm -rf / #";
-      const { lastFrame, unmount } = await renderWithMockedStats(
-        emptyMetrics,
-        maliciousSessionId,
-      );
-      const output = lastFrame();
-
-      // escapeShellArg (using shell-quote for bash) will wrap special characters in double quotes.
-      expect(output).toContain('gemini --resume "\'; rm -rf / #"');
-      unmount();
-    });
-
-    it('renders a standard UUID-formatted session ID in the footer (powershell)', async () => {
+    it('renders session ID without quotes (powershell)', async () => {
       getShellConfigurationMock.mockReturnValue({
         executable: 'powershell.exe',
         argsPrefix: ['-NoProfile', '-Command'],
@@ -181,18 +170,32 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps strings in single quotes
-      expect(output).toContain("gemini --resume '1234-abcd-5678-efgh'");
+      // Session IDs are UUIDs — no quoting needed on any shell.
+      expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
       unmount();
     });
 
-    it('sanitizes a malicious session ID in the footer (powershell)', async () => {
+    it('renders session ID without quotes (cmd)', async () => {
       getShellConfigurationMock.mockReturnValue({
-        executable: 'powershell.exe',
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
+        executable: 'cmd.exe',
+        argsPrefix: ['/d', '/s', '/c'],
+        shell: 'cmd',
       });
 
+      const uuidSessionId = '935c6d18-0c3f-4f42-8113-370b2daada1a';
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        uuidSessionId,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain(
+        'gemini --resume 935c6d18-0c3f-4f42-8113-370b2daada1a',
+      );
+      unmount();
+    });
+
+    it('safely quotes a malicious-looking session ID in the footer', async () => {
       const maliciousSessionId = "'; rm -rf / #";
       const { lastFrame, unmount } = await renderWithMockedStats(
         emptyMetrics,
@@ -200,8 +203,9 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      // PowerShell wraps in single quotes and escapes internal single quotes by doubling them
-      expect(output).toContain("gemini --resume '''; rm -rf / #'");
+      // escapeShellArg with bash (shell-quote) keeps this payload as a
+      // single shell argument instead of allowing it to break out.
+      expect(output).toContain('gemini --resume "\'; rm -rf / #"');
       unmount();
     });
   });
