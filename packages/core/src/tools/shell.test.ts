@@ -325,6 +325,7 @@ describe('ShellTool', () => {
       const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({ pid: 54321 });
 
+      // Simulate pgrep output file creation by the shell command
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
       fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
 
@@ -385,7 +386,6 @@ describe('ShellTool', () => {
         expect.any(Object),
       );
     });
-
     it('should use the provided absolute directory as cwd', async () => {
       const subdir = path.join(tempRootDir, 'subdir');
       const invocation = shellTool.build({
