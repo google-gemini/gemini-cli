@@ -261,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
       },
       checkpointing: {
