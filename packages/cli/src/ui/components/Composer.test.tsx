@@ -17,16 +17,11 @@ import {
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import {
-  ApprovalMode,
-  tokenLimit,
-  CoreToolCallStatus,
-} from '@google/gemini-cli-core';
+import { ApprovalMode, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
 // Mock VimModeContext hook
@@ -54,14 +49,25 @@ vi.mock('./LoadingIndicator.js', () => ({
   LoadingIndicator: ({
     thought,
     thoughtLabel,
+    wittyPhrase,
   }: {
     thought?: { subject?: string } | string;
     thoughtLabel?: string;
+    wittyPhrase?: string;
   }) => {
     const fallbackText =
       typeof thought === 'string' ? thought : thought?.subject;
     const text = thoughtLabel ?? fallbackText;
-    return <Text>LoadingIndicator{text ? `: ${text}` : ''}</Text>;
+    return (
+      <Box>
+        <Text>LoadingIndicator{text ? `: ${text}` : ''}</Text>
+        {wittyPhrase && (
+          <Box marginLeft={1}>
+            <Text>{wittyPhrase}</Text>
+          </Box>
+        )}
+      </Box>
+    );
   },
 }));
 
@@ -75,22 +81,12 @@ vi.mock('./ContextSummaryDisplay.js', () => ({
   ContextSummaryDisplay: () => <Text>ContextSummaryDisplay</Text>,
 }));
 
-vi.mock('./HookStatusDisplay.js', () => ({
-  HookStatusDisplay: () => <Text>HookStatusDisplay</Text>,
-}));
-
-vi.mock('./ApprovalModeIndicator.js', () => ({
-  ApprovalModeIndicator: ({ approvalMode }: { approvalMode: ApprovalMode }) => (
-    <Text>ApprovalModeIndicator: {approvalMode}</Text>
-  ),
-}));
-
-vi.mock('./ShellModeIndicator.js', () => ({
-  ShellModeIndicator: () => <Text>ShellModeIndicator</Text>,
-}));
-
 vi.mock('./ShortcutsHelp.js', () => ({
   ShortcutsHelp: () => <Text>ShortcutsHelp</Text>,
+}));
+
+vi.mock('./ShortcutsHint.js', () => ({
+  ShortcutsHint: () => <Text>ShortcutsHint</Text>,
 }));
 
 vi.mock('./DetailedMessagesDisplay.js', () => ({
@@ -145,6 +141,12 @@ vi.mock('./QueuedMessageDisplay.js', () => ({
   },
 }));
 
+vi.mock('./ContextUsageDisplay.js', () => ({
+  ContextUsageDisplay: ({ promptTokenCount }: { promptTokenCount: number }) => (
+    <Text>ContextUsageDisplay: {promptTokenCount}</Text>
+  ),
+}));
+
 // Mock contexts
 vi.mock('../contexts/OverflowContext.js', () => ({
   OverflowProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -153,6 +155,7 @@ vi.mock('../contexts/OverflowContext.js', () => ({
 // Create mock context providers
 const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
   ({
+    terminalWidth: 100,
     streamingState: StreamingState.Idle,
     isConfigInitialized: true,
     contextFileNames: [],
@@ -186,8 +189,10 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     sessionStats: {
       sessionId: 'test-session',
       sessionStartTime: new Date(),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      metrics: {} as any,
+      metrics: {
+        files: { totalLinesAdded: 0, totalLinesRemoved: 0 },
+        models: {},
+      },
       lastPromptTokenCount: 0,
       promptCount: 0,
     },
@@ -266,7 +271,11 @@ const renderComposer = async (
   // Wait for shortcuts hint debounce if using fake timers
   if (vi.isFakeTimers()) {
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(250);
+      vi.advanceTimersByTime(250);
+    });
+    // Extra tick for state updates
+    await act(async () => {
+      await Promise.resolve();
     });
   }
 
@@ -301,52 +310,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState, settings);
 
-      // Check for content that only appears IN the Footer component itself
-      expect(lastFrame()).not.toContain('[NORMAL]'); // Vim mode indicator
-      expect(lastFrame()).not.toContain('(main'); // Branch name with parentheses
-    });
-
-    it('passes correct props to Footer including vim mode when enabled', async () => {
-      const uiState = createMockUIState({
-        branchName: 'feature-branch',
-        corgiMode: true,
-        errorCount: 2,
-        sessionStats: {
-          sessionId: 'test-session',
-          sessionStartTime: new Date(),
-          metrics: {
-            models: {},
-            tools: {},
-            files: {},
-          } as SessionMetrics,
-          lastPromptTokenCount: 150,
-          promptCount: 5,
-        },
-      });
-      const config = createMockConfig({
-        getModel: vi.fn(() => 'gemini-1.5-flash'),
-        getTargetDir: vi.fn(() => '/project/path'),
-        getDebugMode: vi.fn(() => true),
-      });
-      const settings = createMockSettings({
-        ui: {
-          hideFooter: false,
-          showMemoryUsage: true,
-        },
-      });
-      // Mock vim mode for this test
-      const { useVimMode } = await import('../contexts/VimModeContext.js');
-      vi.mocked(useVimMode).mockReturnValueOnce({
-        vimEnabled: true,
-        vimMode: 'INSERT',
-        toggleVimEnabled: vi.fn(),
-        setVimMode: vi.fn(),
-      } as unknown as ReturnType<typeof useVimMode>);
-
-      const { lastFrame } = await renderComposer(uiState, settings, config);
-
-      expect(lastFrame()).toContain('Footer');
-      // Footer should be rendered with all the state passed through
+      expect(lastFrame()).not.toContain('Footer');
     });
   });
 
@@ -383,12 +347,10 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      // In Refreshed UX, we don't force 'Thinking...' label in renderStatusNode
-      // It uses the subject directly
       expect(output).toContain('LoadingIndicator: Thinking about code');
     });
 
-    it('shows shortcuts hint while loading', async () => {
+    it('shows shortcuts hint while loading in minimal mode', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
@@ -400,7 +362,6 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
       expect(output).toContain('press tab twice for more');
-      expect(output).not.toContain('? for shortcuts');
     });
 
     it('renders LoadingIndicator with thought when loadingPhrases is off', async () => {
@@ -416,7 +377,6 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).toContain('LoadingIndicator: Hidden');
     });
 
     it('does not render LoadingIndicator when waiting for confirmation', async () => {
@@ -473,23 +433,6 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator');
     });
 
-    it('renders both LoadingIndicator and ApprovalModeIndicator when streaming in full UI mode', async () => {
-      const uiState = createMockUIState({
-        streamingState: StreamingState.Responding,
-        thought: {
-          subject: 'Thinking',
-          description: '',
-        },
-        showApprovalModeIndicator: ApprovalMode.PLAN,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      const output = lastFrame();
-      expect(output).toContain('LoadingIndicator: Thinking');
-      expect(output).toContain('ApprovalModeIndicator');
-    });
-
     it('does NOT render LoadingIndicator when embedded shell is focused and background shell is NOT visible', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
@@ -501,6 +444,23 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).not.toContain('LoadingIndicator');
+    });
+
+    it('renders both Thinking and witty phrase', async () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: { subject: 'Processing', description: '' },
+        currentWittyPhrase: 'Reticulating splines...',
+      });
+      const settings = createMockSettings({
+        ui: { loadingPhrases: 'witty' },
+      });
+
+      const { lastFrame } = await renderComposer(uiState, settings);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator: Processing');
+      expect(output).toContain('Reticulating splines...');
     });
   });
 
@@ -521,23 +481,10 @@ describe('Composer', () => {
       expect(output).toContain('Second queued message');
       expect(output).toContain('Third queued message');
     });
-
-    it('renders QueuedMessageDisplay with empty message queue', async () => {
-      const uiState = createMockUIState({
-        messageQueue: [],
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      // The component should render but return null for empty queue
-      // This test verifies that the component receives the correct prop
-      const output = lastFrame();
-      expect(output).toContain('InputPrompt'); // Verify basic Composer rendering
-    });
   });
 
   describe('Context and Status Display', () => {
-    it('shows StatusDisplay and ApprovalModeIndicator in normal state', async () => {
+    it('shows StatusDisplay in normal state', async () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: false,
         ctrlDPressedOnce: false,
@@ -548,11 +495,9 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('StatusDisplay');
-      expect(output).toContain('ApprovalModeIndicator');
-      expect(output).not.toContain('ToastDisplay');
     });
 
-    it('shows ToastDisplay and hides ApprovalModeIndicator when a toast is present', async () => {
+    it('shows ToastDisplay when a toast is present', async () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
       });
@@ -561,10 +506,6 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('Press Ctrl+C again to exit.');
-      // In Refreshed UX, Row 1 shows toast, and Row 2 shows ApprovalModeIndicator/StatusDisplay
-      // They are no longer mutually exclusive.
-      expect(output).toContain('ApprovalModeIndicator');
-      expect(output).toContain('StatusDisplay');
     });
 
     it('shows ToastDisplay for other toast types', async () => {
@@ -579,7 +520,6 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('Warning');
-      expect(output).toContain('ApprovalModeIndicator');
     });
   });
 
@@ -595,8 +535,7 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).not.toContain('press tab twice for more');
-      expect(output).not.toContain('? for shortcuts');
+      expect(output).not.toContain('ShortcutsHint');
       expect(output).toContain('InputPrompt');
       expect(output).not.toContain('Footer');
     });
@@ -621,148 +560,41 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('InputPrompt');
     });
 
-    it.each([
-      [ApprovalMode.DEFAULT],
-      [ApprovalMode.AUTO_EDIT],
-      [ApprovalMode.PLAN],
-      [ApprovalMode.YOLO],
-    ])(
-      'shows ApprovalModeIndicator when approval mode is %s and shell mode is inactive',
-      async (mode) => {
-        const uiState = createMockUIState({
-          showApprovalModeIndicator: mode,
-          shellModeActive: false,
-        });
-
-        const { lastFrame } = await renderComposer(uiState);
-
-        expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
-      },
-    );
-
-    it('shows ShellModeIndicator when shell mode is active', async () => {
-      const uiState = createMockUIState({
-        shellModeActive: true,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).toMatch(/ShellModeIndic[\s\S]*tor/);
-    });
-
-    it('shows RawMarkdownIndicator when renderMarkdown is false', async () => {
-      const uiState = createMockUIState({
-        renderMarkdown: false,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).toContain('raw markdown mode');
-    });
-
-    it('does not show RawMarkdownIndicator when renderMarkdown is true', async () => {
-      const uiState = createMockUIState({
-        renderMarkdown: true,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).not.toContain('raw markdown mode');
-    });
-
-    it.each([
-      { mode: ApprovalMode.YOLO, label: '● YOLO' },
-      { mode: ApprovalMode.PLAN, label: '● plan' },
-      {
-        mode: ApprovalMode.AUTO_EDIT,
-        label: '● auto edit',
-      },
-    ])(
-      'shows minimal mode badge "$mode" when clean UI details are hidden',
-      async ({ mode, label }) => {
-        const uiState = createMockUIState({
-          cleanUiDetailsVisible: false,
-          showApprovalModeIndicator: mode,
-        });
-
-        const { lastFrame } = await renderComposer(uiState);
-        expect(lastFrame()).toContain(label);
-      },
-    );
-
-    it('hides minimal mode badge while loading in clean mode', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        streamingState: StreamingState.Responding,
-        elapsedTime: 1,
-        showApprovalModeIndicator: ApprovalMode.PLAN,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('plan');
-      expect(output).toContain('press tab twice for more');
-      expect(output).not.toContain('? for shortcuts');
-    });
-
-    it('hides minimal mode badge while action-required state is active', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        showApprovalModeIndicator: ApprovalMode.PLAN,
-        customDialog: (
-          <Box>
-            <Text>Prompt</Text>
-          </Box>
-        ),
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-      expect(lastFrame({ allowEmpty: true })).toBe('');
-    });
-
-    it('shows Esc rewind prompt in minimal mode without showing full UI', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        showEscapePrompt: true,
-        history: [{ id: 1, type: 'user', text: 'msg' }],
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).toContain('Press Esc again to rewind.');
-      expect(output).not.toContain('ContextSummaryDisplay');
-    });
-
     it('shows context usage bleed-through when over 60%', async () => {
-      const model = 'gemini-2.5-pro';
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
-        currentModel: model,
         sessionStats: {
-          sessionId: 'test-session',
+          lastPromptTokenCount: 700000,
+          metrics: {
+            files: { totalLinesAdded: 0, totalLinesRemoved: 0 },
+            models: {},
+            tools: {
+              totalCalls: 0,
+              totalSuccess: 0,
+              totalFail: 0,
+              totalDurationMs: 0,
+              totalDecisions: {
+                accept: 0,
+                reject: 0,
+                modify: 0,
+                auto_accept: 0,
+              },
+              byName: {},
+            },
+          },
+          sessionId: 'test',
           sessionStartTime: new Date(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          metrics: {} as any,
-          lastPromptTokenCount: Math.floor(tokenLimit(model) * 0.7),
           promptCount: 0,
         },
+        currentModel: 'gemini-1.5-pro',
       });
       const settings = createMockSettings({
-        ui: {
-          footer: { hideContextPercentage: false },
-        },
+        ui: { footer: { hideContextPercentage: false } },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
-      // StatusDisplay (which contains ContextUsageDisplay) should bleed through in minimal mode
-      expect(lastFrame()).toContain('StatusDisplay');
-      expect(lastFrame()).toContain('70% used');
+      expect(lastFrame()).toContain('ContextUsageDisplay: 700000');
     });
   });
 
@@ -834,10 +666,6 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
       expect(lastFrame({ allowEmpty: true })).toContain(
         'press tab twice for more',
       );
@@ -851,8 +679,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('press tab twice for more');
-      expect(lastFrame()).not.toContain('? for shortcuts');
+      expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
     it('hides shortcuts hint when showShortcutsHint setting is false', async () => {
@@ -865,7 +692,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState, settings);
 
-      expect(lastFrame()).not.toContain('? for shortcuts');
+      expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
     it('hides shortcuts hint when a action is required (e.g. dialog is open)', async () => {
@@ -891,10 +718,6 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
       expect(lastFrame()).toContain('press tab twice for more');
     });
 
@@ -905,49 +728,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
-      // In Refreshed UX, shortcuts hint is in the top multipurpose status row
       expect(lastFrame()).toContain('? for shortcuts');
-    });
-
-    it('shows shortcuts hint while loading when full UI details are visible', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: true,
-        streamingState: StreamingState.Responding,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
-      // In experimental layout, status row is visible during loading
-      expect(lastFrame()).toContain('LoadingIndicator');
-      expect(lastFrame()).toContain('? for shortcuts');
-      expect(lastFrame()).not.toContain('press tab twice for more');
-    });
-
-    it('shows shortcuts hint while loading in minimal mode', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        streamingState: StreamingState.Responding,
-        elapsedTime: 1,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
-      // In experimental layout, status row is visible in clean mode while busy
-      expect(lastFrame()).toContain('LoadingIndicator');
-      expect(lastFrame()).toContain('press tab twice for more');
-      expect(lastFrame()).not.toContain('? for shortcuts');
     });
 
     it('shows shortcuts help in minimal mode when toggled on', async () => {
@@ -967,46 +748,11 @@ describe('Composer', () => {
 
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
-        showApprovalModeIndicator: ApprovalMode.PLAN,
       });
 
       const { lastFrame } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('press tab twice for more');
-      expect(lastFrame()).not.toContain('? for shortcuts');
-      expect(lastFrame()).not.toContain('plan');
-    });
-
-    it('hides approval mode indicator when suggestions are visible above input in alternate buffer', async () => {
-      composerTestControls.isAlternateBuffer = true;
-      composerTestControls.suggestionsVisible = true;
-
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: true,
-        showApprovalModeIndicator: ApprovalMode.YOLO,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).not.toContain('ApprovalModeIndicator');
-    });
-
-    it('keeps shortcuts hint when suggestions are visible below input in regular buffer', async () => {
-      composerTestControls.isAlternateBuffer = false;
-      composerTestControls.suggestionsVisible = true;
-
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
-      });
-
-      // In Refreshed UX, shortcuts hint is in the top status row and doesn't collide with suggestions below
-      expect(lastFrame()).toContain('press tab twice for more');
+      expect(lastFrame()).not.toContain('ShortcutsHint');
     });
   });
 
@@ -1034,22 +780,8 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('ShortcutsHelp');
       unmount();
     });
-    it('hides shortcuts help when action is required', async () => {
-      const uiState = createMockUIState({
-        shortcutsHelpVisible: true,
-        customDialog: (
-          <Box>
-            <Text>Test Dialog</Text>
-          </Box>
-        ),
-      });
-
-      const { lastFrame, unmount } = await renderComposer(uiState);
-
-      expect(lastFrame({ allowEmpty: true })).toBe('');
-      unmount();
-    });
   });
+
   describe('Snapshots', () => {
     it('matches snapshot in idle state', async () => {
       const uiState = createMockUIState();

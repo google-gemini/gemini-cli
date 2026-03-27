@@ -18,7 +18,10 @@ import process from 'node:process';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
-import { DebugProfiler } from './DebugProfiler.js';
+import {
+  UnifiedModeIndicator,
+  getModeHeaderLabel,
+} from './UnifiedModeIndicator.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -246,13 +249,10 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   };
 
   // 1. System Indicators (Far Left, high priority)
-  if (uiState.showDebugProfiler) {
-    addCol('debug', '', () => <DebugProfiler />, 45, true);
-  }
   if (displayVimMode) {
     const vimStr = `[${displayVimMode}]`;
     addCol(
-      'vim',
+      'vim-mode',
       '',
       () => <Text color={theme.text.accent}>{vimStr}</Text>,
       vimStr.length,
@@ -264,9 +264,39 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   for (const id of items) {
     if (!isFooterItemId(id)) continue;
     const itemConfig = ALL_ITEMS.find((i) => i.id === id);
-    const header = itemConfig?.header ?? id;
+    let header = itemConfig?.header ?? id;
 
     switch (id) {
+      case 'mode': {
+        header = getModeHeaderLabel(
+          uiState.showApprovalModeIndicator,
+          uiState.shellModeActive,
+        );
+
+        // Calculate dynamic width based on which modes are active
+        let contentWidth = 6; // 'manual' or 'plan' or 'YOLO' (max 11 for auto-accept)
+        if (uiState.showApprovalModeIndicator === 'autoEdit') contentWidth = 11;
+        if (uiState.shellModeActive)
+          contentWidth = 5; // 'shell' (obscures others)
+        else if (uiState.showApprovalModeIndicator === 'yolo') contentWidth = 4; // 'YOLO' (obscures others)
+
+        if (!uiState.renderMarkdown) contentWidth += 6; // ' · raw'
+
+        addCol(
+          id,
+          header,
+          () => (
+            <UnifiedModeIndicator
+              approvalMode={uiState.showApprovalModeIndicator}
+              shellModeActive={uiState.shellModeActive}
+              renderMarkdown={uiState.renderMarkdown}
+            />
+          ),
+          Math.max(contentWidth, showLabels ? header.length : 0),
+          true, // high priority, always shown
+        );
+        break;
+      }
       case 'workspace': {
         const fullPath = tildeifyPath(targetDir);
         const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';
@@ -430,10 +460,10 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   }
 
   // 3. Transients
-  if (corgiMode) addCol('corgi', '', () => <CorgiIndicator />, 5);
+  if (corgiMode) addCol('corgi-mode', '', () => <CorgiIndicator />, 5);
   if (showErrorSummary) {
     addCol(
-      'error-count',
+      'error-summary',
       '',
       () => <ConsoleSummaryDisplay errorCount={errorCount} />,
       12,
@@ -482,7 +512,7 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
     const estimatedWidth = isWorkspace ? availableForWorkspace : col.width;
 
     return {
-      key: col.id,
+      key: col.id + index,
       header: col.header,
       element: col.element(estimatedWidth),
       flexGrow: 0,

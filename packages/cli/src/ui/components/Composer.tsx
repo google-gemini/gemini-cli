@@ -4,16 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, useIsScreenReaderEnabled } from 'ink';
 import { useState, useEffect } from 'react';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
-import { useVimMode } from '../contexts/VimModeContext.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { ShortcutsHelp } from './ShortcutsHelp.js';
@@ -22,10 +14,19 @@ import { Footer } from './Footer.js';
 import { StatusRow } from './StatusRow.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
+import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
@@ -34,7 +35,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const { vimEnabled, vimMode } = useVimMode();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const { columns: terminalWidth } = useTerminalSize();
+  const terminalWidth = uiState.terminalWidth;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
@@ -65,20 +66,69 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     setShortcutsHelpVisible,
   ]);
 
-  const showShortcutsHelp =
-    uiState.shortcutsHelpVisible &&
-    uiState.streamingState === 'idle' &&
+  const hideUiDetailsForSuggestions =
+    suggestionsVisible && suggestionsPosition === 'above';
+  const isModelIdle = uiState.streamingState === 'idle';
+  const isModelResponding = uiState.streamingState === 'responding';
+  const isBufferEmpty = uiState.buffer.text.length === 0;
+  const canShowShortcutsHint =
+    (isModelIdle || isModelResponding) &&
+    isBufferEmpty &&
     !hasPendingActionRequired;
+
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(canShowShortcutsHint);
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
 
   if (hasPendingActionRequired && shouldCollapseDuringApproval) {
     return null;
   }
 
-  const hasToast = shouldShowToast(uiState);
-  const hideUiDetailsForSuggestions =
-    suggestionsVisible && suggestionsPosition === 'above';
+  const showShortcutsHelp =
+    uiState.shortcutsHelpVisible &&
+    uiState.streamingState === 'idle' &&
+    !hasPendingActionRequired;
 
-  // Mini Mode VIP Flags (Pure Content Triggers)
+  const hasToast = shouldShowToast(uiState);
+
+  const shouldReserveSpaceForShortcutsHint =
+    settings.merged.ui.showShortcutsHint &&
+    !hideUiDetailsForSuggestions &&
+    !hasPendingActionRequired;
+  const showShortcutsHint =
+    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
+
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+
+  /**
+   * Determine the ambient text (tip or shortcut hint) to display.
+   */
+  const ambientContent = (() => {
+    if (showTips && uiState.currentTip) {
+      return { text: `Tip: ${uiState.currentTip}`, isTip: true };
+    }
+    if (showShortcutsHint) {
+      const text = showUiDetails
+        ? '? for shortcuts'
+        : 'press tab twice for more';
+      return { text, isTip: false };
+    }
+    return null;
+  })();
+
   const showMinimalToast = hasToast;
 
   return (
@@ -98,20 +148,60 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails && <TodoTray />}
 
-      {showShortcutsHelp && <ShortcutsHelp />}
-
-      {(showUiDetails || showMinimalToast) && (
-        <Box minHeight={1} marginLeft={isNarrow ? 0 : 1}>
-          <ToastDisplay />
-        </Box>
-      )}
-
       <Box width="100%" flexDirection="column">
+        {/* Above Divider Zone: Alerts, Tips, and Hints */}
+        {showUiDetails && (
+          <Box
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+            justifyContent={isNarrow ? 'flex-start' : 'space-between'}
+          >
+            <Box
+              marginLeft={1}
+              marginRight={isNarrow ? 0 : 1}
+              flexDirection="row"
+              alignItems={isNarrow ? 'flex-start' : 'center'}
+              flexGrow={1}
+            >
+              {hasToast && <ToastDisplay />}
+            </Box>
+            <Box
+              marginTop={isNarrow ? 1 : 0}
+              flexDirection="column"
+              alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+              minHeight={ambientContent ? 1 : 0}
+            >
+              {ambientContent && (
+                <Box flexDirection="row" justifyContent="flex-end">
+                  <Text
+                    color={
+                      !ambientContent.isTip && uiState.shortcutsHelpVisible
+                        ? theme.text.accent
+                        : theme.text.secondary
+                    }
+                    wrap="truncate-end"
+                  >
+                    {ambientContent.text}
+                  </Text>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {showShortcutsHelp && <ShortcutsHelp />}
+        {showUiDetails && <HorizontalLine />}
+
+        {/* Below Divider Zone: Active Processing and Status (handled by StatusRow) */}
         <StatusRow
-          showUiDetails={showUiDetails}
-          isNarrow={isNarrow}
-          terminalWidth={terminalWidth}
+          uiState={uiState}
+          settings={settings}
           hideContextSummary={hideContextSummary}
+          isNarrow={isNarrow}
+          ambientContent={ambientContent}
+          showUiDetails={showUiDetails}
+          showMinimalToast={showMinimalToast}
           hideUiDetailsForSuggestions={hideUiDetailsForSuggestions}
           hasPendingActionRequired={hasPendingActionRequired}
         />
@@ -165,7 +255,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           streamingState={uiState.streamingState}
           suggestionsPosition={suggestionsPosition}
           onSuggestionsVisibilityChange={setSuggestionsVisible}
-          copyModeEnabled={uiState.copyModeEnabled}
         />
       )}
 

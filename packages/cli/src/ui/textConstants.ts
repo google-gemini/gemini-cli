@@ -20,3 +20,7 @@ export const getRedirectionWarningTipText = (shiftTabHint: string) =>
   `Toggle auto-edit (${shiftTabHint}) to allow redirection in the future.`;
 
 export const GENERIC_WORKING_LABEL = 'Working...';
+
+export const MODE_HEADER_SHELL = 'exit shell (!)';
+export const MODE_HEADER_YOLO = 'toggle yolo (Ctrl+Y)';
+export const MODE_HEADER_DEFAULT = 'mode (Shift+Tab)';

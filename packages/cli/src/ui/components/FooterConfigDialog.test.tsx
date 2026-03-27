@@ -42,6 +42,10 @@ describe('<FooterConfigDialog />', () => {
     );
 
     act(() => {
+      stdin.write('\u001b[B'); // Down arrow to move from 'mode' to 'workspace'
+    });
+
+    act(() => {
       stdin.write('\r'); // Enter to toggle
     });
 
@@ -74,6 +78,9 @@ describe('<FooterConfigDialog />', () => {
     expect(cwdIdx).toBeLessThan(branchIdx);
 
     // Move workspace down (right arrow)
+    act(() => {
+      stdin.write('\u001b[B'); // Down arrow to workspace
+    });
     act(() => {
       stdin.write('\u001b[C'); // Right arrow
     });
@@ -116,7 +123,7 @@ describe('<FooterConfigDialog />', () => {
     expect(lastFrame()).toContain('~/project/path');
 
     // Move focus down to 'code-changes' (which has colored elements)
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 9; i++) {
       act(() => {
         stdin.write('\u001b[B'); // Down arrow
       });
@@ -148,8 +155,8 @@ describe('<FooterConfigDialog />', () => {
       { settings },
     );
 
-    // Default items are the first 5. We toggle them off.
-    for (let i = 0; i < 5; i++) {
+    // Default items are the first 6. We toggle them off.
+    for (let i = 0; i < 6; i++) {
       act(() => {
         stdin.write('\r'); // Toggle off
       });
@@ -176,7 +183,7 @@ describe('<FooterConfigDialog />', () => {
       { settings },
     );
 
-    // Default initial items in mock settings are 'git-branch', 'workspace', ...
+    // Default initial items in mock settings are 'mode', 'workspace', 'git-branch', ...
     await waitFor(() => {
       const output = lastFrame();
       expect(output).toContain('] git-branch');
@@ -188,22 +195,22 @@ describe('<FooterConfigDialog />', () => {
     const workspaceIdx = output.indexOf('] workspace');
     expect(workspaceIdx).toBeLessThan(branchIdx);
 
-    // Try to move workspace up (left arrow) while it's at the top
+    // Focus is on 'mode' at index 0. Try to move it up (left arrow). It should do nothing.
     act(() => {
       stdin.write('\u001b[D'); // Left arrow
     });
 
-    // Move workspace down (right arrow)
+    // Move 'mode' down (right arrow). Order becomes 'workspace', 'mode', 'git-branch'.
     act(() => {
       stdin.write('\u001b[C'); // Right arrow
     });
 
     await waitFor(() => {
       const outputAfter = lastFrame();
-      const bIdxAfter = outputAfter.indexOf('] git-branch');
+      const mIdxAfter = outputAfter.indexOf('] mode');
       const wIdxAfter = outputAfter.indexOf('] workspace');
-      // workspace should now be after git-branch
-      expect(bIdxAfter).toBeLessThan(wIdxAfter);
+      // mode should now be after workspace
+      expect(wIdxAfter).toBeLessThan(mIdxAfter);
     });
   });
 

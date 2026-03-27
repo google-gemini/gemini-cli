@@ -1,33 +1,32 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
-"
-                                                                                    ? for shortcuts
+"                                                                                     ? for shortcuts
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- ApprovalModeIndicator: default                                                        StatusDisplay
+                                                                                       StatusDisplay
 InputPrompt:   Type your message or @path/to/file
 Footer
 "
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode 1`] = `
-"                                                                           press tab twice for more
+"                                                                            press tab twice for more
 InputPrompt:   Type your message or @path/to/file
 "
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode while loading 1`] = `
-"LoadingIndicator                                                           press tab twice for more
+" LoadingIndicator                                                           press tab twice for more
 InputPrompt:   Type your message or @path/to/file
 "
 `;
 
 exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
 "
-                        ? for shortcuts
+? for shortcuts
 ────────────────────────────────────────
- ApprovalModeIndicator:     StatusDispl
- default                    ay
+
+StatusDisplay
 InputPrompt:   Type your message or
 @path/to/file
 Footer
@@ -35,10 +34,9 @@ Footer
 `;
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
-"
- LoadingIndicator: Thinking                                                         ? for shortcuts
+"                                                                                     ? for shortcuts
 ────────────────────────────────────────────────────────────────────────────────────────────────────
- ApprovalModeIndicator: default                                                        StatusDisplay
+ LoadingIndicator: Thinking
 InputPrompt:   Type your message or @path/to/file
 Footer
 "
