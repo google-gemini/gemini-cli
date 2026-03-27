@@ -311,9 +311,10 @@ export function sanitizePaths(paths?: string[]): string[] | undefined {
 }
 
 /**
- * Resolves symlinks for a given path to prevent sandbox escapes.
- * If a file does not exist (ENOENT), it recursively resolves the parent directory.
- * Other errors (e.g. EACCES) are re-thrown.
+ * Resolves symlinks safely.
+ * - If path exists → returns realpath
+ * - If ENOENT → resolves nearest existing parent and reconstructs path
+ * - If other error → throws
  */
 export async function tryRealpath(p: string): Promise<string> {
   try {
@@ -321,11 +322,18 @@ export async function tryRealpath(p: string): Promise<string> {
   } catch (e) {
     if (isNodeError(e) && e.code === 'ENOENT') {
       const parentDir = path.dirname(p);
+
+      // Stop recursion at filesystem root
       if (parentDir === p) {
         return p;
       }
-      return path.join(await tryRealpath(parentDir), path.basename(p));
+
+      const resolvedParent = await tryRealpath(parentDir);
+
+      // Reconstruct original path structure
+      return path.join(resolvedParent, path.basename(p));
     }
+
     throw e;
   }
 }
