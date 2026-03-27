@@ -82,41 +82,45 @@ export function BaseSelectionList<
     priority,
   });
 
-  const [scrollOffsetState, setScrollOffsetState] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Compute effective scroll offset synchronously during render to avoid flicker
-  let scrollOffset = scrollOffsetState;
-
-  if (activeIndex < scrollOffset) {
-    scrollOffset = activeIndex;
-  } else if (activeIndex >= scrollOffset + maxItemsToShow) {
-    scrollOffset = Math.max(
+  // Derive the effective scroll offset during render to avoid "no-selection" flicker.
+  // This ensures that the visibleItems calculation uses an offset that includes activeIndex.
+  let effectiveScrollOffset = scrollOffset;
+  if (activeIndex < effectiveScrollOffset) {
+    effectiveScrollOffset = activeIndex;
+  } else if (activeIndex >= effectiveScrollOffset + maxItemsToShow) {
+    effectiveScrollOffset = Math.max(
       0,
       Math.min(activeIndex - maxItemsToShow + 1, items.length - maxItemsToShow),
     );
   }
 
+  // Ensure offset is within bounds if items length changed
   const maxScroll = Math.max(0, items.length - maxItemsToShow);
-  if (scrollOffset > maxScroll) {
-    scrollOffset = maxScroll;
+  if (effectiveScrollOffset > maxScroll) {
+    effectiveScrollOffset = maxScroll;
   }
 
-  // Update state to match derived value if it changed
-  if (scrollOffsetState !== scrollOffset) {
-    setScrollOffsetState(scrollOffset);
+  // Synchronize state if it changed during derivation
+  if (scrollOffset !== effectiveScrollOffset) {
+    setScrollOffset(effectiveScrollOffset);
   }
 
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
+  const visibleItems = items.slice(
+    effectiveScrollOffset,
+    effectiveScrollOffset + maxItemsToShow,
+  );
   const numberColumnWidth = String(items.length).length;
 
-  const canScrollUp = scrollOffset > 0;
-  const canScrollDown = scrollOffset + maxItemsToShow < items.length;
+  const canScrollUp = effectiveScrollOffset > 0;
+  const canScrollDown = effectiveScrollOffset + maxItemsToShow < items.length;
   const hasScrollArrows = showScrollArrows && items.length > maxItemsToShow;
 
   return (
     <Box flexDirection="column">
       {visibleItems.map((item, index) => {
-        const itemIndex = scrollOffset + index;
+        const itemIndex = effectiveScrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
         // Determine colors based on selection and disabled state

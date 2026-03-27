@@ -17,7 +17,6 @@ import {
  * Creates a mocked Config object with default values and allows overrides.
  */
 export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     getSandbox: vi.fn(() => undefined),
     getQuestion: vi.fn(() => ''),
@@ -45,6 +44,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getDeleteSession: vi.fn(() => undefined),
     setSessionId: vi.fn(),
     getSessionId: vi.fn().mockReturnValue('mock-session-id'),
+    getWorktreeSettings: vi.fn(() => undefined),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
     getAcpMode: vi.fn(() => false),
     isBrowserLaunchSuppressed: vi.fn(() => false),
@@ -79,6 +79,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getFileService: vi.fn().mockReturnValue({}),
     getGitService: vi.fn().mockResolvedValue({}),
     getUserMemory: vi.fn().mockReturnValue(''),
+    getSystemInstructionMemory: vi.fn().mockReturnValue(''),
+    getSessionMemory: vi.fn().mockReturnValue(''),
     getGeminiMdFilePaths: vi.fn().mockReturnValue([]),
     getShowMemoryUsage: vi.fn().mockReturnValue(false),
     getAccessibility: vi.fn().mockReturnValue({}),
@@ -182,11 +184,9 @@ export function createMockSettings(
   overrides: Record<string, unknown> = {},
 ): LoadedSettings {
   const merged = createTestMergedSettings(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (overrides['merged'] as Partial<Settings>) || {},
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     system: { settings: {} },
     systemDefaults: { settings: {} },

@@ -19,7 +19,7 @@ import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { Command } from '../../key/keyMatchers.js';
+import { Command, type KeyMatchers } from '../../key/keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
@@ -103,6 +103,9 @@ export interface BaseSettingsDialogProps {
     currentItem: SettingsDialogItem | undefined,
   ) => boolean;
 
+  /** Optional override for key matchers used for navigation. */
+  keyMatchers?: KeyMatchers;
+
   /** Available terminal height for dynamic windowing */
   availableHeight?: number;
 
@@ -134,10 +137,12 @@ export function BaseSettingsDialog({
   onItemClear,
   onClose,
   onKeyPress,
+  keyMatchers: customKeyMatchers,
   availableHeight,
   footer,
 }: BaseSettingsDialogProps): React.JSX.Element {
-  const keyMatchers = useKeyMatchers();
+  const globalKeyMatchers = useKeyMatchers();
+  const keyMatchers = customKeyMatchers ?? globalKeyMatchers;
   // Calculate effective max items and scope visibility based on terminal height
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
     const initialShowScope = showScopeSelector;
