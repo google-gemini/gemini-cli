@@ -59,7 +59,9 @@ You can view traces in the Jaeger UI for local development.
 
     This command configures your workspace for local telemetry and provides a
     link to the Jaeger UI (usually `http://localhost:16686`).
-    - **Collector logs:** `~/.gemini/tmp/<projectHash>/otel/collector.log`
+    - **Collector logs:** `tmp/<projectHash>/otel/collector.log` in your
+      [temporary directory](./reference/configuration.md#temporary-directory)
+      (for example, `~/.cache/gemini-cli/tmp/<projectHash>/otel/collector.log`)
 
 2.  **Run Gemini CLI:**
 
@@ -108,7 +110,10 @@ Trace for custom processing or routing.
 
     The script outputs links to view traces, metrics, and logs in the Google
     Cloud Console.
-    - **Collector logs:** `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log`
+    - **Collector logs:** `tmp/<projectHash>/otel/collector-gcp.log` in your
+      [temporary directory](./reference/configuration.md#temporary-directory)
+      (for example,
+      `~/.cache/gemini-cli/tmp/<projectHash>/otel/collector-gcp.log`)
 
 3.  **Run Gemini CLI:**
 

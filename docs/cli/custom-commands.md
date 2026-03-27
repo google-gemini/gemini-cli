@@ -9,8 +9,9 @@ all your projects, streamlining your workflow and ensuring consistency.
 
 Gemini CLI discovers commands from two locations, loaded in a specific order:
 
-1.  **User commands (global):** Located in `~/.gemini/commands/`. These commands
-    are available in any project you are working on.
+1.  **User commands (global):** Located in the `commands/` directory under your
+    user config directory (for example, `~/.config/gemini-cli/commands/`). These
+    commands are available in any project you are working on.
 2.  **Project commands (local):** Located in
     `<your-project-root>/.gemini/commands/`. These commands are specific to the
     current project and can be checked into version control to be shared with
@@ -26,7 +27,8 @@ The name of a command is determined by its file path relative to its `commands`
 directory. Subdirectories are used to create namespaced commands, with the path
 separator (`/` or `\`) being converted to a colon (`:`).
 
-- A file at `~/.gemini/commands/test.toml` becomes the command `/test`.
+- A file at `commands/test.toml` in your user config directory (for example,
+  `~/.config/gemini-cli/commands/test.toml`) becomes the command `/test`.
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced
   command `/git:commit`.
 
@@ -280,28 +282,31 @@ Let's create a global command that asks the model to refactor a piece of code.
 First, ensure the user commands directory exists, then create a `refactor`
 subdirectory for organization and the final TOML file.
 
+The example paths below use the typical default user config directory.
+
 **macOS/Linux**
 
 ```bash
-mkdir -p ~/.gemini/commands/refactor
-touch ~/.gemini/commands/refactor/pure.toml
+mkdir -p ~/.config/gemini-cli/commands/refactor
+touch ~/.config/gemini-cli/commands/refactor/pure.toml
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\commands\refactor"
-New-Item -ItemType File -Force -Path "$env:USERPROFILE\.gemini\commands\refactor\pure.toml"
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\gemini-cli\commands\refactor"
+New-Item -ItemType File -Force -Path "$env:USERPROFILE\.config\gemini-cli\commands\refactor\pure.toml"
 ```
 
 **2. Add the content to the file:**
 
-Open `~/.gemini/commands/refactor/pure.toml` in your editor and add the
+Open `commands/refactor/pure.toml` in your user config directory (for example,
+`~/.config/gemini-cli/commands/refactor/pure.toml`) in your editor and add the
 following content. We are including the optional `description` for best
 practice.
 
 ```toml
-# In: ~/.gemini/commands/refactor/pure.toml
+# In: ~/.config/gemini-cli/commands/refactor/pure.toml
 # This command will be invoked via: /refactor:pure
 
 description = "Asks the model to refactor the current context into a pure function."

@@ -1,5 +1,5 @@
 # Policy for Memory Manager Agent
-# Allows the save_memory agent to manage memories in the ~/.gemini/ folder.
+# Allows the save_memory agent to manage memories in the user config folder.
 
 # Read-only tools: allow access to anything under .gemini/
 [[rule]]
@@ -7,14 +7,14 @@ subagent = "save_memory"
 toolName = ["read_file", "list_directory", "glob", "grep_search"]
 decision = "allow"
 priority = 100
-argsPattern = "(^|.*/)\\.gemini/.*"
-denyMessage = "Memory Manager is only allowed to access the .gemini folder."
+argsPattern = "(^|.*/)(\\.config/gemini-cli|\\.gemini)/.*"
+denyMessage = "Memory Manager is only allowed to access the user config folder."
 
-# Write tools: only allow .md files under .gemini/
+# Write tools: only allow .md files under user config folder
 [[rule]]
 subagent = "save_memory"
 toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 100
-argsPattern = "(^|.*/)\\.gemini/.*\\.md\""
-denyMessage = "Memory Manager is only allowed to write .md files in the .gemini folder."
+argsPattern = "(^|.*/)(\\.config/gemini-cli|\\.gemini)/.*\\.md\""
+denyMessage = "Memory Manager is only allowed to write .md files in the user config folder."

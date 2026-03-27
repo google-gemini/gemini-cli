@@ -354,18 +354,24 @@ persist them with the following methods:
 > shell can read them.
 
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
-    directory or home directory. Gemini CLI automatically loads variables from
-    the first `.env` file it finds, searching up from the current directory,
-    then in your home directory's `.gemini/.env` (for example, `~/.gemini/.env`
-    or `%USERPROFILE%\.gemini\.env`).
+    directory or a `.env` file in your user config directory. Gemini CLI
+    automatically loads variables from the first `.env` file it finds. It
+    searches upward from the current directory, checking each directory's
+    `.gemini/.env` first and then its `.env`. If no file is found before
+    reaching the filesystem root, Gemini CLI falls back to `.env` in your
+    [configuration directory](../reference/configuration.md#configuration-directory),
+    usually `~/.config/gemini-cli/.env` on Unix-like systems. If you still have
+    legacy values in `~/.gemini/.env`, move or merge them into that file.
+
+    The example paths below use the typical default user config directory.
 
     Example for user-wide settings:
 
     **macOS/Linux**
 
     ```bash
-    mkdir -p ~/.gemini
-    cat >> ~/.gemini/.env <<'EOF'
+    mkdir -p ~/.config/gemini-cli
+    cat >> ~/.config/gemini-cli/.env <<'EOF'
     GOOGLE_CLOUD_PROJECT="your-project-id"
     # Add other variables like GEMINI_API_KEY as needed
     EOF
@@ -374,11 +380,11 @@ persist them with the following methods:
     **Windows (PowerShell)**
 
     ```powershell
-    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini"
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\gemini-cli"
     @"
     GOOGLE_CLOUD_PROJECT="your-project-id"
     # Add other variables like GEMINI_API_KEY as needed
-    "@ | Out-File -FilePath "$env:USERPROFILE\.gemini\.env" -Encoding utf8 -Append
+    "@ | Out-File -FilePath "$env:USERPROFILE\.config\gemini-cli\.env" -Encoding utf8 -Append
     ```
 
 Variables are loaded from the first file found, not merged.

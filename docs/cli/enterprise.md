@@ -28,7 +28,8 @@ Settings are merged from four files. The precedence order for single-value
 settings (like `theme`) is:
 
 1. System Defaults (`system-defaults.json`)
-2. User Settings (`~/.gemini/settings.json`)
+2. User Settings (`settings.json` in your user config directory, for example
+   `~/.config/gemini-cli/settings.json`)
 3. Workspace Settings (`<project>/.gemini/settings.json`)
 4. System Overrides (`settings.json`)
 
@@ -52,7 +53,8 @@ Here is how settings from different levels are combined.
   }
   ```
 
-- **User `settings.json` (`~/.gemini/settings.json`):**
+- **User `settings.json`** (in your user config directory, for example
+  `~/.config/gemini-cli/settings.json`):
 
   ```json
   {
@@ -217,19 +219,22 @@ Add-Content -Path $PROFILE -Value '$env:GEMINI_CLI_SYSTEM_SETTINGS_PATH="C:\Prog
 ## User isolation in shared environments
 
 In shared compute environments (like ML experiment runners or shared build
-servers), you can isolate Gemini CLI state by overriding the user's home
-directory.
+servers), you can isolate Gemini CLI state by setting exact user directories.
 
-By default, Gemini CLI stores configuration and history in `~/.gemini`. You can
-use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
-for a specific user or job. The CLI will create a `.gemini` folder inside the
-specified path.
+By default, Gemini CLI stores user settings in its
+[configuration directory](../reference/configuration.md#configuration-directory)
+and temporary artefacts in its
+[temporary directory](../reference/configuration.md#temporary-directory). For
+exact per-user or per-job isolation, prefer the exact directory overrides
+instead of the deprecated `$GEMINI_CLI_HOME` root override.
 
 **macOS/Linux**
 
 ```bash
 # Isolate state for a specific job
-export GEMINI_CLI_HOME="/tmp/gemini-job-123"
+export GEMINI_CONFIG_DIR="/tmp/gemini-job-123/config"
+export GEMINI_CACHE_DIR="/tmp/gemini-job-123/cache"
+export GEMINI_TMP_DIR="/tmp/gemini-job-123/tmp"
 gemini
 ```
 
@@ -237,9 +242,16 @@ gemini
 
 ```powershell
 # Isolate state for a specific job
-$env:GEMINI_CLI_HOME="C:\temp\gemini-job-123"
+$env:GEMINI_CONFIG_DIR="C:\temp\gemini-job-123\config"
+$env:GEMINI_CACHE_DIR="C:\temp\gemini-job-123\cache"
+$env:GEMINI_TMP_DIR="C:\temp\gemini-job-123\tmp"
 gemini
 ```
+
+Gemini CLI creates `$GEMINI_CONFIG_DIR` if it does not exist. The older
+`$GEMINI_CLI_HOME` root override is deprecated. It still creates and uses a
+`.gemini` directory under the path you provide, and Gemini CLI exits at startup
+if you combine it with any exact `*_DIR` override.
 
 ## Restricting tool access
 

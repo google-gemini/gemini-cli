@@ -156,11 +156,11 @@ under `agents.browser`:
 
 The available modes are:
 
-| Mode         | Description                                                                                                                                                                                 |
-| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `persistent` | **(Default)** Launches Chrome with a persistent profile stored at `~/.gemini/cli-browser-profile/`. Cookies, history, and settings are preserved between sessions.                          |
-| `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                           |
-| `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched. |
+| Mode         | Description                                                                                                                                                                                                                                             |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `persistent` | **(Default)** Launches Chrome with a persistent profile stored in your user config directory's `cli-browser-profile/` folder (for example, `~/.config/gemini-cli/cli-browser-profile/`). Cookies, history, and settings are preserved between sessions. |
+| `isolated`   | Launches Chrome with a temporary profile that is deleted after each session. Use this for clean-state automation.                                                                                                                                       |
+| `existing`   | Attaches to an already-running Chrome instance. You must enable remote debugging first by navigating to `chrome://inspect/#remote-debugging` in Chrome. No new browser process is launched.                                                             |
 
 #### First-run consent
 
@@ -313,7 +313,8 @@ Custom agents are defined as Markdown files (`.md`) with YAML frontmatter. You
 can place them in:
 
 1.  **Project-level:** `.gemini/agents/*.md` (Shared with your team)
-2.  **User-level:** `~/.gemini/agents/*.md` (Personal agents)
+2.  **User-level:** `agents/*.md` in your user config directory (for example,
+    `~/.config/gemini-cli/agents/*.md`) (Personal agents)
 
 ### File format
 

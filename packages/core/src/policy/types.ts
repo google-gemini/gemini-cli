@@ -339,7 +339,7 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
-  // User provided policies that will replace the USER level policies in ~/.gemini/policies
+  // User provided policies that will replace the USER level policies in ~/.config/gemini-cli/policies
   policyPaths?: string[];
   // Admin provided policies that will supplement the ADMIN level policies
   adminPolicyPaths?: string[];

@@ -5,8 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { loadConfig } from './config.js';
+import { findEnvFile, loadConfig } from './config.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -64,6 +66,58 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       emitAdminSettingsChanged: vi.fn(),
     },
   };
+});
+
+describe('findEnvFile', () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    while (tempDirs.length > 0) {
+      const tempDir = tempDirs.pop();
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it('prefers project .gemini/.env before user config .env', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'a2a-find-env-'));
+    tempDirs.push(tempRoot);
+
+    const workspaceDir = path.join(tempRoot, 'workspace');
+    const projectGeminiDir = path.join(workspaceDir, '.gemini');
+    const userConfigRoot = path.join(tempRoot, 'user-home');
+    const userConfigDir = path.join(userConfigRoot, '.gemini');
+    const projectEnvPath = path.join(projectGeminiDir, '.env');
+    const userEnvPath = path.join(userConfigDir, '.env');
+
+    vi.stubEnv('GEMINI_CLI_HOME', userConfigRoot);
+    fs.mkdirSync(projectGeminiDir, { recursive: true });
+    fs.mkdirSync(userConfigDir, { recursive: true });
+    fs.writeFileSync(projectEnvPath, 'GEMINI_SANDBOX=project\n');
+    fs.writeFileSync(userEnvPath, 'GEMINI_SANDBOX=user\n');
+
+    expect(findEnvFile(workspaceDir)).toBe(projectEnvPath);
+  });
+
+  it('falls back to the selected user config .env after reaching filesystem root', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'a2a-find-env-'));
+    tempDirs.push(tempRoot);
+
+    const workspaceDir = path.join(tempRoot, 'workspace');
+    const userConfigRoot = path.join(tempRoot, 'user-home');
+    const userConfigDir = path.join(userConfigRoot, '.gemini');
+    const userEnvPath = path.join(userConfigDir, '.env');
+
+    vi.stubEnv('GEMINI_CLI_HOME', userConfigRoot);
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    fs.mkdirSync(userConfigDir, { recursive: true });
+    fs.writeFileSync(userEnvPath, 'GEMINI_SANDBOX=user\n');
+    fs.writeFileSync(path.join(userConfigRoot, '.env'), 'IGNORED=1\n');
+
+    expect(findEnvFile(workspaceDir)).toBe(userEnvPath);
+  });
 });
 
 vi.mock('../utils/logger.js', () => ({

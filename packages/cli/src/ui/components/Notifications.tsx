@@ -15,17 +15,12 @@ import { persistentState } from '../../utils/persistentState.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { KeypressPriority } from '../contexts/KeypressContext.js';
 
-import {
-  GEMINI_DIR,
-  Storage,
-  homedir,
-  WarningPriority,
-} from '@google/gemini-cli-core';
+import { Storage, WarningPriority } from '@google/gemini-cli-core';
 
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
-const settingsPath = path.join(homedir(), GEMINI_DIR, 'settings.json');
+const settingsPath = Storage.getGlobalSettingsPath();
 
 const screenReaderNudgeFilePath = path.join(
   Storage.getGlobalTempDir(),

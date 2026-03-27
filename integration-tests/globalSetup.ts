@@ -94,9 +94,9 @@ export async function setup() {
   if (process.platform === 'win32') {
     process.env['USERPROFILE'] = runDir;
   }
-  // We also need to set the config dir explicitly, since the code might
-  // construct the path before the HOME env var is set.
-  process.env['GEMINI_CONFIG_DIR'] = join(runDir, '.gemini');
+  // Also set the XDG config root explicitly so user config resolution stays
+  // inside the isolated test directory.
+  process.env['XDG_CONFIG_HOME'] = join(runDir, '.config');
 
   // Download ripgrep to avoid race conditions in parallel tests
   const available = await canUseRipgrep();

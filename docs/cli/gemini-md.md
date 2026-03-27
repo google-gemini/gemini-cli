@@ -16,7 +16,8 @@ sends them to the model with every prompt. The CLI loads files in the following
 order:
 
 1.  **Global context file:**
-    - **Location:** `~/.gemini/GEMINI.md` (in your user home directory).
+    - **Location:** `GEMINI.md` in your user config directory (for example,
+      `~/.config/gemini-cli/GEMINI.md`).
     - **Scope:** Provides default instructions for all your projects.
 
 2.  **Environment and workspace context files:**
@@ -65,8 +66,9 @@ You can interact with the loaded context files by using the `/memory` command.
   being provided to the model.
 - **`/memory reload`**: Forces a re-scan and reload of all `GEMINI.md` files
   from all configured locations.
-- **`/memory add <text>`**: Appends your text to your global
-  `~/.gemini/GEMINI.md` file. This lets you add persistent memories on the fly.
+- **`/memory add <text>`**: Appends your text to your global `GEMINI.md` file in
+  your user config directory (for example, `~/.config/gemini-cli/GEMINI.md`).
+  This lets you add persistent memories on the fly.
 
 ## Modularize context with imports
 

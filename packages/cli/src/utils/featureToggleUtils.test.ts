@@ -28,7 +28,7 @@ function createMockLoadedSettings(opts: {
   > = {
     [SettingScope.User]: {
       settings: opts.userSettings ?? {},
-      path: opts.userPath ?? '/home/user/.gemini/settings.json',
+      path: opts.userPath ?? '/home/user/.config/gemini-cli/settings.json',
     },
     [SettingScope.Workspace]: {
       settings: opts.workspaceSettings ?? {},

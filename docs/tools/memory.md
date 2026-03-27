@@ -6,7 +6,8 @@ preferences, and project details across sessions.
 ## Technical reference
 
 This tool appends information to the `## Gemini Added Memories` section of your
-global `GEMINI.md` file (typically located at `~/.gemini/GEMINI.md`).
+global `GEMINI.md` file in your user config directory (for example,
+`~/.config/gemini-cli/GEMINI.md`).
 
 ### Arguments
 
@@ -15,7 +16,7 @@ global `GEMINI.md` file (typically located at `~/.gemini/GEMINI.md`).
 
 ## Technical behavior
 
-- **Storage:** Appends to the global context file in the user's home directory.
+- **Storage:** Appends to the global context file in the user config directory.
 - **Loading:** The stored facts are automatically included in the hierarchical
   context system for all future sessions.
 - **Format:** Saves data as a bulleted list item within a dedicated Markdown

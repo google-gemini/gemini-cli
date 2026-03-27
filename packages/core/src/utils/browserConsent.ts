@@ -12,7 +12,7 @@ import * as path from 'node:path';
 /** Sentinel file written after the user acknowledges the browser privacy notice. */
 const BROWSER_CONSENT_FLAG_FILE = 'browser-consent-acknowledged.txt';
 
-/** Default browser profile directory name within ~/.gemini/ */
+/** Default browser profile directory name within the user config dir. */
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 
 /**

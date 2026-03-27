@@ -335,7 +335,7 @@ export async function initializeTelemetry(
     resource,
     spanProcessors: [spanProcessor],
     logRecordProcessors: [logRecordProcessor],
-    metricReader,
+    metricReaders: [metricReader],
     instrumentations: [new HttpInstrumentation()],
   });
 

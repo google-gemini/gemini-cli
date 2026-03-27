@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  Storage,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -83,6 +84,19 @@ export async function start_sandbox(
         ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
         ...nodeArgs,
       ].join(' ');
+      const userConfigDir = Storage.getGlobalGeminiDir();
+      const userCacheDir = Storage.getGlobalCacheDir();
+      const userTmpDir = Storage.getGlobalTempDir();
+      const resolveRealPath = (candidate: string): string => {
+        try {
+          return fs.realpathSync(candidate);
+        } catch {
+          return candidate;
+        }
+      };
+      const realUserConfigDir = (() => resolveRealPath(userConfigDir))();
+      const realUserCacheDir = resolveRealPath(userCacheDir);
+      const realUserTmpDir = resolveRealPath(userTmpDir);
 
       const args = [
         '-D',
@@ -93,6 +107,12 @@ export async function start_sandbox(
         `HOME_DIR=${fs.realpathSync(homedir())}`,
         '-D',
         `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
+        '-D',
+        `USER_CONFIG_DIR=${realUserConfigDir}`,
+        '-D',
+        `USER_CACHE_DIR=${realUserCacheDir}`,
+        '-D',
+        `USER_TMP_DIR=${realUserTmpDir}`,
       ];
 
       // Add included directories from the workspace context
