@@ -1303,7 +1303,6 @@ const SETTINGS_SCHEMA = {
           'An empty array disables parent traversal.',
         showInDialog: false,
         items: { type: 'string' },
-        mergeStrategy: MergeStrategy.UNION,
       },
       includeDirectories: {
         type: 'array',
