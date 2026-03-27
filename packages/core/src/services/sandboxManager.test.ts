@@ -373,6 +373,7 @@ describe('SandboxManager', () => {
     it.each([
       { platform: 'linux', expected: LinuxSandboxManager },
       { platform: 'darwin', expected: MacOsSandboxManager },
+      { platform: 'win32', expected: WindowsSandboxManager },
     ] as const)(
       'should return $expected.name if sandboxing is enabled and platform is $platform',
       ({ platform, expected }) => {
