@@ -33,7 +33,7 @@ export function createSandboxManager(
   }
 
   if (sandbox?.enabled) {
-    if (os.platform() === 'win32' && sandbox?.command === 'windows-native') {
+    if (os.platform() === 'win32') {
       return new WindowsSandboxManager(options);
     } else if (os.platform() === 'linux') {
       return new LinuxSandboxManager(options);
