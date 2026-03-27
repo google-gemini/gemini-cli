@@ -14,12 +14,10 @@ import type { Part } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
-import { Scheduler } from '../scheduler/scheduler.js';
+import type { Scheduler } from '../scheduler/scheduler.js';
 import { recordToolCallInteractions } from '../code_assist/telemetry.js';
 import { ToolErrorType, isFatalToolError } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
-import type { ToolCallsUpdateMessage } from '../confirmation-bus/types.js';
 import {
   buildToolResponseData,
   contentPartsToGeminiParts,
@@ -46,18 +44,15 @@ function isAbortLikeError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
 }
 
-import type { EditorType } from '../utils/editor.js';
-
 export interface LegacyAgentSessionDeps {
+  client: GeminiClient;
+  scheduler: Scheduler;
   config: Config;
-  client?: GeminiClient;
-  scheduler?: Scheduler;
-  promptId?: string;
+  promptId: string;
   streamId?: string;
-  getPreferredEditor?: () => EditorType | undefined;
 }
 
-export class LegacyAgentProtocol implements AgentProtocol {
+class LegacyAgentProtocol implements AgentProtocol {
   private _events: AgentEvent[] = [];
   private _subscribers = new Set<(event: AgentEvent) => void>();
   private _translationState: TranslationState;
@@ -74,16 +69,10 @@ export class LegacyAgentProtocol implements AgentProtocol {
   constructor(deps: LegacyAgentSessionDeps) {
     this._translationState = createTranslationState(deps.streamId);
     this._nextStreamIdOverride = deps.streamId;
+    this._client = deps.client;
+    this._scheduler = deps.scheduler;
     this._config = deps.config;
-    this._client = deps.client ?? deps.config.getGeminiClient();
-    this._promptId = deps.promptId ?? deps.config.promptId ?? '';
-    this._scheduler =
-      deps.scheduler ??
-      new Scheduler({
-        context: deps.config,
-        schedulerId: 'legacy-agent-scheduler',
-        getPreferredEditor: deps.getPreferredEditor ?? (() => undefined),
-      });
+    this._promptId = deps.promptId;
   }
 
   get events(): readonly AgentEvent[] {
@@ -174,223 +163,142 @@ export class LegacyAgentProtocol implements AgentProtocol {
     let turnCount = 0;
     const maxTurns = this._config.getMaxSessionTurns();
 
-    const handleToolCallsUpdate = (event: ToolCallsUpdateMessage) => {
-      const toolUpdates: AgentEvent[] = [];
-      for (const tc of event.toolCalls) {
-        if (tc.status === 'awaiting_approval') {
-          this._emit([
-            this._makeToolResponseEvent({
-              requestId: tc.request.callId,
-              name: tc.request.name,
-              content: [
-                { type: 'text', text: 'Tool approvals not yet implemented.' },
-              ],
-              isError: true,
-              displayContent: [{ type: 'text', text: 'Approval required' }],
-            }),
-            this._makeErrorEvent({
-              status: 'UNIMPLEMENTED',
-              message:
-                'TODO: Tool approvals not yet implemented, please switch to YOLO mode to test.',
-              fatal: true,
-            }),
-          ]);
-          void this.abort();
-          return;
-        }
-
-        if (tc.status === 'executing') {
-          toolUpdates.push(
-            this._makeToolUpdateEvent({
-              requestId: tc.request.callId,
-              displayContent: toolResultDisplayToContentParts(tc.liveOutput),
-              data: {
-                progressMessage: tc.progressMessage,
-                progress: tc.progress,
-                progressTotal: tc.progressTotal,
-                pid: tc.pid,
-              },
-              _meta: {
-                description: tc.invocation.getDescription(),
-              },
-            }),
-          );
-        }
+    while (true) {
+      turnCount++;
+      if (maxTurns >= 0 && turnCount > maxTurns) {
+        this._finishStream('max_turns', {
+          code: 'MAX_TURNS_EXCEEDED',
+          maxTurns,
+          turnCount: turnCount - 1,
+        });
+        return;
       }
-      this._emit(toolUpdates);
-    };
 
-    this._config
-      .getMessageBus()
-      .subscribe(MessageBusType.TOOL_CALLS_UPDATE, handleToolCallsUpdate);
+      const toolCallRequests: ToolCallRequestInfo[] = [];
+      const responseStream = this._client.sendMessageStream(
+        currentParts,
+        this._abortController.signal,
+        this._promptId,
+        undefined,
+        false,
+        currentDisplayContent,
+      );
+      currentDisplayContent = undefined;
 
-    try {
-      while (true) {
-        turnCount++;
-        if (maxTurns >= 0 && turnCount > maxTurns) {
-          this._finishStream('max_turns', {
-            code: 'MAX_TURNS_EXCEEDED',
-            maxTurns,
-            turnCount: turnCount - 1,
-          });
+      for await (const event of responseStream) {
+        if (this._abortController.signal.aborted) {
+          this._finishStream('aborted');
           return;
         }
 
-        const toolCallRequests: ToolCallRequestInfo[] = [];
-        const responseStream = this._client.sendMessageStream(
-          currentParts,
-          this._abortController.signal,
-          this._promptId,
-          undefined,
-          false,
-          currentDisplayContent,
-        );
-        currentDisplayContent = undefined;
+        if (event.type === GeminiEventType.ToolCallRequest) {
+          toolCallRequests.push(event.value);
+        }
 
-        for await (const event of responseStream) {
-          if (this._abortController.signal.aborted) {
-            this._finishStream('aborted');
+        this._emit(translateEvent(event, this._translationState));
+
+        switch (event.type) {
+          case GeminiEventType.Error:
+          case GeminiEventType.InvalidStream:
+          case GeminiEventType.ContextWindowWillOverflow:
+            this._finishStream('failed');
             return;
-          }
-
-          if (event.type === GeminiEventType.ToolCallRequest) {
-            toolCallRequests.push(event.value);
-          }
-
-          const translatedEvents = translateEvent(
-            event,
-            this._translationState,
-          );
-
-          for (const ev of translatedEvents) {
-            if (ev.type === 'tool_request') {
-              const tool = this._config.getToolRegistry().getTool(ev.name);
-              const invocation = tool?.build(ev.args);
-              ev._meta = {
-                legacyState: {
-                  displayName: tool?.displayName ?? ev.name,
-                  description:
-                    invocation?.getDescription() ?? tool?.description ?? '',
-                  isOutputMarkdown: tool?.isOutputMarkdown ?? false,
-                  kind: tool?.kind,
-                },
-              };
+          case GeminiEventType.Finished:
+            if (toolCallRequests.length === 0) {
+              this._finishStream(mapFinishReason(event.value.reason));
+              return;
             }
-          }
-
-          this._emit(translatedEvents);
-
-          switch (event.type) {
-            case GeminiEventType.Error:
-            case GeminiEventType.InvalidStream:
-            case GeminiEventType.ContextWindowWillOverflow:
-              this._finishStream('failed');
-              return;
-            case GeminiEventType.Finished:
-              if (toolCallRequests.length === 0) {
-                this._finishStream(mapFinishReason(event.value.reason));
-                return;
-              }
-              break;
-            case GeminiEventType.AgentExecutionStopped:
-            case GeminiEventType.UserCancelled:
-            case GeminiEventType.MaxSessionTurns:
-              this._clearActiveStream();
-              return;
-            default:
-              break;
-          }
+            break;
+          case GeminiEventType.AgentExecutionStopped:
+          case GeminiEventType.UserCancelled:
+          case GeminiEventType.MaxSessionTurns:
+            this._clearActiveStream();
+            return;
+          default:
+            break;
         }
-
-        if (this._abortController.signal.aborted) {
-          this._finishStream('aborted');
-          return;
-        }
-
-        if (toolCallRequests.length === 0) {
-          this._finishStream('completed');
-          return;
-        }
-
-        const completedToolCalls = await this._scheduler.schedule(
-          toolCallRequests,
-          this._abortController.signal,
-        );
-
-        if (this._abortController.signal.aborted) {
-          this._finishStream('aborted');
-          return;
-        }
-
-        const toolResponseParts: Part[] = [];
-        for (const tc of completedToolCalls) {
-          const response = tc.response;
-          const request = tc.request;
-          const content: ContentPart[] = response.error
-            ? [{ type: 'text', text: response.error.message }]
-            : geminiPartsToContentParts(response.responseParts);
-          const displayContent = toolResultDisplayToContentParts(
-            response.resultDisplay,
-          );
-          const data = buildToolResponseData(response);
-
-          this._emit([
-            this._makeToolResponseEvent({
-              requestId: request.callId,
-              name: request.name,
-              content,
-              isError: response.error !== undefined,
-              ...(displayContent ? { displayContent } : {}),
-              ...(data ? { data } : {}),
-              _meta: {
-                resultDisplay: response.resultDisplay,
-                outputFile: response.outputFile,
-              },
-            }),
-          ]);
-
-          if (response.responseParts) {
-            toolResponseParts.push(...response.responseParts);
-          }
-        }
-
-        try {
-          const currentModel =
-            this._client.getCurrentSequenceModel() ?? this._config.getModel();
-          this._client
-            .getChat()
-            .recordCompletedToolCalls(currentModel, completedToolCalls);
-          await recordToolCallInteractions(this._config, completedToolCalls);
-        } catch (error) {
-          debugLogger.error(
-            `Error recording completed tool call information: ${error}`,
-          );
-        }
-
-        const stopTool = completedToolCalls.find(
-          (tc) =>
-            tc.response.errorType === ToolErrorType.STOP_EXECUTION &&
-            tc.response.error !== undefined,
-        );
-        if (stopTool) {
-          this._finishStream('completed');
-          return;
-        }
-
-        const fatalTool = completedToolCalls.find((tc) =>
-          isFatalToolError(tc.response.errorType),
-        );
-        if (fatalTool) {
-          this._finishStream('failed');
-          return;
-        }
-
-        currentParts = toolResponseParts;
       }
-    } finally {
-      this._config
-        .getMessageBus()
-        .unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, handleToolCallsUpdate);
+
+      if (this._abortController.signal.aborted) {
+        this._finishStream('aborted');
+        return;
+      }
+
+      if (toolCallRequests.length === 0) {
+        this._finishStream('completed');
+        return;
+      }
+
+      const completedToolCalls = await this._scheduler.schedule(
+        toolCallRequests,
+        this._abortController.signal,
+      );
+
+      if (this._abortController.signal.aborted) {
+        this._finishStream('aborted');
+        return;
+      }
+
+      const toolResponseParts: Part[] = [];
+      for (const tc of completedToolCalls) {
+        const response = tc.response;
+        const request = tc.request;
+        const content: ContentPart[] = response.error
+          ? [{ type: 'text', text: response.error.message }]
+          : geminiPartsToContentParts(response.responseParts);
+        const displayContent = toolResultDisplayToContentParts(
+          response.resultDisplay,
+        );
+        const data = buildToolResponseData(response);
+
+        this._emit([
+          this._makeToolResponseEvent({
+            requestId: request.callId,
+            name: request.name,
+            content,
+            isError: response.error !== undefined,
+            ...(displayContent ? { displayContent } : {}),
+            ...(data ? { data } : {}),
+          }),
+        ]);
+
+        if (response.responseParts) {
+          toolResponseParts.push(...response.responseParts);
+        }
+      }
+
+      try {
+        const currentModel =
+          this._client.getCurrentSequenceModel() ?? this._config.getModel();
+        this._client
+          .getChat()
+          .recordCompletedToolCalls(currentModel, completedToolCalls);
+        await recordToolCallInteractions(this._config, completedToolCalls);
+      } catch (error) {
+        debugLogger.error(
+          `Error recording completed tool call information: ${error}`,
+        );
+      }
+
+      const stopTool = completedToolCalls.find(
+        (tc) =>
+          tc.response.errorType === ToolErrorType.STOP_EXECUTION &&
+          tc.response.error !== undefined,
+      );
+      if (stopTool) {
+        this._finishStream('completed');
+        return;
+      }
+
+      const fatalTool = completedToolCalls.find((tc) =>
+        isFatalToolError(tc.response.errorType),
+      );
+      if (fatalTool) {
+        this._finishStream('failed');
+        return;
+      }
+
+      currentParts = toolResponseParts;
     }
   }
 
@@ -523,20 +431,6 @@ export class LegacyAgentProtocol implements AgentProtocol {
       type: 'tool_response',
       ...payload,
     } satisfies AgentEvent<'tool_response'>;
-    return event;
-  }
-
-  private _makeToolUpdateEvent(
-    payload: Omit<
-      AgentEvent<'tool_update'>,
-      'id' | 'timestamp' | 'streamId' | 'type'
-    >,
-  ): AgentEvent<'tool_update'> {
-    const event = {
-      ...this._nextEventFields(),
-      type: 'tool_update',
-      ...payload,
-    } satisfies AgentEvent<'tool_update'>;
     return event;
   }
 
