@@ -40,6 +40,12 @@ const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
 
+// Maximum reconnection attempts before giving up
+const MAX_RECONNECT_RETRIES = 3;
+
+// Base delay (ms) for exponential backoff between reconnection attempts
+const RECONNECT_BASE_DELAY_MS = 500;
+
 /**
  * Tools that can cause a full-page navigation (explicitly or implicitly).
  *
@@ -92,10 +98,73 @@ export interface McpToolCallResult {
  * in the main ToolRegistry. Tools are kept local to the browser agent.
  */
 export class BrowserManager {
+  // --- Static singleton management ---
+  private static instances = new Map<string, BrowserManager>();
+
+  /**
+   * Returns the cache key for a given config.
+   * Uses `sessionMode:profilePath` so different profiles get separate instances.
+   */
+  private static getInstanceKey(config: Config): string {
+    const browserConfig = config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const profilePath = browserConfig.customConfig.profilePath ?? 'default';
+    return `${sessionMode}:${profilePath}`;
+  }
+
+  /**
+   * Returns an existing BrowserManager for the current config's session mode
+   * and profile, or creates a new one.
+   */
+  static getInstance(config: Config): BrowserManager {
+    const key = BrowserManager.getInstanceKey(config);
+    let instance = BrowserManager.instances.get(key);
+    if (!instance) {
+      instance = new BrowserManager(config);
+      BrowserManager.instances.set(key, instance);
+      debugLogger.log(`Created new BrowserManager singleton (key: ${key})`);
+    } else {
+      debugLogger.log(
+        `Reusing existing BrowserManager singleton (key: ${key})`,
+      );
+    }
+    return instance;
+  }
+
+  /**
+   * Closes all cached BrowserManager instances and clears the cache.
+   * Called on /clear commands and CLI exit.
+   */
+  static async resetAll(): Promise<void> {
+    const results = await Promise.allSettled(
+      Array.from(BrowserManager.instances.values()).map((instance) =>
+        instance.close(),
+      ),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        debugLogger.error(
+          `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+        );
+      }
+    }
+    BrowserManager.instances.clear();
+  }
+
+  /**
+   * Alias for resetAll — used by CLI exit cleanup for clarity.
+   */
+  static async closeAll(): Promise<void> {
+    await BrowserManager.resetAll();
+  }
+
+  // --- Instance state ---
   // Raw MCP SDK Client - NOT the wrapper McpClient
   private rawMcpClient: Client | undefined;
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
+  private disconnected = false;
+  private connectionPromise: Promise<void> | undefined;
 
   /** State for action rate limiting */
   private actionCounter = 0;
@@ -215,6 +284,10 @@ export class BrowserManager {
     // Re-inject the automation overlay and input blocker after tools that
     // can cause a full-page navigation. chrome-devtools-mcp emits no MCP
     // notifications, so callTool() is the only interception point.
+    //
+    // The input blocker injection is idempotent: the injected function
+    // reuses the existing DOM element when present and only recreates
+    // it when navigation has actually replaced the page DOM.
     if (
       !result.isError &&
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
@@ -224,17 +297,8 @@ export class BrowserManager {
         if (this.shouldInjectOverlay) {
           await injectAutomationOverlay(this, signal);
         }
-        // Only re-inject the input blocker for tools that *reliably*
-        // replace the page DOM (navigate_page, new_page, select_page).
-        // click/click_at are handled by pointer-events suspend/resume
-        // in mcpToolWrapper — no full re-inject roundtrip needed.
-        // press_key/handle_dialog only sometimes navigate.
-        const reliableNavigation =
-          toolName === 'navigate_page' ||
-          toolName === 'new_page' ||
-          toolName === 'select_page';
-        if (this.shouldDisableInput && reliableNavigation) {
-          await injectInputBlocker(this);
+        if (this.shouldDisableInput) {
+          await injectInputBlocker(this, signal);
         }
       } catch {
         // Never let overlay/blocker failures interrupt the tool result
@@ -272,13 +336,52 @@ export class BrowserManager {
   }
 
   /**
+   * Returns whether the MCP client is currently connected and healthy.
+   */
+  isConnected(): boolean {
+    return this.rawMcpClient !== undefined && !this.disconnected;
+  }
+
+  /**
    * Ensures browser and MCP client are connected.
+   * If a previous connection was lost (e.g., user closed the browser),
+   * this will reconnect with exponential backoff (up to MAX_RECONNECT_RETRIES).
+   *
+   * Concurrent callers share a single in-flight connection promise so that
+   * two subagents racing at startup do not trigger duplicate connectMcp() calls.
    */
   async ensureConnection(): Promise<void> {
-    if (this.rawMcpClient) {
+    // Already connected and healthy — nothing to do
+    if (this.rawMcpClient && !this.disconnected) {
       return;
     }
 
+    // A connection is already being established — wait for it instead of racing
+    if (this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
+    // If previously connected but transport died, clean up before reconnecting
+    if (this.disconnected) {
+      debugLogger.log(
+        'Previous browser connection was lost. Cleaning up before reconnecting...',
+      );
+      await this.close();
+      this.disconnected = false;
+    }
+
+    // Start connecting; store the promise so concurrent callers can join it
+    this.connectionPromise = this.connectWithRetry().finally(() => {
+      this.connectionPromise = undefined;
+    });
+
+    return this.connectionPromise;
+  }
+
+  /**
+   * Connects to chrome-devtools-mcp with exponential backoff retry.
+   */
+  private async connectWithRetry(): Promise<void> {
     // Request browser consent if needed (first-run privacy notice)
     const consentGranted = await getBrowserConsentIfNeeded();
     if (!consentGranted) {
@@ -288,7 +391,23 @@ export class BrowserManager {
       );
     }
 
-    await this.connectMcp();
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt < MAX_RECONNECT_RETRIES; attempt++) {
+      try {
+        await this.connectMcp();
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < MAX_RECONNECT_RETRIES - 1) {
+          const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt);
+          debugLogger.log(
+            `Connection attempt ${attempt + 1} failed, retrying in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError!;
   }
 
   /**
@@ -322,6 +441,7 @@ export class BrowserManager {
     }
 
     this.discoveredTools = [];
+    this.connectionPromise = undefined;
   }
 
   /**
@@ -447,7 +567,7 @@ export class BrowserManager {
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      this.rawMcpClient = undefined;
+      this.disconnected = true;
     };
     this.mcpTransport.onerror = (error: Error) => {
       debugLogger.error(

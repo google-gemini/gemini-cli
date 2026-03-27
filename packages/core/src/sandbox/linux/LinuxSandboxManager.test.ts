@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
+import * as shellUtils from '../../utils/shell-utils.js';
 
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
@@ -20,17 +21,40 @@ vi.mock('node:fs', async () => {
       realpathSync: vi.fn((p) => p.toString()),
       statSync: vi.fn(() => ({ isDirectory: () => true }) as fs.Stats),
       mkdirSync: vi.fn(),
+      mkdtempSync: vi.fn((prefix: string) => prefix + 'mocked'),
       openSync: vi.fn(),
       closeSync: vi.fn(),
       writeFileSync: vi.fn(),
+      readdirSync: vi.fn(() => []),
+      chmodSync: vi.fn(),
+      unlinkSync: vi.fn(),
+      rmSync: vi.fn(),
     },
     existsSync: vi.fn(() => true),
     realpathSync: vi.fn((p) => p.toString()),
     statSync: vi.fn(() => ({ isDirectory: () => true }) as fs.Stats),
     mkdirSync: vi.fn(),
+    mkdtempSync: vi.fn((prefix: string) => prefix + 'mocked'),
     openSync: vi.fn(),
     closeSync: vi.fn(),
     writeFileSync: vi.fn(),
+    readdirSync: vi.fn(() => []),
+    chmodSync: vi.fn(),
+    unlinkSync: vi.fn(),
+    rmSync: vi.fn(),
+  };
+});
+
+vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    spawnAsync: vi.fn(() =>
+      Promise.resolve({ status: 0, stdout: Buffer.from('') }),
+    ),
+    initializeShellParsers: vi.fn(),
+    isStrictlyApproved: vi.fn().mockResolvedValue(true),
   };
 });
 
@@ -451,5 +475,45 @@ describe('LinuxSandboxManager', () => {
         expect(tmpfsIdx).toBeGreaterThan(bindTryIdx);
       });
     });
+  });
+
+  it('blocks .env and .env.* files in the workspace root', async () => {
+    vi.mocked(shellUtils.spawnAsync).mockImplementation((cmd, args) => {
+      if (cmd === 'find' && args?.[0] === workspace) {
+        // Assert that find is NOT excluding dotfiles
+        expect(args).not.toContain('-not');
+        expect(args).toContain('-prune');
+
+        return Promise.resolve({
+          status: 0,
+          stdout: Buffer.from(
+            `${workspace}/.env\0${workspace}/.env.local\0${workspace}/.env.test\0`,
+          ),
+        } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
+      }
+      return Promise.resolve({
+        status: 0,
+        stdout: Buffer.from(''),
+      } as unknown as ReturnType<typeof shellUtils.spawnAsync>);
+    });
+
+    const bwrapArgs = await getBwrapArgs({
+      command: 'ls',
+      args: [],
+      cwd: workspace,
+      env: {},
+    });
+
+    const bindsIndex = bwrapArgs.indexOf('--seccomp');
+    const binds = bwrapArgs.slice(0, bindsIndex);
+
+    expect(binds).toContain(`${workspace}/.env`);
+    expect(binds).toContain(`${workspace}/.env.local`);
+    expect(binds).toContain(`${workspace}/.env.test`);
+
+    // Verify they are bound to a mask file
+    const envIndex = binds.indexOf(`${workspace}/.env`);
+    expect(binds[envIndex - 2]).toBe('--bind');
+    expect(binds[envIndex - 1]).toMatch(/gemini-cli-mask-file-.*mocked\/mask/);
   });
 });
