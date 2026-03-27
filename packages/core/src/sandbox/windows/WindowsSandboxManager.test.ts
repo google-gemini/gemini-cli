@@ -38,6 +38,7 @@ describe('WindowsSandboxManager', () => {
     manager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: false, allowOverrides: true },
+      forbiddenPaths: [],
     });
   });
 
@@ -106,6 +107,7 @@ describe('WindowsSandboxManager', () => {
     const planManager = new WindowsSandboxManager({
       workspace: testCwd,
       modeConfig: { readonly: true, allowOverrides: false },
+      forbiddenPaths: [],
     });
     const req: SandboxRequest = {
       command: 'curl',
@@ -135,6 +137,7 @@ describe('WindowsSandboxManager', () => {
       workspace: testCwd,
       modeConfig: { allowOverrides: true, network: false },
       policyManager: mockPolicyManager,
+      forbiddenPaths: [],
     });
 
     const req: SandboxRequest = {
@@ -362,17 +365,19 @@ describe('WindowsSandboxManager', () => {
       fs.rmSync(missingPath, { recursive: true, force: true });
     }
 
+    const managerWithForbidden = new WindowsSandboxManager({
+      workspace: testCwd,
+      forbiddenPaths: [missingPath],
+    });
+
     const req: SandboxRequest = {
       command: 'test',
       args: [],
       cwd: testCwd,
       env: {},
-      policy: {
-        forbiddenPaths: [missingPath],
-      },
     };
 
-    await manager.prepareCommand(req);
+    await managerWithForbidden.prepareCommand(req);
 
     // Should NOT have called icacls to deny the missing path
     expect(spawnAsync).not.toHaveBeenCalledWith('icacls', [
@@ -388,17 +393,19 @@ describe('WindowsSandboxManager', () => {
       fs.mkdirSync(forbiddenPath);
     }
     try {
+      const managerWithForbidden = new WindowsSandboxManager({
+        workspace: testCwd,
+        forbiddenPaths: [forbiddenPath],
+      });
+
       const req: SandboxRequest = {
         command: 'test',
         args: [],
         cwd: testCwd,
         env: {},
-        policy: {
-          forbiddenPaths: [forbiddenPath],
-        },
       };
 
-      await manager.prepareCommand(req);
+      await managerWithForbidden.prepareCommand(req);
 
       expect(spawnAsync).toHaveBeenCalledWith('icacls', [
         path.resolve(forbiddenPath),
@@ -416,6 +423,11 @@ describe('WindowsSandboxManager', () => {
       fs.mkdirSync(conflictPath);
     }
     try {
+      const managerWithForbidden = new WindowsSandboxManager({
+        workspace: testCwd,
+        forbiddenPaths: [conflictPath],
+      });
+
       const req: SandboxRequest = {
         command: 'test',
         args: [],
@@ -423,11 +435,10 @@ describe('WindowsSandboxManager', () => {
         env: {},
         policy: {
           allowedPaths: [conflictPath],
-          forbiddenPaths: [conflictPath],
         },
       };
 
-      await manager.prepareCommand(req);
+      await managerWithForbidden.prepareCommand(req);
 
       const spawnMock = vi.mocked(spawnAsync);
       const allowCallIndex = spawnMock.mock.calls.findIndex(
