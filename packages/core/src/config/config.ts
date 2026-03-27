@@ -89,6 +89,17 @@ import {
   TrackerVisualizeTool,
 } from '../tools/trackerTools.js';
 import {
+  DebugLaunchTool,
+  DebugSetBreakpointTool,
+  DebugGetStackTraceTool,
+  DebugGetVariablesTool,
+  DebugStepTool,
+  DebugEvaluateTool,
+  DebugDisconnectTool,
+  DebugAttachTool,
+  DebugSetFunctionBreakpointTool,
+} from '../tools/debug/index.js';
+import {
   logRipgrepFallback,
   logFlashFallback,
   logApprovalModeSwitch,
@@ -3405,6 +3416,37 @@ export class Config implements McpContext, AgentLoopContext {
         registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
+
+    // Register Debug Tools
+    maybeRegister(DebugLaunchTool, () =>
+      registry.registerTool(new DebugLaunchTool(this.messageBus)),
+    );
+    maybeRegister(DebugSetBreakpointTool, () =>
+      registry.registerTool(new DebugSetBreakpointTool(this.messageBus)),
+    );
+    maybeRegister(DebugGetStackTraceTool, () =>
+      registry.registerTool(new DebugGetStackTraceTool(this.messageBus)),
+    );
+    maybeRegister(DebugGetVariablesTool, () =>
+      registry.registerTool(new DebugGetVariablesTool(this.messageBus)),
+    );
+    maybeRegister(DebugStepTool, () =>
+      registry.registerTool(new DebugStepTool(this.messageBus)),
+    );
+    maybeRegister(DebugEvaluateTool, () =>
+      registry.registerTool(new DebugEvaluateTool(this.messageBus)),
+    );
+    maybeRegister(DebugDisconnectTool, () =>
+      registry.registerTool(new DebugDisconnectTool(this.messageBus)),
+    );
+    maybeRegister(DebugAttachTool, () =>
+      registry.registerTool(new DebugAttachTool(this.messageBus)),
+    );
+    maybeRegister(DebugSetFunctionBreakpointTool, () =>
+      registry.registerTool(
+        new DebugSetFunctionBreakpointTool(this.messageBus),
+      ),
+    );
 
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
