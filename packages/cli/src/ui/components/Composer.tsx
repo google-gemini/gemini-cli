@@ -4,16 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, useIsScreenReaderEnabled, Text } from 'ink';
 import { useState, useEffect } from 'react';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
-import { useVimMode } from '../contexts/VimModeContext.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { ShortcutsHelp } from './ShortcutsHelp.js';
@@ -22,11 +14,18 @@ import { Footer } from './Footer.js';
 import { StatusRow } from './StatusRow.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useComposerStatus } from '../hooks/useComposerStatus.js';
-import { HorizontalLine } from './shared/HorizontalLine.js';
 import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
@@ -36,13 +35,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const { vimEnabled, vimMode } = useVimMode();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const { columns: terminalWidth } = useTerminalSize();
+  const terminalWidth = uiState.terminalWidth;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
-  const { showApprovalModeIndicator } = uiState;
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
@@ -152,44 +150,50 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       <Box width="100%" flexDirection="column">
         {/* Above Divider Zone: Alerts, Tips, and Hints */}
-        <Box
-          width="100%"
-          flexDirection={isNarrow ? 'column' : 'row'}
-          alignItems={isNarrow ? 'flex-start' : 'center'}
-          justifyContent={isNarrow ? 'flex-start' : 'space-between'}
-        >
+        {showUiDetails && (
           <Box
-            marginLeft={1}
-            marginRight={isNarrow ? 0 : 1}
-            flexDirection="row"
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
             alignItems={isNarrow ? 'flex-start' : 'center'}
-            flexGrow={1}
+            justifyContent={isNarrow ? 'flex-start' : 'space-between'}
           >
-            {showUiDetails && hasToast && <ToastDisplay />}
+            <Box
+              marginLeft={1}
+              marginRight={isNarrow ? 0 : 1}
+              flexDirection="row"
+              alignItems={isNarrow ? 'flex-start' : 'center'}
+              flexGrow={1}
+            >
+              {hasToast && <ToastDisplay />}
+            </Box>
+            <Box
+              marginTop={isNarrow ? 1 : 0}
+              flexDirection="column"
+              alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+              minHeight={ambientContent ? 1 : 0}
+            >
+              {ambientContent && (
+                <Box flexDirection="row" justifyContent="flex-end">
+                  <Text
+                    color={
+                      !ambientContent.isTip && uiState.shortcutsHelpVisible
+                        ? theme.text.accent
+                        : theme.text.secondary
+                    }
+                    wrap="truncate-end"
+                  >
+                    {ambientContent.text}
+                  </Text>
+                </Box>
+              )}
+            </Box>
           </Box>
-          <Box
-            marginTop={isNarrow ? 1 : 0}
-            flexDirection="column"
-            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
-            minHeight={showUiDetails && ambientContent ? 1 : 0}
-          >
-            {showUiDetails && ambientContent && (
-              <Box flexDirection="row" justifyContent="flex-end">
-                <Text
-                  color={
-                    !ambientContent.isTip && uiState.shortcutsHelpVisible
-                      ? theme.text.accent
-                      : theme.text.secondary
-                  }
-                  wrap="truncate-end"
-                >
-                  {ambientContent.text}
-                </Text>
-              </Box>
-            )}
-          </Box>
-        </Box>
+        )}
 
+        {showShortcutsHelp && <ShortcutsHelp />}
+        {showUiDetails && <HorizontalLine />}
+
+        {/* Below Divider Zone: Active Processing and Status (handled by StatusRow) */}
         <StatusRow
           uiState={uiState}
           settings={settings}
@@ -201,9 +205,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           hideUiDetailsForSuggestions={hideUiDetailsForSuggestions}
           hasPendingActionRequired={hasPendingActionRequired}
         />
-
-        {showShortcutsHelp && <ShortcutsHelp />}
-        {showUiDetails && <HorizontalLine />}
       </Box>
 
       {showUiDetails && uiState.showErrorDetails && (
@@ -235,7 +236,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
-          approvalMode={showApprovalModeIndicator}
+          approvalMode={uiState.showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}

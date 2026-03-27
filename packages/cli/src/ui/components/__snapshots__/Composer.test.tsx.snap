@@ -2,8 +2,8 @@
 
 exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
 "                                                                                     ? for shortcuts
-                                                                                       StatusDisplay
 ────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                       StatusDisplay
 InputPrompt:   Type your message or @path/to/file
 Footer
 "
@@ -22,9 +22,11 @@ InputPrompt:   Type your message or @path/to/file
 `;
 
 exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
-"                         ? for shortcuts
-                           StatusDisplay
+"
+? for shortcuts
 ────────────────────────────────────────
+
+StatusDisplay
 InputPrompt:   Type your message or
 @path/to/file
 Footer
@@ -33,8 +35,8 @@ Footer
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
 "                                                                                     ? for shortcuts
- LoadingIndicator: Thinking
 ────────────────────────────────────────────────────────────────────────────────────────────────────
+ LoadingIndicator: Thinking
 InputPrompt:   Type your message or @path/to/file
 Footer
 "
