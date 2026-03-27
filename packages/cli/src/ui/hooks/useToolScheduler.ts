@@ -183,9 +183,18 @@ export function useToolScheduler(
     const handler = (event: SubagentActivityMessage) => {
       setSubagentHistoryMap((prev) => {
         const history = prev[event.subagentName] ?? [];
+        const index = history.findIndex(
+          (item) => item.id === event.activity.id,
+        );
+        const nextHistory = [...history];
+        if (index >= 0) {
+          nextHistory[index] = event.activity;
+        } else {
+          nextHistory.push(event.activity);
+        }
         return {
           ...prev,
-          [event.subagentName]: [...history, event.activity],
+          [event.subagentName]: nextHistory,
         };
       });
     };

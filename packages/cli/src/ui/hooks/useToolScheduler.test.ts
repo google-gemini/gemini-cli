@@ -658,4 +658,74 @@ describe('useToolScheduler', () => {
       'Calling tool',
     );
   });
+
+  it('replaces SUBAGENT_ACTIVITY events by ID instead of appending', async () => {
+    const { result } = await renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const mockToolCall = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-1',
+        name: 'research',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool({ name: 'research' }),
+      invocation: createMockInvocation(),
+    };
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [mockToolCall],
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
+    });
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.SUBAGENT_ACTIVITY,
+        subagentName: 'research',
+        activity: {
+          id: '1',
+          type: 'thought',
+          content: 'Thinking...',
+          status: 'running',
+        },
+      });
+    });
+
+    expect(result.current[0][0].subagentHistory).toHaveLength(1);
+    expect(result.current[0][0].subagentHistory![0].content).toBe(
+      'Thinking...',
+    );
+
+    // Publish same ID with updated content
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.SUBAGENT_ACTIVITY,
+        subagentName: 'research',
+        activity: {
+          id: '1',
+          type: 'thought',
+          content: 'Thinking... Done!',
+          status: 'completed',
+        },
+      });
+    });
+
+    // Should still be length 1, and content should be updated
+    expect(result.current[0][0].subagentHistory).toHaveLength(1);
+    expect(result.current[0][0].subagentHistory![0].content).toBe(
+      'Thinking... Done!',
+    );
+    expect(result.current[0][0].subagentHistory![0].status).toBe('completed');
+  });
 });
