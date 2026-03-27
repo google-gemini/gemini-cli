@@ -1151,8 +1151,11 @@ describe('loggers', () => {
       getQuestion: () => 'test-question',
       getToolRegistry: () =>
         new ToolRegistry(cfg1, {} as unknown as MessageBus),
-
       getUserMemory: () => 'user-memory',
+      isExperimentalAgentHistoryTruncationEnabled: () => false,
+      getExperimentalAgentHistoryTruncationThreshold: () => 30,
+      getExperimentalAgentHistoryRetainedMessages: () => 15,
+      isExperimentalAgentHistorySummarizationEnabled: () => false,
     } as unknown as Config;
 
     (cfg2 as unknown as { config: Config; promptId: string }).config = cfg2;
