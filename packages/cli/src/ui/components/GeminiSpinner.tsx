@@ -7,20 +7,22 @@
 import type React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { Text, useIsScreenReaderEnabled } from 'ink';
-import { CliSpinner } from './CliSpinner.js';
-import type { SpinnerName } from 'cli-spinners';
+import {
+  CircularSpinner,
+  type CircularSpinnerVariant,
+} from './CircularSpinner.js';
 import { Colors } from '../colors.js';
 import tinygradient from 'tinygradient';
 
 const COLOR_CYCLE_DURATION_MS = 4000;
 
 interface GeminiSpinnerProps {
-  spinnerType?: SpinnerName;
+  variant?: CircularSpinnerVariant;
   altText?: string;
 }
 
 export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
-  spinnerType = 'dots',
+  variant = 'Composite',
   altText,
 }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -51,13 +53,18 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
   }, [isScreenReaderEnabled]);
 
   const progress = (time % COLOR_CYCLE_DURATION_MS) / COLOR_CYCLE_DURATION_MS;
-  const currentColor = googleGradient.rgbAt(progress).toHexString();
+  const leadingColor = googleGradient.rgbAt(progress).toHexString();
+  // Offset the trailing color by ~10% of the cycle duration
+  const trailingProgress = (progress - 0.1 + 1) % 1;
+  const trailingColor = googleGradient.rgbAt(trailingProgress).toHexString();
 
   return isScreenReaderEnabled ? (
     <Text>{altText}</Text>
   ) : (
-    <Text color={currentColor}>
-      <CliSpinner type={spinnerType} />
-    </Text>
+    <CircularSpinner
+      variant={variant}
+      color1={trailingColor}
+      color2={leadingColor}
+    />
   );
 };

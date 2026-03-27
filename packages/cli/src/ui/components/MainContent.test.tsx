@@ -53,6 +53,10 @@ vi.mock('../contexts/AppContext.js', async () => {
   };
 });
 
+vi.mock('./GeminiSpinner.js', () => ({
+  GeminiSpinner: () => null,
+}));
+
 vi.mock('../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(),
 }));

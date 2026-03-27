@@ -86,7 +86,7 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('⠏'); // Static char for WaitingForConfirmation
+    expect(output).toContain('⢎⡱'); // Static char for WaitingForConfirmation
     expect(output).toContain('Confirm action');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 10s');
@@ -208,7 +208,7 @@ describe('<LoadingIndicator />', () => {
     });
     await waitUntilReady();
     output = lastFrame();
-    expect(output).toContain('⠏');
+    expect(output).toContain('⢎⡱');
     expect(output).toContain('Please Confirm');
     expect(output).not.toContain('(esc to cancel)');
     expect(output).not.toContain(', 15s');
@@ -461,7 +461,7 @@ describe('<LoadingIndicator />', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('?');
-    expect(output).not.toContain('⠏');
+    expect(output).not.toContain('⢎⡱');
     unmount();
   });
 });
