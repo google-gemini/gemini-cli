@@ -228,7 +228,7 @@ export type ElicitationResponse = {
 export interface ErrorData {
   // One of https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
   status: // 400
-  | 'INVALID_ARGUMENT'
+    | 'INVALID_ARGUMENT'
     | 'FAILED_PRECONDITION'
     | 'OUT_OF_RANGE'
     // 401

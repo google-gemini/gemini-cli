@@ -334,8 +334,8 @@ Would you like to attempt to install via "git clone" instead?`,
         const previousSkills = previous?.skills ?? [];
         const isMigrating = Boolean(
           previous &&
-            previous.installMetadata &&
-            previous.installMetadata.source !== installMetadata.source,
+          previous.installMetadata &&
+          previous.installMetadata.source !== installMetadata.source,
         );
 
         await maybeRequestConsentOrFail(

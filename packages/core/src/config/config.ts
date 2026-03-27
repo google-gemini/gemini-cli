@@ -2226,9 +2226,8 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.experimentalJitContext && this.contextManager) {
       await this.contextManager.refresh();
     } else {
-      const { refreshServerHierarchicalMemory } = await import(
-        '../utils/memoryDiscovery.js'
-      );
+      const { refreshServerHierarchicalMemory } =
+        await import('../utils/memoryDiscovery.js');
       await refreshServerHierarchicalMemory(this);
     }
     if (this._geminiClient?.isInitialized()) {

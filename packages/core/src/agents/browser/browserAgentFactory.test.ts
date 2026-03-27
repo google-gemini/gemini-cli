@@ -318,9 +318,8 @@ describe('browserAgentFactory', () => {
 
   describe('resetBrowserSession', () => {
     it('should delegate to BrowserManager.resetAll', async () => {
-      const { BrowserManager: MockBrowserManager } = await import(
-        './browserManager.js'
-      );
+      const { BrowserManager: MockBrowserManager } =
+        await import('./browserManager.js');
       await resetBrowserSession();
       expect(
         (

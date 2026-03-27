@@ -229,9 +229,8 @@ export async function toggleDevToolsPanel(
   }
 
   try {
-    const { openBrowserSecurely, shouldLaunchBrowser } = await import(
-      '@google/gemini-cli-core'
-    );
+    const { openBrowserSecurely, shouldLaunchBrowser } =
+      await import('@google/gemini-cli-core');
     const url = await startDevToolsServer(config);
     if (shouldLaunchBrowser()) {
       try {

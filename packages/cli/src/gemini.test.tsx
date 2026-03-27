@@ -837,9 +837,8 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it('should start normally with a warning when no sessions found for resume', async () => {
-    const { SessionSelector, SessionError } = await import(
-      './utils/sessionUtils.js'
-    );
+    const { SessionSelector, SessionError } =
+      await import('./utils/sessionUtils.js');
     vi.mocked(SessionSelector).mockImplementation(
       () =>
         ({
@@ -894,9 +893,8 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
-    const { cleanupExpiredSessions } = await import(
-      './utils/sessionCleanup.js'
-    );
+    const { cleanupExpiredSessions } =
+      await import('./utils/sessionCleanup.js');
     vi.mocked(cleanupExpiredSessions).mockRejectedValue(
       new Error('Cleanup failed'),
     );

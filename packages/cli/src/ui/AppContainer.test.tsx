@@ -3116,9 +3116,8 @@ describe('AppContainer State Management', () => {
 
   describe('Submission Handling', () => {
     it('resets expansion state on submission when not in alternate buffer', async () => {
-      const { checkPermissions } = await import(
-        './hooks/atCommandProcessor.js'
-      );
+      const { checkPermissions } =
+        await import('./hooks/atCommandProcessor.js');
       vi.mocked(checkPermissions).mockResolvedValue([]);
 
       const { unmount } = await act(async () =>
@@ -3149,9 +3148,8 @@ describe('AppContainer State Management', () => {
     });
 
     it('resets expansion state on submission when in alternate buffer without clearing terminal', async () => {
-      const { checkPermissions } = await import(
-        './hooks/atCommandProcessor.js'
-      );
+      const { checkPermissions } =
+        await import('./hooks/atCommandProcessor.js');
       vi.mocked(checkPermissions).mockResolvedValue([]);
 
       vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
@@ -3428,9 +3426,8 @@ describe('AppContainer State Management', () => {
 
   describe('Permission Handling', () => {
     it('shows permission dialog when checkPermissions returns paths', async () => {
-      const { checkPermissions } = await import(
-        './hooks/atCommandProcessor.js'
-      );
+      const { checkPermissions } =
+        await import('./hooks/atCommandProcessor.js');
       vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
 
       const { unmount } = await act(async () => renderAppContainer());
@@ -3451,9 +3448,8 @@ describe('AppContainer State Management', () => {
     it.each([true, false])(
       'handles permissions when allowed is %s',
       async (allowed) => {
-        const { checkPermissions } = await import(
-          './hooks/atCommandProcessor.js'
-        );
+        const { checkPermissions } =
+          await import('./hooks/atCommandProcessor.js');
         vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
         const addReadOnlyPathSpy = vi.spyOn(
           mockConfig.getWorkspaceContext(),
