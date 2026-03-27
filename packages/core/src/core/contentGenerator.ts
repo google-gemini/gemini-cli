@@ -101,6 +101,26 @@ export type ContentGeneratorConfig = {
   customHeaders?: Record<string, string>;
 };
 
+export function validateBaseUrl(url?: string): void {
+  if (!url) return;
+  try {
+    const parsedUrl = new URL(url);
+    if (
+      parsedUrl.protocol !== 'https:' &&
+      parsedUrl.hostname !== 'localhost' &&
+      parsedUrl.hostname !== '127.0.0.1' &&
+      parsedUrl.hostname !== '[::1]'
+    ) {
+      throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('HTTPS')) {
+      throw error;
+    }
+    throw new Error(`Invalid custom base URL: ${url}`);
+  }
+}
+
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
@@ -119,6 +139,8 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
+
+  validateBaseUrl(baseUrl);
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,

@@ -960,10 +960,21 @@ export class Config implements McpContext, AgentLoopContext {
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
 
-    this._sandboxManager = createSandboxManager(this.sandbox, {
-      workspace: params.targetDir,
-      includeDirectories: this.pendingIncludeDirectories,
-    });
+    this._sandboxPolicyManager = new SandboxPolicyManager();
+    const initialApprovalMode =
+      params.approvalMode ??
+      params.policyEngineConfig?.approvalMode ??
+      'default';
+
+    this._sandboxManager = createSandboxManager(
+      this.sandbox,
+      {
+        workspace: params.targetDir,
+        includeDirectories: this.pendingIncludeDirectories,
+        policyManager: this._sandboxPolicyManager,
+      },
+      initialApprovalMode,
+    );
 
     if (
       !(this._sandboxManager instanceof NoopSandboxManager) &&
@@ -977,20 +988,6 @@ export class Config implements McpContext, AgentLoopContext {
       this.fileSystemService = new StandardFileSystemService();
     }
 
-    this._sandboxPolicyManager = new SandboxPolicyManager();
-    const initialApprovalMode =
-      params.approvalMode ??
-      params.policyEngineConfig?.approvalMode ??
-      'default';
-    this._sandboxManager = createSandboxManager(
-      this.sandbox,
-      {
-        workspace: params.targetDir,
-        includeDirectories: this.pendingIncludeDirectories,
-        policyManager: this._sandboxPolicyManager,
-      },
-      initialApprovalMode,
-    );
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;

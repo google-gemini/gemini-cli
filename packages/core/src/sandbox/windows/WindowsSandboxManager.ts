@@ -221,12 +221,14 @@ export class WindowsSandboxManager implements SandboxManager {
       args = ['/c', 'type', ...args];
     } else if (command === '__write') {
       // Use PowerShell for piping stdin to a file
+      const targetPath = args[0] || '';
       command = 'PowerShell.exe';
       args = [
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        `$Input | Out-File -FilePath "${args[0]}" -Encoding utf8`,
+        '$Input | Out-File -FilePath $args[0] -Encoding utf8',
+        targetPath,
       ];
     }
 
