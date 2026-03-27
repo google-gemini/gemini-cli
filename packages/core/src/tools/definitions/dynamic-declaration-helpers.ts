@@ -38,28 +38,16 @@ export function getShellToolDescription(
   enableEfficiency: boolean,
 ): string {
   const efficiencyGuidelines = enableEfficiency
-    ? `
-
-      Efficiency Guidelines:
-      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).`
+    ? '\n\n      Efficiency Guidelines:\n      - Quiet Flags: Always prefer silent or quiet flags (e.g., `npm install --silent`, `git --no-pager`) to reduce output volume while still capturing necessary information.\n      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use `git --no-pager`, `systemctl --no-pager`, or set `PAGER=cat`).'
     : '';
 
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Exit Code: Only included if non-zero (command failed).
-      Error: Only included if a process-level error occurred (e.g., spawn failure).
-      Signal: Only included if process was terminated by a signal.
-      Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.`;
+  const returnedInfo =
+    '\n\n      The following information is returned:\n\n      Output: Combined stdout/stderr. Can be `(empty)` or partial on error and for any unwaited background processes.\n      Exit Code: Only included if non-zero (command failed).\n      Error: Only included if a process-level error occurred (e.g., spawn failure).\n      Signal: Only included if process was terminated by a signal.\n      Background PIDs: Only included if background processes were started.\n      Process Group PGID: Only included if available.';
 
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use PowerShell background constructs.`
-      : 'Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.';
+      : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
     return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
@@ -231,7 +219,8 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
         },
         [TOPIC_PARAM_STRATEGIC_INTENT]: {
           type: 'string',
-          description: 'A mandatory one-sentence statement of your immediate intent.',
+          description:
+            'A mandatory one-sentence statement of your immediate intent.',
         },
       },
       required: [TOPIC_PARAM_STRATEGIC_INTENT],
