@@ -266,10 +266,6 @@ export const useGeminiStream = (
   }, [config, storage]);
 
   useEffect(() => {
-    isRespondingRef.current = isResponding;
-  }, [isResponding]);
-
-  useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
       if (turnCancelledRef.current || !isRespondingRef.current) {
         return;
@@ -280,7 +276,7 @@ export const useGeminiStream = (
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, []);
+  }, [isRespondingRef]);
 
   const [
     toolCalls,
@@ -1646,7 +1642,6 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
-      settings.merged.billing?.overageStrategy,
       setIsResponding,
     ],
   );

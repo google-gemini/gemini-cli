@@ -635,19 +635,15 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
 
-  it('should not emit onRetry when abort happens before retry callback', async () => {
+  it('should not emit onRetry when aborted before catch retry handling', async () => {
     const abortController = new AbortController();
     const onRetry = vi.fn();
-    const error = new Error('Server error') as HttpError;
-    Object.defineProperty(error, 'status', {
-      configurable: true,
-      get: () => {
-        abortController.abort();
-        return 500;
-      },
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error = new Error('Server error') as HttpError;
+      error.status = 500;
+      abortController.abort();
+      throw error;
     });
-
-    const mockFn = vi.fn().mockRejectedValue(error);
 
     const promise = retryWithBackoff(mockFn, {
       maxAttempts: 3,
@@ -660,6 +656,33 @@ describe('retryWithBackoff', () => {
       expect.objectContaining({ name: 'AbortError' }),
     );
     expect(onRetry).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not emit onRetry when aborted before content retry handling', async () => {
+    const abortController = new AbortController();
+    const onRetry = vi.fn();
+    const shouldRetryOnContent = vi.fn().mockImplementation(() => {
+      abortController.abort();
+      return true;
+    });
+    const mockFn = vi.fn().mockResolvedValue({});
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+      onRetry,
+      shouldRetryOnContent,
+    });
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(debugLogger.warn).not.toHaveBeenCalled();
+    expect(shouldRetryOnContent).toHaveBeenCalledTimes(1);
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
 

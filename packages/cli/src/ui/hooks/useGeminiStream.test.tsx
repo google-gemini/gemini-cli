@@ -193,22 +193,6 @@ vi.mock('../utils/markdownUtilities.js', () => ({
   findLastSafeSplitPoint: vi.fn((s: string) => s.length),
 }));
 
-vi.mock('./useStateAndRef.js', () => ({
-  useStateAndRef: vi.fn((initial) => {
-    let val = initial;
-    const ref = { current: val };
-    const setVal = vi.fn((updater) => {
-      if (typeof updater === 'function') {
-        val = updater(val);
-      } else {
-        val = updater;
-      }
-      ref.current = val;
-    });
-    return [val, ref, setVal];
-  }),
-}));
-
 vi.mock('./useLogger.js', () => ({
   useLogger: vi.fn().mockReturnValue({
     logMessage: vi.fn().mockResolvedValue(undefined),

@@ -251,10 +251,10 @@ export async function retryWithBackoff<T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
+        throwIfAborted();
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
         if (onRetry) {
-          throwIfAborted();
           onRetry(attempt, new Error('Invalid content'), delayWithJitter);
         }
         await delay(delayWithJitter, signal);
@@ -272,6 +272,7 @@ export async function retryWithBackoff<T>(
       if (error instanceof Error && error.name === 'AbortError') {
         throw error;
       }
+      throwIfAborted();
 
       const classifiedError = classifyGoogleError(error);
 
@@ -362,7 +363,6 @@ export async function retryWithBackoff<T>(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
           );
           if (onRetry) {
-            throwIfAborted();
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
@@ -376,7 +376,6 @@ export async function retryWithBackoff<T>(
           const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
           const delayWithJitter = Math.max(0, currentDelay + jitter);
           if (onRetry) {
-            throwIfAborted();
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
@@ -401,7 +400,6 @@ export async function retryWithBackoff<T>(
       const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
       const delayWithJitter = Math.max(0, currentDelay + jitter);
       if (onRetry) {
-        throwIfAborted();
         onRetry(attempt, error, delayWithJitter);
       }
       await delay(delayWithJitter, signal);
