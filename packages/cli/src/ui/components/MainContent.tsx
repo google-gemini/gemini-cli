@@ -228,16 +228,6 @@ export const MainContent = () => {
             confirmingTool={confirmingTool}
           />
         )}
-        {uiState.btwState.isActive && (
-          <BtwDisplay
-            key="btw-display"
-            query={uiState.btwState.query}
-            response={uiState.btwState.response}
-            isStreaming={uiState.btwState.isStreaming}
-            error={uiState.btwState.error}
-            terminalWidth={uiState.terminalWidth}
-          />
-        )}
       </Box>
     ),
     [
@@ -249,17 +239,20 @@ export const MainContent = () => {
       confirmingTool,
       uiState.history,
       suppressNarrationFlags,
-      uiState.btwState.isActive,
-      uiState.btwState.query,
-      uiState.btwState.response,
-      uiState.btwState.isStreaming,
-      uiState.btwState.error,
-      uiState.terminalWidth,
     ],
   );
 
-  const virtualizedData = useMemo(
-    () => [
+  const virtualizedData = useMemo(() => {
+    const data: Array<
+      | { type: 'header' }
+      | { type: 'pending' }
+      | { type: 'btw' }
+      | {
+          type: 'history';
+          item: (typeof augmentedHistory)[0]['item'];
+          element: React.ReactNode;
+        }
+    > = [
       { type: 'header' as const },
       ...augmentedHistory.map((data, index) => ({
         type: 'history' as const,
@@ -267,9 +260,12 @@ export const MainContent = () => {
         element: historyItems[index],
       })),
       { type: 'pending' as const },
-    ],
-    [augmentedHistory, historyItems],
-  );
+    ];
+    if (uiState.btwState.isActive) {
+      data.push({ type: 'btw' as const });
+    }
+    return data;
+  }, [augmentedHistory, historyItems, uiState.btwState.isActive]);
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
@@ -282,12 +278,33 @@ export const MainContent = () => {
           />
         );
       } else if (item.type === 'history') {
-        return item.element;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return (item as any).element;
+      } else if (item.type === 'btw') {
+        return (
+          <BtwDisplay
+            key="btw-display"
+            query={uiState.btwState.query}
+            response={uiState.btwState.response}
+            isStreaming={uiState.btwState.isStreaming}
+            error={uiState.btwState.error}
+            terminalWidth={uiState.terminalWidth}
+          />
+        );
       } else {
         return pendingItems;
       }
     },
-    [showHeaderDetails, version, pendingItems],
+    [
+      showHeaderDetails,
+      version,
+      pendingItems,
+      uiState.btwState.query,
+      uiState.btwState.response,
+      uiState.btwState.isStreaming,
+      uiState.btwState.error,
+      uiState.terminalWidth,
+    ],
   );
 
   const estimatedItemHeight = useCallback(() => 100, []);
@@ -296,6 +313,7 @@ export const MainContent = () => {
     (item: (typeof virtualizedData)[number], _index: number) => {
       if (item.type === 'header') return 'header';
       if (item.type === 'history') return item.item.id.toString();
+      if (item.type === 'btw') return 'btw';
       return 'pending';
     },
     [],
@@ -374,6 +392,16 @@ export const MainContent = () => {
         {(item) => item}
       </Static>
       {pendingItems}
+      {uiState.btwState.isActive && (
+        <BtwDisplay
+          key="btw-display"
+          query={uiState.btwState.query}
+          response={uiState.btwState.response}
+          isStreaming={uiState.btwState.isStreaming}
+          error={uiState.btwState.error}
+          terminalWidth={uiState.terminalWidth}
+        />
+      )}
     </>
   );
 };
