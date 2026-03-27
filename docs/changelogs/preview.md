@@ -1,6 +1,6 @@
-# Preview release: v0.36.0-preview.3
+# Preview release: v0.36.0-preview.4
 
-Released: March 25, 2026
+Released: March 26, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -31,6 +31,8 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- feat(core): support inline agentCardJson for remote agents by @adamfweidman in
+  [#23743](https://github.com/google-gemini/gemini-cli/pull/23743)
 - fix(patch): cherry-pick 055ff92 to release/v0.36.0-preview.0-pr-23672 to patch
   version v0.36.0-preview.0 and create version 0.36.0-preview.1 by
   @gemini-cli-robot in
@@ -379,4 +381,4 @@ npm install -g @google/gemini-cli@preview
   [#23666](https://github.com/google-gemini/gemini-cli/pull/23666)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.3
+https://github.com/google-gemini/gemini-cli/compare/v0.35.0-preview.5...v0.36.0-preview.4
