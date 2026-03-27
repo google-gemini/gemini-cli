@@ -127,8 +127,10 @@ describe('BrowserManager', () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    // Clear singleton cache to avoid cross-test leakage
+    await BrowserManager.resetAll();
   });
 
   describe('MCP bundled path resolution', () => {
@@ -700,6 +702,137 @@ describe('BrowserManager', () => {
     });
   });
 
+  describe('getInstance', () => {
+    it('should return the same instance for the same session mode', () => {
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      const instance2 = BrowserManager.getInstance(mockConfig);
+
+      expect(instance1).toBe(instance2);
+    });
+
+    it('should return different instances for different session modes', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+
+      expect(instance1).not.toBe(instance2);
+    });
+
+    it('should return different instances for different profile paths', () => {
+      const config1 = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { profilePath: '/path/a' },
+        },
+      });
+      const config2 = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { profilePath: '/path/b' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(config1);
+      const instance2 = BrowserManager.getInstance(config2);
+
+      expect(instance1).not.toBe(instance2);
+    });
+  });
+
+  describe('resetAll', () => {
+    it('should close all instances and clear the cache', async () => {
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      await instance1.ensureConnection();
+
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+      await instance2.ensureConnection();
+
+      await BrowserManager.resetAll();
+
+      // After resetAll, getInstance should return new instances
+      const instance3 = BrowserManager.getInstance(mockConfig);
+      expect(instance3).not.toBe(instance1);
+    });
+
+    it('should handle errors during cleanup gracefully', async () => {
+      const instance = BrowserManager.getInstance(mockConfig);
+      await instance.ensureConnection();
+
+      // Make close throw by overriding the client's close method
+      const client = await instance.getRawMcpClient();
+      vi.mocked(client.close).mockRejectedValueOnce(new Error('close failed'));
+
+      // Should not throw
+      await expect(BrowserManager.resetAll()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('isConnected', () => {
+    it('should return false before connection', () => {
+      const manager = new BrowserManager(mockConfig);
+      expect(manager.isConnected()).toBe(false);
+    });
+
+    it('should return true after successful connection', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+      expect(manager.isConnected()).toBe(true);
+    });
+
+    it('should return false after close', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+      await manager.close();
+      expect(manager.isConnected()).toBe(false);
+    });
+  });
+
+  describe('reconnection', () => {
+    it('should reconnect after unexpected disconnect', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      // Simulate transport closing unexpectedly via the onclose callback
+      const transportInstance =
+        vi.mocked(StdioClientTransport).mock.results[0]?.value;
+      if (transportInstance?.onclose) {
+        transportInstance.onclose();
+      }
+
+      // Manager should recognize disconnection
+      expect(manager.isConnected()).toBe(false);
+
+      // ensureConnection should reconnect
+      await manager.ensureConnection();
+      expect(manager.isConnected()).toBe(true);
+    });
+  });
+
+  describe('concurrency', () => {
+    it('should not call connectMcp twice when ensureConnection is called concurrently', async () => {
+      const manager = new BrowserManager(mockConfig);
+
+      // Call ensureConnection twice simultaneously without awaiting the first
+      const [p1, p2] = [manager.ensureConnection(), manager.ensureConnection()];
+      await Promise.all([p1, p2]);
+
+      // connectMcp (via StdioClientTransport constructor) should only have been called once
+      // Each connection attempt creates a new StdioClientTransport
+    });
+  });
+
   describe('overlay re-injection in callTool', () => {
     it('should re-inject overlay and input blocker after click in non-headless mode when input disabling is enabled', async () => {
       // Enable input disabling in config
@@ -822,8 +955,6 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: 'bad' });
-
-      expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
   });
 

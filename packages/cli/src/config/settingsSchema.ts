@@ -261,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
       },
       checkpointing: {
@@ -2139,6 +2139,46 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      agentHistoryTruncation: {
+        type: 'boolean',
+        label: 'Agent History Truncation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable truncation window logic for the Agent History Provider.',
+        showInDialog: true,
+      },
+      agentHistoryTruncationThreshold: {
+        type: 'number',
+        label: 'Agent History Truncation Threshold',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 30,
+        description:
+          'The maximum number of messages before history is truncated.',
+        showInDialog: true,
+      },
+      agentHistoryRetainedMessages: {
+        type: 'number',
+        label: 'Agent History Retained Messages',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 15,
+        description:
+          'The number of recent messages to retain after truncation.',
+        showInDialog: true,
+      },
+      agentHistorySummarization: {
+        type: 'boolean',
+        label: 'Agent History Summarization',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable summarization of truncated content via a small model for the Agent History Provider.',
         showInDialog: true,
       },
       topicUpdateNarration: {
