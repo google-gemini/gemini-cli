@@ -1,4 +1,4 @@
-# Latest stable release: v0.35.1
+# Latest stable release: v0.35.2
 
 Released: March 26, 2026
 
@@ -29,6 +29,11 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(core): allow disabling environment variable redaction by @galz10 in
+  [#23927](https://github.com/google-gemini/gemini-cli/pull/23927)
+- fix(a2a-server): A2A server should execute ask policies in interactive mode by
+  @keith.schaab in
+  [#23831](https://github.com/google-gemini/gemini-cli/pull/23831)
 - feat(cli): customizable keyboard shortcuts by @scidomino in
   [#21945](https://github.com/google-gemini/gemini-cli/pull/21945)
 - feat(core): Thread `AgentLoopContext` through core. by @joshualitt in
@@ -380,4 +385,4 @@ npm install -g @google/gemini-cli
   [#23585](https://github.com/google-gemini/gemini-cli/pull/23585)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.1
+https://github.com/google-gemini/gemini-cli/compare/v0.34.0...v0.35.2
