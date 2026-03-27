@@ -1562,6 +1562,79 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
+
+    it('initializes sandbox with ignored paths as forbidden paths', async () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      const fileService = config.getFileService();
+      vi.spyOn(fileService, 'getIgnoredPaths').mockResolvedValue([
+        '/tmp/forbidden',
+      ]);
+
+      await config.initialize();
+
+      expect(fileService.getIgnoredPaths).toHaveBeenCalled();
+      expect(config['sandboxForbiddenPaths']).toEqual(['/tmp/forbidden']);
+    });
+
+    it('skips fetching ignored paths if sandbox is disabled', async () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: { enabled: false },
+      });
+
+      const fileService = config.getFileService();
+      vi.spyOn(fileService, 'getIgnoredPaths').mockResolvedValue([
+        '/tmp/forbidden',
+      ]);
+
+      await config.initialize();
+
+      expect(fileService.getIgnoredPaths).not.toHaveBeenCalled();
+      expect(config['sandboxForbiddenPaths']).toBeUndefined();
+    });
+
+    it('rebuilds sandbox services when approval mode changes', () => {
+      const config = new Config({
+        ...baseParams,
+        trustedFolder: true,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      const initialFs = config['fileSystemService'];
+      const initialSandboxManager =
+        config['shellExecutionConfig'].sandboxManager;
+
+      // Change approval mode, which triggers rebuildSandboxEnvironment
+      config.setApprovalMode(ApprovalMode.PLAN);
+
+      // Verify that new instances were created to prevent stale references
+      expect(config['fileSystemService']).not.toBe(initialFs);
+      expect(config['shellExecutionConfig'].sandboxManager).not.toBe(
+        initialSandboxManager,
+      );
+    });
+
+    it('downgrades to standard file system in permissive approval modes', () => {
+      const config = new Config({
+        ...baseParams,
+        trustedFolder: true,
+        sandbox: { enabled: true, command: 'docker' },
+      });
+
+      expect(config['fileSystemService'].constructor.name).toBe(
+        'SandboxedFileSystemService',
+      );
+
+      config.setApprovalMode(ApprovalMode.YOLO);
+
+      expect(config['fileSystemService'].constructor.name).toBe(
+        'StandardFileSystemService',
+      );
+    });
   });
 });
 

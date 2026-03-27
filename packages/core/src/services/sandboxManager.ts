@@ -61,12 +61,11 @@ export interface SandboxModeConfig {
 
 /**
  * Global configuration options used to initialize a SandboxManager.
+ * These options are constructed during Config instantiation and updated
+ * whenever the sandbox environment is rebuilt (e.g., on Approval Mode changes).
  */
 export interface GlobalSandboxOptions {
-  /**
-   * The primary workspace path the sandbox is anchored to.
-   * This directory is granted full read and write access.
-   */
+  /** The absolute path to the primary workspace directory, granted full read/write access. */
   workspace: string;
   /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
   forbiddenPaths?: string[];
