@@ -32,7 +32,7 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from './coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -84,13 +84,16 @@ export type StreamEvent =
 interface MidStreamRetryOptions {
   /** Total number of attempts to make (1 initial + N retries). */
   maxAttempts: number;
-  /** The base delay in milliseconds for linear backoff. */
+  /** The base delay in milliseconds for backoff. */
   initialDelayMs: number;
+  /** Whether to use exponential backoff instead of linear. */
+  useExponentialBackoff: boolean;
 }
 
 const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
   maxAttempts: 4, // 1 initial call + 3 retries mid-stream
-  initialDelayMs: 500,
+  initialDelayMs: 1000,
+  useExponentialBackoff: true,
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
@@ -433,7 +436,10 @@ export class GeminiChat {
                 attempt < maxAttempts - 1 &&
                 attempt < maxMidStreamAttempts - 1
               ) {
-                const delayMs = MID_STREAM_RETRY_OPTIONS.initialDelayMs;
+                const delayMs = MID_STREAM_RETRY_OPTIONS.useExponentialBackoff
+                  ? MID_STREAM_RETRY_OPTIONS.initialDelayMs *
+                    Math.pow(2, attempt)
+                  : MID_STREAM_RETRY_OPTIONS.initialDelayMs * (attempt + 1);
 
                 if (isContentError) {
                   logContentRetry(
@@ -447,7 +453,7 @@ export class GeminiChat {
                       attempt + 1,
                       maxAttempts,
                       errorType,
-                      delayMs * (attempt + 1),
+                      delayMs,
                       model,
                     ),
                   );
@@ -455,13 +461,11 @@ export class GeminiChat {
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
                   maxAttempts: Math.min(maxAttempts, maxMidStreamAttempts),
-                  delayMs: delayMs * (attempt + 1),
+                  delayMs,
                   error: errorType,
                   model,
                 });
-                await new Promise((res) =>
-                  setTimeout(res, delayMs * (attempt + 1)),
-                );
+                await new Promise((res) => setTimeout(res, delayMs));
                 continue;
               }
             }
@@ -520,8 +524,20 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useGemini3_1FlashLite =
+        (await this.context.config.getGemini31FlashLiteLaunched?.()) ?? false;
+      const hasAccessToPreview =
+        this.context.config.getHasAccessToPreviewModel?.() ?? true;
+
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        useGemini3_1,
+        useGemini3_1FlashLite,
+        false,
+        hasAccessToPreview,
+        this.context.config,
+      );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
@@ -529,6 +545,10 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
+          useGemini3_1FlashLite,
+          false,
+          hasAccessToPreview,
+          this.context.config,
         );
       }
 
@@ -1012,8 +1032,8 @@ export class GeminiChat {
 
       return {
         id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),

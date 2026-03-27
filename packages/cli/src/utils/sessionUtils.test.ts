@@ -239,6 +239,44 @@ describe('SessionSelector', () => {
     expect(result.sessionData.messages[0].content).toBe('Latest session');
   });
 
+  it('should resolve session by UUID with whitespace (trimming)', async () => {
+    const sessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    // Test resolving by UUID with leading/trailing spaces
+    const result = await sessionSelector.resolveSession(`  ${sessionId}  `);
+    expect(result.sessionData.sessionId).toBe(sessionId);
+    expect(result.sessionData.messages[0].content).toBe('Test message');
+  });
+
   it('should deduplicate sessions by ID', async () => {
     const sessionId = randomUUID();
 
