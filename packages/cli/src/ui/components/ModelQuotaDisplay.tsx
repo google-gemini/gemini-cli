@@ -25,14 +25,74 @@ interface ModelQuotaDisplayProps {
   availableWidth?: number;
 }
 
+interface ModelUsageRowProps {
+  row: {
+    modelId: string;
+    name: string;
+    usedFraction: number;
+    usedPercentage: number;
+    resetTime?: string;
+  };
+  availableWidth?: number;
+}
+
+const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
+  row,
+  availableWidth,
+}) => {
+  const { terminalWidth } = useUIState();
+
+  const nameLabelLength = 25;
+  const resetLabelLength = 33;
+  // const nameLabel = row.name.slice(0, nameLabelLength).padEnd(nameLabelLength);
+  let nameLabel = row.name;
+  if (nameLabel.length > nameLabelLength) {
+    nameLabel = nameLabel.slice(0, nameLabelLength - 1) + '…';
+  } else {
+    nameLabel = nameLabel.padEnd(nameLabelLength);
+  }
+  const percentageLabel = `${row.usedPercentage.toFixed(0)}%`.padStart(4);
+  const resetLabel = `${row.resetTime}`
+    ? formatResetTime(row.resetTime, 'column')
+        .slice(0, resetLabelLength)
+        .padEnd(resetLabelLength)
+    : ''.padEnd(resetLabelLength);
+
+  const calcWidth = availableWidth ?? terminalWidth;
+  const defaultPadding = availableWidth != null ? 0 : 4;
+  const barWidth = Math.max(
+    10,
+    calcWidth - defaultPadding - (nameLabelLength + resetLabelLength + 9),
+  );
+
+  return (
+    <Box flexDirection="row" width="100%">
+      <Box width={nameLabelLength}>
+        <Text color={theme.text.primary}>{nameLabel}</Text>
+      </Box>
+
+      <Box flexGrow={1}>
+        <ProgressBar value={row.usedPercentage} width={barWidth} />
+      </Box>
+
+      <Box width={4} marginLeft={1}>
+        <Text color={theme.text.primary}>{percentageLabel}</Text>
+      </Box>
+
+      <Box width={resetLabelLength} marginLeft={1}>
+        <Text color={theme.text.secondary}>Resets in {resetLabel}</Text>
+      </Box>
+    </Box>
+  );
+};
+
 export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
   buckets,
   availableWidth,
 }) => {
-  const { terminalWidth } = useUIState();
   const config = useConfig();
 
-  const usageRows = useMemo(() => {
+  const modelsWithQuotas = useMemo(() => {
     if (!buckets) return [];
 
     return buckets
@@ -50,7 +110,7 @@ export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
       });
   }, [buckets, config]);
 
-  if (usageRows.length === 0) {
+  if (modelsWithQuotas.length === 0) {
     return null;
   }
 
@@ -66,55 +126,21 @@ export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
         borderColor={theme.border.default}
       />
 
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column">
         <Text bold color={theme.text.primary}>
           Model usage
         </Text>
 
-        {usageRows.map((row) => {
-          const nameLabelLength = 25;
-          const resetLabelLength = 33;
-          const nameLabel = row.name
-            .slice(0, nameLabelLength)
-            .padEnd(nameLabelLength);
-          const percentageLabel = `${row.usedPercentage.toFixed(0)}%`.padStart(
-            4,
-          );
-          const resetLabel = row.resetTime
-            ? formatResetTime(row.resetTime, 'column')
-                .slice(0, resetLabelLength)
-                .padEnd(resetLabelLength)
-            : ''.padEnd(resetLabelLength);
-
-          const calcWidth = availableWidth ?? terminalWidth;
-          const defaultPadding = availableWidth != null ? 0 : 4;
-          const barWidth = Math.min(
-            10,
-            calcWidth -
-              defaultPadding -
-              (nameLabelLength + resetLabelLength + 9),
-          );
-
-          return (
-            <Box key={row.modelId} flexDirection="row" width="100%">
-              <Box width={nameLabelLength}>
-                <Text color={theme.text.primary}>{nameLabel}</Text>
-              </Box>
-
-              <Box flexGrow={1}>
-                <ProgressBar value={row.usedPercentage} width={barWidth} />
-              </Box>
-
-              <Box width={4} marginLeft={1}>
-                <Text color={theme.text.primary}>{percentageLabel}</Text>
-              </Box>
-
-              <Box width={resetLabelLength} marginLeft={1}>
-                <Text color={theme.text.secondary}>{resetLabel}</Text>
-              </Box>
-            </Box>
-          );
-        })}
+        {modelsWithQuotas.map(
+          (row) =>
+            row.resetTime && (
+              <ModelUsageRow
+                key={row.modelId}
+                row={row}
+                availableWidth={availableWidth}
+              />
+            ),
+        )}
       </Box>
 
       {/* Rule Line */}
@@ -125,7 +151,6 @@ export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
         borderLeft={false}
         borderRight={false}
         borderColor={theme.border.default}
-        marginTop={1}
       />
     </Box>
   );
