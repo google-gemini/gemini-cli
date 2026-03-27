@@ -25,6 +25,9 @@ export class SandboxedFileSystemService implements FileSystemService {
       args: [filePath],
       cwd: this.cwd,
       env: process.env,
+      policy: {
+        allowedPaths: [filePath],
+      },
     });
 
     return new Promise((resolve, reject) => {
@@ -50,11 +53,19 @@ export class SandboxedFileSystemService implements FileSystemService {
         if (code === 0) {
           resolve(output);
         } else {
-          reject(
-            new Error(
-              `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
-            ),
+          const isEnoent =
+            error.toLowerCase().includes('no such file or directory') ||
+            error.toLowerCase().includes('enoent') ||
+            error.toLowerCase().includes('could not find file') ||
+            error.toLowerCase().includes('could not find a part of the path');
+          const err = new Error(
+            `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
           );
+          if (isEnoent) {
+            // @ts-expect-error - Adding code property to Error object
+            err.code = 'ENOENT';
+          }
+          reject(err);
         }
       });
 
@@ -74,6 +85,14 @@ export class SandboxedFileSystemService implements FileSystemService {
       args: [filePath],
       cwd: this.cwd,
       env: process.env,
+      policy: {
+        allowedPaths: [filePath],
+        additionalPermissions: {
+          fileSystem: {
+            write: [filePath],
+          },
+        },
+      },
     });
 
     return new Promise((resolve, reject) => {

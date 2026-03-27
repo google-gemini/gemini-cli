@@ -18,17 +18,17 @@ import {
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
-import {
-  initializeShellParsers,
-  getCommandName,
-} from '../../utils/shell-utils.js';
+import { initializeShellParsers } from '../../utils/shell-utils.js';
 import {
   isKnownSafeCommand,
   isDangerousCommand,
-  isStrictlyApproved,
 } from '../utils/commandSafety.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
-import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import {
+  verifySandboxOverrides,
+  getCommandName as getFullCommandName,
+  isStrictlyApproved,
+} from '../utils/commandUtils.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 export interface MacOsSandboxOptions extends GlobalSandboxOptions {
@@ -80,11 +80,23 @@ export class MacOsSandboxManager implements SandboxManager {
     // Reject override attempts in plan mode
     verifySandboxOverrides(allowOverrides, req.policy);
 
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      command = '/bin/cat';
+    } else if (command === '__write') {
+      command = '/bin/sh';
+      args = ['-c', 'cat > "$1"', '_', ...args];
+    }
+
+    const currentReq = { ...req, command, args };
+
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
-          req.command,
-          req.args,
+          currentReq,
           this.options.modeConfig?.approvedTools,
         )
       : false;
@@ -94,7 +106,7 @@ export class MacOsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
 
     // Fetch persistent approvals for this command
-    const commandName = await getCommandName(req.command, req.args);
+    const commandName = await getFullCommandName(currentReq);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
@@ -129,7 +141,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     return {
       program: '/usr/bin/sandbox-exec',
-      args: [...sandboxArgs, '--', req.command, ...req.args],
+      args: [...sandboxArgs, '--', command, ...args],
       env: sanitizedEnv,
       cwd: req.cwd,
     };
