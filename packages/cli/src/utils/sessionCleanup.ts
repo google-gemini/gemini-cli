@@ -13,6 +13,8 @@ import {
   Storage,
   TOOL_OUTPUTS_DIR,
   type Config,
+  deleteSessionArtifactsAsync,
+  deleteSubagentSessionDirAndArtifactsAsync,
 } from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
@@ -60,47 +62,17 @@ function deriveShortIdFromFileName(fileName: string): string | null {
 }
 
 /**
- * Gets the log path for a session ID.
- */
-function getSessionLogPath(tempDir: string, safeSessionId: string): string {
-  return path.join(tempDir, 'logs', `session-${safeSessionId}.jsonl`);
-}
-
-/**
  * Cleans up associated artifacts (logs, tool-outputs, directory) for a session.
  */
-async function deleteSessionArtifactsAsync(
+async function cleanupSessionAndSubagentsAsync(
   sessionId: string,
   config: Config,
 ): Promise<void> {
   const tempDir = config.storage.getProjectTempDir();
+  const chatsDir = path.join(tempDir, 'chats');
 
-  // Cleanup logs
-  const logsDir = path.join(tempDir, 'logs');
-  const safeSessionId = sanitizeFilenamePart(sessionId);
-  const logPath = getSessionLogPath(tempDir, safeSessionId);
-  if (logPath.startsWith(logsDir)) {
-    await fs.unlink(logPath).catch(() => {});
-  }
-
-  // Cleanup tool outputs
-  const toolOutputDir = path.join(
-    tempDir,
-    TOOL_OUTPUTS_DIR,
-    `session-${safeSessionId}`,
-  );
-  const toolOutputsBase = path.join(tempDir, TOOL_OUTPUTS_DIR);
-  if (toolOutputDir.startsWith(toolOutputsBase)) {
-    await fs
-      .rm(toolOutputDir, { recursive: true, force: true })
-      .catch(() => {});
-  }
-
-  // Cleanup session directory
-  const sessionDir = path.join(tempDir, safeSessionId);
-  if (safeSessionId && sessionDir.startsWith(tempDir + path.sep)) {
-    await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
-  }
+  await deleteSessionArtifactsAsync(sessionId, tempDir);
+  await deleteSubagentSessionDirAndArtifactsAsync(sessionId, chatsDir, tempDir);
 }
 
 /**
@@ -201,7 +173,7 @@ export async function cleanupExpiredSessions(
                 await fs.unlink(filePath);
 
                 if (fullSessionId) {
-                  await deleteSessionArtifactsAsync(fullSessionId, config);
+                  await cleanupSessionAndSubagentsAsync(fullSessionId, config);
                 }
                 result.deleted++;
               } else {
@@ -230,7 +202,7 @@ export async function cleanupExpiredSessions(
 
           const sessionId = sessionToDelete.sessionInfo?.id;
           if (sessionId) {
-            await deleteSessionArtifactsAsync(sessionId, config);
+            await cleanupSessionAndSubagentsAsync(sessionId, config);
           }
 
           if (config.getDebugMode()) {
