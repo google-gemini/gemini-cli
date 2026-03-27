@@ -93,7 +93,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (isWindows) {
       return command;
     }
-    const trimmed = command.trim();
+    let trimmed = command.trim();
+    if (!trimmed) {
+      return '';
+    }
+    if (trimmed.endsWith('\\')) {
+      trimmed += ' ';
+    }
     return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
   }
 
