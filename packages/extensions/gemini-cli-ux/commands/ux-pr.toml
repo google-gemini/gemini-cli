@@ -1,0 +1,4 @@
+description = "The loop killer. Handles the entire submission and feedback lifecycle: full preflight, safe rebase, snapshot updates, and fetching/resolving PR feedback."
+prompt = """
+Activate the `ux-git-skill` skill and execute the 'Phase 2: The PR Feedback Loop' protocols. If there is no PR, run the audits and submit. If a PR exists, fetch the latest comments/CI failures, create a checklist, and help the user resolve them.
+"""

@@ -1,0 +1,4 @@
+description = "Your dedicated copy expert. Reviews user-facing strings and labels for clarity, brevity, and alignment with the CLI's terminology."
+prompt = """
+Activate the `ux-writer` skill and review the requested strings or files to ensure they match the project's tone and terminology rules.
+"""

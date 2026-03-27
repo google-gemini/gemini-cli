@@ -46,7 +46,7 @@ export abstract class ExtensionLoader {
       await Promise.all(
         this.getExtensions()
           .filter((e) => e.isActive)
-          .map(this.startExtension.bind(this)),
+          .map((e) => this.startExtension(e)),
       );
     } finally {
       this.isStarting = false;
@@ -62,7 +62,10 @@ export abstract class ExtensionLoader {
    * go through `maybeStartExtension` which will only start the extension if
    * extension reloading is enabled and the `config` object is initialized.
    */
-  protected async startExtension(extension: GeminiCLIExtension) {
+  protected async startExtension(
+    extension: GeminiCLIExtension,
+    skipRefresh = false,
+  ) {
     if (!this.config) {
       throw new Error('Cannot call `startExtension` prior to calling `start`.');
     }
@@ -107,7 +110,9 @@ export abstract class ExtensionLoader {
         this.startingCount = 0;
         this.startCompletedCount = 0;
       }
-      await this.maybeRefreshMemories();
+      if (!skipRefresh) {
+        await this.maybeRefreshMemories();
+      }
     }
   }
 
@@ -169,7 +174,10 @@ export abstract class ExtensionLoader {
    * extension if extension reloading is enabled and the `config` object is
    * initialized.
    */
-  protected async stopExtension(extension: GeminiCLIExtension) {
+  protected async stopExtension(
+    extension: GeminiCLIExtension,
+    skipRefresh = false,
+  ) {
     if (!this.config) {
       throw new Error('Cannot call `stopExtension` prior to calling `start`.');
     }
@@ -221,7 +229,9 @@ export abstract class ExtensionLoader {
         this.stoppingCount = 0;
         this.stopCompletedCount = 0;
       }
-      await this.maybeRefreshMemories();
+      if (!skipRefresh) {
+        await this.maybeRefreshMemories();
+      }
     }
   }
 
@@ -239,8 +249,14 @@ export abstract class ExtensionLoader {
   }
 
   async restartExtension(extension: GeminiCLIExtension): Promise<void> {
-    await this.stopExtension(extension);
-    await this.startExtension(extension);
+    this.isStarting = true;
+    try {
+      await this.stopExtension(extension, true);
+      await this.startExtension(extension, true);
+    } finally {
+      this.isStarting = false;
+      await this.maybeRefreshMemories();
+    }
   }
 }
 

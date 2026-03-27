@@ -1,0 +1,4 @@
+description = "Start a new feature or check out an existing PR. Creates a clean, isolated worktree and prepares your environment so you're immediately ready to code."
+prompt = """
+Activate the `ux-git-skill` skill and assist the user with creating a new branch or checking out an existing PR into a sibling worktree. Ensure all 'Phase 1' workflows (like npm install) are completed so they are ready to code.
+"""

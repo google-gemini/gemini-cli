@@ -1,5 +1,5 @@
 ---
-name: _ux_git-worktree
+name: git-worktree
 description: Manage Git Worktrees according to the "Base Folder Strategy". Use when the user wants to create branches, switch tasks, check out PRs, or manage parallel development environments.
 ---
 
@@ -29,7 +29,7 @@ When the user asks to "start a new task" or "create a branch":
 
 When the user asks to "check out PR #123":
 1.  **NEVER** use standard `gh pr checkout` without a directory.
-2.  **ALWAYS** use the automation script: `./packages/extensions/ux-toolkit/skills/_ux_git-worktree/scripts/worktree-manager.sh pr 123`.
+2.  **ALWAYS** use the automation script: `./packages/extensions/extension/skills/git-worktree/scripts/worktree-manager.sh pr 123`.
 3.  **Mandatory Prep**: Run `npm install` inside the new worktree directory to ensure all dependencies are resolved.
 4.  This script will automatically fetch the PR title and create a semantic directory name (e.g., `pr-123-fix-core-bug`).
 

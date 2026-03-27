@@ -18,6 +18,7 @@ export class SkillManager {
   private skills: SkillDefinition[] = [];
   private activeSkillNames: Set<string> = new Set();
   private adminSkillsEnabled = true;
+  private pendingWarnings: Set<string> = new Set();
 
   /**
    * Clears all discovered skills.
@@ -50,6 +51,7 @@ export class SkillManager {
     isTrusted: boolean = false,
   ): Promise<void> {
     this.clearSkills();
+    this.pendingWarnings.clear();
 
     // 1. Built-in skills (lowest precedence)
     await this.discoverBuiltinSkills();
@@ -76,19 +78,27 @@ export class SkillManager {
       debugLogger.debug(
         'Workspace skills disabled because folder is not trusted.',
       );
-      return;
+    } else {
+      const projectSkills = await loadSkillsFromDir(
+        storage.getProjectSkillsDir(),
+      );
+      this.addSkillsWithPrecedence(projectSkills);
+
+      // 4.1 Workspace agent skills alias (.agents/skills)
+      const projectAgentSkills = await loadSkillsFromDir(
+        storage.getProjectAgentSkillsDir(),
+      );
+      this.addSkillsWithPrecedence(projectAgentSkills);
     }
 
-    const projectSkills = await loadSkillsFromDir(
-      storage.getProjectSkillsDir(),
-    );
-    this.addSkillsWithPrecedence(projectSkills);
+    this.emitPendingWarnings();
+  }
 
-    // 4.1 Workspace agent skills alias (.agents/skills)
-    const projectAgentSkills = await loadSkillsFromDir(
-      storage.getProjectAgentSkillsDir(),
-    );
-    this.addSkillsWithPrecedence(projectAgentSkills);
+  private emitPendingWarnings(): void {
+    for (const warning of this.pendingWarnings) {
+      coreEvents.emitFeedback('warning', warning);
+    }
+    this.pendingWarnings.clear();
   }
 
   /**
@@ -112,6 +122,7 @@ export class SkillManager {
    */
   addSkills(skills: SkillDefinition[]): void {
     this.addSkillsWithPrecedence(skills);
+    this.emitPendingWarnings();
   }
 
   private addSkillsWithPrecedence(newSkills: SkillDefinition[]): void {
@@ -127,8 +138,7 @@ export class SkillManager {
             `Skill "${newSkill.name}" from "${newSkill.location}" is overriding the built-in skill.`,
           );
         } else {
-          coreEvents.emitFeedback(
-            'warning',
+          this.pendingWarnings.add(
             `Skill conflict detected: "${newSkill.name}" from "${newSkill.location}" is overriding the same skill from "${existingSkill.location}".`,
           );
         }

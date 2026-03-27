@@ -1,5 +1,5 @@
 ---
-name: _ux_finish-pr
+name: finish-pr
 description: Expert PR submission tool. Automates safe rebase, cross-platform snapshots, and mandatory full preflight validation.
 ---
 
@@ -17,7 +17,7 @@ You are a senior co-author assistant. Your goal is to ensure this PR passes CI o
 ### **2. Neutral Environment Snapshots**
 - **Action**: If UI files were modified, you MUST run tests with:
   ```bash
-  TERM_PROGRAM=none npm test -w @google/gemini-cli -- -u
+  TERM_PROGRAM=generic npm test -w @google/gemini-cli -- -u
   ```
 - **Reason**: This prevents macOS-specific icons (like `MAC_TERMINAL_ICON`) from leaking into snapshots, which causes CI failure on Linux runners.
 
@@ -26,6 +26,7 @@ You are a senior co-author assistant. Your goal is to ensure this PR passes CI o
   ```bash
   npm run preflight
   ```
+- **Verification**: Run `npm run typecheck` explicitly if `preflight` does not include it, to ensure cross-package integrity.
 - **Automated Audit**: You MUST run `/review-frontend <PR_NUMBER>` and address any issues found. This provides an automated audit of your changes to catch common mistakes before a maintainer review.
 - **Constraint**: Passing individual tests is NOT enough. `preflight` ensures `tsc --build` passes, catching TypeScript inference bugs that unit tests miss.
 - **TDD Fallback**: If `preflight` fails, you must create a local reproduction test before attempting a fix.

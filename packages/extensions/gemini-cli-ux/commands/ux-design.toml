@@ -1,0 +1,4 @@
+description = "Your UI architect partner. Use this to scaffold new React/Ink components or audit your existing UI against the v1.0 Design Principles."
+prompt = """
+Activate the `ux-designer` skill and help the user scaffold new UI components or audit existing ones against the principles of Signal over Noise, Coherent State, and Intent Signaling.
+"""

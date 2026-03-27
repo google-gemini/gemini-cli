@@ -235,15 +235,8 @@ async function restartAction(
   );
 
   if (failures.length < extensionsToRestart.length) {
-    try {
-      await context.services.agentContext?.config.reloadSkills();
-      await context.services.agentContext?.config.getAgentRegistry()?.reload();
-    } catch (error) {
-      context.ui.addItem({
-        type: MessageType.ERROR,
-        text: `Failed to reload skills or agents: ${getErrorMessage(error)}`,
-      });
-    }
+    // Note: reloadSkills and agentRegistry.reload are handled by the ExtensionLoader
+    // during the restart process.
   }
 
   if (failures.length > 0) {

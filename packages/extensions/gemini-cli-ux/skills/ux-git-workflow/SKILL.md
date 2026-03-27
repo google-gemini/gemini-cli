@@ -1,6 +1,9 @@
 ---
-name: ux-git-workflow
-description: End-to-end PR lifecycle manager. Handles the "Base Folder Strategy" for worktrees, safe rebasing, Neutral Environment snapshots, preflight validation, and Jacob's Protocol for structured commits.
+name: ux-git-skill
+description:
+  End-to-end PR lifecycle manager. Handles the "Base Folder Strategy" for
+  worktrees, safe rebasing, Neutral Environment snapshots, preflight
+  validation, and Jacob's Protocol for structured commits.
 ---
 
 # UX Git Workflow
@@ -24,7 +27,7 @@ When the user asks to "start a new task" or "create a branch":
 1.  Identify the base directory (the parent of `main/`).
 2.  Use `git worktree add ../<branch-name> -b <branch-name>` from within `main/`.
 3.  **Mandatory Prep**: Run `npm install` inside the new worktree directory to ensure all dependencies are resolved.
-4.  Instruct the user to move into the new directory and reload their session.
+4.  **User Handoff & Education**: Instruct the user to move into the new directory, reload their session, and test their branch using the new fast build method: `npm run bundle; node bundle/gemini.js` (which replaces the slower `npm run build-and-start`).
 
 #### 2. Checking out a PR (Semantic Naming)
 When the user asks to "check out PR #123":
@@ -116,6 +119,7 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
      - Link the issue in the PR description (e.g., `Fixes #<number>`).
   4. If **NO** high-confidence match is found:
      - Create a new issue using `gh issue create` detailing the bug or feature.
+     - **UX Epic Link**: The new issue's description MUST include a reference to the main UX Epic: `Epic: https://github.com/google-gemini/maintainers-gemini-cli/issues/1607`.
      - Assign it to the user and link it in the PR description.
   5. **Project Board Requirement**: You MUST ensure the chosen or created issue is added to the UX engineering board.
      - Add it to the project: `gh project item-add 33 --owner google-gemini --url <issue-url>` (Targeting: https://github.com/orgs/google-gemini/projects/33/views/5).
@@ -129,7 +133,7 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
   - **Action**: Use `git rebase -i` or `git reset --soft` to organize commits into these tiers. Ensure refactors are ALWAYS isolated from logic.
 - **Push**: `git push origin HEAD --force-with-lease`.
 - **Draft PR**: If creating a new PR, you MUST create it as a draft by default (e.g., `gh pr create --draft`).
-- **Link**: You MUST provide the full, clickable GitHub PR link (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`) as the final output of this skill. This allows the user to immediately verify the update.
+- **MANDATORY FINAL OUTPUT**: You MUST provide the full, clickable **GitHub PR link** (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`) AND the **Issue URL** (e.g., `https://github.com/google-gemini/gemini-cli/issues/12345`) as the final output of this skill. This allows the user to immediately verify the update and track the associated task.
 
 #### 10. CI Verification & Remediation Loop (The Slog)
 - **Context**: Getting PRs ready for review is typically a "slog" due to CI checks failing in the GitHub environment even after passing local presubmit tests.

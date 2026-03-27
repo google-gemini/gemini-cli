@@ -1,0 +1,14 @@
+{
+  "name": "gemini-cli-ux",
+  "version": "1.0.0",
+  "description": "Specialized suite of UX development tools for the Gemini CLI team. A Lifecycle Command Center providing workflow management, UI design scaffolding, and copy review.",
+  "author": "AI DevTools UX Team",
+  "skills": ["skills/ux-git-workflow", "skills/ux-design", "skills/ux-writing"],
+  "commands": [
+    "commands/ux-new-feature.toml",
+    "commands/ux-pr.toml",
+    "commands/ux-design.toml",
+    "commands/ux-review.toml",
+    "commands/ux.toml"
+  ]
+}

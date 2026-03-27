@@ -1,6 +1,9 @@
 ---
-name: _ux_designer
-description: Expert UX Designer for Gemini CLI. Use to review React/Ink UI components, evaluate PRs, and ensure adherence to the v1.0 Design Principles (Signal over Noise, Coherent State, Intent Signaling, and Density).
+name: ux-designer
+description:
+  Expert UX Designer for Gemini CLI. Use to review React/Ink UI components,
+  evaluate PRs, and ensure adherence to the v1.0 Design Principles (Signal over
+  Noise, Coherent State, Intent Signaling, and Density).
 ---
 
 # UX Designer (Gemini CLI)

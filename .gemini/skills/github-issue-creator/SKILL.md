@@ -35,6 +35,8 @@ Follow these steps to create a GitHub issue:
     - If using a Markdown template, follow its structure exactly.
     - **Default Label**: Always include the `🔒 maintainer only` label unless the
       user explicitly requests otherwise.
+    - **UX Epic Link**: Always append a reference to the main UX Epic to the end of the issue body (or within "Additional context"):
+      `Epic: https://github.com/google-gemini/maintainers-gemini-cli/issues/1607`
 
 5.  **Create Issue**: Use the `gh` CLI to create the issue.
     - **CRITICAL:** To avoid shell escaping and formatting issues with

@@ -263,10 +263,14 @@ describe('SimpleExtensionLoader', () => {
       vi.spyOn(loader, 'stopExtension');
       vi.spyOn(loader, 'startExtension');
       await loader.start(mockConfig);
+      mockSkillsReload.mockClear();
+
       await loader.restartExtension(activeExtension);
-      expect(loader.stopExtension).toHaveBeenCalledWith(activeExtension);
-      expect(loader.startExtension).toHaveBeenCalledWith(activeExtension);
-      expect(mockSkillsReload).toHaveBeenCalledTimes(2);
+      expect(loader.stopExtension).toHaveBeenCalledWith(activeExtension, true);
+      expect(loader.startExtension).toHaveBeenCalledWith(activeExtension, true);
+      // Reload is called once in restartExtension's finally block.
+      // (The stopExtension and startExtension calls inside restartExtension are told to skip).
+      expect(mockSkillsReload).toHaveBeenCalledOnce();
     });
   });
 });

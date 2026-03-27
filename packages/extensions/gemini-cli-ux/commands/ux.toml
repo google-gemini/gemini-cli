@@ -1,0 +1,4 @@
+description = "Display the UX Extension help and onboarding guide."
+prompt = """
+Please read the `packages/extensions/gemini-cli-ux/WELCOME.md` file and present its contents to the user. This serves as the main help guide, explaining the workflow and available commands for the UX extension.
+"""

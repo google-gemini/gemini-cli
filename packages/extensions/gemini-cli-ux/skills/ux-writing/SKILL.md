@@ -1,10 +1,10 @@
 ---
-name: _ux_string-reviewer
-description: >
-  Use this skill when asked to review text and user-facing strings within the codebase. It ensures that these strings follow rules on clarity,
-  usefulness, brevity and style.
+name: ux-writer
+description:
+  Use this skill when asked to review text and user-facing strings within the
+  codebase. It ensures that these strings follow rules on clarity, usefulness,
+  brevity and style.
 ---
-
 # String Reviewer
 
 ## Instructions

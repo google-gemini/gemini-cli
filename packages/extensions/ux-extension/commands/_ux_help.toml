@@ -1,4 +1,0 @@
-description = "Show the UX Contribution Guide and workflow overview."
-prompt = """
-Read the guide at `packages/extensions/ux-extension/WELCOME.md` and output its contents to the user.
-"""
