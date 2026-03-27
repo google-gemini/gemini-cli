@@ -225,6 +225,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     setEmbeddedShellFocused,
     setShortcutsHelpVisible,
     toggleCleanUiDetailsVisible,
+    stashPrompt,
+    popStashedPrompt,
   } = useUIActions();
   const {
     terminalWidth,
@@ -372,6 +374,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
+
+      // Restore stashed prompt after submit
+      const stashed = popStashedPrompt();
+      if (stashed) {
+        buffer.setText(stashed, 'end');
+      }
     },
     [
       buffer,
@@ -380,6 +388,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      popStashedPrompt,
     ],
   );
 
@@ -1215,6 +1224,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      // Stash current input
+      if (keyMatchers[Command.STASH_INPUT](key)) {
+        if (buffer.text.length > 0) {
+          stashPrompt(buffer.text);
+          buffer.setText('');
+          resetCompletionState();
+        }
+        return true;
+      }
+
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1306,6 +1325,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shouldShowSuggestions,
       isShellSuggestionsVisible,
       forceShowShellSuggestions,
+      stashPrompt,
       keyMatchers,
       isHelpDismissKey,
       settings,

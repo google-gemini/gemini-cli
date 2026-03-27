@@ -22,6 +22,7 @@ import { Footer } from './Footer.js';
 import { StatusRow } from './StatusRow.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { StashedPromptDisplay } from './StashedPromptDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
@@ -92,9 +93,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         <ConfigInitDisplay message="Resuming session..." />
       )}
 
-      {showUiDetails && (
-        <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
-      )}
+      {showUiDetails &&
+        (uiState.stashedPrompt || uiState.messageQueue.length > 0) && (
+          <Box flexDirection="column" marginTop={1}>
+            <StashedPromptDisplay stashedPrompt={uiState.stashedPrompt} />
+            <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+          </Box>
+        )}
 
       {showUiDetails && <TodoTray />}
 

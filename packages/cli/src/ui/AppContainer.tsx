@@ -130,6 +130,7 @@ import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { usePromptStash } from './hooks/usePromptStash.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -252,6 +253,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
     QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
+
+  const { stashedPrompt, stashPrompt, popStashedPrompt } = usePromptStash();
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
@@ -2278,6 +2281,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
+      stashedPrompt,
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
@@ -2404,6 +2408,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeHooks,
       messageQueue,
       queueErrorMessage,
+      stashedPrompt,
       showApprovalModeIndicator,
       allowPlanMode,
       userTier,
@@ -2503,6 +2508,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleDeleteSession,
       setQueueErrorMessage,
       popAllMessages,
+      stashPrompt,
+      popStashedPrompt,
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
@@ -2594,6 +2601,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleDeleteSession,
       setQueueErrorMessage,
       popAllMessages,
+      stashPrompt,
+      popStashedPrompt,
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,

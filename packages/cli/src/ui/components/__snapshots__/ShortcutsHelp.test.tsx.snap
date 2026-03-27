@@ -13,6 +13,7 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'linux' 1`] = `
  Alt+M raw markdown mode
  Ctrl+R reverse-search history
  Ctrl+X open external editor
+ Alt+S stash prompt
 "
 `;
 
@@ -29,6 +30,7 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
  Option+M raw markdown mode
  Ctrl+R reverse-search history
  Ctrl+X open external editor
+ Option+S stash prompt
 "
 `;
 
@@ -37,8 +39,8 @@ exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'linux' 1`] = `
  Shortcuts See /help for more
  ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
  @ select file or folder         Ctrl+Y YOLO mode                Alt+M raw markdown mode
- Double Esc clear & rewind       Ctrl+R reverse-search history   Ctrl+X open external editor
- Tab focus UI
+ Double Esc clear & rewind       Ctrl+R reverse-search history   Alt+S stash prompt
+ Tab focus UI                    Ctrl+X open external editor
 "
 `;
 
@@ -47,7 +49,7 @@ exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'mac' 1`] = `
  Shortcuts See /help for more
  ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
  @ select file or folder         Ctrl+Y YOLO mode                Option+M raw markdown mode
- Double Esc clear & rewind       Ctrl+R reverse-search history   Ctrl+X open external editor
- Tab focus UI
+ Double Esc clear & rewind       Ctrl+R reverse-search history   Option+S stash prompt
+ Tab focus UI                    Ctrl+X open external editor
 "
 `;

@@ -77,6 +77,7 @@ export enum Command {
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
+  STASH_INPUT = 'input.stash',
 
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
@@ -374,6 +375,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
     ],
   ],
 
+  [Command.STASH_INPUT, [new KeyBinding('alt+s')]],
+
   // App Controls
   [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
   [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
@@ -491,6 +494,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
+      Command.STASH_INPUT,
     ],
   },
   {
@@ -597,6 +601,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
+  [Command.STASH_INPUT]:
+    'Stash the current input to temporarily set it aside. Restores on next submit.',
 
   // App Controls
   [Command.SHOW_ERROR_DETAILS]: 'Toggle detailed error information.',

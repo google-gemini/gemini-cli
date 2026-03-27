@@ -172,6 +172,7 @@ export interface UIState {
   activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
+  stashedPrompt: string | null;
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
   // Quota-related state

@@ -569,6 +569,8 @@ const mockUIActions: UIActions = {
   handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
+  stashPrompt: vi.fn(),
+  popStashedPrompt: vi.fn(),
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),

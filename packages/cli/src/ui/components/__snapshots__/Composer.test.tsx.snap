@@ -43,3 +43,18 @@ InputPrompt:   Type your message or @path/to/file
 Footer
 "
 `;
+
+exports[`Composer > Snapshots > matches snapshot with stashed prompt and queued messages 1`] = `
+"
+  Stashed (restores after submit)
+  Queued (press ↑ to edit):
+    First queued message
+    Second queued message
+
+                                                                                    ? for shortcuts
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ApprovalModeIndicator: default                                                        StatusDisplay
+InputPrompt:   Type your message or @path/to/file
+Footer
+"
+`;

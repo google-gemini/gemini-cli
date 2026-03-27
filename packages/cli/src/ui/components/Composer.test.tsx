@@ -136,11 +136,16 @@ vi.mock('./QueuedMessageDisplay.js', () => ({
       return null;
     }
     return (
-      <>
+      <Box flexDirection="column">
+        <Box paddingLeft={2}>
+          <Text>Queued (press ↑ to edit):</Text>
+        </Box>
         {messageQueue.map((message, index) => (
-          <Text key={index}>{message}</Text>
+          <Box key={index} paddingLeft={4}>
+            <Text>{message}</Text>
+          </Box>
         ))}
-      </>
+      </Box>
     );
   },
 }));
@@ -158,6 +163,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     messageQueue: [],
+    stashedPrompt: null,
     showErrorDetails: false,
     constrainHeight: false,
     isInputActive: true,
@@ -1090,6 +1096,15 @@ describe('Composer', () => {
         cleanUiDetailsVisible: false,
         streamingState: StreamingState.Responding,
         elapsedTime: 1000,
+      });
+      const { lastFrame } = await renderComposer(uiState);
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    it('matches snapshot with stashed prompt and queued messages', async () => {
+      const uiState = createMockUIState({
+        stashedPrompt: 'This is a stashed prompt',
+        messageQueue: ['First queued message', 'Second queued message'],
       });
       const { lastFrame } = await renderComposer(uiState);
       expect(lastFrame()).toMatchSnapshot();
