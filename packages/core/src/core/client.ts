@@ -44,6 +44,7 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { AgentHistoryProvider } from '../services/agentHistoryProvider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -98,6 +99,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
+  private readonly agentHistoryProvider: AgentHistoryProvider;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
@@ -113,6 +115,12 @@ export class GeminiClient {
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
+    this.agentHistoryProvider = new AgentHistoryProvider(this.config, {
+      truncationThreshold:
+        this.config.getExperimentalAgentHistoryTruncationThreshold(),
+      retainedMessages:
+        this.config.getExperimentalAgentHistoryRetainedMessages(),
+    });
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
@@ -613,10 +621,20 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false, signal);
+    if (this.config.isExperimentalAgentHistoryTruncationEnabled()) {
+      const newHistory = await this.agentHistoryProvider.manageHistory(
+        this.getHistory(),
+        signal,
+      );
+      if (newHistory.length !== this.getHistory().length) {
+        this.getChat().setHistory(newHistory);
+      }
+    } else {
+      const compressed = await this.tryCompressChat(prompt_id, false, signal);
 
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
+      if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+        yield { type: GeminiEventType.ChatCompressed, value: compressed };
+      }
     }
 
     const remainingTokenCount =

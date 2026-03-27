@@ -681,7 +681,14 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   experimentalMemoryManager?: boolean;
+<<<<<<< HEAD
   useAgentProtocol?: boolean;
+=======
+  experimentalAgentHistoryTruncation?: boolean;
+  experimentalAgentHistoryTruncationThreshold?: number;
+  experimentalAgentHistoryRetainedMessages?: number;
+  experimentalAgentHistorySummarization?: boolean;
+>>>>>>> 320c8aba4 (feat(core): Land `AgentHistoryProvider`. (#23978))
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -910,7 +917,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+<<<<<<< HEAD
   private readonly useAgentProtocol: boolean;
+=======
+  private readonly experimentalAgentHistoryTruncation: boolean;
+  private readonly experimentalAgentHistoryTruncationThreshold: number;
+  private readonly experimentalAgentHistoryRetainedMessages: number;
+  private readonly experimentalAgentHistorySummarization: boolean;
+>>>>>>> 320c8aba4 (feat(core): Land `AgentHistoryProvider`. (#23978))
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -1120,7 +1134,18 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+<<<<<<< HEAD
     this.useAgentProtocol = params.useAgentProtocol ?? false;
+=======
+    this.experimentalAgentHistoryTruncation =
+      params.experimentalAgentHistoryTruncation ?? false;
+    this.experimentalAgentHistoryTruncationThreshold =
+      params.experimentalAgentHistoryTruncationThreshold ?? 30;
+    this.experimentalAgentHistoryRetainedMessages =
+      params.experimentalAgentHistoryRetainedMessages ?? 15;
+    this.experimentalAgentHistorySummarization =
+      params.experimentalAgentHistorySummarization ?? false;
+>>>>>>> 320c8aba4 (feat(core): Land `AgentHistoryProvider`. (#23978))
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2306,6 +2331,22 @@ export class Config implements McpContext, AgentLoopContext {
       this.useAgentProtocol ||
       process.env['GEMINI_CLI_USE_AGENT_PROTOCOL'] === 'true'
     );
+  }
+
+  isExperimentalAgentHistoryTruncationEnabled(): boolean {
+    return this.experimentalAgentHistoryTruncation;
+  }
+
+  getExperimentalAgentHistoryTruncationThreshold(): number {
+    return this.experimentalAgentHistoryTruncationThreshold;
+  }
+
+  getExperimentalAgentHistoryRetainedMessages(): number {
+    return this.experimentalAgentHistoryRetainedMessages;
+  }
+
+  isExperimentalAgentHistorySummarizationEnabled(): boolean {
+    return this.experimentalAgentHistorySummarization;
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
