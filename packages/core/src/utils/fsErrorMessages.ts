@@ -15,12 +15,12 @@ const errorMessageGenerators: Record<string, (path?: string) => string> = {
     (path
       ? `Permission denied: cannot access '${path}'. `
       : 'Permission denied. ') +
-    'Check file permissions or run with elevated privileges.\nSuggestions: Verify file ownership and system-level access rights.',
+    'Check file permissions or run with elevated privileges.\nSuggestions: Verify file ownership, check for sufficient read/write permissions, or try running with elevated privileges (e.g., sudo).',
   ENOENT: (path) =>
     (path
       ? `File or directory not found: '${path}'. `
       : 'File or directory not found. ') +
-    'Check if the path exists and is spelled correctly.\nSuggestions: Verify the file path and ensure all environment variables are correctly resolved.',
+    'Check if the path exists and is spelled correctly.\nSuggestions: Double-check the path for typos, ensure the file or directory exists in the specified location, and verify that any environment variables are correctly resolved.',
   ENOSPC: () =>
     'No space left on device. Free up some disk space and try again.',
   EISDIR: (path) =>
