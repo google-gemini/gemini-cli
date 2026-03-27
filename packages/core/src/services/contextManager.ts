@@ -51,9 +51,10 @@ export class ContextManager {
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
       this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths([
-            ...this.config.getWorkspaceContext().getDirectories(),
-          ])
+        ? getEnvironmentMemoryPaths(
+            [...this.config.getWorkspaceContext().getDirectories()],
+            this.config.getMemoryBoundaryMarkers(),
+          )
         : Promise.resolve([]),
     ]);
 
@@ -133,6 +134,7 @@ export class ContextManager {
       trustedRoots,
       this.loadedPaths,
       this.loadedFileIdentities,
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     if (result.files.length === 0) {
