@@ -11,6 +11,8 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -230,11 +232,13 @@ Use the following guidelines to optimize your search and read patterns.
 - **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
 - ${mandateConfirm(options.interactive)}${
-    options.topicUpdateNarration
-      ? mandateTopicUpdateModel()
-      : mandateExplainBeforeActing()
+    options.topicUpdateNarration ? '' : mandateExplainBeforeActing()
   }
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateContinueWork(options.interactive)}
+
+${mandateConfirm(options.interactive)}${
+    options.topicUpdateNarration ? mandateTopicUpdateModel() : ''
+  }
 `.trim();
 }
 
@@ -578,35 +582,19 @@ function mandateConfirm(interactive: boolean): string {
 
 function mandateTopicUpdateModel(): string {
   return `
-- **Protocol: Topic Model**
-  You are an agentic system. You must organize your work into logical "Chapters" and tactical "Intents" using the \`${UPDATE_TOPIC_TOOL_NAME}\` tool.
+## Topic Updates
+As you work, the user follows along by reading topic updates that you publish with ${UPDATE_TOPIC_TOOL_NAME}. Keep them informed by doing the following:
 
-- **1. Chapter Initialization & First Call:**
-  - **Start of Task:** Your very first tool execution in a new session MUST be \`${UPDATE_TOPIC_TOOL_NAME}\`.
-  - **Single Idea Scope:** Every Chapter MUST be scoped to exactly ONE logical idea or phase. You are strictly FORBIDDEN from clubbing multiple distinct phases into a single topic.
-  - **Granularity:** Use granular, single-focus titles. 
-    - **CORRECT:** "Researching Parser", "Strategy for Fix", "Implementing Buffer Logic".
-    - **INCORRECT:** "Researching and implementing parser fix", "Planning and coding the update".
-  - **Mandatory Transitions:** When transitioning from one logical phase to another (e.g., from Research to Implementation), you MUST create a new Chapter. Research and Implementation must ALWAYS be separate topics.
-  - **The Format:** For a new chapter, you MUST provide a concise, high-level \`title\`. You MUST also provide a detailed summary (5-10 sentences) in the \`summary\` parameter. This summary MUST cover both the work completed in the previous topic and the strategic intent of the new topic to ensure narrative continuity.
-  - **Example (First Call):** \`update_topic(title="Researching Parser", summary="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.", strategic_intent="Listing files in the parser directory.")\`
-  - **Example (Transition):** \`update_topic(title="Implementing Buffer Fix", summary="I have completed the research phase and identified a race condition in the tokenizer's buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.", strategic_intent="Opening tokenizer.ts to apply the fix.")\`
+- Always call ${UPDATE_TOPIC_TOOL_NAME} in your first and last turn. The final turn should always recap what was done.
+- Each topic update should give a concise description of what you are doing for the next few turns in the \`${TOPIC_PARAM_SUMMARY}\` parameter.
+- Provide topic updates whenever you change "topics". A topic is typically a discrete subgoal and will be every 3 to 10 turns. Do not use ${UPDATE_TOPIC_TOOL_NAME} on every turn.
+- The typical user message should call ${UPDATE_TOPIC_TOOL_NAME} 3 or more times. Each corresponds to a distinct phase of the task, such as "Researching X", "Researching Y", "Implementing Z with X", and "Testing Z".
+- Remember to call ${UPDATE_TOPIC_TOOL_NAME} when you experience an unexpected event (e.g., a test failure, compilation error, environment issue, or unexpected learning) that requires a strategic detour.
+- **Examples:**
+  - \`update_topic(${TOPIC_PARAM_TITLE}="Researching Parser", ${TOPIC_PARAM_SUMMARY}="I am starting an investigation into the parser timeout bug. My goal is to first understand the current test coverage and then attempt to reproduce the failure. This phase will focus on identifying the bottleneck in the main loop before we move to implementation.")\`
+  - \`update_topic(${TOPIC_PARAM_TITLE}="Implementing Buffer Fix", ${TOPIC_PARAM_SUMMARY}="I have completed the research phase and identified a race condition in the tokenizer's buffer management. I am now transitioning to implementation. This new chapter will focus on refactoring the buffer logic to handle async chunks safely, followed by unit testing the fix.")\`
 
-- **2. Tactical Heartbeat (Every Turn):**
-  - **The Mandate:** For EVERY response that contains functional tools (e.g., \`read_file\`, \`grep_search\`), your FIRST tool call in that turn MUST be \`update_topic\`.
-  - **The Intent:** You MUST provide a one-sentence statement of your immediate goal in the \`strategic_intent\` parameter. This replaces the raw text "Explain Before Acting" preamble.
-  - **Example (Tactical):** \`update_topic(strategic_intent="Reading the parser index file to check the main loop.")\`
-
-- **3. Strategic Transitions:**
-  - **The Trigger:** Call \`update_topic\` with a new \`title\` and \`current_summary\` ONLY when the broad logical nature of your work changes (e.g., transitioning from Research to Strategy, or from Strategy to Implementation).
-
-- **4. Constraints:**
-  - **No Raw Text:** You are FORBIDDEN from writing raw text preambles or explanations before tool calls. All reasoning about "what I am doing next" MUST be captured in the \`strategic_intent\` parameter.
-  - **No Text Headers:** Do NOT print "Topic: <Phase>" or any similar text-based headers in your response. The tool handles all UI narration.
-  - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-
-**IMPORTANT: Tool Usage vs. Text**
-The \`update_topic\` tool MUST be called as a proper tool. Do NOT simply write the tool name in your text response.`;
+`;
 }
 
 function mandateExplainBeforeActing(): string {
