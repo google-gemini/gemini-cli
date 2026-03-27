@@ -37,10 +37,8 @@ const authCommand: SlashCommand = {
   description: 'Authenticate with an OAuth-enabled MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (
-    context: CommandContext,
-    args: string,
-  ): Promise<MessageActionReturn> => {
+  action: async (context: CommandContext): Promise<MessageActionReturn> => {
+    const args = context.invocation?.args || '';
     const serverName = args.trim();
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
@@ -371,15 +369,15 @@ const reloadCommand: SlashCommand = {
     // Reload the slash commands to reflect the changes.
     context.ui.reloadCommands();
 
-    return listCommand.action!(context, '');
+    return listCommand.action!(context);
   },
 };
 
 async function handleEnableDisable(
   context: CommandContext,
-  args: string,
   enable: boolean,
 ): Promise<MessageActionReturn> {
+  const args = context.invocation?.args || '';
   const agentContext = context.services.agentContext;
   const config = agentContext?.config;
   if (!config) {
@@ -503,7 +501,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable a disabled MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (ctx, args) => handleEnableDisable(ctx, args, true),
+  action: (ctx) => handleEnableDisable(ctx, true),
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, false),
 };
 
@@ -512,7 +510,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable an MCP server',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (ctx, args) => handleEnableDisable(ctx, args, false),
+  action: (ctx) => handleEnableDisable(ctx, false),
   completion: (ctx, arg) => getEnablementCompletion(ctx, arg, true),
 };
 

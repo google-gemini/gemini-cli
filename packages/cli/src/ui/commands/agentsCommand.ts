@@ -59,7 +59,6 @@ const agentsListCommand: SlashCommand = {
 
 async function enableAction(
   context: CommandContext,
-  args: string,
 ): Promise<SlashCommandActionReturn | void> {
   const config = context.services.agentContext?.config;
   const { settings } = context.services;
@@ -71,7 +70,7 @@ async function enableAction(
     };
   }
 
-  const agentName = args.trim();
+  const agentName = context.invocation?.args.trim() || '';
   if (!agentName) {
     return {
       type: 'message',
@@ -136,7 +135,6 @@ async function enableAction(
 
 async function disableAction(
   context: CommandContext,
-  args: string,
 ): Promise<SlashCommandActionReturn | void> {
   const config = context.services.agentContext?.config;
   const { settings } = context.services;
@@ -148,7 +146,7 @@ async function disableAction(
     };
   }
 
-  const agentName = args.trim();
+  const agentName = context.invocation?.args.trim() || '';
   if (!agentName) {
     return {
       type: 'message',
@@ -216,7 +214,6 @@ async function disableAction(
 
 async function configAction(
   context: CommandContext,
-  args: string,
 ): Promise<SlashCommandActionReturn | void> {
   const config = context.services.agentContext?.config;
   if (!config) {
@@ -227,7 +224,7 @@ async function configAction(
     };
   }
 
-  const agentName = args.trim();
+  const agentName = context.invocation?.args.trim() || '';
   if (!agentName) {
     return {
       type: 'message',
@@ -367,7 +364,7 @@ export const agentsCommand: SlashCommand = {
     disableCommand,
     configCommand,
   ],
-  action: async (context: CommandContext, args) =>
+  action: async (context: CommandContext) =>
     // Default to list if no subcommand is provided
-    agentsListCommand.action!(context, args),
+    agentsListCommand.action!(context),
 };

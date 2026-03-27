@@ -16,7 +16,7 @@ export const settingsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   isSafeConcurrent: true,
-  action: (_context, _args): OpenDialogActionReturn => ({
+  action: (_context): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'settings',
   }),

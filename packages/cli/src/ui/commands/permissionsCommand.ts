@@ -8,8 +8,7 @@ import type {
   OpenDialogActionReturn,
   SlashCommand,
   SlashCommandActionReturn,
-} from './types.js';
-import { CommandKind } from './types.js';
+ CommandKind, type CommandContext } from './types.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -27,8 +26,8 @@ export const permissionsCommand: SlashCommand = {
         'Manage folder trust settings. Usage: /permissions trust [<directory-path>]',
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
-      action: (context, input): SlashCommandActionReturn => {
-        const dirPath = input.trim();
+      action: (context: CommandContext): SlashCommandActionReturn => {
+        const dirPath = context.invocation!.args.trim();
         let targetDirectory: string;
 
         if (!dirPath) {
@@ -64,8 +63,8 @@ export const permissionsCommand: SlashCommand = {
       },
     },
   ],
-  action: (context, input): SlashCommandActionReturn => {
-    const parts = input.trim().split(' ');
+  action: (context: CommandContext): SlashCommandActionReturn => {
+    const parts = context.invocation!.args.trim().split(' ');
     const subcommand = parts[0];
 
     if (!subcommand) {

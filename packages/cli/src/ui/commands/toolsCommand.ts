@@ -67,8 +67,9 @@ export const toolsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [listSubCommand, descSubCommand],
-  action: async (context: CommandContext, args?: string): Promise<void> => {
-    const subCommand = args?.trim();
+  action: async (context: CommandContext): Promise<void> => {
+    const args = context.invocation?.args || '';
+    const subCommand = args.trim();
 
     // Keep backward compatibility for typed arguments while exposing subcommands in TUI.
     const useShowDescriptions =

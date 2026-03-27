@@ -141,11 +141,12 @@ export const directoryCommand: SlashCommand = {
 
         return filteredSuggestions.map((s) => leadingWhitespace + s);
       },
-      action: async (context: CommandContext, args: string) => {
+      action: async (context: CommandContext) => {
         const {
           ui: { addItem },
           services: { agentContext, settings },
         } = context;
+        const args = context.invocation?.args || '';
         const [...rest] = args.split(' ');
 
         if (!agentContext) {

@@ -93,8 +93,8 @@ const saveCommand: SlashCommand = {
     'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const tag = args.trim();
+  action: async (context): Promise<SlashCommandActionReturn | void> => {
+    const tag = context.invocation?.args.trim() || '';
     if (!tag) {
       return {
         type: 'message',
@@ -163,8 +163,8 @@ const resumeCheckpointCommand: SlashCommand = {
     'Resume a conversation from a checkpoint. Usage: /resume resume <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (context, args) => {
-    const tag = args.trim();
+  action: async (context) => {
+    const tag = context.invocation?.args.trim() || '';
     if (!tag) {
       return {
         type: 'message',
@@ -242,8 +242,8 @@ const deleteCommand: SlashCommand = {
   description: 'Delete a conversation checkpoint. Usage: /resume delete <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (context, args): Promise<MessageActionReturn> => {
-    const tag = args.trim();
+  action: async (context): Promise<MessageActionReturn> => {
+    const tag = context.invocation?.args.trim() || '';
     if (!tag) {
       return {
         type: 'message',
@@ -284,8 +284,8 @@ const shareCommand: SlashCommand = {
     'Share the current conversation to a markdown or json file. Usage: /resume share <file>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  action: async (context, args): Promise<MessageActionReturn> => {
-    let filePathArg = args.trim();
+  action: async (context): Promise<MessageActionReturn> => {
+    let filePathArg = context.invocation?.args.trim() || '';
     if (!filePathArg) {
       filePathArg = `gemini-conversation-${Date.now()}.json`;
     }
@@ -411,9 +411,8 @@ export const chatCommand: SlashCommand = {
   description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async () => ({
-    type: 'dialog',
-    dialog: 'sessionBrowser',
-  }),
+  action: async (context: CommandContext) =>
+    // Default to list if no subcommand is provided
+    chatCommand.subCommands?.find((sc) => sc.name === 'list')?.action!(context),
   subCommands: chatResumeSubCommands,
 };

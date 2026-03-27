@@ -22,7 +22,6 @@ import {
  */
 async function listAction(
   _context: CommandContext,
-  _args: string,
 ): Promise<void | SlashCommandActionReturn> {
   return {
     type: 'message',

@@ -54,7 +54,6 @@ function panelAction(
  */
 async function enableAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | MessageActionReturn> {
   const agentContext = context.services.agentContext;
   const config = agentContext?.config;
@@ -75,7 +74,7 @@ async function enableAction(
     };
   }
 
-  const hookName = args.trim();
+  const hookName = context.invocation!.args.trim();
   if (!hookName) {
     return {
       type: 'message',
@@ -108,7 +107,6 @@ async function enableAction(
  */
 async function disableAction(
   context: CommandContext,
-  args: string,
 ): Promise<void | MessageActionReturn> {
   const agentContext = context.services.agentContext;
   const config = agentContext?.config;
@@ -129,7 +127,7 @@ async function disableAction(
     };
   }
 
-  const hookName = args.trim();
+  const hookName = context.invocation!.args.trim();
   if (!hookName) {
     return {
       type: 'message',
@@ -407,5 +405,5 @@ export const hooksCommand: SlashCommand = {
     enableAllCommand,
     disableAllCommand,
   ],
-  action: (context: CommandContext) => panelCommand.action!(context, ''),
+  action: (context: CommandContext) => panelCommand.action!(context),
 };

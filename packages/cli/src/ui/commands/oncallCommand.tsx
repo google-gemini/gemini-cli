@@ -23,7 +23,8 @@ export const oncallCommand: SlashCommand = {
       description: 'Triage issues labeled as status/possible-duplicate',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
-      action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
+      action: async (context): Promise<OpenCustomDialogActionReturn> => {
+        const args = context.invocation?.args || '';
         const agentContext = context.services.agentContext;
         const config = agentContext?.config;
         if (!config) {
@@ -56,7 +57,8 @@ export const oncallCommand: SlashCommand = {
       description: 'Triage issues labeled as status/need-triage',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
-      action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
+      action: async (context): Promise<OpenCustomDialogActionReturn> => {
+        const args = context.invocation?.args || '';
         const agentContext = context.services.agentContext;
         const config = agentContext?.config;
         if (!config) {
