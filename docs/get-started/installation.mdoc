@@ -23,34 +23,33 @@ installation methods, and release types.
 We recommend most users install Gemini CLI using one of the following
 installation methods:
 
-- npm
-- Homebrew
-- MacPorts
-- Anaconda
-
-Note that Gemini CLI comes pre-installed on
-[**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
-[**Cloud Workstations**](https://cloud.google.com/workstations).
-
-### Install globally with npm
+{% tabs %}
+{% tabitem label="npm" %}
+Install globally with npm:
 
 ```bash
 npm install -g @google/gemini-cli
 ```
+{% /tabitem %}
 
-### Install globally with Homebrew (macOS/Linux)
+{% tabitem label="Homebrew" %}
+Install globally with Homebrew (macOS/Linux):
 
 ```bash
 brew install gemini-cli
 ```
+{% /tabitem %}
 
-### Install globally with MacPorts (macOS)
+{% tabitem label="MacPorts" %}
+Install globally with MacPorts (macOS):
 
 ```bash
 sudo port install gemini-cli
 ```
+{% /tabitem %}
 
-### Install with Anaconda (for restricted environments)
+{% tabitem label="Anaconda" %}
+Install with Anaconda (for restricted environments):
 
 ```bash
 # Create and activate a new environment
@@ -60,6 +59,12 @@ conda activate gemini_env
 # Install Gemini CLI globally via npm (inside the environment)
 npm install -g @google/gemini-cli
 ```
+{% /tabitem %}
+{% /tabs %}
+
+Note that Gemini CLI comes pre-installed on
+[**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
+[**Cloud Workstations**](https://cloud.google.com/workstations).
 
 ## Run Gemini CLI
 
@@ -102,7 +107,7 @@ the default way that the CLI executes tools that might have side effects.
   to run the CLI.
   ```bash
   # Run the published sandbox image
-  docker run --rm -it us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1
+  docker run --rm -it us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:latest
   ```
 - **Using the `--sandbox` flag:** If you have Gemini CLI installed locally
   (using the standard installation described above), you can instruct it to run
