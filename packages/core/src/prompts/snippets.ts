@@ -242,9 +242,7 @@ Use the following guidelines to optimize your search and read patterns.
   }
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateContinueWork(options.interactive)}
 
-${mandateConfirm(options.interactive)}${
-    options.topicUpdateNarration ? mandateTopicUpdateModel() : ''
-  }
+${options.topicUpdateNarration ? mandateTopicUpdateModel() : ''}
 `.trim();
 }
 
