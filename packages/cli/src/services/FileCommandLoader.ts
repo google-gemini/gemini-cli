@@ -9,7 +9,13 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import { Storage, coreEvents, type Config } from '@google/gemini-cli-core';
+import {
+  Storage,
+  coreEvents,
+  resolveToRealPath,
+  normalizePath,
+  type Config,
+} from '@google/gemini-cli-core';
 import type { ICommandLoader } from './types.js';
 import type {
   CommandContext,
@@ -152,16 +158,20 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
+    const userCommandsDir = Storage.getUserCommandsDir();
     dirs.push({
-      path: Storage.getUserCommandsDir(),
+      path: userCommandsDir,
       kind: CommandKind.USER_FILE,
     });
 
-    // 2. Project commands
-    dirs.push({
-      path: storage.getProjectCommandsDir(),
-      kind: CommandKind.WORKSPACE_FILE,
-    });
+    // 2. Project commands (skip if same directory as user commands, e.g. when
+    //    cwd is the user's home directory, to avoid false conflict warnings)
+    if (!storage.isWorkspaceHomeDir()) {
+      dirs.push({
+        path: storage.getProjectCommandsDir(),
+        kind: CommandKind.WORKSPACE_FILE,
+      });
+    }
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
