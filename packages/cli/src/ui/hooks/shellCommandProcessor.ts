@@ -201,11 +201,14 @@ export const useShellCommandProcessor = (
     const pidToBackground =
       state.activeShellPtyId ?? activeBackgroundExecutionId;
     if (pidToBackground) {
+      // TRACK THE PID BEFORE TRIGGERING THE BACKGROUND ACTION
+      // This prevents the onBackground listener from double-registering.
+      m.backgroundedPids.add(pidToBackground);
+
       // Use ShellExecutionService for shell PTYs (handles log files, etc.),
       // fall back to ExecutionLifecycleService for non-shell executions
       // (e.g. remote agents, MCP tools, local agents).
       if (state.activeShellPtyId) {
-        m.backgroundedPids.add(pidToBackground);
         ShellExecutionService.background(pidToBackground);
       } else {
         ExecutionLifecycleService.background(pidToBackground);
@@ -249,6 +252,7 @@ export const useShellCommandProcessor = (
       initialOutput: string | AnsiOutput,
       completionBehavior?: CompletionBehavior,
     ) => {
+      m.backgroundedPids.add(pid);
       dispatch({
         type: 'REGISTER_SHELL',
         pid,
