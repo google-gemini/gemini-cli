@@ -7,6 +7,8 @@ exports[`<FooterConfigDialog /> > highlights the active item in the preview 1`] 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
+│    [✓] mode                                                                                      │
+│     Current session state: approval mode, shell mode, markdown mode                              │
 │    [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
 │    [✓] git-branch                                                                                │
@@ -50,7 +52,9 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
-│  > [✓] workspace                                                                                 │
+│  > [✓] mode                                                                                      │
+│     Current session state: approval mode, shell mode, markdown mode                              │
+│    [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
 │    [✓] git-branch                                                                                │
 │     Current git branch name (not shown when unavailable)                                         │
@@ -94,7 +98,9 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 2`] = 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
-│  > [✓] workspace                                                                                 │
+│  > [✓] mode                                                                                      │
+│     Current session state: approval mode, shell mode, markdown mode                              │
+│    [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
 │    [✓] git-branch                                                                                │
 │     Current git branch name (not shown when unavailable)                                         │
@@ -137,6 +143,8 @@ exports[`<FooterConfigDialog /> > updates the preview when Show footer labels is
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
+│    [✓] mode                                                                                      │
+│     Current session state: approval mode, shell mode, markdown mode                              │
 │    [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
 │    [✓] git-branch                                                                                │

@@ -5,6 +5,7 @@
  */
 
 import type { MergedSettings } from './settings.js';
+import { MODE_HEADER_DEFAULT } from '../ui/textConstants.js';
 
 export const ALL_ITEMS: ReadonlyArray<{
   id:
@@ -24,7 +25,7 @@ export const ALL_ITEMS: ReadonlyArray<{
 }> = [
   {
     id: 'mode',
-    header: 'mode (Shift+Tab)',
+    header: MODE_HEADER_DEFAULT,
     description:
       'Current session state: approval mode, shell mode, markdown mode',
   },

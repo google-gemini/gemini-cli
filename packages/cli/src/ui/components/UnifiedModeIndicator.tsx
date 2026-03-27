@@ -9,6 +9,12 @@ import { Box, Text } from 'ink';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 
+import {
+  MODE_HEADER_SHELL,
+  MODE_HEADER_YOLO,
+  MODE_HEADER_DEFAULT,
+} from '../textConstants.js';
+
 export interface UnifiedModeIndicatorProps {
   approvalMode: ApprovalMode;
   shellModeActive: boolean;
@@ -23,12 +29,12 @@ export function getModeHeaderLabel(
   shellModeActive: boolean,
 ): string {
   if (shellModeActive) {
-    return 'exit shell (!)';
+    return MODE_HEADER_SHELL;
   }
   if (approvalMode === ApprovalMode.YOLO) {
-    return 'toggle yolo (Ctrl+Y)';
+    return MODE_HEADER_YOLO;
   }
-  return 'mode (Shift+Tab)';
+  return MODE_HEADER_DEFAULT;
 }
 
 /**

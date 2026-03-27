@@ -10,31 +10,36 @@ import {
   UnifiedModeIndicator,
   getModeHeaderLabel,
 } from './UnifiedModeIndicator.js';
+import {
+  MODE_HEADER_SHELL,
+  MODE_HEADER_YOLO,
+  MODE_HEADER_DEFAULT,
+} from '../textConstants.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
 describe('UnifiedModeIndicator', () => {
   describe('getModeHeaderLabel', () => {
     it('returns shell exit label when shell is active', () => {
       expect(getModeHeaderLabel(ApprovalMode.DEFAULT, true)).toBe(
-        'exit shell (!)',
+        MODE_HEADER_SHELL,
       );
     });
 
     it('returns yolo toggle label when YOLO is active and shell is NOT active', () => {
       expect(getModeHeaderLabel(ApprovalMode.YOLO, false)).toBe(
-        'toggle yolo (Ctrl+Y)',
+        MODE_HEADER_YOLO,
       );
     });
 
     it('returns default mode label for other modes', () => {
       expect(getModeHeaderLabel(ApprovalMode.DEFAULT, false)).toBe(
-        'mode (Shift+Tab)',
+        MODE_HEADER_DEFAULT,
       );
       expect(getModeHeaderLabel(ApprovalMode.PLAN, false)).toBe(
-        'mode (Shift+Tab)',
+        MODE_HEADER_DEFAULT,
       );
       expect(getModeHeaderLabel(ApprovalMode.AUTO_EDIT, false)).toBe(
-        'mode (Shift+Tab)',
+        MODE_HEADER_DEFAULT,
       );
     });
   });
