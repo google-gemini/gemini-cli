@@ -4,9 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as path from 'node:path';
 import { getNormalizedRelativePath } from './ignorePathUtils.js';
+
+vi.mock('node:path', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:path')>();
+  return {
+    ...actual,
+    resolve: vi.fn(actual.resolve),
+    relative: vi.fn(actual.relative),
+  };
+});
 
 describe('ignorePathUtils', () => {
   const projectRoot = path.resolve('/work/project');
@@ -103,5 +112,18 @@ describe('ignorePathUtils', () => {
         false,
       ),
     ).toBe('file.ts');
+  });
+
+  it('should reject Windows cross-drive absolute paths', () => {
+    // Simulate Windows path resolution where cross-drive paths return an
+    // absolute path without "..".
+    vi.spyOn(path, 'resolve').mockImplementation(
+      (...args) => args[args.length - 1],
+    );
+    vi.spyOn(path, 'relative').mockReturnValue('D:\\outside');
+
+    expect(
+      getNormalizedRelativePath('C:\\project', 'D:\\outside', false),
+    ).toBeNull();
   });
 });

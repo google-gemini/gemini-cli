@@ -5,6 +5,7 @@
  */
 
 import * as path from 'node:path';
+import { isWithinRoot } from './fileUtils.js';
 
 /**
  * Normalizes a file path to be relative to the project root and formatted for the 'ignore' library.
@@ -21,12 +22,13 @@ export function getNormalizedRelativePath(
   }
 
   const absoluteFilePath = path.resolve(projectRoot, filePath);
-  const relativePath = path.relative(projectRoot, absoluteFilePath);
 
   // Ensure the path is within the project root
-  if (relativePath.startsWith(`..${path.sep}`) || relativePath === '..') {
+  if (!isWithinRoot(absoluteFilePath, projectRoot)) {
     return null;
   }
+
+  const relativePath = path.relative(projectRoot, absoluteFilePath);
 
   // Convert Windows backslashes to forward slashes for the 'ignore' library
   let normalized = relativePath.replace(/\\/g, '/');
