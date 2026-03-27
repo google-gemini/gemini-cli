@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AgentHistoryProvider > should handle summarizer failures gracefully 1`] = `
+{
+  "parts": [
+    {
+      "text": "[System Note: Prior conversation history was truncated. The most recent user message before truncation was:]
+
+Message 18",
+    },
+    {
+      "text": "Message 20",
+    },
+  ],
+  "role": "user",
+}
+`;

@@ -256,5 +256,9 @@
   "chat-compression-default": {
     "model": "gemini-3-pro-preview",
     "generateContentConfig": {}
+  },
+  "agent-history-provider-summarizer": {
+    "model": "gemini-3-flash-preview",
+    "generateContentConfig": {}
   }
 }
