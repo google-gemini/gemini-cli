@@ -6,15 +6,15 @@
 
 import type {
   Config,
-  ToolCallRequestInfo,
   ResumedSessionData,
   UserFeedbackPayload,
+  AgentEvent,
+  ContentPart,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
   convertSessionToClientHistory,
-  GeminiEventType,
   FatalInputError,
   promptIdContext,
   OutputFormat,
@@ -22,17 +22,17 @@ import {
   StreamJsonFormatter,
   JsonStreamEventType,
   uiTelemetryService,
-  debugLogger,
   coreEvents,
   CoreEvent,
   createWorkingStdio,
-  recordToolCallInteractions,
-  ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  LegacyAgentSession,
+  ToolErrorType,
+  geminiPartsToContentParts,
 } from '@google/gemini-cli-core';
 
-import type { Content, Part } from '@google/genai';
+import type { Part } from '@google/genai';
 import readline from 'node:readline';
 import stripAnsi from 'strip-ansi';
 
@@ -151,8 +151,6 @@ export async function runNonInteractive({
           }, 200);
 
           abortController.abort();
-          // Note: Don't exit here - let the abort flow through the system
-          // and trigger handleCancellationError() which will exit with proper code
         }
       };
 
@@ -183,6 +181,8 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let terminalProcessExitHandled = false;
+    let abortSession = () => {};
     try {
       consolePatcher.patch();
 
@@ -247,9 +247,6 @@ export async function runNonInteractive({
           config,
           settings,
         );
-        // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
         if (slashCommandResult) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
@@ -267,8 +264,6 @@ export async function runNonInteractive({
           escapePastedAtSymbols: false,
         });
         if (error || !processedQuery) {
-          // An error occurred during @include processing (e.g., file not found).
-          // The error message is already logged by handleAtCommand.
           throw new FatalInputError(
             error || 'Exiting due to an error processing the @ command.',
           );
@@ -287,235 +282,281 @@ export async function runNonInteractive({
         });
       }
 
-      let currentMessages: Content[] = [{ role: 'user', parts: query }];
+      // Create LegacyAgentSession — owns the agentic loop
+      const session = new LegacyAgentSession({
+        client: geminiClient,
+        scheduler,
+        config,
+        promptId: prompt_id,
+      });
 
-      let turnCount = 0;
-      while (true) {
-        turnCount++;
-        if (
-          config.getMaxSessionTurns() >= 0 &&
-          turnCount > config.getMaxSessionTurns()
-        ) {
-          handleMaxTurnsExceededError(config);
-        }
-        const toolCallRequests: ToolCallRequestInfo[] = [];
+      // Wire Ctrl+C to session abort
+      abortSession = () => {
+        void session.abort();
+      };
+      abortController.signal.addEventListener('abort', abortSession);
+      if (abortController.signal.aborted) {
+        return handleCancellationError(config);
+      }
 
-        const responseStream = geminiClient.sendMessageStream(
-          currentMessages[0]?.parts || [],
-          abortController.signal,
-          prompt_id,
-          undefined,
-          false,
-          turnCount === 1 ? input : undefined,
+      // Start the agentic loop (runs in background)
+      const { streamId } = await session.send({
+        message: {
+          content: geminiPartsToContentParts(query),
+          displayContent: input,
+        },
+      });
+      if (streamId === null) {
+        throw new Error(
+          'LegacyAgentSession.send() unexpectedly returned no stream for a message send.',
         );
+      }
 
-        let responseText = '';
-        for await (const event of responseStream) {
-          if (abortController.signal.aborted) {
-            handleCancellationError(config);
-          }
+      const getTextContent = (parts?: ContentPart[]): string | undefined => {
+        const text = parts
+          ?.map((part) => (part.type === 'text' ? part.text : ''))
+          .join('');
+        return text ? text : undefined;
+      };
 
-          if (event.type === GeminiEventType.Content) {
-            const isRaw =
-              config.getRawOutput() || config.getAcceptRawOutputRisk();
-            const output = isRaw ? event.value : stripAnsi(event.value);
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.MESSAGE,
-                timestamp: new Date().toISOString(),
-                role: 'assistant',
-                content: output,
-                delta: true,
-              });
-            } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              responseText += output;
-            } else {
-              if (event.value) {
-                textOutput.write(output);
+      const emitFinalSuccessResult = (): void => {
+        if (streamFormatter) {
+          const metrics = uiTelemetryService.getMetrics();
+          const durationMs = Date.now() - startTime;
+          streamFormatter.emitEvent({
+            type: JsonStreamEventType.RESULT,
+            timestamp: new Date().toISOString(),
+            status: 'success',
+            stats: streamFormatter.convertToStreamStats(metrics, durationMs),
+          });
+        } else if (config.getOutputFormat() === OutputFormat.JSON) {
+          const formatter = new JsonFormatter();
+          const stats = uiTelemetryService.getMetrics();
+          textOutput.write(
+            formatter.format(config.getSessionId(), responseText, stats),
+          );
+        } else {
+          textOutput.ensureTrailingNewline();
+        }
+      };
+
+      const reconstructFatalError = (event: AgentEvent<'error'>): Error => {
+        const errToThrow = new Error(event.message);
+        const errorMeta = event._meta;
+        if (errorMeta?.['exitCode'] !== undefined) {
+          Object.defineProperty(errToThrow, 'exitCode', {
+            value: errorMeta['exitCode'],
+            enumerable: true,
+          });
+        }
+        if (errorMeta?.['errorName'] !== undefined) {
+          Object.defineProperty(errToThrow, 'name', {
+            value: errorMeta['errorName'],
+            enumerable: true,
+          });
+        }
+        if (errorMeta?.['code'] !== undefined) {
+          Object.defineProperty(errToThrow, 'code', {
+            value: errorMeta['code'],
+            enumerable: true,
+          });
+        }
+        if (errorMeta?.['status'] !== undefined) {
+          Object.defineProperty(errToThrow, 'status', {
+            value: errorMeta['status'],
+            enumerable: true,
+          });
+        }
+        return errToThrow;
+      };
+
+      const runTerminalExitHandler = (handler: () => never): never => {
+        terminalProcessExitHandled = true;
+        return handler();
+      };
+
+      // Consume AgentEvents for output formatting
+      let responseText = '';
+      let preToolResponseText: string | undefined;
+      let streamEnded = false;
+      for await (const event of session.stream({ streamId })) {
+        if (streamEnded) break;
+        switch (event.type) {
+          case 'message': {
+            if (event.role === 'agent') {
+              for (const part of event.content) {
+                if (part.type === 'text') {
+                  const isRaw =
+                    config.getRawOutput() || config.getAcceptRawOutputRisk();
+                  const output = isRaw ? part.text : stripAnsi(part.text);
+                  if (streamFormatter) {
+                    streamFormatter.emitEvent({
+                      type: JsonStreamEventType.MESSAGE,
+                      timestamp: new Date().toISOString(),
+                      role: 'assistant',
+                      content: output,
+                      delta: true,
+                    });
+                  } else if (config.getOutputFormat() === OutputFormat.JSON) {
+                    responseText += output;
+                  } else {
+                    if (part.text) {
+                      textOutput.write(output);
+                    }
+                  }
+                }
               }
             }
-          } else if (event.type === GeminiEventType.ToolCallRequest) {
+            break;
+          }
+          case 'tool_request': {
+            if (config.getOutputFormat() === OutputFormat.JSON) {
+              // Final JSON output should reflect the last assistant answer after
+              // any tool orchestration, not intermediate pre-tool text.
+              preToolResponseText = responseText || preToolResponseText;
+              responseText = '';
+            }
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_USE,
                 timestamp: new Date().toISOString(),
-                tool_name: event.value.name,
-                tool_id: event.value.callId,
-                parameters: event.value.args,
+                tool_name: event.name,
+                tool_id: event.requestId,
+                parameters: event.args,
               });
             }
-            toolCallRequests.push(event.value);
-          } else if (event.type === GeminiEventType.LoopDetected) {
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.ERROR,
-                timestamp: new Date().toISOString(),
-                severity: 'warning',
-                message: 'Loop detected, stopping execution',
-              });
-            }
-          } else if (event.type === GeminiEventType.MaxSessionTurns) {
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.ERROR,
-                timestamp: new Date().toISOString(),
-                severity: 'error',
-                message: 'Maximum session turns exceeded',
-              });
-            }
-          } else if (event.type === GeminiEventType.Error) {
-            throw event.value.error;
-          } else if (event.type === GeminiEventType.AgentExecutionStopped) {
-            const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`${stopMessage}\n`);
-            }
-            // Emit final result event for streaming JSON if needed
-            if (streamFormatter) {
-              const metrics = uiTelemetryService.getMetrics();
-              const durationMs = Date.now() - startTime;
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.RESULT,
-                timestamp: new Date().toISOString(),
-                status: 'success',
-                stats: streamFormatter.convertToStreamStats(
-                  metrics,
-                  durationMs,
-                ),
-              });
-            }
-            return;
-          } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
-            const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`[WARNING] ${blockMessage}\n`);
-            }
+            break;
           }
-        }
-
-        if (toolCallRequests.length > 0) {
-          textOutput.ensureTrailingNewline();
-          const completedToolCalls = await scheduler.schedule(
-            toolCallRequests,
-            abortController.signal,
-          );
-          const toolResponseParts: Part[] = [];
-
-          for (const completedToolCall of completedToolCalls) {
-            const toolResponse = completedToolCall.response;
-            const requestInfo = completedToolCall.request;
-
+          case 'tool_response': {
+            textOutput.ensureTrailingNewline();
             if (streamFormatter) {
+              const displayText = getTextContent(event.displayContent);
+              const errorMsg = getTextContent(event.content) ?? 'Tool error';
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_RESULT,
                 timestamp: new Date().toISOString(),
-                tool_id: requestInfo.callId,
-                status:
-                  completedToolCall.status === 'error' ? 'error' : 'success',
-                output:
-                  typeof toolResponse.resultDisplay === 'string'
-                    ? toolResponse.resultDisplay
-                    : undefined,
-                error: toolResponse.error
+                tool_id: event.requestId,
+                status: event.isError ? 'error' : 'success',
+                output: displayText,
+                error: event.isError
                   ? {
-                      type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                      message: toolResponse.error.message,
+                      type:
+                        typeof event.data?.['errorType'] === 'string'
+                          ? event.data['errorType']
+                          : 'TOOL_EXECUTION_ERROR',
+                      message: errorMsg,
                     }
                   : undefined,
               });
             }
+            if (event.isError) {
+              const displayText = getTextContent(event.displayContent);
+              const errorMsg = getTextContent(event.content) ?? 'Tool error';
 
-            if (toolResponse.error) {
+              if (event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION) {
+                if (
+                  config.getOutputFormat() === OutputFormat.JSON &&
+                  !responseText &&
+                  preToolResponseText
+                ) {
+                  responseText = preToolResponseText;
+                }
+                const stopMessage = `Agent execution stopped: ${errorMsg}`;
+                if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`${stopMessage}\n`);
+                }
+              }
+
+              if (event.data?.['errorType'] === ToolErrorType.NO_SPACE_LEFT) {
+                terminalProcessExitHandled = true;
+                handleToolError(
+                  event.name,
+                  new Error(errorMsg),
+                  config,
+                  typeof event.data?.['errorType'] === 'string'
+                    ? event.data['errorType']
+                    : undefined,
+                  displayText,
+                );
+                return;
+              }
               handleToolError(
-                requestInfo.name,
-                toolResponse.error,
+                event.name,
+                new Error(errorMsg),
                 config,
-                toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                typeof toolResponse.resultDisplay === 'string'
-                  ? toolResponse.resultDisplay
+                typeof event.data?.['errorType'] === 'string'
+                  ? event.data['errorType']
                   : undefined,
+                displayText,
               );
             }
-
-            if (toolResponse.responseParts) {
-              toolResponseParts.push(...toolResponse.responseParts);
+            break;
+          }
+          case 'error': {
+            if (event.fatal) {
+              throw reconstructFatalError(event);
             }
-          }
 
-          // Record tool calls with full metadata before sending responses to Gemini
-          try {
-            const currentModel =
-              geminiClient.getCurrentSequenceModel() ?? config.getModel();
-            geminiClient
-              .getChat()
-              .recordCompletedToolCalls(currentModel, completedToolCalls);
+            const errorCode = event._meta?.['code'];
 
-            await recordToolCallInteractions(config, completedToolCalls);
-          } catch (error) {
-            debugLogger.error(
-              `Error recording completed tool call information: ${error}`,
-            );
-          }
+            if (errorCode === 'AGENT_EXECUTION_BLOCKED') {
+              if (config.getOutputFormat() === OutputFormat.TEXT) {
+                process.stderr.write(`[WARNING] ${event.message}\n`);
+              }
+              break;
+            }
 
-          // Check if any tool requested to stop execution immediately
-          const stopExecutionTool = completedToolCalls.find(
-            (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
-          );
-
-          if (stopExecutionTool && stopExecutionTool.response.error) {
-            const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error.message}`;
-
+            const severity =
+              event.status === 'RESOURCE_EXHAUSTED' ? 'error' : 'warning';
             if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`${stopMessage}\n`);
+              process.stderr.write(`[WARNING] ${event.message}\n`);
             }
-
-            // Emit final result event for streaming JSON
             if (streamFormatter) {
-              const metrics = uiTelemetryService.getMetrics();
-              const durationMs = Date.now() - startTime;
               streamFormatter.emitEvent({
-                type: JsonStreamEventType.RESULT,
+                type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
-                status: 'success',
-                stats: streamFormatter.convertToStreamStats(
-                  metrics,
-                  durationMs,
-                ),
+                severity,
+                message: event.message,
               });
-            } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              const formatter = new JsonFormatter();
-              const stats = uiTelemetryService.getMetrics();
-              textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
-              );
-            } else {
-              textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
-            return;
+            break;
           }
+          case 'agent_end': {
+            if (event.reason === 'aborted') {
+              runTerminalExitHandler(() => handleCancellationError(config));
+            } else if (event.reason === 'max_turns') {
+              const isConfiguredTurnLimit =
+                typeof event.data?.['maxTurns'] === 'number' ||
+                typeof event.data?.['turnCount'] === 'number';
 
-          currentMessages = [{ role: 'user', parts: toolResponseParts }];
-        } else {
-          // Emit final result event for streaming JSON
-          if (streamFormatter) {
-            const metrics = uiTelemetryService.getMetrics();
-            const durationMs = Date.now() - startTime;
-            streamFormatter.emitEvent({
-              type: JsonStreamEventType.RESULT,
-              timestamp: new Date().toISOString(),
-              status: 'success',
-              stats: streamFormatter.convertToStreamStats(metrics, durationMs),
-            });
-          } else if (config.getOutputFormat() === OutputFormat.JSON) {
-            const formatter = new JsonFormatter();
-            const stats = uiTelemetryService.getMetrics();
-            textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
-            );
-          } else {
-            textOutput.ensureTrailingNewline(); // Ensure a final newline
+              if (isConfiguredTurnLimit) {
+                runTerminalExitHandler(() =>
+                  handleMaxTurnsExceededError(config),
+                );
+              } else if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: 'Maximum session turns exceeded',
+                });
+              }
+            }
+
+            const stopMessage =
+              typeof event.data?.['message'] === 'string'
+                ? event.data['message']
+                : '';
+            if (stopMessage && config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`Agent execution stopped: ${stopMessage}\n`);
+            }
+
+            emitFinalSuccessResult();
+            streamEnded = true;
+            break;
           }
-          return;
+          default:
+            break;
         }
       }
     } catch (error) {
@@ -523,12 +564,16 @@ export async function runNonInteractive({
     } finally {
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
+      abortController.signal.removeEventListener('abort', abortSession);
 
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
 
     if (errorToHandle) {
+      if (terminalProcessExitHandled) {
+        throw errorToHandle;
+      }
       handleError(errorToHandle, config);
     }
   });
