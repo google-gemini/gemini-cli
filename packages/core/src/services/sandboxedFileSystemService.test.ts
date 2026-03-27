@@ -30,10 +30,10 @@ vi.mock('node:child_process', () => ({
 class MockSandboxManager implements SandboxManager {
   prepareCommand = vi.fn(
     async (req: SandboxRequest): Promise<SandboxedCommand> => ({
-        program: 'sandbox.exe',
-        args: ['0', req.cwd, req.command, ...req.args],
-        env: req.env || {},
-      }),
+      program: 'sandbox.exe',
+      args: ['0', req.cwd, req.command, ...req.args],
+      env: req.env || {},
+    }),
   );
 
   isKnownSafeCommand(): boolean {
