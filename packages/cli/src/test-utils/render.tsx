@@ -521,6 +521,13 @@ const baseMockUiState = {
   },
   hintMode: false,
   hintBuffer: '',
+  btwState: {
+    isActive: false,
+    query: '',
+    response: '',
+    isStreaming: false,
+    error: null,
+  },
   bannerData: {
     defaultText: '',
     warningText: '',
@@ -587,6 +594,7 @@ const mockUIActions: UIActions = {
   dismissBackgroundTask: vi.fn(),
   setActiveBackgroundTaskPid: vi.fn(),
   setIsBackgroundTaskListOpen: vi.fn(),
+  dismissBtw: vi.fn(),
   setAuthContext: vi.fn(),
   onHintInput: vi.fn(),
   onHintBackspace: vi.fn(),

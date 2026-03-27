@@ -16,6 +16,7 @@ import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundTaskDisplay } from '../components/BackgroundTaskDisplay.js';
+import { BtwDisplay } from '../components/BtwDisplay.js';
 import { StreamingState } from '../types.js';
 
 export const DefaultAppLayout: React.FC = () => {
@@ -66,6 +67,15 @@ export const DefaultAppLayout: React.FC = () => {
           uiState.copyModeEnabled ? uiState.stableControlsHeight : undefined
         }
       >
+        {uiState.btwState.isActive && (
+          <BtwDisplay
+            query={uiState.btwState.query}
+            response={uiState.btwState.response}
+            isStreaming={uiState.btwState.isStreaming}
+            error={uiState.btwState.error}
+            terminalWidth={uiState.terminalWidth}
+          />
+        )}
         <Notifications />
         <CopyModeWarning />
 
