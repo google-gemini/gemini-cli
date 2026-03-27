@@ -60,7 +60,14 @@ describe('WindowsSandboxManager', () => {
     const result = await manager.prepareCommand(req);
 
     expect(result.program).toContain('GeminiSandbox.exe');
-    expect(result.args).toEqual(['0', testCwd, 'whoami', '/groups']);
+    expect(result.args).toEqual([
+      '0',
+      testCwd,
+      '--forbidden-manifest',
+      expect.stringMatching(/manifest\.txt$/),
+      'whoami',
+      '/groups',
+    ]);
   });
 
   it('should handle networkAccess from config', async () => {
@@ -111,7 +118,7 @@ describe('WindowsSandboxManager', () => {
     };
 
     await expect(planManager.prepareCommand(req)).rejects.toThrow(
-      'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
+      'Sandbox request rejected: Cannot override readonly/network/filesystem restrictions in Plan mode.',
     );
   });
 

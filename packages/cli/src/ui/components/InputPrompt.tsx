@@ -711,6 +711,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      const isGenerating =
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation;
+
       // Hide the shortcuts panel if voice is active or if other keys are pressed
       if (shortcutsHelpVisible) {
         setShortcutsHelpVisible(false);
@@ -723,14 +727,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           resetEscapeState();
           return true;
         }
-      }
-
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
-        return false;
       }
 
       const isPlainTab =
@@ -918,6 +914,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setShellModeActive(false);
           resetEscapeState();
           return true;
+        }
+
+        // If we're generating and no local overlay consumed Escape, let it
+        // propagate to the global cancellation handler.
+        if (isGenerating) {
+          return false;
         }
 
         handleEscPress();

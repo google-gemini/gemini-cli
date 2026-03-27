@@ -132,6 +132,10 @@ export class GeminiClient {
     this.updateSystemInstruction();
   };
 
+  clearCurrentSequenceModel(): void {
+    this.currentSequenceModel = null;
+  }
+
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
   private hookStateMap = new Map<
@@ -575,6 +579,7 @@ export class GeminiClient {
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
+      this.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       this.config.getHasAccessToPreviewModel?.() ?? true,
       this.config,
