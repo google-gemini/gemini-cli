@@ -332,7 +332,9 @@ Use the `/mcp auth` command to manage OAuth authentication:
 
 OAuth tokens are automatically:
 
-- **Stored securely** in `~/.gemini/mcp-oauth-tokens.json`
+- **Stored securely** in `mcp-oauth-tokens.json` in your user config directory
+  (for example, `~/.config/gemini-cli/mcp-oauth-tokens.json` on a typical
+  Unix-like setup)
 - **Refreshed** when expired (if refresh tokens are available)
 - **Validated** before each connection attempt
 - **Cleaned up** when invalid or expired
@@ -1038,8 +1040,10 @@ directly edit JSON files.
 ### Adding a server (`gemini mcp add`)
 
 The `add` command configures a new MCP server in your `settings.json`. Based on
-the scope (`-s, --scope`), it will be added to either the user config
-`~/.gemini/settings.json` or the project config `.gemini/settings.json` file.
+the scope (`-s, --scope`), it will be added to either the user `settings.json`
+file in your user config directory (for example,
+`~/.config/gemini-cli/settings.json`) or the project config
+`.gemini/settings.json` file.
 
 **Command:**
 
@@ -1195,8 +1199,9 @@ gemini mcp disable <name> [--session]
 - `--session`: Apply change only for this session (not persisted to file).
 
 Disabled servers appear in `/mcp` status as "Disabled" but won't connect or
-provide tools. Enablement state is stored in
-`~/.gemini/mcp-server-enablement.json`.
+provide tools. Enablement state is stored in `mcp-server-enablement.json` in
+your user config directory (for example,
+`~/.config/gemini-cli/mcp-server-enablement.json`).
 
 The same commands are available as slash commands during an active session:
 `/mcp enable <name>` and `/mcp disable <name>`.

@@ -8,16 +8,16 @@
 
 import {
   GEMINI_DIR,
+  Storage,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
-  homedir,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { logger } from '../utils/logger.js';
 
-export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
+export const EXTENSIONS_DIRECTORY_NAME = 'extensions';
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 
@@ -38,8 +38,12 @@ interface ExtensionConfig {
 
 export function loadExtensions(workspaceDir: string): GeminiCLIExtension[] {
   const allExtensions = [
-    ...loadExtensionsFromDir(workspaceDir),
-    ...loadExtensionsFromDir(homedir()),
+    ...loadExtensionsFromDir(
+      path.join(workspaceDir, GEMINI_DIR, EXTENSIONS_DIRECTORY_NAME),
+    ),
+    ...loadExtensionsFromDir(
+      path.join(Storage.getGlobalGeminiDir(), EXTENSIONS_DIRECTORY_NAME),
+    ),
   ];
 
   const uniqueExtensions: GeminiCLIExtension[] = [];
@@ -57,8 +61,7 @@ export function loadExtensions(workspaceDir: string): GeminiCLIExtension[] {
   return uniqueExtensions;
 }
 
-function loadExtensionsFromDir(dir: string): GeminiCLIExtension[] {
-  const extensionsDir = path.join(dir, EXTENSIONS_DIRECTORY_NAME);
+function loadExtensionsFromDir(extensionsDir: string): GeminiCLIExtension[] {
   if (!fs.existsSync(extensionsDir)) {
     return [];
   }

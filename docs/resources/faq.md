@@ -135,7 +135,9 @@ To store your API keys securely, you can:
 
 The Gemini CLI configuration is stored in two `settings.json` files:
 
-1.  In your home directory: `~/.gemini/settings.json`.
+1.  In your
+    [configuration directory](../reference/configuration.md#configuration-directory),
+    usually `~/.config/gemini-cli/settings.json` on Unix-like systems.
 2.  In your project's root directory: `./.gemini/settings.json`.
 
 Refer to [Gemini CLI Configuration](../reference/configuration.md) for more

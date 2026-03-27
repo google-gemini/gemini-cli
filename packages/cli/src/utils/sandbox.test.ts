@@ -81,6 +81,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    Storage: {
+      getGlobalGeminiDir: vi.fn(() => '/home/user/.config/gemini-cli'),
+      getGlobalCacheDir: vi.fn(() => '/home/user/.cache/gemini-cli'),
+      getGlobalTempDir: vi.fn(() => '/home/user/.cache/gemini-cli/tmp'),
+    },
     debugLogger: {
       log: vi.fn(),
       debug: vi.fn(),
@@ -164,6 +169,12 @@ describe('sandbox', () => {
       expect(spawn).toHaveBeenCalledWith(
         'sandbox-exec',
         expect.arrayContaining([
+          '-D',
+          expect.stringMatching(/^USER_CONFIG_DIR=/),
+          '-D',
+          expect.stringMatching(/^USER_CACHE_DIR=/),
+          '-D',
+          expect.stringMatching(/^USER_TMP_DIR=/),
           '-f',
           expect.stringContaining('sandbox-macos-permissive-open.sb'),
         ]),

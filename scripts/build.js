@@ -18,49 +18,110 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
+const bunEnv = {
+  ...process.env,
+  BUN_TMPDIR: process.env.BUN_TMPDIR ?? '/tmp',
+  TMPDIR: process.env.TMPDIR ?? '/tmp',
+};
 
-// npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
+function pickPackageManager() {
+  for (const candidate of ['bun', 'yarn', 'npm']) {
+    try {
+      execSync(`${candidate} --version`, { stdio: 'ignore' });
+      return candidate;
+    } catch {
+      // Try the next available package manager.
+    }
+  }
+
+  throw new Error('No supported package manager found');
+}
+
+const packageManager = pickPackageManager();
+const run = (command) => `${packageManager} ${command}`;
+const execOptions = { stdio: 'inherit', cwd: root, env: bunEnv };
+const workspaceBuildOrder = new Map([
+  ['@google/gemini-cli-devtools', 0],
+  ['@google/gemini-cli-core', 1],
+  ['@google/gemini-cli-test-utils', 2],
+  ['@google/gemini-cli-sdk', 3],
+  ['@google/gemini-cli-a2a-server', 4],
+  ['@google/gemini-cli', 5],
+]);
+
+function getWorkspacePackageDirs() {
+  const rootPackageJson = JSON.parse(
+    readFileSync(join(root, 'package.json'), 'utf-8'),
+  );
+  const workspaceDirs = [];
+
+  for (const workspace of rootPackageJson.workspaces ?? []) {
+    const workspaceRoot = join(root, dirname(workspace));
+    for (const entry of readdirSync(workspaceRoot)) {
+      const pkgDir = join(workspaceRoot, entry);
+      try {
+        if (statSync(pkgDir).isDirectory()) {
+          workspaceDirs.push(pkgDir);
+        }
+      } catch {
+        // Ignore entries that disappear mid-scan.
+      }
+    }
+  }
+
+  return workspaceDirs;
+}
+
+function buildWorkspaces() {
+  const packages = [];
+  for (const pkgDir of getWorkspacePackageDirs()) {
+    const pkgJsonPath = join(pkgDir, 'package.json');
+    if (!existsSync(pkgJsonPath)) {
+      continue;
+    }
+
+    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+    if (!pkgJson.scripts?.build) {
+      continue;
+    }
+
+    packages.push({ name: pkgJson.name, dir: pkgDir });
+  }
+
+  packages.sort((a, b) => {
+    const aOrder = workspaceBuildOrder.get(a.name) ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = workspaceBuildOrder.get(b.name) ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  for (const { dir: pkgDir } of packages) {
+    execSync(run('run build'), {
+      ...execOptions,
+      cwd: pkgDir,
+    });
+  }
+}
+
+// Install dependencies if node_modules was removed (e.g. via scripts/clean.js).
 if (!existsSync(join(root, 'node_modules'))) {
-  execSync('npm install', { stdio: 'inherit', cwd: root });
+  execSync(run('install'), execOptions);
 }
 
 // build all workspaces/packages
-execSync('npm run generate', { stdio: 'inherit', cwd: root });
-
-if (process.env.CI) {
-  console.log('CI environment detected. Building workspaces sequentially...');
-  execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
-} else {
-  // Build core first because everyone depends on it
-  console.log('Building @google/gemini-cli-core...');
-  execSync('npm run build -w @google/gemini-cli-core', {
-    stdio: 'inherit',
-    cwd: root,
-  });
-
-  // Build the rest in parallel
-  console.log('Building other workspaces in parallel...');
-  const workspaceInfo = JSON.parse(
-    execSync('npm query .workspace --json', { cwd: root, encoding: 'utf-8' }),
-  );
-  const parallelWorkspaces = workspaceInfo
-    .map((w) => w.name)
-    .filter((name) => name !== '@google/gemini-cli-core');
-
-  execSync(
-    `npx npm-run-all --parallel ${parallelWorkspaces.map((w) => `"build -w ${w}"`).join(' ')}`,
-    { stdio: 'inherit', cwd: root },
-  );
-}
+execSync(run('run generate'), execOptions);
+buildWorkspaces();
 
 // also build container image if sandboxing is enabled
-// skip (-s) npm install + build since we did that above
+// skip (-s) package-manager install + build since we did that above
 try {
   execSync('node scripts/sandbox_command.js -q', {
     stdio: 'inherit',

@@ -401,12 +401,12 @@ git add .gemini/settings.json
 Understanding where hooks come from and what they can do is critical for secure
 usage.
 
-| Hook Source                   | Description                                                                                                                |
-| :---------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
-| **System**                    | Configured by system administrators (e.g., `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
-| **User** (`~/.gemini/...`)    | Configured by you. You are responsible for ensuring they are safe.                                                         |
-| **Extensions**                | You explicitly approve and install these. Security depends on the extension source (integrity).                            |
-| **Project** (`./.gemini/...`) | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                       |
+| Hook Source                                                              | Description                                                                                                                |
+| :----------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
+| **System**                                                               | Configured by system administrators (e.g., `/etc/gemini-cli/settings.json`, `/Library/...`). Assumed to be the **safest**. |
+| **User** (user config directory, for example `~/.config/gemini-cli/...`) | Configured by you. You are responsible for ensuring they are safe.                                                         |
+| **Extensions**                                                           | You explicitly approve and install these. Security depends on the extension source (integrity).                            |
+| **Project** (`./.gemini/...`)                                            | **Untrusted by default.** Safest in trusted internal repos; higher risk in third-party/public repos.                       |
 
 #### Project Hook Security
 

@@ -42,7 +42,9 @@ chat regarding the proposed strategy BEFORE calling this tool.
 - **Parameters:**
   - `plan_path` (string, required): The path to the finalized Markdown plan
     file. This file MUST be located within the project's temporary plans
-    directory (for example, `~/.gemini/tmp/<project>/plans/`).
+    directory in Gemini CLI's
+    [temporary directory](../reference/configuration.md#temporary-directory)
+    (for example, `~/.cache/gemini-cli/tmp/<project>/plans/`).
 - **Behavior:**
   - Validates that the `plan_path` is within the allowed directory and that the
     file exists and has content.

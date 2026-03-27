@@ -127,7 +127,7 @@ export interface ResumedSessionData {
  * - Token usage statistics
  * - Assistant thoughts and reasoning
  *
- * Sessions are stored as JSON files in ~/.gemini/tmp/<project_hash>/chats/
+ * Sessions are stored as JSON files under the user config tmp directory.
  */
 export class ChatRecordingService {
   private conversationFile: string | null = null;

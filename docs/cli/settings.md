@@ -8,8 +8,16 @@ Your Gemini CLI settings are stored in a `settings.json` file. In addition to
 using the `/settings` command, you can also edit them in one of the following
 locations:
 
-- **User settings**: `~/.gemini/settings.json`
+- **User settings**: `settings.json` in your
+  [configuration directory](../reference/configuration.md#configuration-directory)
+  (for example, `~/.config/gemini-cli/settings.json`)
 - **Workspace settings**: `your-project/.gemini/settings.json`
+
+The
+[configuration directory](../reference/configuration.md#configuration-directory)
+is usually `~/.config/gemini-cli` on Unix-like systems. If you need an exact
+path, set `$GEMINI_CONFIG_DIR`. Gemini CLI creates the configuration directory
+if it does not exist.
 
 <!-- prettier-ignore -->
 > [!IMPORTANT]
@@ -31,7 +39,7 @@ they appear in the UI.
 | Enable Auto Update      | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                                                                                                     | `true`      |
 | Enable Notifications    | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion.                                                                                                                                                                            | `false`     |
 | Enable Plan Mode        | `general.plan.enabled`             | Enable Plan Mode for read-only safety during planning.                                                                                                                                                                                                        | `true`      |
-| Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.                                                                     | `undefined` |
+| Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, Gemini CLI uses its managed temporary directory. A custom directory requires a policy to allow write access in Plan Mode.                                                                | `undefined` |
 | Plan Model Routing      | `general.plan.modelRouting`        | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.                                                                                                          | `true`      |
 | Retry Fetch Errors      | `general.retryFetchErrors`         | Retry on "exception TypeError: fetch failed sending request" errors.                                                                                                                                                                                          | `true`      |
 | Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                                                                                                             | `10`        |

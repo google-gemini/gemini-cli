@@ -13,8 +13,7 @@ import {
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
-  GEMINI_DIR,
-  homedir,
+  Storage,
   isHeadlessMode,
   coreEvents,
   type HeadlessModeOptions,
@@ -27,7 +26,7 @@ const { promises: fsPromises } = fs;
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
 export function getUserSettingsDir(): string {
-  return path.join(homedir(), GEMINI_DIR);
+  return Storage.getGlobalGeminiDir();
 }
 
 export function getTrustedFoldersPath(): string {

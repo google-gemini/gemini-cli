@@ -57,7 +57,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       vi.fn().mockImplementation((_cwd: string) => ({
         getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
         getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
-        getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
+        getProjectTempDir: () =>
+          '/test/home/.config/gemini-cli/tmp/mocked_hash',
       })),
       {
         getGlobalSettingsPath: () => '/tmp/gemini/settings.json',

@@ -19,58 +19,39 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import stripJsonComments from 'strip-json-comments';
 import os from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import dotenv from 'dotenv';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 
-const argv = yargs(hideBin(process.argv)).option('q', {
-  alias: 'quiet',
-  type: 'boolean',
-  default: false,
-}).argv;
-
-const homedir = () => process.env['GEMINI_CLI_HOME'] || os.homedir();
-
-let geminiSandbox = process.env.GEMINI_SANDBOX;
-
-if (!geminiSandbox) {
-  const userSettingsFile = join(homedir(), GEMINI_DIR, 'settings.json');
-  if (existsSync(userSettingsFile)) {
-    const settings = JSON.parse(
-      stripJsonComments(readFileSync(userSettingsFile, 'utf-8')),
-    );
-    if (settings.sandbox) {
-      geminiSandbox = settings.sandbox;
-    }
-  }
-}
-
-if (!geminiSandbox) {
-  let currentDir = process.cwd();
+export function findSandboxEnvFile(startDir, userConfigDir) {
+  let currentDir = startDir;
   while (true) {
     const geminiEnv = join(currentDir, GEMINI_DIR, '.env');
-    const regularEnv = join(currentDir, '.env');
     if (existsSync(geminiEnv)) {
-      dotenv.config({ path: geminiEnv, quiet: true });
-      break;
-    } else if (existsSync(regularEnv)) {
-      dotenv.config({ path: regularEnv, quiet: true });
-      break;
+      return geminiEnv;
     }
+
+    const regularEnv = join(currentDir, '.env');
+    if (existsSync(regularEnv)) {
+      return regularEnv;
+    }
+
     const parentDir = dirname(currentDir);
     if (parentDir === currentDir) {
-      break;
+      const userGeminiEnv = join(userConfigDir, '.env');
+      if (existsSync(userGeminiEnv)) {
+        return userGeminiEnv;
+      }
+      return null;
     }
     currentDir = parentDir;
   }
-  geminiSandbox = process.env.GEMINI_SANDBOX;
 }
-
-geminiSandbox = (geminiSandbox || '').toLowerCase();
 
 const commandExists = (cmd) => {
   const checkCommand = os.platform() === 'win32' ? 'where' : 'command -v';
@@ -90,40 +71,106 @@ const commandExists = (cmd) => {
   }
 };
 
-let command = '';
-if (['1', 'true'].includes(geminiSandbox)) {
-  if (commandExists('docker')) {
-    command = 'docker';
-  } else if (commandExists('podman')) {
-    command = 'podman';
-  } else {
-    console.error(
-      'ERROR: install docker or podman or specify command in GEMINI_SANDBOX',
+function resolveGeminiSandbox() {
+  let geminiSandbox = process.env.GEMINI_SANDBOX;
+
+  if (!geminiSandbox) {
+    const userSettingsFile = join(
+      Storage.getGlobalGeminiDir(),
+      'settings.json',
     );
-    process.exit(1);
-  }
-} else if (geminiSandbox && !['0', 'false'].includes(geminiSandbox)) {
-  if (commandExists(geminiSandbox)) {
-    command = geminiSandbox;
-  } else {
-    console.error(
-      `ERROR: missing sandbox command '${geminiSandbox}' (from GEMINI_SANDBOX)`,
-    );
-    process.exit(1);
-  }
-} else {
-  if (os.platform() === 'darwin' && process.env.SEATBELT_PROFILE !== 'none') {
-    if (commandExists('sandbox-exec')) {
-      command = 'sandbox-exec';
-    } else {
-      process.exit(1);
+    if (existsSync(userSettingsFile)) {
+      const settings = JSON.parse(
+        stripJsonComments(readFileSync(userSettingsFile, 'utf-8')),
+      );
+      if (settings.sandbox) {
+        geminiSandbox = settings.sandbox;
+      }
     }
-  } else {
-    process.exit(1);
   }
+
+  if (!geminiSandbox) {
+    const envPath = findSandboxEnvFile(
+      process.cwd(),
+      Storage.getGlobalGeminiDir(),
+    );
+    if (envPath) {
+      dotenv.config({ path: envPath, quiet: true });
+    }
+    geminiSandbox = process.env.GEMINI_SANDBOX;
+  }
+
+  return (geminiSandbox || '').toLowerCase();
 }
 
-if (!argv.q) {
-  console.log(command);
+export function getSandboxCommand() {
+  const geminiSandbox = resolveGeminiSandbox();
+
+  if (['1', 'true'].includes(geminiSandbox)) {
+    if (commandExists('docker')) {
+      return 'docker';
+    }
+    if (commandExists('podman')) {
+      return 'podman';
+    }
+    throw new Error(
+      'ERROR: install docker or podman or specify command in GEMINI_SANDBOX',
+    );
+  }
+
+  if (geminiSandbox && !['0', 'false'].includes(geminiSandbox)) {
+    if (commandExists(geminiSandbox)) {
+      return geminiSandbox;
+    }
+    throw new Error(
+      `ERROR: missing sandbox command '${geminiSandbox}' (from GEMINI_SANDBOX)`,
+    );
+  }
+
+  if (os.platform() === 'darwin' && process.env.SEATBELT_PROFILE !== 'none') {
+    if (commandExists('sandbox-exec')) {
+      return 'sandbox-exec';
+    }
+    return '';
+  }
+
+  return '';
 }
-process.exit(0);
+
+function isExecutedDirectly() {
+  const entrypoint = process.argv[1];
+  if (!entrypoint) {
+    return false;
+  }
+
+  return resolve(entrypoint) === fileURLToPath(import.meta.url);
+}
+
+function main() {
+  const argv = yargs(hideBin(process.argv)).option('q', {
+    alias: 'quiet',
+    type: 'boolean',
+    default: false,
+  }).argv;
+
+  let command = '';
+  try {
+    command = getSandboxCommand();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    return 1;
+  }
+
+  if (!command) {
+    return 1;
+  }
+
+  if (!argv.q) {
+    console.log(command);
+  }
+  return 0;
+}
+
+if (isExecutedDirectly()) {
+  process.exit(main());
+}

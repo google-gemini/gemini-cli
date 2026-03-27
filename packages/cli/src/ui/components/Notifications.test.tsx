@@ -64,12 +64,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   const MockStorage = vi.fn().mockImplementation(() => ({
-    getExtensionsDir: () => '/mock/home/.gemini/extensions',
+    getExtensionsDir: () => '/mock/home/.config/gemini-cli/extensions',
   }));
   Object.assign(MockStorage, {
     getGlobalTempDir: () => '/mock/temp',
-    getGlobalSettingsPath: () => '/mock/home/.gemini/settings.json',
-    getGlobalGeminiDir: () => '/mock/home/.gemini',
+    getGlobalSettingsPath: () => '/mock/home/.config/gemini-cli/settings.json',
+    getGlobalGeminiDir: () => '/mock/home/.config/gemini-cli',
   });
   return {
     ...actual,

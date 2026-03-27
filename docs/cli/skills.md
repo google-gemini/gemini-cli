@@ -38,8 +38,9 @@ Gemini CLI discovers skills from three primary locations:
 1.  **Workspace Skills**: Located in `.gemini/skills/` or the `.agents/skills/`
     alias. Workspace skills are typically committed to version control and
     shared with the team.
-2.  **User Skills**: Located in `~/.gemini/skills/` or the `~/.agents/skills/`
-    alias. These are personal skills available across all your workspaces.
+2.  **User Skills**: Located in `skills/` under your user config directory (for
+    example, `~/.config/gemini-cli/skills/`) or the `~/.agents/skills/` alias.
+    These are personal skills available across all your workspaces.
 3.  **Extension Skills**: Skills bundled within installed
     [extensions](../extensions/index.md).
 
@@ -77,15 +78,17 @@ The `gemini skills` command provides management utilities:
 gemini skills list
 
 # Link agent skills from a local directory via symlink
-# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in ~/.gemini/skills
-# (or ~/.agents/skills)
+# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in skills/ under
+# your user config directory (for example, ~/.config/gemini-cli/skills)
+# or ~/.agents/skills
 gemini skills link /path/to/my-skills-repo
 
 # Link to the workspace scope (.gemini/skills or .agents/skills)
 gemini skills link /path/to/my-skills-repo --scope workspace
 
 # Install a skill from a Git repository, local directory, or zipped skill file (.skill)
-# Uses the user scope by default (~/.gemini/skills or ~/.agents/skills)
+# Uses the user scope by default (skills/ in your user config directory,
+# for example ~/.config/gemini-cli/skills, or ~/.agents/skills)
 gemini skills install https://github.com/user/repo.git
 gemini skills install /path/to/local/skill
 gemini skills install /path/to/local/my-expertise.skill

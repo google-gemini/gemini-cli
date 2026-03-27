@@ -10,13 +10,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   escapePath,
+  getUserCacheDir,
+  getUserConfigDir,
+  getUserTmpDir,
+  validateUserDirectoryEnvironment,
   unescapePath,
   isSubpath,
   shortenPath,
   normalizePath,
   resolveToRealPath,
   makeRelative,
+  resetUserConfigDirWarningForTesting,
 } from './paths.js';
+import { coreEvents } from './events.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -36,6 +42,171 @@ const mockPlatform = (platform: string) => {
     }),
   );
 };
+
+describe('getUserConfigDir', () => {
+  beforeEach(() => {
+    vi.stubEnv('HOME', '/mock/home');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    resetUserConfigDirWarningForTesting();
+  });
+
+  it('uses GEMINI_CLI_HOME when set', () => {
+    vi.stubEnv('GEMINI_CLI_HOME', '/override/home');
+    const existsSpy = vi.spyOn(fs, 'existsSync');
+    const mkdirSpy = vi.spyOn(fs, 'mkdirSync');
+
+    expect(getUserConfigDir()).toBe('/override/home/.gemini');
+    expect(existsSpy).not.toHaveBeenCalled();
+    expect(mkdirSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses GEMINI_CONFIG_DIR exactly when set', () => {
+    vi.stubEnv('GEMINI_CONFIG_DIR', '/exact/config/path');
+    const existsSpy = vi.spyOn(fs, 'existsSync');
+    const mkdirSpy = vi
+      .spyOn(fs, 'mkdirSync')
+      .mockImplementation(() => undefined);
+
+    expect(getUserConfigDir()).toBe('/exact/config/path');
+    expect(existsSpy).not.toHaveBeenCalled();
+    expect(mkdirSpy).toHaveBeenCalledWith('/exact/config/path', {
+      recursive: true,
+    });
+  });
+
+  it('rejects GEMINI_CONFIG_DIR when deprecated GEMINI_CLI_HOME is also set', () => {
+    vi.stubEnv('GEMINI_CONFIG_DIR', '/exact/config/path');
+    vi.stubEnv('GEMINI_CLI_HOME', '/legacy/root');
+
+    expect(() => validateUserDirectoryEnvironment()).toThrow(
+      /\$GEMINI_CONFIG_DIR.*\$GEMINI_CLI_HOME cannot both be set/,
+    );
+  });
+
+  it('rejects GEMINI_CACHE_DIR when deprecated GEMINI_CLI_HOME is also set', () => {
+    vi.stubEnv('GEMINI_CACHE_DIR', '/exact/cache/path');
+    vi.stubEnv('GEMINI_CLI_HOME', '/legacy/root');
+
+    expect(() => validateUserDirectoryEnvironment()).toThrow(
+      /\$GEMINI_CACHE_DIR.*\$GEMINI_CLI_HOME cannot both be set/,
+    );
+  });
+
+  it('rejects GEMINI_TMP_DIR when deprecated GEMINI_CLI_HOME is also set', () => {
+    vi.stubEnv('GEMINI_TMP_DIR', '/exact/tmp/path');
+    vi.stubEnv('GEMINI_CLI_HOME', '/legacy/root');
+
+    expect(() => validateUserDirectoryEnvironment()).toThrow(
+      /\$GEMINI_TMP_DIR.*\$GEMINI_CLI_HOME cannot both be set/,
+    );
+  });
+
+  it('prefers XDG when both XDG and legacy dirs exist and warns once', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/mock/home/.config');
+    const xdgDir = path.join('/mock/home/.config', 'gemini-cli');
+    const legacyDir = path.join('/mock/home', '.gemini');
+    vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
+      const value = p.toString();
+      return value === xdgDir || value === legacyDir;
+    });
+    const warnSpy = vi
+      .spyOn(coreEvents, 'emitFeedback')
+      .mockImplementation(() => {});
+
+    expect(getUserConfigDir()).toBe(xdgDir);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not warn when XDG and legacy dirs resolve to the same real path', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/mock/home/.config');
+    const xdgDir = path.join('/mock/home/.config', 'gemini-cli');
+    const legacyDir = path.join('/mock/home', '.gemini');
+    vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
+      const value = p.toString();
+      return value === xdgDir || value === legacyDir;
+    });
+    vi.spyOn(fs, 'realpathSync').mockReturnValue('/mock/home/.gemini');
+    const warnSpy = vi
+      .spyOn(coreEvents, 'emitFeedback')
+      .mockImplementation(() => {});
+
+    expect(getUserConfigDir()).toBe(xdgDir);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to legacy .gemini when XDG does not exist', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/mock/home/.config');
+    const legacyDir = path.join('/mock/home', '.gemini');
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (p) => p.toString() === legacyDir,
+    );
+    const mkdirSpy = vi.spyOn(fs, 'mkdirSync');
+
+    expect(getUserConfigDir()).toBe(legacyDir);
+    expect(mkdirSpy).not.toHaveBeenCalled();
+  });
+
+  it('creates XDG dir when neither location exists', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/mock/home/.config');
+    const xdgDir = path.join('/mock/home/.config', 'gemini-cli');
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    const mkdirSpy = vi
+      .spyOn(fs, 'mkdirSync')
+      .mockImplementation(() => undefined);
+
+    expect(getUserConfigDir()).toBe(xdgDir);
+    expect(mkdirSpy).toHaveBeenCalledWith(xdgDir, { recursive: true });
+  });
+});
+
+describe('getUserCacheDir', () => {
+  beforeEach(() => {
+    vi.stubEnv('HOME', '/mock/home');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('uses XDG_CACHE_HOME when it is absolute', () => {
+    vi.stubEnv('XDG_CACHE_HOME', '/mock/cache');
+    expect(getUserCacheDir()).toBe('/mock/cache/gemini-cli');
+  });
+
+  it('uses GEMINI_CACHE_DIR exactly when set', () => {
+    vi.stubEnv('GEMINI_CACHE_DIR', '/exact/cache/path');
+    expect(getUserCacheDir()).toBe('/exact/cache/path');
+  });
+
+  it('ignores relative XDG_CACHE_HOME values', () => {
+    vi.stubEnv('XDG_CACHE_HOME', 'relative/cache');
+    expect(getUserCacheDir()).toBe('/mock/home/.cache/gemini-cli');
+  });
+});
+
+describe('getUserTmpDir', () => {
+  beforeEach(() => {
+    vi.stubEnv('HOME', '/mock/home');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('uses GEMINI_TMP_DIR exactly when set', () => {
+    vi.stubEnv('GEMINI_TMP_DIR', '/exact/tmp/path');
+    expect(getUserTmpDir()).toBe('/exact/tmp/path');
+  });
+
+  it('defaults to the cache tmp directory', () => {
+    vi.stubEnv('XDG_CACHE_HOME', '/mock/cache');
+    expect(getUserTmpDir()).toBe('/mock/cache/gemini-cli/tmp');
+  });
+});
 
 describe('escapePath', () => {
   afterEach(() => vi.unstubAllGlobals());

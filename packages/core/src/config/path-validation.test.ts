@@ -4,22 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Config } from './config.js';
 import * as path from 'node:path';
-import * as os from 'node:os';
-
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    existsSync: vi.fn().mockReturnValue(true),
-    statSync: vi.fn().mockReturnValue({
-      isDirectory: vi.fn().mockReturnValue(true),
-    }),
-    realpathSync: vi.fn((p) => p),
-  };
-});
+import * as fs from 'node:fs';
+import { Storage } from './storage.js';
 
 vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
@@ -32,10 +21,16 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
 
 describe('Config Path Validation', () => {
   let config: Config;
-  const targetDir = '/mock/workspace';
-  const globalGeminiDir = path.join(os.homedir(), '.gemini');
+  const targetDir = '/tmp/mock-workspace';
+  const globalGeminiDir = '/tmp/mock-home/.gemini';
 
   beforeEach(() => {
+    vi.stubEnv('GEMINI_CLI_HOME', '/tmp/mock-home');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.mkdirSync(globalGeminiDir, { recursive: true });
+    vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
+      '/tmp/mock-workspace/.gemini/tmp/test-session',
+    );
     config = new Config({
       targetDir,
       sessionId: 'test-session',
@@ -43,6 +38,11 @@ describe('Config Path Validation', () => {
       cwd: targetDir,
       model: 'test-model',
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('should allow access to ~/.gemini if it is added to the workspace', () => {

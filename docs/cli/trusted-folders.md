@@ -35,8 +35,9 @@ folder, a dialog will automatically appear, prompting you to make a choice:
 - **Don't trust**: Marks the folder as untrusted. The CLI will operate in a
   restricted "safe mode."
 
-Your choice is saved in a central file (`~/.gemini/trustedFolders.json`), so you
-will only be asked once per folder.
+Your choice is saved in a central file in your user config directory
+(`trustedFolders.json`, for example `~/.config/gemini-cli/trustedFolders.json`)
+so you will only be asked once per folder.
 
 ## Understanding folder contents: The discovery phase
 
@@ -111,7 +112,8 @@ options:
 
 - **View all trust rules**: To see a complete list of all your trusted and
   untrusted folder rules, you can inspect the contents of the
-  `~/.gemini/trustedFolders.json` file in your home directory.
+  `trustedFolders.json` file in your user config directory (for example,
+  `~/.config/gemini-cli/trustedFolders.json`).
 
 ## The trust check process (advanced)
 
@@ -123,4 +125,4 @@ trust is determined:
     if the workspace is trusted. The IDE's response takes highest priority.
 
 2.  **Local trust file**: If the IDE is not connected, the CLI checks the
-    central `~/.gemini/trustedFolders.json` file.
+    central `trustedFolders.json` file in your user config directory.

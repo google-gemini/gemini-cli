@@ -9,8 +9,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
 import { coreEvents } from '../utils/events.js';
+import {
+  getUserConfigDir,
+  normalizePath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 
-import * as path from 'node:path';
 import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 
@@ -35,7 +39,12 @@ vi.mock('node:fs', () => ({
   })),
 }));
 vi.mock('node:os');
-vi.mock('node:path');
+vi.mock('../utils/paths.js', () => ({
+  GEMINI_DIR: '.gemini',
+  getUserConfigDir: vi.fn(),
+  normalizePath: vi.fn((p: string) => p),
+  resolveToRealPath: vi.fn((p: string) => p),
+}));
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
@@ -64,7 +73,8 @@ describe('OAuthCredentialStorage', () => {
     updatedAt: expect.any(Number),
   };
 
-  const oldFilePath = '/mock/home/.gemini/oauth.json';
+  const selectedFilePath = '/mock/home/.config/gemini-cli/oauth_creds.json';
+  const legacyFilePath = '/mock/home/.gemini/oauth_creds.json';
 
   beforeEach(() => {
     vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(null);
@@ -79,7 +89,11 @@ describe('OAuthCredentialStorage', () => {
     vi.spyOn(fs, 'rm').mockResolvedValue(undefined);
 
     vi.spyOn(os, 'homedir').mockReturnValue('/mock/home');
-    vi.spyOn(path, 'join').mockReturnValue(oldFilePath);
+    vi.mocked(getUserConfigDir).mockReturnValue(
+      '/mock/home/.config/gemini-cli',
+    );
+    vi.mocked(normalizePath).mockImplementation((p: string) => p);
+    vi.mocked(resolveToRealPath).mockImplementation((p: string) => p);
   });
 
   afterEach(() => {
@@ -113,9 +127,25 @@ describe('OAuthCredentialStorage', () => {
       expect(mockHybridTokenStorage.getCredentials).toHaveBeenCalledWith(
         'main-account',
       );
-      expect(fs.readFile).toHaveBeenCalledWith(oldFilePath, 'utf-8');
+      expect(fs.readFile).toHaveBeenCalledWith(selectedFilePath, 'utf-8');
       expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalled(); // Verify credentials were saved
-      expect(fs.rm).toHaveBeenCalledWith(oldFilePath, { force: true }); // Verify old file was removed
+      expect(fs.rm).toHaveBeenCalledWith(selectedFilePath, { force: true }); // Verify old file was removed
+      expect(result).toEqual(mockCredentials);
+    });
+
+    it('should fallback to the legacy user config OAuth file when the selected path is missing', async () => {
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        null,
+      );
+      vi.spyOn(fs, 'readFile')
+        .mockRejectedValueOnce({ code: 'ENOENT' })
+        .mockResolvedValueOnce(JSON.stringify(mockCredentials));
+
+      const result = await OAuthCredentialStorage.loadCredentials();
+
+      expect(fs.readFile).toHaveBeenNthCalledWith(1, selectedFilePath, 'utf-8');
+      expect(fs.readFile).toHaveBeenNthCalledWith(2, legacyFilePath, 'utf-8');
+      expect(fs.rm).toHaveBeenCalledWith(legacyFilePath, { force: true });
       expect(result).toEqual(mockCredentials);
     });
 
@@ -289,7 +319,13 @@ describe('OAuthCredentialStorage', () => {
     it('should attempt to remove the old file-based storage', async () => {
       await OAuthCredentialStorage.clearCredentials();
 
-      expect(fs.rm).toHaveBeenCalledWith(oldFilePath, { force: true });
+      expect(fs.rm).toHaveBeenCalledWith(selectedFilePath, { force: true });
+    });
+
+    it('should also remove the legacy OAuth file when it is a distinct path', async () => {
+      await OAuthCredentialStorage.clearCredentials();
+
+      expect(fs.rm).toHaveBeenCalledWith(legacyFilePath, { force: true });
     });
 
     it('should not throw an error if deleting old file fails', async () => {

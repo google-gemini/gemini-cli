@@ -6,10 +6,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import toml from '@iarna/toml';
 import { z } from 'zod';
 import { fileURLToPath } from 'node:url';
+import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type SandboxPermissions } from '../services/sandboxManager.js';
 import { sanitizePaths } from '../services/sandboxManager.js';
@@ -101,7 +101,7 @@ export class SandboxPolicyManager {
   constructor(customConfigPath?: string) {
     this.configPath =
       customConfigPath ??
-      path.join(os.homedir(), '.gemini', 'policies', 'sandbox.toml');
+      path.join(Storage.getGlobalGeminiDir(), 'policies', 'sandbox.toml');
     this.config = this.loadConfig();
   }
 

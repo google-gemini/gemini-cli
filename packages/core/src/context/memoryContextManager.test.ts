@@ -71,7 +71,7 @@ describe('MemoryContextManager', () => {
 
   describe('refresh', () => {
     it('should load and format global and environment memory', async () => {
-      const globalPaths = ['/home/user/.gemini/GEMINI.md'];
+      const globalPaths = ['/home/user/.config/gemini-cli/GEMINI.md'];
       const envPaths = ['/app/GEMINI.md'];
 
       vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue(
@@ -135,10 +135,13 @@ describe('MemoryContextManager', () => {
     it('should not load environment memory if folder is not trusted', async () => {
       vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
       vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue([
-        '/home/user/.gemini/GEMINI.md',
+        '/home/user/.config/gemini-cli/GEMINI.md',
       ]);
       vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
-        { filePath: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+        {
+          filePath: '/home/user/.config/gemini-cli/GEMINI.md',
+          content: 'Global Content',
+        },
       ]);
 
       await memoryContextManager.refresh();
@@ -151,7 +154,7 @@ describe('MemoryContextManager', () => {
     });
 
     it('should deduplicate files by file identity in case-insensitive filesystems', async () => {
-      const globalPaths = ['/home/user/.gemini/GEMINI.md'];
+      const globalPaths = ['/home/user/.config/gemini-cli/GEMINI.md'];
       const envPaths = ['/app/gemini.md', '/app/GEMINI.md'];
 
       vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue(
@@ -165,12 +168,15 @@ describe('MemoryContextManager', () => {
       vi.mocked(
         memoryDiscovery.deduplicatePathsByFileIdentity,
       ).mockResolvedValue({
-        paths: ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
+        paths: ['/home/user/.config/gemini-cli/GEMINI.md', '/app/gemini.md'],
         identityMap: new Map<string, string>(),
       });
 
       vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
-        { filePath: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+        {
+          filePath: '/home/user/.config/gemini-cli/GEMINI.md',
+          content: 'Global Content',
+        },
         { filePath: '/app/gemini.md', content: 'Project Content' },
       ]);
 
@@ -180,13 +186,13 @@ describe('MemoryContextManager', () => {
         memoryDiscovery.deduplicatePathsByFileIdentity,
       ).toHaveBeenCalledWith(
         expect.arrayContaining([
-          '/home/user/.gemini/GEMINI.md',
+          '/home/user/.config/gemini-cli/GEMINI.md',
           '/app/gemini.md',
           '/app/GEMINI.md',
         ]),
       );
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
-        ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
+        ['/home/user/.config/gemini-cli/GEMINI.md', '/app/gemini.md'],
         'tree',
         ['.git'],
       );
