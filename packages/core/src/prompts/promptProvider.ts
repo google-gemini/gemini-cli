@@ -62,6 +62,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -145,6 +149,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        taskTracker: context.config.isTrackerEnabled(),
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -171,6 +176,7 @@ export class PromptProvider {
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
+            interactive: interactiveMode,
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
@@ -178,7 +184,6 @@ export class PromptProvider {
           }),
           isPlanMode,
         ),
-        taskTracker: context.config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
@@ -188,9 +193,13 @@ export class PromptProvider {
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration:
               context.config.isTopicUpdateNarrationEnabled(),
+            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
-        sandbox: this.withSection('sandbox', () => getSandboxMode()),
+        sandbox: this.withSection('sandbox', () => ({
+          mode: getSandboxMode(),
+          toolSandboxingEnabled: context.config.getSandboxEnabled(),
+        })),
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
           () => true,
@@ -239,6 +248,10 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;

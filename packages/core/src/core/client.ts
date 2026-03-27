@@ -44,6 +44,7 @@ import type {
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
+import { AgentHistoryProvider } from '../services/agentHistoryProvider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -98,6 +99,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
+  private readonly agentHistoryProvider: AgentHistoryProvider;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
@@ -113,10 +115,17 @@ export class GeminiClient {
   constructor(private readonly context: AgentLoopContext) {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
+    this.agentHistoryProvider = new AgentHistoryProvider(this.config, {
+      truncationThreshold:
+        this.config.getExperimentalAgentHistoryTruncationThreshold(),
+      retainedMessages:
+        this.config.getExperimentalAgentHistoryRetainedMessages(),
+    });
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   private get config(): Config {
@@ -126,6 +135,14 @@ export class GeminiClient {
   private handleModelChanged = () => {
     this.currentSequenceModel = null;
   };
+
+  private handleMemoryChanged = () => {
+    this.updateSystemInstruction();
+  };
+
+  clearCurrentSequenceModel(): void {
+    this.currentSequenceModel = null;
+  }
 
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
@@ -306,6 +323,7 @@ export class GeminiClient {
 
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   async resumeChat(
@@ -344,7 +362,7 @@ export class GeminiClient {
       return;
     }
 
-    const systemMemory = this.config.getUserMemory();
+    const systemMemory = this.config.getSystemInstructionMemory();
     const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
     this.getChat().setSystemInstruction(systemInstruction);
   }
@@ -364,7 +382,7 @@ export class GeminiClient {
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const systemMemory = this.config.getUserMemory();
+      const systemMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       return new GeminiChat(
         this.config,
@@ -569,6 +587,10 @@ export class GeminiClient {
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
+      this.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
+      false,
+      this.config.getHasAccessToPreviewModel?.() ?? true,
+      this.config,
     );
   }
 
@@ -599,10 +621,20 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false);
+    if (this.config.isExperimentalAgentHistoryTruncationEnabled()) {
+      const newHistory = await this.agentHistoryProvider.manageHistory(
+        this.getHistory(),
+        signal,
+      );
+      if (newHistory.length !== this.getHistory().length) {
+        this.getChat().setHistory(newHistory);
+      }
+    } else {
+      const compressed = await this.tryCompressChat(prompt_id, false, signal);
 
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
+      if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+        yield { type: GeminiEventType.ChatCompressed, value: compressed };
+      }
     }
 
     const remainingTokenCount =
@@ -1027,7 +1059,7 @@ export class GeminiClient {
     } = desiredModelConfig;
 
     try {
-      const userMemory = this.config.getUserMemory();
+      const userMemory = this.config.getSystemInstructionMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
       const {
         model,
@@ -1149,6 +1181,7 @@ export class GeminiClient {
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    abortSignal?: AbortSignal,
   ): Promise<ChatCompressionInfo> {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
@@ -1162,6 +1195,7 @@ export class GeminiClient {
       model,
       this.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (

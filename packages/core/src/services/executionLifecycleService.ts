@@ -17,7 +17,7 @@ export type ExecutionMethod =
   | 'none';
 
 export interface ExecutionResult {
-  rawOutput: Buffer;
+  rawOutput?: Buffer;
   output: string;
   exitCode: number | null;
   signal: number | null;

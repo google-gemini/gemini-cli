@@ -5,6 +5,7 @@
  */
 
 import type { SafetyCheckInput } from '../safety/protocol.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 
 export enum PolicyDecision {
   ALLOW = 'allow',
@@ -106,9 +107,9 @@ export interface PolicyRule {
 
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * The name of the subagent this rule applies to.
@@ -153,6 +154,13 @@ export interface PolicyRule {
   modes?: ApprovalMode[];
 
   /**
+   * If true, this rule only applies to interactive environments.
+   * If false, this rule only applies to non-interactive environments.
+   * If undefined, it applies to both interactive and non-interactive environments.
+   */
+  interactive?: boolean;
+
+  /**
    * If true, allows command redirection even if the policy engine would normally
    * downgrade ALLOW to ASK_USER for redirected commands.
    * Only applies when decision is ALLOW.
@@ -175,9 +183,9 @@ export interface PolicyRule {
 export interface SafetyCheckerRule {
   /**
    * The name of the tool this rule applies to.
-   * If undefined, the rule applies to all tools.
+   * Use '*' to match all tools.
    */
-  toolName?: string;
+  toolName: string;
 
   /**
    * Identifies the MCP server this rule applies to.
@@ -302,6 +310,11 @@ export interface PolicyEngineConfig {
    * Used to filter rules that have specific 'modes' defined.
    */
   approvalMode?: ApprovalMode;
+
+  /**
+   * The sandbox manager instance.
+   */
+  sandboxManager?: SandboxManager;
 }
 
 export interface PolicySettings {
@@ -345,3 +358,9 @@ export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
  */
 export const ALWAYS_ALLOW_PRIORITY_OFFSET =
   ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
+
+/**
+ * Priority for the YOLO "allow all" rule.
+ * Matches the raw priority used in yolo.toml.
+ */
+export const PRIORITY_YOLO_ALLOW_ALL = 998;

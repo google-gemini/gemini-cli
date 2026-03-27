@@ -19,6 +19,7 @@ describe('WriteTodosTool', () => {
           { description: 'Task 1', status: 'pending' },
           { description: 'Task 2', status: 'in_progress' },
           { description: 'Task 3', status: 'completed' },
+          { description: 'Task 4', status: 'blocked' },
         ],
       };
       await expect(tool.buildAndExecute(params, signal)).resolves.toBeDefined();
@@ -96,13 +97,15 @@ describe('WriteTodosTool', () => {
           { description: 'First task', status: 'completed' },
           { description: 'Second task', status: 'in_progress' },
           { description: 'Third task', status: 'pending' },
+          { description: 'Fourth task', status: 'blocked' },
         ],
       };
       const result = await tool.buildAndExecute(params, signal);
       const expectedOutput = `Successfully updated the todo list. The current list is now:
 1. [completed] First task
 2. [in_progress] Second task
-3. [pending] Third task`;
+3. [pending] Third task
+4. [blocked] Fourth task`;
       expect(result.llmContent).toBe(expectedOutput);
       expect(result.returnDisplay).toEqual(params);
     });

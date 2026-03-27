@@ -165,16 +165,27 @@ describe('getEnvironmentContext', () => {
     expect(getFolderStructure).not.toHaveBeenCalled();
   });
 
-  it('should exclude environment memory when JIT context is enabled', async () => {
+  it('should use session memory instead of environment memory when JIT context is enabled', async () => {
     (mockConfig as Record<string, unknown>)['isJitContextEnabled'] = vi
       .fn()
       .mockReturnValue(true);
+    (mockConfig as Record<string, unknown>)['getSessionMemory'] = vi
+      .fn()
+      .mockReturnValue(
+        '\n<loaded_context>\n<extension_context>\nExt Memory\n</extension_context>\n<project_context>\nProj Memory\n</project_context>\n</loaded_context>',
+      );
 
     const parts = await getEnvironmentContext(mockConfig as Config);
 
     const context = parts[0].text;
     expect(context).not.toContain('Mock Environment Memory');
     expect(mockConfig.getEnvironmentMemory).not.toHaveBeenCalled();
+    expect(context).toContain('<loaded_context>');
+    expect(context).toContain('<extension_context>');
+    expect(context).toContain('Ext Memory');
+    expect(context).toContain('<project_context>');
+    expect(context).toContain('Proj Memory');
+    expect(context).toContain('</loaded_context>');
   });
 
   it('should include environment memory when JIT context is disabled', async () => {

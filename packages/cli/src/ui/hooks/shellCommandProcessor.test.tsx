@@ -164,7 +164,7 @@ describe('useShellCommandProcessor', () => {
     });
   });
 
-  const renderProcessorHook = () => {
+  const renderProcessorHook = async () => {
     let hookResult: ReturnType<typeof useShellCommandProcessor>;
     let renderCount = 0;
     function TestComponent({
@@ -188,7 +188,7 @@ describe('useShellCommandProcessor', () => {
       );
       return null;
     }
-    const { rerender } = render(<TestComponent />);
+    const { rerender } = await render(<TestComponent />);
     return {
       result: {
         get current() {
@@ -218,7 +218,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   it('should initiate command execution and set pending state', async () => {
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
 
     await act(async () => {
       result.current.handleShellCommand('ls -l', new AbortController().signal);
@@ -251,7 +251,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   it('should handle successful execution and update history correctly', async () => {
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
 
     act(() => {
       result.current.handleShellCommand(
@@ -283,7 +283,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   it('should handle command failure and display error status', async () => {
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
 
     act(() => {
       result.current.handleShellCommand(
@@ -318,7 +318,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should update UI for text streams (non-interactive)', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
       await act(async () => {
         result.current.handleShellCommand(
           'stream',
@@ -381,7 +381,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should show binary progress messages correctly', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
       act(() => {
         result.current.handleShellCommand(
           'cat img',
@@ -449,7 +449,7 @@ describe('useShellCommandProcessor', () => {
 
   it('should not wrap the command on Windows', async () => {
     vi.mocked(os.platform).mockReturnValue('win32');
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
 
     await act(async () => {
       result.current.handleShellCommand('dir', new AbortController().signal);
@@ -471,7 +471,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   it('should handle command abort and display cancelled status', async () => {
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
     const abortController = new AbortController();
 
     act(() => {
@@ -495,7 +495,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   it('should handle binary output result correctly', async () => {
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
     const binaryBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
     mockIsBinary.mockReturnValue(true);
 
@@ -522,7 +522,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   it('should handle promise rejection and show an error', async () => {
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
     const testError = new Error('Unexpected failure');
     mockShellExecutionService.mockImplementation(() => ({
       pid: 12345,
@@ -556,7 +556,7 @@ describe('useShellCommandProcessor', () => {
     // Mock that the temp file was created before the error was thrown
     vi.mocked(fs.existsSync).mockReturnValue(true);
 
-    const { result } = renderProcessorHook();
+    const { result } = await renderProcessorHook();
 
     act(() => {
       result.current.handleShellCommand(
@@ -586,7 +586,7 @@ describe('useShellCommandProcessor', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('/test/dir/new'); // A different directory
 
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
       act(() => {
         result.current.handleShellCommand(
           'cd new',
@@ -611,7 +611,7 @@ describe('useShellCommandProcessor', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('/test/dir'); // The same directory
 
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
       act(() => {
         result.current.handleShellCommand('ls', new AbortController().signal);
       });
@@ -641,13 +641,13 @@ describe('useShellCommandProcessor', () => {
       });
     });
 
-    it('should have activeShellPtyId as null initially', () => {
-      const { result } = renderProcessorHook();
+    it('should have activeShellPtyId as null initially', async () => {
+      const { result } = await renderProcessorHook();
       expect(result.current.activeShellPtyId).toBeNull();
     });
 
     it('should set activeShellPtyId when a command with a PID starts', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       await act(async () => {
         result.current.handleShellCommand('ls', new AbortController().signal);
@@ -657,7 +657,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should update the pending history item with the ptyId', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       await act(async () => {
         result.current.handleShellCommand('ls', new AbortController().signal);
@@ -680,7 +680,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should reset activeShellPtyId to null after successful execution', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       await act(async () => {
         result.current.handleShellCommand('ls', new AbortController().signal);
@@ -698,7 +698,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should reset activeShellPtyId to null after failed execution', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       await act(async () => {
         result.current.handleShellCommand(
@@ -728,7 +728,7 @@ describe('useShellCommandProcessor', () => {
           }),
         }),
       );
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       await act(async () => {
         result.current.handleShellCommand('cmd', new AbortController().signal);
@@ -750,7 +750,7 @@ describe('useShellCommandProcessor', () => {
       mockShellExecutionService.mockImplementation(() => {
         throw new Error('Sync Error');
       });
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       expect(result.current.activeShellPtyId).toBeNull(); // Pre-condition
 
@@ -779,7 +779,7 @@ describe('useShellCommandProcessor', () => {
         });
       });
 
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.handleShellCommand('ls', new AbortController().signal);
@@ -794,7 +794,7 @@ describe('useShellCommandProcessor', () => {
 
   describe('Background Shell Management', () => {
     it('should register a background shell and update count', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
@@ -820,7 +820,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should toggle background shell visibility', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
@@ -842,7 +842,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should show info message when toggling background shells if none are active', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.toggleBackgroundShell();
@@ -859,7 +859,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should dismiss a background shell and remove it from state', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
@@ -886,7 +886,7 @@ describe('useShellCommandProcessor', () => {
         });
       });
 
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       await act(async () => {
         result.current.handleShellCommand('top', new AbortController().signal);
@@ -920,7 +920,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should auto-dismiss background task on successful exit', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(888, 'auto-exit', '');
@@ -944,7 +944,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should auto-dismiss background task on failed exit', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(999, 'fail-exit', '');
@@ -967,7 +967,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should NOT trigger re-render on background shell output when visible', async () => {
-      const { result, getRenderCount } = renderProcessorHook();
+      const { result, getRenderCount } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
@@ -997,7 +997,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should NOT trigger re-render on background shell output when hidden', async () => {
-      const { result, getRenderCount } = renderProcessorHook();
+      const { result, getRenderCount } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
@@ -1023,7 +1023,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should trigger re-render on binary progress when visible', async () => {
-      const { result, getRenderCount } = renderProcessorHook();
+      const { result, getRenderCount } = await renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
@@ -1054,7 +1054,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should NOT hide background shell when model is responding without confirmation', async () => {
-      const { result, rerender } = renderProcessorHook();
+      const { result, rerender } = await renderProcessorHook();
 
       // 1. Register and show background shell
       act(() => {
@@ -1075,7 +1075,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should hide background shell when waiting for confirmation and restore after delay', async () => {
-      const { result, rerender } = renderProcessorHook();
+      const { result, rerender } = await renderProcessorHook();
 
       // 1. Register and show background shell
       act(() => {
@@ -1109,7 +1109,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should auto-hide background shell when foreground shell starts and restore when it ends', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       // 1. Register and show background shell
       act(() => {
@@ -1145,7 +1145,7 @@ describe('useShellCommandProcessor', () => {
     });
 
     it('should NOT restore background shell if it was manually hidden during foreground execution', async () => {
-      const { result } = renderProcessorHook();
+      const { result } = await renderProcessorHook();
 
       // 1. Register and show background shell
       act(() => {
