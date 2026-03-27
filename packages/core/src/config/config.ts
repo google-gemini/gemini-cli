@@ -1387,7 +1387,7 @@ export class Config implements McpContext, AgentLoopContext {
         if (active.length > 0) {
           coreEvents.emitFeedback(
             'info',
-            `Channels listening for messages: ${active.join(', ')}`,
+            `Channels listening for messages: ${active.join(', ')}\n  Only use channels you trust — messages are injected into the conversation.`,
             undefined,
             { style: 'channel' },
           );

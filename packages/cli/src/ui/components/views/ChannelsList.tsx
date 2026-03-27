@@ -46,7 +46,11 @@ export const ChannelsList: React.FC<ChannelsListProps> = ({ channels }) => {
               <Text color={theme.text.secondary}>
                 Direction:{' '}
                 <Text
-                  color={channel.supportsReply ? 'green' : theme.text.secondary}
+                  color={
+                    channel.supportsReply
+                      ? theme.status.success
+                      : theme.text.secondary
+                  }
                 >
                   {channel.supportsReply ? 'two-way' : 'one-way'}
                 </Text>

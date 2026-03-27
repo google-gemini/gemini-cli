@@ -68,11 +68,12 @@ import type {
   WorkspaceContext,
 } from '../utils/workspaceContext.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
+import { escapeXml, sanitizeXmlKey } from '../utils/textUtils.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
-import { activeChannels } from '../channels/types.js';
+import { activeChannels, removeChannel } from '../channels/types.js';
 import {
   type ResourceRegistry,
   type MCPResource,
@@ -289,6 +290,7 @@ export class McpClient implements McpProgressReporter {
       registries.promptRegistry.removePromptsByServer(this.serverName);
       registries.resourceRegistry.removeResourcesByServer(this.serverName);
     }
+    removeChannel(this.serverName);
     this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
@@ -486,7 +488,7 @@ export class McpClient implements McpProgressReporter {
     // listen for channel notifications and route them through coreEvents.
     // Only register if this server is in the --channels list.
     const channelCap = capabilities?.experimental?.['gemini/channel'];
-    const enabledChannels = this.cliConfig.getChannels?.() ?? [];
+    const enabledChannels = this.cliConfig.getChannels();
     if (channelCap && enabledChannels.includes(this.serverName)) {
       debugLogger.log(
         `Server '${this.serverName}' declares gemini/channel capability. Listening for channel messages...`,
@@ -496,12 +498,11 @@ export class McpClient implements McpProgressReporter {
         channelCap != null && typeof channelCap === 'object'
           ? Object.fromEntries(Object.entries(channelCap))
           : {};
+      const rawDisplayName = channelCapRecord['displayName'];
       activeChannels.set(this.serverName, {
         supportsReply: capabilities?.tools != null,
         displayName:
-          typeof channelCapRecord['displayName'] === 'string'
-            ? channelCapRecord['displayName']
-            : undefined,
+          typeof rawDisplayName === 'string' ? rawDisplayName : undefined,
       });
 
       const ChannelNotificationSchema = NotificationSchema.extend({
@@ -517,19 +518,28 @@ export class McpClient implements McpProgressReporter {
           if (typeof content !== 'string' || !content) return;
 
           const rawMeta = params['meta'];
-          const meta =
+          const metaObj: Record<string, string> =
             rawMeta != null && typeof rawMeta === 'object'
               ? Object.fromEntries(
                   Object.entries(rawMeta).map(([k, v]) => [k, String(v)]),
                 )
-              : undefined;
+              : {};
+          metaObj['user'] =
+            metaObj['user'] ?? String(params['sender'] ?? 'unknown');
+
+          const attrs = Object.entries(metaObj)
+            .filter(([, v]) => v !== '')
+            .map(([k, v]) => `${sanitizeXmlKey(k)}="${escapeXml(v)}"`)
+            .join(' ');
+
+          const safeContent = content.replace(/<\/channel/gi, '&lt;/channel');
+
+          const source = escapeXml(this.serverName);
+          const formattedXml = `<channel source="${source}"${attrs ? ' ' + attrs : ''}>\n${safeContent}\n</channel>`;
+
           coreEvents.emitChannelMessage({
             channelName: this.serverName,
-            sender: String(params['sender'] ?? 'unknown'),
-            content,
-            timestamp: Date.now(),
-            replyTo: params['replyTo'] ? String(params['replyTo']) : undefined,
-            metadata: meta,
+            content: formattedXml,
           });
         },
       );
@@ -1817,7 +1827,7 @@ export interface McpContext {
       source?: string;
     }>;
   };
-  getChannels?(): string[];
+  getChannels(): string[];
 }
 
 /**
