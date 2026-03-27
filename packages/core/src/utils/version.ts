@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getPackageJson } from './package.js';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -12,6 +12,35 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let versionPromise: Promise<string> | undefined;
+
+type VersionPackageJson = {
+  name?: string;
+  version?: string;
+};
+
+async function readPackageJsonAtDir(
+  dir: string,
+): Promise<VersionPackageJson | undefined> {
+  try {
+    const packageJsonPath = path.join(dir, 'package.json');
+    const packageJsonText = await readFile(packageJsonPath, 'utf8');
+    const parsedPackageJson: unknown = JSON.parse(packageJsonText);
+    if (!parsedPackageJson || typeof parsedPackageJson !== 'object') {
+      return undefined;
+    }
+
+    const name =
+      'name' in parsedPackageJson ? parsedPackageJson.name : undefined;
+    const version =
+      'version' in parsedPackageJson ? parsedPackageJson.version : undefined;
+    return {
+      name: typeof name === 'string' ? name : undefined,
+      version: typeof version === 'string' ? version : undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
 
 export function getVersion(): Promise<string> {
   if (versionPromise) {
@@ -26,7 +55,7 @@ export function getVersion(): Promise<string> {
     let bestVersion = 'unknown';
 
     while (true) {
-      const pkgJson = await getPackageJson(currentDir);
+      const pkgJson = await readPackageJsonAtDir(currentDir);
       if (pkgJson?.version) {
         bestVersion = pkgJson.version;
         if (
