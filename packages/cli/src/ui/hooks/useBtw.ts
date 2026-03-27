@@ -27,7 +27,7 @@ interface BtwState {
 
 type BtwAction =
   | { type: 'SUBMIT'; query: string }
-  | { type: 'APPEND_CONTENT'; content: string }
+  | { type: 'SET_RESPONSE'; content: string }
   | { type: 'ERROR'; error: string }
   | { type: 'FINISHED' }
   | { type: 'DISMISS' };
@@ -51,10 +51,10 @@ const btwReducer = (state: BtwState, action: BtwAction): BtwState => {
         isStreaming: true,
         error: null,
       };
-    case 'APPEND_CONTENT':
+    case 'SET_RESPONSE':
       return {
         ...state,
-        response: state.response + action.content,
+        response: action.content,
       };
     case 'ERROR':
       return {
@@ -103,6 +103,16 @@ export const useBtw = (
 
       dispatch({ type: 'SUBMIT', query: newQuery });
 
+      let accumulatedResponse = '';
+      let lastDispatchTime = 0;
+      let flushTimer: NodeJS.Timeout | null = null;
+
+      const flushResponse = () => {
+        if (abortControllerRef.current !== abortController) return;
+        dispatch({ type: 'SET_RESPONSE', content: accumulatedResponse });
+        lastDispatchTime = Date.now();
+      };
+
       try {
         const stream = geminiClient.sendBtwStream(
           [{ text: newQuery }],
@@ -114,10 +124,27 @@ export const useBtw = (
           if (abortController.signal.aborted) break;
 
           switch (event.type) {
-            case GeminiEventType.Content:
-              dispatch({ type: 'APPEND_CONTENT', content: event.value ?? '' });
+            case GeminiEventType.Content: {
+              accumulatedResponse += event.value ?? '';
+              const now = Date.now();
+              if (now - lastDispatchTime > 50) {
+                if (flushTimer) {
+                  clearTimeout(flushTimer);
+                  flushTimer = null;
+                }
+                flushResponse();
+              } else if (!flushTimer) {
+                flushTimer = setTimeout(() => {
+                  flushResponse();
+                  flushTimer = null;
+                }, 50);
+              }
               break;
+            }
             case GeminiEventType.Error: {
+              if (flushTimer) clearTimeout(flushTimer);
+              flushResponse();
+
               const value = event.value;
               let errorMessage = 'Unknown error';
               if (
@@ -142,9 +169,9 @@ export const useBtw = (
               break;
             }
             case GeminiEventType.Finished:
-              dispatch({ type: 'FINISHED' });
-              break;
             case GeminiEventType.UserCancelled:
+              if (flushTimer) clearTimeout(flushTimer);
+              flushResponse();
               dispatch({ type: 'FINISHED' });
               break;
             default:
@@ -152,15 +179,21 @@ export const useBtw = (
           }
         }
       } catch (err) {
+        if (flushTimer) clearTimeout(flushTimer);
+        flushResponse();
+
         if (err instanceof Error && err.name === 'AbortError') {
           // Ignore aborts
-        } else {
+        } else if (abortControllerRef.current === abortController) {
           dispatch({
             type: 'ERROR',
             error: err instanceof Error ? err.message : String(err),
           });
         }
       } finally {
+        if (flushTimer) clearTimeout(flushTimer);
+        flushResponse();
+
         if (abortControllerRef.current === abortController) {
           dispatch({ type: 'FINISHED' });
         }
