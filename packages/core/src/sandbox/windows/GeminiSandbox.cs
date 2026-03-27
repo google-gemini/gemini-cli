@@ -143,6 +143,10 @@ public class GeminiSandbox {
     public const uint CREATE_SUSPENDED = 0x00000004;
     public const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
     public const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+    public const uint JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008;
+    public const uint JOB_OBJECT_LIMIT_JOB_MEMORY = 0x00000200;
+    public const uint JOB_OBJECT_LIMIT_PRIORITY_CLASS = 0x00000020;
+    public const uint BELOW_NORMAL_PRIORITY_CLASS = 0x00004000;
     public const uint STARTF_USESTDHANDLES = 0x00000100;
     public const int TokenIntegrityLevel = 25;
     public const uint SE_GROUP_INTEGRITY = 0x00000020;
@@ -163,9 +167,7 @@ public class GeminiSandbox {
         IntPtr hRestrictedToken = IntPtr.Zero;
         IntPtr hJob = IntPtr.Zero;
         IntPtr pSidsToDisable = IntPtr.Zero;
-        IntPtr pSidsToRestrict = IntPtr.Zero;
         IntPtr networkSid = IntPtr.Zero;
-        IntPtr restrictedSid = IntPtr.Zero;
         IntPtr lowIntegritySid = IntPtr.Zero;
 
         try {
@@ -177,7 +179,6 @@ public class GeminiSandbox {
             }
 
             uint sidCount = 0;
-            uint restrictCount = 0;
 
             // "networkAccess == false" implies Strict Sandbox Level 1.
             if (!networkAccess) {
@@ -190,24 +191,15 @@ public class GeminiSandbox {
                     saa.Attributes = 0;
                     Marshal.StructureToPtr(saa, pSidsToDisable, false);
                 }
-
-                // S-1-5-12 is Restricted Code SID
-                if (ConvertStringSidToSid("S-1-5-12", out restrictedSid)) {
-                    restrictCount = 1;
-                    int saaSize = Marshal.SizeOf(typeof(SID_AND_ATTRIBUTES));
-                    pSidsToRestrict = Marshal.AllocHGlobal(saaSize);
-                    SID_AND_ATTRIBUTES saa = new SID_AND_ATTRIBUTES();
-                    saa.Sid = restrictedSid;
-                    saa.Attributes = 0;
-                    Marshal.StructureToPtr(saa, pSidsToRestrict, false);
-                }
             }
 
-            if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, sidCount, pSidsToDisable, 0, IntPtr.Zero, restrictCount, pSidsToRestrict, out hRestrictedToken)) {
+            // Create a restricted token with DISABLE_MAX_PRIVILEGE to strip admin rights.
+            // We no longer use SidsToRestrict (Restricted Code SID S-1-5-12) as it is too restrictive
+            // for general shell commands. We rely on Low Integrity Level for filesystem write protection.     
+            if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, sidCount, pSidsToDisable, 0, IntPtr.Zero, 0, IntPtr.Zero, out hRestrictedToken)) {
                 Console.Error.WriteLine("Failed to create restricted token");
                 return 1;
             }
-
             // 2. Set Integrity Level to Low
             if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySid)) {
                 TOKEN_MANDATORY_LABEL tml = new TOKEN_MANDATORY_LABEL();
@@ -267,7 +259,15 @@ public class GeminiSandbox {
             hJob = CreateJobObject(IntPtr.Zero, null);
             if (hJob != IntPtr.Zero) {
                 JOBOBJECT_EXTENDED_LIMIT_INFORMATION limitInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
-                limitInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                limitInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 
+                                                           | JOB_OBJECT_LIMIT_ACTIVE_PROCESS 
+                                                           | JOB_OBJECT_LIMIT_JOB_MEMORY 
+                                                           | JOB_OBJECT_LIMIT_PRIORITY_CLASS;
+                
+                limitInfo.BasicLimitInformation.ActiveProcessLimit = 32;
+                limitInfo.BasicLimitInformation.PriorityClass = BELOW_NORMAL_PRIORITY_CLASS;
+                limitInfo.JobMemoryLimit = (UIntPtr)(2048L * 1024 * 1024); // 2GB limit
+
                 int limitSize = Marshal.SizeOf(limitInfo);
                 IntPtr pLimit = Marshal.AllocHGlobal(limitSize);
                 try {
@@ -321,9 +321,7 @@ public class GeminiSandbox {
             if (hToken != IntPtr.Zero) CloseHandle(hToken);
             if (hJob != IntPtr.Zero) CloseHandle(hJob);
             if (pSidsToDisable != IntPtr.Zero) Marshal.FreeHGlobal(pSidsToDisable);
-            if (pSidsToRestrict != IntPtr.Zero) Marshal.FreeHGlobal(pSidsToRestrict);
             if (networkSid != IntPtr.Zero) LocalFree(networkSid);
-            if (restrictedSid != IntPtr.Zero) LocalFree(restrictedSid);
             if (lowIntegritySid != IntPtr.Zero) LocalFree(lowIntegritySid);
         }
     }

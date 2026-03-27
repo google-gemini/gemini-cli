@@ -35,7 +35,7 @@ export function createSandboxManager(
       : undefined;
 
   if (sandbox?.enabled) {
-    if (os.platform() === 'win32' && sandbox?.command === 'windows-native') {
+    if (os.platform() === 'win32') {
       return new WindowsSandboxManager({
         workspace,
         modeConfig,
