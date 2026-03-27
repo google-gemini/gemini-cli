@@ -123,7 +123,7 @@ export async function loadSandboxConfig(
 
   let sandboxValue: boolean | string | null | undefined;
   let allowedPaths: string[] = [];
-  let networkAccess = false;
+  let networkAccess = true;
   let customImage: string | undefined;
 
   if (
@@ -134,7 +134,7 @@ export async function loadSandboxConfig(
     const config = sandboxOption;
     sandboxValue = config.enabled ? (config.command ?? true) : false;
     allowedPaths = config.allowedPaths ?? [];
-    networkAccess = config.networkAccess ?? false;
+    networkAccess = config.networkAccess ?? true;
     customImage = config.image;
   } else if (typeof sandboxOption !== 'object' || sandboxOption === null) {
     sandboxValue = sandboxOption;
