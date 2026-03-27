@@ -240,6 +240,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     setEmbeddedShellFocused,
     setShortcutsHelpVisible,
     toggleCleanUiDetailsVisible,
+    dismissBtw,
   } = useUIActions();
   const {
     terminalWidth,
@@ -248,6 +249,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundTasks,
     backgroundTaskHeight,
     shortcutsHelpVisible,
+    btwState,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -681,6 +683,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           keyMatchers[Command.EXPAND_SUGGESTION](key) ||
           keyMatchers[Command.COLLAPSE_SUGGESTION](key) ||
           keyMatchers[Command.ACCEPT_SUGGESTION](key));
+
+      // Handle BTW dismissal
+      if (btwState.isActive) {
+        if (
+          keyMatchers[Command.ESCAPE](key) ||
+          keyMatchers[Command.SUBMIT](key) ||
+          (key.sequence === ' ' && buffer.text.length === 0)
+        ) {
+          dismissBtw();
+          return true;
+        }
+      }
 
       // Reset completion suppression if the user performs any action other than
       // history navigation or cursor movement.
@@ -1371,6 +1385,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       keyMatchers,
       isHelpDismissKey,
       settings,
+      btwState.isActive,
+      dismissBtw,
     ],
   );
 
