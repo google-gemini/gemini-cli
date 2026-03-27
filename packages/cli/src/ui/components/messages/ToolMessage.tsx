@@ -24,6 +24,7 @@ import {
 import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { SUBAGENT_MAX_LINES } from '../../constants.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 export type { TextEmphasis };
 
@@ -39,6 +40,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  isExpandable?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -62,7 +64,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   originalRequestName,
   progress,
   progressTotal,
+  isExpandable,
 }) => {
+  const { constrainHeight } = useUIState();
+  const isExpanded = isExpandable && !constrainHeight;
+
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,
@@ -102,6 +108,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           emphasis={emphasis}
           progressMessage={progressMessage}
           originalRequestName={originalRequestName}
+          isExpanded={isExpanded}
         />
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}
