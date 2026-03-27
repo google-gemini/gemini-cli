@@ -338,11 +338,8 @@ describe('loadSandboxConfig', () => {
             sandbox: {
               enabled: true,
               command: 'podman',
-<<<<<<< HEAD
-=======
               allowedPaths: [],
               networkAccess: true,
->>>>>>> 765fb6701 (Enable network access in sandbox configuration (#24055))
             },
           },
         },
@@ -358,11 +355,8 @@ describe('loadSandboxConfig', () => {
             sandbox: {
               enabled: true,
               image: 'custom/image',
-<<<<<<< HEAD
-=======
               allowedPaths: [],
               networkAccess: true,
->>>>>>> 765fb6701 (Enable network access in sandbox configuration (#24055))
             },
           },
         },
@@ -377,11 +371,8 @@ describe('loadSandboxConfig', () => {
           tools: {
             sandbox: {
               enabled: false,
-<<<<<<< HEAD
-=======
               allowedPaths: [],
               networkAccess: true,
->>>>>>> 765fb6701 (Enable network access in sandbox configuration (#24055))
             },
           },
         },
@@ -397,10 +388,7 @@ describe('loadSandboxConfig', () => {
             sandbox: {
               enabled: true,
               allowedPaths: ['/settings-path'],
-<<<<<<< HEAD
-=======
               networkAccess: true,
->>>>>>> 765fb6701 (Enable network access in sandbox configuration (#24055))
             },
           },
         },
