@@ -692,6 +692,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation;
 
+      const isQueueMessageKey = keyMatchers[Command.QUEUE_MESSAGE](key);
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
       const hasTabCompletionInteraction =
@@ -702,7 +703,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (
         isGenerating &&
-        isPlainTab &&
+        isQueueMessageKey &&
         !hasTabCompletionInteraction &&
         buffer.text.trim().length > 0
       ) {
