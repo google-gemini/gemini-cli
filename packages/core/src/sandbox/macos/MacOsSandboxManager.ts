@@ -10,27 +10,28 @@ import {
   type SandboxedCommand,
   type SandboxPermissions,
   type GlobalSandboxOptions,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-  type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
 import {
-  getCommandRoots,
   initializeShellParsers,
-  splitCommands,
-  stripShellWrapper,
+  getCommandName,
 } from '../../utils/shell-utils.js';
-import { isKnownSafeCommand } from './commandSafety.js';
-import { parse as shellParse } from 'shell-quote';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+  isStrictlyApproved,
+} from '../utils/commandSafety.js';
 import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
-import path from 'node:path';
+import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 export interface MacOsSandboxOptions extends GlobalSandboxOptions {
-  /** Optional base sanitization config. */
-  sanitizationConfig?: EnvironmentSanitizationConfig;
   /** The current sandbox mode behavior from config. */
   modeConfig?: {
     readonly?: boolean;
@@ -48,52 +49,21 @@ export interface MacOsSandboxOptions extends GlobalSandboxOptions {
 export class MacOsSandboxManager implements SandboxManager {
   constructor(private readonly options: MacOsSandboxOptions) {}
 
-  private async isStrictlyApproved(req: SandboxRequest): Promise<boolean> {
-    const approvedTools = this.options.modeConfig?.approvedTools;
-    if (!approvedTools || approvedTools.length === 0) {
-      return false;
-    }
-
-    await initializeShellParsers();
-
-    const fullCmd = [req.command, ...req.args].join(' ');
-    const stripped = stripShellWrapper(fullCmd);
-
-    const roots = getCommandRoots(stripped);
-    if (roots.length === 0) return false;
-
-    const allRootsApproved = roots.every((root) =>
-      approvedTools.includes(root),
-    );
-    if (allRootsApproved) {
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0];
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.includes(toolName)) {
       return true;
     }
-
-    const pipelineCommands = splitCommands(stripped);
-    if (pipelineCommands.length === 0) return false;
-
-    // For safety, every command in the pipeline must be considered safe.
-    for (const cmdString of pipelineCommands) {
-      const parsedArgs = shellParse(cmdString).map(String);
-      if (!isKnownSafeCommand(parsedArgs)) {
-        return false;
-      }
-    }
-
-    return true;
+    return isKnownSafeCommand(args);
   }
 
-  private async getCommandName(req: SandboxRequest): Promise<string> {
-    await initializeShellParsers();
-    const fullCmd = [req.command, ...req.args].join(' ');
-    const stripped = stripShellWrapper(fullCmd);
-    const roots = getCommandRoots(stripped).filter(
-      (r) => r !== 'shopt' && r !== 'set',
-    );
-    if (roots.length > 0) {
-      return roots[0];
-    }
-    return path.basename(req.command);
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
@@ -108,29 +78,23 @@ export class MacOsSandboxManager implements SandboxManager {
     const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
 
     // Reject override attempts in plan mode
-    if (!allowOverrides && req.policy?.additionalPermissions) {
-      const perms = req.policy.additionalPermissions;
-      if (
-        perms.network ||
-        (perms.fileSystem?.write && perms.fileSystem.write.length > 0)
-      ) {
-        throw new Error(
-          'Sandbox request rejected: Cannot override readonly/network restrictions in Plan mode.',
-        );
-      }
-    }
+    verifySandboxOverrides(allowOverrides, req.policy);
 
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
-      ? await this.isStrictlyApproved(req)
+      ? await isStrictlyApproved(
+          req.command,
+          req.args,
+          this.options.modeConfig?.approvedTools,
+        )
       : false;
 
     const workspaceWrite = !isReadonlyMode || isApproved;
-    const networkAccess =
+    const defaultNetwork =
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
 
     // Fetch persistent approvals for this command
-    const commandName = await this.getCommandName(req);
+    const commandName = await getCommandName(req.command, req.args);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
@@ -148,13 +112,13 @@ export class MacOsSandboxManager implements SandboxManager {
         ],
       },
       network:
-        networkAccess ||
+        defaultNetwork ||
         persistentPermissions?.network ||
         req.policy?.additionalPermissions?.network ||
         false,
     };
 
-    const sandboxArgs = await buildSeatbeltArgs({
+    const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
       forbiddenPaths: req.policy?.forbiddenPaths,
