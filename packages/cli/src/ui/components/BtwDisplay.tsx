@@ -63,16 +63,12 @@ export const BtwDisplay: React.FC<BtwDisplayProps> = ({
         {error ? (
           <Text color={theme.status.error}>{error}</Text>
         ) : (
-          <Box flexDirection="row">
-            <Box flexGrow={1}>
-              <MarkdownDisplay
-                text={response}
-                isPending={isStreaming}
-                terminalWidth={terminalWidth - 6}
-                renderMarkdown={renderMarkdown}
-              />
-            </Box>
-          </Box>
+          <MarkdownDisplay
+            text={response}
+            isPending={isStreaming}
+            terminalWidth={terminalWidth - 6}
+            renderMarkdown={renderMarkdown}
+          />
         )}
       </Box>
 
