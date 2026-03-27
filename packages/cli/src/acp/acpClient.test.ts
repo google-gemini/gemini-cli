@@ -99,6 +99,8 @@ vi.mock(
     const actual = await importOriginal();
     return {
       ...actual,
+      updatePolicy: vi.fn(),
+      createPolicyUpdater: vi.fn(),
       ReadManyFilesTool: vi.fn().mockImplementation(() => ({
         name: 'read_many_files',
         kind: 'read',
@@ -181,6 +183,20 @@ describe('GeminiAgent', () => {
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
       }),
+      getPolicyEngine: vi.fn().mockReturnValue({
+        addRule: vi.fn(),
+      }),
+      messageBus: {
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      },
+      storage: {
+        getWorkspaceAutoSavedPolicyPath: vi.fn(),
+        getAutoSavedPolicyPath: vi.fn(),
+        setClientName: vi.fn(),
+      },
+      setClientName: vi.fn(),
       get config() {
         return this;
       },
@@ -201,7 +217,10 @@ describe('GeminiAgent', () => {
     (loadCliConfig as unknown as Mock).mockResolvedValue(mockConfig);
     (loadSettings as unknown as Mock).mockImplementation(() => ({
       merged: {
-        security: { auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE } },
+        security: {
+          auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE },
+          enablePermanentToolApproval: true,
+        },
         mcpServers: {},
       },
       setValue: vi.fn(),
@@ -687,7 +706,10 @@ describe('Session', () => {
       systemDefaults: { settings: {} },
       user: { settings: {} },
       workspace: { settings: {} },
-      merged: { settings: {} },
+      merged: {
+        security: { enablePermanentToolApproval: true },
+        mcpServers: {},
+      },
       errors: [],
     } as unknown as LoadedSettings);
   });
@@ -1026,6 +1048,166 @@ describe('Session', () => {
     );
   });
 
+  it('should exclude always allow and save permanent option when enablePermanentToolApproval is false', async () => {
+    mockConfig.getDisableAlwaysAllow = vi.fn().mockReturnValue(false);
+    const confirmationDetails = {
+      type: 'edit',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const customSettings = {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: {
+        security: { enablePermanentToolApproval: false },
+        mcpServers: {},
+      },
+      errors: [],
+    } as unknown as LoadedSettings;
+
+    const localSession = new Session(
+      'session-2',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      customSettings,
+    );
+
+    mockConnection.requestPermission.mockResolvedValueOnce({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await localSession.prompt({
+      sessionId: 'session-2',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+          }),
+        ]),
+      }),
+    );
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlways,
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('should include always allow and save permanent option when enablePermanentToolApproval is true', async () => {
+    mockConfig.getDisableAlwaysAllow = vi.fn().mockReturnValue(false);
+    const confirmationDetails = {
+      type: 'edit',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    const customSettings = {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: {
+        security: { enablePermanentToolApproval: true },
+        mcpServers: {},
+      },
+      errors: [],
+    } as unknown as LoadedSettings;
+
+    const localSession = new Session(
+      'session-2',
+      mockChat,
+      mockConfig,
+      mockConnection,
+      customSettings,
+    );
+
+    mockConnection.requestPermission.mockResolvedValueOnce({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await localSession.prompt({
+      sessionId: 'session-2',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow for this file in all future sessions',
+          }),
+        ]),
+      }),
+    );
+  });
+
   it('should use filePath for ACP diff content in permission request', async () => {
     const confirmationDetails = {
       type: 'edit',
@@ -1152,6 +1334,56 @@ describe('Session', () => {
         }),
       }),
     );
+  });
+
+  it('should call updatePolicy when tool permission triggers always allow', async () => {
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedAlways,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    const { updatePolicy } = await import('@google/gemini-cli-core');
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(confirmationDetails.onConfirm).toHaveBeenCalled();
+
+    expect(updatePolicy).toHaveBeenCalled();
   });
 
   it('should use filePath for ACP diff content in tool result', async () => {
