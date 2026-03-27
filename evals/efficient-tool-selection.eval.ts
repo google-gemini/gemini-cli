@@ -48,7 +48,7 @@ describe('efficient tool selection', () => {
         const cmd =
           typeof c.toolRequest.args === 'string'
             ? c.toolRequest.args
-            : (c.toolRequest.args as any).command;
+            : JSON.parse(c.toolRequest.args).command;
         return cmd?.includes('wc');
       });
 
