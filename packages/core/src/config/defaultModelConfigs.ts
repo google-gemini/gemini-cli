@@ -36,7 +36,9 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'chat-base-2.5': {
       extends: 'chat-base',
       modelConfig: {
-        generateContentConfig: {},
+        generateContentConfig: {
+          thinkingConfig: undefined,
+        },
       },
     },
     'chat-base-3': {
