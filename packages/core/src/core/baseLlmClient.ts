@@ -348,6 +348,7 @@ export class BaseLlmClient {
             maxAttempts: actualMaxAttempts,
             delayMs,
             error: errorType,
+            errorCode: errorType,
             model: modelName,
           });
 

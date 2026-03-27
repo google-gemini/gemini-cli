@@ -463,6 +463,7 @@ export class GeminiChat {
                   maxAttempts: Math.min(maxAttempts, maxMidStreamAttempts),
                   delayMs,
                   error: errorType,
+                  errorCode: errorType,
                   model,
                 });
                 await new Promise((res) => setTimeout(res, delayMs));
@@ -690,6 +691,7 @@ export class GeminiChat {
             availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
           delayMs,
           error: error instanceof Error ? error.message : String(error),
+          errorCode: getRetryErrorType(error),
           model: lastModelToUse,
         });
       },

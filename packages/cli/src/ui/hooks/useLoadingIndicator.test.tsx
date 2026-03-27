@@ -239,6 +239,28 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+    expect(result.current.currentLoadingPhrase).toContain('retrying in');
+  });
+
+  it('should show quota-specific message for Pro model with QUOTA_EXCEEDED error (full verbosity)', async () => {
+    const retryStatus = {
+      model: 'gemini-3-pro-preview',
+      attempt: 1,
+      maxAttempts: 10,
+      delayMs: 5000,
+      errorCode: 'QUOTA_EXCEEDED',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+    );
+
+    const phrase = result.current.currentLoadingPhrase;
+    expect(phrase).toContain('at capacity');
+    expect(phrase).toContain('retrying in');
+    expect(phrase).toContain('Attempt 2/10');
+    expect(phrase).toContain('/model flash');
   });
 
   it('should hide low-verbosity retry status for early retry attempts', async () => {
@@ -264,7 +286,7 @@ describe('useLoadingIndicator', () => {
 
   it('should show a generic retry phrase in low error verbosity mode for later retries', async () => {
     const retryStatus = {
-      model: 'gemini-pro',
+      model: 'gemini-flash',
       attempt: 2,
       maxAttempts: 5,
       delayMs: 1000,
@@ -280,6 +302,28 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toBe(
       "This is taking a bit longer, we're still on it.",
+    );
+  });
+
+  it('should show quota-specific low-verbosity retry phrase for Pro model after threshold', async () => {
+    const retryStatus = {
+      model: 'gemini-3-pro-preview',
+      attempt: 2,
+      maxAttempts: 10,
+      delayMs: 5000,
+      errorCode: 'QUOTA_EXCEEDED',
+    };
+    const { result } = await renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      true,
+      true,
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      'Pro model is at capacity. Try /model flash to switch, or wait.',
     );
   });
 

@@ -32,6 +32,7 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import {
   retryWithBackoff,
+  getRetryErrorType,
   type RetryAvailabilityContext,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
@@ -1134,6 +1135,7 @@ export class GeminiClient {
               availabilityMaxAttempts ?? this.config.getMaxAttempts(),
             delayMs,
             error: error instanceof Error ? error.message : String(error),
+            errorCode: getRetryErrorType(error),
             model: getDisplayString(currentAttemptModel),
           });
         },
