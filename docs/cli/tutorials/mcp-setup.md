@@ -36,8 +36,9 @@ $env:GITHUB_PERSONAL_ACCESS_TOKEN="github_pat_..."
 
 You tell Gemini about new servers by editing your `settings.json`.
 
-1.  Open `~/.gemini/settings.json` (or the project-specific
-    `.gemini/settings.json`).
+1.  Open the user `settings.json` file in your user config directory (for
+    example, `~/.config/gemini-cli/settings.json`) or the project-specific
+    `.gemini/settings.json`.
 2.  Add the `mcpServers` block. This tells Gemini: "Run this docker container
     and talk to it."
 

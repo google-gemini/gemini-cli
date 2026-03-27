@@ -12,9 +12,16 @@ import {
   GEMINI_DIR,
   homedir,
   GOOGLE_ACCOUNTS_FILENAME,
+  getUserConfigDir,
+  getUserCacheDir,
+  getUserTmpDir,
   isSubpath,
   resolveToRealPath,
   normalizePath,
+  GEMINI_CLI_HOME_ENV,
+  GEMINI_CACHE_DIR_ENV,
+  GEMINI_CONFIG_DIR_ENV,
+  GEMINI_TMP_DIR_ENV,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
@@ -43,11 +50,16 @@ export class Storage {
   }
 
   static getGlobalGeminiDir(): string {
-    const homeDir = homedir();
-    if (!homeDir) {
-      return path.join(os.tmpdir(), GEMINI_DIR);
-    }
-    return path.join(homeDir, GEMINI_DIR);
+    return getUserConfigDir();
+  }
+
+  private static shouldUseDeprecatedHomeLayout(): boolean {
+    return !!(
+      process.env[GEMINI_CLI_HOME_ENV] &&
+      !process.env[GEMINI_CONFIG_DIR_ENV] &&
+      !process.env[GEMINI_CACHE_DIR_ENV] &&
+      !process.env[GEMINI_TMP_DIR_ENV]
+    );
   }
 
   static getGlobalAgentsDir(): string {
@@ -118,6 +130,13 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policy_integrity.json');
   }
 
+  static getGlobalCacheDir(): string {
+    if (Storage.shouldUseDeprecatedHomeLayout()) {
+      return path.join(Storage.getGlobalGeminiDir(), 'cache');
+    }
+    return getUserCacheDir();
+  }
+
   private static getSystemConfigDir(): string {
     if (os.platform() === 'darwin') {
       return '/Library/Application Support/GeminiCli';
@@ -140,7 +159,10 @@ export class Storage {
   }
 
   static getGlobalTempDir(): string {
-    return path.join(Storage.getGlobalGeminiDir(), TMP_DIR_NAME);
+    if (Storage.shouldUseDeprecatedHomeLayout()) {
+      return path.join(Storage.getGlobalGeminiDir(), TMP_DIR_NAME);
+    }
+    return getUserTmpDir();
   }
 
   static getGlobalBinDir(): string {
@@ -223,6 +245,8 @@ export class Storage {
         return;
       }
 
+      await this.migrateLegacyTempRoot();
+
       const registryPath = path.join(
         Storage.getGlobalGeminiDir(),
         'projects.json',
@@ -238,6 +262,23 @@ export class Storage {
     })();
 
     return this.initPromise;
+  }
+
+  private async migrateLegacyTempRoot(): Promise<void> {
+    const currentTempRoot = Storage.getGlobalTempDir();
+    const legacyTempRoot = path.join(
+      Storage.getGlobalGeminiDir(),
+      TMP_DIR_NAME,
+    );
+
+    if (
+      normalizePath(resolveToRealPath(currentTempRoot)) ===
+      normalizePath(resolveToRealPath(legacyTempRoot))
+    ) {
+      return;
+    }
+
+    await StorageMigration.migrateDirectory(legacyTempRoot, currentTempRoot);
   }
 
   /**

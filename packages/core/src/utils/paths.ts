@@ -9,21 +9,158 @@ import os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { coreEvents } from './events.js';
 
 export const GEMINI_DIR = '.gemini';
+export const USER_CONFIG_DIR_NAME = 'gemini-cli';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
+export const GEMINI_CONFIG_DIR_ENV = 'GEMINI_CONFIG_DIR';
+export const GEMINI_CACHE_DIR_ENV = 'GEMINI_CACHE_DIR';
+export const GEMINI_TMP_DIR_ENV = 'GEMINI_TMP_DIR';
+export const GEMINI_CLI_HOME_ENV = 'GEMINI_CLI_HOME';
+
+let warnedAboutDualUserConfigDirs = false;
+
+export function resetUserConfigDirWarningForTesting(): void {
+  warnedAboutDualUserConfigDirs = false;
+}
 
 /**
  * Returns the home directory.
- * If GEMINI_CLI_HOME environment variable is set, it returns its value.
+ * If the deprecated GEMINI_CLI_HOME environment variable is set, it returns its value.
  * Otherwise, it returns the user's home directory.
  */
 export function homedir(): string {
-  const envHome = process.env['GEMINI_CLI_HOME'];
+  const envHome = process.env[GEMINI_CLI_HOME_ENV];
   if (envHome) {
     return envHome;
   }
   return os.homedir();
+}
+
+function getAbsoluteEnvPath(envVar: string): string | undefined {
+  const value = process.env[envVar];
+  if (!value || !path.isAbsolute(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+function ensureDirectoryExists(dir: string): string {
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function validateUserDirectoryEnvironment(): void {
+  const exactDirOverrides = [
+    GEMINI_CONFIG_DIR_ENV,
+    GEMINI_CACHE_DIR_ENV,
+    GEMINI_TMP_DIR_ENV,
+  ].filter((envVar) => process.env[envVar]);
+
+  if (process.env[GEMINI_CLI_HOME_ENV] && exactDirOverrides.length > 0) {
+    throw new Error(
+      `${exactDirOverrides.map((envVar) => `$${envVar}`).join(', ')} and deprecated $${GEMINI_CLI_HOME_ENV} cannot both be set. Unset $${GEMINI_CLI_HOME_ENV} and keep the exact $*_DIR overrides you want to use.`,
+    );
+  }
+}
+
+/**
+ * Returns the user-level Gemini config directory.
+ * Preference order:
+ * 1. GEMINI_CONFIG_DIR exact override
+ * 2. Deprecated GEMINI_CLI_HOME root override
+ * 3. XDG config dir at $XDG_CONFIG_HOME/gemini-cli
+ * 4. Legacy user config dir if it already exists
+ * 5. Create and use the XDG config dir
+ */
+export function getUserConfigDir(): string {
+  const explicitConfigDir = process.env[GEMINI_CONFIG_DIR_ENV];
+  if (explicitConfigDir) {
+    return ensureDirectoryExists(explicitConfigDir);
+  }
+
+  const envHome = process.env[GEMINI_CLI_HOME_ENV];
+  if (envHome) {
+    return path.join(envHome, GEMINI_DIR);
+  }
+
+  const homeDir = os.homedir();
+  if (!homeDir) {
+    return path.join(os.tmpdir(), GEMINI_DIR);
+  }
+
+  const legacyDir = path.join(homeDir, GEMINI_DIR);
+  const xdgConfigHome =
+    getAbsoluteEnvPath('XDG_CONFIG_HOME') ?? path.join(homeDir, '.config');
+  const xdgGeminiDir = path.join(xdgConfigHome, USER_CONFIG_DIR_NAME);
+
+  const xdgExists = fs.existsSync(xdgGeminiDir);
+  const legacyExists = fs.existsSync(legacyDir);
+
+  if (xdgExists && legacyExists) {
+    const resolveRealPath = (dir: string): string => {
+      try {
+        return fs.realpathSync(dir);
+      } catch {
+        return dir;
+      }
+    };
+    const xdgRealPath = resolveRealPath(xdgGeminiDir);
+    const legacyRealPath = resolveRealPath(legacyDir);
+
+    if (xdgRealPath !== legacyRealPath && !warnedAboutDualUserConfigDirs) {
+      warnedAboutDualUserConfigDirs = true;
+      coreEvents.emitFeedback(
+        'warning',
+        [
+          `Both user config directories exist: ${xdgGeminiDir} and ${legacyDir}.`,
+          `Gemini CLI will use ${xdgGeminiDir}.`,
+          'Options:',
+          `1) Merge all config into ${xdgGeminiDir} (suggested)`,
+          `2) Merge all config into ${legacyDir} (deprecated, legacy directory)`,
+          `3) Do nothing, continue receiving this warning (before using ${xdgGeminiDir})`,
+          `Or set $${GEMINI_CONFIG_DIR_ENV} to choose an exact user config directory explicitly.`,
+        ].join(' '),
+      );
+    }
+  }
+
+  if (xdgExists) {
+    return xdgGeminiDir;
+  }
+
+  if (legacyExists) {
+    return legacyDir;
+  }
+
+  fs.mkdirSync(xdgGeminiDir, { recursive: true });
+  return xdgGeminiDir;
+}
+
+export function getUserCacheDir(): string {
+  const explicitCacheDir = process.env[GEMINI_CACHE_DIR_ENV];
+  if (explicitCacheDir) {
+    return explicitCacheDir;
+  }
+
+  const homeDir = os.homedir();
+  if (!homeDir) {
+    return path.join(os.tmpdir(), USER_CONFIG_DIR_NAME);
+  }
+
+  const xdgCacheHome =
+    getAbsoluteEnvPath('XDG_CACHE_HOME') ?? path.join(homeDir, '.cache');
+  return path.join(xdgCacheHome, USER_CONFIG_DIR_NAME);
+}
+
+export function getUserTmpDir(): string {
+  const explicitTmpDir = process.env[GEMINI_TMP_DIR_ENV];
+  if (explicitTmpDir) {
+    return explicitTmpDir;
+  }
+
+  return path.join(getUserCacheDir(), 'tmp');
 }
 
 /**

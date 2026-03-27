@@ -12,12 +12,13 @@ import {
   debugLogger,
   GEMINI_DIR,
   getErrorMessage,
+  Storage,
   type TelemetrySettings,
-  homedir,
+  validateUserDirectoryEnvironment,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
-export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
+export const USER_SETTINGS_DIR = Storage.getGlobalGeminiDir();
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
 // TODO: Ensure full compatibility with V2 nested settings structure (settings.schema.json).
@@ -71,6 +72,8 @@ export interface CheckpointingSettings {
  * settings.json).
  */
 export function loadSettings(workspaceDir: string): Settings {
+  validateUserDirectoryEnvironment();
+
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];

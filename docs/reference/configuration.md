@@ -42,9 +42,14 @@ locations for these files:
     settings have the lowest precedence and are intended to be overridden by
     user, project, or system override settings.
 - **User settings file:**
-  - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
+  - **Location:** `settings.json` in your
+    [configuration directory](#configuration-directory) (usually
+    `~/.config/gemini-cli/settings.json` on Unix-like systems, where `~` is your
+    home directory).
   - **Scope:** Applies to all Gemini CLI sessions for the current user. User
     settings override system defaults.
+  - **Resolution details:** See
+    [Configuration directory](#configuration-directory).
 - **Project settings file:**
   - **Location:** `.gemini/settings.json` within your project's root directory.
   - **Scope:** Applies only when running Gemini CLI from that specific project.
@@ -59,6 +64,51 @@ locations for these files:
     System settings act as overrides, taking precedence over all other settings
     files. May be useful for system administrators at enterprises to have
     controls over users' Gemini CLI setups.
+
+## User directories
+
+### Configuration directory
+
+Gemini CLI stores user-level settings, policies, commands, skills, agents,
+memories, and history in a configuration directory.
+
+- **Exact override:** `$GEMINI_CONFIG_DIR`. Gemini CLI uses this exact directory
+  and creates it if it does not exist.
+- **Deprecated root override:** `$GEMINI_CLI_HOME`. Gemini CLI uses
+  `$GEMINI_CLI_HOME/.gemini`.
+- **Default:** `$XDG_CONFIG_HOME/gemini-cli`, usually `~/.config/gemini-cli` on
+  Unix-like systems.
+- **Legacy fallback:** A pre-existing legacy `~/.gemini` directory is used only
+  if the configuration directory does not exist.
+- **If both exist:** Gemini CLI warns at startup for that session and uses the
+  configuration directory.
+- **If neither exists:** Gemini CLI creates and uses the configuration
+  directory.
+
+### Cache directory
+
+Gemini CLI stores cache-like artefacts in a cache directory.
+
+- **Exact override:** `$GEMINI_CACHE_DIR`. Gemini CLI uses this exact directory.
+- **Deprecated root override:** `$GEMINI_CLI_HOME`. Gemini CLI uses
+  `$GEMINI_CLI_HOME/.gemini/cache`.
+- **Default:** `$XDG_CACHE_HOME/gemini-cli`, usually `~/.cache/gemini-cli` on
+  Unix-like systems.
+
+### Temporary directory
+
+Gemini CLI stores project-scoped temporary artefacts here, including plans,
+checkpoints, chats, shell history, telemetry collector files, and background
+process logs.
+
+- **Exact override:** `$GEMINI_TMP_DIR`. Gemini CLI uses this exact directory.
+- **Deprecated root override:** `$GEMINI_CLI_HOME`. Gemini CLI uses
+  `$GEMINI_CLI_HOME/.gemini/tmp`.
+- **Default:** The `tmp/` directory under the cache directory, usually
+  `~/.cache/gemini-cli/tmp` on Unix-like systems.
+
+If `$GEMINI_CLI_HOME` is set together with any exact `*_DIR` override, Gemini
+CLI exits at startup with an error.
 
 **Note on environment variables in settings:** String values within your
 `settings.json` and `gemini-extension.json` files can reference environment
@@ -79,6 +129,9 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 
 - [Custom sandbox profiles](#sandboxing) (e.g.,
   `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
+
+The project-level `.gemini` directory is unchanged by the XDG user-config
+update. It remains the workspace-local location for project-specific files.
 
 ### Available settings in `settings.json`
 
@@ -143,8 +196,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.plan.directory`** (string):
   - **Description:** The directory where planning artifacts are stored. If not
-    specified, defaults to the system temporary directory. A custom directory
-    requires a policy to allow write access in Plan Mode.
+    specified, Gemini CLI uses its managed temporary directory. A custom
+    directory requires a policy to allow write access in Plan Mode.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1943,9 +1996,10 @@ of v0.3.0:
 
 The CLI keeps a history of shell commands you run. To avoid conflicts between
 different projects, this history is stored in a project-specific directory
-within your user's home folder.
+within Gemini CLI's [temporary directory](#temporary-directory).
 
-- **Location:** `~/.gemini/tmp/<project_hash>/shell_history`
+- **Location:** `tmp/<project_hash>/shell_history` in your temporary directory
+  (for example, `~/.cache/gemini-cli/tmp/<project_hash>/shell_history`)
   - `<project_hash>` is a unique identifier generated from your project's root
     path.
   - The history is stored in a file named `shell_history`.
@@ -1965,7 +2019,9 @@ loading order is:
 2.  If not found, it searches upwards in parent directories until it finds an
     `.env` file or reaches the project root (identified by a `.git` folder) or
     the home directory.
-3.  If still not found, it looks for `~/.env` (in the user's home directory).
+3.  If still not found, it looks for `.env` in your
+    [configuration directory](#configuration-directory) (for example,
+    `~/.config/gemini-cli/.env`).
 
 **Environment variable exclusion:** Some environment variables (like `DEBUG` and
 `DEBUG_MODE`) are automatically excluded from being loaded from project `.env`
@@ -1989,14 +2045,29 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     is useful when running Gemini CLI in a standalone terminal while still
     wanting to associate it with a specific IDE instance.
   - Overrides the automatic IDE detection logic.
-- **`GEMINI_CLI_HOME`**:
-  - Specifies the root directory for Gemini CLI's user-level configuration and
-    storage.
-  - By default, this is the user's system home directory. The CLI will create a
-    `.gemini` folder inside this directory.
-  - Useful for shared compute environments or keeping CLI state isolated.
-  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
-    PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
+- **`$GEMINI_CONFIG_DIR`**:
+  - Specifies the exact configuration directory for Gemini CLI.
+  - Gemini CLI creates this directory if it does not exist.
+  - Example: `export GEMINI_CONFIG_DIR="/path/to/gemini-config"` (Windows
+    PowerShell: `$env:GEMINI_CONFIG_DIR="C:\path\to\gemini-config"`)
+- **`$GEMINI_CACHE_DIR`**:
+  - Specifies the exact cache directory for Gemini CLI.
+  - Example: `export GEMINI_CACHE_DIR="/path/to/gemini-cache"` (Windows
+    PowerShell: `$env:GEMINI_CACHE_DIR="C:\path\to\gemini-cache"`)
+- **`$GEMINI_TMP_DIR`**:
+  - Specifies the exact temporary directory for Gemini CLI.
+  - Example: `export GEMINI_TMP_DIR="/path/to/gemini-tmp"` (Windows PowerShell:
+    `$env:GEMINI_TMP_DIR="C:\path\to\gemini-tmp"`)
+- **`$GEMINI_CLI_HOME`** (deprecated):
+  - Specifies a root directory for Gemini CLI's legacy `.gemini` layout.
+  - When set, Gemini CLI uses `$GEMINI_CLI_HOME/.gemini`,
+    `$GEMINI_CLI_HOME/.gemini/cache`, and `$GEMINI_CLI_HOME/.gemini/tmp`.
+  - Gemini CLI exits at startup if `$GEMINI_CLI_HOME` is set together with any
+    of `$GEMINI_CONFIG_DIR`, `$GEMINI_CACHE_DIR`, or `$GEMINI_TMP_DIR`.
+  - Useful only for compatibility with existing isolated workflows that still
+    expect the `.gemini` subdirectory.
+  - Example: `export GEMINI_CLI_HOME="/path/to/user/root"` (Windows PowerShell:
+    `$env:GEMINI_CLI_HOME="C:\path\to\user\root"`)
 - **`GEMINI_CLI_SURFACE`**:
   - Specifies a custom label to include in the `User-Agent` header for API
     traffic reporting.
@@ -2317,8 +2388,8 @@ conventions and context.
   general). The exact concatenation order and final context can be inspected
   using the `/memory show` command. The typical loading order is:
   1.  **Global context file:**
-      - Location: `~/.gemini/<configured-context-filename>` (e.g.,
-        `~/.gemini/GEMINI.md` in your user home directory).
+      - Location: `<configured-context-filename>` in your user config directory
+        (for example, `~/.config/gemini-cli/GEMINI.md`).
       - Scope: Provides default instructions for all your projects.
   2.  **Project root and ancestors context files:**
       - Location: The CLI searches for the configured context file in the

@@ -376,7 +376,7 @@ describe('BrowserManager', () => {
       expect(args).not.toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
       expect(args).not.toContain('-y');
-      // Persistent mode should set the default --userDataDir under ~/.gemini
+      // Persistent mode should set the default --userDataDir under ~/.config/gemini-cli
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
       expect(args[userDataDirIndex + 1]).toMatch(/cli-browser-profile$/);

@@ -103,8 +103,12 @@ gemini extensions link <path>
 
 ## Extension format
 
-Gemini CLI loads extensions from `<home>/.gemini/extensions`. Each extension
-must have a `gemini-extension.json` file in its root directory.
+Gemini CLI loads user extensions from the `extensions/` folder in your
+[configuration directory](../reference/configuration.md#configuration-directory)
+(for example, `~/.config/gemini-cli/extensions` on Unix-like systems). If you
+are migrating legacy user extensions, move or merge `~/.gemini/extensions` into
+that directory. Each extension must have a `gemini-extension.json` file in its
+root directory.
 
 ### `gemini-extension.json`
 
@@ -169,7 +173,9 @@ The manifest file defines the extension's behavior and configuration.
   - `directory`: The directory where planning artifacts are stored. This serves
     as a fallback if the user hasn't specified a plan directory in their
     settings. If not specified by either the extension or the user, the default
-    is `~/.gemini/tmp/<project>/<session-id>/plans/`.
+    is `tmp/<project>/<session-id>/plans/` in Gemini CLI's
+    [temporary directory](../reference/configuration.md#temporary-directory)
+    (for example, `~/.cache/gemini-cli/tmp/<project>/<session-id>/plans/`).
 
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes

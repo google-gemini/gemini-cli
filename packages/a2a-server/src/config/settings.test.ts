@@ -9,7 +9,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  validateUserDirectoryEnvironment,
+} from '@google/gemini-cli-core';
 
 const mocks = vi.hoisted(() => {
   const suffix = Math.random().toString(36).slice(2);
@@ -18,28 +21,26 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:os')>();
-  const path = await import('node:path');
-  return {
-    ...actual,
-    homedir: () => path.join(actual.tmpdir(), `gemini-home-${mocks.suffix}`),
-  };
-});
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const path = await import('node:path');
-  const os = await import('node:os');
   return {
     ...actual,
-    GEMINI_DIR: '.gemini',
     debugLogger: {
       error: vi.fn(),
     },
     getErrorMessage: (error: unknown) => String(error),
-    homedir: () => path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`),
+    validateUserDirectoryEnvironment: vi.fn(),
+    Storage: class extends actual.Storage {
+      static override getGlobalGeminiDir() {
+        return path.join(
+          os.tmpdir(),
+          `gemini-home-${mocks.suffix}`,
+          '.config',
+          'gemini-cli',
+        );
+      }
+    },
   };
 });
 
@@ -49,11 +50,14 @@ describe('loadSettings', () => {
     os.tmpdir(),
     `gemini-workspace-${mocks.suffix}`,
   );
-  const mockGeminiHomeDir = path.join(mockHomeDir, '.gemini');
+  const mockGeminiHomeDir = path.join(mockHomeDir, '.config', 'gemini-cli');
   const mockGeminiWorkspaceDir = path.join(mockWorkspaceDir, '.gemini');
 
   beforeEach(() => {
     vi.clearAllMocks();
+    expect(USER_SETTINGS_PATH).toBe(
+      path.join(mockGeminiHomeDir, 'settings.json'),
+    );
     // Create the directories using the real fs
     if (!fs.existsSync(mockGeminiHomeDir)) {
       fs.mkdirSync(mockGeminiHomeDir, { recursive: true });
@@ -110,6 +114,7 @@ describe('loadSettings', () => {
     expect(result.coreTools).toEqual(['tool1', 'tool2']);
     expect(result.mcpServers).toHaveProperty('server1');
     expect(result.fileFiltering?.respectGitIgnore).toBe(true);
+    expect(validateUserDirectoryEnvironment).toHaveBeenCalled();
   });
 
   it('should load experimental settings correctly', () => {

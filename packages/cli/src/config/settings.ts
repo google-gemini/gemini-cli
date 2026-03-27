@@ -17,7 +17,7 @@ import {
   getFsErrorMessage,
   Storage,
   coreEvents,
-  homedir,
+  validateUserDirectoryEnvironment,
   type AdminControlsSettings,
   createCache,
 } from '@google/gemini-cli-core';
@@ -508,14 +508,10 @@ function findEnvFile(startDir: string): string | null {
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(homedir(), GEMINI_DIR, '.env');
+      // Check the user-level config dir as fallback.
+      const homeGeminiEnvPath = path.join(Storage.getGlobalGeminiDir(), '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
         return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
       }
       return null;
     }
@@ -643,6 +639,12 @@ export function isWorktreeEnabled(settings: LoadedSettings): boolean {
 export function loadSettings(
   workspaceDir: string = process.cwd(),
 ): LoadedSettings {
+  try {
+    validateUserDirectoryEnvironment();
+  } catch (error) {
+    throw new FatalConfigError(getErrorMessage(error));
+  }
+
   const normalizedWorkspaceDir = path.resolve(workspaceDir);
   return settingsCache.getOrCreate(normalizedWorkspaceDir, () =>
     _doLoadSettings(normalizedWorkspaceDir),

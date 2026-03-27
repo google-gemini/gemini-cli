@@ -25,8 +25,9 @@ Slash commands provide meta-level control over the CLI itself.
       and remote agents.
     - **Usage:** `/agents list`
   - **`reload`** (alias: `refresh`):
-    - **Description:** Rescans agent directories (`~/.gemini/agents` and
-      `.gemini/agents`) and reloads the registry.
+    - **Description:** Rescans the user agent directory in your user config
+      directory (for example, `~/.config/gemini-cli/agents`) and the project
+      agent directory (`.gemini/agents`), then reloads the registry.
     - **Usage:** `/agents reload`
   - **`enable`**:
     - **Description:** Enables a specific subagent.
@@ -85,8 +86,12 @@ Slash commands provide meta-level control over the CLI itself.
       `<tag>` for identifying the conversation state.
     - **Details on checkpoint location:** The default locations for saved chat
       checkpoints are:
-      - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
-      - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
+      - Linux/macOS: `tmp/<project_hash>/` in your
+        [temporary directory](./configuration.md#temporary-directory) (for
+        example, `~/.cache/gemini-cli/tmp/<project_hash>/`)
+      - Windows: `tmp\<project_hash>\` in your
+        [temporary directory](./configuration.md#temporary-directory) (for
+        example, `%USERPROFILE%\.cache\gemini-cli\tmp\<project_hash>\`)
       - **Behavior:** Chats are saved into a project-specific directory,
         determined by where you run the CLI. Consequently, saved chats are only
         accessible when working within that same project.
@@ -115,8 +120,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **Sub-commands:**
   - **`reload`**:
     - **Description:** Reload custom command definitions from all sources
-      (user-level `~/.gemini/commands/`, project-level
-      `<project>/.gemini/commands/`, MCP prompts, and extensions). Use this to
+      (user-level `commands/` in your user config directory, for example
+      `~/.config/gemini-cli/commands/`; project-level
+      `<project>/.gemini/commands/`; MCP prompts; and extensions). Use this to
       pick up new or modified `.toml` files without restarting the CLI.
     - **Usage:** `/commands reload`
 
@@ -483,8 +489,9 @@ Slash commands provide meta-level control over the CLI itself.
   - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`,
     `b`, `e`; go to line start/end with `0`, `$`, `^`; go to specific lines with
     `G` (or `gg` for first line)
-  - **Persistent setting:** Vim mode preference is saved to
-    `~/.gemini/settings.json` and restored between sessions
+  - **Persistent setting:** Vim mode preference is saved to `settings.json` in
+    your user config directory (for example,
+    `~/.config/gemini-cli/settings.json`) and restored between sessions
   - **Repeat last command:** Use `.` to repeat the last editing operation
   - **Status indicator:** When enabled, shows `[NORMAL]` or `[INSERT]` in the
     footer

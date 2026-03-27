@@ -15,6 +15,7 @@ import {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   type FileFilteringOptions,
 } from '../config/constants.js';
+import { Storage } from '../config/storage.js';
 import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
@@ -538,7 +539,7 @@ async function findUpwardGeminiFiles(
   let currentDir = normalizePath(startDir);
   const resolvedStopDir = normalizePath(stopDir);
   const geminiMdFilenames = getAllGeminiMdFilenames();
-  const globalGeminiDir = normalizePath(path.join(homedir(), GEMINI_DIR));
+  const globalGeminiDir = normalizePath(Storage.getGlobalGeminiDir());
 
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Starting upward search from',

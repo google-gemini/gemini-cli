@@ -3691,7 +3691,7 @@ describe('loadCliConfig mcpEnabled', () => {
   describe('extension plan settings', () => {
     beforeEach(() => {
       vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
-        '/mock/home/user/.gemini/tmp/test-project',
+        '/mock/home/user/.config/gemini-cli/tmp/test-project',
       );
     });
 

@@ -665,12 +665,22 @@ export class TestRig {
       }
     }
 
-    return {
+    const testEnv: Record<string, string | undefined> = {
       ...cleanEnv,
       GEMINI_CLI_HOME: this.homeDir!,
       GEMINI_PTY_INFO: 'child_process',
       ...extraEnv,
     };
+
+    if (
+      this.fakeResponsesPath &&
+      testEnv['GEMINI_API_KEY'] === undefined &&
+      testEnv['GOOGLE_API_KEY'] === undefined
+    ) {
+      testEnv['GEMINI_API_KEY'] = 'test-api-key';
+    }
+
+    return testEnv;
   }
 
   run(options: {

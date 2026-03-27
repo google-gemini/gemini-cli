@@ -20,7 +20,7 @@ import {
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
-import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import { buildArgsPatterns, escapeRegex, isSafeRegExp } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -82,12 +82,41 @@ export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 // Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
 export const ALWAYS_ALLOW_PRIORITY =
   WORKSPACE_POLICY_TIER + ALWAYS_ALLOW_PRIORITY_OFFSET;
+const PLAN_MODE_STORAGE_RULE_PRIORITY = DEFAULT_POLICY_TIER + 0.07;
+const PLAN_MODE_STORAGE_RULE_SOURCE = 'Dynamic (Plan Mode Storage)';
 
 /**
  * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
  */
 export function getAlwaysAllowPriorityFraction(): number {
   return Math.round((ALWAYS_ALLOW_PRIORITY % 1) * 1000);
+}
+
+function buildPortablePathPattern(filePath: string): string {
+  return escapeRegex(path.resolve(filePath))
+    .replace(/\\\\/g, '[\\\\/]+')
+    .replace(/\//g, '[\\\\/]+');
+}
+
+function addDynamicPlanModeStorageRules(rules: PolicyRule[]): void {
+  const tempRootPattern = buildPortablePathPattern(Storage.getGlobalTempDir());
+  const planFilePatterns = [
+    `\\\\0"file_path":"${tempRootPattern}[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[^"\\\\/]+\\.md"\\\\0`,
+    `\\\\0"file_path":"${tempRootPattern}[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[^"\\\\/]+\\.md"\\\\0`,
+  ];
+
+  for (const toolName of ['write_file', 'replace']) {
+    for (const argsPattern of planFilePatterns) {
+      rules.push({
+        toolName,
+        decision: PolicyDecision.ALLOW,
+        priority: PLAN_MODE_STORAGE_RULE_PRIORITY,
+        modes: [ApprovalMode.PLAN],
+        argsPattern: new RegExp(argsPattern),
+        source: PLAN_MODE_STORAGE_RULE_SOURCE,
+      });
+    }
+  }
 }
 
 /**
@@ -521,6 +550,8 @@ export async function createPolicyEngineConfig(
       });
     }
   }
+
+  addDynamicPlanModeStorageRules(rules);
 
   return {
     rules,
