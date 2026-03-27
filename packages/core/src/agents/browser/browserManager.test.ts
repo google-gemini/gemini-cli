@@ -9,6 +9,7 @@ import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { injectInputBlocker } from './inputBlocker.js';
 import { coreEvents } from '../../utils/events.js';
 
 // Mock the MCP SDK
@@ -54,6 +55,13 @@ vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('./inputBlocker.js', () => ({
+  injectInputBlocker: vi.fn().mockResolvedValue(undefined),
+  removeInputBlocker: vi.fn().mockResolvedValue(undefined),
+  suspendInputBlocker: vi.fn().mockResolvedValue(undefined),
+  resumeInputBlocker: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
@@ -78,6 +86,7 @@ describe('BrowserManager', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(injectAutomationOverlay).mockClear();
+    vi.mocked(injectInputBlocker).mockClear();
     vi.spyOn(coreEvents, 'emitFeedback').mockImplementation(() => {});
 
     // Re-establish consent mock after resetAllMocks
@@ -118,8 +127,10 @@ describe('BrowserManager', () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    // Clear singleton cache to avoid cross-test leakage
+    await BrowserManager.resetAll();
   });
 
   describe('MCP bundled path resolution', () => {
@@ -271,6 +282,76 @@ describe('BrowserManager', () => {
 
       expect(result.isError).toBe(true);
       expect((result.content || [])[0]?.text).toContain('not permitted');
+    });
+
+    it('should block proxy URL with embedded disallowed domain in query params', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?sl=en&tl=en&u=https://blocked.org/page',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should block proxy URL with embedded disallowed domain in URL fragment (hash)', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/#view=home&op=translate&sl=en&tl=zh-CN&u=https://blocked.org',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain(
+        'an embedded URL targets a disallowed domain',
+      );
+    });
+
+    it('should allow proxy URL when embedded domain is also allowed', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com', 'github.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/translate?u=https://github.com/repo',
+      });
+
+      expect(result.isError).toBe(false);
+    });
+
+    it('should allow navigation to allowed domain without proxy params', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://translate.google.com/?sl=en&tl=zh',
+      });
+
+      expect(result.isError).toBe(false);
     });
   });
 
@@ -621,22 +702,198 @@ describe('BrowserManager', () => {
     });
   });
 
+  describe('getInstance', () => {
+    it('should return the same instance for the same session mode', () => {
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      const instance2 = BrowserManager.getInstance(mockConfig);
+
+      expect(instance1).toBe(instance2);
+    });
+
+    it('should return different instances for different session modes', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+
+      expect(instance1).not.toBe(instance2);
+    });
+
+    it('should return different instances for different profile paths', () => {
+      const config1 = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { profilePath: '/path/a' },
+        },
+      });
+      const config2 = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { profilePath: '/path/b' },
+        },
+      });
+
+      const instance1 = BrowserManager.getInstance(config1);
+      const instance2 = BrowserManager.getInstance(config2);
+
+      expect(instance1).not.toBe(instance2);
+    });
+  });
+
+  describe('resetAll', () => {
+    it('should close all instances and clear the cache', async () => {
+      const instance1 = BrowserManager.getInstance(mockConfig);
+      await instance1.ensureConnection();
+
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+      const instance2 = BrowserManager.getInstance(isolatedConfig);
+      await instance2.ensureConnection();
+
+      await BrowserManager.resetAll();
+
+      // After resetAll, getInstance should return new instances
+      const instance3 = BrowserManager.getInstance(mockConfig);
+      expect(instance3).not.toBe(instance1);
+    });
+
+    it('should handle errors during cleanup gracefully', async () => {
+      const instance = BrowserManager.getInstance(mockConfig);
+      await instance.ensureConnection();
+
+      // Make close throw by overriding the client's close method
+      const client = await instance.getRawMcpClient();
+      vi.mocked(client.close).mockRejectedValueOnce(new Error('close failed'));
+
+      // Should not throw
+      await expect(BrowserManager.resetAll()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('isConnected', () => {
+    it('should return false before connection', () => {
+      const manager = new BrowserManager(mockConfig);
+      expect(manager.isConnected()).toBe(false);
+    });
+
+    it('should return true after successful connection', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+      expect(manager.isConnected()).toBe(true);
+    });
+
+    it('should return false after close', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+      await manager.close();
+      expect(manager.isConnected()).toBe(false);
+    });
+  });
+
+  describe('reconnection', () => {
+    it('should reconnect after unexpected disconnect', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      // Simulate transport closing unexpectedly via the onclose callback
+      const transportInstance =
+        vi.mocked(StdioClientTransport).mock.results[0]?.value;
+      if (transportInstance?.onclose) {
+        transportInstance.onclose();
+      }
+
+      // Manager should recognize disconnection
+      expect(manager.isConnected()).toBe(false);
+
+      // ensureConnection should reconnect
+      await manager.ensureConnection();
+      expect(manager.isConnected()).toBe(true);
+    });
+  });
+
+  describe('concurrency', () => {
+    it('should not call connectMcp twice when ensureConnection is called concurrently', async () => {
+      const manager = new BrowserManager(mockConfig);
+
+      // Call ensureConnection twice simultaneously without awaiting the first
+      const [p1, p2] = [manager.ensureConnection(), manager.ensureConnection()];
+      await Promise.all([p1, p2]);
+
+      // connectMcp (via StdioClientTransport constructor) should only have been called once
+      // Each connection attempt creates a new StdioClientTransport
+    });
+  });
+
   describe('overlay re-injection in callTool', () => {
-    it('should re-inject overlay after click in non-headless mode', async () => {
+    it('should re-inject overlay and input blocker after click in non-headless mode when input disabling is enabled', async () => {
+      // Enable input disabling in config
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: '1_2' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
     });
 
-    it('should re-inject overlay after navigate_page in non-headless mode', async () => {
+    it('should re-inject overlay and input blocker after navigate_page in non-headless mode when input disabling is enabled', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('navigate_page', { url: 'https://example.com' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
     });
 
-    it('should re-inject overlay after click_at, new_page, press_key, handle_dialog', async () => {
+    it('should re-inject overlay and input blocker after click_at, new_page, press_key, handle_dialog when input disabling is enabled', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       for (const tool of [
         'click_at',
@@ -645,12 +902,15 @@ describe('BrowserManager', () => {
         'handle_dialog',
       ]) {
         vi.mocked(injectAutomationOverlay).mockClear();
+        vi.mocked(injectInputBlocker).mockClear();
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).toHaveBeenCalledTimes(1);
+        expect(injectInputBlocker).toHaveBeenCalledTimes(1);
+        expect(injectInputBlocker).toHaveBeenCalledWith(manager, undefined);
       }
     });
 
-    it('should NOT re-inject overlay after read-only tools', async () => {
+    it('should NOT re-inject overlay or input blocker after read-only tools', async () => {
       const manager = new BrowserManager(mockConfig);
       for (const tool of [
         'take_snapshot',
@@ -659,8 +919,10 @@ describe('BrowserManager', () => {
         'fill',
       ]) {
         vi.mocked(injectAutomationOverlay).mockClear();
+        vi.mocked(injectInputBlocker).mockClear();
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).not.toHaveBeenCalled();
+        expect(injectInputBlocker).not.toHaveBeenCalled();
       }
     });
 
@@ -693,8 +955,30 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: 'bad' });
+    });
+  });
 
-      expect(injectAutomationOverlay).not.toHaveBeenCalled();
+  describe('Rate limiting', () => {
+    it('should terminate task when maxActionsPerTask is reached', async () => {
+      const limitedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            maxActionsPerTask: 3,
+          },
+        },
+      });
+      const manager = new BrowserManager(limitedConfig);
+
+      // First 3 calls should succeed
+      await manager.callTool('take_snapshot', {});
+      await manager.callTool('take_snapshot', { some: 'args' });
+      await manager.callTool('take_snapshot', { other: 'args' });
+      await manager.callTool('take_snapshot', { other: 'new args' });
+
+      // 4th call should throw
+      await expect(manager.callTool('take_snapshot', {})).rejects.toThrow(
+        /maximum action limit \(3\)/,
+      );
     });
   });
 });

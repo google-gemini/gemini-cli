@@ -46,6 +46,7 @@ export * from './core/geminiRequest.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
+export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
@@ -83,12 +84,17 @@ export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/googleErrors.js';
 export * from './utils/fileUtils.js';
+export * from './utils/sessionOperations.js';
 export * from './utils/planUtils.js';
 export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
-export { PolicyDecision, ApprovalMode } from './policy/types.js';
+export {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_YOLO_ALLOW_ALL,
+} from './policy/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
@@ -126,7 +132,7 @@ export * from './services/FolderTrustDiscoveryService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sandboxedFileSystemService.js';
-export * from './services/windowsSandboxManager.js';
+export * from './sandbox/windows/WindowsSandboxManager.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
 export * from './services/trackerService.js';
@@ -180,6 +186,8 @@ export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
 
+// Export browser session management
+export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';
 // Export agent session interface
 export * from './agent/agent-session.js';
 export * from './agent/legacy-agent-session.js';

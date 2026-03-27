@@ -10,6 +10,8 @@ import { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
+import type { ConversationRecord } from '../services/chatRecordingService.js';
+export type { ConversationRecord };
 import {
   AuthType,
   createContentGenerator,
@@ -231,6 +233,25 @@ export interface ResolvedExtensionSetting {
   source?: string;
 }
 
+export interface TrajectoryProvider {
+  /** Prefix used to identify sessions from this provider (e.g., 'ext:') */
+  prefix: string;
+  /** Optional display name for UI Tabs */
+  displayName?: string;
+  /** Return an array of conversational tags/ids */
+  listSessions(workspaceUri?: string): Promise<
+    Array<{
+      id: string;
+      mtime: string;
+      name?: string;
+      displayName?: string;
+      messageCount?: number;
+    }>
+  >;
+  /** Load a single conversation payload */
+  loadSession(id: string): Promise<ConversationRecord | null>;
+}
+
 export interface AgentRunConfig {
   maxTimeMinutes?: number;
   maxTurns?: number;
@@ -331,6 +352,8 @@ export interface BrowserAgentCustomConfig {
   allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /** Maximum number of actions (tool calls) allowed per task. Default: 100 */
+  maxActionsPerTask?: number;
   /** Whether to confirm sensitive actions (e.g., fill_form, evaluate_script). */
   confirmSensitiveActions?: boolean;
   /** Whether to block file uploads. */
@@ -384,6 +407,8 @@ export interface GeminiCLIExtension {
    * Used to migrate an extension to a new repository source.
    */
   migratedTo?: string;
+  /** Loaded JS module for trajectory decoding */
+  trajectoryProviderModule?: TrajectoryProvider;
 }
 
 export interface ExtensionInstallMetadata {
@@ -1027,7 +1052,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -1195,10 +1220,7 @@ export class Config implements McpContext, AgentLoopContext {
         ...params.policyEngineConfig,
         approvalMode: engineApprovalMode,
         disableAlwaysAllow: this.disableAlwaysAllow,
-        toolSandboxEnabled: this.getSandboxEnabled(),
-        sandboxApprovedTools:
-          this.sandboxPolicyManager?.getModeConfig(engineApprovalMode)
-            ?.approvedTools ?? [],
+        sandboxManager: this._sandboxManager,
       },
       checkerRunner,
     );
@@ -1821,6 +1843,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -1833,6 +1859,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -1845,6 +1875,10 @@ export class Config implements McpContext, AgentLoopContext {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      this.getGemini31FlashLiteLaunchedSync(),
+      this.getUseCustomToolModelSync(),
+      this.getHasAccessToPreviewModel(),
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -2335,6 +2369,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.policyEngine.getApprovalMode();
   }
 
+  isPlanMode(): boolean {
+    return this.getApprovalMode() === ApprovalMode.PLAN;
+  }
+
   getPolicyUpdateConfirmationRequest():
     | PolicyUpdateConfirmationRequest
     | undefined {
@@ -2386,10 +2424,7 @@ export class Config implements McpContext, AgentLoopContext {
       );
     }
 
-    this.policyEngine.setApprovalMode(
-      mode,
-      this.sandboxPolicyManager?.getModeConfig(mode)?.approvedTools ?? [],
-    );
+    this.policyEngine.setApprovalMode(mode);
     this.refreshSandboxManager();
 
     const isPlanModeTransition =
@@ -2401,6 +2436,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     if (isPlanModeTransition || isYoloModeTransition) {
       if (this._geminiClient?.isInitialized()) {
+        this._geminiClient.clearCurrentSequenceModel();
         this._geminiClient.setTools().catch((err) => {
           debugLogger.error('Failed to update tools', err);
         });
@@ -2907,12 +2943,21 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Returns whether Gemini 3.1 has been launched.
+   * Returns whether Gemini 3.1 Pro has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
   async getGemini31Launched(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
     return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether Gemini 3.1 Flash Lite has been launched.
+   * This method is async and ensures that experiments are loaded before returning the result.
+   */
+  async getGemini31FlashLiteLaunched(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getGemini31FlashLiteLaunchedSync();
   }
 
   /**
@@ -2952,6 +2997,27 @@ export class Config implements McpContext, AgentLoopContext {
     }
     return (
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
+        ?.boolValue ?? false
+    );
+  }
+
+  /**
+   * Returns whether Gemini 3.1 Flash Lite has been launched.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   * If you need to call this during startup or from an async context, use
+   * getGemini31FlashLiteLaunched instead.
+   */
+  getGemini31FlashLiteLaunchedSync(): boolean {
+    const authType = this.contentGeneratorConfig?.authType;
+    if (
+      authType === AuthType.USE_GEMINI ||
+      authType === AuthType.USE_VERTEX_AI
+    ) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_FLASH_LITE_LAUNCHED]
         ?.boolValue ?? false
     );
   }
@@ -3190,6 +3256,7 @@ export class Config implements McpContext, AgentLoopContext {
         visualModel: customConfig.visualModel,
         allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
+        maxActionsPerTask: customConfig.maxActionsPerTask ?? 100,
         confirmSensitiveActions: customConfig.confirmSensitiveActions,
         blockFileUploads: customConfig.blockFileUploads,
       },

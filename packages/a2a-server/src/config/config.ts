@@ -125,10 +125,10 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    interactive: !isHeadlessMode(),
+    interactive: true,
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
-    enableAgents: settings.experimental?.enableAgents ?? false,
+    enableAgents: settings.experimental?.enableAgents ?? true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {

@@ -14,7 +14,7 @@ import {
 } from 'react';
 import {
   type DOMElement,
-  measureElement,
+  ResizeObserver,
   useApp,
   useStdout,
   useStdin,
@@ -397,7 +397,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const branchName = useGitBranchName(config.getTargetDir());
 
   // Layout measurements
-  const mainControlsRef = useRef<DOMElement>(null);
   // For performance profiling only
   const rootUiRef = useRef<DOMElement>(null);
   const lastTitleRef = useRef<string | null>(null);
@@ -700,7 +699,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
-  const isAuthenticating = authState === AuthState.Unauthenticated;
+  // TODO: Consider handling other auth types that should also skip the blocking screen
+  const isAuthenticating =
+    authState === AuthState.Unauthenticated &&
+    settings.merged.security.auth.selectedType !== AuthType.USE_GEMINI;
 
   // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
@@ -724,7 +726,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Wrap handleDeleteSession to return a Promise for UIActions interface
   const handleDeleteSession = useCallback(
     async (session: SessionInfo): Promise<void> => {
-      handleDeleteSessionSync(session);
+      await handleDeleteSessionSync(session);
     },
     [handleDeleteSessionSync],
   );
@@ -1300,7 +1302,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
-      if (isSlash || (isIdle && isMcpReady)) {
+      const isMcpOrConfigReady = isConfigInitialized && isMcpReady;
+      if ((isSlash && isConfigInitialized) || (isIdle && isMcpOrConfigReady)) {
         if (!isSlash) {
           const permissions = await checkPermissions(submittedValue, config);
           if (permissions.length > 0) {
@@ -1323,10 +1326,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
-        if (isIdle && !isMcpReady && messageQueue.length === 0) {
+        if (isIdle && !isMcpOrConfigReady && messageQueue.length === 0) {
           coreEvents.emitFeedback(
             'info',
-            'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
+            !isConfigInitialized
+              ? 'Initializing... Prompts will be queued.'
+              : 'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
           );
         }
         addMessage(submittedValue);
@@ -1350,6 +1355,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       reset,
       handleHintSubmit,
+      isConfigInitialized,
       triggerExpandHint,
     ],
   );
@@ -1380,32 +1386,55 @@ Logging in with Google... Restarting Gemini CLI to continue.
    * - Any future streaming states not explicitly allowed
    */
   const isInputActive =
-    isConfigInitialized &&
     !initError &&
     !isProcessing &&
     !isResuming &&
-    !!slashCommands &&
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding ||
       streamingState === StreamingState.WaitingForConfirmation) &&
-    !proQuotaRequest;
+    !proQuotaRequest &&
+    !copyModeEnabled;
 
+  const observerRef = useRef<ResizeObserver | null>(null);
   const [controlsHeight, setControlsHeight] = useState(0);
+  const [lastNonCopyControlsHeight, setLastNonCopyControlsHeight] = useState(0);
 
   useLayoutEffect(() => {
-    if (mainControlsRef.current) {
-      const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      const roundedHeight = Math.round(fullFooterMeasurement.height);
-      if (roundedHeight > 0 && roundedHeight !== controlsHeight) {
-        setControlsHeight(roundedHeight);
-      }
+    if (!copyModeEnabled && controlsHeight > 0) {
+      setLastNonCopyControlsHeight(controlsHeight);
     }
-  }, [buffer, terminalWidth, terminalHeight, controlsHeight, isInputActive]);
+  }, [copyModeEnabled, controlsHeight]);
 
-  // Compute available terminal height based on controls measurement
+  const stableControlsHeight =
+    copyModeEnabled && lastNonCopyControlsHeight > 0
+      ? lastNonCopyControlsHeight
+      : controlsHeight;
+
+  const mainControlsRef = useCallback((node: DOMElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const roundedHeight = Math.round(entry.contentRect.height);
+          setControlsHeight((prev) =>
+            roundedHeight !== prev ? roundedHeight : prev,
+          );
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  }, []);
+
+  // Compute available terminal height based on stable controls measurement
   const availableTerminalHeight = Math.max(
     0,
-    terminalHeight - controlsHeight - backgroundShellHeight - 1,
+    terminalHeight - stableControlsHeight - backgroundShellHeight - 1,
   );
 
   config.setShellExecutionConfig({
@@ -2264,6 +2293,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       contextFileNames,
       errorCount,
       availableTerminalHeight,
+      stableControlsHeight,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       staticExtraHeight,
@@ -2385,6 +2415,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       contextFileNames,
       errorCount,
       availableTerminalHeight,
+      stableControlsHeight,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       staticExtraHeight,

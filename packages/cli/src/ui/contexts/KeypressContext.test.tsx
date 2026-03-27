@@ -14,6 +14,7 @@ import {
   useKeypressContext,
   ESC_TIMEOUT,
   FAST_RETURN_TIMEOUT,
+  KeypressPriority,
   type Key,
 } from './KeypressContext.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
@@ -256,6 +257,48 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+      );
+    });
+
+    it('should stop propagation when a higher priority handler returns true', async () => {
+      const higherPriorityHandler = vi.fn(() => true);
+      const lowerPriorityHandler = vi.fn();
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
+
+      act(() => {
+        result.current.subscribe(higherPriorityHandler, KeypressPriority.High);
+        result.current.subscribe(lowerPriorityHandler, KeypressPriority.Normal);
+      });
+
+      act(() => stdin.write('\x1b[27u'));
+
+      expect(higherPriorityHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
+      expect(lowerPriorityHandler).not.toHaveBeenCalled();
+    });
+
+    it('should continue propagation when a higher priority handler does not consume the event', async () => {
+      const higherPriorityHandler = vi.fn(() => false);
+      const lowerPriorityHandler = vi.fn();
+      const { result } = await renderHookWithProviders(() =>
+        useKeypressContext(),
+      );
+
+      act(() => {
+        result.current.subscribe(higherPriorityHandler, KeypressPriority.High);
+        result.current.subscribe(lowerPriorityHandler, KeypressPriority.Normal);
+      });
+
+      act(() => stdin.write('\x1b[27u'));
+
+      expect(higherPriorityHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
+      expect(lowerPriorityHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
       );
     });
 
