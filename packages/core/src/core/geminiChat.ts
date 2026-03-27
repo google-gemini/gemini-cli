@@ -462,7 +462,7 @@ export class GeminiChat {
                   attempt: attempt + 1,
                   maxAttempts: Math.min(maxAttempts, maxMidStreamAttempts),
                   delayMs,
-                  error: errorType,
+                  error: error instanceof Error ? error.message : String(error),
                   errorCode: errorType,
                   model,
                 });
