@@ -108,11 +108,18 @@ export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
 }
 
+const MAX_TELEMETRY_BUFFER_SIZE = 100;
+
 export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
   if (telemetryInitialized) {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fn();
   } else {
+    // 2. If the buffer is full, remove the oldest event to save memory
+    if (telemetryBuffer.length >= MAX_TELEMETRY_BUFFER_SIZE) {
+      telemetryBuffer.shift(); 
+      debugLogger.warn('Telemetry buffer full. Dropping oldest event to prevent OOM.');
+    }
     telemetryBuffer.push(fn);
   }
 }
