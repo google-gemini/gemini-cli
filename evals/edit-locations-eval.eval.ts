@@ -72,6 +72,7 @@ test('capitalize capitalizes the first letter', () => {
     prompt: 'Fix the bug in src/math.ts. Do not run the code.',
     timeout: 180000,
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
       const replaceCalls = toolLogs.filter(
         (t) => t.toolRequest.name === 'replace',
@@ -94,8 +95,6 @@ test('capitalize capitalizes the first letter', () => {
           return null;
         }
       });
-
-      console.log('DEBUG: targetFiles', targetFiles);
 
       expect(
         new Set(targetFiles).size,
