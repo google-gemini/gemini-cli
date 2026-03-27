@@ -31,6 +31,7 @@ import {
   canLoadServer,
 } from '../../config/mcp/mcpServerEnablement.js';
 import { loadSettings } from '../../config/settings.js';
+import { parseSlashCommand } from '../../utils/commands.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
@@ -348,9 +349,9 @@ const reloadCommand: SlashCommand = {
   description: 'Reloads MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: async (
     context: CommandContext,
-    args: string,
   ): Promise<void | SlashCommandActionReturn> => {
     const agentContext = context.services.agentContext;
     const config = agentContext?.config;
@@ -387,7 +388,7 @@ const reloadCommand: SlashCommand = {
     // Reload the slash commands to reflect the changes.
     context.ui.reloadCommands();
 
-    return listCommand.action!(context, args);
+    return listCommand.action!(context, '');
   },
 };
 
@@ -546,5 +547,18 @@ export const mcpCommand: SlashCommand = {
     enableCommand,
     disableCommand,
   ],
-  action: async (context: CommandContext) => listAction(context),
+  action: async (
+    context: CommandContext,
+    args: string,
+  ): Promise<void | SlashCommandActionReturn> => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, mcpCommand.subCommands!);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+      // If no subcommand matches, treat the whole args as a filter for list
+      return listAction(context, false, false, args);
+    }
+    return listAction(context);
+  },
 };

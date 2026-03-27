@@ -227,5 +227,15 @@ describe('parseSlashCommand', () => {
       expect(result.args).toBe('some args');
       expect(result.canonicalPath).toEqual(['parent', 'takes']);
     });
+
+    it('should backtrack if subcommand has takesArgs: false and args are provided (like /plan copy foo)', () => {
+      const result = parseSlashCommand(
+        '/parent notakes some prompt',
+        backtrackingCommands,
+      );
+      expect(result.commandToExecute?.name).toBe('parent');
+      expect(result.args).toBe('notakes some prompt');
+      expect(result.canonicalPath).toEqual(['parent']);
+    });
   });
 });

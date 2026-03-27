@@ -282,10 +282,7 @@ describe('mcpCommand', () => {
     });
 
     it('should filter servers by name when an argument is provided to list', async () => {
-      const listSubCommand = mcpCommand.subCommands!.find(
-        (c) => c.name === 'list',
-      );
-      await listSubCommand!.action!(mockContext, 'server1');
+      await mcpCommand.action!(mockContext, 'list server1');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -303,10 +300,7 @@ describe('mcpCommand', () => {
     });
 
     it('should filter servers by name and show descriptions when an argument is provided to desc', async () => {
-      const descSubCommand = mcpCommand.subCommands!.find(
-        (c) => c.name === 'desc',
-      );
-      await descSubCommand!.action!(mockContext, 'server2');
+      await mcpCommand.action!(mockContext, 'desc server2');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
