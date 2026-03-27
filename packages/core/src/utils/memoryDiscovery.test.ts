@@ -1269,6 +1269,96 @@ included directory memory
       expect(result.files[0].path).toBe(subDirMemory);
       expect(result.files[0].content).toBe('Content without git');
     });
+
+    it('should stop at a custom boundary marker instead of .git', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'custom_marker'),
+      );
+      // Use a custom marker file instead of .git
+      await createTestFile(path.join(rootDir, '.monorepo-root'), '');
+      const subDir = await createEmptyDir(path.join(rootDir, 'packages/app'));
+      const targetFile = path.join(subDir, 'file.ts');
+
+      const rootMemory = await createTestFile(
+        path.join(rootDir, DEFAULT_CONTEXT_FILENAME),
+        'Root rules',
+      );
+      const subDirMemory = await createTestFile(
+        path.join(subDir, DEFAULT_CONTEXT_FILENAME),
+        'App rules',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+        undefined,
+        ['.monorepo-root'],
+      );
+
+      expect(result.files).toHaveLength(2);
+      expect(result.files.find((f) => f.path === rootMemory)).toBeDefined();
+      expect(result.files.find((f) => f.path === subDirMemory)).toBeDefined();
+    });
+
+    it('should support multiple boundary markers', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'multi_marker'),
+      );
+      // Use a non-.git marker
+      await createTestFile(path.join(rootDir, 'package.json'), '{}');
+      const subDir = await createEmptyDir(path.join(rootDir, 'src'));
+      const targetFile = path.join(subDir, 'index.ts');
+
+      const rootMemory = await createTestFile(
+        path.join(rootDir, DEFAULT_CONTEXT_FILENAME),
+        'Root content',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+        undefined,
+        ['.git', 'package.json'],
+      );
+
+      // Should find the root because package.json is a marker
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].path).toBe(rootMemory);
+    });
+
+    it('should disable parent traversal when boundary markers array is empty', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'empty_markers'),
+      );
+      await createEmptyDir(path.join(rootDir, '.git'));
+      const subDir = await createEmptyDir(path.join(rootDir, 'subdir'));
+      const targetFile = path.join(subDir, 'target.txt');
+
+      await createTestFile(
+        path.join(rootDir, DEFAULT_CONTEXT_FILENAME),
+        'Root content',
+      );
+      const subDirMemory = await createTestFile(
+        path.join(subDir, DEFAULT_CONTEXT_FILENAME),
+        'Subdir content',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+        undefined,
+        [],
+      );
+
+      // With empty markers, no project root is found so the trusted root
+      // is used as the ceiling. Traversal still finds files between the
+      // target path and the trusted root.
+      expect(result.files).toHaveLength(2);
+      expect(result.files.find((f) => f.path === subDirMemory)).toBeDefined();
+    });
   });
 
   it('refreshServerHierarchicalMemory should refresh memory and update config', async () => {
@@ -1341,6 +1431,7 @@ included directory memory
       getImportFormat: vi.fn().mockReturnValue('tree'),
       getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
       getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
+      getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),
