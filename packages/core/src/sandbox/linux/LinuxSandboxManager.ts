@@ -16,14 +16,15 @@ import {
   GOVERNANCE_FILES,
   getSecretFileFindArgs,
   sanitizePaths,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
-import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import {
   isStrictlyApproved,
   verifySandboxOverrides,
@@ -38,6 +39,7 @@ import {
   isKnownSafeCommand,
   isDangerousCommand,
 } from '../utils/commandSafety.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 let cachedBpfPath: string | undefined;
 
@@ -131,20 +133,10 @@ function touch(filePath: string, isDirectory: boolean) {
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 
-export interface LinuxSandboxOptions extends GlobalSandboxOptions {
-  modeConfig?: {
-    readonly?: boolean;
-    network?: boolean;
-    approvedTools?: string[];
-    allowOverrides?: boolean;
-  };
-  policyManager?: SandboxPolicyManager;
-}
-
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
 
-  constructor(private readonly options: LinuxSandboxOptions) {}
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
     return isKnownSafeCommand(args);
@@ -152,6 +144,10 @@ export class LinuxSandboxManager implements SandboxManager {
 
   isDangerousCommand(args: string[]): boolean {
     return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
   }
 
   private getMaskFilePath(): string {
@@ -326,7 +322,7 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const p of forbiddenPaths) {
       let resolved: string;
       try {

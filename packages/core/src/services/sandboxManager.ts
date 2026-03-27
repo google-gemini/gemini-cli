@@ -21,7 +21,8 @@ import {
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-
+import type { ShellExecutionResult } from './shellExecutionService.js';
+import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -40,14 +41,22 @@ export interface SandboxPermissions {
 export interface ExecutionPolicy {
   /** Additional absolute paths to grant full read/write access to. */
   allowedPaths?: string[];
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
   /** Whether network access is allowed. */
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
   /** Additional granular permissions to grant to this command. */
   additionalPermissions?: SandboxPermissions;
+}
+
+/**
+ * Configuration for the sandbox mode behavior.
+ */
+export interface SandboxModeConfig {
+  readonly?: boolean;
+  network?: boolean;
+  approvedTools?: string[];
+  allowOverrides?: boolean;
 }
 
 /**
@@ -59,6 +68,12 @@ export interface GlobalSandboxOptions {
    * This directory is granted full read and write access.
    */
   workspace: string;
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
+  /** The current sandbox mode behavior from config. */
+  modeConfig?: SandboxModeConfig;
+  /** The policy manager for persistent approvals. */
+  policyManager?: SandboxPolicyManager;
 }
 
 /**
@@ -92,6 +107,16 @@ export interface SandboxedCommand {
 }
 
 /**
+ * A structured result from parsing sandbox denials.
+ */
+export interface ParsedSandboxDenial {
+  /** If the denial is related to file system access, these are the paths that were blocked. */
+  filePaths?: string[];
+  /** If the denial is related to network access. */
+  network?: boolean;
+}
+
+/**
  * Interface for a service that prepares commands for sandboxed execution.
  */
 export interface SandboxManager {
@@ -109,6 +134,11 @@ export interface SandboxManager {
    * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
    */
   isDangerousCommand(args: string[]): boolean;
+
+  /**
+   * Parses the output of a command to detect sandbox denials.
+   */
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
 }
 
 /**
@@ -236,10 +266,14 @@ export class NoopSandboxManager implements SandboxManager {
       ? isWindowsDangerousCommand(args)
       : isMacDangerousCommand(args);
   }
+
+  parseDenials(): undefined {
+    return undefined;
+  }
 }
 
 /**
- * SandboxManager that implements actual sandboxing.
+ * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
@@ -252,6 +286,10 @@ export class LocalSandboxManager implements SandboxManager {
 
   isDangerousCommand(_args: string[]): boolean {
     return false;
+  }
+
+  parseDenials(): undefined {
+    return undefined;
   }
 }
 
