@@ -455,7 +455,19 @@ export class ChatCompressionService {
       }),
     );
 
-    if (newTokenCount > originalTokenCount) {
+    // If compression inflated OR result is still above threshold, bail out.
+    // This prevents the endless compression loop. Issue #23907
+    const stillAboveThreshold =
+      newTokenCount >= DEFAULT_COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model);
+
+    if (newTokenCount > originalTokenCount || stillAboveThreshold) {
+      if (stillAboveThreshold && newTokenCount <= originalTokenCount) {
+        debugLogger.debug(
+          '[compression] Result still above threshold after compression — ' +
+            'marking as COMPRESSION_FAILED_INFLATED_TOKEN_COUNT to prevent loop. ' +
+            'Issue: https://github.com/google-gemini/gemini-cli/issues/23907',
+        );
+      }
       return {
         newHistory: null,
         info: {
