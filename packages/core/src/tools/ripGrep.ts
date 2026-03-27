@@ -251,8 +251,11 @@ class GrepToolInvocation extends BaseToolInvocation<
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
       const configTimeout = this.config.getFileFilteringOptions().searchTimeout;
+      // If configTimeout is less than standard default, it might be too short for grep.
+      // We check if it's greater or if we should use DEFAULT_SEARCH_TIMEOUT_MS as a fallback.
+      // Let's assume the user can set it higher if they want. Using it directly if it exists, otherwise fallback.
       const timeoutMs =
-        configTimeout && configTimeout > 5000
+        configTimeout && configTimeout > DEFAULT_SEARCH_TIMEOUT_MS
           ? configTimeout
           : DEFAULT_SEARCH_TIMEOUT_MS;
       const timeoutId = setTimeout(() => {
