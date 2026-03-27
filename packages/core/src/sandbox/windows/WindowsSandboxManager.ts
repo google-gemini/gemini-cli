@@ -211,8 +211,27 @@ export class WindowsSandboxManager implements SandboxManager {
     // Reject override attempts in plan mode
     verifySandboxOverrides(allowOverrides, req.policy);
 
+    let command = req.command;
+    let args = req.args;
+
+    // Translate virtual commands for sandboxed file system access
+    if (command === '__read') {
+      // Use 'type' via cmd.exe for basic file reading
+      command = 'cmd.exe';
+      args = ['/c', 'type', ...args];
+    } else if (command === '__write') {
+      // Use PowerShell for piping stdin to a file
+      command = 'PowerShell.exe';
+      args = [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$Input | Out-File -FilePath "${args[0]}" -Encoding utf8`,
+      ];
+    }
+
     // Fetch persistent approvals for this command
-    const commandName = await getCommandName(req.command, req.args);
+    const commandName = await getCommandName(command, args);
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
       : undefined;
@@ -240,8 +259,8 @@ export class WindowsSandboxManager implements SandboxManager {
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
     const isApproved = allowOverrides
       ? await isStrictlyApproved(
-          req.command,
-          req.args,
+          command,
+          args,
           this.options.modeConfig?.approvedTools,
         )
       : false;
@@ -250,10 +269,28 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
+    // Grant "Low Mandatory Level" access to includeDirectories.
+    const includeDirs = sanitizePaths(this.options.includeDirectories) || [];
+    for (const includeDir of includeDirs) {
+      await this.grantLowIntegrityAccess(includeDir);
+    }
+
     // Grant "Low Mandatory Level" read access to allowedPaths.
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
-      await this.grantLowIntegrityAccess(allowedPath);
+      const resolved = await tryRealpath(allowedPath);
+      if (!fs.existsSync(resolved)) {
+        // If the path doesn't exist, we still want to allow access to its parent
+        // if it's explicitly allowed, to enable creating it.
+        try {
+          const resolvedParent = await tryRealpath(path.dirname(resolved));
+          await this.grantLowIntegrityAccess(resolvedParent);
+        } catch {
+          // Ignore
+        }
+      } else {
+        await this.grantLowIntegrityAccess(resolved);
+      }
     }
 
     // Grant "Low Mandatory Level" write access to additional permissions write paths.
@@ -267,7 +304,11 @@ export class WindowsSandboxManager implements SandboxManager {
     // On Windows, we explicitly deny access to secret files for Low Integrity
     // processes to ensure they cannot be read or written.
     const secretsToBlock: string[] = [];
-    const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
+    const searchDirs = new Set([
+      this.options.workspace,
+      ...allowedPaths,
+      ...includeDirs,
+    ]);
     for (const dir of searchDirs) {
       try {
         // We use maxDepth 3 to catch common nested secrets while keeping performance high.
@@ -345,18 +386,18 @@ export class WindowsSandboxManager implements SandboxManager {
       this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
     const networkAccess = defaultNetwork || mergedAdditional.network;
 
-    const args = [
+    const finalArgs = [
       networkAccess ? '1' : '0',
       req.cwd,
       '--forbidden-manifest',
       manifestPath,
-      req.command,
-      ...req.args,
+      command,
+      ...args,
     ];
 
     return {
       program,
-      args,
+      args: finalArgs,
       env: sanitizedEnv,
       cwd: req.cwd,
     };

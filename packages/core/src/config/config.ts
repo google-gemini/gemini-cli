@@ -952,8 +952,17 @@ export class Config implements McpContext, AgentLoopContext {
           networkAccess: false,
         };
 
+    this.targetDir = path.resolve(params.targetDir);
+    this.folderTrust = params.folderTrust ?? false;
+    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.pendingIncludeDirectories = params.includeDirectories ?? [];
+    this.debugMode = params.debugMode;
+    this.question = params.question;
+    this.worktreeSettings = params.worktreeSettings;
+
     this._sandboxManager = createSandboxManager(this.sandbox, {
       workspace: params.targetDir,
+      includeDirectories: this.pendingIncludeDirectories,
     });
 
     if (
@@ -977,27 +986,11 @@ export class Config implements McpContext, AgentLoopContext {
       this.sandbox,
       {
         workspace: params.targetDir,
+        includeDirectories: this.pendingIncludeDirectories,
         policyManager: this._sandboxPolicyManager,
       },
       initialApprovalMode,
     );
-
-    if (
-      !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox?.enabled
-    ) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        params.targetDir,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
-
-    this.targetDir = path.resolve(params.targetDir);
-    this.folderTrust = params.folderTrust ?? false;
-    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
-    this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;

@@ -286,7 +286,18 @@ export class LinuxSandboxManager implements SandboxManager {
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
+    const includeDirs = sanitizePaths(this.options.includeDirectories) || [];
+    for (const includeDir of includeDirs) {
+      try {
+        const resolved = tryRealpath(includeDir);
+        bwrapArgs.push('--ro-bind-try', resolved, resolved);
+      } catch {
+        // Ignore
+      }
+    }
+
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
+
     const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
     for (const allowedPath of allowedPaths) {
       const resolved = tryRealpath(allowedPath);

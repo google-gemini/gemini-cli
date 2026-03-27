@@ -119,7 +119,10 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
-      allowedPaths: [...(req.policy?.allowedPaths || [])],
+      allowedPaths: [
+        ...(req.policy?.allowedPaths || []),
+        ...(this.options.includeDirectories || []),
+      ],
       forbiddenPaths: this.options.forbiddenPaths,
       networkAccess: mergedAdditional.network,
       workspaceWrite,
