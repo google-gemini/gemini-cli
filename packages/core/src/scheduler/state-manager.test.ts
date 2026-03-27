@@ -362,20 +362,40 @@ describe('SchedulerStateManager', () => {
       expect(active.confirmationDetails).toEqual(details);
     });
 
-    it('should preserve diff and derive stats when cancelling an edit tool call', () => {
+    it('should preserve diff when cancelling an edit tool call with cancelResult', () => {
       const call = createValidatingCall();
       stateManager.enqueue([call]);
       stateManager.dequeue();
+
+      const diffContent = '@@ -1,1 +1,1 @@\n-old line\n+new line';
+      const cancelResult: FileDiff = {
+        fileDiff: diffContent,
+        fileName: 'test.txt',
+        filePath: '/path/to/test.txt',
+        originalContent: 'old line',
+        newContent: 'new line',
+        diffStat: {
+          model_added_lines: 1,
+          model_removed_lines: 1,
+          model_added_chars: 8,
+          model_removed_chars: 8,
+          user_added_lines: 0,
+          user_removed_lines: 0,
+          user_added_chars: 0,
+          user_removed_chars: 0,
+        },
+      };
 
       const details = {
         type: 'edit' as const,
         title: 'Edit',
         fileName: 'test.txt',
         filePath: '/path/to/test.txt',
-        fileDiff: '@@ -1,1 +1,1 @@\n-old line\n+new line',
+        fileDiff: diffContent,
         originalContent: 'old line',
         newContent: 'new line',
         onConfirm: vi.fn(),
+        cancelResult,
       };
 
       stateManager.updateStatus(
@@ -393,13 +413,45 @@ describe('SchedulerStateManager', () => {
       const completed = stateManager.completedBatch[0] as CancelledToolCall;
       expect(completed.status).toBe(CoreToolCallStatus.Cancelled);
       const result = completed.response.resultDisplay as FileDiff;
-      expect(result.fileDiff).toBe(details.fileDiff);
+      expect(result.fileDiff).toBe(diffContent);
       expect(result.diffStat).toEqual(
         expect.objectContaining({
           model_added_lines: 1,
           model_removed_lines: 1,
         }),
       );
+    });
+
+    it('should use cancelResult from confirmation details for any tool type', () => {
+      const call = createValidatingCall();
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      const cancelResult = 'Operation was cancelled before completion';
+
+      const details = {
+        type: 'info' as const,
+        title: 'Info',
+        prompt: 'Some info prompt',
+        onConfirm: vi.fn(),
+        cancelResult,
+      };
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.AwaitingApproval,
+        details,
+      );
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Cancelled,
+        'User cancelled',
+      );
+      stateManager.finalizeCall(call.request.callId);
+
+      const completed = stateManager.completedBatch[0] as CancelledToolCall;
+      expect(completed.status).toBe(CoreToolCallStatus.Cancelled);
+      expect(completed.response.resultDisplay).toBe(cancelResult);
     });
 
     it('should ignore status updates for non-existent callIds', () => {
