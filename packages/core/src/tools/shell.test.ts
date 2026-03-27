@@ -299,6 +299,35 @@ describe('ShellTool', () => {
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
+    it('should preserve trailing spaces after background commands on linux', async () => {
+      const invocation = shellTool.build({ command: 'my-command & ' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ pid: 54321 });
+
+      // Simulate pgrep output file creation by the shell command
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
+
+      const result = await promise;
+
+      const escapedTmpFile = escapeShellArg(tmpFile, 'bash');
+      const wrappedCommand = `{ my-command &  }; __code=$?; pgrep -g 0 >${escapedTmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
+      );
+      expect(result.llmContent).toContain('Background PIDs: 54322');
+      expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
     it('should use the provided absolute directory as cwd', async () => {
       const subdir = path.join(tempRootDir, 'subdir');
       const invocation = shellTool.build({
@@ -375,7 +404,11 @@ EOF
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -398,7 +431,11 @@ EOF
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
