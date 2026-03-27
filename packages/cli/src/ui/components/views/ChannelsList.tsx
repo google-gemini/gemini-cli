@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type { ChannelInfo } from '../../types.js';
 
 interface ChannelsListProps {
@@ -18,10 +19,11 @@ export const ChannelsList: React.FC<ChannelsListProps> = ({ channels }) => {
     return (
       <Box flexDirection="column" marginBottom={1}>
         <Text color={theme.text.primary}>No active channels.</Text>
-        <Text color="gray">
-          {
-            "MCP servers must declare `experimental['gemini/channel']` in their capabilities to act as channels."
-          }
+        <Text color={theme.text.secondary}>
+          <RenderInline
+            text="Use `--channels <name>` to listen for channel messages from MCP servers."
+            defaultColor={theme.text.secondary}
+          />
         </Text>
       </Box>
     );
@@ -41,9 +43,11 @@ export const ChannelsList: React.FC<ChannelsListProps> = ({ channels }) => {
               <Text bold color={theme.text.accent}>
                 {channel.displayName || channel.name} ({channel.name})
               </Text>
-              <Text color="gray">
+              <Text color={theme.text.secondary}>
                 Direction:{' '}
-                <Text color={channel.supportsReply ? 'green' : 'gray'}>
+                <Text
+                  color={channel.supportsReply ? 'green' : theme.text.secondary}
+                >
                   {channel.supportsReply ? 'two-way' : 'one-way'}
                 </Text>
               </Text>

@@ -173,6 +173,7 @@ export type HistoryItemInfo = HistoryItemBase & {
   secondaryText?: string;
   icon?: string;
   color?: string;
+  marginTop?: number;
   marginBottom?: number;
 };
 

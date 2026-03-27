@@ -285,13 +285,6 @@ export async function main() {
     });
   }
 
-  if (argv.channels && argv.channels.length > 0) {
-    coreEvents.emitFeedback(
-      'info',
-      `Channels listening for messages: ${argv.channels.join(', ')}`,
-    );
-  }
-
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(

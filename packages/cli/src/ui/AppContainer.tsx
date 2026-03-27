@@ -37,6 +37,7 @@ import {
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
+import { theme } from './semantic-colors.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
   type StartupWarning,
@@ -66,7 +67,6 @@ import {
   flattenMemory,
   type MemoryChangedPayload,
   type ChannelMessagePayload,
-  activeChannels,
   writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
@@ -1233,22 +1233,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [channelsEnabled, addMessage]);
 
-  // Warn about requested channels whose MCP servers did not declare capability.
-  const channelWarningFired = useRef(false);
-  useEffect(() => {
-    if (!isMcpReady || !channelsEnabled || channelWarningFired.current) return;
-    channelWarningFired.current = true;
-    const requested = config.getChannels();
-    for (const name of requested) {
-      if (!activeChannels.has(name)) {
-        coreEvents.emitFeedback(
-          'warning',
-          `Channel "${name}" was requested but the MCP server did not declare channel capability.`,
-        );
-      }
-    }
-  }, [isMcpReady, channelsEnabled, config]);
-
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
       if (isToolAwaitingConfirmation(pendingHistoryItems)) {
@@ -2011,10 +1995,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
           );
       }
 
+      const isChannel = payload.style === 'channel';
       historyManager.addItem(
         {
           type,
           text: payload.message,
+          ...(isChannel && {
+            icon: '» ',
+            color: theme.text.secondary,
+            marginTop: 0,
+          }),
         },
         Date.now(),
       );

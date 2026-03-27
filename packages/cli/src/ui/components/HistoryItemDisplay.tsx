@@ -119,6 +119,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           secondaryText={itemForDisplay.secondaryText}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
+          marginTop={itemForDisplay.marginTop}
           marginBottom={itemForDisplay.marginBottom}
         />
       )}

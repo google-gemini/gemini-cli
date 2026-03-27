@@ -41,6 +41,12 @@ export interface UserFeedbackPayload {
    * or verbose output, while keeping the 'message' field clean for end users.
    */
   error?: unknown;
+  /**
+   * Optional semantic style hint for the UI.
+   * 'channel' renders with secondary text color and a » icon,
+   * suitable for channel status messages.
+   */
+  style?: 'channel';
 }
 
 /**
@@ -285,8 +291,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     severity: FeedbackSeverity,
     message: string,
     error?: unknown,
+    options?: { style?: 'channel' },
   ): void {
-    const payload: UserFeedbackPayload = { severity, message, error };
+    const payload: UserFeedbackPayload = {
+      severity,
+      message,
+      error,
+      ...options,
+    };
     this._emitOrQueue(CoreEvent.UserFeedback, payload);
   }
 
