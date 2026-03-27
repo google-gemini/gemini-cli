@@ -22,6 +22,7 @@ export class UserSimulator {
   private interactionsFile: string | null = null;
 
   private knowledgeBase = '';
+  private actionHistory: string[] = [];
 
   constructor(
     private readonly config: Config,
@@ -122,6 +123,10 @@ export class UserSimulator {
         ? `\nUser Knowledge Base:\nUse this information to answer questions if applicable. If the answer is not here, respond as you normally would.\n${this.knowledgeBase}\n`
         : '';
 
+      const historyInstruction = this.actionHistory.length > 0
+        ? `\nRecent Simulator Actions (last 10):\n${this.actionHistory.slice(-10).map((a, i) => `${i + 1}. ${JSON.stringify(a)}`).join('\n')}\n`
+        : '';
+
       const prompt = `You are evaluating a CLI agent by simulating a user sitting at the terminal.
 Look carefully at the screen and determine the CLI's current state:
 
@@ -145,7 +150,7 @@ CRITICAL RULES:
 - RULE 2: If there is an "Action Required" or confirmation prompt on the screen, YOU MUST HANDLE IT (State 2). This takes precedence over everything else.
 - RULE 3: Output ONLY the raw characters to send, <WAIT>, or <DONE>.
 - RULE 4: Do NOT output markdown, explanations of your thought process, or quotes.
-${goalInstruction}${knowledgeInstruction}
+${goalInstruction}${knowledgeInstruction}${historyInstruction}
 
 Here is the current terminal screen output:
 
@@ -217,6 +222,13 @@ ${strippedScreen}
         debugLogger.log(
           '[SIMULATOR] Skipping action (model decided to <WAIT>)',
         );
+        this.actionHistory.push('<WAIT>');
+        if (this.interactionsFile) {
+          fs.appendFileSync(
+            this.interactionsFile,
+            `[LOG] [SIMULATOR] Action History updated with: "<WAIT>"\n\n`,
+          );
+        }
         this.lastScreenContent = normalizedScreen;
         return;
       }
@@ -224,14 +236,31 @@ ${strippedScreen}
       if (responseText) {
         const keys = responseText.replace(/\\n/g, '\r').replace(/\\r/g, '\r');
 
-
         debugLogger.log(
           `[SIMULATOR] Sending to stdin: ${JSON.stringify(keys)}`,
         );
+
+        this.actionHistory.push(keys);
+        if (this.interactionsFile) {
+          fs.appendFileSync(
+            this.interactionsFile,
+            `[LOG] [SIMULATOR] Action History updated with: ${JSON.stringify(keys)}\n\n`,
+          );
+        }
+
         this.stdinBuffer.write(keys);
         this.lastScreenContent = normalizedScreen;
       } else {
         debugLogger.log('[SIMULATOR] Skipping (empty response)');
+        
+        this.actionHistory.push('<EMPTY>');
+        if (this.interactionsFile) {
+          fs.appendFileSync(
+            this.interactionsFile,
+            `[LOG] [SIMULATOR] Action History updated with: "<EMPTY>"\n\n`,
+          );
+        }
+        
         this.lastScreenContent = normalizedScreen;
       }
     } catch (e: unknown) {

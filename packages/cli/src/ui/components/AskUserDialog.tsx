@@ -853,7 +853,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     listHeight && !isAlternateBuffer
       ? question.unconstrainedHeight
         ? Math.max(1, listHeight - selectionItems.length * 2)
-        : Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+        : Math.min(15, Math.max(1, listHeight - Math.min(selectionItems.length, 5) * 2))
       : undefined;
 
   const maxItemsToShow =
