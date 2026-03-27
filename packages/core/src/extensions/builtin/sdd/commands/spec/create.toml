@@ -137,12 +137,18 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 ### 2.4 Create Spec Artifacts and Update Main Plan
 
 1.  **Check for existing spec name:** Before generating a new Spec ID, resolve the **Spec Directory** by reading `.gemini/specs/index.md`. List all existing spec directories in that resolved path. Extract the short names from these spec IDs (e.g., ``shortname_YYYYMMDD`` -> `shortname`). If the proposed short name for the new spec (derived from the initial description) matches an existing short name, halt the `newSpec` creation. Explain that a spec with that name already exists and suggest choosing a different name or resuming the existing spec.
-2.  **Generate Spec ID:** Create a unique Spec ID (e.g., ``shortname_YYYYMMDD``).
-3.  **Create Directory:** Create a new directory for the specs: `<Spec Directory>/<spec_id>/`.
-4.  **Create `metadata.json`:** Create a metadata file at `<Spec Directory>/<spec_id>/metadata.json` with content like:
+2.  **Generate Spec ID:** Create a unique Spec ID (e.g., `shortname_YYYYMMDD`).
+3.  **Generate Root Tracker ID:** Use the `tracker_create_task` tool to create a root task for this spec.
+    -   **type:** `epic`
+    -   **title:** A concise but highly descriptive title summarizing the spec (e.g., "Feature: Implement User Authentication Flow").
+    -   **description:** A detailed explanation of the spec's purpose and scope, providing context beyond the title.
+    -   **Record the returned Task ID** (this is the `root_tracker_id`).
+4.  **Create Directory:** Create a new directory for the specs: `<Spec Directory>/<spec_id>/`.
+5.  **Create `metadata.json`:** Create a metadata file at `<Spec Directory>/<spec_id>/metadata.json` with content like:
     ```json
     {
       "spec_id": "<spec_id>",
+      "root_tracker_id": "<root_tracker_id>",
       "type": "feature", // or "bug", "chore", etc.
       "status": "new", // or in_progress, completed, cancelled
       "created_at": "YYYY-MM-DDTHH:MM:SSZ",

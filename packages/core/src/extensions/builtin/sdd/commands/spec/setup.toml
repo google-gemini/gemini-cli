@@ -517,11 +517,17 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `.gemini/specs/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: SDD - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
     c. **Create Spec Artifacts:**
         i. **Generate and Store Spec ID:** Create a unique Spec ID from the spec description using format `shortname_YYYYMMDD` and store it. You MUST use this exact same ID for all subsequent steps for this spec.
-        ii. **Create Single Directory:** Resolve the **Spec Directory** by reading `.gemini/specs/index.md` and create a single new directory: `<Spec Directory>/<spec_id>/`.
-        iii. **Create `metadata.json`:** In the new directory, create a `metadata.json` file with the correct structure and content, using the stored Spec ID. An example is:
+        ii. **Generate Root Tracker ID:** Use the `tracker_create_task` tool to create a root task for this spec.
+            -   **type:** `epic`
+            -   **title:** A concise but highly descriptive title summarizing the spec (e.g., "Feature: Implement User Authentication Flow").
+            -   **description:** A detailed explanation of the spec's purpose and scope, providing context beyond the title.
+            -   **Record the returned Task ID** (this is the `root_tracker_id`).
+        iii. **Create Single Directory:** Resolve the **Spec Directory** by reading `.gemini/specs/index.md` and create a single new directory: `<Spec Directory>/<spec_id>/`.
+        iv. **Create `metadata.json`:** In the new directory, create a `metadata.json` file with the correct structure and content, using the stored Spec ID. An example is:
             - ```json
             {
             "spec_id": "<spec_id>",
+            "root_tracker_id": "<root_tracker_id>",
             "type": "feature", // or "bug"
             "status": "new", // or in_progress, completed, cancelled
             "created_at": "YYYY-MM-DDTHH:MM:SSZ",
@@ -530,8 +536,8 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             }
             ```
         Populate fields with actual values. Use the current timestamp.
-        iv. **Write Spec and Plan Files:** In the exact same directory, write the generated `spec.md` and `plan.md` files.
-        v.  **Write Index File:** In the exact same directory, write `index.md` with content:
+        v. **Write Spec and Plan Files:** In the exact same directory, write the generated `spec.md` and `plan.md` files.
+        vi.  **Write Index File:** In the exact same directory, write `index.md` with content:
             ```markdown
             # Spec <spec_id> Context
 
