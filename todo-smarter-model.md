@@ -133,6 +133,12 @@ state for the XDG user-config migration work.
   - This should replace ad hoc shell or Python snippets for deterministic
     one-line mutations.
 
+- [ ] Create a helper script and companion skill for batch GitHub issue
+      inspection.
+  - It should take a repo plus issue numbers or a search query and emit
+    deterministic JSON or markdown summaries, replacing ad hoc shell loops like
+    repeated `gh issue view` calls in `for` loops.
+
 ## 5) Review targets before git workflow resumes
 
 1. [x] Decide whether to narrow the remaining broad `HOME_DIR/.config` read in

@@ -83,20 +83,42 @@ The warning gives explicit options:
   `~/.config` and `~/.cache`; this PR only threads the exact selected Gemini
   directories through the templates.
 
-## Related issues from the repo search for `$XDG_CONFIG_HOME`
+## Open issue search review
 
-Search snapshot date: 2026-03-26.
+Search snapshot date: 2026-03-27.
 
-| Issue                                                              | Classification                           | Notes                                                                                                                                                                     |
-| ------------------------------------------------------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#23796](https://github.com/google-gemini/gemini-cli/issues/23796) | Fully resolved for the main ask          | Adds XDG-aware config selection, exact `$GEMINI_CONFIG_DIR`, and legacy compatibility.                                                                                    |
-| [#1825](https://github.com/google-gemini/gemini-cli/issues/1825)   | Partially resolved                       | Covers the XDG config/cache/tmp direction. Full XDG data/state classification is still outstanding.                                                                       |
-| [#2815](https://github.com/google-gemini/gemini-cli/issues/2815)   | Partially resolved                       | This PR adds the explicit config-dir override that issue wanted, via `$GEMINI_CONFIG_DIR`. It does not implement the broader set of XDG base-dir changes discussed there. |
-| [#7280](https://github.com/google-gemini/gemini-cli/issues/7280)   | Fully resolved as a side-effect          | Not really a config-path issue on its own, but this PR does satisfy the `.config`-style expectation it was tagged with.                                                   |
-| [#8440](https://github.com/google-gemini/gemini-cli/issues/8440)   | Partially resolved / partially unrelated | Exact user config override is now supported via `$GEMINI_CONFIG_DIR`. Other items in that issue remain out of scope here.                                                 |
-| [#6438](https://github.com/google-gemini/gemini-cli/issues/6438)   | String-only linked                       | Not a user-directory issue; it appears in the search only because `$XDG_CONFIG_HOME` is mentioned in a shell snippet.                                                     |
+### Open issues from the repo search for `XDG`
 
-## Related PR context
+| Issue                                                              | Classification                  | Notes                                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [#23796](https://github.com/google-gemini/gemini-cli/issues/23796) | Fully resolved for the main ask | Adds XDG-aware config selection, exact `$GEMINI_CONFIG_DIR`, and legacy compatibility.                      |
+| [#1825](https://github.com/google-gemini/gemini-cli/issues/1825)   | Partially resolved              | Covers the XDG config/cache/tmp direction. Full XDG data/state/runtime classification is still outstanding. |
+| [#22274](https://github.com/google-gemini/gemini-cli/issues/22274) | Not related                     | Mentions `XDG_SESSION_TYPE`; not a config/cache/tmp directory issue.                                        |
+| [#21983](https://github.com/google-gemini/gemini-cli/issues/21983) | Not related                     | Wayland/browser issue; not about XDG base-directory handling.                                               |
+| [#2023](https://github.com/google-gemini/gemini-cli/issues/2023)   | Not related                     | Search hit only; not a user-directory issue.                                                                |
+| [#12657](https://github.com/google-gemini/gemini-cli/issues/12657) | Not related                     | Search hit only; not a user-directory issue.                                                                |
+
+### Open issues from the repo searches for `$HOME/.gemini` or `~/.gemini`
+
+| Issue                                                              | Classification     | Notes                                                                                                                                                            |
+| ------------------------------------------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#23622](https://github.com/google-gemini/gemini-cli/issues/23622) | Mostly resolved    | This PR documents deprecated `$GEMINI_CLI_HOME` semantics clearly and adds exact `*_DIR` overrides so users no longer need to rely on the hidden `.gemini` leaf. |
+| [#21652](https://github.com/google-gemini/gemini-cli/issues/21652) | Partially resolved | Temporary files now default to `<cache directory>/tmp` or `$GEMINI_TMP_DIR`, but this PR does not yet change cleanup or retention policy.                        |
+| [#19263](https://github.com/google-gemini/gemini-cli/issues/19263) | Partially resolved | User-level `.env` loading now follows the selected user config dir, and legacy `~/.gemini/.env` remains a compatibility fallback for existing users.             |
+| [#2493](https://github.com/google-gemini/gemini-cli/issues/2493)   | Not resolved       | This PR preserves existing project `.env` precedence; it does not add an “ignore local `.env`” mode.                                                             |
+| [#19663](https://github.com/google-gemini/gemini-cli/issues/19663) | Not resolved       | This PR does not implement merged hierarchical `.env` loading.                                                                                                   |
+| [#20005](https://github.com/google-gemini/gemini-cli/issues/20005) | Not resolved       | Adjacent `.env` trust-warning UX only; this PR does not change untrusted-workspace warning behaviour.                                                            |
+| [#22309](https://github.com/google-gemini/gemini-cli/issues/22309) | Not resolved       | Adjacent home-directory warning behaviour only; not changed here.                                                                                                |
+| [#22929](https://github.com/google-gemini/gemini-cli/issues/22929) | Not resolved       | Adjacent home-directory command conflict behaviour only; not changed here.                                                                                       |
+
+Literal `~/.gemini` / `$HOME/.gemini` searches also surface many incidental open
+issues where those paths appear only in logs, crash output, or repro examples
+rather than as the underlying feature request. I reviewed those search hits as
+well, but did not treat them as related config-path issues in this PR. Examples
+include [#23934](https://github.com/google-gemini/gemini-cli/issues/23934) and
+[#23665](https://github.com/google-gemini/gemini-cli/issues/23665).
+
+## Earlier issue context
 
 - [#1825](https://github.com/google-gemini/gemini-cli/issues/1825): useful
   earlier XDG discussion, but the proposed implementation is old and no longer
