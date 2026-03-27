@@ -108,6 +108,30 @@ describe('ChatRecordingService', () => {
       expect(conversation.kind).toBe('subagent');
     });
 
+    it('should create a subdirectory for subagents if parentSessionId is present', () => {
+      const parentSessionId = 'test-parent-uuid';
+      Object.defineProperty(mockConfig, 'parentSessionId', {
+        value: parentSessionId,
+        writable: true,
+        configurable: true,
+      });
+
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const chatsDir = path.join(testTempDir, 'chats');
+      const subagentDir = path.join(chatsDir, parentSessionId);
+      expect(fs.existsSync(subagentDir)).toBe(true);
+
+      const files = fs.readdirSync(subagentDir);
+      expect(files.length).toBeGreaterThan(0);
+      expect(files[0]).toBe('test-session-id.json');
+    });
+
     it('should resume from an existing session if provided', () => {
       const chatsDir = path.join(testTempDir, 'chats');
       fs.mkdirSync(chatsDir, { recursive: true });
@@ -437,7 +461,7 @@ describe('ChatRecordingService', () => {
   });
 
   describe('deleteSession', () => {
-    it('should delete the session file, tool outputs, session directory, and logs if they exist', () => {
+    it('should delete the session file, tool outputs, session directory, and logs if they exist', async () => {
       const sessionId = 'test-session-id';
       const shortId = '12345678';
       const chatsDir = path.join(testTempDir, 'chats');
@@ -464,7 +488,7 @@ describe('ChatRecordingService', () => {
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
       // Call with shortId
-      chatRecordingService.deleteSession(shortId);
+      await chatRecordingService.deleteSession(shortId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
@@ -472,7 +496,7 @@ describe('ChatRecordingService', () => {
       expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
-    it('should delete subagent files and their logs when parent is deleted', () => {
+    it('should delete subagent files and their logs when parent is deleted', async () => {
       const parentSessionId = '12345678-session-id';
       const shortId = '12345678';
       const subagentSessionId = 'subagent-session-id';
@@ -494,11 +518,10 @@ describe('ChatRecordingService', () => {
         JSON.stringify({ sessionId: parentSessionId }),
       );
 
-      // Create subagent session file
-      const subagentFile = path.join(
-        chatsDir,
-        `session-2023-01-01T00-01-${shortId}.json`,
-      );
+      // Create subagent session file in subdirectory
+      const subagentDir = path.join(chatsDir, parentSessionId);
+      fs.mkdirSync(subagentDir, { recursive: true });
+      const subagentFile = path.join(subagentDir, `${subagentSessionId}.json`);
       fs.writeFileSync(
         subagentFile,
         JSON.stringify({ sessionId: subagentSessionId, kind: 'subagent' }),
@@ -526,17 +549,55 @@ describe('ChatRecordingService', () => {
       fs.mkdirSync(subagentToolOutputDir, { recursive: true });
 
       // Call with parent sessionId
-      chatRecordingService.deleteSession(parentSessionId);
+      await chatRecordingService.deleteSession(parentSessionId);
 
       expect(fs.existsSync(parentFile)).toBe(false);
       expect(fs.existsSync(subagentFile)).toBe(false);
+      expect(fs.existsSync(subagentDir)).toBe(false); // Subagent directory should be deleted
       expect(fs.existsSync(parentLog)).toBe(false);
       expect(fs.existsSync(subagentLog)).toBe(false);
       expect(fs.existsSync(parentToolOutputDir)).toBe(false);
       expect(fs.existsSync(subagentToolOutputDir)).toBe(false);
     });
 
-    it('should delete by basename', () => {
+    it('should delete subagent files and their logs when parent is deleted (legacy flat structure)', async () => {
+      const parentSessionId = '12345678-session-id';
+      const shortId = '12345678';
+      const subagentSessionId = 'subagent-session-id';
+      const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+
+      fs.mkdirSync(chatsDir, { recursive: true });
+      fs.mkdirSync(logsDir, { recursive: true });
+
+      // Create parent session file
+      const parentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-00-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        parentFile,
+        JSON.stringify({ sessionId: parentSessionId }),
+      );
+
+      // Create legacy subagent session file (flat in chatsDir)
+      const subagentFile = path.join(
+        chatsDir,
+        `session-2023-01-01T00-01-${shortId}.json`,
+      );
+      fs.writeFileSync(
+        subagentFile,
+        JSON.stringify({ sessionId: subagentSessionId, kind: 'subagent' }),
+      );
+
+      // Call with parent sessionId
+      await chatRecordingService.deleteSession(parentSessionId);
+
+      expect(fs.existsSync(parentFile)).toBe(false);
+      expect(fs.existsSync(subagentFile)).toBe(false);
+    });
+
+    it('should delete by basename', async () => {
       const sessionId = 'test-session-id';
       const shortId = '12345678';
       const chatsDir = path.join(testTempDir, 'chats');
@@ -553,16 +614,16 @@ describe('ChatRecordingService', () => {
       fs.writeFileSync(logFile, '{}');
 
       // Call with basename
-      chatRecordingService.deleteSession(basename);
+      await chatRecordingService.deleteSession(basename);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
       expect(fs.existsSync(logFile)).toBe(false);
     });
 
-    it('should not throw if session file does not exist', () => {
-      expect(() =>
+    it('should not throw if session file does not exist', async () => {
+      await expect(
         chatRecordingService.deleteSession('non-existent'),
-      ).not.toThrow();
+      ).resolves.not.toThrow();
     });
   });
 

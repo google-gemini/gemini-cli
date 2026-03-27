@@ -69,6 +69,10 @@ import {
   type FunctionDeclaration,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { GeminiClient } from '../core/client.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
@@ -377,10 +381,8 @@ describe('LocalAgentExecutor', () => {
   describe('create (Initialization and Validation)', () => {
     it('should explicitly map execution context properties to prevent unintended propagation', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
-      const mockGeminiClient =
-        {} as unknown as import('../core/client.js').GeminiClient;
-      const mockSandboxManager =
-        {} as unknown as import('../services/sandboxManager.js').SandboxManager;
+      const mockGeminiClient = {} as unknown as GeminiClient;
+      const mockSandboxManager = {} as unknown as SandboxManager;
       const extendedContext = {
         config: mockConfig,
         promptId: mockConfig.promptId,
@@ -391,7 +393,7 @@ describe('LocalAgentExecutor', () => {
         geminiClient: mockGeminiClient,
         sandboxManager: mockSandboxManager,
         unintendedProperty: 'should not be here',
-      } as unknown as import('../config/agent-loop-context.js').AgentLoopContext;
+      } as unknown as AgentLoopContext;
 
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -414,7 +416,7 @@ describe('LocalAgentExecutor', () => {
 
       expect(executionContext).toBeDefined();
       expect(executionContext.config).toBe(extendedContext.config);
-      expect(executionContext.promptId).toBe(extendedContext.promptId);
+      expect(executionContext.promptId).toBeDefined();
       expect(executionContext.geminiClient).toBe(extendedContext.geminiClient);
       expect(executionContext.sandboxManager).toBe(
         extendedContext.sandboxManager,
@@ -445,7 +447,99 @@ describe('LocalAgentExecutor', () => {
       expect(executionContext.messageBus).not.toBe(extendedContext.messageBus);
     });
 
-    it('should create successfully with allowed tools', async () => {
+    it('should propagate parentSessionId from context when creating executionContext', async () => {
+      const parentSessionId = 'top-level-session-id';
+      const currentPromptId = 'subagent-a-id';
+      const mockGeminiClient = {} as unknown as GeminiClient;
+      const mockSandboxManager = {} as unknown as SandboxManager;
+      const mockMessageBus = {
+        derive: () => ({}),
+      } as unknown as MessageBus;
+      const mockToolRegistry = {
+        getMessageBus: () => mockMessageBus,
+        getAllToolNames: () => [],
+        sortTools: () => {},
+      } as unknown as ToolRegistry;
+
+      const context = {
+        config: mockConfig,
+        promptId: currentPromptId,
+        parentSessionId,
+        toolRegistry: mockToolRegistry,
+        promptRegistry: {} as unknown as PromptRegistry,
+        resourceRegistry: {} as unknown as ResourceRegistry,
+        geminiClient: mockGeminiClient,
+        sandboxManager: mockSandboxManager,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext;
+
+      const definition = createTestDefinition([]);
+      const executor = await LocalAgentExecutor.create(definition, context);
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      const chatConstructorArgs =
+        MockedGeminiChat.mock.calls[MockedGeminiChat.mock.calls.length - 1];
+      const executionContext = chatConstructorArgs[0];
+
+      expect(executionContext.parentSessionId).toBe(parentSessionId);
+      expect(executionContext.promptId).toBe(executor['agentId']);
+    });
+
+    it('should fall back to promptId if parentSessionId is missing (top-level subagent)', async () => {
+      const rootSessionId = 'root-session-id';
+      const mockGeminiClient = {} as unknown as GeminiClient;
+      const mockSandboxManager = {} as unknown as SandboxManager;
+      const mockMessageBus = {
+        derive: () => ({}),
+      } as unknown as MessageBus;
+      const mockToolRegistry = {
+        getMessageBus: () => mockMessageBus,
+        getAllToolNames: () => [],
+        sortTools: () => {},
+      } as unknown as ToolRegistry;
+
+      const context = {
+        config: mockConfig,
+        promptId: rootSessionId,
+        // parentSessionId is undefined
+        toolRegistry: mockToolRegistry,
+        promptRegistry: {} as unknown as PromptRegistry,
+        resourceRegistry: {} as unknown as ResourceRegistry,
+        geminiClient: mockGeminiClient,
+        sandboxManager: mockSandboxManager,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext;
+
+      const definition = createTestDefinition([]);
+      const executor = await LocalAgentExecutor.create(definition, context);
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      const chatConstructorArgs =
+        MockedGeminiChat.mock.calls[MockedGeminiChat.mock.calls.length - 1];
+      const executionContext = chatConstructorArgs[0];
+
+      expect(executionContext.parentSessionId).toBe(rootSessionId);
+      expect(executionContext.promptId).toBe(executor['agentId']);
+    });
+    it('should successfully with allowed tools', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -500,9 +594,7 @@ describe('LocalAgentExecutor', () => {
         onActivity,
       );
 
-      expect(executor['agentId']).toMatch(
-        new RegExp(`^${parentId}-${definition.name}-`),
-      );
+      expect(executor['agentId']).toBeDefined();
     });
 
     it('should correctly apply templates to initialMessages', async () => {

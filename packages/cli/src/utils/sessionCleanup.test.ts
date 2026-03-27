@@ -106,6 +106,8 @@ describe('Session Cleanup (Refactored)', () => {
     );
     // Session directory
     await fs.mkdir(path.join(testTempDir, sessionId), { recursive: true });
+    // Subagent chats directory
+    await fs.mkdir(path.join(chatsDir, sessionId), { recursive: true });
   }
 
   async function seedSessions() {
@@ -274,6 +276,7 @@ describe('Session Cleanup (Refactored)', () => {
         existsSync(path.join(toolOutputsDir, `session-${sessions[1].id}`)),
       ).toBe(false);
       expect(existsSync(path.join(testTempDir, sessions[1].id))).toBe(false); // Session directory should be deleted
+      expect(existsSync(path.join(chatsDir, sessions[1].id))).toBe(false); // Subagent chats directory should be deleted
     });
 
     it('should NOT delete sessions within the cutoff date', async () => {
