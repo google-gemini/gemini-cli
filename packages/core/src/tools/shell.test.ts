@@ -136,6 +136,7 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       sanitizationConfig: {},
@@ -277,7 +278,7 @@ describe('ShellTool', () => {
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -P $$ >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
@@ -295,6 +296,28 @@ describe('ShellTool', () => {
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
+    it('should disable PTY execution when interactive shell is unavailable', async () => {
+      (mockConfig.getEnableInteractiveShell as Mock).mockReturnValue(true);
+      (mockConfig.isInteractiveShellEnabled as Mock).mockReturnValue(false);
+
+      const invocation = shellTool.build({ command: 'python --version' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ pid: 54321 });
+
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.any(String),
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.objectContaining({
+          pager: 'cat',
+        }),
+      );
+    });
+
     it('should use the provided absolute directory as cwd', async () => {
       const subdir = path.join(tempRootDir, 'subdir');
       const invocation = shellTool.build({
@@ -306,7 +329,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -P $$ >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
@@ -331,7 +354,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -P $$ >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),

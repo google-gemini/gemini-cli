@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --no-warnings=DEP0040
+#!/usr/bin/env node
 
 /**
  * @license
@@ -6,9 +6,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { main } from './src/gemini.js';
-import { FatalError, writeToStderr } from '@google/gemini-cli-core';
-import { runExitCleanup } from './src/utils/cleanup.js';
+import { createRequire } from 'node:module';
+
+const argv = process.argv.slice(2);
+if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) {
+  const require = createRequire(import.meta.url);
+  const { version } = require('../package.json');
+  process.stdout.write(`${version}\n`);
+  process.exit(0);
+}
+
+const [geminiModule, coreModule, cleanupModule] = await Promise.all([
+  import('./src/gemini.js'),
+  import('@google/gemini-cli-core'),
+  import('./src/utils/cleanup.js'),
+]);
+
+const { main } = geminiModule;
+const { FatalError, writeToStderr } = coreModule;
+const { runExitCleanup } = cleanupModule;
 
 // --- Global Entry Point ---
 
