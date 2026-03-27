@@ -49,6 +49,7 @@ import {
   getDisplayString,
   processSingleFileContent,
   type AgentLoopContext,
+  updatePolicy,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -64,6 +65,7 @@ import {
   loadSettings,
   type LoadedSettings,
 } from '../config/settings.js';
+import { createPolicyUpdater } from '../config/policy.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -133,6 +135,7 @@ export class GeminiAgent {
     args: acp.InitializeRequest,
   ): Promise<acp.InitializeResponse> {
     this.clientCapabilities = args.clientCapabilities;
+
     const authMethods = [
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
@@ -322,6 +325,7 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
+
     const session = new Session(
       sessionId,
       chat,
@@ -511,6 +515,12 @@ export class GeminiAgent {
     };
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
+
+    createPolicyUpdater(
+      config.getPolicyEngine(),
+      config.messageBus,
+      config.storage,
+    );
 
     return config;
   }
@@ -1012,6 +1022,7 @@ export class Session {
           options: toPermissionOptions(
             confirmationDetails,
             this.context.config,
+            this.settings.merged.security.enablePermanentToolApproval,
           ),
           toolCall: {
             toolCallId: callId,
@@ -1035,6 +1046,16 @@ export class Session {
                 .parse(output.outcome.optionId);
 
         await confirmationDetails.onConfirm(outcome);
+
+        // Update policy to enable Always Allow persistence
+        await updatePolicy(
+          tool,
+          outcome,
+          confirmationDetails,
+          this.context,
+          this.context.messageBus,
+          invocation,
+        );
 
         switch (outcome) {
           case ToolConfirmationOutcome.Cancel:
@@ -1785,6 +1806,7 @@ const basicPermissionOptions = [
 function toPermissionOptions(
   confirmation: ToolCallConfirmationDetails,
   config: Config,
+  enablePermanentToolApproval: boolean = false,
 ): acp.PermissionOption[] {
   const disableAlwaysAllow = config.getDisableAlwaysAllow();
   const options: acp.PermissionOption[] = [];
@@ -1794,37 +1816,65 @@ function toPermissionOptions(
       case 'edit':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: 'Allow All Edits',
+          name: 'Allow for this session',
           kind: 'allow_always',
         });
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow for this file in all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'exec':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: `Always Allow ${confirmation.rootCommand}`,
+          name: 'Allow for this session',
           kind: 'allow_always',
         });
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow this command for all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'mcp':
         options.push(
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-            name: `Always Allow ${confirmation.serverName}`,
+            name: 'Allow all server tools for this session',
             kind: 'allow_always',
           },
           {
             optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-            name: `Always Allow ${confirmation.toolName}`,
+            name: 'Allow tool for this session',
             kind: 'allow_always',
           },
         );
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow tool for all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'info':
         options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
-          name: `Always Allow`,
+          name: 'Allow for this session',
           kind: 'allow_always',
         });
+        if (enablePermanentToolApproval) {
+          options.push({
+            optionId: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            name: 'Allow for all future sessions',
+            kind: 'allow_always',
+          });
+        }
         break;
       case 'ask_user':
       case 'exit_plan_mode':
