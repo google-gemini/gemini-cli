@@ -171,7 +171,7 @@ function isFooterItemId(id: string): id is FooterItemId {
 }
 
 interface FooterColumn {
-  id: FooterItemId;
+  id: string;
   header: string;
   element: (maxWidth: number) => React.ReactNode;
   width: number;
@@ -233,7 +233,7 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   const potentialColumns: FooterColumn[] = [];
 
   const addCol = (
-    id: FooterItemId,
+    id: string,
     header: string,
     element: (maxWidth: number) => React.ReactNode,
     dataWidth: number,
@@ -249,12 +249,10 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   };
 
   // 1. System Indicators (Far Left, high priority)
-  // Note: These don't have IDs in ALL_ITEMS yet, but we handle them as specials
   if (displayVimMode) {
     const vimStr = `[${displayVimMode}]`;
-    // We'll use a hacky cast for now or ideally update ALL_ITEMS
     addCol(
-      'mode', // Using 'mode' as a placeholder for system indicators
+      'vim-mode',
       '',
       () => <Text color={theme.text.accent}>{vimStr}</Text>,
       vimStr.length,
@@ -462,10 +460,10 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   }
 
   // 3. Transients
-  if (corgiMode) addCol('mode', '', () => <CorgiIndicator />, 5); // Hacky ID for now
+  if (corgiMode) addCol('corgi-mode', '', () => <CorgiIndicator />, 5);
   if (showErrorSummary) {
     addCol(
-      'mode', // Hacky ID
+      'error-summary',
       '',
       () => <ConsoleSummaryDisplay errorCount={errorCount} />,
       12,
