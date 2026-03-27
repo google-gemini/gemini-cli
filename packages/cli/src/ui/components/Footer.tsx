@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -12,6 +13,8 @@ import {
   tildeifyPath,
   getDisplayString,
   checkExhaustive,
+  AuthType,
+  UserAccountManager,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -183,6 +186,15 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   const settings = useSettings();
   const { vimEnabled, vimMode } = useVimMode();
 
+  const authType = config.getContentGeneratorConfig()?.authType;
+  const email = useMemo(() => {
+    if (authType) {
+      const userAccountManager = new UserAccountManager();
+      return userAccountManager.getCachedGoogleAccount() ?? undefined;
+    }
+    return undefined;
+  }, [authType]);
+
   if (copyModeEnabled) {
     return <Box height={1} />;
   }
@@ -221,6 +233,7 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
     errorCount > 0 &&
     (isFullErrorVerbosity || debugMode || isDevelopment);
   const displayVimMode = vimEnabled ? vimMode : undefined;
+
   const items =
     settings.merged.ui.footer.items ??
     deriveItemsFromLegacySettings(settings.merged);
@@ -382,6 +395,24 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
             </Text>
           ),
           8,
+        );
+        break;
+      }
+      case 'auth': {
+        if (!authType) break;
+        const displayStr =
+          authType === AuthType.LOGIN_WITH_GOOGLE
+            ? (email ?? 'google')
+            : authType;
+        addCol(
+          id,
+          header,
+          () => (
+            <Text color={itemColor} wrap="truncate-end">
+              {displayStr}
+            </Text>
+          ),
+          displayStr.length,
         );
         break;
       }
