@@ -2272,6 +2272,16 @@
           "default": 200,
           "type": "number"
         },
+        "memoryBoundaryMarkers": {
+          "title": "Memory Boundary Markers",
+          "description": "File or directory names that mark the boundary for GEMINI.md discovery. The upward traversal stops at the first directory containing any of these markers. An empty array disables parent traversal.",
+          "markdownDescription": "File or directory names that mark the boundary for GEMINI.md discovery. The upward traversal stops at the first directory containing any of these markers. An empty array disables parent traversal.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[\n  \".git\"\n]`",
+          "default": [".git"],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "includeDirectories": {
           "title": "Include Directories",
           "description": "Additional directories to include in the workspace context. Missing directories will be skipped with a warning.",
