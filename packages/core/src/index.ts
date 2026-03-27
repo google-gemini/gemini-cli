@@ -46,6 +46,7 @@ export * from './core/geminiRequest.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
+export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
