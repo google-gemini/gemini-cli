@@ -6,7 +6,6 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import {
   BaseToolInvocation,
@@ -88,16 +87,12 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     return description.slice(0, DESCRIPTION_MAX_LENGTH);
   }
 
-  private publishActivity(activity: SubagentActivityItem, label: string): void {
-    this.messageBus
-      .publish({
-        type: MessageBusType.SUBAGENT_ACTIVITY,
-        subagentName: this.definition.displayName ?? this.definition.name,
-        activity,
-      })
-      .catch((err: unknown) =>
-        debugLogger.error(`Failed to publish ${label}: ${err}`),
-      );
+  private publishActivity(activity: SubagentActivityItem): void {
+    void this.messageBus.publish({
+      type: MessageBusType.SUBAGENT_ACTIVITY,
+      subagentName: this.definition.displayName ?? this.definition.name,
+      activity,
+    });
   }
 
   /**
@@ -156,7 +151,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 
             const latestThought = recentActivity[recentActivity.length - 1];
             if (latestThought) {
-              this.publishActivity(latestThought, 'thought chunk');
+              this.publishActivity(latestThought);
             }
             break;
           }
@@ -184,7 +179,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 
             const latestTool = recentActivity[recentActivity.length - 1];
             if (latestTool) {
-              this.publishActivity(latestTool, 'tool start');
+              this.publishActivity(latestTool);
             }
             break;
           }
@@ -202,7 +197,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
                 recentActivity[i].status = isError ? 'error' : 'completed';
                 updated = true;
 
-                this.publishActivity(recentActivity[i], 'tool end');
+                this.publishActivity(recentActivity[i]);
                 break;
               }
             }
