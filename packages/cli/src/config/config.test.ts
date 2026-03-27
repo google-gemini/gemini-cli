@@ -3792,6 +3792,26 @@ describe('loadCliConfig acpMode and clientName', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+    // Isolate tests from host IDE environment variables checked by detectIdeFromEnv()
+    // so results are consistent regardless of which IDE runs the tests.
+    const ideEnvVarsToStub = [
+      'ANTIGRAVITY_CLI_ALIAS',
+      '__COG_BASHRC_SOURCED',
+      'REPLIT_USER',
+      'CURSOR_TRACE_ID',
+      'CODESPACES',
+      'EDITOR_IN_CLOUD_SHELL',
+      'CLOUD_SHELL',
+      'TERM_PRODUCT',
+      'MONOSPACE_ENV',
+      'POSITRON',
+      'ZED_SESSION_ID',
+      'XCODE_VERSION_ACTUAL',
+      'TERMINAL_EMULATOR',
+    ];
+    for (const envVar of ideEnvVarsToStub) {
+      vi.stubEnv(envVar, '');
+    }
   });
 
   afterEach(() => {
