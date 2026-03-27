@@ -236,6 +236,10 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   const showRow1 = showUiDetails || showRow1Minimal;
   const showRow2 = showUiDetails || showRow2Minimal;
 
+  const onStatusResize = useCallback((width: number) => {
+    if (width > 0) setStatusWidth(width);
+  }, []);
+
   const statusNode = (
     <StatusNode
       showTips={showTips}
@@ -248,9 +252,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       errorVerbosity={
         settings.merged.ui.errorVerbosity as 'low' | 'full' | undefined
       }
-      onResize={(width) => {
-        if (width > 0) setStatusWidth(width);
-      }}
+      onResize={onStatusResize}
     />
   );
 
