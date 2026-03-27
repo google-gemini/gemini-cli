@@ -43,7 +43,7 @@ const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
   const { terminalWidth } = useUIState();
 
   const nameLabelLength = 25;
-  const resetLabelLength = 33;
+  const resetLabelLength = 31;
   // const nameLabel = row.name.slice(0, nameLabelLength).padEnd(nameLabelLength);
   let nameLabel = row.name;
   if (nameLabel.length > nameLabelLength) {
@@ -51,7 +51,7 @@ const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
   } else {
     nameLabel = nameLabel.padEnd(nameLabelLength);
   }
-  const percentageLabel = `${row.usedPercentage.toFixed(0)}%`.padStart(4);
+  const percentageLabel = `${row.usedPercentage.toFixed(0)}%`.padEnd(4);
   const resetLabel = `${row.resetTime}`
     ? formatResetTime(row.resetTime, 'column')
         .slice(0, resetLabelLength)
@@ -80,7 +80,7 @@ const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
       </Box>
 
       <Box width={resetLabelLength} marginLeft={1}>
-        <Text color={theme.text.secondary}>Resets in {resetLabel}</Text>
+        <Text color={theme.text.secondary}>Resets: {resetLabel}</Text>
       </Box>
     </Box>
   );
@@ -142,16 +142,6 @@ export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
             ),
         )}
       </Box>
-
-      {/* Rule Line */}
-      <Box
-        borderStyle="single"
-        borderTop={true}
-        borderBottom={false}
-        borderLeft={false}
-        borderRight={false}
-        borderColor={theme.border.default}
-      />
     </Box>
   );
 };
