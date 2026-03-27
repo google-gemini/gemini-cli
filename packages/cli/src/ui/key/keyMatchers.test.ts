@@ -504,6 +504,73 @@ describe('keyMatchers', () => {
       );
     });
   });
+
+  describe('Platform-specific bindings', () => {
+    const originalPlatform = process.platform;
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+        writable: true,
+        configurable: true,
+      });
+      vi.resetModules();
+    });
+
+    it('should bind Ctrl+Z to undo and empty suspend on Windows', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        writable: true,
+        configurable: true,
+      });
+      vi.resetModules();
+
+      const { defaultKeyBindingConfig: winConfig } = await import(
+        './keyBindings.js'
+      );
+      const { createKeyMatchers: createMatchers } = await import(
+        './keyMatchers.js'
+      );
+
+      const matchers = createMatchers(winConfig);
+
+      expect(matchers[Command.UNDO](createKey('z', { ctrl: true }))).toBe(true);
+      expect(matchers[Command.UNDO](createKey('z', { alt: true }))).toBe(true);
+      expect(matchers[Command.UNDO](createKey('z', { cmd: true }))).toBe(false);
+
+      expect(
+        matchers[Command.SUSPEND_APP](createKey('z', { ctrl: true })),
+      ).toBe(false);
+    });
+
+    it('should bind Alt+Z/Cmd+Z to undo and Ctrl+Z to suspend on non-Windows', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        writable: true,
+        configurable: true,
+      });
+      vi.resetModules();
+
+      const { defaultKeyBindingConfig: posixConfig } = await import(
+        './keyBindings.js'
+      );
+      const { createKeyMatchers: createMatchers } = await import(
+        './keyMatchers.js'
+      );
+
+      const matchers = createMatchers(posixConfig);
+
+      expect(matchers[Command.UNDO](createKey('z', { alt: true }))).toBe(true);
+      expect(matchers[Command.UNDO](createKey('z', { cmd: true }))).toBe(true);
+      expect(matchers[Command.UNDO](createKey('z', { ctrl: true }))).toBe(
+        false,
+      );
+
+      expect(
+        matchers[Command.SUSPEND_APP](createKey('z', { ctrl: true })),
+      ).toBe(true);
+    });
+  });
 });
 
 describe('loadKeyMatchers integration', () => {

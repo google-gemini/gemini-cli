@@ -238,169 +238,192 @@ export class KeyBinding {
 export type KeyBindingConfig = Map<Command, readonly KeyBinding[]>;
 
 /**
- * Default key binding configuration
- * Matches the original hard-coded logic exactly
+ * Builds the default key binding configuration with platform-specific overrides.
+ * - On Windows, Ctrl+Z is Undo (Win+Z opens Snap Layouts, and suspend is unsupported).
+ * - On macOS/Linux, Cmd/Super+Z is Undo, Ctrl+Z is Suspend.
  */
-export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
-  // Basic Controls
-  [Command.RETURN, [new KeyBinding('enter')]],
-  [Command.ESCAPE, [new KeyBinding('escape'), new KeyBinding('ctrl+[')]],
-  [Command.QUIT, [new KeyBinding('ctrl+c')]],
-  [Command.EXIT, [new KeyBinding('ctrl+d')]],
+function buildDefaultKeyBindingConfig(): KeyBindingConfig {
+  const isWindows = process.platform === 'win32';
+  return new Map([
+    // Basic Controls
+    [Command.RETURN, [new KeyBinding('enter')]],
+    [Command.ESCAPE, [new KeyBinding('escape'), new KeyBinding('ctrl+[')]],
+    [Command.QUIT, [new KeyBinding('ctrl+c')]],
+    [Command.EXIT, [new KeyBinding('ctrl+d')]],
 
-  // Cursor Movement
-  [Command.HOME, [new KeyBinding('ctrl+a'), new KeyBinding('home')]],
-  [Command.END, [new KeyBinding('ctrl+e'), new KeyBinding('end')]],
-  [Command.MOVE_UP, [new KeyBinding('up')]],
-  [Command.MOVE_DOWN, [new KeyBinding('down')]],
-  [Command.MOVE_LEFT, [new KeyBinding('left')]],
-  [Command.MOVE_RIGHT, [new KeyBinding('right'), new KeyBinding('ctrl+f')]],
-  [
-    Command.MOVE_WORD_LEFT,
+    // Cursor Movement
+    [Command.HOME, [new KeyBinding('ctrl+a'), new KeyBinding('home')]],
+    [Command.END, [new KeyBinding('ctrl+e'), new KeyBinding('end')]],
+    [Command.MOVE_UP, [new KeyBinding('up')]],
+    [Command.MOVE_DOWN, [new KeyBinding('down')]],
+    [Command.MOVE_LEFT, [new KeyBinding('left')]],
+    [Command.MOVE_RIGHT, [new KeyBinding('right'), new KeyBinding('ctrl+f')]],
     [
-      new KeyBinding('ctrl+left'),
-      new KeyBinding('alt+left'),
-      new KeyBinding('alt+b'),
+      Command.MOVE_WORD_LEFT,
+      [
+        new KeyBinding('ctrl+left'),
+        new KeyBinding('alt+left'),
+        new KeyBinding('alt+b'),
+      ],
     ],
-  ],
-  [
-    Command.MOVE_WORD_RIGHT,
     [
-      new KeyBinding('ctrl+right'),
-      new KeyBinding('alt+right'),
-      new KeyBinding('alt+f'),
+      Command.MOVE_WORD_RIGHT,
+      [
+        new KeyBinding('ctrl+right'),
+        new KeyBinding('alt+right'),
+        new KeyBinding('alt+f'),
+      ],
     ],
-  ],
 
-  // Editing
-  [Command.KILL_LINE_RIGHT, [new KeyBinding('ctrl+k')]],
-  [Command.KILL_LINE_LEFT, [new KeyBinding('ctrl+u')]],
-  [Command.CLEAR_INPUT, [new KeyBinding('ctrl+c')]],
-  [
-    Command.DELETE_WORD_BACKWARD,
+    // Editing
+    [Command.KILL_LINE_RIGHT, [new KeyBinding('ctrl+k')]],
+    [Command.KILL_LINE_LEFT, [new KeyBinding('ctrl+u')]],
+    [Command.CLEAR_INPUT, [new KeyBinding('ctrl+c')]],
     [
-      new KeyBinding('ctrl+backspace'),
-      new KeyBinding('alt+backspace'),
-      new KeyBinding('ctrl+w'),
+      Command.DELETE_WORD_BACKWARD,
+      [
+        new KeyBinding('ctrl+backspace'),
+        new KeyBinding('alt+backspace'),
+        new KeyBinding('ctrl+w'),
+      ],
     ],
-  ],
-  [
-    Command.DELETE_WORD_FORWARD,
     [
-      new KeyBinding('ctrl+delete'),
-      new KeyBinding('alt+delete'),
-      new KeyBinding('alt+d'),
+      Command.DELETE_WORD_FORWARD,
+      [
+        new KeyBinding('ctrl+delete'),
+        new KeyBinding('alt+delete'),
+        new KeyBinding('alt+d'),
+      ],
     ],
-  ],
-  [
-    Command.DELETE_CHAR_LEFT,
-    [new KeyBinding('backspace'), new KeyBinding('ctrl+h')],
-  ],
-  [
-    Command.DELETE_CHAR_RIGHT,
-    [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
-  ],
-  [Command.UNDO, [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]],
-  [
-    Command.REDO,
     [
-      new KeyBinding('ctrl+shift+z'),
-      new KeyBinding('cmd+shift+z'),
-      new KeyBinding('alt+shift+z'),
+      Command.DELETE_CHAR_LEFT,
+      [new KeyBinding('backspace'), new KeyBinding('ctrl+h')],
     ],
-  ],
-
-  // Scrolling
-  [Command.SCROLL_UP, [new KeyBinding('shift+up')]],
-  [Command.SCROLL_DOWN, [new KeyBinding('shift+down')]],
-  [
-    Command.SCROLL_HOME,
-    [new KeyBinding('ctrl+home'), new KeyBinding('shift+home')],
-  ],
-  [
-    Command.SCROLL_END,
-    [new KeyBinding('ctrl+end'), new KeyBinding('shift+end')],
-  ],
-  [Command.PAGE_UP, [new KeyBinding('pageup')]],
-  [Command.PAGE_DOWN, [new KeyBinding('pagedown')]],
-
-  // History & Search
-  [Command.HISTORY_UP, [new KeyBinding('ctrl+p')]],
-  [Command.HISTORY_DOWN, [new KeyBinding('ctrl+n')]],
-  [Command.REVERSE_SEARCH, [new KeyBinding('ctrl+r')]],
-  [Command.SUBMIT_REVERSE_SEARCH, [new KeyBinding('enter')]],
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH, [new KeyBinding('tab')]],
-
-  // Navigation
-  [Command.NAVIGATION_UP, [new KeyBinding('up')]],
-  [Command.NAVIGATION_DOWN, [new KeyBinding('down')]],
-  // Navigation shortcuts appropriate for dialogs where we do not need to accept
-  // text input.
-  [Command.DIALOG_NAVIGATION_UP, [new KeyBinding('up'), new KeyBinding('k')]],
-  [
-    Command.DIALOG_NAVIGATION_DOWN,
-    [new KeyBinding('down'), new KeyBinding('j')],
-  ],
-  [Command.DIALOG_NEXT, [new KeyBinding('tab')]],
-  [Command.DIALOG_PREV, [new KeyBinding('shift+tab')]],
-
-  // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION, [new KeyBinding('tab'), new KeyBinding('enter')]],
-  [Command.COMPLETION_UP, [new KeyBinding('up'), new KeyBinding('ctrl+p')]],
-  [Command.COMPLETION_DOWN, [new KeyBinding('down'), new KeyBinding('ctrl+n')]],
-  [Command.EXPAND_SUGGESTION, [new KeyBinding('right')]],
-  [Command.COLLAPSE_SUGGESTION, [new KeyBinding('left')]],
-
-  // Text Input
-  // Must also exclude shift to allow shift+enter for newline
-  [Command.SUBMIT, [new KeyBinding('enter')]],
-  [
-    Command.NEWLINE,
     [
-      new KeyBinding('ctrl+enter'),
-      new KeyBinding('cmd+enter'),
-      new KeyBinding('alt+enter'),
-      new KeyBinding('shift+enter'),
-      new KeyBinding('ctrl+j'),
+      Command.DELETE_CHAR_RIGHT,
+      [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
     ],
-  ],
-  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
-  [
-    Command.PASTE_CLIPBOARD,
     [
-      new KeyBinding('ctrl+v'),
-      new KeyBinding('cmd+v'),
-      new KeyBinding('alt+v'),
+      Command.UNDO,
+      isWindows
+        ? [new KeyBinding('ctrl+z'), new KeyBinding('alt+z')]
+        : [new KeyBinding('alt+z'), new KeyBinding('cmd+z')],
     ],
-  ],
+    [
+      Command.REDO,
+      [
+        new KeyBinding('ctrl+shift+z'),
+        new KeyBinding('cmd+shift+z'),
+        new KeyBinding('alt+shift+z'),
+      ],
+    ],
 
-  // App Controls
-  [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
-  [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
-  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
-  [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
-  [Command.TOGGLE_COPY_MODE, [new KeyBinding('ctrl+s')]],
-  [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
-  [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
-  [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
-  [Command.EXPAND_PASTE, [new KeyBinding('ctrl+o')]],
-  [Command.FOCUS_SHELL_INPUT, [new KeyBinding('tab')]],
-  [Command.UNFOCUS_SHELL_INPUT, [new KeyBinding('shift+tab')]],
-  [Command.CLEAR_SCREEN, [new KeyBinding('ctrl+l')]],
-  [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
-  [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+    // Scrolling
+    [Command.SCROLL_UP, [new KeyBinding('shift+up')]],
+    [Command.SCROLL_DOWN, [new KeyBinding('shift+down')]],
+    [
+      Command.SCROLL_HOME,
+      [new KeyBinding('ctrl+home'), new KeyBinding('shift+home')],
+    ],
+    [
+      Command.SCROLL_END,
+      [new KeyBinding('ctrl+end'), new KeyBinding('shift+end')],
+    ],
+    [Command.PAGE_UP, [new KeyBinding('pageup')]],
+    [Command.PAGE_DOWN, [new KeyBinding('pagedown')]],
 
-  // Background Shell Controls
-  [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
-  [Command.BACKGROUND_SHELL_SELECT, [new KeyBinding('enter')]],
-  [Command.TOGGLE_BACKGROUND_SHELL, [new KeyBinding('ctrl+b')]],
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST, [new KeyBinding('ctrl+l')]],
-  [Command.KILL_BACKGROUND_SHELL, [new KeyBinding('ctrl+k')]],
-  [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
-]);
+    // History & Search
+    [Command.HISTORY_UP, [new KeyBinding('ctrl+p')]],
+    [Command.HISTORY_DOWN, [new KeyBinding('ctrl+n')]],
+    [Command.REVERSE_SEARCH, [new KeyBinding('ctrl+r')]],
+    [Command.SUBMIT_REVERSE_SEARCH, [new KeyBinding('enter')]],
+    [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH, [new KeyBinding('tab')]],
+
+    // Navigation
+    [Command.NAVIGATION_UP, [new KeyBinding('up')]],
+    [Command.NAVIGATION_DOWN, [new KeyBinding('down')]],
+    // Navigation shortcuts appropriate for dialogs where we do not need to accept
+    // text input.
+    [Command.DIALOG_NAVIGATION_UP, [new KeyBinding('up'), new KeyBinding('k')]],
+    [
+      Command.DIALOG_NAVIGATION_DOWN,
+      [new KeyBinding('down'), new KeyBinding('j')],
+    ],
+    [Command.DIALOG_NEXT, [new KeyBinding('tab')]],
+    [Command.DIALOG_PREV, [new KeyBinding('shift+tab')]],
+
+    // Suggestions & Completions
+    [
+      Command.ACCEPT_SUGGESTION,
+      [new KeyBinding('tab'), new KeyBinding('enter')],
+    ],
+    [Command.COMPLETION_UP, [new KeyBinding('up'), new KeyBinding('ctrl+p')]],
+    [
+      Command.COMPLETION_DOWN,
+      [new KeyBinding('down'), new KeyBinding('ctrl+n')],
+    ],
+    [Command.EXPAND_SUGGESTION, [new KeyBinding('right')]],
+    [Command.COLLAPSE_SUGGESTION, [new KeyBinding('left')]],
+
+    // Text Input
+    // Must also exclude shift to allow shift+enter for newline
+    [Command.SUBMIT, [new KeyBinding('enter')]],
+    [
+      Command.NEWLINE,
+      [
+        new KeyBinding('ctrl+enter'),
+        new KeyBinding('cmd+enter'),
+        new KeyBinding('alt+enter'),
+        new KeyBinding('shift+enter'),
+        new KeyBinding('ctrl+j'),
+      ],
+    ],
+    [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+    [
+      Command.PASTE_CLIPBOARD,
+      [
+        new KeyBinding('ctrl+v'),
+        new KeyBinding('cmd+v'),
+        new KeyBinding('alt+v'),
+      ],
+    ],
+
+    // App Controls
+    [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
+    [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
+    [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
+    [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
+    [Command.TOGGLE_COPY_MODE, [new KeyBinding('ctrl+s')]],
+    [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
+    [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
+    [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
+    [Command.EXPAND_PASTE, [new KeyBinding('ctrl+o')]],
+    [Command.FOCUS_SHELL_INPUT, [new KeyBinding('tab')]],
+    [Command.UNFOCUS_SHELL_INPUT, [new KeyBinding('shift+tab')]],
+    [Command.CLEAR_SCREEN, [new KeyBinding('ctrl+l')]],
+    [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
+    [Command.SUSPEND_APP, isWindows ? [] : [new KeyBinding('ctrl+z')]],
+    [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+
+    // Background Shell Controls
+    [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
+    [Command.BACKGROUND_SHELL_SELECT, [new KeyBinding('enter')]],
+    [Command.TOGGLE_BACKGROUND_SHELL, [new KeyBinding('ctrl+b')]],
+    [Command.TOGGLE_BACKGROUND_SHELL_LIST, [new KeyBinding('ctrl+l')]],
+    [Command.KILL_BACKGROUND_SHELL, [new KeyBinding('ctrl+k')]],
+    [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
+    [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
+    [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  ]);
+}
+
+/**
+ * Default key binding configuration
+ * Platform-aware: uses Ctrl+Z for Undo on Windows (Win+Z opens Snap Layouts),
+ * and Cmd/Super+Z on macOS/Linux.
+ */
+export const defaultKeyBindingConfig: KeyBindingConfig =
+  buildDefaultKeyBindingConfig();
 
 interface CommandCategory {
   readonly title: string;
