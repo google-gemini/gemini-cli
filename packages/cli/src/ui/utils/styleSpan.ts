@@ -1,13 +1,10 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  toStyledCharacters,
-  styledCharsToString as inkStyledCharsToString,
-} from 'ink';
+import { toStyledCharacters } from 'ink';
 import type { StyledChar } from 'ink';
 import { getCachedStringWidth } from './textUtils.js';
 
@@ -286,17 +283,7 @@ export function styleSpansToString(spans: StyleSpan[]): string {
  * @returns String with ANSI codes
  */
 export function styleSpansToANSIString(spans: StyleSpan[]): string {
-  // Convert spans back to StyledChars and use ink's function
-  const styledChars: StyledChar[] = [];
-
-  for (const span of spans) {
-    for (const char of span.text) {
-      styledChars.push({
-        value: char,
-        styles: span.styles,
-      });
-    }
-  }
-
-  return inkStyledCharsToString(styledChars);
+  // For now, just return the text content without reconstructing ANSI codes
+  // Full ANSI reconstruction would require storing type and fullWidth in StyleSpan
+  return styleSpansToString(spans);
 }

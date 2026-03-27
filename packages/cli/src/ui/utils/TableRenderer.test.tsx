@@ -32,6 +32,7 @@ describe('TableRenderer', () => {
       expect(text).toContain('Age');
       expect(text).toContain('Alice');
       expect(text).toContain('Bob');
+      await expect(lastFrame()).toMatchSvgSnapshot();
     });
 
     it('should render table with single row', async () => {
@@ -80,6 +81,7 @@ describe('TableRenderer', () => {
       expect(text).toContain('E');
       expect(text).toContain('a1');
       expect(text).toContain('e2');
+      await expect(lastFrame()).toMatchSvgSnapshot();
     });
 
     it('should render table with many rows', async () => {
@@ -260,6 +262,7 @@ describe('TableRenderer', () => {
 
       const text = stripAnsi(lastFrame());
       expect(text).toMatch(/[┌│└┐┤┘├┼┬┴─]/);
+      await expect(lastFrame()).toMatchSvgSnapshot();
     });
 
     it('should have proper border structure', async () => {
@@ -277,6 +280,7 @@ describe('TableRenderer', () => {
       const text = stripAnsi(lastFrame());
       const lines = text.split('\n').filter((line) => line.trim());
       expect(lines.length).toBeGreaterThan(3);
+      await expect(lastFrame()).toMatchSvgSnapshot();
     });
   });
 
@@ -370,6 +374,7 @@ describe('TableRenderer', () => {
       const text = stripAnsi(lastFrame());
       expect(text).toContain('Col0');
       expect(text).toContain('Col9');
+      await expect(lastFrame()).toMatchSvgSnapshot();
     });
 
     it('should handle table with very long cell content', async () => {
@@ -418,6 +423,7 @@ describe('TableRenderer', () => {
 
       const narrowText = stripAnsi(narrowFrame());
       expect(narrowText).toContain('Item');
+      await expect(narrowFrame()).toMatchSvgSnapshot();
 
       const { lastFrame: wideFrame } = await renderWithProviders(
         <TableRenderer headers={headers} rows={rows} terminalWidth={120} />,
@@ -425,6 +431,7 @@ describe('TableRenderer', () => {
 
       const wideText = stripAnsi(wideFrame());
       expect(wideText).toContain('Item');
+      await expect(wideFrame()).toMatchSvgSnapshot();
     });
   });
 
