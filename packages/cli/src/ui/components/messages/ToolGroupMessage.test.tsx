@@ -22,6 +22,9 @@ import {
   EDIT_DISPLAY_NAME,
   READ_FILE_DISPLAY_NAME,
   GLOB_DISPLAY_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from '@google/gemini-cli-core';
 import os from 'node:os';
 import { createMockSettings } from '../../../test-utils/settings.js';
@@ -462,6 +465,60 @@ describe('<ToolGroupMessage />', () => {
       );
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
+    });
+
+    describe('UpdateTopicTool', () => {
+      it('renders update_topic with Title -- Description format even when compact mode is disabled', async () => {
+        const toolCalls = [
+          createToolCall({
+            name: UPDATE_TOPIC_DISPLAY_NAME,
+            args: {
+              [TOPIC_PARAM_TITLE]: 'Research',
+              [TOPIC_PARAM_STRATEGIC_INTENT]: 'Researching Agent Skills',
+            },
+          }),
+        ];
+        const item = createItem(toolCalls);
+        const { lastFrame, unmount } = await renderWithProviders(
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+          {
+            config: baseMockConfig,
+            settings: createMockSettings({
+              ui: { compactToolOutput: false },
+            }),
+          },
+        );
+
+        const output = lastFrame();
+        expect(output).toContain('Research');
+        expect(output).toContain('-- Researching Agent Skills');
+        expect(output).not.toContain('update_topic');
+        unmount();
+      });
+
+      it('renders update_topic with Topic -- Description format when title is missing', async () => {
+        const toolCalls = [
+          createToolCall({
+            name: UPDATE_TOPIC_DISPLAY_NAME,
+            args: {
+              [TOPIC_PARAM_STRATEGIC_INTENT]: 'Tactical update',
+            },
+          }),
+        ];
+        const item = createItem(toolCalls);
+        const { lastFrame, unmount } = await renderWithProviders(
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+          {
+            config: baseMockConfig,
+            settings: fullVerbositySettings,
+          },
+        );
+
+        const output = lastFrame();
+        expect(output).toContain('Topic');
+        expect(output).toContain('-- Tactical update');
+        unmount();
+      });
     });
 
     it('renders two tool groups where only the last line of the previous group is visible', async () => {

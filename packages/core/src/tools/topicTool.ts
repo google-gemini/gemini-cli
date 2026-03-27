@@ -10,6 +10,7 @@ import {
   TOPIC_PARAM_SUMMARY,
   TOPIC_PARAM_STRATEGIC_INTENT,
 } from './definitions/coreTools.js';
+import { UPDATE_TOPIC_DISPLAY_NAME } from './tool-names.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -153,7 +154,7 @@ export class UpdateTopicTool extends BaseDeclarativeTool<
     const declaration = getUpdateTopicDeclaration();
     super(
       UPDATE_TOPIC_TOOL_NAME,
-      'Update Topic Context',
+      UPDATE_TOPIC_DISPLAY_NAME,
       declaration.description ?? '',
       Kind.Think,
       declaration.parametersJsonSchema,

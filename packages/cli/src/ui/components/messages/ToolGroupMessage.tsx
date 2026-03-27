@@ -33,6 +33,8 @@ import {
   WEB_FETCH_DISPLAY_NAME,
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
   isFileDiff,
   isGrepResult,
   isListResult,
@@ -51,6 +53,8 @@ const COMPACT_OUTPUT_ALLOWLIST = new Set([
   WEB_FETCH_DISPLAY_NAME,
   WRITE_FILE_DISPLAY_NAME,
   READ_MANY_FILES_DISPLAY_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 ]);
 
 // Helper to identify if a tool should use the compact view
@@ -60,6 +64,15 @@ export const isCompactTool = (
 ): boolean => {
   const hasCompactOutputSupport = COMPACT_OUTPUT_ALLOWLIST.has(tool.name);
   const displayStatus = mapCoreStatusToDisplayStatus(tool.status);
+
+  // update_topic always uses the dense/compact representation
+  if (
+    tool.name === UPDATE_TOPIC_DISPLAY_NAME ||
+    tool.name === UPDATE_TOPIC_TOOL_NAME
+  ) {
+    return displayStatus !== ToolCallStatus.Confirming;
+  }
+
   return (
     isCompactModeEnabled &&
     hasCompactOutputSupport &&

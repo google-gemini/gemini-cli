@@ -17,6 +17,10 @@ import {
   isGrepResult,
   isListResult,
   isReadManyFilesResult,
+  UPDATE_TOPIC_DISPLAY_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay, isTodoList } from '../../types.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -306,10 +310,33 @@ function getGenericSuccessData(
   return { description, summary, payload };
 }
 
+function getUpdateTopicData(args?: Record<string, unknown>): ViewParts {
+  const rawTitle = args?.[TOPIC_PARAM_TITLE];
+  const title = typeof rawTitle === 'string' ? rawTitle : undefined;
+  const rawIntent = args?.[TOPIC_PARAM_STRATEGIC_INTENT];
+  const intent = typeof rawIntent === 'string' ? rawIntent : undefined;
+
+  const description = (
+    <Text color={theme.text.primary} bold wrap="truncate-end">
+      {title || 'Topic'}
+    </Text>
+  );
+
+  const summary = intent ? (
+    <Text color={theme.text.secondary} wrap="truncate-end">
+      {' '}
+      -- {intent}
+    </Text>
+  ) : undefined;
+
+  return { description, summary };
+}
+
 export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const {
     callId,
     name,
+    args,
     status,
     resultDisplay,
     confirmationDetails,
@@ -322,6 +349,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const { isExpanded: isExpandedInContext, toggleExpansion } = useToolActions();
+
+  // ... (rest of component)
 
   // Handle optional context members
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
@@ -370,6 +399,9 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   // State-to-View Coordination
   const viewParts = useMemo((): ViewParts => {
+    if (name === UPDATE_TOPIC_DISPLAY_NAME || name === UPDATE_TOPIC_TOOL_NAME) {
+      return getUpdateTopicData(args);
+    }
     if (diff) {
       return getFileOpData(
         diff,
@@ -431,6 +463,8 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     availableTerminalHeight,
     originalDescription,
     isAlternateBuffer,
+    name,
+    args,
   ]);
 
   const { description, summary } = viewParts;
@@ -497,25 +531,42 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
 
   return (
     <Box flexDirection="column">
-      <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
-        <ToolStatusIndicator status={status} name={name} />
-        <Box maxWidth={25} flexShrink={1} flexGrow={0}>
-          <Text color={theme.text.primary} bold wrap="truncate-end">
-            {name}{' '}
-          </Text>
-        </Box>
-        <Box marginLeft={1} flexShrink={1} flexGrow={0}>
-          {description}
-        </Box>
-        {summary && (
-          <Box
-            key="tool-summary"
-            ref={isAlternateBuffer && diff ? toggleRef : undefined}
-            marginLeft={1}
-            flexGrow={0}
-          >
-            {summary}
-          </Box>
+      <Box marginLeft={2} flexDirection="row">
+        {name === UPDATE_TOPIC_DISPLAY_NAME ||
+        name === UPDATE_TOPIC_TOOL_NAME ? (
+          <>
+            <Box flexShrink={1} flexGrow={0}>
+              {description}
+            </Box>
+            {summary && (
+              <Box marginLeft={1} flexGrow={0} flexShrink={1}>
+                {summary}
+              </Box>
+            )}
+          </>
+        ) : (
+          <>
+            <ToolStatusIndicator status={status} name={name} />
+            <Box maxWidth={25} flexShrink={1} flexGrow={0}>
+              <Text color={theme.text.primary} bold wrap="truncate-end">
+                {name}{' '}
+              </Text>
+            </Box>
+            <Box marginLeft={1} flexShrink={1} flexGrow={0}>
+              {description}
+            </Box>
+            {summary && (
+              <Box
+                key="tool-summary"
+                ref={isAlternateBuffer && diff ? toggleRef : undefined}
+                marginLeft={1}
+                flexGrow={0}
+                flexShrink={1}
+              >
+                {summary}
+              </Box>
+            )}
+          </>
         )}
       </Box>
 
