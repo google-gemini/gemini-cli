@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import {
   UnifiedModeIndicator,
   getModeHeaderLabel,
@@ -46,7 +46,7 @@ describe('UnifiedModeIndicator', () => {
 
   describe('Rendering', () => {
     it('renders shell mode with precedence over YOLO', async () => {
-      const { lastFrame } = await render(
+      const { lastFrame } = await renderWithProviders(
         <UnifiedModeIndicator
           approvalMode={ApprovalMode.YOLO}
           shellModeActive={true}
@@ -58,7 +58,7 @@ describe('UnifiedModeIndicator', () => {
     });
 
     it('renders YOLO mode with precedence over background mode', async () => {
-      const { lastFrame } = await render(
+      const { lastFrame } = await renderWithProviders(
         <UnifiedModeIndicator
           approvalMode={ApprovalMode.YOLO}
           shellModeActive={false}
@@ -70,7 +70,7 @@ describe('UnifiedModeIndicator', () => {
     });
 
     it('renders background mode (manual)', async () => {
-      const { lastFrame } = await render(
+      const { lastFrame } = await renderWithProviders(
         <UnifiedModeIndicator
           approvalMode={ApprovalMode.DEFAULT}
           shellModeActive={false}
@@ -81,7 +81,7 @@ describe('UnifiedModeIndicator', () => {
     });
 
     it('renders background mode (plan)', async () => {
-      const { lastFrame } = await render(
+      const { lastFrame } = await renderWithProviders(
         <UnifiedModeIndicator
           approvalMode={ApprovalMode.PLAN}
           shellModeActive={false}
@@ -92,7 +92,7 @@ describe('UnifiedModeIndicator', () => {
     });
 
     it('renders background mode (auto-accept)', async () => {
-      const { lastFrame } = await render(
+      const { lastFrame } = await renderWithProviders(
         <UnifiedModeIndicator
           approvalMode={ApprovalMode.AUTO_EDIT}
           shellModeActive={false}
@@ -103,7 +103,7 @@ describe('UnifiedModeIndicator', () => {
     });
 
     it('renders raw markdown modifier', async () => {
-      const { lastFrame } = await render(
+      const { lastFrame } = await renderWithProviders(
         <UnifiedModeIndicator
           approvalMode={ApprovalMode.DEFAULT}
           shellModeActive={false}
