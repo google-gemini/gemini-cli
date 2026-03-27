@@ -105,7 +105,9 @@ describe('planCommand', () => {
   });
 
   it('should not return a submit_prompt action if arguments are empty', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
+    vi.mocked(
+      mockContext.services.agentContext!.config.isPlanEnabled,
+    ).mockReturnValue(true);
     mockContext.invocation = {
       raw: '/plan',
       name: 'plan',
@@ -116,13 +118,15 @@ describe('planCommand', () => {
     const result = await planCommand.action(mockContext, '');
 
     expect(result).toBeUndefined();
-    expect(mockContext.services.config!.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.PLAN,
-    );
+    expect(
+      mockContext.services.agentContext!.config.setApprovalMode,
+    ).toHaveBeenCalledWith(ApprovalMode.PLAN);
   });
 
   it('should return a submit_prompt action if arguments are provided', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
+    vi.mocked(
+      mockContext.services.agentContext!.config.isPlanEnabled,
+    ).mockReturnValue(true);
     mockContext.invocation = {
       raw: '/plan implement auth',
       name: 'plan',
@@ -136,9 +140,9 @@ describe('planCommand', () => {
       type: 'submit_prompt',
       content: 'implement auth',
     });
-    expect(mockContext.services.config!.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.PLAN,
-    );
+    expect(
+      mockContext.services.agentContext!.config.setApprovalMode,
+    ).toHaveBeenCalledWith(ApprovalMode.PLAN);
   });
 
   it('should display the approved plan from config', async () => {
