@@ -15,6 +15,7 @@ import {
   type SandboxPermissions,
   sanitizePaths,
   GOVERNANCE_FILES,
+  SECRET_FILES,
 } from '../../services/sandboxManager.js';
 import { tryRealpath, resolveGitWorktreePaths } from '../utils/fsUtils.js';
 
@@ -86,6 +87,34 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
     if (realGovernanceFile !== governanceFile) {
       args.push('-D', `REAL_GOVERNANCE_FILE_${i}=${realGovernanceFile}`);
       profile += `(deny file-write* (${ruleType} (param "REAL_GOVERNANCE_FILE_${i}")))\n`;
+    }
+  }
+
+  // Add explicit deny rules for secret files (.env, .env.*) in the workspace and allowed paths.
+  // We use regex rules to avoid expensive file discovery scans.
+  // Anchoring to workspace/allowed paths to avoid over-blocking.
+  const searchPaths = sanitizePaths([
+    options.workspace,
+    ...(options.allowedPaths || []),
+  ]) || [options.workspace];
+
+  for (const basePath of searchPaths) {
+    const resolvedBase = tryRealpath(basePath);
+    for (const secret of SECRET_FILES) {
+      // Map pattern to Seatbelt regex
+      let regexPattern: string;
+      const escapedBase = escapeRegex(resolvedBase);
+      if (secret.pattern.endsWith('*')) {
+        // .env.* -> .env\..+ (match .env followed by dot and something)
+        // We anchor the secret file name to either a directory separator or the start of the relative path.
+        const basePattern = secret.pattern.slice(0, -1).replace(/\./g, '\\\\.');
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}[^/]+$`;
+      } else {
+        // .env -> \.env$
+        const basePattern = secret.pattern.replace(/\./g, '\\\\.');
+        regexPattern = `^${escapedBase}/(.*/)?${basePattern}$`;
+      }
+      profile += `(deny file-read* file-write* (regex #"${regexPattern}"))\n`;
     }
   }
 
@@ -205,4 +234,24 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
   args.unshift('-p', profile);
 
   return args;
+}
+
+/**
+ * Escapes a string for use within a Seatbelt regex literal #"..."
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\"]/g, (c) => {
+    if (c === '"') {
+      // Escape double quotes for the Scheme string literal
+      return '\\"';
+    }
+    if (c === '\\') {
+      // A literal backslash needs to be \\ in the regex.
+      // To get \\ in the regex engine, we need \\\\ in the Scheme string literal.
+      return '\\\\\\\\';
+    }
+    // For other regex special characters (like .), we need \c in the regex.
+    // To get \c in the regex engine, we need \\c in the Scheme string literal.
+    return '\\\\' + c;
+  });
 }

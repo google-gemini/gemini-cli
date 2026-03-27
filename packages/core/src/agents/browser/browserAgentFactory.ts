@@ -62,8 +62,8 @@ export async function createBrowserAgentDefinition(
     'Creating browser agent definition with isolated MCP tools...',
   );
 
-  // Create and initialize browser manager with isolated MCP client
-  const browserManager = new BrowserManager(config);
+  // Get or create browser manager singleton for this session mode/profile
+  const browserManager = BrowserManager.getInstance(config);
   await browserManager.ensureConnection();
 
   if (printOutput) {
@@ -242,19 +242,10 @@ export async function createBrowserAgentDefinition(
 }
 
 /**
- * Cleans up browser resources after agent execution.
+ * Closes all persistent browser sessions and cleans up resources.
  *
- * @param browserManager The browser manager to clean up
+ * Call this on /clear commands and CLI exit to reset browser state.
  */
-export async function cleanupBrowserAgent(
-  browserManager: BrowserManager,
-): Promise<void> {
-  try {
-    await browserManager.close();
-    debugLogger.log('Browser agent cleanup complete');
-  } catch (error) {
-    debugLogger.error(
-      `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+export async function resetBrowserSession(): Promise<void> {
+  await BrowserManager.resetAll();
 }

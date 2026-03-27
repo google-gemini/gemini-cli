@@ -121,7 +121,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private get executionContext(): AgentLoopContext {
     return {
       config: this.context.config,
-      promptId: this.context.promptId,
+      promptId: this.agentId,
+      parentSessionId: this.context.parentSessionId || this.context.promptId, // Always preserve the main agent session ID
       geminiClient: this.context.geminiClient,
       sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
@@ -255,9 +256,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     agentToolRegistry.sortTools();
 
-    // Get the parent prompt ID from context
-    const parentPromptId = context.promptId;
-
     // Get the parent tool call ID from context
     const toolContext = getToolCallContext();
     const parentCallId = toolContext?.callId;
@@ -265,7 +263,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     return new LocalAgentExecutor(
       definition,
       context,
-      parentPromptId,
       agentToolRegistry,
       agentPromptRegistry,
       agentResourceRegistry,
@@ -283,7 +280,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private constructor(
     definition: LocalAgentDefinition<TOutput>,
     context: AgentLoopContext,
-    parentPromptId: string | undefined,
     toolRegistry: ToolRegistry,
     promptRegistry: PromptRegistry,
     resourceRegistry: ResourceRegistry,
@@ -299,11 +295,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
 
-    const randomIdPart = Math.random().toString(36).slice(2, 8);
-    // parentPromptId will be undefined if this agent is invoked directly
-    // (top-level), rather than as a sub-agent.
-    const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
-    this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
+    this.agentId = Math.random().toString(36).slice(2, 8);
   }
 
   /**
