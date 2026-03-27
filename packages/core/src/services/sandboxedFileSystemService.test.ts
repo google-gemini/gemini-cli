@@ -73,7 +73,7 @@ describe('SandboxedFileSystemService', () => {
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
-    const readPromise = service.readTextFile('/test/file.txt');
+    const readPromise = service.readTextFile('/test/cwd/file.txt');
 
     // Use setImmediate to ensure events are emitted after the promise starts executing
     setImmediate(() => {
@@ -86,15 +86,15 @@ describe('SandboxedFileSystemService', () => {
     expect(vi.mocked(sandboxManager.prepareCommand)).toHaveBeenCalledWith(
       expect.objectContaining({
         command: '__read',
-        args: ['/test/file.txt'],
+        args: ['/test/cwd/file.txt'],
         policy: {
-          allowedPaths: ['/test/file.txt'],
+          allowedPaths: ['/test/cwd/file.txt'],
         },
       }),
     );
     expect(spawn).toHaveBeenCalledWith(
       'sandbox.exe',
-      ['0', cwd, '__read', '/test/file.txt'],
+      ['0', cwd, '__read', '/test/cwd/file.txt'],
       expect.any(Object),
     );
   });
@@ -113,7 +113,10 @@ describe('SandboxedFileSystemService', () => {
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
-    const writePromise = service.writeTextFile('/test/file.txt', 'new content');
+    const writePromise = service.writeTextFile(
+      '/test/cwd/file.txt',
+      'new content',
+    );
 
     setImmediate(() => {
       mockChild.emit('close', 0);
@@ -127,12 +130,12 @@ describe('SandboxedFileSystemService', () => {
     expect(vi.mocked(sandboxManager.prepareCommand)).toHaveBeenCalledWith(
       expect.objectContaining({
         command: '__write',
-        args: ['/test/file.txt'],
+        args: ['/test/cwd/file.txt'],
         policy: {
-          allowedPaths: ['/test/file.txt'],
+          allowedPaths: ['/test/cwd/file.txt'],
           additionalPermissions: {
             fileSystem: {
-              write: ['/test/file.txt'],
+              write: ['/test/cwd/file.txt'],
             },
           },
         },
@@ -140,7 +143,7 @@ describe('SandboxedFileSystemService', () => {
     );
     expect(spawn).toHaveBeenCalledWith(
       'sandbox.exe',
-      ['0', cwd, '__write', '/test/file.txt'],
+      ['0', cwd, '__write', '/test/cwd/file.txt'],
       expect.any(Object),
     );
   });
@@ -154,7 +157,7 @@ describe('SandboxedFileSystemService', () => {
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
-    const readPromise = service.readTextFile('/test/file.txt');
+    const readPromise = service.readTextFile('/test/cwd/file.txt');
 
     setImmediate(() => {
       mockChild.stderr!.emit('data', Buffer.from('access denied'));
@@ -162,7 +165,7 @@ describe('SandboxedFileSystemService', () => {
     });
 
     await expect(readPromise).rejects.toThrow(
-      "Sandbox Error: read_file failed for '/test/file.txt'. Exit code 1. Details: access denied",
+      "Sandbox Error: read_file failed for '/test/cwd/file.txt'. Exit code 1. Details: access denied",
     );
   });
 
@@ -175,7 +178,7 @@ describe('SandboxedFileSystemService', () => {
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
-    const readPromise = service.readTextFile('/test/missing.txt');
+    const readPromise = service.readTextFile('/test/cwd/missing.txt');
 
     setImmediate(() => {
       mockChild.stderr!.emit('data', Buffer.from('No such file or directory'));
@@ -202,7 +205,7 @@ describe('SandboxedFileSystemService', () => {
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
-    const readPromise = service.readTextFile('/test/missing.txt');
+    const readPromise = service.readTextFile('/test/cwd/missing.txt');
 
     setImmediate(() => {
       mockChild.stderr!.emit(

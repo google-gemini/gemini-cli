@@ -9,6 +9,7 @@ import { type FileSystemService } from './fileSystemService.js';
 import { type SandboxManager } from './sandboxManager.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isNodeError } from '../utils/errors.js';
+import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 
 /**
  * A FileSystemService implementation that performs operations through a sandbox.
@@ -19,14 +20,25 @@ export class SandboxedFileSystemService implements FileSystemService {
     private cwd: string,
   ) {}
 
+  private sanitizeAndValidatePath(filePath: string): string {
+    const resolvedPath = resolveToRealPath(filePath);
+    if (!isSubpath(this.cwd, resolvedPath) && this.cwd !== resolvedPath) {
+      throw new Error(
+        `Access denied: Path '${filePath}' is outside the workspace.`,
+      );
+    }
+    return resolvedPath;
+  }
+
   async readTextFile(filePath: string): Promise<string> {
+    const safePath = this.sanitizeAndValidatePath(filePath);
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__read',
-      args: [filePath],
+      args: [safePath],
       cwd: this.cwd,
       env: process.env,
       policy: {
-        allowedPaths: [filePath],
+        allowedPaths: [safePath],
       },
     });
 
@@ -80,16 +92,17 @@ export class SandboxedFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
+    const safePath = this.sanitizeAndValidatePath(filePath);
     const prepared = await this.sandboxManager.prepareCommand({
       command: '__write',
-      args: [filePath],
+      args: [safePath],
       cwd: this.cwd,
       env: process.env,
       policy: {
-        allowedPaths: [filePath],
+        allowedPaths: [safePath],
         additionalPermissions: {
           fileSystem: {
-            write: [filePath],
+            write: [safePath],
           },
         },
       },

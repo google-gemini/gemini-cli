@@ -368,9 +368,9 @@ describe('LinuxSandboxManager', () => {
         });
 
         const parentDir = '/home/user/workspace';
-        const bindIndex = bwrapArgs.indexOf(parentDir);
+        const bindIndex = bwrapArgs.lastIndexOf(parentDir);
         expect(bindIndex).not.toBe(-1);
-        expect(bwrapArgs[bindIndex - 1]).toBe('--ro-bind-try');
+        expect(bwrapArgs[bindIndex - 2]).toBe('--bind-try');
       });
     });
 

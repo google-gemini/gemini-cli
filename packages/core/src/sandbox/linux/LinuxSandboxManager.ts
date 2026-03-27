@@ -295,7 +295,11 @@ export class LinuxSandboxManager implements SandboxManager {
         // if it's explicitly allowed, to enable creating it.
         try {
           const resolvedParent = tryRealpath(dirname(resolved));
-          bwrapArgs.push(bindFlag, resolvedParent, resolvedParent);
+          bwrapArgs.push(
+            req.command === '__write' ? '--bind-try' : bindFlag,
+            resolvedParent,
+            resolvedParent,
+          );
         } catch {
           // Ignore
         }
