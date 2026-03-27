@@ -4929,6 +4929,92 @@ describe('InputPrompt', () => {
       },
     );
   });
+
+  describe('Btw dismiss behavior', () => {
+    it('dismisses Btw on ESC key press', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1B'); // ESC
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('dismisses Btw on Enter key press', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\r'); // Enter
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('dismisses Btw on Space key press when buffer is empty', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write(' '); // Space
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+      });
+      unmount();
+    });
+  });
 });
 
 function clean(str: string | undefined): string {
