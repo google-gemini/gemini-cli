@@ -12,16 +12,14 @@ export const btwCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   isSafeConcurrent: true,
-  action: (context, args) => {
+  action: (_context, args) => {
     const query = args.trim();
     if (!query) {
       return {
-        type: 'command_output',
-        value: [
-          {
-            text: 'Please provide a question, e.g. /btw what is this regex doing?',
-          },
-        ],
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Please provide a question, e.g. /btw what is this regex doing?',
       };
     }
 
