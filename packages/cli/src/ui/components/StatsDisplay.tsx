@@ -244,6 +244,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       <ModelQuotaDisplay
         buckets={quotas?.buckets}
         availableWidth={terminalWidth - 4}
+        modelsToShow={Object.keys(stats.metrics.models)}
+        title="Models used in this session"
       />
       {renderFooter()}
     </Box>

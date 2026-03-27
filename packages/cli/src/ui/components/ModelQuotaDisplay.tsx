@@ -23,6 +23,8 @@ interface LocalBucket {
 interface ModelQuotaDisplayProps {
   buckets?: LocalBucket[];
   availableWidth?: number;
+  modelsToShow?: string[];
+  title?: string;
 }
 
 interface ModelUsageRowProps {
@@ -43,7 +45,7 @@ const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
   const { terminalWidth } = useUIState();
 
   const nameLabelLength = 25;
-  const resetLabelLength = 31;
+  const resetLabelLength = 25;
   // const nameLabel = row.name.slice(0, nameLabelLength).padEnd(nameLabelLength);
   let nameLabel = row.name;
   if (nameLabel.length > nameLabelLength) {
@@ -61,7 +63,7 @@ const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
   const calcWidth = availableWidth ?? terminalWidth;
   const defaultPadding = availableWidth != null ? 0 : 4;
   const barWidth = Math.max(
-    10,
+    0,
     calcWidth - defaultPadding - (nameLabelLength + resetLabelLength + 9),
   );
 
@@ -89,26 +91,41 @@ const ModelUsageRow: React.FC<ModelUsageRowProps> = ({
 export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
   buckets,
   availableWidth,
+  modelsToShow = ['all'],
+  title = 'Model usage',
 }) => {
   const config = useConfig();
 
   const modelsWithQuotas = useMemo(() => {
     if (!buckets) return [];
 
-    return buckets
-      .filter((b) => b.modelId && b.remainingFraction != null)
-      .map((b) => {
-        const usedFraction = 1 - b.remainingFraction!;
-        const usedPercentage = usedFraction * 100;
-        return {
-          modelId: b.modelId!,
-          name: getDisplayString(b.modelId!, config),
-          usedFraction,
-          usedPercentage,
-          resetTime: b.resetTime,
-        };
-      });
-  }, [buckets, config]);
+    let filteredBuckets = buckets.filter(
+      (b) => b.modelId && b.remainingFraction != null,
+    );
+
+    if (modelsToShow.includes('current')) {
+      const currentModel = config.getActiveModel?.() ?? config.getModel?.();
+      filteredBuckets = filteredBuckets.filter(
+        (b) => b.modelId === currentModel,
+      );
+    } else if (!modelsToShow.includes('all')) {
+      filteredBuckets = filteredBuckets.filter(
+        (b) => b.modelId && modelsToShow.includes(b.modelId),
+      );
+    }
+
+    return filteredBuckets.map((b) => {
+      const usedFraction = 1 - b.remainingFraction!;
+      const usedPercentage = usedFraction * 100;
+      return {
+        modelId: b.modelId!,
+        name: getDisplayString(b.modelId!, config),
+        usedFraction,
+        usedPercentage,
+        resetTime: b.resetTime,
+      };
+    });
+  }, [buckets, config, modelsToShow]);
 
   if (modelsWithQuotas.length === 0) {
     return null;
@@ -128,7 +145,7 @@ export const ModelQuotaDisplay: React.FC<ModelQuotaDisplayProps> = ({
 
       <Box flexDirection="column">
         <Text bold color={theme.text.primary}>
-          Model usage
+          {title}
         </Text>
 
         {modelsWithQuotas.map(
