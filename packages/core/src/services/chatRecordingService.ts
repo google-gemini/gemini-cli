@@ -27,8 +27,6 @@ import type { ToolResultDisplay } from '../tools/tools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
-const MAX_HISTORY_MESSAGES = 50;
-const MAX_TOOL_OUTPUT_SIZE = 50 * 1024; // 50KB
 
 /**
  * Warning message shown when recording is disabled due to disk full.
@@ -126,7 +124,6 @@ export interface ResumedSessionData {
  * Returns null if the file is invalid or cannot be read.
  */
 export interface LoadConversationOptions {
-  maxMessages?: number;
   metadataOnly?: boolean;
 }
 
@@ -323,6 +320,7 @@ export async function loadConversationRecord(
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               record as unknown as MessageRecord,
             );
+<<<<<<< HEAD
 >>>>>>> fa56f2436 (fix(core): address PR comments and optimize jsonl streaming memory)
             if (
               options?.maxMessages &&
@@ -337,6 +335,8 @@ export async function loadConversationRecord(
 =======
               if (firstKey) messagesMap.delete(firstKey);
             }
+=======
+>>>>>>> e51a53766 (fix(core): remove bounding and truncation limits from jsonl migration)
           }
         } else if (record['$set']) {
 >>>>>>> fa56f2436 (fix(core): address PR comments and optimize jsonl streaming memory)
@@ -378,41 +378,6 @@ export async function loadConversationRecord(
   }
 }
 
-function truncateLargeToolResults(message: MessageRecord): MessageRecord {
-  if (message.type !== 'gemini' || !message.toolCalls) return message;
-
-  let modified = false;
-  const truncatedCalls = message.toolCalls.map((tc) => {
-    if (!tc.result) return tc;
-    const str = JSON.stringify(tc.result);
-    if (str.length > MAX_TOOL_OUTPUT_SIZE) {
-      modified = true;
-      return {
-        ...tc,
-        result: [
-          {
-            functionResponse: {
-              name: tc.name,
-              response: {
-                result:
-                  '[Output truncated for memory: full content saved to disk]',
-              },
-            },
-          },
-        ],
-        resultDisplay:
-          '[Output truncated for memory: full content saved to disk]',
-      };
-    }
-    return tc;
-  });
-
-  if (modified) {
-    return { ...message, toolCalls: truncatedCalls };
-  }
-  return message;
-}
-
 /**
  * Service for automatically recording chat conversations to disk.
  */
@@ -445,18 +410,9 @@ export class ChatRecordingService {
 
         const loadedRecord = await loadConversationRecord(
           this.conversationFile,
-          { maxMessages: MAX_HISTORY_MESSAGES },
         );
         if (loadedRecord) {
-          // Truncate memory messages and keep bounded
-          const boundedMessages = loadedRecord.messages.map(
-            truncateLargeToolResults,
-          );
-
-          this.cachedConversation = {
-            ...loadedRecord,
-            messages: boundedMessages,
-          };
+          this.cachedConversation = loadedRecord;
           this.projectHash = this.cachedConversation.projectHash;
 
           // Update the session ID in the existing file
@@ -582,23 +538,15 @@ export class ChatRecordingService {
   private pushMessage(msg: MessageRecord): void {
     if (!this.cachedConversation) return;
 
-    // We append the full, untruncated message to the log
     this.appendRecord(msg);
 
-    // Now update memory with truncated version
-    const truncatedMsg = truncateLargeToolResults(msg);
     const index = this.cachedConversation.messages.findIndex(
       (m) => m.id === msg.id,
     );
     if (index !== -1) {
-      this.cachedConversation.messages[index] = truncatedMsg;
+      this.cachedConversation.messages[index] = msg;
     } else {
-      this.cachedConversation.messages.push(truncatedMsg);
-    }
-
-    if (this.cachedConversation.messages.length > MAX_HISTORY_MESSAGES) {
-      this.cachedConversation.messages =
-        this.cachedConversation.messages.slice(-MAX_HISTORY_MESSAGES);
+      this.cachedConversation.messages.push(msg);
     }
   }
 
