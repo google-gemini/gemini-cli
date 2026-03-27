@@ -37,11 +37,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'chat-base-2.5': {
       extends: 'chat-base',
       modelConfig: {
-        generateContentConfig: {
-          thinkingConfig: {
-            thinkingBudget: DEFAULT_THINKING_MODE,
-          },
-        },
+        generateContentConfig: {},
       },
     },
     'chat-base-3': {
