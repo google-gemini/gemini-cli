@@ -10,6 +10,12 @@ import { BtwDisplay } from './BtwDisplay.js';
 import { StreamingState } from '../types.js';
 import type { UIState } from '../contexts/UIStateContext.js';
 
+import { Text } from 'ink';
+
+vi.mock('./GeminiRespondingSpinner.js', () => ({
+  GeminiRespondingSpinner: () => <Text>⠋</Text>,
+}));
+
 describe('BtwDisplay', () => {
   const defaultMockUiState = {
     renderMarkdown: true,

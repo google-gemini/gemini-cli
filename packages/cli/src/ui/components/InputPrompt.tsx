@@ -674,6 +674,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           dismissBtw();
           return true;
         }
+
+        const isPrintable =
+          key.sequence &&
+          !key.ctrl &&
+          !key.cmd &&
+          !key.alt &&
+          key.sequence.length === 1;
+
+        const isEditingKey =
+          isPrintable ||
+          key.name === 'backspace' ||
+          key.name === 'delete' ||
+          key.name === 'paste';
+
+        if (isEditingKey) {
+          if (btwState.isStreaming) {
+            return true;
+          } else {
+            dismissBtw();
+          }
+        }
       }
 
       // Reset completion suppression if the user performs any action other than
@@ -1357,6 +1378,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       isHelpDismissKey,
       settings,
       btwState.isActive,
+      btwState.isStreaming,
       dismissBtw,
     ],
   );

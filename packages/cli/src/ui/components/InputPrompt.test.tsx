@@ -5014,6 +5014,64 @@ describe('InputPrompt', () => {
       });
       unmount();
     });
+
+    it('dismisses Btw and accepts input on typing when not streaming', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, stdout, unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: false,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('a');
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).toHaveBeenCalled();
+        expect(clean(stdout.lastFrameRaw())).toContain('a');
+      });
+      unmount();
+    });
+
+    it('blocks typing when Btw is streaming', async () => {
+      const dismissBtw = vi.fn();
+      const { stdin, stdout, unmount } = await renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: {
+            btwState: {
+              isActive: true,
+              query: '',
+              response: '',
+              isStreaming: true,
+              error: null,
+            },
+          },
+          uiActions: { dismissBtw },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('Z');
+      });
+
+      await waitFor(() => {
+        expect(dismissBtw).not.toHaveBeenCalled();
+        expect(clean(stdout.lastFrameRaw())).not.toContain('Z');
+      });
+      unmount();
+    });
   });
 });
 
