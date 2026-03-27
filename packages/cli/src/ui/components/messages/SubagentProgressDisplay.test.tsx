@@ -182,4 +182,25 @@ describe('<SubagentProgressDisplay />', () => {
     );
     expect(lastFrame()).toMatchSnapshot();
   });
+
+  it('renders error tool status correctly', async () => {
+    const progress: SubagentProgress = {
+      isSubagentProgress: true,
+      agentName: 'TestAgent',
+      recentActivity: [
+        {
+          id: '7',
+          type: 'tool_call',
+          content: 'run_shell_command',
+          args: '{"command": "echo hello"}',
+          status: 'error',
+        },
+      ],
+    };
+
+    const { lastFrame } = await render(
+      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
 });

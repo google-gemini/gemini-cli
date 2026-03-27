@@ -83,6 +83,7 @@ export class ToolExecutor {
     return runInDevTraceSpan(
       {
         operation: GeminiCliOperation.ToolCall,
+        logPrompts: this.config.getTelemetryLogPromptsEnabled(),
         attributes: {
           [GEN_AI_TOOL_NAME]: toolName,
           [GEN_AI_TOOL_CALL_ID]: callId,
@@ -319,7 +320,7 @@ export class ToolExecutor {
 
       outputFile = truncatedOutputFile;
       responseParts = convertToFunctionResponse(
-        call.request.name,
+        call.request.originalRequestName ?? call.request.name,
         call.request.callId,
         output,
         this.config.getActiveModel(),
@@ -337,7 +338,7 @@ export class ToolExecutor {
         {
           functionResponse: {
             id: call.request.callId,
-            name: call.request.name,
+            name: call.request.originalRequestName ?? call.request.name,
             response: { error: errorMessage },
           },
         },
