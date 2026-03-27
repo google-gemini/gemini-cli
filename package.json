@@ -68,7 +68,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.11",
+    "ink": "npm:@jrichman/ink@6.5.0",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -130,14 +130,13 @@
     "semver": "^7.7.2",
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
-    "tsx": "^4.21.0",
+    "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "ink": "npm:@jrichman/ink@6.4.11",
-    "ink-big-text": "^2.0.0",
+    "ink": "npm:@jrichman/ink@6.5.0",
     "latest-version": "^9.0.0",
     "node-fetch-native": "^1.6.7",
     "proper-lockfile": "^4.1.2",

@@ -293,8 +293,22 @@ describe('PolicyEngine', () => {
       const config: PolicyEngineConfig = {
         nonInteractive: true,
         rules: [
-          { toolName: 'interactive-tool', decision: PolicyDecision.ASK_USER },
+          {
+            toolName: 'interactive-tool',
+            decision: PolicyDecision.ASK_USER,
+            interactive: true,
+          },
+          {
+            toolName: 'interactive-tool',
+            decision: PolicyDecision.DENY,
+            interactive: false,
+          },
           { toolName: 'allowed-tool', decision: PolicyDecision.ALLOW },
+          {
+            toolName: 'ask_user',
+            decision: PolicyDecision.DENY,
+            interactive: false,
+          },
         ],
       };
 
@@ -361,6 +375,7 @@ describe('PolicyEngine', () => {
         isKnownSafeCommand: vi
           .fn()
           .mockImplementation((args) => args[0] === 'npm'),
+        parseDenials: vi.fn().mockReturnValue(undefined),
       } as unknown as SandboxManager;
 
       engine = new PolicyEngine({
@@ -1258,6 +1273,51 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should NOT automatically DENY redirected shell commands in non-interactive mode if rules permit it', async () => {
+      const toolName = 'run_shell_command';
+      const command = 'ls > out.txt';
+
+      const rules: PolicyRule[] = [
+        {
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          allowRedirection: true,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      expect(
+        (await engine.check({ name: toolName, args: { command } }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should respect DENY rules for redirected shell commands in non-interactive mode', async () => {
+      const toolName = 'run_shell_command';
+      const command = 'ls > out.txt';
+
+      const rules: PolicyRule[] = [
+        {
+          toolName,
+          decision: PolicyDecision.ASK_USER,
+          interactive: true,
+        },
+        {
+          toolName,
+          decision: PolicyDecision.DENY,
+          interactive: false,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      expect(
+        (await engine.check({ name: toolName, args: { command } }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should NOT downgrade ALLOW to ASK_USER for quoted redirection chars', async () => {
       const rules: PolicyRule[] = [
         {
@@ -1423,21 +1483,25 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.DENY);
     });
 
-    it('should DENY redirected shell commands in non-interactive mode', async () => {
+    it('should respect explicit DENY rules for redirected shell commands in non-interactive mode', async () => {
       const config: PolicyEngineConfig = {
         nonInteractive: true,
         rules: [
           {
             toolName: 'run_shell_command',
             decision: PolicyDecision.ALLOW,
+            interactive: true,
+          },
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.DENY,
+            interactive: false,
           },
         ],
       };
 
       engine = new PolicyEngine(config);
 
-      // Redirected command should be DENIED in non-interactive mode
-      // (Normally ASK_USER, but ASK_USER -> DENY in non-interactive)
       expect(
         (
           await engine.check(
@@ -2215,34 +2279,6 @@ describe('PolicyEngine', () => {
       const result = await engine.check({ name: 'tool' }, undefined);
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
-
-    it('should DENY if checker returns ASK_USER in non-interactive mode', async () => {
-      const rules: PolicyRule[] = [
-        { toolName: 'tool', decision: PolicyDecision.ALLOW },
-      ];
-      const checkers: SafetyCheckerRule[] = [
-        {
-          toolName: '*',
-          checker: {
-            type: 'in-process',
-            name: InProcessCheckerType.ALLOWED_PATH,
-          },
-        },
-      ];
-
-      engine = new PolicyEngine(
-        { rules, checkers, nonInteractive: true },
-        mockCheckerRunner,
-      );
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ASK_USER,
-        reason: 'Suspicious path',
-      });
-
-      const result = await engine.check({ name: 'tool' }, undefined);
-      expect(result.decision).toBe(PolicyDecision.DENY);
-    });
   });
 
   describe('getExcludedTools', () => {
@@ -2345,17 +2381,41 @@ describe('PolicyEngine', () => {
         expected: [],
       },
       {
-        name: 'should NOT include ASK_USER tools even in non-interactive mode',
+        name: 'should include tools in exclusion list only if explicitly denied in non-interactive mode',
         rules: [
           {
             toolName: 'tool1',
             decision: PolicyDecision.ASK_USER,
             modes: [ApprovalMode.DEFAULT],
+            interactive: true,
+          },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            modes: [ApprovalMode.DEFAULT],
+            interactive: false,
           },
         ],
         nonInteractive: true,
         allToolNames: ['tool1'],
         expected: ['tool1'],
+      },
+      {
+        name: 'should specifically exclude ask_user tool in non-interactive mode',
+        rules: [
+          {
+            toolName: 'ask_user',
+            decision: PolicyDecision.DENY,
+            interactive: false,
+          },
+          {
+            toolName: 'read_file',
+            decision: PolicyDecision.ALLOW,
+          },
+        ],
+        nonInteractive: true,
+        allToolNames: ['ask_user', 'read_file'],
+        expected: ['ask_user'],
       },
       {
         name: 'should ignore rules with argsPattern',

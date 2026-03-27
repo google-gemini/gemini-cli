@@ -46,6 +46,7 @@ export * from './core/geminiRequest.js';
 export * from './scheduler/scheduler.js';
 export * from './scheduler/types.js';
 export * from './scheduler/tool-executor.js';
+export * from './scheduler/policy.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
@@ -184,6 +185,8 @@ export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
 
+// Export browser session management
+export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';
 // Export agent session interface
 export * from './agent/agent-session.js';
 export * from './agent/legacy-agent-session.js';
