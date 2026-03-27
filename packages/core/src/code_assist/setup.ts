@@ -32,6 +32,7 @@ export class ProjectIdRequiredError extends Error {
     super(
       'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
     );
+    this.name = 'ProjectIdRequiredError';
   }
 }
 
@@ -42,6 +43,7 @@ export class ProjectIdRequiredError extends Error {
 export class ValidationCancelledError extends Error {
   constructor() {
     super('User cancelled account validation');
+    this.name = 'ValidationCancelledError';
   }
 }
 
@@ -51,6 +53,7 @@ export class IneligibleTierError extends Error {
   constructor(ineligibleTiers: IneligibleTier[]) {
     const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
     super(reasons);
+    this.name = 'IneligibleTierError';
     this.ineligibleTiers = ineligibleTiers;
   }
 }

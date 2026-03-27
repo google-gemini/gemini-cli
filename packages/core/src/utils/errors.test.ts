@@ -355,12 +355,29 @@ describe('getErrorType', () => {
     expect(getErrorType(undefined)).toBe('unknown');
   });
 
-  it('should strip leading underscores from error names', () => {
-    class _GaxiosError extends Error {}
+  it('should use explicitly set error names', () => {
+    class _GaxiosError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'GaxiosError';
+      }
+    }
     expect(getErrorType(new _GaxiosError('test'))).toBe('GaxiosError');
 
-    const errorWithUnderscoreName = new Error('test');
-    errorWithUnderscoreName.name = '_CodeBuddyError';
-    expect(getErrorType(errorWithUnderscoreName)).toBe('CodeBuddyError');
+    class BadRequestError3 extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'BadRequestError';
+      }
+    }
+    expect(getErrorType(new BadRequestError3('test'))).toBe('BadRequestError');
+
+    class _AbortError2 extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'AbortError';
+      }
+    }
+    expect(getErrorType(new _AbortError2('test'))).toBe('AbortError');
   });
 });
