@@ -5,20 +5,18 @@
  */
 
 import {
+  type ToolConfirmationOutcome,
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
-  type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
@@ -30,7 +28,7 @@ import {
   NetworkRetryAttemptEvent,
 } from '../telemetry/index.js';
 import { LlmRole } from '../telemetry/llmRole.js';
-import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { WEB_FETCH_TOOL_NAME, WEB_FETCH_DISPLAY_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
@@ -231,7 +229,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      true,
+      () => this.context.config.getApprovalMode(),
+    );
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
@@ -501,27 +508,12 @@ ${aggregatedContent}
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (this.params.url) {
-      return {
-        argsPattern: buildParamArgsPattern('url', this.params.url),
-      };
-    } else if (this.params.prompt) {
-      return {
-        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
-      };
-    }
-    return undefined;
+    return {};
   }
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Check for AUTO_EDIT approval mode. This tool has a specific behavior
-    // where ProceedAlways switches the entire session to AUTO_EDIT.
-    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     let urls: string[] = [];
     let prompt = this.params.prompt || '';
 
@@ -891,7 +883,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   ) {
     super(
       WebFetchTool.Name,
-      'WebFetch',
+      WEB_FETCH_DISPLAY_NAME,
       WEB_FETCH_DEFINITION.base.description!,
       Kind.Fetch,
       WEB_FETCH_DEFINITION.base.parametersJsonSchema,

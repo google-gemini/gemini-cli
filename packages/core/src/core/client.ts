@@ -117,6 +117,7 @@ export class GeminiClient {
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   private get config(): Config {
@@ -126,6 +127,14 @@ export class GeminiClient {
   private handleModelChanged = () => {
     this.currentSequenceModel = null;
   };
+
+  private handleMemoryChanged = () => {
+    this.updateSystemInstruction();
+  };
+
+  clearCurrentSequenceModel(): void {
+    this.currentSequenceModel = null;
+  }
 
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
@@ -306,6 +315,7 @@ export class GeminiClient {
 
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   async resumeChat(
@@ -569,6 +579,7 @@ export class GeminiClient {
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
+      this.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       this.config.getHasAccessToPreviewModel?.() ?? true,
       this.config,
@@ -602,7 +613,7 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false);
+    const compressed = await this.tryCompressChat(prompt_id, false, signal);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -1152,6 +1163,7 @@ export class GeminiClient {
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    abortSignal?: AbortSignal,
   ): Promise<ChatCompressionInfo> {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
@@ -1165,6 +1177,7 @@ export class GeminiClient {
       model,
       this.config,
       this.hasFailedCompressionAttempt,
+      abortSignal,
     );
 
     if (

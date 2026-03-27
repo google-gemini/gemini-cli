@@ -4,15 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as crypto from 'node:crypto';
 import { Storage } from '../config/storage.js';
 import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
+import { getAgentCardLoadOptions, getRemoteAgentTargetUrl } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
+import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -56,7 +59,7 @@ export class AgentRegistry {
   }
 
   private onModelChanged = () => {
-    this.refreshAgents().catch((e) => {
+    this.refreshAgents('local').catch((e) => {
       debugLogger.error(
         '[AgentRegistry] Failed to refresh agents on model change:',
         e,
@@ -161,7 +164,14 @@ export class AgentRegistry {
           if (!agent.metadata) {
             agent.metadata = {};
           }
-          agent.metadata.hash = agent.agentCardUrl;
+          agent.metadata.hash =
+            agent.agentCardUrl ??
+            (agent.agentCardJson
+              ? crypto
+                  .createHash('sha256')
+                  .update(agent.agentCardJson)
+                  .digest('hex')
+              : undefined);
         }
 
         if (!agent.metadata?.hash) {
@@ -249,14 +259,36 @@ export class AgentRegistry {
     if (browserConfig.enabled) {
       this.registerLocalAgent(BrowserAgentDefinition(this.config));
     }
+
+    // Register the memory manager agent as a replacement for the save_memory tool.
+    if (this.config.isMemoryManagerEnabled()) {
+      this.registerLocalAgent(MemoryManagerAgent(this.config));
+
+      // Ensure the global .gemini directory is accessible to tools.
+      // This allows the save_memory agent to read and write to it.
+      // Access control is enforced by the Policy Engine (memory-manager.toml).
+      try {
+        const globalDir = Storage.getGlobalGeminiDir();
+        this.config.getWorkspaceContext().addDirectory(globalDir);
+      } catch (e) {
+        debugLogger.warn(
+          `[AgentRegistry] Could not add global .gemini directory to workspace:`,
+          e,
+        );
+      }
+    }
   }
 
-  private async refreshAgents(): Promise<void> {
+  private async refreshAgents(
+    scope: AgentDefinition['kind'] | 'all' = 'all',
+  ): Promise<void> {
     this.loadBuiltInAgents();
     await Promise.allSettled(
-      Array.from(this.agents.values()).map((agent) =>
-        this.registerAgent(agent),
-      ),
+      Array.from(this.agents.values()).map(async (agent) => {
+        if (scope === 'all' || agent.kind === scope) {
+          await this.registerAgent(agent);
+        }
+      }),
     );
   }
 
@@ -420,12 +452,13 @@ export class AgentRegistry {
         );
         return;
       }
+      const targetUrl = getRemoteAgentTargetUrl(remoteDef);
       let authHandler: AuthenticationHandler | undefined;
       if (definition.auth) {
         const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
-          targetUrl: definition.agentCardUrl,
+          targetUrl,
           agentCardUrl: remoteDef.agentCardUrl,
         });
         if (!provider) {
@@ -438,7 +471,7 @@ export class AgentRegistry {
 
       const agentCard = await clientManager.loadAgent(
         remoteDef.name,
-        remoteDef.agentCardUrl,
+        getAgentCardLoadOptions(remoteDef),
         authHandler,
       );
 
@@ -492,7 +525,7 @@ export class AgentRegistry {
 
       if (this.config.getDebugMode()) {
         debugLogger.log(
-          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
+          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl ?? 'inline JSON'}`,
         );
       }
       this.agents.set(definition.name, definition);

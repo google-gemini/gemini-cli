@@ -89,6 +89,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
@@ -96,6 +97,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
@@ -417,12 +419,14 @@ describe('Core System Prompt (prompts.ts)', () => {
       const testConfig = {
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+        getSandboxEnabled: vi.fn().mockReturnValue(false),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
         isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
+        isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
         isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),

@@ -20,9 +20,7 @@ vi.mock('../components/CliSpinner.js', () => ({
 
 const altBufferOptions = {
   config: makeFakeConfig({ useAlternateBuffer: true }),
-  settings: createMockSettings({
-    merged: { ui: { useAlternateBuffer: true } },
-  }),
+  settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
 };
 
 describe('getToolGroupBorderAppearance', () => {
@@ -112,7 +110,7 @@ describe('getToolGroupBorderAppearance', () => {
 
 describe('MainContent tool group border SVG snapshots', () => {
   it('should render SVG snapshot for a pending search dialog (google_web_search)', async () => {
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
       ...altBufferOptions,
       uiState: {
         history: [],
@@ -137,7 +135,7 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for an empty slice following a search tool', async () => {
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
       ...altBufferOptions,
       uiState: {
         history: [],
@@ -166,7 +164,7 @@ describe('MainContent tool group border SVG snapshots', () => {
   });
 
   it('should render SVG snapshot for a shell tool', async () => {
-    const renderResult = renderWithProviders(<MainContent />, {
+    const renderResult = await renderWithProviders(<MainContent />, {
       ...altBufferOptions,
       uiState: {
         history: [],

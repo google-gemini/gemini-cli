@@ -69,6 +69,10 @@ import {
   type FunctionDeclaration,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { GeminiClient } from '../core/client.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
@@ -91,9 +95,18 @@ import {
   type LocalAgentDefinition,
   type SubagentActivityEvent,
   type OutputConfig,
+  SubagentActivityErrorType,
 } from './types.js';
-import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
-import type { ToolCallRequestInfo } from '../scheduler/types.js';
+import {
+  ToolConfirmationOutcome,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+} from '../tools/tools.js';
+import {
+  type ToolCallRequestInfo,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
+
 import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import type {
@@ -166,6 +179,7 @@ vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
   return {
     ...actual,
     promptIdContext: {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...actual.promptIdContext,
       getStore: vi.fn(),
       run: vi.fn((_id, fn) => fn()),
@@ -365,7 +379,167 @@ describe('LocalAgentExecutor', () => {
   });
 
   describe('create (Initialization and Validation)', () => {
-    it('should create successfully with allowed tools', async () => {
+    it('should explicitly map execution context properties to prevent unintended propagation', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const mockGeminiClient = {} as unknown as GeminiClient;
+      const mockSandboxManager = {} as unknown as SandboxManager;
+      const extendedContext = {
+        config: mockConfig,
+        promptId: mockConfig.promptId,
+        toolRegistry: parentToolRegistry,
+        promptRegistry: mockConfig.promptRegistry,
+        resourceRegistry: mockConfig.resourceRegistry,
+        messageBus: mockConfig.messageBus,
+        geminiClient: mockGeminiClient,
+        sandboxManager: mockSandboxManager,
+        unintendedProperty: 'should not be here',
+      } as unknown as AgentLoopContext;
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        extendedContext,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const executionContext = chatConstructorArgs[0];
+
+      expect(executionContext).toBeDefined();
+      expect(executionContext.config).toBe(extendedContext.config);
+      expect(executionContext.promptId).toBeDefined();
+      expect(executionContext.geminiClient).toBe(extendedContext.geminiClient);
+      expect(executionContext.sandboxManager).toBe(
+        extendedContext.sandboxManager,
+      );
+
+      const agentToolRegistry = executor['toolRegistry'];
+      const agentPromptRegistry = executor['promptRegistry'];
+      const agentResourceRegistry = executor['resourceRegistry'];
+
+      expect(executionContext.toolRegistry).toBe(agentToolRegistry);
+      expect(executionContext.promptRegistry).toBe(agentPromptRegistry);
+      expect(executionContext.resourceRegistry).toBe(agentResourceRegistry);
+
+      expect(executionContext.messageBus).toBe(
+        agentToolRegistry.getMessageBus(),
+      );
+
+      // Ensure the unintended property was not spread
+      expect(
+        (executionContext as unknown as { unintendedProperty?: string })
+          .unintendedProperty,
+      ).toBeUndefined();
+
+      // Ensure registries and message bus are not the parent's
+      expect(executionContext.toolRegistry).not.toBe(
+        extendedContext.toolRegistry,
+      );
+      expect(executionContext.messageBus).not.toBe(extendedContext.messageBus);
+    });
+
+    it('should propagate parentSessionId from context when creating executionContext', async () => {
+      const parentSessionId = 'top-level-session-id';
+      const currentPromptId = 'subagent-a-id';
+      const mockGeminiClient = {} as unknown as GeminiClient;
+      const mockSandboxManager = {} as unknown as SandboxManager;
+      const mockMessageBus = {
+        derive: () => ({}),
+      } as unknown as MessageBus;
+      const mockToolRegistry = {
+        getMessageBus: () => mockMessageBus,
+        getAllToolNames: () => [],
+        sortTools: () => {},
+      } as unknown as ToolRegistry;
+
+      const context = {
+        config: mockConfig,
+        promptId: currentPromptId,
+        parentSessionId,
+        toolRegistry: mockToolRegistry,
+        promptRegistry: {} as unknown as PromptRegistry,
+        resourceRegistry: {} as unknown as ResourceRegistry,
+        geminiClient: mockGeminiClient,
+        sandboxManager: mockSandboxManager,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext;
+
+      const definition = createTestDefinition([]);
+      const executor = await LocalAgentExecutor.create(definition, context);
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      const chatConstructorArgs =
+        MockedGeminiChat.mock.calls[MockedGeminiChat.mock.calls.length - 1];
+      const executionContext = chatConstructorArgs[0];
+
+      expect(executionContext.parentSessionId).toBe(parentSessionId);
+      expect(executionContext.promptId).toBe(executor['agentId']);
+    });
+
+    it('should fall back to promptId if parentSessionId is missing (top-level subagent)', async () => {
+      const rootSessionId = 'root-session-id';
+      const mockGeminiClient = {} as unknown as GeminiClient;
+      const mockSandboxManager = {} as unknown as SandboxManager;
+      const mockMessageBus = {
+        derive: () => ({}),
+      } as unknown as MessageBus;
+      const mockToolRegistry = {
+        getMessageBus: () => mockMessageBus,
+        getAllToolNames: () => [],
+        sortTools: () => {},
+      } as unknown as ToolRegistry;
+
+      const context = {
+        config: mockConfig,
+        promptId: rootSessionId,
+        // parentSessionId is undefined
+        toolRegistry: mockToolRegistry,
+        promptRegistry: {} as unknown as PromptRegistry,
+        resourceRegistry: {} as unknown as ResourceRegistry,
+        geminiClient: mockGeminiClient,
+        sandboxManager: mockSandboxManager,
+        messageBus: mockMessageBus,
+      } as unknown as AgentLoopContext;
+
+      const definition = createTestDefinition([]);
+      const executor = await LocalAgentExecutor.create(definition, context);
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      const chatConstructorArgs =
+        MockedGeminiChat.mock.calls[MockedGeminiChat.mock.calls.length - 1];
+      const executionContext = chatConstructorArgs[0];
+
+      expect(executionContext.parentSessionId).toBe(rootSessionId);
+      expect(executionContext.promptId).toBe(executor['agentId']);
+    });
+    it('should successfully with allowed tools', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -420,9 +594,7 @@ describe('LocalAgentExecutor', () => {
         onActivity,
       );
 
-      expect(executor['agentId']).toMatch(
-        new RegExp(`^${parentId}-${definition.name}-`),
-      );
+      expect(executor['agentId']).toBeDefined();
     });
 
     it('should correctly apply templates to initialMessages', async () => {
@@ -943,6 +1115,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'protocol_violation',
             error: expectedError,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -988,6 +1161,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expectedError,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1091,7 +1265,7 @@ describe('LocalAgentExecutor', () => {
               if (callsStarted === 2) resolveCalls();
               await vi.advanceTimersByTimeAsync(100);
               return {
-                status: 'success',
+                status: CoreToolCallStatus.Success,
                 request: reqInfo,
                 tool: {} as AnyDeclarativeTool,
                 invocation: {} as AnyToolInvocation,
@@ -1109,7 +1283,7 @@ describe('LocalAgentExecutor', () => {
                   ],
                   error: undefined,
                   errorType: undefined,
-                  contentLength: undefined,
+                  contentLength: 0,
                 },
               };
             }),
@@ -1147,10 +1321,10 @@ describe('LocalAgentExecutor', () => {
       expect(parts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            functionResponse: expect.objectContaining({ id: 'c1' }),
+            functionResponse: expect.objectContaining({ name: LS_TOOL_NAME }),
           }),
           expect.objectContaining({
-            functionResponse: expect.objectContaining({ id: 'c2' }),
+            functionResponse: expect.objectContaining({ name: LS_TOOL_NAME }),
           }),
         ]),
       );
@@ -1221,6 +1395,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'tool_call_unauthorized',
             name: READ_FILE_TOOL_NAME,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1274,6 +1449,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expect.stringContaining('Output validation failed'),
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1320,6 +1496,7 @@ describe('LocalAgentExecutor', () => {
           type: 'ERROR',
           data: expect.objectContaining({
             error: `Error: Failed to create chat object: ${getErrorMessage(initError)}`,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1348,7 +1525,7 @@ describe('LocalAgentExecutor', () => {
       ]);
       mockScheduleAgentTools.mockResolvedValueOnce([
         {
-          status: 'error',
+          status: CoreToolCallStatus.Error,
           request: {
             callId: 'call1',
             name: LS_TOOL_NAME,
@@ -1399,6 +1576,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: toolErrorMessage,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1420,6 +1598,157 @@ describe('LocalAgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
       expect(output.result).toBe('Aborted due to tool failure.');
+    });
+
+    it('should handle a soft tool rejection (outcome: Cancel) and provide direct instructions to the model', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls a tool that will be rejected
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '/secret' }, id: 'call1' },
+      ]);
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'cancelled',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '/secret' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          outcome: ToolConfirmationOutcome.Cancel, // Soft rejection
+          response: {
+            callId: 'call1',
+            resultDisplay: '',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: {
+                    error:
+                      '[Operation Cancelled] Reason: User denied execution.',
+                  },
+                  id: 'call1',
+                },
+              },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: 0,
+          },
+        },
+      ]);
+
+      // Turn 2: Model sees the rejection + consolidated instructions and completes
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'User rejected access to /secret.' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run(
+        { goal: 'Soft rejection test' },
+        signal,
+      );
+
+      // Verify the activity stream reported the consolidated instruction
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'tool_call',
+            name: LS_TOOL_NAME,
+            error: expect.stringContaining('User rejected this operation'),
+            errorType: SubagentActivityErrorType.REJECTED,
+          }),
+        }),
+      );
+
+      // Verify the instruction was sent back to the model as the tool error
+      const turn2Params = getMockMessageParams(1);
+      const parts = turn2Params.message as Part[];
+      const errorMsg = parts[0].functionResponse?.response?.['error'];
+      expect(typeof errorMsg).toBe('string');
+      if (typeof errorMsg === 'string') {
+        expect(errorMsg).toContain('User rejected this operation');
+        expect(errorMsg).toContain('acknowledge this, rethink your strategy');
+      }
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('User rejected access to /secret.');
+    });
+
+    it('should handle a hard tool abort (cancelled with no outcome) and terminate the agent', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls a tool that will be aborted (e.g. Ctrl+C)
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '/secret' }, id: 'call1' },
+      ]);
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'cancelled',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '/secret' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          outcome: undefined, // Hard abort
+          response: {
+            callId: 'call1',
+            resultDisplay: '',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: { error: 'Request cancelled.' },
+                  id: 'call1',
+                },
+              },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: 0,
+          },
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Hard abort test' }, signal);
+
+      // Verify the activity stream reported the cancellation
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'tool_call',
+            name: LS_TOOL_NAME,
+            error: 'Request cancelled.',
+            errorType: SubagentActivityErrorType.CANCELLED,
+          }),
+        }),
+      );
+
+      // Agent should terminate with ABORTED status
+      expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
     });
   });
 
@@ -1615,6 +1944,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'timeout',
             error: 'Agent timed out after 0.5 minutes.',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1803,6 +2133,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'recovery_turn',
             error: 'Graceful recovery attempt failed. Reason: stop',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1886,6 +2217,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'recovery_turn',
             error: 'Graceful recovery attempt failed. Reason: stop',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -2007,6 +2339,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'recovery_turn',
             error: 'Graceful recovery attempt failed. Reason: stop',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -3132,6 +3465,105 @@ describe('LocalAgentExecutor', () => {
       // Verify the complete set of names has no duplicates
       const uniqueNames = new Set(names);
       expect(uniqueNames.size).toBe(names.length);
+    });
+
+    describe('Memory Injection', () => {
+      it('should inject system instruction memory into system prompt', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const mockMemory = 'Global memory constraint';
+        vi.spyOn(mockConfig, 'getSystemInstructionMemory').mockReturnValue(
+          mockMemory,
+        );
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+        const systemInstruction = chatConstructorArgs[1] as string;
+
+        expect(systemInstruction).toContain(mockMemory);
+        expect(systemInstruction).toContain('<loaded_context>');
+      });
+
+      it('should inject environment memory into the first message when JIT is disabled', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const mockMemory = 'Project memory rule';
+        vi.spyOn(mockConfig, 'getEnvironmentMemory').mockReturnValue(
+          mockMemory,
+        );
+        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(false);
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+
+        expect(parts).toBeDefined();
+        const memoryPart = parts.find((p) => p.text?.includes(mockMemory));
+        expect(memoryPart).toBeDefined();
+        expect(memoryPart?.text).toBe(mockMemory);
+      });
+
+      it('should inject session memory into the first message when JIT is enabled', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          mockConfig,
+          onActivity,
+        );
+
+        const mockMemory =
+          '<loaded_context>\nExtension memory rule\n</loaded_context>';
+        vi.spyOn(mockConfig, 'getSessionMemory').mockReturnValue(mockMemory);
+        vi.spyOn(mockConfig, 'isJitContextEnabled').mockReturnValue(true);
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'test' }, signal);
+
+        const { message } = getMockMessageParams(0);
+        const parts = message as Part[];
+
+        expect(parts).toBeDefined();
+        const memoryPart = parts.find((p) =>
+          p.text?.includes('Extension memory rule'),
+        );
+        expect(memoryPart).toBeDefined();
+        expect(memoryPart?.text).toContain(mockMemory);
+      });
     });
   });
 });

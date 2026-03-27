@@ -36,7 +36,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
-  sandbox?: SandboxMode;
+  sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
@@ -67,9 +67,15 @@ export interface OperationalGuidelinesOptions {
   isGemini3: boolean;
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
+  memoryManagerEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
+
+export interface SandboxOptions {
+  mode: SandboxMode;
+  toolSandboxingEnabled: boolean;
+}
 
 export interface GitRepoOptions {
   interactive: boolean;
@@ -289,8 +295,9 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 `.trim();
 }
 
-export function renderSandbox(mode?: SandboxMode): string {
-  if (!mode) return '';
+export function renderSandbox(options?: SandboxOptions): string {
+  if (!options || !options.mode) return '';
+  const mode = options.mode;
   if (mode === 'macos-seatbelt') {
     return `
 # macOS Seatbelt
@@ -299,11 +306,12 @@ You are running under macos seatbelt with limited access to files outside the pr
     return `
 # Sandbox
 You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
-  } else {
+  } else if (mode === 'outside') {
     return `
 # Outside of Sandbox
 You are running outside of a sandbox container, directly on the user's system. For critical commands that are particularly likely to modify the user's system outside of the project directory or system temp directory, as you explain the command to the user (per the Explain Critical Commands rule above), also remind the user to consider enabling sandboxing.`.trim();
   }
+  return '';
 }
 
 export function renderInteractiveYoloMode(enabled?: boolean): string {
@@ -648,8 +656,12 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
+  if (options.memoryManagerEnabled) {
+    return `
+- **Memory Tool:** You MUST use the '${MEMORY_TOOL_NAME}' tool to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+  }
   const base = `
-- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
+- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases, or a workflow like "always lint after editing"). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
   const suffix = options.interactive
     ? ' If unsure whether to save something, you can ask the user, "Should I remember that for you?"'
     : '';

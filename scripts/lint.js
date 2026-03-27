@@ -394,6 +394,82 @@ export function runTSConfigLinter() {
   }
 }
 
+export function runGithubActionsPinningLinter() {
+  console.log('\nRunning GitHub Actions pinning linter...');
+
+  let files = [];
+  try {
+    files = execSync(
+      "git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml' '.github/actions/**/*.yml' '.github/actions/**/*.yaml'",
+    )
+      .toString()
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch (e) {
+    console.error('Error finding GitHub Actions workflow files:', e.message);
+    process.exit(1);
+  }
+
+  let violationsFound = false;
+  // Improved regex to capture action name and ref, handling optional quotes and comments.
+  const USES_PATTERN = /uses:\s*['"]?([^@\s'"]+)@([^#\s'"]+)['"]?/;
+  const SHA_PATTERN = /^[0-9a-f]{40}$/i;
+
+  for (const file of files) {
+    if (!existsSync(file) || lstatSync(file).isDirectory()) {
+      continue;
+    }
+    const content = readFileSync(file, 'utf-8');
+    const lines = content.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const match = line.match(USES_PATTERN);
+      if (match) {
+        const action = match[1];
+        let ref = match[2];
+
+        // Clean up any trailing quotes that might have been captured
+        ref = ref.replace(/['"]$/, '');
+
+        // Skip local actions (starting with ./), docker actions, and explicit exclusions
+        if (
+          action.startsWith('./') ||
+          action.startsWith('docker://') ||
+          line.includes('# github-actions-pinning:ignore')
+        ) {
+          continue;
+        }
+
+        if (!SHA_PATTERN.test(ref)) {
+          violationsFound = true;
+          const lineNum = i + 1;
+          console.error(
+            `::error file=${file},line=${lineNum}::Action "${action}" uses "${ref}" instead of a 40-character SHA.`,
+          );
+        }
+      }
+    }
+  }
+
+  if (violationsFound) {
+    console.error(`
+GitHub Actions pinning violations found. Please use exact commit hashes.
+
+To automatically fix these, you can use the "ratchet" tool (https://github.com/sethvargo/ratchet):
+  - Mac/Linux (Homebrew): brew install ratchet && ratchet pin .github/workflows/*.yml .github/actions/**/*.yml
+  - Other platforms: Download from GitHub releases and run "ratchet pin .github/workflows/*.yml .github/actions/**/*.yml"
+
+If you must use a tag, you can ignore this check by adding a comment (discouraged):
+  uses: some-action@v1 # github-actions-pinning:ignore
+`);
+    process.exit(1);
+  } else {
+    console.log('No GitHub Actions pinning violations found.');
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -421,6 +497,9 @@ function main() {
   if (args.includes('--tsconfig')) {
     runTSConfigLinter();
   }
+  if (args.includes('--check-github-actions-pinning')) {
+    runGithubActionsPinningLinter();
+  }
 
   if (args.length === 0) {
     setupLinters();
@@ -431,6 +510,7 @@ function main() {
     runPrettier();
     runSensitiveKeywordLinter();
     runTSConfigLinter();
+    runGithubActionsPinningLinter();
     console.log('\nAll linting checks passed!');
   }
 }
