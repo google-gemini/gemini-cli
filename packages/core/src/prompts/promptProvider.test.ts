@@ -57,6 +57,7 @@ describe('PromptProvider', () => {
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       topicState: new TopicState(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),

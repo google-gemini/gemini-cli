@@ -25,7 +25,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -171,10 +170,13 @@ describe('Scheduler (Orchestrator)', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       toolRegistry: mockToolRegistry,
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
@@ -421,7 +423,7 @@ describe('Scheduler (Orchestrator)', () => {
       const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
       const fn = spanArgs[1];
       const metadata = { attributes: {} };
-      await fn({ metadata, endSpan: vi.fn() });
+      await fn({ metadata });
       expect(metadata).toMatchObject({
         input: [req1],
       });
@@ -679,6 +681,7 @@ describe('Scheduler (Orchestrator)', () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
         rule: {
+          toolName: '*',
           decision: PolicyDecision.DENY,
           denyMessage: 'Custom denial reason',
         },
@@ -698,6 +701,30 @@ describe('Scheduler (Orchestrator)', () => {
                   error:
                     'Tool execution denied by policy. Custom denial reason',
                 },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should use originalRequestName when generating an error response', async () => {
+      const error = new Error('Some error');
+      vi.mocked(checkPolicy).mockRejectedValue(error);
+
+      const tailReq = { ...req1, originalRequestName: 'original-tool-name' };
+      await scheduler.schedule(tailReq, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        CoreToolCallStatus.Error,
+        expect.objectContaining({
+          errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                name: 'original-tool-name',
+                response: { error: 'Some error' },
               }),
             }),
           ]),
@@ -730,7 +757,7 @@ describe('Scheduler (Orchestrator)', () => {
     it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { decision: PolicyDecision.DENY },
+        rule: { toolName: '*', decision: PolicyDecision.DENY },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -759,7 +786,11 @@ describe('Scheduler (Orchestrator)', () => {
       const customMessage = 'Custom Plan Mode Deny';
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
-        rule: { decision: PolicyDecision.DENY, denyMessage: customMessage },
+        rule: {
+          toolName: '*',
+          decision: PolicyDecision.DENY,
+          denyMessage: customMessage,
+        },
       });
 
       mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
@@ -1163,6 +1194,7 @@ describe('Scheduler (Orchestrator)', () => {
               name: 'tool-b',
               args: { key: 'value' },
               originalRequestName: 'test-tool', // Preserves original name
+              originalRequestArgs: req1.args, // Preserves original args
             }),
             tool: mockToolB,
           }),
@@ -1385,10 +1417,12 @@ describe('Scheduler MCP Progress', () => {
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
 
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;

@@ -12,8 +12,9 @@ import {
 } from './sandboxManager.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
+import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
+import { type SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 
 /**
  * Creates a sandbox manager based on the provided settings.
@@ -21,22 +22,37 @@ import type { SandboxConfig } from '../config/config.js';
 export function createSandboxManager(
   sandbox: SandboxConfig | undefined,
   workspace: string,
+  policyManager?: SandboxPolicyManager,
+  approvalMode?: string,
 ): SandboxManager {
-  const isWindows = os.platform() === 'win32';
-
-  if (
-    isWindows &&
-    (sandbox?.enabled || sandbox?.command === 'windows-native')
-  ) {
-    return new WindowsSandboxManager();
+  if (approvalMode === 'yolo') {
+    return new NoopSandboxManager();
   }
 
+  const modeConfig =
+    policyManager && approvalMode
+      ? policyManager.getModeConfig(approvalMode)
+      : undefined;
+
   if (sandbox?.enabled) {
-    if (os.platform() === 'linux') {
-      return new LinuxSandboxManager({ workspace });
-    }
-    if (os.platform() === 'darwin') {
-      return new MacOsSandboxManager({ workspace });
+    if (os.platform() === 'win32' && sandbox?.command === 'windows-native') {
+      return new WindowsSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
+    } else if (os.platform() === 'linux') {
+      return new LinuxSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
+    } else if (os.platform() === 'darwin') {
+      return new MacOsSandboxManager({
+        workspace,
+        modeConfig,
+        policyManager,
+      });
     }
     return new LocalSandboxManager();
   }

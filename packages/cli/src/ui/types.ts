@@ -16,13 +16,20 @@ import {
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
+  type AnsiOutput,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export { CoreToolCallStatus };
+export type {
+  ThoughtSummary,
+  SkillDefinition,
+  SerializableConfirmationDetails,
+  ToolResultDisplay,
+};
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -85,6 +92,16 @@ export function mapCoreStatusToDisplayStatus(
       return checkExhaustive(coreStatus);
   }
 }
+
+/**
+ * --- TYPE GUARDS ---
+ */
+
+export const isTodoList = (res: unknown): res is { todos: unknown[] } =>
+  typeof res === 'object' && res !== null && 'todos' in res;
+
+export const isAnsiOutput = (res: unknown): res is AnsiOutput =>
+  Array.isArray(res) && (res.length === 0 || Array.isArray(res[0]));
 
 export interface ToolCallEvent {
   type: 'tool_call';
@@ -507,6 +524,7 @@ export interface PermissionConfirmationRequest {
 export interface ActiveHook {
   name: string;
   eventName: string;
+  source?: string;
   index?: number;
   total?: number;
 }

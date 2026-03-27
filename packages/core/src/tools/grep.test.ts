@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GrepTool, type GrepToolParams } from './grep.js';
-import type { ToolResult } from './tools.js';
+import type { ToolResult, GrepResult } from './tools.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -180,7 +180,9 @@ describe('GrepTool', () => {
         `File: ${path.join('sub', 'fileC.txt')}`,
       );
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 3 matches');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 3 matches',
+      );
     }, 30000);
 
     it('should include files that start with ".." in JS fallback', async () => {
@@ -221,7 +223,9 @@ describe('GrepTool', () => {
       );
       expect(result.llmContent).toContain('File: fileC.txt'); // Path relative to 'sub'
       expect(result.llmContent).toContain('L1: another world in sub dir');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 1 match',
+      );
     }, 30000);
 
     it('should find matches with an include glob', async () => {
@@ -238,7 +242,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain(
         'L2: function baz() { return "hello"; }',
       );
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 1 match',
+      );
     }, 30000);
 
     it('should find matches with an include glob and path', async () => {
@@ -258,7 +264,9 @@ describe('GrepTool', () => {
       );
       expect(result.llmContent).toContain('File: another.js');
       expect(result.llmContent).toContain('L1: const greeting = "hello";');
-      expect(result.returnDisplay).toBe('Found 1 match');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 1 match',
+      );
     }, 30000);
 
     it('should return "No matches found" when pattern does not exist', async () => {
@@ -268,7 +276,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain(
         'No matches found for pattern "nonexistentpattern" in the workspace directory.',
       );
-      expect(result.returnDisplay).toBe('No matches found');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'No matches found',
+      );
     }, 30000);
 
     it('should handle regex special characters correctly', async () => {
@@ -480,7 +490,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L2: second line with world');
       // And sub/fileC.txt should be excluded because limit reached
       expect(result.llmContent).not.toContain('File: sub/fileC.txt');
-      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+      expect((result.returnDisplay as GrepResult)?.summary).toBe(
+        'Found 2 matches (limited)',
+      );
     });
 
     it('should respect max_matches_per_file in JS fallback', async () => {

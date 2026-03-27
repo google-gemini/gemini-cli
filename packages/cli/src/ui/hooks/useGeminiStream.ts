@@ -26,7 +26,6 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
-  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -39,6 +38,8 @@ import {
   getPlanModeExitMessage,
   isBackgroundExecutionData,
   Kind,
+  ACTIVATE_SKILL_TOOL_NAME,
+  shouldHideToolCall,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -65,7 +66,12 @@ import type {
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType } from '../types.js';
+import {
+  StreamingState,
+  MessageType,
+  mapCoreStatusToDisplayStatus,
+  ToolCallStatus,
+} from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
@@ -76,6 +82,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
+import { isCompactTool } from '../components/messages/ToolGroupMessage.js';
 import {
   useToolScheduler,
   type TrackedToolCall,
@@ -292,9 +299,32 @@ export const useGeminiStream = (
           (tc) => !pushedToolCallIdsRef.current.has(tc.request.callId),
         );
         if (toolsToPush.length > 0) {
+          const isCompactModeEnabled =
+            settings.merged.ui?.compactToolOutput === true;
+          const firstToolToPush = toolsToPush[0];
+          const tcIndex = toolCalls.indexOf(firstToolToPush);
+          const prevTool = tcIndex > 0 ? toolCalls[tcIndex - 1] : null;
+
+          let borderTop = isFirstToolInGroupRef.current;
+          if (!borderTop && prevTool) {
+            // If the first tool in this push is non-compact but follows a compact tool,
+            // we must start a new border group.
+            const currentIsCompact = isCompactTool(
+              mapTrackedToolCallsToDisplay(firstToolToPush).tools[0],
+              isCompactModeEnabled,
+            );
+            const prevWasCompact = isCompactTool(
+              mapTrackedToolCallsToDisplay(prevTool).tools[0],
+              isCompactModeEnabled,
+            );
+            if (!currentIsCompact && prevWasCompact) {
+              borderTop = true;
+            }
+          }
+
           addItem(
             mapTrackedToolCallsToDisplay(toolsToPush as TrackedToolCall[], {
-              borderTop: isFirstToolInGroupRef.current,
+              borderTop,
               borderBottom: true,
               borderColor: theme.border.default,
               borderDimColor: false,
@@ -329,9 +359,7 @@ export const useGeminiStream = (
         }
 
         // Handle tool response submission immediately when tools complete
-        await handleCompletedTools(
-          completedToolCallsFromScheduler as TrackedToolCall[],
-        );
+        await handleCompletedTools(completedToolCallsFromScheduler);
       }
     },
     config,
@@ -461,26 +489,85 @@ export const useGeminiStream = (
 
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
+      const isFirstInThisPush = isFirstToolInGroupRef.current;
+      const isCompactModeEnabled =
+        settings.merged.ui?.compactToolOutput === true;
+
+      const groups: TrackedToolCall[][] = [];
+      let currentGroup: TrackedToolCall[] = [];
 
       for (const tc of toolsToPush) {
         newPushed.add(tc.request.callId);
+
+        if (tc.tool?.kind === Kind.Agent) {
+          currentGroup.push(tc);
+        } else {
+          if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+            currentGroup = [];
+          }
+          groups.push([tc]);
+        }
+      }
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
       }
 
-      const isLastInBatch =
-        toolsToPush[toolsToPush.length - 1] === toolCalls[toolCalls.length - 1];
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
+        const isFirstInBatch = i === 0 && isFirstInThisPush;
+        const lastTcInGroup = group[group.length - 1];
+        const tcIndexInBatch = toolCalls.indexOf(lastTcInGroup);
+        const isLastInBatch = tcIndexInBatch === toolCalls.length - 1;
 
-      const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
-        borderTop: isFirstToolInGroupRef.current,
-        borderBottom: isLastInBatch,
-        ...getToolGroupBorderAppearance(
-          { type: 'tool_group', tools: toolCalls },
-          activeShellPtyId,
-          !!isShellFocused,
-          [],
-          backgroundShells,
-        ),
-      });
-      addItem(historyItem);
+        const nextTcInBatch =
+          tcIndexInBatch < toolCalls.length - 1
+            ? toolCalls[tcIndexInBatch + 1]
+            : null;
+        const prevTcInBatch =
+          toolCalls.indexOf(group[0]) > 0
+            ? toolCalls[toolCalls.indexOf(group[0]) - 1]
+            : null;
+
+        const historyItem = mapTrackedToolCallsToDisplay(group, {
+          ...getToolGroupBorderAppearance(
+            { type: 'tool_group', tools: toolCalls },
+            activeShellPtyId,
+            !!isShellFocused,
+            [],
+            backgroundShells,
+          ),
+        });
+
+        // Determine if this group starts with a compact tool
+        const currentIsCompact =
+          historyItem.tools.length === 1 &&
+          isCompactTool(historyItem.tools[0], isCompactModeEnabled);
+
+        let nextIsCompact = false;
+        if (nextTcInBatch) {
+          const nextHistoryItem = mapTrackedToolCallsToDisplay(nextTcInBatch);
+          nextIsCompact =
+            nextHistoryItem.tools.length === 1 &&
+            isCompactTool(nextHistoryItem.tools[0], isCompactModeEnabled);
+        }
+
+        let prevWasCompact = false;
+        if (prevTcInBatch) {
+          const prevHistoryItem = mapTrackedToolCallsToDisplay(prevTcInBatch);
+          prevWasCompact =
+            prevHistoryItem.tools.length === 1 &&
+            isCompactTool(prevHistoryItem.tools[0], isCompactModeEnabled);
+        }
+
+        historyItem.borderTop =
+          isFirstInBatch || (!currentIsCompact && prevWasCompact);
+        historyItem.borderBottom = currentIsCompact
+          ? isLastInBatch && !nextIsCompact
+          : isLastInBatch || nextIsCompact;
+
+        addItem(historyItem);
+      }
 
       setPushedToolCallIds(newPushed);
       setIsFirstToolInGroup(false);
@@ -495,6 +582,7 @@ export const useGeminiStream = (
     activeShellPtyId,
     isShellFocused,
     backgroundShells,
+    settings.merged.ui?.compactToolOutput,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
@@ -538,27 +626,62 @@ export const useGeminiStream = (
       toolCalls.length > 0 &&
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
-    const anyVisibleInHistory = pushedToolCallIds.size > 0;
-    const anyVisibleInPending = remainingTools.some((tc) => {
-      // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
-      const isInProgress =
-        tc.status !== 'success' &&
-        tc.status !== 'error' &&
-        tc.status !== 'cancelled';
-      if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
+    const isToolVisible = (tc: TrackedToolCall) => {
+      const displayName = tc.tool?.displayName ?? tc.request.name;
+
+      let hasResultDisplay = false;
+      if (
+        tc.status === CoreToolCallStatus.Success ||
+        tc.status === CoreToolCallStatus.Error ||
+        tc.status === CoreToolCallStatus.Cancelled
+      ) {
+        hasResultDisplay = !!tc.response?.resultDisplay;
+      } else if (tc.status === CoreToolCallStatus.Executing) {
+        hasResultDisplay = !!tc.liveOutput;
+      }
+
+      // AskUser tools and Plan Mode write/edit are handled by this logic
+      if (
+        shouldHideToolCall({
+          displayName,
+          status: tc.status,
+          approvalMode: tc.approvalMode,
+          hasResultDisplay,
+          parentCallId: tc.request.parentCallId,
+        })
+      ) {
         return false;
       }
-      return (
-        tc.status !== 'scheduled' &&
-        tc.status !== 'validating' &&
-        tc.status !== 'awaiting_approval'
-      );
-    });
+
+      // ToolGroupMessage explicitly hides Confirming tools because they are
+      // rendered in the interactive ToolConfirmationQueue instead.
+      const displayStatus = mapCoreStatusToDisplayStatus(tc.status);
+      if (displayStatus === ToolCallStatus.Confirming) {
+        return false;
+      }
+
+      // ToolGroupMessage now shows all non-canceled tools, so they are visible
+      // in pending and we need to draw the closing border for them.
+      return true;
+    };
+
+    let lastVisibleIsCompact = false;
+    const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
+    for (let i = toolCalls.length - 1; i >= 0; i--) {
+      if (isToolVisible(toolCalls[i])) {
+        const mapped = mapTrackedToolCallsToDisplay(toolCalls[i]);
+        lastVisibleIsCompact = mapped.tools[0]
+          ? isCompactTool(mapped.tools[0], isCompactModeEnabled)
+          : false;
+        break;
+      }
+    }
 
     if (
       toolCalls.length > 0 &&
       !(allTerminal && allPushed) &&
-      (anyVisibleInHistory || anyVisibleInPending)
+      toolCalls.some(isToolVisible) &&
+      !lastVisibleIsCompact
     ) {
       items.push({
         type: 'tool_group' as const,
@@ -576,6 +699,7 @@ export const useGeminiStream = (
     activeShellPtyId,
     isShellFocused,
     backgroundShells,
+    settings.merged.ui?.compactToolOutput,
   ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -1658,7 +1782,7 @@ export const useGeminiStream = (
       ) {
         let awaitingApprovalCalls = toolCalls.filter(
           (call): call is TrackedWaitingToolCall =>
-            call.status === 'awaiting_approval',
+            call.status === 'awaiting_approval' && !call.request.forcedAsk,
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
@@ -1722,6 +1846,36 @@ export const useGeminiStream = (
       );
       if (clientTools.length > 0) {
         markToolsAsSubmitted(clientTools.map((t) => t.request.callId));
+
+        if (geminiClient) {
+          for (const tool of clientTools) {
+            // Only manually record skill activations in the chat history.
+            // Other client-initiated tools (like save_memory) update the system
+            // prompt/context and don't strictly need to be in the history.
+            if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
+              continue;
+            }
+
+            // Add both the call (model turn) and the result (user turn) to history.
+            // Client-initiated calls are essentially "synthetic" turns that let
+            // subsequent model calls understand what just happened in the UI.
+            await geminiClient.addHistory({
+              role: 'model',
+              parts: [
+                {
+                  functionCall: {
+                    name: tool.request.name,
+                    args: tool.request.args,
+                  },
+                },
+              ],
+            });
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: tool.response.responseParts,
+            });
+          }
+        }
       }
 
       // Identify new, successful save_memory calls that we haven't processed yet.

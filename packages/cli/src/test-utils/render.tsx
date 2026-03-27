@@ -524,6 +524,8 @@ const baseMockUiState = {
   nightly: false,
   updateInfo: null,
   pendingHistoryItems: [],
+  mainControlsRef: () => {},
+  rootUiRef: { current: null },
 };
 
 export const mockAppState: AppState = {
@@ -610,6 +612,7 @@ export const renderWithProviders = async (
     mouseEventsEnabled = false,
     config,
     uiActions,
+    toolActions,
     persistentState,
     appState = mockAppState,
   }: {
@@ -620,6 +623,11 @@ export const renderWithProviders = async (
     mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
+    toolActions?: Partial<{
+      isExpanded: (callId: string) => boolean;
+      toggleExpansion: (callId: string) => void;
+      toggleAllExpansion: (callIds: string[]) => void;
+    }>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
       set?: typeof persistentStateMock.set;
@@ -665,7 +673,7 @@ export const renderWithProviders = async (
     );
   }
 
-  const mainAreaWidth = terminalWidth;
+  const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
   const finalUiState = {
     ...baseState,
@@ -707,6 +715,16 @@ export const renderWithProviders = async (
                         <ToolActionsProvider
                           config={config}
                           toolCalls={allToolCalls}
+                          isExpanded={
+                            toolActions?.isExpanded ??
+                            vi.fn().mockReturnValue(false)
+                          }
+                          toggleExpansion={
+                            toolActions?.toggleExpansion ?? vi.fn()
+                          }
+                          toggleAllExpansion={
+                            toolActions?.toggleAllExpansion ?? vi.fn()
+                          }
                         >
                           <AskUserActionsProvider
                             request={null}
@@ -778,7 +796,6 @@ export async function renderHook<Result, Props>(
   generateSvg: () => string;
 }> {
   const result = { current: undefined as unknown as Result };
-
   let currentProps = options?.initialProps as Props;
 
   function TestComponent({

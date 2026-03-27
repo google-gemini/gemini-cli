@@ -300,7 +300,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description:
-              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.',
             showInDialog: true,
           },
           modelRouting: {
@@ -561,6 +561,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the "? for shortcuts" hint above the input.',
         showInDialog: true,
       },
+      compactToolOutput: {
+        type: 'boolean',
+        label: 'Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
@@ -656,6 +666,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Hide the footer from the UI',
         showInDialog: true,
+      },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
       },
       showMemoryUsage: {
         type: 'boolean',
@@ -1196,6 +1216,16 @@ const SETTINGS_SCHEMA = {
             default: true,
             description:
               'Disable user input on browser window during automation.',
+            showInDialog: false,
+          },
+          maxActionsPerTask: {
+            type: 'number',
+            label: 'Max Actions Per Task',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 100,
+            description:
+              'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
             showInDialog: false,
           },
           confirmSensitiveActions: {
@@ -3004,6 +3034,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {

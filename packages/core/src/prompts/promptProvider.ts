@@ -67,6 +67,7 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
@@ -208,7 +209,10 @@ export class PromptProvider {
             memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
-        sandbox: this.withSection('sandbox', () => getSandboxMode()),
+        sandbox: this.withSection('sandbox', () => ({
+          mode: getSandboxMode(),
+          toolSandboxingEnabled: context.config.getSandboxEnabled(),
+        })),
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
           () => true,
@@ -265,6 +269,7 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
+      context.config.getGemini31FlashLiteLaunchedSync?.() ?? false,
       false,
       context.config.getHasAccessToPreviewModel?.() ?? true,
       context.config,
