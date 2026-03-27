@@ -4,25 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import {
   type SandboxManager,
-  type GlobalSandboxOptions,
   type SandboxRequest,
   type SandboxedCommand,
-  type ExecutionPolicy,
-  sanitizePaths,
+  type SandboxPermissions,
+  type GlobalSandboxOptions,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
 import {
-  BASE_SEATBELT_PROFILE,
-  NETWORK_SEATBELT_PROFILE,
-} from './baseProfile.js';
+  initializeShellParsers,
+  getCommandName,
+} from '../../utils/shell-utils.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+  isStrictlyApproved,
+} from '../utils/commandSafety.js';
+import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 /**
  * A SandboxManager implementation for macOS that uses Seatbelt.
@@ -30,14 +36,83 @@ import {
 export class MacOsSandboxManager implements SandboxManager {
   constructor(private readonly options: GlobalSandboxOptions) {}
 
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0];
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.includes(toolName)) {
+      return true;
+    }
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
+  }
+
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+    await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
       req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
-    const sandboxArgs = this.buildSeatbeltArgs(this.options, req.policy);
+    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
+
+    // Reject override attempts in plan mode
+    verifySandboxOverrides(allowOverrides, req.policy);
+
+    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(
+          req.command,
+          req.args,
+          this.options.modeConfig?.approvedTools,
+        )
+      : false;
+
+    const workspaceWrite = !isReadonlyMode || isApproved;
+    const defaultNetwork =
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+
+    // Fetch persistent approvals for this command
+    const commandName = await getCommandName(req.command, req.args);
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
+
+    // Merge all permissions
+    const mergedAdditional: SandboxPermissions = {
+      fileSystem: {
+        read: [
+          ...(persistentPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
+        ],
+        write: [
+          ...(persistentPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
+        ],
+      },
+      network:
+        defaultNetwork ||
+        persistentPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
+        false,
+    };
+
+    const sandboxArgs = buildSeatbeltArgs({
+      workspace: this.options.workspace,
+      allowedPaths: [...(req.policy?.allowedPaths || [])],
+      forbiddenPaths: this.options.forbiddenPaths,
+      networkAccess: mergedAdditional.network,
+      workspaceWrite,
+      additionalPermissions: mergedAdditional,
+    });
 
     return {
       program: '/usr/bin/sandbox-exec',
@@ -45,66 +120,5 @@ export class MacOsSandboxManager implements SandboxManager {
       env: sanitizedEnv,
       cwd: req.cwd,
     };
-  }
-
-  /**
-   * Builds the arguments array for sandbox-exec using a strict allowlist profile.
-   * It relies on parameters passed to sandbox-exec via the -D flag to avoid
-   * string interpolation vulnerabilities, and normalizes paths against symlink escapes.
-   *
-   * Returns arguments up to the end of sandbox-exec configuration (e.g. ['-p', '<profile>', '-D', ...])
-   * Does not include the final '--' separator or the command to run.
-   */
-  private buildSeatbeltArgs(
-    options: GlobalSandboxOptions,
-    policy?: ExecutionPolicy,
-  ): string[] {
-    const profileLines = [BASE_SEATBELT_PROFILE];
-    const args: string[] = [];
-
-    const workspacePath = this.tryRealpath(options.workspace);
-    args.push('-D', `WORKSPACE=${workspacePath}`);
-
-    const tmpPath = this.tryRealpath(os.tmpdir());
-    args.push('-D', `TMPDIR=${tmpPath}`);
-
-    const allowedPaths = sanitizePaths(policy?.allowedPaths) || [];
-    for (let i = 0; i < allowedPaths.length; i++) {
-      const allowedPath = this.tryRealpath(allowedPaths[i]);
-      args.push('-D', `ALLOWED_PATH_${i}=${allowedPath}`);
-      profileLines.push(
-        `(allow file-read* file-write* (subpath (param "ALLOWED_PATH_${i}")))`,
-      );
-    }
-
-    // TODO: handle forbidden paths
-
-    if (policy?.networkAccess) {
-      profileLines.push(NETWORK_SEATBELT_PROFILE);
-    }
-
-    args.unshift('-p', profileLines.join('\n'));
-
-    return args;
-  }
-
-  /**
-   * Resolves symlinks for a given path to prevent sandbox escapes.
-   * If a file does not exist (ENOENT), it recursively resolves the parent directory.
-   * Other errors (e.g. EACCES) are re-thrown.
-   */
-  private tryRealpath(p: string): string {
-    try {
-      return fs.realpathSync(p);
-    } catch (e) {
-      if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-        const parentDir = path.dirname(p);
-        if (parentDir === p) {
-          return p;
-        }
-        return path.join(this.tryRealpath(parentDir), path.basename(p));
-      }
-      throw e;
-    }
   }
 }

@@ -20,6 +20,7 @@ import {
   coreEvents,
   getErrorType,
   getErrorMessage,
+  getErrorType,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
 
@@ -178,7 +179,7 @@ export function handleCancellationError(config: Config): never {
       timestamp: new Date().toISOString(),
       status: 'error',
       error: {
-        type: 'FatalCancellationError',
+        type: getErrorType(cancellationError),
         message: cancellationError.message,
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),
@@ -219,7 +220,7 @@ export function handleMaxTurnsExceededError(config: Config): never {
       timestamp: new Date().toISOString(),
       status: 'error',
       error: {
-        type: 'FatalTurnLimitedError',
+        type: getErrorType(maxTurnsError),
         message: maxTurnsError.message,
       },
       stats: streamFormatter.convertToStreamStats(metrics, 0),

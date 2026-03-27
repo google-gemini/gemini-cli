@@ -79,4 +79,28 @@ describe('colorizeCode', () => {
     await expect(renderResult).toMatchSvgSnapshot();
     renderResult.unmount();
   });
+
+  it('returns an array of lines when returnLines is true', () => {
+    const code = 'line 1\nline 2\nline 3';
+    const settings = new LoadedSettings(
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      { path: '', settings: {}, originalSettings: {} },
+      true,
+      [],
+    );
+
+    const result = colorizeCode({
+      code,
+      language: 'javascript',
+      maxWidth: 80,
+      settings,
+      hideLineNumbers: true,
+      returnLines: true,
+    });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(3);
+  });
 });

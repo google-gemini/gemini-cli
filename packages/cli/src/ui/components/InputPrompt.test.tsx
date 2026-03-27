@@ -61,7 +61,7 @@ import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
-import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
   AppEvent,
@@ -162,6 +162,18 @@ describe('InputPrompt', () => {
   let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
+
+  const GlobalEscapeHandler = ({ onEscape }: { onEscape: () => void }) => {
+    useKeypress(
+      (key) => {
+        if (key.name !== 'escape') return false;
+        onEscape();
+        return true;
+      },
+      { isActive: true, priority: false },
+    );
+    return null;
+  };
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
@@ -2767,6 +2779,54 @@ describe('InputPrompt', () => {
 
         expect(props.setShellModeActive).toHaveBeenCalledWith(false);
       });
+      unmount();
+    });
+
+    it('should not propagate ESC to global cancellation handler when shell mode is active (responding)', async () => {
+      props.shellModeActive = true;
+      props.streamingState = StreamingState.Responding;
+      const onGlobalEscape = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalEscapeHandler onEscape={onGlobalEscape} />
+          <InputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      });
+      expect(onGlobalEscape).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should allow ESC to reach global cancellation handler when responding and no overlay is active', async () => {
+      props.shellModeActive = false;
+      props.streamingState = StreamingState.Responding;
+      const onGlobalEscape = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalEscapeHandler onEscape={onGlobalEscape} />
+          <InputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(onGlobalEscape).toHaveBeenCalledTimes(1);
+      });
+      expect(props.setShellModeActive).not.toHaveBeenCalled();
       unmount();
     });
 

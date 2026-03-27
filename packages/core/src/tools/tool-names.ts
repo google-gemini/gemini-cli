@@ -73,7 +73,7 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
 } from './definitions/coreTools.js';
 
@@ -146,11 +146,9 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
 };
-
-export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
@@ -182,6 +180,11 @@ export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
+export const LS_DISPLAY_NAME = 'ReadFolder';
+export const GREP_DISPLAY_NAME = 'SearchText';
+export const WEB_SEARCH_DISPLAY_NAME = 'GoogleSearch';
+export const WEB_FETCH_DISPLAY_NAME = 'WebFetch';
+export const READ_MANY_FILES_DISPLAY_NAME = 'ReadManyFiles';
 
 /**
  * Mapping of legacy tool names to their current names.

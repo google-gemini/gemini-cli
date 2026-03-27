@@ -44,7 +44,6 @@ const runInDevTraceSpan = vi.hoisted(() =>
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
-      endSpan: vi.fn(),
     });
   }),
 );
@@ -142,7 +141,7 @@ describe('ToolExecutor', () => {
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
-    await fn({ metadata, endSpan: vi.fn() });
+    await fn({ metadata });
     expect(metadata).toMatchObject({
       input: scheduledCall.request,
       output: {
@@ -205,7 +204,7 @@ describe('ToolExecutor', () => {
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
     const metadata = { attributes: {} };
-    await fn({ metadata, endSpan: vi.fn() });
+    await fn({ metadata });
     expect(metadata).toMatchObject({
       error: new Error('Tool Failed'),
     });
@@ -331,6 +330,53 @@ describe('ToolExecutor', () => {
     const result = await promise;
 
     expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+  });
+
+  it('should return cancelled result and use originalRequestName when signal is aborted', async () => {
+    const mockTool = new MockTool({
+      name: 'slowTool',
+    });
+    const invocation = mockTool.build({});
+
+    // Mock executeToolWithHooks to simulate slow execution
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+      async () => {
+        await new Promise((r) => setTimeout(r, 100));
+        return { llmContent: 'Done', returnDisplay: 'Done' };
+      },
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-4',
+        name: 'actualToolName',
+        originalRequestName: 'originalToolName',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-4',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const controller = new AbortController();
+    const promise = executor.execute({
+      call: scheduledCall,
+      signal: controller.signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    controller.abort();
+    const result = await promise;
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      expect(result.response.responseParts[0]?.functionResponse?.name).toBe(
+        'originalToolName',
+      );
+    }
   });
 
   it('should truncate large shell output', async () => {

@@ -65,6 +65,7 @@ export async function runNonInteractive({
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
+      interactive: false,
       debugMode: config.getDebugMode(),
       onNewMessage: (msg) => {
         coreEvents.emitConsoleLog(msg.type, msg.content);

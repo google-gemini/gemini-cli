@@ -4,25 +4,59 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  isKnownSafeCommand as isMacSafeCommand,
+  isDangerousCommand as isMacDangerousCommand,
+} from '../sandbox/utils/commandSafety.js';
+import {
+  isKnownSafeCommand as isWindowsSafeCommand,
+  isDangerousCommand as isWindowsDangerousCommand,
+} from '../sandbox/windows/commandSafety.js';
+import { isNodeError } from '../utils/errors.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import type { ShellExecutionResult } from './shellExecutionService.js';
+import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
+export interface SandboxPermissions {
+  /** Filesystem permissions. */
+  fileSystem?: {
+    /** Paths that should be readable by the command. */
+    read?: string[];
+    /** Paths that should be writable by the command. */
+    write?: string[];
+  };
+  /** Whether the command should have network access. */
+  network?: boolean;
+}
+
 /**
  * Security boundaries and permissions applied to a specific sandboxed execution.
  */
 export interface ExecutionPolicy {
   /** Additional absolute paths to grant full read/write access to. */
   allowedPaths?: string[];
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
   /** Whether network access is allowed. */
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+  /** Additional granular permissions to grant to this command. */
+  additionalPermissions?: SandboxPermissions;
+}
+
+/**
+ * Configuration for the sandbox mode behavior.
+ */
+export interface SandboxModeConfig {
+  readonly?: boolean;
+  network?: boolean;
+  approvedTools?: string[];
+  allowOverrides?: boolean;
 }
 
 /**
@@ -34,6 +68,12 @@ export interface GlobalSandboxOptions {
    * This directory is granted full read and write access.
    */
   workspace: string;
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
+  /** The current sandbox mode behavior from config. */
+  modeConfig?: SandboxModeConfig;
+  /** The policy manager for persistent approvals. */
+  policyManager?: SandboxPolicyManager;
 }
 
 /**
@@ -67,6 +107,16 @@ export interface SandboxedCommand {
 }
 
 /**
+ * A structured result from parsing sandbox denials.
+ */
+export interface ParsedSandboxDenial {
+  /** If the denial is related to file system access, these are the paths that were blocked. */
+  filePaths?: string[];
+  /** If the denial is related to network access. */
+  network?: boolean;
+}
+
+/**
  * Interface for a service that prepares commands for sandboxed execution.
  */
 export interface SandboxManager {
@@ -74,6 +124,112 @@ export interface SandboxManager {
    * Prepares a command to run in a sandbox, including environment sanitization.
    */
   prepareCommand(req: SandboxRequest): Promise<SandboxedCommand>;
+
+  /**
+   * Checks if a command with its arguments is known to be safe for this sandbox.
+   */
+  isKnownSafeCommand(args: string[]): boolean;
+
+  /**
+   * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
+   */
+  isDangerousCommand(args: string[]): boolean;
+
+  /**
+   * Parses the output of a command to detect sandbox denials.
+   */
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
+}
+
+/**
+ * Files that represent the governance or "constitution" of the repository
+ * and should be write-protected in any sandbox.
+ */
+export const GOVERNANCE_FILES = [
+  { path: '.gitignore', isDirectory: false },
+  { path: '.geminiignore', isDirectory: false },
+  { path: '.git', isDirectory: true },
+] as const;
+
+/**
+ * Files that contain sensitive secrets or credentials and should be
+ * completely hidden (deny read/write) in any sandbox.
+ */
+export const SECRET_FILES = [
+  { pattern: '.env' },
+  { pattern: '.env.*' },
+] as const;
+
+/**
+ * Checks if a given file name matches any of the secret file patterns.
+ */
+export function isSecretFile(fileName: string): boolean {
+  return SECRET_FILES.some((s) => {
+    if (s.pattern.endsWith('*')) {
+      const prefix = s.pattern.slice(0, -1);
+      return fileName.startsWith(prefix);
+    }
+    return fileName === s.pattern;
+  });
+}
+
+/**
+ * Returns arguments for the Linux 'find' command to locate secret files.
+ */
+export function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s, i) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
+  return args;
+}
+
+/**
+ * Finds all secret files in a directory up to a certain depth.
+ * Default is shallow scan (depth 1) for performance.
+ */
+export async function findSecretFiles(
+  baseDir: string,
+  maxDepth = 1,
+): Promise<string[]> {
+  const secrets: string[] = [];
+  const skipDirs = new Set([
+    'node_modules',
+    '.git',
+    '.venv',
+    '__pycache__',
+    'dist',
+    'build',
+    '.next',
+    '.idea',
+    '.vscode',
+  ]);
+
+  async function walk(dir: string, depth: number) {
+    if (depth > maxDepth) return;
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!skipDirs.has(entry.name)) {
+            await walk(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          if (isSecretFile(entry.name)) {
+            secrets.push(fullPath);
+          }
+        }
+      }
+    } catch {
+      // Ignore read errors
+    }
+  }
+
+  await walk(baseDir, 1);
+  return secrets;
 }
 
 /**
@@ -98,14 +254,42 @@ export class NoopSandboxManager implements SandboxManager {
       env: sanitizedEnv,
     };
   }
+
+  isKnownSafeCommand(args: string[]): boolean {
+    return os.platform() === 'win32'
+      ? isWindowsSafeCommand(args)
+      : isMacSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return os.platform() === 'win32'
+      ? isWindowsDangerousCommand(args)
+      : isMacDangerousCommand(args);
+  }
+
+  parseDenials(): undefined {
+    return undefined;
+  }
 }
 
 /**
- * SandboxManager that implements actual sandboxing.
+ * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
     throw new Error('Tool sandboxing is not yet implemented.');
+  }
+
+  isKnownSafeCommand(_args: string[]): boolean {
+    return false;
+  }
+
+  isDangerousCommand(_args: string[]): boolean {
+    return false;
+  }
+
+  parseDenials(): undefined {
+    return undefined;
   }
 }
 
@@ -140,4 +324,25 @@ export function sanitizePaths(paths?: string[]): string[] | undefined {
 
   return Array.from(uniquePathsMap.values());
 }
+
+/**
+ * Resolves symlinks for a given path to prevent sandbox escapes.
+ * If a file does not exist (ENOENT), it recursively resolves the parent directory.
+ * Other errors (e.g. EACCES) are re-thrown.
+ */
+export async function tryRealpath(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      const parentDir = path.dirname(p);
+      if (parentDir === p) {
+        return p;
+      }
+      return path.join(await tryRealpath(parentDir), path.basename(p));
+    }
+    throw e;
+  }
+}
+
 export { createSandboxManager } from './sandboxManagerFactory.js';
