@@ -58,7 +58,7 @@ export function getShellToolDescription(
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use PowerShell background constructs.`
-      : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
+      : 'Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.';
     return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
@@ -183,7 +183,7 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
   return {
     name: UPDATE_TOPIC_TOOL_NAME,
     description:
-      'Manages your narrative flow. You MUST call this in EVERY turn to state your `strategic_intent`. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
+      'Manages your narrative flow. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -198,8 +198,7 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
         },
         [TOPIC_PARAM_STRATEGIC_INTENT]: {
           type: 'string',
-          description:
-            'A mandatory one-sentence statement of your immediate intent. You MUST provide this for every tool-use turn to maintain strategic alignment. This replaces the raw text preamble.',
+          description: 'A mandatory one-sentence statement of your immediate intent.',
         },
       },
       required: [TOPIC_PARAM_STRATEGIC_INTENT],
