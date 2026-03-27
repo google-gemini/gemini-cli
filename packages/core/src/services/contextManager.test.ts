@@ -46,7 +46,6 @@ describe('ContextManager', () => {
         getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
       }),
       isTrustedFolder: vi.fn().mockReturnValue(true),
-      getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
     } as unknown as Config;
 
     contextManager = new ContextManager(mockConfig);
@@ -82,14 +81,12 @@ describe('ContextManager', () => {
       await contextManager.refresh();
 
       expect(memoryDiscovery.getGlobalMemoryPaths).toHaveBeenCalled();
-      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith(
-        ['/app'],
-        ['.git'],
-      );
+      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith([
+        '/app',
+      ]);
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         expect.arrayContaining([...globalPaths, ...envPaths]),
         'tree',
-        ['.git'],
       );
 
       expect(contextManager.getGlobalMemory()).toContain('Global Content');
@@ -175,7 +172,6 @@ describe('ContextManager', () => {
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
         'tree',
-        ['.git'],
       );
       expect(contextManager.getEnvironmentMemory()).toContain(
         'Project Content',
@@ -201,7 +197,6 @@ describe('ContextManager', () => {
         ['/app'],
         expect.any(Set),
         expect.any(Set),
-        ['.git'],
       );
       expect(result).toMatch(/--- Context from: \/app\/src\/GEMINI\.md ---/);
       expect(result).toContain('Src Content');
@@ -230,26 +225,6 @@ describe('ContextManager', () => {
 
       expect(memoryDiscovery.loadJitSubdirectoryMemory).not.toHaveBeenCalled();
       expect(result).toBe('');
-    });
-
-    it('should pass custom boundary markers from config', async () => {
-      const customMarkers = ['.monorepo-root', 'package.json'];
-      vi.mocked(mockConfig.getMemoryBoundaryMarkers).mockReturnValue(
-        customMarkers,
-      );
-      vi.mocked(memoryDiscovery.loadJitSubdirectoryMemory).mockResolvedValue({
-        files: [],
-      });
-
-      await contextManager.discoverContext('/app/src/file.ts', ['/app']);
-
-      expect(memoryDiscovery.loadJitSubdirectoryMemory).toHaveBeenCalledWith(
-        '/app/src/file.ts',
-        ['/app'],
-        expect.any(Set),
-        expect.any(Set),
-        customMarkers,
-      );
     });
   });
 });

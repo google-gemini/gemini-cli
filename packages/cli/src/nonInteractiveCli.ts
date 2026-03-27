@@ -345,6 +345,15 @@ export async function runNonInteractive({
               });
             }
             toolCallRequests.push(event.value);
+          } else if (event.type === GeminiEventType.Thought) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.THOUGHT,
+                timestamp: new Date().toISOString(),
+                subject: event.value.subject,
+                content: event.value.description,
+              });
+            }
           } else if (event.type === GeminiEventType.LoopDetected) {
             if (streamFormatter) {
               streamFormatter.emitEvent({
