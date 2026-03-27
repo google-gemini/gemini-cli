@@ -82,6 +82,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  LegacyAgentProtocol,
   type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
@@ -1092,8 +1093,44 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
-  const useAgentProtocol = config?.getExperimentalUseAgentProtocol() || false;
-  const useActiveStream = useAgentProtocol ? useAgentStream : useGeminiStream;
+  const streamAgent = useMemo(
+    () =>
+      config?.getExperimentalUseAgentProtocol()
+        ? new LegacyAgentProtocol({ config, getPreferredEditor })
+        : undefined,
+    [config, getPreferredEditor],
+  );
+
+  const activeStream = streamAgent
+    ? // eslint-disable-next-line react-hooks/rules-of-hooks
+      useAgentStream({
+        agent: streamAgent,
+        addItem: historyManager.addItem,
+        onCancelSubmit,
+        isShellFocused: embeddedShellFocused,
+      })
+    : // eslint-disable-next-line react-hooks/rules-of-hooks
+      useGeminiStream(
+        config.getGeminiClient(),
+        historyManager.history,
+        historyManager.addItem,
+        config,
+        settings,
+        setDebugMessage,
+        handleSlashCommand,
+        shellModeActive,
+        getPreferredEditor,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitchedFromQuotaError,
+        setModelSwitchedFromQuotaError,
+        onCancelSubmit,
+        setEmbeddedShellFocused,
+        terminalWidth,
+        terminalHeight,
+        embeddedShellFocused,
+        consumePendingHints,
+      );
 
   const {
     streamingState,
@@ -1114,27 +1151,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
-  } = useActiveStream(
-    config.getGeminiClient(),
-    historyManager.history,
-    historyManager.addItem,
-    config,
-    settings,
-    setDebugMessage,
-    handleSlashCommand,
-    shellModeActive,
-    getPreferredEditor,
-    onAuthError,
-    performMemoryRefresh,
-    modelSwitchedFromQuotaError,
-    setModelSwitchedFromQuotaError,
-    onCancelSubmit,
-    setEmbeddedShellFocused,
-    terminalWidth,
-    terminalHeight,
-    embeddedShellFocused,
-    consumePendingHints,
-  );
+  } = activeStream;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],

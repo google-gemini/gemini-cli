@@ -1519,6 +1519,9 @@ describe('runNonInteractive', () => {
         name: 'ShellTool',
         description: 'A shell tool',
         run: vi.fn(),
+        build: vi.fn().mockReturnValue({
+          getDescription: () => 'A shell tool',
+        }),
       }),
       getFunctionDeclarations: vi.fn().mockReturnValue([{ name: 'ShellTool' }]),
     } as unknown as ToolRegistry);

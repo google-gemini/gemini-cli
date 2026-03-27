@@ -9,27 +9,21 @@ import {
   getErrorMessage,
   MessageSenderType,
   debugLogger,
-  LegacyAgentSession,
   geminiPartsToContentParts,
   parseThought,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import {
-  type Config,
-  type GeminiClient,
   type ApprovalMode,
   Kind,
-  type EditorType,
   type ThoughtSummary,
   type RetryAttemptPayload,
   type AgentEvent,
+  type AgentProtocol,
 } from '@google/gemini-cli-core';
-import { type PartListUnion } from '@google/genai';
 import type {
-  HistoryItem,
   HistoryItemWithoutId,
   LoopDetectionConfirmationRequest,
-  SlashCommandProcessorResult,
   IndividualToolCallDisplay,
   HistoryItemToolGroup,
 } from '../types.js';
@@ -39,42 +33,29 @@ import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { type BackgroundShell } from './shellCommandProcessor.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
-import { useToolScheduler } from './useToolScheduler.js';
-
 import { useSessionStats } from '../contexts/SessionContext.js';
-import type { LoadedSettings } from '../../config/settings.js';
 import { useStateAndRef } from './useStateAndRef.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { type MinimalTrackedToolCall } from './useTurnActivityMonitor.js';
+
+export interface UseAgentStreamOptions {
+  agent?: AgentProtocol;
+  addItem: UseHistoryManagerReturn['addItem'];
+  onCancelSubmit: (shouldRestorePrompt?: boolean) => void;
+  isShellFocused?: boolean;
+}
 
 /**
- * useAgentStream implements the interactive agent loop using the LegacyAgentSession (AgentProtocol).
- * It attempts to maintain parity with useGeminiStream while consolidating model/tool orchestration
- * into the unified core API.
+ * useAgentStream implements the interactive agent loop using an AgentProtocol.
+ * It is completely agnostic to the specific agent implementation.
  */
-export const useAgentStream = (
-  geminiClient: GeminiClient,
-  _history: HistoryItem[],
-  addItem: UseHistoryManagerReturn['addItem'],
-  config: Config,
-  _settings: LoadedSettings,
-  _onDebugMessage: (message: string) => void,
-  _handleSlashCommand: (
-    cmd: PartListUnion,
-  ) => Promise<SlashCommandProcessorResult | false>,
-  _shellModeActive: boolean,
-  getPreferredEditor: () => EditorType | undefined,
-  _onAuthError: (error: string) => void,
-  _performMemoryRefresh: () => Promise<void>,
-  _modelSwitchedFromQuotaError: boolean,
-  _setModelSwitchedFromQuotaError: React.Dispatch<
-    React.SetStateAction<boolean>
-  >,
-  onCancelSubmit: (shouldRestorePrompt?: boolean) => void,
-  _setShellInputFocused: (value: boolean) => void,
-  _terminalWidth: number,
-  _terminalHeight: number,
-  _isShellFocused?: boolean,
-  _consumeUserHint?: () => string | null,
-) => {
+export const useAgentStream = ({
+  agent,
+  addItem,
+  onCancelSubmit,
+  isShellFocused,
+}: UseAgentStreamOptions) => {
+  const config = useConfig();
   const [initError] = useState<string | null>(null);
   const [retryStatus] = useState<RetryAttemptPayload | null>(null);
   const [streamingState, setStreamingState] = useState<StreamingState>(
@@ -82,8 +63,6 @@ export const useAgentStream = (
   );
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
 
-  // Track the current session instance
-  const sessionRef = useRef<LegacyAgentSession | null>(null);
   const currentStreamIdRef = useRef<string | null>(null);
   const userMessageTimestampRef = useRef<number>(0);
   const geminiMessageBufferRef = useRef<string>('');
@@ -98,24 +77,8 @@ export const useAgentStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
 
-  const [
-    toolCalls,
-    _schedule,
-    _markToolsAsSubmitted,
-    _setToolCallsForDisplay,
-    cancelAllToolCalls,
-    lastOutputTime,
-    scheduler,
-  ] = useToolScheduler(
-    async (_completedTools) => {
-      // LegacyAgentSession owns the loop, so we don't need to trigger next turns here.
-    },
-    config,
-    getPreferredEditor,
-  );
-
   const { startNewPrompt } = useSessionStats();
-  const logger = useLogger(config.storage);
+  const logger = useLogger(config?.storage);
 
   const activePtyId = undefined;
   const backgroundShellCount = 0;
@@ -127,6 +90,24 @@ export const useAgentStream = (
     [],
   );
   const dismissBackgroundShell = useCallback(async (_pid: number) => {}, []);
+
+  // Use the trackedTools to mock pendingToolCalls for inactivity monitors
+  const pendingToolCalls = useMemo(
+    (): MinimalTrackedToolCall[] =>
+      trackedTools.map((t) => ({
+        request: {
+          name: t.originalRequestName || t.name,
+          args: { command: t.description },
+          callId: t.callId,
+          isClientInitiated: t.isClientInitiated ?? false,
+          prompt_id: '',
+        },
+        status: t.status,
+      })),
+    [trackedTools],
+  );
+
+  const lastOutputTime = Date.now(); // We could track actual time if needed, simplified for now
 
   // TODO: Support LoopDetection confirmation requests
   const [loopDetectionConfirmationRequest] =
@@ -141,13 +122,12 @@ export const useAgentStream = (
   }, [addItem, pendingHistoryItemRef, setPendingHistoryItem]);
 
   const cancelOngoingRequest = useCallback(async () => {
-    if (sessionRef.current) {
-      await sessionRef.current.abort();
-      cancelAllToolCalls(new AbortController().signal);
+    if (agent) {
+      await agent.abort();
       setStreamingState(StreamingState.Idle);
       onCancelSubmit(false);
     }
-  }, [cancelAllToolCalls, onCancelSubmit]);
+  }, [agent, onCancelSubmit]);
 
   // TODO: Support native handleApprovalModeChange for Plan Mode
   const handleApprovalModeChange = useCallback(
@@ -308,21 +288,11 @@ export const useAgentStream = (
   );
 
   useEffect(() => {
-    if (sessionRef.current) {
-      return sessionRef.current.subscribe(handleEvent);
+    if (agent) {
+      return agent.subscribe(handleEvent);
     }
     return undefined;
-  }, [handleEvent]);
-
-  // Handle initialization of the session
-  if (!sessionRef.current) {
-    sessionRef.current = new LegacyAgentSession({
-      client: geminiClient,
-      scheduler,
-      config,
-      promptId: '',
-    });
-  }
+  }, [agent, handleEvent]);
 
   const submitQuery = useCallback(
     async (
@@ -330,7 +300,7 @@ export const useAgentStream = (
       options?: { isContinuation: boolean },
       _prompt_id?: string,
     ) => {
-      if (!sessionRef.current) return;
+      if (!agent) return;
 
       const timestamp = Date.now();
       userMessageTimestampRef.current = timestamp;
@@ -349,7 +319,7 @@ export const useAgentStream = (
       );
 
       try {
-        const { streamId } = await sessionRef.current.send({
+        const { streamId } = await agent.send({
           message: parts,
         });
         currentStreamIdRef.current = streamId;
@@ -360,7 +330,7 @@ export const useAgentStream = (
         );
       }
     },
-    [addItem, logger, startNewPrompt],
+    [agent, addItem, logger, startNewPrompt],
   );
 
   useEffect(() => {
@@ -415,7 +385,7 @@ export const useAgentStream = (
       const appearance = getToolGroupBorderAppearance(
         { type: 'tool_group', tools: trackedTools },
         activePtyId,
-        !!_isShellFocused,
+        !!isShellFocused,
         [],
         backgroundShells,
       );
@@ -440,7 +410,7 @@ export const useAgentStream = (
     setIsFirstToolInGroup,
     addItem,
     activePtyId,
-    _isShellFocused,
+    isShellFocused,
     backgroundShells,
   ]);
 
@@ -454,7 +424,7 @@ export const useAgentStream = (
     const appearance = getToolGroupBorderAppearance(
       { type: 'tool_group', tools: trackedTools },
       activePtyId,
-      !!_isShellFocused,
+      !!isShellFocused,
       [],
       backgroundShells,
     );
@@ -504,7 +474,7 @@ export const useAgentStream = (
     trackedTools,
     pushedToolCallIds,
     activePtyId,
-    _isShellFocused,
+    isShellFocused,
     backgroundShells,
   ]);
 
@@ -523,7 +493,7 @@ export const useAgentStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
-    pendingToolCalls: toolCalls,
+    pendingToolCalls,
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
