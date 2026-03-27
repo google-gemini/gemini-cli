@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Kind } from 'src/tools/tools.js';
+import type { Kind } from '../tools/tools.js';
 
 export type WithMeta = { _meta?: Record<string, unknown> };
 

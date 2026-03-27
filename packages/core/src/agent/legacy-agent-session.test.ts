@@ -40,6 +40,11 @@ function createMockDeps(
   const mockConfig = {
     getMaxSessionTurns: vi.fn().mockReturnValue(-1),
     getModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
+    getGeminiClient: vi.fn().mockReturnValue(mockClient),
+    getMessageBus: vi.fn().mockImplementation(() => ({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    })),
   };
 
   return {
@@ -126,7 +131,7 @@ describe('LegacyAgentSession', () => {
 
   describe('send', () => {
     it('returns streamId', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -148,7 +153,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('records the sent user message in the trajectory before send resolves', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -177,7 +182,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('returns streamId before emitting agent_start', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -219,7 +224,7 @@ describe('LegacyAgentSession', () => {
 
     it('throws if send is called while a stream is active', async () => {
       let resolveHang: (() => void) | undefined;
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -249,7 +254,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('creates a new streamId after the previous stream completes', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock
@@ -315,7 +320,7 @@ describe('LegacyAgentSession', () => {
 
   describe('stream - basic flow', () => {
     it('emits agent_start, content messages, and agent_end', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -354,7 +359,7 @@ describe('LegacyAgentSession', () => {
 
   describe('stream - tool calls', () => {
     it('handles a tool call round-trip', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       // First turn: model requests a tool
@@ -381,7 +386,7 @@ describe('LegacyAgentSession', () => {
         ]),
       );
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockResolvedValueOnce([
         makeCompletedToolCall('call-1', 'read_file', 'file contents'),
       ]);
@@ -414,7 +419,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('handles tool errors and sends error message in content', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValueOnce(
@@ -451,7 +456,7 @@ describe('LegacyAgentSession', () => {
         },
       } as CompletedToolCall;
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockResolvedValueOnce([errorToolCall]);
 
       const session = new LegacyAgentSession(deps);
@@ -474,7 +479,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('stops on STOP_EXECUTION tool error', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValueOnce(
@@ -502,7 +507,7 @@ describe('LegacyAgentSession', () => {
         },
       } as CompletedToolCall;
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockResolvedValueOnce([stopToolCall]);
 
       const session = new LegacyAgentSession(deps);
@@ -520,7 +525,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('treats fatal tool errors as tool_response followed by agent_end failed', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValueOnce(
@@ -548,7 +553,7 @@ describe('LegacyAgentSession', () => {
         },
       } as CompletedToolCall;
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockResolvedValueOnce([fatalToolCall]);
 
       const session = new LegacyAgentSession(deps);
@@ -579,7 +584,7 @@ describe('LegacyAgentSession', () => {
 
   describe('stream - terminal events', () => {
     it('handles AgentExecutionStopped', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -603,7 +608,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('handles AgentExecutionBlocked as non-terminal and continues the stream', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -650,7 +655,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('handles Error events', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -674,7 +679,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('handles LoopDetected as non-terminal warning event', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       // LoopDetected followed by more content — stream continues
@@ -728,7 +733,7 @@ describe('LegacyAgentSession', () => {
       >;
       configMock.mockReturnValue(0);
 
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -754,7 +759,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('treats GeminiClient MaxSessionTurns as a terminal max_turns stream end', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -783,7 +788,7 @@ describe('LegacyAgentSession', () => {
   describe('abort', () => {
     it('treats abort before the first model event as aborted without fatal error', async () => {
       let releaseAbort: (() => void) | undefined;
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -824,7 +829,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('aborts the stream', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       // Stream that yields content then checks abort signal via a deferred
@@ -867,7 +872,7 @@ describe('LegacyAgentSession', () => {
 
     it('treats abort during pending scheduler work as aborted without fatal error', async () => {
       let resolveSchedule: ((value: CompletedToolCall[]) => void) | undefined;
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -883,7 +888,7 @@ describe('LegacyAgentSession', () => {
         ]),
       );
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockReturnValue(
         new Promise<CompletedToolCall[]>((resolve) => {
           resolveSchedule = resolve;
@@ -921,7 +926,7 @@ describe('LegacyAgentSession', () => {
 
   describe('events property', () => {
     it('accumulates all events', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -945,7 +950,7 @@ describe('LegacyAgentSession', () => {
 
   describe('subscription and stream scoping', () => {
     it('subscribe receives live events for the next stream', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -978,7 +983,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('subscribe is live-only and does not replay old history when idle', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock
@@ -1034,7 +1039,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('streams only the requested streamId', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock
@@ -1096,7 +1101,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('resumes from eventId within the same stream only', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock
@@ -1161,7 +1166,7 @@ describe('LegacyAgentSession', () => {
 
   describe('agent_end ordering', () => {
     it('agent_end is always the final event yielded', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -1183,7 +1188,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('agent_end is final even after error events', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValue(
@@ -1205,7 +1210,7 @@ describe('LegacyAgentSession', () => {
 
   describe('intermediate Finished events', () => {
     it('does NOT emit agent_end when tool calls are pending', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       // First turn: tool request + Finished (should NOT produce agent_end)
@@ -1238,7 +1243,7 @@ describe('LegacyAgentSession', () => {
         ]),
       );
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockResolvedValueOnce([
         makeCompletedToolCall('call-1', 'read_file', 'data'),
       ]);
@@ -1254,7 +1259,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('emits usage for intermediate Finished events', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockReturnValueOnce(
@@ -1285,7 +1290,7 @@ describe('LegacyAgentSession', () => {
         ]),
       );
 
-      const scheduleMock = deps.scheduler.schedule as ReturnType<typeof vi.fn>;
+      const scheduleMock = deps.scheduler!.schedule as ReturnType<typeof vi.fn>;
       scheduleMock.mockResolvedValueOnce([
         makeCompletedToolCall('call-1', 'read_file', 'contents'),
       ]);
@@ -1306,7 +1311,7 @@ describe('LegacyAgentSession', () => {
 
   describe('error handling in runLoop', () => {
     it('catches thrown errors and emits error + agent_end', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       sendMock.mockImplementation(() => {
@@ -1332,7 +1337,7 @@ describe('LegacyAgentSession', () => {
 
   describe('_emitErrorAndAgentEnd metadata', () => {
     it('preserves exitCode and code in _meta for FatalError', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       // Simulate a FatalError being thrown
@@ -1355,7 +1360,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('preserves exitCode for non-FatalError errors that carry one', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       const exitCodeError = new Error('custom exit');
@@ -1375,7 +1380,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('preserves code in _meta for errors with code property', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       const codedError = new Error('ENOENT');
@@ -1395,7 +1400,7 @@ describe('LegacyAgentSession', () => {
     });
 
     it('preserves status in _meta for errors with status property', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
+      const sendMock = deps.client!.sendMessageStream as ReturnType<
         typeof vi.fn
       >;
       const statusError = new Error('rate limited');

@@ -1268,17 +1268,16 @@ describe('runNonInteractive', () => {
       (process.stdin as any).setRawMode = vi.fn();
     }
 
-    const stdinOnSpy = vi.spyOn(process.stdin, 'on').mockImplementation(
-      (
-        event: string | symbol,
-        listener: (...args: unknown[]) => void,
-      ) => {
-        if (event === 'keypress') {
-          listener('\u0003', { ctrl: true, name: 'c' });
-        }
-        return process.stdin;
-      },
-    );
+    const stdinOnSpy = vi
+      .spyOn(process.stdin, 'on')
+      .mockImplementation(
+        (event: string | symbol, listener: (...args: unknown[]) => void) => {
+          if (event === 'keypress') {
+            listener('\u0003', { ctrl: true, name: 'c' });
+          }
+          return process.stdin;
+        },
+      );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.spyOn(process.stdin as any, 'setRawMode').mockImplementation(() => true);
     vi.spyOn(process.stdin, 'resume').mockImplementation(() => process.stdin);
@@ -1493,6 +1492,9 @@ describe('runNonInteractive', () => {
         name: 'ShellTool',
         description: 'A shell tool',
         run: vi.fn(),
+        build: vi.fn().mockReturnValue({
+          getDescription: () => 'A shell tool',
+        }),
       }),
       getFunctionDeclarations: vi.fn().mockReturnValue([{ name: 'ShellTool' }]),
     } as unknown as ToolRegistry);
