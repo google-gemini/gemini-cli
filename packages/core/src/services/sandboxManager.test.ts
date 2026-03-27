@@ -364,7 +364,10 @@ describe('SandboxManager', () => {
 
   describe('createSandboxManager', () => {
     it('should return NoopSandboxManager if sandboxing is disabled', () => {
-      const manager = createSandboxManager({ enabled: false }, '/workspace');
+      const manager = createSandboxManager(
+        { enabled: false },
+        { workspace: '/workspace' },
+      );
       expect(manager).toBeInstanceOf(NoopSandboxManager);
     });
 
@@ -375,7 +378,10 @@ describe('SandboxManager', () => {
       'should return $expected.name if sandboxing is enabled and platform is $platform',
       ({ platform, expected }) => {
         vi.spyOn(os, 'platform').mockReturnValue(platform);
-        const manager = createSandboxManager({ enabled: true }, '/workspace');
+        const manager = createSandboxManager(
+          { enabled: true },
+          { workspace: '/workspace' },
+        );
         expect(manager).toBeInstanceOf(expected);
       },
     );
@@ -384,7 +390,7 @@ describe('SandboxManager', () => {
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       const manager = createSandboxManager(
         { enabled: true, command: 'windows-native' },
-        '/workspace',
+        { workspace: '/workspace' },
       );
       expect(manager).toBeInstanceOf(WindowsSandboxManager);
     });
@@ -393,7 +399,7 @@ describe('SandboxManager', () => {
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       const manager = createSandboxManager(
         { enabled: true, command: 'docker' as unknown as 'windows-native' },
-        '/workspace',
+        { workspace: '/workspace' },
       );
       expect(manager).toBeInstanceOf(LocalSandboxManager);
     });
