@@ -9,6 +9,7 @@ import { ActivateSkillTool } from './activate-skill.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { getFolderStructure } from '../utils/getFolderStructure.js';
 
 vi.mock('../utils/getFolderStructure.js', () => ({
   getFolderStructure: vi.fn().mockResolvedValue('Mock folder structure'),
@@ -146,5 +147,79 @@ describe('ActivateSkillTool', () => {
     expect(() =>
       tool.build({ name: '' } as unknown as { name: string }),
     ).toThrow();
+  });
+
+  it('should use categorized resource summary when skill has resources', async () => {
+    vi.mocked(getFolderStructure).mockClear();
+
+    const skillWithResources = {
+      name: 'test-skill',
+      description: 'A test skill',
+      location: '/path/to/test-skill/SKILL.md',
+      body: 'Skill instructions content.',
+      resources: {
+        scripts: ['scripts/run.sh'],
+        references: ['references/doc.md'],
+        assets: [],
+        other: [],
+      },
+    };
+
+    mockConfig = {
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        addDirectory: vi.fn(),
+      }),
+      getSkillManager: vi.fn().mockReturnValue({
+        getSkills: vi.fn().mockReturnValue([skillWithResources]),
+        getAllSkills: vi.fn().mockReturnValue([skillWithResources]),
+        getSkill: vi.fn().mockReturnValue(skillWithResources),
+        activateSkill: vi.fn(),
+      }),
+    } as unknown as Config;
+
+    const toolWithResources = new ActivateSkillTool(mockConfig, mockMessageBus);
+    const invocation = toolWithResources.build({ name: 'test-skill' });
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('Skill resource index');
+    expect(result.llmContent).toContain('references/doc.md');
+    expect(result.llmContent).not.toContain('Mock folder structure');
+    expect(getFolderStructure).not.toHaveBeenCalled();
+  });
+
+  it('should not embed reference file contents in available_resources', async () => {
+    const secret = 'SECRET_REF_BODY_XYZ';
+    const skillWithResources = {
+      name: 'test-skill',
+      description: 'A test skill',
+      location: '/path/to/test-skill/SKILL.md',
+      body: 'Only instruction body here.',
+      resources: {
+        scripts: [],
+        references: ['references/secret.md'],
+        assets: [],
+        other: [],
+      },
+    };
+
+    mockConfig = {
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        addDirectory: vi.fn(),
+      }),
+      getSkillManager: vi.fn().mockReturnValue({
+        getSkills: vi.fn().mockReturnValue([skillWithResources]),
+        getAllSkills: vi.fn().mockReturnValue([skillWithResources]),
+        getSkill: vi.fn().mockReturnValue(skillWithResources),
+        activateSkill: vi.fn(),
+      }),
+    } as unknown as Config;
+
+    const t = new ActivateSkillTool(mockConfig, mockMessageBus);
+    const result = await t
+      .build({ name: 'test-skill' })
+      .execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('references/secret.md');
+    expect(result.llmContent).not.toContain(secret);
   });
 });

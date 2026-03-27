@@ -116,8 +116,9 @@ gemini skills disable my-expertise --scope workspace
 3.  **Consent**: You will see a confirmation prompt in the UI detailing the
     skill's name, purpose, and the directory path it will gain access to.
 4.  **Injection**: Upon your approval:
-    - The `SKILL.md` body and folder structure is added to the conversation
-      history.
+    - The `SKILL.md` body and a compact **categorized resource index** (paths
+      under `references/`, `scripts/`, `assets/`, and other files—not the full
+      directory tree or file contents) is added to the conversation history.
     - The skill's directory is added to the agent's allowed file paths, granting
       it permission to read any bundled assets.
 5.  **Execution**: The model proceeds with the specialized expertise active. It

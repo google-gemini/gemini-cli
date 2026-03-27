@@ -28,6 +28,12 @@ skill's specific instructions until the task is complete.
 
 ## Behavior
 
+When a skill is activated, the model receives the `SKILL.md` body plus a short
+**resource index**: paths grouped as references, scripts, assets, and other
+files (relative to the skill root). This is a path list only—not a full
+directory tree and not the contents of those files; reading bundled files still
+uses the normal file tools (or a future dedicated references reader).
+
 The agent uses this tool to provide professional-grade assistance:
 
 - **Specialized logic:** Skills contain expert-level procedures for complex

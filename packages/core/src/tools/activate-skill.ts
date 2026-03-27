@@ -6,6 +6,8 @@
 
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
+import type { SkillDefinition } from '../skills/skillLoader.js';
+import { formatSkillResourceSummary } from '../skills/skillResourceIndex.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   BaseDeclarativeTool,
@@ -36,7 +38,7 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
   ActivateSkillToolParams,
   ToolResult
 > {
-  private cachedFolderStructure: string | undefined;
+  private cachedResourcePresentation: string | undefined;
 
   constructor(
     private config: Config,
@@ -57,15 +59,20 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     return `"${skillName}" (?) unknown skill`;
   }
 
-  private async getOrFetchFolderStructure(
-    skillLocation: string,
-  ): Promise<string> {
-    if (this.cachedFolderStructure === undefined) {
-      this.cachedFolderStructure = await getFolderStructure(
-        path.dirname(skillLocation),
-      );
+  private async getResourcePresentation(skill: SkillDefinition): Promise<string> {
+    if (skill.resources !== undefined) {
+      return formatSkillResourceSummary(skill.resources);
     }
-    return this.cachedFolderStructure;
+    return await getFolderStructure(path.dirname(skill.location));
+  }
+
+  private async getOrFetchResourcePresentation(
+    skill: SkillDefinition,
+  ): Promise<string> {
+    if (this.cachedResourcePresentation === undefined) {
+      this.cachedResourcePresentation = await this.getResourcePresentation(skill);
+    }
+    return this.cachedResourcePresentation;
   }
 
   protected override async getConfirmationDetails(
@@ -86,8 +93,8 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
       return false;
     }
 
-    const folderStructure = await this.getOrFetchFolderStructure(
-      skill.location,
+    const resourcePresentation = await this.getOrFetchResourcePresentation(
+      skill,
     );
 
     const confirmationDetails: ToolCallConfirmationDetails = {
@@ -99,7 +106,7 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
 ${skill.description}
 
 **Resources to be shared with the model:**
-${folderStructure}`,
+${resourcePresentation}`,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         await this.publishPolicyUpdate(outcome);
       },
@@ -134,8 +141,8 @@ ${folderStructure}`,
       .getWorkspaceContext()
       .addDirectory(path.dirname(skill.location));
 
-    const folderStructure = await this.getOrFetchFolderStructure(
-      skill.location,
+    const resourcePresentation = await this.getOrFetchResourcePresentation(
+      skill,
     );
 
     return {
@@ -145,10 +152,10 @@ ${folderStructure}`,
   </instructions>
 
   <available_resources>
-    ${folderStructure}
+    ${resourcePresentation}
   </available_resources>
 </activated_skill>`,
-      returnDisplay: `Skill **${skillName}** activated. Resources loaded from \`${path.dirname(skill.location)}\`:\n\n${folderStructure}`,
+      returnDisplay: `Skill **${skillName}** activated. Resources loaded from \`${path.dirname(skill.location)}\`:\n\n${resourcePresentation}`,
     };
   }
 }

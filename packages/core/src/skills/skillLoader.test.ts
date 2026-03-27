@@ -44,7 +44,32 @@ describe('skillLoader', () => {
     expect(skills[0].description).toBe('A test skill');
     expect(skills[0].location).toBe(skillFile);
     expect(skills[0].body).toBe('# Instructions\nDo something.');
+    expect(skills[0].resources).toEqual({
+      scripts: [],
+      references: [],
+      assets: [],
+      other: [],
+    });
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+  });
+
+  it('should attach resource index when references and scripts exist', async () => {
+    const skillDir = path.join(testRootDir, 'res-skill');
+    await fs.mkdir(path.join(skillDir, 'references'), { recursive: true });
+    await fs.writeFile(
+      path.join(skillDir, 'references', 'x.md'),
+      'ref body',
+    );
+    const skillFile = path.join(skillDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---\nname: res-skill\ndescription: Has refs\n---\n# Instructions\n`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].resources?.references).toContain('references/x.md');
   });
 
   it('should emit feedback when no valid skills are found in a non-empty directory', async () => {
