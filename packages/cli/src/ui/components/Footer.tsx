@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -187,12 +187,15 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
   const { vimEnabled, vimMode } = useVimMode();
 
   const authType = config.getContentGeneratorConfig()?.authType;
-  const email = useMemo(() => {
+  const [email, setEmail] = useState<string | undefined>();
+
+  useEffect(() => {
     if (authType) {
       const userAccountManager = new UserAccountManager();
-      return userAccountManager.getCachedGoogleAccount() ?? undefined;
+      setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
+    } else {
+      setEmail(undefined);
     }
-    return undefined;
   }, [authType]);
 
   if (copyModeEnabled) {
