@@ -10,7 +10,6 @@ import fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   NoopSandboxManager,
-  LocalSandboxManager,
   sanitizePaths,
   findSecretFiles,
   isSecretFile,
@@ -386,22 +385,13 @@ describe('SandboxManager', () => {
       },
     );
 
-    it("should return WindowsSandboxManager if sandboxing is enabled with 'windows-native' command on win32", () => {
+    it('should return WindowsSandboxManager if sandboxing is enabled on win32', () => {
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       const manager = createSandboxManager(
-        { enabled: true, command: 'windows-native' },
+        { enabled: true },
         { workspace: '/workspace' },
       );
       expect(manager).toBeInstanceOf(WindowsSandboxManager);
-    });
-
-    it('should return LocalSandboxManager on win32 if command is not windows-native', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      const manager = createSandboxManager(
-        { enabled: true, command: 'docker' as unknown as 'windows-native' },
-        { workspace: '/workspace' },
-      );
-      expect(manager).toBeInstanceOf(LocalSandboxManager);
     });
   });
 });
