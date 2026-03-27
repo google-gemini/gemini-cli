@@ -238,13 +238,13 @@ Use the following guidelines to optimize your search and read patterns.
 - **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
 - ${mandateConfirm(options.interactive)}${
-    options.topicUpdateNarration ? '' : mandateExplainBeforeActing()
+    options.topicUpdateNarration
+      ? mandateTopicUpdateModel()
+      : mandateExplainBeforeActing()
   }
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateContinueWork(options.interactive)}
-
-${mandateConfirm(options.interactive)}${
-    options.topicUpdateNarration ? mandateTopicUpdateModel() : ''
-  }
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(
+    options.hasSkills,
+  )}${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
