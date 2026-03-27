@@ -46,6 +46,7 @@ export const createMockSettings = (
     workspace,
     isTrusted,
     errors,
+
     merged: mergedOverride,
     ...settingsOverrides
   } = overrides;
@@ -60,6 +61,7 @@ export const createMockSettings = (
       settings: settingsOverrides,
       originalSettings: settingsOverrides,
     },
+
     (workspace as any) || { path: '', settings: {}, originalSettings: {} },
     isTrusted ?? true,
     errors || [],
@@ -68,6 +70,8 @@ export const createMockSettings = (
   if (mergedOverride) {
     // @ts-expect-error - overriding private field for testing
     loaded._merged = createTestMergedSettings(mergedOverride);
+    // @ts-expect-error - re-calculating snapshot after merged override
+    loaded._snapshot = loaded.computeSnapshot();
   }
 
   // Assign any function overrides (e.g., vi.fn() for methods)
