@@ -28,6 +28,7 @@ import {
   LlmRole,
   type GitService,
   processSingleFileContent,
+  InvalidStreamError,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -782,6 +783,32 @@ describe('Session', () => {
         content: { type: 'text', text: 'Hello' },
       },
     });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with empty response (InvalidStreamError)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue(
+      new InvalidStreamError('Empty response', 'NO_RESPONSE_TEXT'),
+    );
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should handle prompt with empty response (NO_RESPONSE_TEXT anomaly)', async () => {
+    mockChat.sendMessageStream.mockRejectedValue({ type: 'NO_RESPONSE_TEXT' });
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalled();
     expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
