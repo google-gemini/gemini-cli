@@ -587,6 +587,53 @@ describe('loggers', () => {
         }),
       });
     });
+
+    it('should log an API response without response_text or messages when logPrompts is disabled', () => {
+      const mockConfigDisabled = {
+        getSessionId: () => 'test-session-id',
+        getTargetDir: () => 'target-dir',
+        getUsageStatisticsEnabled: () => true,
+        getTelemetryEnabled: () => true,
+        getTelemetryLogPromptsEnabled: () => false, // disabled
+        isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
+      } as unknown as Config;
+
+      const event = new ApiResponseEvent(
+        'test-model',
+        100,
+        { prompt_id: 'prompt-id-role', contents: [] },
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'candidate 1' }],
+              },
+              finishReason: FinishReason.STOP,
+            },
+          ],
+        },
+        AuthType.LOGIN_WITH_GOOGLE,
+        {},
+        'test-response',
+      );
+
+      logApiResponse(mockConfigDisabled, event);
+
+      // Verify the first log (native cli)
+      const apiResponseLog = mockLogger.emit.mock.calls[0][0];
+      expect(apiResponseLog.body).toBe(
+        'API response from test-model. Status: 200. Duration: 100ms.',
+      );
+      expect(apiResponseLog.attributes['response_text']).toBeUndefined();
+
+      // Verify the second log (semantic)
+      const semanticLog = mockLogger.emit.mock.calls[1][0];
+      expect(semanticLog.attributes['gen_ai.output.messages']).toBeUndefined();
+    });
   });
 
   describe('logApiError', () => {
@@ -953,6 +1000,11 @@ describe('loggers', () => {
 
       // Expect two calls to emit
       expect(mockLogger.emit).toHaveBeenCalledTimes(2);
+
+      // Get the arguments of the first (telemetry) log call
+      const telemetryLogCall = mockLogger.emit.mock.calls[0][0];
+      expect(telemetryLogCall.body).toBe('API request to gemini-1.0-pro.');
+      expect(telemetryLogCall.attributes['request_text']).toBeUndefined();
 
       // Get the arguments of the second (semantic) log call
       const semanticLogCall = mockLogger.emit.mock.calls[1][0];
