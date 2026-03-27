@@ -1119,7 +1119,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
-    this.modelSteering = params.modelSteering ?? false;
+    this.modelSteering = params.modelSteering ?? true;
     this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
