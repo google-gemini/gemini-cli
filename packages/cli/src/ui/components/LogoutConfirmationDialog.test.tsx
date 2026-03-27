@@ -23,10 +23,9 @@ describe('LogoutConfirmationDialog', () => {
   });
 
   it('should render the dialog with title, description, and hint', async () => {
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+    const { lastFrame, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={vi.fn()} />,
     );
-    await waitUntilReady();
 
     expect(lastFrame()).toContain('You are now signed out');
     expect(lastFrame()).toContain(
@@ -37,10 +36,9 @@ describe('LogoutConfirmationDialog', () => {
   });
 
   it('should render RadioButtonSelect with Login and Exit options', async () => {
-    const { waitUntilReady, unmount } = await renderWithProviders(
+    const { unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={vi.fn()} />,
     );
-    await waitUntilReady();
 
     expect(RadioButtonSelect).toHaveBeenCalled();
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
@@ -57,7 +55,6 @@ describe('LogoutConfirmationDialog', () => {
     const { waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
-    await waitUntilReady();
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     await act(async () => {
@@ -74,7 +71,6 @@ describe('LogoutConfirmationDialog', () => {
     const { waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
-    await waitUntilReady();
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     await act(async () => {
@@ -91,7 +87,6 @@ describe('LogoutConfirmationDialog', () => {
     const { stdin, waitUntilReady, unmount } = await renderWithProviders(
       <LogoutConfirmationDialog onSelect={onSelect} />,
     );
-    await waitUntilReady();
 
     await act(async () => {
       // Send kitty escape key sequence

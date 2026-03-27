@@ -21,6 +21,10 @@ import {
   type UIState,
 } from '../contexts/UIStateContext.js';
 import { type IndividualToolCallDisplay } from '../types.js';
+import {
+  type ConfirmingToolState,
+  useConfirmingTool,
+} from '../hooks/useConfirmingTool.js';
 
 // Mock dependencies
 const mockUseSettings = vi.fn().mockReturnValue({
@@ -51,6 +55,10 @@ vi.mock('../contexts/AppContext.js', async () => {
 
 vi.mock('../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(),
+}));
+
+vi.mock('../hooks/useConfirmingTool.js', () => ({
+  useConfirmingTool: vi.fn(),
 }));
 
 vi.mock('./AppHeader.js', () => ({
@@ -97,7 +105,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 
   it('inspects only the last pending tool_group item if current has no tools', () => {
-    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const item = { type: 'tool_group' as const, tools: [], id: -1 };
     const pendingItems = [
       {
         type: 'tool_group' as const,
@@ -158,7 +166,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -187,7 +195,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -276,7 +284,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -292,7 +300,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 
   it('handles empty tools with active shell turn (isCurrentlyInShellTurn)', () => {
-    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const item = { type: 'tool_group' as const, tools: [], id: -1 };
 
     // active shell turn
     const result = getToolGroupBorderAppearance(
@@ -364,14 +372,9 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -452,14 +455,9 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: defaultMockUiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: defaultMockUiState as Partial<UIState>,
+    });
     const output = lastFrame();
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
@@ -479,16 +477,11 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
@@ -507,19 +500,62 @@ describe('MainContent', () => {
       staticAreaMaxItemHeight: 5,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as unknown as Partial<UIState>,
-        config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
-      },
-    );
-
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as unknown as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: true }),
+      settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+    });
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a subagent with a complete box including bottom border', async () => {
+    const subagentCall = {
+      callId: 'subagent-1',
+      name: 'codebase_investigator',
+      description: 'Investigating codebase',
+      status: CoreToolCallStatus.Executing,
+      kind: 'agent',
+      resultDisplay: {
+        isSubagentProgress: true,
+        agentName: 'codebase_investigator',
+        recentActivity: [
+          {
+            id: '1',
+            type: 'tool_call',
+            content: 'run_shell_command',
+            args: '{"command": "echo hello"}',
+            status: 'running',
+          },
+        ],
+        state: 'running',
+      },
+    } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay;
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Investigate' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: [subagentCall],
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('codebase_investigator');
+    });
+
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -564,21 +600,127 @@ describe('MainContent', () => {
       ],
     };
 
-    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
-      <MainContent />,
-      {
-        uiState: uiState as Partial<UIState>,
-      },
-    );
-    await waitUntilReady();
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
 
-    const output = lastFrame();
-    // Verify Part 1 and Part 2 are rendered.
-    expect(output).toContain('Part 1');
-    expect(output).toContain('Part 2');
+    await waitFor(() => {
+      const output = lastFrame();
+      // Verify Part 1 and Part 2 are rendered.
+      expect(output).toContain('Part 1');
+      expect(output).toContain('Part 2');
+    });
 
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
-    expect(output).toMatchSnapshot();
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a ToolConfirmationQueue without an extra line when preceded by hidden tools', async () => {
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
+    const hiddenToolCalls = [
+      {
+        callId: 'tool-hidden',
+        name: WRITE_FILE_DISPLAY_NAME,
+        approvalMode: ApprovalMode.PLAN,
+        status: CoreToolCallStatus.Success,
+        resultDisplay: 'Hidden content',
+      } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay,
+    ];
+
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'exit_plan_mode',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'exit_plan_mode' as const,
+          planPath: '/path/to/plan',
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Apply plan' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: hiddenToolCalls,
+          borderBottom: true,
+        },
+      ],
+    };
+
+    // We need to mock useConfirmingTool to return our confirmingTool
+    vi.mocked(useConfirmingTool).mockReturnValue(
+      confirmingTool as unknown as ConfirmingToolState,
+    );
+
+    mockUseSettings.mockReturnValue(
+      createMockSettings({
+        security: { enablePermanentToolApproval: true },
+        ui: { errorVerbosity: 'full' },
+      }),
+    );
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    await waitFor(() => {
+      const output = lastFrame();
+      // The output should NOT contain 'Hidden content'
+      expect(output).not.toContain('Hidden content');
+      // The output should contain the confirmation header
+      expect(output).toContain('Ready to start implementation?');
+    });
+
+    // Snapshot will reveal if there are extra blank lines
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a spurious line when a tool group has only hidden tools and borderBottom true', async () => {
+    const { ApprovalMode, WRITE_FILE_DISPLAY_NAME } = await import(
+      '@google/gemini-cli-core'
+    );
+    const uiState = {
+      ...defaultMockUiState,
+      history: [{ id: 1, type: 'user', text: 'Apply plan' }],
+      pendingHistoryItems: [
+        {
+          type: 'tool_group' as const,
+          tools: [
+            {
+              callId: 'tool-1',
+              name: WRITE_FILE_DISPLAY_NAME,
+              approvalMode: ApprovalMode.PLAN,
+              status: CoreToolCallStatus.Success,
+              resultDisplay: 'hidden',
+            } as Partial<IndividualToolCallDisplay> as IndividualToolCallDisplay,
+          ],
+          borderBottom: true,
+        },
+      ],
+    };
+
+    const { lastFrame, unmount } = await renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+      config: makeFakeConfig({ useAlternateBuffer: false }),
+    });
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Apply plan');
+    });
+
+    // This snapshot will show no spurious line because the group is now correctly suppressed.
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
@@ -629,7 +771,6 @@ describe('MainContent', () => {
     const renderResult = await renderWithProviders(<MainContent />, {
       uiState: uiState as Partial<UIState>,
     });
-    await renderResult.waitUntilReady();
 
     const output = renderResult.lastFrame();
     expect(output).toContain('Initial analysis');
@@ -693,7 +834,7 @@ describe('MainContent', () => {
           pendingHistoryItems: [
             {
               type: 'tool_group',
-              id: 1,
+              id: -1,
               tools: [
                 {
                   callId: 'call_1',
@@ -732,15 +873,16 @@ describe('MainContent', () => {
           bannerVisible: false,
         };
 
-        const { lastFrame, waitUntilReady, unmount } =
-          await renderWithProviders(<MainContent />, {
+        const { lastFrame, unmount } = await renderWithProviders(
+          <MainContent />,
+          {
             uiState: uiState as Partial<UIState>,
             config: makeFakeConfig({ useAlternateBuffer: isAlternateBuffer }),
             settings: createMockSettings({
               ui: { useAlternateBuffer: isAlternateBuffer },
             }),
-          });
-        await waitUntilReady();
+          },
+        );
 
         const output = lastFrame();
 

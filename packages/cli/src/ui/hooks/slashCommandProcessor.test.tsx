@@ -187,7 +187,7 @@ describe('useSlashCommandProcessor', () => {
     let rerender!: (props?: unknown) => void;
 
     await act(async () => {
-      const hook = renderHook(() =>
+      const hook = await renderHook(() =>
         useSlashCommandProcessor(
           mockConfig,
           mockSettings,

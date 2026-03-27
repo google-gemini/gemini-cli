@@ -32,13 +32,20 @@ const mockExtension: RegistryExtension = {
   licenseKey: 'Apache-2.0',
 };
 
+const linkableExtension: RegistryExtension = {
+  ...mockExtension,
+  url: '/local/path/to/extension',
+};
+
 describe('ExtensionDetails', () => {
   let mockOnBack: ReturnType<typeof vi.fn>;
   let mockOnInstall: ReturnType<typeof vi.fn>;
+  let mockOnLink: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockOnBack = vi.fn();
     mockOnInstall = vi.fn();
+    mockOnLink = vi.fn();
   });
 
   const renderDetails = async (isInstalled = false) =>
@@ -47,6 +54,7 @@ describe('ExtensionDetails', () => {
         extension={mockExtension}
         onBack={mockOnBack}
         onInstall={mockOnInstall}
+        onLink={mockOnLink}
         isInstalled={isInstalled}
       />,
     );
@@ -116,5 +124,45 @@ describe('ExtensionDetails', () => {
     });
     expect(mockOnInstall).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it('should call onLink when "l" is pressed and is linkable', async () => {
+    const { stdin } = await renderWithProviders(
+      <ExtensionDetails
+        extension={linkableExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={false}
+      />,
+    );
+    await React.act(async () => {
+      stdin.write('l');
+    });
+    await waitFor(() => {
+      expect(mockOnLink).toHaveBeenCalled();
+    });
+  });
+
+  it('should NOT show "Link" button for GitHub extensions', async () => {
+    const { lastFrame } = await renderDetails(true);
+    await waitFor(() => {
+      expect(lastFrame()).not.toContain('[L] Link');
+    });
+  });
+
+  it('should show "Link" button for local extensions', async () => {
+    const { lastFrame } = await renderWithProviders(
+      <ExtensionDetails
+        extension={linkableExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={false}
+      />,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[L] Link');
+    });
   });
 });

@@ -139,8 +139,7 @@ describe('ExtensionRegistryView', () => {
     );
 
   it('should render extensions', async () => {
-    const { lastFrame, waitUntilReady } = await renderView();
-    await waitUntilReady();
+    const { lastFrame } = await renderView();
 
     await waitFor(() => {
       expect(lastFrame()).toContain('Test Extension 1');

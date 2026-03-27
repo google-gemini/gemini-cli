@@ -9,6 +9,7 @@ import {
   WarningPriority,
   type Config,
   type ResumedSessionData,
+  type WorktreeInfo,
   type OutputPayload,
   type ConsoleLogPayload,
   type UserFeedbackPayload,
@@ -31,6 +32,7 @@ import {
   ValidationRequiredError,
   type AdminControlsSettings,
   debugLogger,
+  isHeadlessMode,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -63,6 +65,7 @@ import {
   registerTelemetryConfig,
   setupSignalHandlers,
 } from './utils/cleanup.js';
+import { setupWorktree } from './utils/worktreeSetup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
@@ -210,6 +213,37 @@ export async function main() {
   const settings = loadSettings();
   loadSettingsHandle?.end();
 
+  // If a worktree is requested and enabled, set it up early.
+  // This must be awaited before any other async tasks that depend on CWD (like loadCliConfig)
+  // because setupWorktree calls process.chdir().
+  const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
+  let worktreeInfo: WorktreeInfo | undefined;
+  if (requestedWorktree !== undefined) {
+    const worktreeHandle = startupProfiler.start('setup_worktree');
+    worktreeInfo = await setupWorktree(requestedWorktree || undefined);
+    worktreeHandle?.end();
+  }
+
+  const cleanupOpsHandle = startupProfiler.start('cleanup_ops');
+  Promise.all([
+    cleanupCheckpoints(),
+    cleanupToolOutputFiles(settings.merged),
+    cleanupBackgroundLogs(),
+  ])
+    .catch((e) => {
+      debugLogger.error('Early cleanup failed:', e);
+    })
+    .finally(() => {
+      cleanupOpsHandle?.end();
+    });
+
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
+  const argvPromise = parseArguments(settings.merged).finally(() => {
+    parseArgsHandle?.end();
+  });
+
+  const rawStartupWarningsPromise = getStartupWarnings();
+
   // Report settings errors once during startup
   settings.errors.forEach((error) => {
     coreEvents.emitFeedback('warning', error.message);
@@ -223,15 +257,7 @@ export async function main() {
     );
   });
 
-  await Promise.all([
-    cleanupCheckpoints(),
-    cleanupToolOutputFiles(settings.merged),
-    cleanupBackgroundLogs(),
-  ]);
-
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argv = await parseArguments(settings.merged);
-  parseArgsHandle?.end();
+  const argv = await argvPromise;
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -271,6 +297,7 @@ export async function main() {
   const isDebugMode = cliConfig.isDebugMode(argv);
   const consolePatcher = new ConsolePatcher({
     stderr: true,
+    interactive: isHeadlessMode() ? false : true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
       coreEvents.emitConsoleLog(msg.type, msg.content);
@@ -309,7 +336,7 @@ export async function main() {
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
+  if (!settings.merged.security.auth.useExternal && !argv.isCommand) {
     try {
       if (
         partialConfig.isInteractive() &&
@@ -361,7 +388,7 @@ export async function main() {
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
+  if (!process.env['SANDBOX'] && !argv.isCommand) {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
@@ -426,6 +453,7 @@ export async function main() {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
+      worktreeSettings: worktreeInfo,
     });
     loadConfigHandle?.end();
 
@@ -457,12 +485,10 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
-    // Cleanup sessions after config initialization
-    try {
-      await cleanupExpiredSessions(config, settings.merged);
-    } catch (e) {
+    // Launch cleanup expired sessions as a background task
+    cleanupExpiredSessions(config, settings.merged).catch((e) => {
       debugLogger.error('Failed to cleanup expired sessions:', e);
-    }
+    });
 
     if (config.getListExtensions()) {
       debugLogger.log('Installed extensions:');
@@ -514,7 +540,9 @@ export async function main() {
       });
     }
 
+    const terminalHandle = startupProfiler.start('setup_terminal');
     await setupTerminalAndTheme(config, settings);
+    terminalHandle?.end();
 
     const initAppHandle = startupProfiler.start('initialize_app');
     const initializationResult = await initializeApp(config, settings);
@@ -538,7 +566,7 @@ export async function main() {
       isAlternateBufferEnabled(config),
       config.getScreenReader(),
     );
-    const rawStartupWarnings = await getStartupWarnings();
+    const rawStartupWarnings = await rawStartupWarningsPromise;
     const startupWarnings: StartupWarning[] = [
       ...rawStartupWarnings.map((message) => ({
         id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
@@ -585,8 +613,17 @@ export async function main() {
     }
 
     cliStartupHandle?.end();
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
+      // Earlier initialization phases (like TerminalCapabilityManager resolving
+      // or authWithWeb) may have added and removed 'data' listeners on process.stdin.
+      // When the listener count drops to 0, Node.js implicitly pauses the stream buffer.
+      // React Ink's useInput hooks will silently fail to receive keystrokes if the stream remains paused.
+      if (process.stdin.isTTY) {
+        process.stdin.resume();
+      }
+
       await startInteractiveUI(
         config,
         settings,

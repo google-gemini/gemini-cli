@@ -113,7 +113,9 @@ There are three possible decisions a rule can enforce:
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
 
-> **Note:** The `deny` decision is the recommended way to exclude tools. The
+<!-- prettier-ignore -->
+> [!NOTE]
+> The `deny` decision is the recommended way to exclude tools. The
 > legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
 > policy rules with a `deny` decision.
 
@@ -239,15 +241,17 @@ directory are **ignored**.
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
   or others (e.g., `chmod 755`).
 - **Windows:** Must be in `C:\ProgramData`. Standard users (`Users`, `Everyone`)
-  must NOT have `Write`, `Modify`, or `Full Control` permissions. _Tip: If you
-  see a security warning, use the folder properties to remove write permissions
-  for non-admin groups. You may need to "Disable inheritance" in Advanced
-  Security Settings._
+  must NOT have `Write`, `Modify`, or `Full Control` permissions. If you see a
+  security warning, use the folder properties to remove write permissions for
+  non-admin groups. You may need to "Disable inheritance" in Advanced Security
+  Settings.
 
-**Note:** Supplemental admin policies (provided via `--admin-policy` or
-`adminPolicyPaths` settings) are **NOT** subject to these strict ownership
-checks, as they are explicitly provided by the user or administrator in their
-current execution context.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Supplemental admin policies (provided via `--admin-policy` or
+> `adminPolicyPaths` settings) are **NOT** subject to these strict ownership
+> checks, as they are explicitly provided by the user or administrator in their
+> current execution context.
 
 ### TOML rule schema
 
@@ -258,8 +262,8 @@ Here is a breakdown of the fields available in a TOML policy rule:
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
 
-# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
-# made by this specific subagent.
+# (Optional) The name of a subagent. If provided, the rule only applies to tool
+# calls made by this specific subagent.
 subagent = "generalist"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
@@ -274,14 +278,17 @@ toolAnnotations = { readOnlyHint = true }
 argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
-# This is syntactic sugar for `toolName = "run_shell_command"` and an `argsPattern`.
+# This is syntactic sugar for `toolName = "run_shell_command"` and an
+# `argsPattern`.
 commandPrefix = "git"
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
-# Note: This pattern is tested against the JSON representation of the arguments (e.g., `{"command":"<your_command>"}`).
-# Because it prepends `"command":"`, it effectively matches from the start of the command.
-# Anchors like `^` or `$` apply to the full JSON string, so `^` should usually be avoided here.
+# Note: This pattern is tested against the JSON representation of the arguments
+# (e.g., `{"command":"<your_command>"}`). Because it prepends `"command":"`,
+# it effectively matches from the start of the command.
+# Anchors like `^` or `$` apply to the full JSON string,
+# so `^` should usually be avoided here.
 # You cannot use commandPrefix and commandRegex in the same rule.
 commandRegex = "git (commit|push)"
 
@@ -291,16 +298,26 @@ decision = "ask_user"
 # The priority of the rule, from 0 to 999.
 priority = 10
 
-# (Optional) A custom message to display when a tool call is denied by this rule.
-# This message is returned to the model and user, useful for explaining *why* it was denied.
-deny_message = "Deletion is permanent"
+# (Optional) A custom message to display when a tool call is denied by this
+# rule. This message is returned to the model and user,
+# useful for explaining *why* it was denied.
+denyMessage = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
 
-# (Optional) A boolean to restrict the rule to interactive (true) or non-interactive (false) environments.
+# (Optional) A boolean to restrict the rule to interactive (true) or
+# non-interactive (false) environments.
 # If omitted, the rule applies to both.
 interactive = true
+
+# (Optional) If true, lets shell commands use redirection operators
+# (>, >>, <, <<, <<<). By default, the policy engine asks for confirmation
+# when redirection is detected, even if a rule matches the command.
+# This permission is granular; it only applies to the specific rule it's
+# defined in. In chained commands (e.g., cmd1 > file && cmd2), each
+# individual command rule must permit redirection if it's used.
+allowRedirection = true
 ```
 
 ### Using arrays (lists)
@@ -348,7 +365,9 @@ using the `mcpName` field. **This is the recommended approach** for defining MCP
 policies, as it is much more robust than manually writing Fully Qualified Names
 (FQNs) or string wildcards.
 
-> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+<!-- prettier-ignore -->
+> [!WARNING]
+> Do not use underscores (`_`) in your MCP server names (e.g., use
 > `my-server` rather than `my_server`). The policy parser splits Fully Qualified
 > Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
 > prefix. If your server name contains an underscore, the parser will
@@ -383,7 +402,7 @@ server.
 mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
-deny_message = "This server is not trusted by the admin."
+denyMessage = "This server is not trusted by the admin."
 ```
 
 **3. Targeting all MCP servers**
@@ -394,6 +413,7 @@ registered MCP server. This is useful for setting category-wide defaults.
 ```toml
 # Ask user for any tool call from any MCP server
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10

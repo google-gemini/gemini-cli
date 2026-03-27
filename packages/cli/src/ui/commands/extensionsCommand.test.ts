@@ -710,10 +710,14 @@ describe('extensionsCommand', () => {
         size: 100,
       } as Stats);
       await linkAction!(mockContext, packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'link',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'link',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
         text: `Linking extension from "${packageName}"...`,
@@ -733,10 +737,14 @@ describe('extensionsCommand', () => {
       } as Stats);
 
       await linkAction!(mockContext, packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'link',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'link',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: `Failed to link extension from "${packageName}": ${errorMessage}`,
