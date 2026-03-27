@@ -89,6 +89,7 @@ describe('ContextManager', () => {
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         expect.arrayContaining([...globalPaths, ...envPaths]),
         'tree',
+        ['.git'],
       );
 
       expect(contextManager.getGlobalMemory()).toContain('Global Content');
@@ -174,6 +175,7 @@ describe('ContextManager', () => {
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
         'tree',
+        ['.git'],
       );
       expect(contextManager.getEnvironmentMemory()).toContain(
         'Project Content',

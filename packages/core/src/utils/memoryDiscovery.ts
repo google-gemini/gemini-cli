@@ -157,6 +157,10 @@ async function findProjectRoot(
   let currentDir = normalizePath(startDir);
   while (true) {
     for (const marker of boundaryMarkers) {
+      // Sanitize: skip markers with path traversal or absolute paths
+      if (path.isAbsolute(marker) || marker.includes('..')) {
+        continue;
+      }
       const markerPath = path.join(currentDir, marker);
       try {
         // Check for existence only — marker can be a directory (normal repos)
@@ -368,6 +372,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
 export async function readGeminiMdFiles(
   filePaths: string[],
   importFormat: 'flat' | 'tree' = 'tree',
+  boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<GeminiFileContent[]> {
   // Process files in parallel with concurrency limit to prevent EMFILE errors
   const CONCURRENT_LIMIT = 20; // Higher limit for file reads as they're typically faster
@@ -388,6 +393,7 @@ export async function readGeminiMdFiles(
             undefined,
             undefined,
             importFormat,
+            boundaryMarkers,
           );
           debugLogger.debug(
             '[DEBUG] [MemoryDiscovery] Successfully read and processed imports:',
@@ -684,7 +690,11 @@ export async function loadServerHierarchicalMemory(
   }
 
   // 2. GATHER: Read all files in parallel
-  const allContents = await readGeminiMdFiles(allFilePaths, importFormat);
+  const allContents = await readGeminiMdFiles(
+    allFilePaths,
+    importFormat,
+    boundaryMarkers,
+  );
   const contentsMap = new Map(allContents.map((c) => [c.filePath, c]));
 
   // 3. CATEGORIZE: Back into Global, Project, Extension
@@ -867,7 +877,7 @@ export async function loadJitSubdirectoryMemory(
     JSON.stringify(newPaths),
   );
 
-  const contents = await readGeminiMdFiles(newPaths, 'tree');
+  const contents = await readGeminiMdFiles(newPaths, 'tree', boundaryMarkers);
 
   return {
     files: contents

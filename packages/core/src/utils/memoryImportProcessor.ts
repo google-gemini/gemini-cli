@@ -60,6 +60,10 @@ async function findProjectRoot(
   let currentDir = path.resolve(startDir);
   while (true) {
     for (const marker of boundaryMarkers) {
+      // Sanitize: skip markers with path traversal or absolute paths
+      if (path.isAbsolute(marker) || marker.includes('..')) {
+        continue;
+      }
       const markerPath = path.join(currentDir, marker);
       try {
         // Check for existence only — marker can be a directory (normal repos)
@@ -194,9 +198,10 @@ export async function processImports(
   },
   projectRoot?: string,
   importFormat: 'flat' | 'tree' = 'tree',
+  boundaryMarkers: readonly string[] = ['.git'],
 ): Promise<ProcessImportsResult> {
   if (!projectRoot) {
-    projectRoot = await findProjectRoot(basePath);
+    projectRoot = await findProjectRoot(basePath, boundaryMarkers);
   }
 
   if (importState.currentDepth >= importState.maxDepth) {
@@ -355,6 +360,7 @@ export async function processImports(
         newImportState,
         projectRoot,
         importFormat,
+        boundaryMarkers,
       );
       result += `<!-- Imported from: ${importPath} -->\n${imported.content}\n<!-- End of import from: ${importPath} -->`;
       imports.push(imported.importTree);

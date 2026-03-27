@@ -77,6 +77,7 @@ export class ContextManager {
     const allContents = await readGeminiMdFiles(
       allPaths,
       this.config.getImportFormat(),
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     const loadedFilePaths = allContents
