@@ -26,6 +26,7 @@ export interface MaxSizedBoxProps {
   maxHeight?: number;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
+  onOverflowChange?: (isOverflowing: boolean) => void;
 }
 
 /**
@@ -38,6 +39,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   maxHeight,
   overflowDirection = 'top',
   additionalHiddenLinesCount = 0,
+  onOverflowChange,
 }) => {
   const id = useId();
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
@@ -104,6 +106,10 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     },
     [id, removeOverflowingId],
   );
+
+  useEffect(() => {
+    onOverflowChange?.(totalHiddenLines > 0);
+  }, [totalHiddenLines, onOverflowChange]);
 
   if (effectiveMaxHeight === undefined) {
     return (

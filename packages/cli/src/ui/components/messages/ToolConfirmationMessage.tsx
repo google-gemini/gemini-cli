@@ -71,6 +71,7 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const [isTruncated, setIsTruncated] = useState(false);
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
@@ -341,30 +342,43 @@ export const ToolConfirmationMessage: React.FC<
         key: 'No, suggest changes (esc)',
       });
     } else if (confirmationDetails.type === 'exec') {
-      options.push({
-        label: 'Allow once',
-        value: ToolConfirmationOutcome.ProceedOnce,
-        key: 'Allow once',
-      });
-      if (isTrustedFolder) {
+      if (isTruncated) {
         options.push({
-          label: `Allow for this session`,
-          value: ToolConfirmationOutcome.ProceedAlways,
-          key: `Allow for this session`,
+          label: '⚠️ Expand to view full command (Press Ctrl+O)',
+          value: ToolConfirmationOutcome.Cancel,
+          key: '⚠️ Expand to view full command (Press Ctrl+O)',
         });
-        if (allowPermanentApproval) {
+        options.push({
+          label: 'No, cancel (esc)',
+          value: ToolConfirmationOutcome.Cancel,
+          key: 'No, cancel (esc)',
+        });
+      } else {
+        options.push({
+          label: 'Allow once',
+          value: ToolConfirmationOutcome.ProceedOnce,
+          key: 'Allow once',
+        });
+        if (isTrustedFolder) {
           options.push({
-            label: `Allow this command for all future sessions`,
-            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            key: `Allow for all future sessions`,
+            label: `Allow for this session`,
+            value: ToolConfirmationOutcome.ProceedAlways,
+            key: `Allow for this session`,
           });
+          if (allowPermanentApproval) {
+            options.push({
+              label: `Allow this command for all future sessions`,
+              value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+              key: `Allow for all future sessions`,
+            });
+          }
         }
+        options.push({
+          label: 'No, suggest changes (esc)',
+          value: ToolConfirmationOutcome.Cancel,
+          key: 'No, suggest changes (esc)',
+        });
       }
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-        key: 'No, suggest changes (esc)',
-      });
     } else if (confirmationDetails.type === 'info') {
       options.push({
         label: 'Allow once',
@@ -429,6 +443,7 @@ export const ToolConfirmationMessage: React.FC<
     allowPermanentApproval,
     config,
     isDiffingEnabled,
+    isTruncated,
   ]);
 
   const availableBodyContentHeight = useCallback(() => {
@@ -708,6 +723,7 @@ export const ToolConfirmationMessage: React.FC<
             <MaxSizedBox
               maxHeight={bodyContentHeight}
               maxWidth={Math.max(terminalWidth, 1)}
+              onOverflowChange={setIsTruncated}
             >
               <Box flexDirection="column">
                 {commandsToDisplay.map((cmd, idx) => (
