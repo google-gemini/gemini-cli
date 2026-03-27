@@ -59,6 +59,7 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  MEMORY_PARAM_TARGET,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -494,14 +495,19 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
+    description: `Persists preferences or facts across future sessions by appending to a GEMINI.md file. By default appends to the global ~/.gemini/GEMINI.md (loaded in every workspace). Use the optional 'target' parameter to write to a project or subdirectory GEMINI.md instead (the file must already exist). CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         [MEMORY_PARAM_FACT]: {
           type: 'string',
           description:
-            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
+            'A concise fact or preference to remember. Should be a clear, self-contained statement.',
+        },
+        [MEMORY_PARAM_TARGET]: {
+          type: 'string',
+          description:
+            'Optional: Absolute path to an existing GEMINI.md file to append to. When omitted, appends to the global ~/.gemini/GEMINI.md. Use this to save project-specific or directory-specific context to an existing GEMINI.md in the workspace.',
         },
       },
       required: [MEMORY_PARAM_FACT],

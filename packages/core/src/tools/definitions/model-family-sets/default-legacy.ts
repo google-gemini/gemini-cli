@@ -59,6 +59,7 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  MEMORY_PARAM_TARGET,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -513,13 +514,13 @@ Use this tool when the user's query implies needing the content of several files
   save_memory: {
     name: MEMORY_TOOL_NAME,
     description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
+Saves concise user context (preferences, facts) by appending to a GEMINI.md file.
 
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
+By default, appends to the global ~/.gemini/GEMINI.md (loaded in every workspace). Use the optional 'target' parameter to write to a project or subdirectory GEMINI.md instead (the file must already exist).
 
 - Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
+- Do NOT use for session context.
+- For project-specific context, pass the absolute path to the project's GEMINI.md via 'target'.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -527,6 +528,11 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
           type: 'string',
           description:
             'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+        },
+        [MEMORY_PARAM_TARGET]: {
+          type: 'string',
+          description:
+            'Optional: Absolute path to an existing GEMINI.md file to append to. When omitted, appends to the global ~/.gemini/GEMINI.md. Use this to save project-specific or directory-specific context to an existing GEMINI.md in the workspace.',
         },
       },
       required: [MEMORY_PARAM_FACT],

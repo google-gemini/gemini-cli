@@ -19,6 +19,9 @@ import {
   getCurrentGeminiMdFilename,
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
+  validateTargetPath,
+  resolveMemoryFilePath,
+  getGlobalMemoryFilePath,
 } from './memoryTool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -36,6 +39,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),
+    access: vi.fn(),
     mkdir: vi.fn(),
     readFile: vi.fn(),
     writeFile: vi.fn(),
@@ -60,6 +64,7 @@ describe('MemoryTool', () => {
 
   beforeEach(() => {
     vi.mocked(os.homedir).mockReturnValue(path.join('/mock', 'home'));
+    vi.mocked(fs.access).mockReset().mockResolvedValue(undefined);
     vi.mocked(fs.mkdir).mockReset().mockResolvedValue(undefined);
     vi.mocked(fs.readFile).mockReset().mockResolvedValue('');
     vi.mocked(fs.writeFile).mockReset().mockResolvedValue(undefined);
@@ -113,9 +118,7 @@ describe('MemoryTool', () => {
     it('should have correct name, displayName, description, and schema', () => {
       expect(memoryTool.name).toBe('save_memory');
       expect(memoryTool.displayName).toBe('SaveMemory');
-      expect(memoryTool.description).toContain(
-        'Saves concise global user context',
-      );
+      expect(memoryTool.description).toContain('Saves concise user context');
       expect(memoryTool.schema).toBeDefined();
       expect(memoryTool.schema.name).toBe('save_memory');
       expect(memoryTool.schema.parametersJsonSchema).toStrictEqual({
@@ -126,6 +129,11 @@ describe('MemoryTool', () => {
             type: 'string',
             description:
               'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+          },
+          target: {
+            type: 'string',
+            description:
+              'Optional: Absolute path to an existing GEMINI.md file to append to. When omitted, appends to the global ~/.gemini/GEMINI.md. Use this to save project-specific or directory-specific context to an existing GEMINI.md in the workspace.',
           },
         },
         required: ['fact'],
@@ -376,6 +384,118 @@ describe('MemoryTool', () => {
       };
 
       expect(() => memoryTool.build(attackParams)).toThrow();
+    });
+  });
+
+  describe('target parameter', () => {
+    describe('validateTargetPath', () => {
+      it('should return null for a valid absolute path ending in GEMINI.md', () => {
+        expect(validateTargetPath('/path/to/project/GEMINI.md')).toBeNull();
+      });
+
+      it('should return error for relative paths', () => {
+        const result = validateTargetPath('./GEMINI.md');
+        expect(result).toContain('must be an absolute path');
+      });
+
+      it('should return error for paths not ending in GEMINI.md', () => {
+        const result = validateTargetPath('/path/to/project/other.md');
+        expect(result).toContain('must point to a GEMINI.md file');
+      });
+
+      it('should return null for paths with ".." that normalize cleanly', () => {
+        // path.normalize resolves '/path/to/../GEMINI.md' to '/path/GEMINI.md'
+        // which no longer contains '..', so validation passes.
+        const result = validateTargetPath('/path/to/../GEMINI.md');
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('resolveMemoryFilePath', () => {
+      it('should return getGlobalMemoryFilePath() when target is undefined', () => {
+        expect(resolveMemoryFilePath(undefined)).toBe(
+          getGlobalMemoryFilePath(),
+        );
+      });
+
+      it('should return the normalized target path when target is provided', () => {
+        const target = '/some/project/GEMINI.md';
+        expect(resolveMemoryFilePath(target)).toBe(path.normalize(target));
+      });
+    });
+
+    describe('writing to a target file', () => {
+      let memoryTool: MemoryTool;
+
+      beforeEach(() => {
+        const bus = createMockMessageBus();
+        getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+        memoryTool = new MemoryTool(bus);
+      });
+
+      it('should write to the target file when it exists', async () => {
+        const targetPath = '/some/project/GEMINI.md';
+        const existingContent = '# Project Context\n';
+
+        vi.mocked(fs.access).mockResolvedValue(undefined);
+        vi.mocked(fs.readFile).mockResolvedValue(existingContent);
+
+        const invocation = memoryTool.build({
+          fact: 'project uses vitest',
+          target: targetPath,
+        });
+        const result = await invocation.execute(mockAbortSignal);
+
+        expect(fs.writeFile).toHaveBeenCalledWith(
+          path.normalize(targetPath),
+          expect.stringContaining('- project uses vitest'),
+          'utf-8',
+        );
+        expect(result.llmContent).toContain('"success":true');
+      });
+
+      it('should return an error when target file does not exist', async () => {
+        const targetPath = '/nonexistent/project/GEMINI.md';
+
+        vi.mocked(fs.access).mockRejectedValue(
+          new Error('ENOENT: no such file or directory'),
+        );
+
+        const invocation = memoryTool.build({
+          fact: 'this should fail',
+          target: targetPath,
+        });
+        const result = await invocation.execute(mockAbortSignal);
+
+        expect(result.llmContent).toContain('"success":false');
+        expect(result.llmContent).toContain('Target file does not exist');
+        expect(result.error?.type).toBe(
+          ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
+        );
+      });
+    });
+
+    describe('validation integration', () => {
+      let memoryTool: MemoryTool;
+
+      beforeEach(() => {
+        memoryTool = new MemoryTool(createMockMessageBus());
+      });
+
+      it('should throw when target is a relative path', () => {
+        expect(() =>
+          memoryTool.build({ fact: 'test', target: 'relative/GEMINI.md' }),
+        ).toThrow('must be an absolute path');
+      });
+
+      it('should not throw when target is a valid absolute path', () => {
+        expect(() =>
+          memoryTool.build({
+            fact: 'test',
+            target: '/valid/path/GEMINI.md',
+          }),
+        ).not.toThrow();
+      });
     });
   });
 });

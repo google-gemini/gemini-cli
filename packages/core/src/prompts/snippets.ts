@@ -820,9 +820,9 @@ function toolUsageRememberingFacts(
 - **Memory Tool:** You MUST use ${formatToolName(MEMORY_TOOL_NAME)} to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
   }
   const base = `
-- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
+- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} to persist facts, preferences, and context across sessions. By default it appends to the global ~/.gemini/GEMINI.md. For project-specific or directory-specific context, pass the absolute path to an existing GEMINI.md file via the \`target\` parameter. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent information only. NEVER use \`write_file\` or \`replace\` to add memories to GEMINI.md files — always use ${formatToolName(MEMORY_TOOL_NAME)}.`;
   const suffix = options.interactive
-    ? ' If unsure whether a fact is worth remembering globally, ask the user.'
+    ? ' If unsure whether a fact should be global or project-specific, ask the user.'
     : '';
   return base + suffix;
 }
