@@ -344,6 +344,13 @@ describe('MainContent', () => {
     bannerVisible: false,
     copyModeEnabled: false,
     terminalWidth: 100,
+    btwState: {
+      isActive: false,
+      query: '',
+      response: '',
+      isStreaming: false,
+      error: null,
+    },
   };
 
   beforeEach(() => {
