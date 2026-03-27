@@ -33,7 +33,8 @@ describe('quitCommand', () => {
     });
 
     if (!quitCommand.action) throw new Error('Action is not defined');
-    const result = quitCommand.action(mockContext, 'quit');
+    mockContext.invocation!.args = 'quit';
+    const result = quitCommand.action(mockContext);
 
     expect(formatDuration).toHaveBeenCalledWith(3600000); // 1 hour in ms
     expect(result).toEqual({

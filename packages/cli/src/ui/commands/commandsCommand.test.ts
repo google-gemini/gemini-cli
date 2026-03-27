@@ -24,7 +24,7 @@ describe('commandsCommand', () => {
 
   describe('default action', () => {
     it('should return an info message prompting subcommand usage', async () => {
-      const result = await commandsCommand.action!(context, '');
+      const result = await commandsCommand.action!(context);
 
       expect(result).toEqual({
         type: 'message',
@@ -41,7 +41,7 @@ describe('commandsCommand', () => {
         (s) => s.name === 'reload',
       )!;
 
-      await reloadCmd.action!(context, '');
+      await reloadCmd.action!(context);
 
       expect(context.ui.reloadCommands).toHaveBeenCalledTimes(1);
       expect(context.ui.addItem).toHaveBeenCalledWith(

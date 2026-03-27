@@ -99,7 +99,8 @@ describe('skillsCommand', () => {
   });
 
   it('should add a SKILLS_LIST item to UI with descriptions by default', async () => {
-    await skillsCommand.action!(context, '');
+    context.invocation!.args = '';
+    await skillsCommand.action!(context);
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,7 +128,8 @@ describe('skillsCommand', () => {
 
   it('should list skills when "list" subcommand is used', async () => {
     const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
-    await listCmd.action!(context, '');
+    context.invocation!.args = '';
+    await listCmd.action!(context);
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,7 +157,8 @@ describe('skillsCommand', () => {
 
   it('should disable descriptions if "nodesc" arg is provided to list', async () => {
     const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
-    await listCmd.action!(context, 'nodesc');
+    context.invocation!.args = 'nodesc';
+    await listCmd.action!(context);
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -187,7 +190,8 @@ describe('skillsCommand', () => {
     const listCmd = skillsCommand.subCommands!.find((s) => s.name === 'list')!;
 
     // By default, only regular skills
-    await listCmd.action!(context, '');
+    context.invocation!.args = '';
+    await listCmd.action!(context);
     let lastCall = vi
       .mocked(context.ui.addItem)
       .mock.calls.at(-1)![0] as HistoryItemSkillsList;
@@ -195,7 +199,8 @@ describe('skillsCommand', () => {
     expect(lastCall.skills[0].name).toBe('regular');
 
     // With "all", show both
-    await listCmd.action!(context, 'all');
+    context.invocation!.args = 'all';
+    await listCmd.action!(context);
     lastCall = vi
       .mocked(context.ui.addItem)
       .mock.calls.at(-1)![0] as HistoryItemSkillsList;
@@ -203,7 +208,8 @@ describe('skillsCommand', () => {
     expect(lastCall.skills.map((s) => s.name)).toContain('builtin');
 
     // With "--all", show both
-    await listCmd.action!(context, '--all');
+    context.invocation!.args = '--all';
+    await listCmd.action!(context);
     lastCall = vi
       .mocked(context.ui.addItem)
       .mock.calls.at(-1)![0] as HistoryItemSkillsList;
@@ -219,7 +225,8 @@ describe('skillsCommand', () => {
         { name: 'test-skill', location: '/path' },
       ]);
 
-      await linkCmd.action!(context, '/some/path');
+      context.invocation!.args = '/some/path';
+      await linkCmd.action!(context);
 
       expect(linkSkill).toHaveBeenCalledWith(
         '/some/path',
@@ -243,7 +250,8 @@ describe('skillsCommand', () => {
         { name: 'test-skill', location: '/path' },
       ]);
 
-      await linkCmd.action!(context, '/some/path --scope workspace');
+      context.invocation!.args = '/some/path --scope workspace';
+      await linkCmd.action!(context);
 
       expect(linkSkill).toHaveBeenCalledWith(
         '/some/path',
@@ -259,7 +267,8 @@ describe('skillsCommand', () => {
       )!;
       vi.mocked(linkSkill).mockRejectedValue(new Error('Link failed'));
 
-      await linkCmd.action!(context, '/some/path');
+      context.invocation!.args = '/some/path';
+      await linkCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -273,7 +282,8 @@ describe('skillsCommand', () => {
       const linkCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'link',
       )!;
-      await linkCmd.action!(context, '');
+      context.invocation!.args = '';
+      await linkCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -324,7 +334,8 @@ describe('skillsCommand', () => {
       const disableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'disable',
       )!;
-      await disableCmd.action!(context, 'skill1');
+      context.invocation!.args = 'skill1';
+      await disableCmd.action!(context);
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
@@ -356,7 +367,8 @@ describe('skillsCommand', () => {
         skills: { disabled: ['skill1'] },
       };
 
-      await disableCmd.action!(context, 'skill1');
+      context.invocation!.args = 'skill1';
+      await disableCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -386,7 +398,8 @@ describe('skillsCommand', () => {
         skills: { disabled: ['skill1'] },
       };
 
-      await enableCmd.action!(context, 'skill1');
+      context.invocation!.args = 'skill1';
+      await enableCmd.action!(context);
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.Workspace,
@@ -420,7 +433,8 @@ describe('skillsCommand', () => {
         skills: { disabled: ['skill1'] },
       };
 
-      await enableCmd.action!(context, 'skill1');
+      context.invocation!.args = 'skill1';
+      await enableCmd.action!(context);
 
       expect(context.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.User,
@@ -444,7 +458,8 @@ describe('skillsCommand', () => {
       const disableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'disable',
       )!;
-      await disableCmd.action!(context, 'non-existent');
+      context.invocation!.args = 'non-existent';
+      await disableCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -463,7 +478,8 @@ describe('skillsCommand', () => {
       const disableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'disable',
       )!;
-      await disableCmd.action!(context, 'skill1');
+      context.invocation!.args = 'skill1';
+      await disableCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -482,7 +498,8 @@ describe('skillsCommand', () => {
       const enableCmd = skillsCommand.subCommands!.find(
         (s) => s.name === 'enable',
       )!;
-      await enableCmd.action!(context, 'skill1');
+      context.invocation!.args = 'skill1';
+      await enableCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -505,7 +522,8 @@ describe('skillsCommand', () => {
       });
       context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
-      const actionPromise = reloadCmd.action!(context, '');
+      context.invocation!.args = '';
+      const actionPromise = reloadCmd.action!(context);
 
       // Initially, no pending item (flicker prevention)
       expect(context.ui.setPendingItem).not.toHaveBeenCalled();
@@ -552,7 +570,8 @@ describe('skillsCommand', () => {
       });
       context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
-      await reloadCmd.action!(context, '');
+      context.invocation!.args = '';
+      await reloadCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -575,7 +594,8 @@ describe('skillsCommand', () => {
       });
       context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
-      await reloadCmd.action!(context, '');
+      context.invocation!.args = '';
+      await reloadCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -599,7 +619,8 @@ describe('skillsCommand', () => {
       });
       context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
-      await reloadCmd.action!(context, '');
+      context.invocation!.args = '';
+      await reloadCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -615,7 +636,8 @@ describe('skillsCommand', () => {
       )!;
       context.services.agentContext = null;
 
-      await reloadCmd.action!(context, '');
+      context.invocation!.args = '';
+      await reloadCmd.action!(context);
 
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -635,7 +657,8 @@ describe('skillsCommand', () => {
       });
       context.services.agentContext!.config.reloadSkills = reloadSkillsMock;
 
-      const actionPromise = reloadCmd.action!(context, '');
+      context.invocation!.args = '';
+      const actionPromise = reloadCmd.action!(context);
       await vi.advanceTimersByTimeAsync(100);
       await vi.advanceTimersByTimeAsync(400);
       await actionPromise;

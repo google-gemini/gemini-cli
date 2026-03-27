@@ -51,7 +51,8 @@ describe('authCommand', () => {
       throw new Error('The auth command must have an action.');
     }
 
-    const result = authCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = authCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'dialog',
@@ -68,7 +69,8 @@ describe('authCommand', () => {
     it('should return auth dialog action', () => {
       const loginCommand = authCommand.subCommands?.[0];
       expect(loginCommand?.name).toBe('signin');
-      const result = loginCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = loginCommand!.action!(mockContext);
       expect(result).toEqual({ type: 'dialog', dialog: 'auth' });
     });
   });
@@ -82,7 +84,8 @@ describe('authCommand', () => {
         '@google/gemini-cli-core'
       );
 
-      await logoutCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await logoutCommand!.action!(mockContext);
 
       expect(clearCachedCredentialFile).toHaveBeenCalledOnce();
     });
@@ -90,7 +93,8 @@ describe('authCommand', () => {
     it('should clear selectedAuthType setting', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
 
-      await logoutCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await logoutCommand!.action!(mockContext);
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         SettingScope.User,
@@ -111,7 +115,8 @@ describe('authCommand', () => {
         );
       }
 
-      await logoutCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      await logoutCommand!.action!(mockContext);
 
       expect(
         mockContext.services.agentContext?.geminiClient
@@ -121,7 +126,8 @@ describe('authCommand', () => {
 
     it('should return logout action to signal explicit state change', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
-      const result = await logoutCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await logoutCommand!.action!(mockContext);
 
       expect(result).toEqual({ type: 'logout' });
     });
@@ -130,7 +136,8 @@ describe('authCommand', () => {
       const logoutCommand = authCommand.subCommands?.[1];
       mockContext.services.agentContext = null;
 
-      const result = await logoutCommand!.action!(mockContext, '');
+      mockContext.invocation!.args = '';
+      const result = await logoutCommand!.action!(mockContext);
 
       expect(result).toEqual({ type: 'logout' });
     });

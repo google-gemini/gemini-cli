@@ -50,7 +50,8 @@ describe('initCommand', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
 
     // Act: Run the command's action
-    const result = await initCommand.action!(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = await initCommand.action!(mockContext);
 
     // Assert: Check for the correct informational message
     expect(result).toEqual({
@@ -68,9 +69,9 @@ describe('initCommand', () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
     // Act: Run the command's action
+    mockContext.invocation!.args = '';
     const result = (await initCommand.action!(
       mockContext,
-      '',
     )) as SubmitPromptActionReturn;
 
     // Assert: Check that writeFileSync was called correctly
@@ -100,7 +101,8 @@ describe('initCommand', () => {
     }
 
     // Act: Run the command's action
-    const result = await initCommand.action!(noConfigContext, '');
+    noConfigContext.invocation!.args = '';
+    const result = await initCommand.action!(noConfigContext);
 
     // Assert: Check for the correct error message
     expect(result).toEqual({

@@ -57,7 +57,8 @@ describe('upgradeCommand', () => {
       throw new Error('The upgrade command must have an action.');
     }
 
-    await upgradeCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    await upgradeCommand.action(mockContext);
 
     expect(openBrowserSecurely).toHaveBeenCalledWith(UPGRADE_URL_PAGE);
   });
@@ -73,7 +74,8 @@ describe('upgradeCommand', () => {
       throw new Error('The upgrade command must have an action.');
     }
 
-    const result = await upgradeCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = await upgradeCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -93,7 +95,8 @@ describe('upgradeCommand', () => {
       throw new Error('The upgrade command must have an action.');
     }
 
-    const result = await upgradeCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = await upgradeCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -109,7 +112,8 @@ describe('upgradeCommand', () => {
       throw new Error('The upgrade command must have an action.');
     }
 
-    const result = await upgradeCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = await upgradeCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',
@@ -128,7 +132,8 @@ describe('upgradeCommand', () => {
       throw new Error('The upgrade command must have an action.');
     }
 
-    const result = await upgradeCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = await upgradeCommand.action(mockContext);
 
     expect(result).toEqual({
       type: 'message',

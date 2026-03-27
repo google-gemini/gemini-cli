@@ -22,7 +22,7 @@ describe('corgiCommand', () => {
       throw new Error('The corgi command must have an action.');
     }
 
-    await corgiCommand.action(mockContext, '');
+    await corgiCommand.action(mockContext);
 
     expect(mockContext.ui.toggleCorgiMode).toHaveBeenCalledTimes(1);
   });

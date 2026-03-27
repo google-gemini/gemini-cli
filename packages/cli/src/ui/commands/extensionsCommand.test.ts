@@ -189,7 +189,7 @@ describe('extensionsCommand', () => {
     it('should add an EXTENSIONS_LIST item to the UI', async () => {
       const command = extensionsCommand();
       if (!command.action) throw new Error('Action not defined');
-      await command.action(mockContext, '');
+      await command.action(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
@@ -201,7 +201,7 @@ describe('extensionsCommand', () => {
       mockGetExtensions.mockReturnValue([]);
       const command = extensionsCommand();
       if (!command.action) throw new Error('Action not defined');
-      await command.action(mockContext, '');
+      await command.action(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -280,7 +280,7 @@ describe('extensionsCommand', () => {
     }
 
     it('should show usage if no args are provided', async () => {
-      await updateAction(mockContext, '');
+      await updateAction(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Usage: /extensions update <extension-names>|--all',
@@ -289,7 +289,7 @@ describe('extensionsCommand', () => {
 
     it('should show a message if no extensions are installed', async () => {
       mockGetExtensions.mockReturnValue([]);
-      await updateAction(mockContext, 'ext-one');
+      await updateAction(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -306,7 +306,7 @@ describe('extensionsCommand', () => {
         },
       );
 
-      await updateAction(mockContext, '--all');
+      await updateAction(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
         text: 'No extensions to update.',
@@ -332,7 +332,7 @@ describe('extensionsCommand', () => {
           }
         },
       );
-      await updateAction(mockContext, '--all');
+      await updateAction(mockContext);
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
         extensions: expect.any(Array),
@@ -348,7 +348,7 @@ describe('extensionsCommand', () => {
       mockDispatchExtensionState.mockImplementationOnce((_) => {
         throw new Error('Something went wrong');
       });
-      await updateAction(mockContext, '--all');
+      await updateAction(mockContext);
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
         extensions: expect.any(Array),
@@ -378,7 +378,7 @@ describe('extensionsCommand', () => {
           }
         },
       );
-      await updateAction(mockContext, 'ext-one');
+      await updateAction(mockContext);
       expect(mockDispatchExtensionState).toHaveBeenCalledWith({
         type: 'SCHEDULE_UPDATE',
         payload: {
@@ -408,7 +408,7 @@ describe('extensionsCommand', () => {
           }
         },
       );
-      await updateAction(mockContext, 'ext-one ext-two');
+      await updateAction(mockContext);
       expect(mockDispatchExtensionState).toHaveBeenCalledWith({
         type: 'SCHEDULE_UPDATE',
         payload: {
@@ -441,7 +441,7 @@ describe('extensionsCommand', () => {
     it('should return ExtensionRegistryView custom dialog when experimental.extensionRegistry is true', async () => {
       mockContext.services.settings.merged.experimental.extensionRegistry = true;
 
-      const result = await exploreAction(mockContext, '');
+      const result = await exploreAction(mockContext);
 
       expect(result).toBeDefined();
       if (result?.type !== 'custom_dialog') {
@@ -457,7 +457,7 @@ describe('extensionsCommand', () => {
     it('should handle onSelect and onClose in ExtensionRegistryView', async () => {
       mockContext.services.settings.merged.experimental.extensionRegistry = true;
 
-      const result = await exploreAction(mockContext, '');
+      const result = await exploreAction(mockContext);
       if (result?.type !== 'custom_dialog') {
         throw new Error('Expected custom_dialog');
       }
@@ -502,7 +502,7 @@ describe('extensionsCommand', () => {
       vi.stubEnv('NODE_ENV', '');
       vi.stubEnv('SANDBOX', '');
 
-      await exploreAction(mockContext, '');
+      await exploreAction(mockContext);
 
       const extensionsUrl = 'https://geminicli.com/extensions/';
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
@@ -519,7 +519,7 @@ describe('extensionsCommand', () => {
       vi.stubEnv('SANDBOX', 'gemini-sandbox');
       const extensionsUrl = 'https://geminicli.com/extensions/';
 
-      await exploreAction(mockContext, '');
+      await exploreAction(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -535,7 +535,7 @@ describe('extensionsCommand', () => {
       vi.stubEnv('SANDBOX', '');
       const extensionsUrl = 'https://geminicli.com/extensions/';
 
-      await exploreAction(mockContext, '');
+      await exploreAction(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -552,7 +552,7 @@ describe('extensionsCommand', () => {
       const errorMessage = 'Failed to open browser';
       vi.mocked(open).mockRejectedValue(new Error(errorMessage));
 
-      await exploreAction(mockContext, '');
+      await exploreAction(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
@@ -611,7 +611,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show usage if no extension name is provided', async () => {
-      await installAction!(mockContext, '');
+      await installAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Usage: /extensions install <source>',
@@ -626,7 +626,7 @@ describe('extensionsCommand', () => {
         type: 'git',
       });
       mockInstallExtension.mockResolvedValue({ name: packageName });
-      await installAction!(mockContext, packageName);
+      await installAction!(mockContext);
       expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
       expect(mockInstallExtension).toHaveBeenCalledWith(
         {
@@ -655,7 +655,7 @@ describe('extensionsCommand', () => {
       });
       mockInstallExtension.mockRejectedValue(new Error(errorMessage));
 
-      await installAction!(mockContext, packageName);
+      await installAction!(mockContext);
       expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
       expect(mockInstallExtension).toHaveBeenCalledWith(
         {
@@ -673,7 +673,7 @@ describe('extensionsCommand', () => {
 
     it('should show error message for invalid source', async () => {
       const invalidSource = 'a;b';
-      await installAction!(mockContext, invalidSource);
+      await installAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: `Invalid source: ${invalidSource}`,
@@ -695,7 +695,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show usage if no extension is provided', async () => {
-      await linkAction!(mockContext, '');
+      await linkAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Usage: /extensions link <source>',
@@ -709,7 +709,7 @@ describe('extensionsCommand', () => {
       vi.mocked(stat).mockResolvedValue({
         size: 100,
       } as Stats);
-      await linkAction!(mockContext, packageName);
+      await linkAction!(mockContext);
       expect(mockInstallExtension).toHaveBeenCalledWith(
         {
           source: packageName,
@@ -736,7 +736,7 @@ describe('extensionsCommand', () => {
         size: 100,
       } as Stats);
 
-      await linkAction!(mockContext, packageName);
+      await linkAction!(mockContext);
       expect(mockInstallExtension).toHaveBeenCalledWith(
         {
           source: packageName,
@@ -752,10 +752,9 @@ describe('extensionsCommand', () => {
     });
 
     it('should show error message for invalid source', async () => {
-      const packageName = 'test-extension-package';
       const errorMessage = 'invalid path';
       vi.mocked(stat).mockRejectedValue(new Error(errorMessage));
-      await linkAction!(mockContext, packageName);
+      await linkAction!(mockContext);
       expect(mockInstallExtension).not.toHaveBeenCalled();
     });
   });
@@ -774,7 +773,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show usage if no extension name is provided', async () => {
-      await uninstallAction!(mockContext, '');
+      await uninstallAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Usage: /extensions uninstall <extension-names...>|--all',
@@ -784,7 +783,7 @@ describe('extensionsCommand', () => {
 
     it('should call uninstallExtension and show success message', async () => {
       const extensionName = 'test-extension';
-      await uninstallAction!(mockContext, extensionName);
+      await uninstallAction!(mockContext);
       expect(mockUninstallExtension).toHaveBeenCalledWith(extensionName, false);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -801,7 +800,7 @@ describe('extensionsCommand', () => {
       const errorMessage = 'uninstall failed';
       mockUninstallExtension.mockRejectedValue(new Error(errorMessage));
 
-      await uninstallAction!(mockContext, extensionName);
+      await uninstallAction!(mockContext);
       expect(mockUninstallExtension).toHaveBeenCalledWith(extensionName, false);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
@@ -824,7 +823,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show usage if no extension name is provided', async () => {
-      await enableAction!(mockContext, '');
+      await enableAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Usage: /extensions enable <extension> [--scope=<user|workspace|session>]',
@@ -832,13 +831,13 @@ describe('extensionsCommand', () => {
     });
 
     it('should call enableExtension with the provided scope', async () => {
-      await enableAction!(mockContext, `${inactiveExt.name} --scope=user`);
+      await enableAction!(mockContext);
       expect(mockEnableExtension).toHaveBeenCalledWith(
         inactiveExt.name,
         SettingScope.User,
       );
 
-      await enableAction!(mockContext, `${inactiveExt.name} --scope workspace`);
+      await enableAction!(mockContext);
       expect(mockEnableExtension).toHaveBeenCalledWith(
         inactiveExt.name,
         SettingScope.Workspace,
@@ -850,7 +849,7 @@ describe('extensionsCommand', () => {
         inactiveExt,
         { ...inactiveExt, name: 'another-inactive-ext' },
       ]);
-      await enableAction!(mockContext, '--all --scope session');
+      await enableAction!(mockContext);
       expect(mockEnableExtension).toHaveBeenCalledWith(
         inactiveExt.name,
         SettingScope.Session,
@@ -876,7 +875,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show usage if no extension name is provided', async () => {
-      await disableAction!(mockContext, '');
+      await disableAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Usage: /extensions disable <extension> [--scope=<user|workspace|session>]',
@@ -884,13 +883,13 @@ describe('extensionsCommand', () => {
     });
 
     it('should call disableExtension with the provided scope', async () => {
-      await disableAction!(mockContext, `${activeExt.name} --scope=user`);
+      await disableAction!(mockContext);
       expect(mockDisableExtension).toHaveBeenCalledWith(
         activeExt.name,
         SettingScope.User,
       );
 
-      await disableAction!(mockContext, `${activeExt.name} --scope workspace`);
+      await disableAction!(mockContext);
       expect(mockDisableExtension).toHaveBeenCalledWith(
         activeExt.name,
         SettingScope.Workspace,
@@ -902,7 +901,7 @@ describe('extensionsCommand', () => {
         activeExt,
         { ...activeExt, name: 'another-active-ext' },
       ]);
-      await disableAction!(mockContext, '--all --scope session');
+      await disableAction!(mockContext);
       expect(mockDisableExtension).toHaveBeenCalledWith(
         activeExt.name,
         SettingScope.Session,
@@ -944,7 +943,7 @@ describe('extensionsCommand', () => {
           restartExtension: mockRestartExtension,
         }));
 
-      await restartAction!(mockContext, '--all');
+      await restartAction!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -960,7 +959,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, '--all');
+      await restartAction!(mockContext);
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(2);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
@@ -996,7 +995,7 @@ describe('extensionsCommand', () => {
       mockGetExtensions.mockReturnValue(mockExtensions);
       mockReloadSkills.mockRejectedValue(new Error('Failed to reload skills'));
 
-      await restartAction!(mockContext, '--all');
+      await restartAction!(mockContext);
 
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
       expect(mockReloadSkills).toHaveBeenCalled();
@@ -1016,7 +1015,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext1 ext3');
+      await restartAction!(mockContext);
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(1);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[2]);
@@ -1029,7 +1028,7 @@ describe('extensionsCommand', () => {
     it('shows an error if no extension loader is available', async () => {
       mockContext.services.agentContext!.config.getExtensionLoader = vi.fn();
 
-      await restartAction!(mockContext, '--all');
+      await restartAction!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1041,7 +1040,7 @@ describe('extensionsCommand', () => {
     });
 
     it('shows usage error for no arguments', async () => {
-      await restartAction!(mockContext, '');
+      await restartAction!(mockContext);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1059,7 +1058,7 @@ describe('extensionsCommand', () => {
       mockGetExtensions.mockReturnValue(mockExtensions);
       mockRestartExtension.mockRejectedValue(new Error('Failed to restart'));
 
-      await restartAction!(mockContext, '--all');
+      await restartAction!(mockContext);
 
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -1076,7 +1075,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext1 ext2');
+      await restartAction!(mockContext);
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(1);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
@@ -1094,7 +1093,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext2 ext3');
+      await restartAction!(mockContext);
 
       expect(mockRestartExtension).not.toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -1139,7 +1138,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should return dialog to configure all extensions if no args provided', async () => {
-      const result = await configAction!(mockContext, '');
+      const result = await configAction!(mockContext);
       if (result?.type !== 'custom_dialog') {
         throw new Error('Expected custom_dialog');
       }
@@ -1152,7 +1151,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should return dialog to configure specific extension', async () => {
-      const result = await configAction!(mockContext, 'ext-one');
+      const result = await configAction!(mockContext);
       if (result?.type !== 'custom_dialog') {
         throw new Error('Expected custom_dialog');
       }
@@ -1166,7 +1165,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should return dialog to configure specific setting for an extension', async () => {
-      const result = await configAction!(mockContext, 'ext-one SETTING1');
+      const result = await configAction!(mockContext);
       if (result?.type !== 'custom_dialog') {
         throw new Error('Expected custom_dialog');
       }
@@ -1180,10 +1179,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should respect scope argument passed to dialog', async () => {
-      const result = await configAction!(
-        mockContext,
-        'ext-one SETTING1 --scope=workspace',
-      );
+      const result = await configAction!(mockContext);
       if (result?.type !== 'custom_dialog') {
         throw new Error('Expected custom_dialog');
       }
@@ -1194,7 +1190,7 @@ describe('extensionsCommand', () => {
     });
 
     it('should show error for invalid extension name', async () => {
-      await configAction!(mockContext, '../invalid');
+      await configAction!(mockContext);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: 'Invalid extension name. Names cannot contain path separators or "..".',
@@ -1205,7 +1201,7 @@ describe('extensionsCommand', () => {
     // We can test that we still return a dialog, and the dialog will handle logical checks via utils.ts
     // For unit testing extensionsCommand, we just ensure delegation.
     it('should return dialog even if extension has no settings (dialog handles logic)', async () => {
-      const result = await configAction!(mockContext, 'ext-one');
+      const result = await configAction!(mockContext);
       if (result?.type !== 'custom_dialog') {
         throw new Error('Expected custom_dialog');
       }

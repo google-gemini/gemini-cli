@@ -22,7 +22,8 @@ describe('themeCommand', () => {
       throw new Error('The theme command must have an action.');
     }
 
-    const result = themeCommand.action(mockContext, '');
+    mockContext.invocation!.args = '';
+    const result = themeCommand.action(mockContext);
 
     // Assert that the action returns the correct object to trigger the theme dialog.
     expect(result).toEqual({

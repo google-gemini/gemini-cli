@@ -18,7 +18,7 @@ describe('shellsCommand', () => {
     } as unknown as CommandContext;
 
     if (shellsCommand.action) {
-      await shellsCommand.action(context, '');
+      await shellsCommand.action(context);
     }
 
     expect(toggleBackgroundShell).toHaveBeenCalled();

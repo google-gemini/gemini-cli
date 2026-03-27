@@ -82,8 +82,9 @@ describe('SkillCommandLoader', () => {
     const loader = new SkillCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const actionResult = await commands[0].action!({} as any, '');
+    const actionResult = await commands[0].action!({
+      invocation: { args: '' },
+    } as any);
     expect(actionResult).toEqual({
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
@@ -99,8 +100,9 @@ describe('SkillCommandLoader', () => {
     const loader = new SkillCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const actionResult = await commands[0].action!({} as any, 'hello world');
+    const actionResult = await commands[0].action!({
+      invocation: { args: 'hello world' },
+    } as any);
     expect(actionResult).toEqual({
       type: 'tool',
       toolName: ACTIVATE_SKILL_TOOL_NAME,
@@ -118,8 +120,9 @@ describe('SkillCommandLoader', () => {
 
     expect(commands[0].name).toBe('my-awesome-skill');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const actionResult = (await commands[0].action!({} as any, '')) as any;
+    const actionResult = (await commands[0].action!({
+      invocation: { args: '' },
+    } as any)) as any;
     expect(actionResult.toolArgs).toEqual({ name: 'my awesome skill' });
   });
 

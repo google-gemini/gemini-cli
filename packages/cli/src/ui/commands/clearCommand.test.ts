@@ -65,7 +65,7 @@ describe('clearCommand', () => {
       throw new Error('clearCommand must have an action.');
     }
 
-    await clearCommand.action(mockContext, '');
+    await clearCommand.action(mockContext);
 
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledWith(
       'Clearing terminal and resetting chat.',
@@ -103,7 +103,7 @@ describe('clearCommand', () => {
       },
     });
 
-    await clearCommand.action(nullConfigContext, '');
+    await clearCommand.action(nullConfigContext);
 
     expect(nullConfigContext.ui.setDebugMessage).toHaveBeenCalledWith(
       'Clearing terminal.',
