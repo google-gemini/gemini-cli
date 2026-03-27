@@ -49,7 +49,7 @@ export const ALL_ITEMS = [
   },
   {
     id: 'auth',
-    header: 'auth',
+    header: '/auth',
     description: 'Current authentication info',
   },
   {
