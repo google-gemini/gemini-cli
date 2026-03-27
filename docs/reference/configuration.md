@@ -694,6 +694,11 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {
           "model": "gemini-3-pro-preview"
         }
+      },
+      "agent-history-provider-summarizer": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
       }
     }
     ```
@@ -1698,6 +1703,28 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Replace the built-in save_memory tool with a memory manager
     subagent that supports adding, removing, de-duplicating, and organizing
     memories.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistoryTruncation`** (boolean):
+  - **Description:** Enable truncation window logic for the Agent History
+    Provider.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistoryTruncationThreshold`** (number):
+  - **Description:** The maximum number of messages before history is truncated.
+  - **Default:** `30`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistoryRetainedMessages`** (number):
+  - **Description:** The number of recent messages to retain after truncation.
+  - **Default:** `15`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistorySummarization`** (boolean):
+  - **Description:** Enable summarization of truncated content via a small model
+    for the Agent History Provider.
   - **Default:** `false`
   - **Requires restart:** Yes
 
