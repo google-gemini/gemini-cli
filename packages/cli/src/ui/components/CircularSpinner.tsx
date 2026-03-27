@@ -126,16 +126,6 @@ export const CircularSpinner: FC<CircularSpinnerProps> = ({
   const char1 = String.fromCharCode(0x2800 + bits1);
   const char2 = String.fromCharCode(0x2800 + bits2);
 
-  return (
-    <Text>
-      {[
-        <Text key="c1" color={color1 ?? color}>
-          {char1}
-        </Text>,
-        <Text key="c2" color={color2 ?? color}>
-          {char2}
-        </Text>,
-      ]}
-    </Text>
-  );
+  // prettier-ignore
+  return (<Text><Text key="c1" color={color1 ?? color}>{char1}</Text><Text key="c2" color={color2 ?? color}>{char2}</Text></Text>);
 };
