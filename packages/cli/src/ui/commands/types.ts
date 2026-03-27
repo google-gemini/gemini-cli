@@ -9,6 +9,7 @@ import type {
   HistoryItemWithoutId,
   HistoryItem,
   ConfirmationRequest,
+  BtwActionReturn,
 } from '../types.js';
 import type {
   GitService,
@@ -164,11 +165,6 @@ export interface OpenCustomDialogActionReturn {
  */
 export interface LogoutActionReturn {
   type: 'logout';
-}
-
-export interface BtwActionReturn {
-  type: 'btw';
-  query: string;
 }
 
 export type SlashCommandActionReturn =
