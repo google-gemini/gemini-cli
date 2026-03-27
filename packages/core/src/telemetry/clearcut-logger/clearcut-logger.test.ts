@@ -25,7 +25,7 @@ import {
   AuthType,
   type ContentGeneratorConfig,
 } from '../../core/contentGenerator.js';
-import type { SuccessfulToolCall } from '../../core/coreToolScheduler.js';
+import type { SuccessfulToolCall } from '../../scheduler/types.js';
 import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
@@ -1675,7 +1675,7 @@ describe('ClearcutLogger', () => {
   describe('logOnboardingSuccessEvent', () => {
     it('logs an event with proper name and user tier', () => {
       const { logger } = setup();
-      const event = new OnboardingSuccessEvent('standard-tier');
+      const event = new OnboardingSuccessEvent('standard-tier', 100);
 
       logger?.logOnboardingSuccessEvent(event);
 
@@ -1685,6 +1685,10 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_ONBOARDING_USER_TIER,
         'standard-tier',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ONBOARDING_DURATION_MS,
+        '100',
       ]);
     });
   });

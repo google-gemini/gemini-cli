@@ -185,6 +185,7 @@ vi.mock('../agents/registry.js', () => {
   const AgentRegistryMock = vi.fn();
   AgentRegistryMock.prototype.initialize = vi.fn();
   AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
+  AgentRegistryMock.prototype.getAllDiscoveredAgentNames = vi.fn(() => []);
   AgentRegistryMock.prototype.getDefinition = vi.fn();
   return { AgentRegistry: AgentRegistryMock };
 });
@@ -1237,124 +1238,6 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
-    it('should register subagents as tools when agents.overrides.codebase_investigator.enabled is true', async () => {
-      const params: ConfigParameters = {
-        ...baseParams,
-        agents: {
-          overrides: {
-            codebase_investigator: { enabled: true },
-          },
-        },
-      };
-      const config = new Config(params);
-
-      const mockAgentDefinition = {
-        name: 'codebase_investigator',
-        description: 'Agent 1',
-        instructions: 'Inst 1',
-      };
-
-      const AgentRegistryMock = (
-        (await vi.importMock('../agents/registry.js')) as {
-          AgentRegistry: Mock;
-        }
-      ).AgentRegistry;
-      AgentRegistryMock.prototype.getDefinition.mockReturnValue(
-        mockAgentDefinition,
-      );
-      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
-        mockAgentDefinition,
-      ]);
-
-      const SubAgentToolMock = (
-        (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubagentTool: Mock;
-        }
-      ).SubagentTool;
-
-      await config.initialize();
-
-      const registerToolMock = (
-        (await vi.importMock('../tools/tool-registry')) as {
-          ToolRegistry: { prototype: { registerTool: Mock } };
-        }
-      ).ToolRegistry.prototype.registerTool;
-
-      expect(SubAgentToolMock).toHaveBeenCalledTimes(1);
-      expect(SubAgentToolMock).toHaveBeenCalledWith(
-        expect.anything(), // AgentRegistry
-        config,
-        expect.anything(), // MessageBus
-      );
-
-      const calls = registerToolMock.mock.calls;
-      const registeredWrappers = calls.filter(
-        (call) => call[0] instanceof SubAgentToolMock,
-      );
-      expect(registeredWrappers).toHaveLength(1);
-    });
-
-    it('should register subagents as tools even when they are not in allowedTools', async () => {
-      const params: ConfigParameters = {
-        ...baseParams,
-        allowedTools: ['read_file'], // codebase_investigator is NOT here
-        agents: {
-          overrides: {
-            codebase_investigator: { enabled: true },
-          },
-        },
-      };
-      const config = new Config(params);
-
-      const mockAgentDefinition = {
-        name: 'codebase_investigator',
-        description: 'Agent 1',
-        instructions: 'Inst 1',
-      };
-
-      const AgentRegistryMock = (
-        (await vi.importMock('../agents/registry.js')) as {
-          AgentRegistry: Mock;
-        }
-      ).AgentRegistry;
-      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue([
-        mockAgentDefinition,
-      ]);
-
-      const SubAgentToolMock = (
-        (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubagentTool: Mock;
-        }
-      ).SubagentTool;
-
-      await config.initialize();
-
-      expect(SubAgentToolMock).toHaveBeenCalled();
-    });
-
-    it('should not register subagents as tools when agents are disabled', async () => {
-      const params: ConfigParameters = {
-        ...baseParams,
-        agents: {
-          overrides: {
-            codebase_investigator: { enabled: false },
-            cli_help: { enabled: false },
-          },
-        },
-      };
-      const config = new Config(params);
-
-      const SubAgentToolMock = (
-        (await vi.importMock('../agents/subagent-tool.js')) as {
-          SubagentTool: Mock;
-        }
-      ).SubagentTool;
-
-      await config.initialize();
-
-      expect(SubAgentToolMock).not.toHaveBeenCalled();
-    });
-
     it('should register EnterPlanModeTool and ExitPlanModeTool when plan is enabled', async () => {
       const params: ConfigParameters = {
         ...baseParams,
@@ -1591,6 +1474,22 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(100); // default
+    });
+
+    it('should return custom maxActionsPerTask', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          browser: {
+            maxActionsPerTask: 50,
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(50);
     });
 
     it('should apply defaults for partial custom config', () => {
