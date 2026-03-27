@@ -13,6 +13,7 @@ import { AppHeader } from './AppHeader.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useConfig } from '../contexts/ConfigContext.js';
+import { BtwDisplay } from './BtwDisplay.js';
 import {
   SCROLL_TO_ITEM_END,
   type VirtualizedListRef,
@@ -47,10 +48,10 @@ export const MainContent = () => {
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
   useEffect(() => {
-    if (showConfirmationQueue) {
+    if (showConfirmationQueue || uiState.btwState.isActive) {
       scrollableListRef.current?.scrollToEnd();
     }
-  }, [showConfirmationQueue, confirmingToolCallId]);
+  }, [showConfirmationQueue, confirmingToolCallId, uiState.btwState.isActive]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -227,6 +228,16 @@ export const MainContent = () => {
             confirmingTool={confirmingTool}
           />
         )}
+        {uiState.btwState.isActive && (
+          <BtwDisplay
+            key="btw-display"
+            query={uiState.btwState.query}
+            response={uiState.btwState.response}
+            isStreaming={uiState.btwState.isStreaming}
+            error={uiState.btwState.error}
+            terminalWidth={uiState.terminalWidth}
+          />
+        )}
       </Box>
     ),
     [
@@ -238,6 +249,12 @@ export const MainContent = () => {
       confirmingTool,
       uiState.history,
       suppressNarrationFlags,
+      uiState.btwState.isActive,
+      uiState.btwState.query,
+      uiState.btwState.response,
+      uiState.btwState.isStreaming,
+      uiState.btwState.error,
+      uiState.terminalWidth,
     ],
   );
 
