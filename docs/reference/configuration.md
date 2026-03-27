@@ -2249,6 +2249,11 @@ for that specific session.
   - Starts the agent in ACP mode.
 - **`--allowed-mcp-server-names`**:
   - Allowed MCP server names.
+- **`--channels <channel1,channel2,...>`**:
+  - A comma-separated list of MCP server names to enable as message channels.
+  - When specified, the CLI will listen for asynchronous messages from these
+    servers and inject them into the conversation.
+  - Example: `gemini --channels telegram,slack`
 - **`--fake-responses`**:
   - Path to a file with fake model responses for testing.
 - **`--record-responses`**:
