@@ -26,7 +26,6 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
-  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -40,6 +39,7 @@ import {
   isBackgroundExecutionData,
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
+  shouldHideToolCall,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -66,7 +66,12 @@ import type {
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType } from '../types.js';
+import {
+  StreamingState,
+  MessageType,
+  mapCoreStatusToDisplayStatus,
+  ToolCallStatus,
+} from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
@@ -541,14 +546,39 @@ export const useGeminiStream = (
 
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
-      // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
-      const isInProgress =
-        tc.status !== 'success' &&
-        tc.status !== 'error' &&
-        tc.status !== 'cancelled';
-      if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
+      const displayName = tc.tool?.displayName ?? tc.request.name;
+
+      let hasResultDisplay = false;
+      if (
+        tc.status === CoreToolCallStatus.Success ||
+        tc.status === CoreToolCallStatus.Error ||
+        tc.status === CoreToolCallStatus.Cancelled
+      ) {
+        hasResultDisplay = !!tc.response?.resultDisplay;
+      } else if (tc.status === CoreToolCallStatus.Executing) {
+        hasResultDisplay = !!tc.liveOutput;
+      }
+
+      // AskUser tools and Plan Mode write/edit are handled by this logic
+      if (
+        shouldHideToolCall({
+          displayName,
+          status: tc.status,
+          approvalMode: tc.approvalMode,
+          hasResultDisplay,
+          parentCallId: tc.request.parentCallId,
+        })
+      ) {
         return false;
       }
+
+      // ToolGroupMessage explicitly hides Confirming tools because they are
+      // rendered in the interactive ToolConfirmationQueue instead.
+      const displayStatus = mapCoreStatusToDisplayStatus(tc.status);
+      if (displayStatus === ToolCallStatus.Confirming) {
+        return false;
+      }
+
       // ToolGroupMessage now shows all non-canceled tools, so they are visible
       // in pending and we need to draw the closing border for them.
       return true;

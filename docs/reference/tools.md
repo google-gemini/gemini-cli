@@ -86,6 +86,62 @@ function.
 | System      | `complete_task`                                  | `Other`       | Finalizes a subagent's mission and returns the result to the parent agent. This tool is not available to the user.<br><br>**Parameters:** `result`                                                                                                 |
 | Web         | [`google_web_search`](../tools/web-search.md)    | `Search`      | Performs a Google Search to find up-to-date information.<br><br>**Parameters:** `query`                                                                                                                                                            |
 | Web         | [`web_fetch`](../tools/web-fetch.md)             | `Fetch`       | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts.<br><br>**Parameters:** `prompt`        |
+The following sections list all available tools, categorized by their primary
+function. For detailed parameter information, see the linked documentation for
+each tool.
+
+### Execution
+
+| Tool                                     | Kind      | Description                                                                                                              |
+| :--------------------------------------- | :-------- | :----------------------------------------------------------------------------------------------------------------------- |
+| [`run_shell_command`](../tools/shell.md) | `Execute` | Executes arbitrary shell commands. Supports interactive sessions and background processes. Requires manual confirmation. |
+
+### File System
+
+| Tool                                         | Kind     | Description                                                                                           |
+| :------------------------------------------- | :------- | :---------------------------------------------------------------------------------------------------- |
+| [`glob`](../tools/file-system.md)            | `Search` | Finds files matching specific glob patterns across the workspace.                                     |
+| [`grep_search`](../tools/file-system.md)     | `Search` | Searches for a regular expression pattern within file contents. Legacy alias: `search_file_content`.  |
+| [`list_directory`](../tools/file-system.md)  | `Read`   | Lists the names of files and subdirectories within a specified path.                                  |
+| [`read_file`](../tools/file-system.md)       | `Read`   | Reads the content of a specific file. Supports text, images, audio, and PDF.                          |
+| [`read_many_files`](../tools/file-system.md) | `Read`   | Reads and concatenates content from multiple files. Often triggered by the `@` symbol in your prompt. |
+| [`replace`](../tools/file-system.md)         | `Edit`   | Performs precise text replacement within a file. Requires manual confirmation.                        |
+| [`write_file`](../tools/file-system.md)      | `Edit`   | Creates or overwrites a file with new content. Requires manual confirmation.                          |
+
+### Interaction
+
+| Tool                               | Kind          | Description                                                                            |
+| :--------------------------------- | :------------ | :------------------------------------------------------------------------------------- |
+| [`ask_user`](../tools/ask-user.md) | `Communicate` | Requests clarification or missing information via an interactive dialog.               |
+| [`write_todos`](../tools/todos.md) | `Other`       | Maintains an internal list of subtasks. The model uses this to track its own progress. |
+
+### Memory
+
+| Tool                                             | Kind    | Description                                                                          |
+| :----------------------------------------------- | :------ | :----------------------------------------------------------------------------------- |
+| [`activate_skill`](../tools/activate-skill.md)   | `Other` | Loads specialized procedural expertise from the `.gemini/skills` directory.          |
+| [`get_internal_docs`](../tools/internal-docs.md) | `Think` | Accesses Gemini CLI's own documentation for accurate answers about its capabilities. |
+| [`save_memory`](../tools/memory.md)              | `Think` | Persists specific facts and project details to your `GEMINI.md` file.                |
+
+### Planning
+
+| Tool                                      | Kind   | Description                                                                              |
+| :---------------------------------------- | :----- | :--------------------------------------------------------------------------------------- |
+| [`enter_plan_mode`](../tools/planning.md) | `Plan` | Switches the CLI to a safe, read-only "Plan Mode" for researching complex changes.       |
+| [`exit_plan_mode`](../tools/planning.md)  | `Plan` | Finalizes a plan, presents it for review, and requests approval to start implementation. |
+
+### System
+
+| Tool            | Kind    | Description                                                                                                        |
+| :-------------- | :------ | :----------------------------------------------------------------------------------------------------------------- |
+| `complete_task` | `Other` | Finalizes a subagent's mission and returns the result to the parent agent. This tool is not available to the user. |
+
+### Web
+
+| Tool                                          | Kind     | Description                                                                                                                                                                                                 |
+| :-------------------------------------------- | :------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`google_web_search`](../tools/web-search.md) | `Search` | Performs a Google Search to find up-to-date information.                                                                                                                                                    |
+| [`web_fetch`](../tools/web-fetch.md)          | `Fetch`  | Retrieves and processes content from specific URLs. **Warning:** This tool can access local and private network addresses (e.g., localhost), which may pose a security risk if used with untrusted prompts. |
 
 ## Under the hood
 
