@@ -1218,13 +1218,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const channelsEnabled = config.getChannels().length > 0;
   useEffect(() => {
     if (!channelsEnabled) return;
+    const escapeAttr = (s: string) =>
+      s
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     const handler = (payload: ChannelMessagePayload) => {
       const meta = payload.metadata ?? {};
       const user = meta['user'] ?? payload.sender;
       const chatId = meta['chat_id'] ?? '';
       const msgId = meta['message_id'] ?? '';
       const imagePath = meta['image_path'] ?? '';
-      const formatted = `<channel source="${payload.channelName}" chat_id="${chatId}" message_id="${msgId}" user="${user}"${imagePath ? ` image_path="${imagePath}"` : ''}>\n${payload.content}\n</channel>`;
+      const safeContent = payload.content.replace(
+        /<\/channel>/gi,
+        '&lt;/channel&gt;',
+      );
+      const formatted = `<channel source="${escapeAttr(payload.channelName)}" chat_id="${escapeAttr(chatId)}" message_id="${escapeAttr(msgId)}" user="${escapeAttr(user)}"${imagePath ? ` image_path="${escapeAttr(imagePath)}"` : ''}>\n${safeContent}\n</channel>`;
       addMessage(formatted);
     };
     coreEvents.on(CoreEvent.ChannelMessage, handler);

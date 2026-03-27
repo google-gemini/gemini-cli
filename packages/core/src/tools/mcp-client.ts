@@ -513,6 +513,9 @@ export class McpClient implements McpProgressReporter {
           const params: Record<string, unknown> = Object.fromEntries(
             Object.entries(notification.params ?? {}),
           );
+          const content = params['content'];
+          if (typeof content !== 'string' || !content) return;
+
           const rawMeta = params['meta'];
           const meta =
             rawMeta != null && typeof rawMeta === 'object'
@@ -523,7 +526,7 @@ export class McpClient implements McpProgressReporter {
           coreEvents.emitChannelMessage({
             channelName: this.serverName,
             sender: String(params['sender'] ?? 'unknown'),
-            content: String(params['content'] ?? ''),
+            content,
             timestamp: Date.now(),
             replyTo: params['replyTo'] ? String(params['replyTo']) : undefined,
             metadata: meta,
