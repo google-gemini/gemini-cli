@@ -803,7 +803,26 @@ function setupNetworkLogging(
         // Flush buffered logs
         flushBuffer();
         break;
-
+      case 'trigger-debugger': {
+        import('node:inspector')
+          .then((inspector) => {
+            inspector.open();
+            debugLogger.log(
+              'Node debugger attached. Open chrome://inspect in Chrome to start debugging.',
+            );
+            return import('./events.js');
+          })
+          .then(({ appEvents, AppEvent, TransientMessageType }) => {
+            appEvents.emit(AppEvent.TransientMessage, {
+              message: 'Debugger attached from DevTools.',
+              type: TransientMessageType.Hint,
+            });
+          })
+          .catch((err) =>
+            debugLogger.debug('Failed to trigger debugger:', err),
+          );
+        break;
+      }
       case 'ping':
         sendMessage({ type: 'pong', timestamp: Date.now() });
         break;

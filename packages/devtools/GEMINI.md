@@ -51,10 +51,11 @@ gemini.tsx / nonInteractiveCli.ts
 
 ## API Endpoints
 
-| Endpoint  | Method    | Description                                                                 |
-| --------- | --------- | --------------------------------------------------------------------------- |
-| `/ws`     | WebSocket | Log ingestion from CLI sessions (register, network, console)                |
-| `/events` | SSE       | Pushes snapshot on connect, then incremental network/console/session events |
+| Endpoint                | Method    | Description                                                                 |
+| ----------------------- | --------- | --------------------------------------------------------------------------- |
+| `/ws`                   | WebSocket | Log ingestion from CLI sessions (register, network, console)                |
+| `/events`               | SSE       | Pushes snapshot on connect, then incremental network/console/session events |
+| `/api/trigger-debugger` | POST      | Triggers the Node.js debugger for a specific CLI session via WebSocket      |
 
 ## Development
 
