@@ -153,6 +153,8 @@ public class GeminiSandbox {
 
     private const int TokenIntegrityLevel = 25;
     private const uint SE_GROUP_INTEGRITY = 0x00000020;
+    private const uint TOKEN_ALL_ACCESS = 0xF01FF;
+    private const uint DISABLE_MAX_PRIVILEGE = 0x1;
 
     static int Main(string[] args) {
         if (args.Length < 3) {
@@ -193,15 +195,14 @@ public class GeminiSandbox {
 
         try {
             // 1. Duplicate Primary Token
-            // TOKEN_ALL_ACCESS = 0xF01FF
-            if (!OpenProcessToken(GetCurrentProcess(), 0xF01FF, out hToken)) {
+            if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, out hToken)) {
                 Console.WriteLine("Error: OpenProcessToken failed (" + Marshal.GetLastWin32Error() + ")");
                 return 1;
             }
 
-            // SecurityImpersonation = 2, TokenPrimary = 1, MAXIMUM_ALLOWED = 0x02000000
-            if (!DuplicateTokenEx(hToken, 0x02000000, IntPtr.Zero, 2, 1, out hRestrictedToken)) {
-                Console.WriteLine("Error: DuplicateTokenEx failed (" + Marshal.GetLastWin32Error() + ")");
+            // Create a restricted token to strip administrative privileges
+            if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, 0, IntPtr.Zero, 0, IntPtr.Zero, 0, IntPtr.Zero, out hRestrictedToken)) {
+                Console.WriteLine("Error: CreateRestrictedToken failed (" + Marshal.GetLastWin32Error() + ")");
                 return 1;
             }
 
