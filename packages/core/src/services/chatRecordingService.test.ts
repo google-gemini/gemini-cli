@@ -1155,6 +1155,74 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('fork', () => {
+    beforeEach(() => {
+      chatRecordingService.initialize();
+    });
+
+    it('should return null when recording is disabled', () => {
+      // Create a service with no conversation file (uninitialized)
+      const uninitializedService = new ChatRecordingService(mockConfig);
+      const result = uninitializedService.fork();
+      expect(result).toBeNull();
+    });
+
+    it('should return null when conversation has no messages', () => {
+      const result = chatRecordingService.fork();
+      expect(result).toBeNull();
+    });
+
+    it('should create a new session file with a new sessionId', () => {
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'hello',
+        model: 'gemini-pro',
+      });
+
+      const shortId = chatRecordingService.fork();
+      expect(shortId).toBeTruthy();
+      expect(shortId).toHaveLength(8);
+
+      const chatsDir = path.join(testTempDir, 'chats');
+      const files = fs.readdirSync(chatsDir);
+      // Original session file + forked session file
+      expect(files.length).toBe(2);
+
+      const forkedFile = files.find((f) => f.includes(shortId!));
+      expect(forkedFile).toBeTruthy();
+      expect(forkedFile).toMatch(/^session-.*\.json$/);
+
+      const forked = JSON.parse(
+        fs.readFileSync(path.join(chatsDir, forkedFile!), 'utf8'),
+      ) as ConversationRecord;
+      expect(forked.sessionId).not.toBe('test-session-id');
+      expect(forked.messages).toHaveLength(1);
+      expect(forked.messages[0].content).toBe('hello');
+      expect(forked.projectHash).toBe('test-project-hash');
+    });
+
+    it('should not modify the original session', () => {
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'original message',
+        model: 'gemini-pro',
+      });
+
+      const originalFile = chatRecordingService.getConversationFilePath()!;
+      const originalBefore = JSON.parse(
+        fs.readFileSync(originalFile, 'utf8'),
+      ) as ConversationRecord;
+
+      chatRecordingService.fork();
+
+      const originalAfter = JSON.parse(
+        fs.readFileSync(originalFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(originalAfter.sessionId).toBe(originalBefore.sessionId);
+      expect(originalAfter.messages).toEqual(originalBefore.messages);
+    });
+  });
+
   describe('ENOENT (missing directory) handling', () => {
     it('should ensure directory exists before writing conversation file', async () => {
       await chatRecordingService.initialize();
