@@ -12,6 +12,7 @@ import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import {
   SCROLL_TO_ITEM_END,
   type VirtualizedListRef,
@@ -34,6 +35,11 @@ export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const config = useConfig();
+  const useTerminalBuffer =
+    typeof config.getUseTerminalBuffer === 'function'
+      ? config.getUseTerminalBuffer()
+      : false;
 
   const confirmingTool = useConfirmingTool();
   const showConfirmationQueue = confirmingTool !== null;
@@ -53,6 +59,7 @@ export const MainContent = () => {
     staticAreaMaxItemHeight,
     availableTerminalHeight,
     cleanUiDetailsVisible,
+    mouseMode,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
@@ -284,24 +291,63 @@ export const MainContent = () => {
     ],
   );
 
+  const estimatedItemHeight = useCallback(() => 100, []);
+
+  const keyExtractor = useCallback(
+    (item: (typeof virtualizedData)[number], _index: number) => {
+      if (item.type === 'header') return 'header';
+      if (item.type === 'history') return item.item.id.toString();
+      return 'pending';
+    },
+    [],
+  );
+
+  const isStaticItem = useCallback(
+    (item: (typeof virtualizedData)[number]) => item.type !== 'pending',
+    [],
+  );
+
+  const scrollableList = useMemo(() => {
+    if (isAlternateBuffer) {
+      return (
+        <ScrollableList
+          ref={scrollableListRef}
+          hasFocus={
+            !uiState.isEditorDialogOpen && !uiState.embeddedShellFocused
+          }
+          width={uiState.terminalWidth}
+          data={virtualizedData}
+          renderItem={renderItem}
+          estimatedItemHeight={estimatedItemHeight}
+          keyExtractor={keyExtractor}
+          initialScrollIndex={SCROLL_TO_ITEM_END}
+          initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
+          renderStatic={useTerminalBuffer}
+          isStaticItem={useTerminalBuffer ? isStaticItem : undefined}
+          overflowToBackbuffer={useTerminalBuffer}
+          scrollbar={mouseMode}
+        />
+        // TODO(jacobr): consider adding         stableScrollback={!config.getUseAlternateBuffer()}
+        // but need to work out ensuring we only attempt it within a smaller range of scrollback vals.
+      );
+    }
+    return null;
+  }, [
+    isAlternateBuffer,
+    uiState.isEditorDialogOpen,
+    uiState.embeddedShellFocused,
+    uiState.terminalWidth,
+    virtualizedData,
+    renderItem,
+    estimatedItemHeight,
+    keyExtractor,
+    useTerminalBuffer,
+    isStaticItem,
+    mouseMode,
+  ]);
+
   if (isAlternateBuffer) {
-    return (
-      <ScrollableList
-        ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
-        width={uiState.terminalWidth}
-        data={virtualizedData}
-        renderItem={renderItem}
-        estimatedItemHeight={() => 100}
-        keyExtractor={(item, _index) => {
-          if (item.type === 'header') return 'header';
-          if (item.type === 'history') return item.item.id.toString();
-          return 'pending';
-        }}
-        initialScrollIndex={SCROLL_TO_ITEM_END}
-        initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
-      />
-    );
+    return scrollableList;
   }
 
   return (

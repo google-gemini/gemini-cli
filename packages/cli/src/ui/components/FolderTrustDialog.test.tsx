@@ -18,7 +18,7 @@ vi.mock('../../utils/processUtils.js', () => ({
 }));
 
 const mockedExit = vi.hoisted(() => vi.fn());
-const mockedCwd = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn().mockReturnValue('/mock/cwd'));
 const mockedRows = vi.hoisted(() => ({ current: 24 }));
 
 vi.mock('node:process', async () => {
