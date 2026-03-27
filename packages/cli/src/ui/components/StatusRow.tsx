@@ -314,7 +314,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
             ) : isInteractiveShellWaiting ? (
               <Box width="100%" marginLeft={LAYOUT.INDICATOR_LEFT_MARGIN}>
                 <Text color={theme.ui.active}>
-                  Shell awaiting input (Tab to focus)
+                  {INTERACTIVE_SHELL_WAITING_PHRASE}
                 </Text>
               </Box>
             ) : (
