@@ -18,11 +18,8 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
-import { type RetrieveUserQuotaResponse } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { QuotaStats } from '../types.js';
-import { ModelQuotaDisplay } from './ModelQuotaDisplay.js';
-import { useUIState } from '../contexts/UIStateContext.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -76,7 +73,6 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 interface StatsDisplayProps {
   duration: string;
   title?: string;
-  quotas?: RetrieveUserQuotaResponse;
   footer?: string;
   selectedAuthType?: string;
   userEmail?: string;
@@ -89,7 +85,6 @@ interface StatsDisplayProps {
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
-  quotas,
   footer,
   selectedAuthType,
   userEmail,
@@ -101,7 +96,6 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   const { tools, files } = metrics;
   const computed = computeSessionStats(metrics);
   const settings = useSettings();
-  const { terminalWidth } = useUIState();
 
   const showUserIdentity = settings.merged.ui.showUserIdentity;
 
@@ -241,12 +235,6 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           </Text>
         </SubStatRow>
       </Section>
-      <ModelQuotaDisplay
-        buckets={quotas?.buckets}
-        availableWidth={terminalWidth - 4}
-        modelsToShow={Object.keys(stats.metrics.models)}
-        title="Models used in this session"
-      />
       {renderFooter()}
     </Box>
   );
