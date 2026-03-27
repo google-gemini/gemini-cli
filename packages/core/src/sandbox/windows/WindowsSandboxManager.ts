@@ -256,7 +256,7 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
-    // Grant "Low Mandatory Level" read access to allowedPaths.
+    // Grant "Low Mandatory Level" write access to allowedPaths.
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       await this.grantLowIntegrityAccess(allowedPath);
@@ -317,6 +317,7 @@ export class WindowsSandboxManager implements SandboxManager {
 
   /**
    * Grants "Low Mandatory Level" access to a path using icacls.
+   * This effectively allows a Low Integrity process to WRITE to the path.
    */
   private async grantLowIntegrityAccess(targetPath: string): Promise<void> {
     if (os.platform() !== 'win32') {
@@ -357,7 +358,23 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      const stats = await fs.promises.stat(resolvedPath);
+      if (stats.isDirectory()) {
+        // For directories, we enable inheritance (OI)(CI) so new files created
+        // by the CLI or other Medium processes inherit the Low label.
+        // We also use /T to recursively apply to existing files.
+        // /C continues on errors, /Q is quiet.
+        await spawnAsync('icacls', [
+          resolvedPath,
+          '/setintegritylevel',
+          '(OI)(CI)Low',
+          '/T',
+          '/C',
+          '/Q',
+        ]);
+      } else {
+        await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      }
       this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
