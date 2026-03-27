@@ -562,8 +562,8 @@ describe('ScrollProvider', () => {
         button: 'none',
       };
 
-      // Perform 10 rapid scrolls (within 50ms of each other)
-      for (let i = 0; i < 10; i++) {
+      // Perform 60 rapid scrolls (within 50ms of each other)
+      for (let i = 0; i < 60; i++) {
         for (const callback of mockUseMouseCallbacks) {
           callback(mouseEvent);
         }
@@ -578,8 +578,8 @@ describe('ScrollProvider', () => {
         (sum, call) => sum + call[0],
         0,
       );
-      expect(totalDelta).toBeGreaterThan(10);
-      expect(totalDelta).toBe(19);
+      expect(totalDelta).toBeGreaterThan(60);
+      expect(totalDelta).toBe(80);
     });
 
     it('does not accelerate for Ghostty terminals even during rapid scrolling', async () => {
@@ -614,7 +614,7 @@ describe('ScrollProvider', () => {
         button: 'none',
       };
 
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 60; i++) {
         for (const callback of mockUseMouseCallbacks) {
           callback(mouseEvent);
         }
@@ -623,12 +623,12 @@ describe('ScrollProvider', () => {
 
       await vi.runAllTimersAsync();
 
-      // No acceleration means 10 scrolls = delta 10
+      // No acceleration means 60 scrolls = delta 60
       const totalDelta = scrollBy.mock.calls.reduce(
         (sum, call) => sum + call[0],
         0,
       );
-      expect(totalDelta).toBe(10);
+      expect(totalDelta).toBe(60);
     });
 
     it('resets acceleration count if scrolling is slow', async () => {
@@ -664,7 +664,7 @@ describe('ScrollProvider', () => {
       };
 
       // Perform scrolls with 100ms gap (greater than 50ms threshold)
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 60; i++) {
         for (const callback of mockUseMouseCallbacks) {
           callback(mouseEvent);
         }
@@ -678,7 +678,7 @@ describe('ScrollProvider', () => {
         (sum, call) => sum + call[0],
         0,
       );
-      expect(totalDelta).toBe(10);
+      expect(totalDelta).toBe(60);
     });
   });
 });

@@ -17,6 +17,7 @@ import {
 import { getBoundingBox, type DOMElement } from 'ink';
 import { useMouse, type MouseEvent } from '../hooks/useMouse.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 export interface ScrollState {
   scrollTop: number;
@@ -140,18 +141,29 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
       // 50ms threshold to consider scrolls consecutive
       if (timeSinceLastScroll < 50) {
         scrollMomentumRef.current.count += 1;
-        if (scrollMomentumRef.current.count > 3) {
+        if (scrollMomentumRef.current.count > 50) {
           // Accelerate up to 5x
           multiplier = Math.min(
             5,
-            1 + (scrollMomentumRef.current.count - 3) * 0.5,
+            1 + (scrollMomentumRef.current.count - 50) * 0.5,
           );
+          if (scrollMomentumRef.current.count === 51) {
+            debugLogger.log('Scroll acceleration engaged');
+          }
         }
       } else {
+        if (scrollMomentumRef.current.count > 50) {
+          debugLogger.log(
+            `Scroll acceleration reset after count=${scrollMomentumRef.current.count}`,
+          );
+        }
         scrollMomentumRef.current.count = 0;
       }
     }
     scrollMomentumRef.current.lastTime = now;
+    debugLogger.log(
+      `Scroll event: direction=${direction}, multiplier=${multiplier.toFixed(2)}, count=${scrollMomentumRef.current.count}`,
+    );
 
     const delta = (direction === 'up' ? -1 : 1) * Math.floor(multiplier);
     const candidates = findScrollableCandidates(
