@@ -279,6 +279,16 @@ describe('Gemini Client (client.ts)', () => {
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
+      isExperimentalAgentHistoryTruncationEnabled: vi
+        .fn()
+        .mockReturnValue(false),
+      getExperimentalAgentHistoryTruncationThreshold: vi
+        .fn()
+        .mockReturnValue(30),
+      getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(15),
+      isExperimentalAgentHistorySummarizationEnabled: vi
+        .fn()
+        .mockReturnValue(false),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -704,6 +714,43 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('calls AgentHistoryProvider.manageHistory when history truncation is enabled', async () => {
+      // Arrange
+      mockConfig.isExperimentalAgentHistoryTruncationEnabled = vi
+        .fn()
+        .mockReturnValue(true);
+      const manageHistorySpy = vi
+        .spyOn(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (client as any).agentHistoryProvider,
+          'manageHistory',
+        )
+        .mockResolvedValue([
+          { role: 'user', parts: [{ text: 'preserved message' }] },
+        ]);
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      await fromAsync(stream);
+
+      // Assert
+      expect(manageHistorySpy).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(AbortSignal),
+      );
+    });
+
     it('emits a compression event when the context was automatically compressed', async () => {
       // Arrange
       mockTurnRunFn.mockReturnValue(
