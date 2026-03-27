@@ -944,7 +944,9 @@ export class Config implements McpContext, AgentLoopContext {
           networkAccess: false,
         };
 
-    this._sandboxManager = createSandboxManager(this.sandbox, params.targetDir);
+    this._sandboxManager = createSandboxManager(this.sandbox, {
+      workspace: params.targetDir,
+    });
 
     if (
       !(this._sandboxManager instanceof NoopSandboxManager) &&
@@ -965,8 +967,10 @@ export class Config implements McpContext, AgentLoopContext {
       'default';
     this._sandboxManager = createSandboxManager(
       this.sandbox,
-      params.targetDir,
-      this._sandboxPolicyManager,
+      {
+        workspace: params.targetDir,
+        policyManager: this._sandboxPolicyManager,
+      },
       initialApprovalMode,
     );
 
@@ -1618,8 +1622,10 @@ export class Config implements McpContext, AgentLoopContext {
   private refreshSandboxManager(): void {
     this._sandboxManager = createSandboxManager(
       this.sandbox,
-      this.targetDir,
-      this._sandboxPolicyManager,
+      {
+        workspace: this.targetDir,
+        policyManager: this._sandboxPolicyManager,
+      },
       this.getApprovalMode(),
     );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;

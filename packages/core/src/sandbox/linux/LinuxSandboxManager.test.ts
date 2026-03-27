@@ -362,15 +362,20 @@ describe('LinuxSandboxManager', () => {
         });
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 
-        const bwrapArgs = await getBwrapArgs({
-          command: 'ls',
-          args: ['-la'],
-          cwd: workspace,
-          env: {},
-          policy: {
-            forbiddenPaths: ['/tmp/cache', '/opt/secret.txt'],
-          },
+        const customManager = new LinuxSandboxManager({
+          workspace,
+          forbiddenPaths: ['/tmp/cache', '/opt/secret.txt'],
         });
+
+        const bwrapArgs = await getBwrapArgs(
+          {
+            command: 'ls',
+            args: ['-la'],
+            cwd: workspace,
+            env: {},
+          },
+          customManager,
+        );
 
         const cacheIndex = bwrapArgs.indexOf('/tmp/cache');
         expect(bwrapArgs[cacheIndex - 1]).toBe('--tmpfs');
@@ -389,15 +394,20 @@ describe('LinuxSandboxManager', () => {
           return p.toString();
         });
 
-        const bwrapArgs = await getBwrapArgs({
-          command: 'ls',
-          args: ['-la'],
-          cwd: workspace,
-          env: {},
-          policy: {
-            forbiddenPaths: ['/tmp/forbidden-symlink'],
-          },
+        const customManager = new LinuxSandboxManager({
+          workspace,
+          forbiddenPaths: ['/tmp/forbidden-symlink'],
         });
+
+        const bwrapArgs = await getBwrapArgs(
+          {
+            command: 'ls',
+            args: ['-la'],
+            cwd: workspace,
+            env: {},
+          },
+          customManager,
+        );
 
         const secretIndex = bwrapArgs.indexOf('/opt/real-target.txt');
         expect(bwrapArgs[secretIndex - 2]).toBe('--ro-bind');
@@ -412,15 +422,20 @@ describe('LinuxSandboxManager', () => {
         });
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 
-        const bwrapArgs = await getBwrapArgs({
-          command: 'ls',
-          args: [],
-          cwd: workspace,
-          env: {},
-          policy: {
-            forbiddenPaths: ['/tmp/not-here.txt'],
-          },
+        const customManager = new LinuxSandboxManager({
+          workspace,
+          forbiddenPaths: ['/tmp/not-here.txt'],
         });
+
+        const bwrapArgs = await getBwrapArgs(
+          {
+            command: 'ls',
+            args: [],
+            cwd: workspace,
+            env: {},
+          },
+          customManager,
+        );
 
         const idx = bwrapArgs.indexOf('/tmp/not-here.txt');
         expect(bwrapArgs[idx - 2]).toBe('--symlink');
@@ -436,15 +451,20 @@ describe('LinuxSandboxManager', () => {
           return p.toString();
         });
 
-        const bwrapArgs = await getBwrapArgs({
-          command: 'ls',
-          args: [],
-          cwd: workspace,
-          env: {},
-          policy: {
-            forbiddenPaths: ['/tmp/dir-link'],
-          },
+        const customManager = new LinuxSandboxManager({
+          workspace,
+          forbiddenPaths: ['/tmp/dir-link'],
         });
+
+        const bwrapArgs = await getBwrapArgs(
+          {
+            command: 'ls',
+            args: [],
+            cwd: workspace,
+            env: {},
+          },
+          customManager,
+        );
 
         const idx = bwrapArgs.indexOf('/opt/real-dir');
         expect(bwrapArgs[idx - 1]).toBe('--tmpfs');
@@ -456,16 +476,23 @@ describe('LinuxSandboxManager', () => {
         );
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 
-        const bwrapArgs = await getBwrapArgs({
-          command: 'ls',
-          args: ['-la'],
-          cwd: workspace,
-          env: {},
-          policy: {
-            allowedPaths: ['/tmp/conflict'],
-            forbiddenPaths: ['/tmp/conflict'],
-          },
+        const customManager = new LinuxSandboxManager({
+          workspace,
+          forbiddenPaths: ['/tmp/conflict'],
         });
+
+        const bwrapArgs = await getBwrapArgs(
+          {
+            command: 'ls',
+            args: ['-la'],
+            cwd: workspace,
+            env: {},
+            policy: {
+              allowedPaths: ['/tmp/conflict'],
+            },
+          },
+          customManager,
+        );
 
         const bindTryIdx = bwrapArgs.indexOf('--bind-try');
         const tmpfsIdx = bwrapArgs.lastIndexOf('--tmpfs');
