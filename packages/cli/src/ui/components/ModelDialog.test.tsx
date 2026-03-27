@@ -68,6 +68,7 @@ describe('<ModelDialog />', () => {
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
     getUserTier: () => UserTierId | undefined;
+    getLastRetrievedQuota: () => undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -80,6 +81,7 @@ describe('<ModelDialog />', () => {
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
     getUserTier: mockGetUserTier,
+    getLastRetrievedQuota: () => undefined,
   };
 
   beforeEach(() => {
