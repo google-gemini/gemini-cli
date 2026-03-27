@@ -12,6 +12,7 @@ import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import {
   SCROLL_TO_ITEM_END,
   type VirtualizedListRef,
@@ -22,6 +23,7 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { isTopicTool } from './messages/TopicMessage.js';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -33,7 +35,10 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
-  const isAlternateBuffer = useAlternateBuffer();
+  const isAlternateBufferOrTerminalBuffer = useAlternateBuffer();
+  const config = useConfig();
+  const useTerminalBuffer = config.getUseTerminalBuffer();
+  const isAlternateBuffer = config.getUseAlternateBuffer();
 
   const confirmingTool = useConfirmingTool();
   const showConfirmationQueue = confirmingTool !== null;
@@ -47,12 +52,23 @@ export const MainContent = () => {
     }
   }, [showConfirmationQueue, confirmingToolCallId]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      scrollableListRef.current?.scrollToEnd();
+    };
+    appEvents.on(AppEvent.ScrollToBottom, handleScroll);
+    return () => {
+      appEvents.off(AppEvent.ScrollToBottom, handleScroll);
+    };
+  }, []);
+
   const {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
     cleanUiDetailsVisible,
+    mouseMode,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
@@ -284,24 +300,68 @@ export const MainContent = () => {
     ],
   );
 
-  if (isAlternateBuffer) {
-    return (
-      <ScrollableList
-        ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
-        width={uiState.terminalWidth}
-        data={virtualizedData}
-        renderItem={renderItem}
-        estimatedItemHeight={() => 100}
-        keyExtractor={(item, _index) => {
-          if (item.type === 'header') return 'header';
-          if (item.type === 'history') return item.item.id.toString();
-          return 'pending';
-        }}
-        initialScrollIndex={SCROLL_TO_ITEM_END}
-        initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
-      />
-    );
+  const estimatedItemHeight = useCallback(() => 100, []);
+
+  const keyExtractor = useCallback(
+    (item: (typeof virtualizedData)[number], _index: number) => {
+      if (item.type === 'header') return 'header';
+      if (item.type === 'history') return item.item.id.toString();
+      return 'pending';
+    },
+    [],
+  );
+
+  const isStaticItem = useCallback(
+    (item: (typeof virtualizedData)[number]) => item.type !== 'pending',
+    [],
+  );
+
+  const scrollableList = useMemo(() => {
+    if (isAlternateBufferOrTerminalBuffer) {
+      return (
+        <ScrollableList
+          ref={scrollableListRef}
+          hasFocus={
+            !uiState.isEditorDialogOpen && !uiState.embeddedShellFocused
+          }
+          width={uiState.terminalWidth}
+          data={virtualizedData}
+          renderItem={renderItem}
+          estimatedItemHeight={estimatedItemHeight}
+          keyExtractor={keyExtractor}
+          initialScrollIndex={SCROLL_TO_ITEM_END}
+          initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
+          renderStatic={useTerminalBuffer}
+          isStaticItem={useTerminalBuffer ? isStaticItem : undefined}
+          overflowToBackbuffer={useTerminalBuffer && !isAlternateBuffer}
+          scrollbar={mouseMode}
+        />
+        // TODO(jacobr): consider adding stableScrollback={!config.getUseAlternateBuffer()}
+        // as that will reduce the # of cases where we will have to clear the
+        // scrollback buffer due to the scrollback size changing but we need to
+        // work out ensuring we only attempt it within a smaller range of
+        // scrollback vals. Right now it sometimes triggers adding more white
+        // space than it should.
+      );
+    }
+    return null;
+  }, [
+    isAlternateBufferOrTerminalBuffer,
+    uiState.isEditorDialogOpen,
+    uiState.embeddedShellFocused,
+    uiState.terminalWidth,
+    virtualizedData,
+    renderItem,
+    estimatedItemHeight,
+    keyExtractor,
+    useTerminalBuffer,
+    isStaticItem,
+    mouseMode,
+    isAlternateBuffer,
+  ]);
+
+  if (isAlternateBufferOrTerminalBuffer) {
+    return scrollableList;
   }
 
   return (

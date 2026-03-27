@@ -119,7 +119,7 @@ describe('terminalSerializer', () => {
       await writeToTerminal(terminal, '\x1b[7mInverse text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].inverse).toBe(true);
-      expect(result[0][0].text).toBe('Inverse text');
+      expect(result[0][0].text.trim()).toBe('Inverse text');
     });
 
     it('should handle foreground colors', async () => {

@@ -36,15 +36,11 @@ export async function toMatchSvgSnapshot(
   }
 
   let textContent: string;
-  if (renderInstance.lastFrameRaw) {
-    textContent = renderInstance.lastFrameRaw({
-      allowEmpty: options?.allowEmpty,
-    });
-  } else if (renderInstance.lastFrame) {
+  if (renderInstance.lastFrame) {
     textContent = renderInstance.lastFrame({ allowEmpty: options?.allowEmpty });
   } else {
     throw new Error(
-      'toMatchSvgSnapshot requires a renderInstance with either lastFrameRaw or lastFrame',
+      'toMatchSvgSnapshot requires a renderInstance with lastFrame',
     );
   }
   const svgContent = renderInstance.generateSvg();
