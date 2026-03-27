@@ -1,14 +1,10 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs/promises';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { CommandKind, type SlashCommand } from './types.js';
-import type { ConversationRecord } from '@google/gemini-cli-core';
 
 /**
  * /fork
@@ -39,34 +35,15 @@ export const forkCommand: SlashCommand = {
       };
     }
 
-    const conversation = recordingService.getConversation();
-    if (!conversation || conversation.messages.length === 0) {
+    const shortId = recordingService.fork();
+
+    if (!shortId) {
       return {
         type: 'message',
         messageType: 'info',
         content: 'Nothing to fork yet — start a conversation first.',
       };
     }
-
-    const forkSessionId = randomUUID();
-    const shortId = forkSessionId.slice(0, 8);
-    const timestamp = new Date().toISOString().slice(0, 16).replace(/:/g, '-');
-    const filename = `session-${timestamp}-${shortId}.json`;
-
-    const forked: ConversationRecord = {
-      ...conversation,
-      sessionId: forkSessionId,
-      startTime: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
-    };
-
-    const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
-    await fs.mkdir(chatsDir, { recursive: true });
-    await fs.writeFile(
-      path.join(chatsDir, filename),
-      JSON.stringify(forked, null, 2),
-      'utf-8',
-    );
 
     return {
       type: 'message',
