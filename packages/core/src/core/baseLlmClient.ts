@@ -347,7 +347,7 @@ export class BaseLlmClient {
             attempt,
             maxAttempts: actualMaxAttempts,
             delayMs,
-            error: errorType,
+            error: error instanceof Error ? error.message : String(error),
             errorCode: errorType,
             model: modelName,
           });
