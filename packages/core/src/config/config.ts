@@ -58,6 +58,7 @@ import {
   uiTelemetryService,
   type TelemetryTarget,
 } from '../telemetry/index.js';
+import { sanitizeErrorMessage } from '../utils/agent-sanitization-utils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
@@ -162,6 +163,34 @@ import { InjectionService } from './injectionService.js';
 import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
+
+function sanitizeFeedbackError(error: unknown): unknown {
+  if (typeof error === 'string') {
+    return sanitizeErrorMessage(error);
+  }
+
+  if (!(error instanceof Error)) {
+    return error;
+  }
+
+  const sanitizedMessage = sanitizeErrorMessage(error.message);
+  const sanitizedStack = error.stack
+    ? sanitizeErrorMessage(error.stack)
+    : undefined;
+
+  if (sanitizedMessage === error.message && sanitizedStack === error.stack) {
+    return error;
+  }
+
+  const sanitizedError = new Error(sanitizedMessage, { cause: error.cause });
+  sanitizedError.name = error.name;
+
+  if (sanitizedStack) {
+    sanitizedError.stack = sanitizedStack;
+  }
+
+  return sanitizedError;
+}
 
 import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
@@ -1312,7 +1341,7 @@ export class Config implements McpContext, AgentLoopContext {
         coreEvents.emitFeedback(
           'error',
           'Invalid proxy configuration detected. Check debug drawer for more details (F12)',
-          error,
+          sanitizeFeedbackError(error),
         );
       }
     }

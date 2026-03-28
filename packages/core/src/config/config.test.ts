@@ -1418,6 +1418,30 @@ describe('Server Config (config.ts)', () => {
       );
     });
 
+    it('should redact embedded proxy credentials in emitted proxy errors', () => {
+      const proxyError = new Error(
+        'Invalid proxy URL: http://api-key-123:super-secret@proxy.example.com:8080',
+      );
+      mockSetGlobalProxy.mockImplementation(() => {
+        throw proxyError;
+      });
+
+      const paramsWithProxy: ConfigParameters = {
+        ...baseParams,
+        proxy: 'http://api-key-123:super-secret@proxy.example.com:8080',
+      };
+      new Config(paramsWithProxy);
+
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+      const emittedError = mockCoreEvents.emitFeedback.mock.calls[0]?.[2];
+      expect(emittedError).toBeInstanceOf(Error);
+      expect((emittedError as Error).message).toContain(
+        'http://[REDACTED]@proxy.example.com:8080',
+      );
+      expect((emittedError as Error).message).not.toContain('api-key-123');
+      expect((emittedError as Error).message).not.toContain('super-secret');
+    });
+
     it('should not emit error feedback when setGlobalProxy succeeds', () => {
       mockSetGlobalProxy.mockImplementation(() => {
         // Success - no error thrown
