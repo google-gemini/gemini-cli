@@ -11,7 +11,6 @@ import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_STRATEGIC_INTENT,
-
   makeFakeConfig,
   CoreToolCallStatus,
   ApprovalMode,
@@ -19,7 +18,8 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   EDIT_DISPLAY_NAME,
   READ_FILE_DISPLAY_NAME,
-  GLOB_DISPLAY_NAME} from '@google/gemini-cli-core';
+  GLOB_DISPLAY_NAME,
+} from '@google/gemini-cli-core';
 import type {
   HistoryItem,
   HistoryItemWithoutId,
@@ -314,6 +314,14 @@ describe('<ToolGroupMessage />', () => {
 
     it('renders mixed tool calls including update_topic', async () => {
       const toolCalls = [
+        createToolCall({
+          callId: 'topic-tool-mixed',
+          name: UPDATE_TOPIC_TOOL_NAME,
+          args: {
+            [TOPIC_PARAM_TITLE]: 'Testing Topic',
+            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
+          },
+        }),
         createToolCall({
           callId: 'tool-1',
           name: 'read_file',

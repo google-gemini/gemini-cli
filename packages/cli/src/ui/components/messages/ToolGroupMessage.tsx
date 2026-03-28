@@ -279,26 +279,26 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           </Box>
         );
       })}
-      {
-        /*
-            We have to keep the bottom border separate so it doesn't get
-            drawn over by the sticky header directly inside it.
-           */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
-          borderBottomOverride !== false && (
-            <Box
-              height={0}
-              width={contentWidth}
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={borderBottomOverride ?? true}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              borderStyle="round"
-            />
-          )
-      }
+      {/*
+          We have to keep the bottom border separate so it doesn't get
+          drawn over by the sticky header directly inside it.
+         */}
+      {(visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
+        borderBottomOverride !== false &&
+        (visibleToolCalls.length === 0 ||
+          !visibleToolCalls.every((tool) => isTopicTool(tool.name))) && (
+          <Box
+            height={0}
+            width={contentWidth}
+            borderLeft={true}
+            borderRight={true}
+            borderTop={false}
+            borderBottom={borderBottomOverride ?? true}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+            borderStyle="round"
+          />
+        )}
     </Box>
   );
 
