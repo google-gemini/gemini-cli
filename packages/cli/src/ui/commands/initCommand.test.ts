@@ -9,8 +9,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { initCommand } from './initCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import type { CommandContext } from './types.js';
-import type { SubmitPromptActionReturn } from '@google/gemini-cli-core';
+import type { CommandContext, SlashCommandActionReturn } from './types.js';
+import { type SubmitPromptActionReturn } from '@google/gemini-cli-core';
 
 // Mock the 'fs' module
 vi.mock('fs', async (importOriginal) => {
@@ -19,6 +19,7 @@ vi.mock('fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn(),
     writeFileSync: vi.fn(),
+    readFileSync: vi.fn(),
   };
 });
 
@@ -48,6 +49,7 @@ describe('initCommand', () => {
   it('should inform the user if GEMINI.md already exists', async () => {
     // Arrange: Simulate that the file exists
     vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('some content');
 
     // Act: Run the command's action
     const result = await initCommand.action!(mockContext, '');
@@ -61,6 +63,21 @@ describe('initCommand', () => {
     });
     // Assert: Ensure no file was written
     expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it('should re-run init if GEMINI.md exists but is empty', async () => {
+    // Arrange: Simulate that the file exists but is empty
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('');
+
+    // Act: Run the command's action
+    const result = (await initCommand.action!(
+      mockContext,
+      '',
+    )) as SlashCommandActionReturn;
+
+    // Assert: Check that it returns a submit_prompt action (treating it as if the file doesn't have content)
+    expect(result.type).toBe('submit_prompt');
   });
 
   it('should create GEMINI.md and submit a prompt if it does not exist', async () => {
