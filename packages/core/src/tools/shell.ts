@@ -709,7 +709,7 @@ export class ShellTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
-      this.context.config,
+      this.context,
       params,
       messageBus,
       _toolName,
