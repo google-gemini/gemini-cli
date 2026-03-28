@@ -236,6 +236,17 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export type HistoryItemPerfStats = HistoryItemBase & {
+  type: 'perf_stats';
+  memoryUsage: {
+    rss: number;
+    heapUsed: number;
+    heapTotal: number;
+    external: number;
+  };
+  startupPhases: Array<import('@google/gemini-cli-core').StartupPhaseStats> | null;
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -384,6 +395,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemPerfStats
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -409,6 +421,7 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  PERF_STATS = 'perf_stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
@@ -460,6 +473,20 @@ export type Message =
   | {
       type: MessageType.TOOL_STATS;
       timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.PERF_STATS;
+      timestamp: Date;
+      memoryUsage: {
+        rss: number;
+        heapUsed: number;
+        heapTotal: number;
+        external: number;
+      };
+      startupPhases:
+        | Array<import('@google/gemini-cli-core').StartupPhaseStats>
+        | null;
       content?: string;
     }
   | {
