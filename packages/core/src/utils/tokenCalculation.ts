@@ -20,6 +20,26 @@ const IMAGE_TOKEN_ESTIMATE = 3000;
 // See: https://ai.google.dev/gemini-api/docs/document-processing
 const PDF_TOKEN_ESTIMATE = 25800;
 
+// Audio token estimation constants.
+// The Gemini API tokenizes audio at ~32 tokens per second.
+// See: https://ai.google.dev/gemini-api/docs/audio
+const AUDIO_TOKENS_PER_SECOND = 32;
+// Conservative bitrate for compressed audio duration estimation (128 kbps).
+// Used to convert raw file size to an approximate duration.
+const COMPRESSED_AUDIO_BYTES_PER_SECOND = 16_000;
+// Default audio token estimate when base64 data is unavailable (~2 min).
+const DEFAULT_AUDIO_TOKEN_ESTIMATE = 120 * AUDIO_TOKENS_PER_SECOND;
+
+// Video token estimation constants.
+// Video frames are tokenized at 258 tokens/frame at 1 fps, plus the audio
+// track at 32 tokens/second.
+// See: https://ai.google.dev/gemini-api/docs/vision#video
+const VIDEO_TOKENS_PER_SECOND = 258 + AUDIO_TOKENS_PER_SECOND;
+// Conservative bitrate for compressed video duration estimation (~2 Mbps).
+const COMPRESSED_VIDEO_BYTES_PER_SECOND = 250_000;
+// Default video token estimate when base64 data is unavailable (~1 min).
+const DEFAULT_VIDEO_TOKEN_ESTIMATE = 60 * VIDEO_TOKENS_PER_SECOND;
+
 // Maximum number of characters to process with the full character-by-character heuristic.
 // Above this, we use a faster approximation to avoid performance bottlenecks.
 const MAX_CHARS_FOR_FULL_HEURISTIC = 100_000;
@@ -50,7 +70,55 @@ function estimateTextTokens(text: string): number {
 }
 
 /**
- * Heuristic estimation for media parts (images, PDFs) using fixed safe estimates.
+ * Estimates tokens for duration-based media (audio, video) from base64 data size.
+ *
+ * Converts the base64 length to a raw byte count, estimates the duration
+ * using a conservative bitrate, then multiplies by the token rate.
+ *
+ * When no base64 data is available (e.g. fileData references), returns a fixed
+ * default estimate.
+ */
+function estimateMediaDurationTokens(
+  base64Data: string | undefined,
+  defaultEstimate: number,
+  bytesPerSecond: number,
+  tokensPerSecond: number,
+): number {
+  if (base64Data === undefined) return defaultEstimate;
+  const rawBytes = base64Data.length * 0.75;
+  const estimatedSeconds = rawBytes / bytesPerSecond;
+  return Math.ceil(estimatedSeconds * tokensPerSecond);
+}
+
+/**
+ * Estimates audio tokens.
+ * @see estimateMediaDurationTokens
+ */
+function estimateAudioTokens(base64Data: string | undefined): number {
+  return estimateMediaDurationTokens(
+    base64Data,
+    DEFAULT_AUDIO_TOKEN_ESTIMATE,
+    COMPRESSED_AUDIO_BYTES_PER_SECOND,
+    AUDIO_TOKENS_PER_SECOND,
+  );
+}
+
+/**
+ * Estimates video tokens.
+ * @see estimateMediaDurationTokens
+ */
+function estimateVideoTokens(base64Data: string | undefined): number {
+  return estimateMediaDurationTokens(
+    base64Data,
+    DEFAULT_VIDEO_TOKEN_ESTIMATE,
+    COMPRESSED_VIDEO_BYTES_PER_SECOND,
+    VIDEO_TOKENS_PER_SECOND,
+  );
+}
+
+/**
+ * Heuristic estimation for media parts (images, PDFs, audio, video) using
+ * either fixed safe estimates or data-size-based duration estimation.
  */
 function estimateMediaTokens(part: Part): number | undefined {
   const inlineData = 'inlineData' in part ? part.inlineData : undefined;
@@ -65,6 +133,14 @@ function estimateMediaTokens(part: Part): number | undefined {
     // PDFs: 25,800 tokens (~100 pages at 258 tokens/page)
     // See: https://ai.google.dev/gemini-api/docs/document-processing
     return PDF_TOKEN_ESTIMATE;
+  } else if (mimeType?.startsWith('audio/')) {
+    // Audio: ~32 tokens per second of audio content.
+    // See: https://ai.google.dev/gemini-api/docs/audio
+    return estimateAudioTokens(inlineData?.data);
+  } else if (mimeType?.startsWith('video/')) {
+    // Video: 258 tokens/frame at 1 fps + 32 tokens/sec for the audio track.
+    // See: https://ai.google.dev/gemini-api/docs/vision#video
+    return estimateVideoTokens(inlineData?.data);
   }
   return undefined;
 }
