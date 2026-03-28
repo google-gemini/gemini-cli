@@ -349,6 +349,7 @@ export class TestRig {
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
   private _initialized = false;
+  private _modelOverride?: string;
 
   setup(
     testName: string,
@@ -356,9 +357,11 @@ export class TestRig {
       settings?: Record<string, unknown>;
       state?: Record<string, unknown>;
       fakeResponsesPath?: string;
+      model?: string;
     } = {},
   ) {
     this.testName = testName;
+    this._modelOverride = options.model;
     const sanitizedName = sanitizeTestName(testName);
     const testFileDir =
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
@@ -430,6 +433,53 @@ export class TestRig {
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
+    const modelEnv = this._modelOverride || env['GEMINI_MODEL'];
+    const models = modelEnv
+      ? modelEnv.split(',').map((m) => m.trim())
+      : [DEFAULT_GEMINI_MODEL];
+
+    const modelSettings: Record<string, any> = {};
+    if (models.length > 1) {
+      // Setup custom fallback chain for integration tests
+      const chainName = 'integration-test-model';
+      modelSettings['model'] = { name: chainName };
+      modelSettings['experimental'] = { dynamicModelConfiguration: true };
+      modelSettings['modelConfigs'] = {
+        modelDefinitions: {
+          [chainName]: {
+            tier: 'auto',
+            isPreview: true,
+            isVisible: false,
+          },
+        },
+        modelIdResolutions: {
+          [chainName]: {
+            default: models[0],
+          },
+        },
+        modelChains: {
+          [chainName]: models.map((m, i) => ({
+            model: m,
+            isLastResort: i === models.length - 1,
+            actions: {
+              terminal: 'silent',
+              transient: 'silent',
+              not_found: 'silent',
+              unknown: 'silent',
+            },
+            stateTransitions: {
+              terminal: 'terminal',
+              transient: 'terminal',
+              not_found: 'terminal',
+              unknown: 'terminal',
+            },
+          })),
+        },
+      };
+    } else {
+      modelSettings['model'] = { name: models[0] };
+    }
+
     const settings = deepMerge(
       {
         general: {
@@ -454,13 +504,7 @@ export class TestRig {
         ui: {
           useAlternateBuffer: true,
         },
-        ...(env['GEMINI_TEST_TYPE'] === 'integration'
-          ? {
-              model: {
-                name: DEFAULT_GEMINI_MODEL,
-              },
-            }
-          : {}),
+        ...(env['GEMINI_TEST_TYPE'] === 'integration' ? modelSettings : {}),
         sandbox:
           env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
         // Don't show the IDE connection dialog when running from VsCode
