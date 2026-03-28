@@ -4,15 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  MCPServerConfig,
-  ExtensionInstallMetadata,
-  CustomTheme,
+import {
+  type MCPServerConfig,
+  type ExtensionInstallMetadata,
+  type CustomTheme,
+  type PolicyRule,
+  type SafetyCheckerRule,
+  type GeminiCLIExtension,
+  type ResolvedExtensionSetting,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { INSTALL_METADATA_FILENAME } from './extensions/variables.js';
+import { z } from 'zod';
 import type { ExtensionSetting } from './extensions/extensionSettings.js';
+import {
+  INSTALL_METADATA_FILENAME,
+  recursivelyHydrateStrings,
+  type JsonObject,
+} from './extensions/variables.js';
 
 /**
  * Extension definition as written to disk in gemini-extension.json files.
@@ -24,6 +33,10 @@ import type { ExtensionSetting } from './extensions/extensionSettings.js';
 export interface ExtensionConfig {
   name: string;
   version: string;
+  manifestType?: 'gemini' | 'open-plugin';
+  description?: string;
+  author?: string | { name: string; email?: string; url?: string };
+  license?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -48,6 +61,34 @@ export interface ExtensionConfig {
   migratedTo?: string;
 }
 
+export const geminiExtensionSchema = z.object({
+  name: z.string().min(1),
+  version: z.string().min(1),
+  description: z.string().optional(),
+  author: z
+    .union([
+      z.string(),
+      z.object({
+        name: z.string(),
+        email: z.string().optional(),
+        url: z.string().optional(),
+      }),
+    ])
+    .optional(),
+  license: z.string().optional(),
+  mcpServers: z.record(z.any()).optional(),
+  contextFileName: z.union([z.string(), z.array(z.string())]).optional(),
+  excludeTools: z.array(z.string()).optional(),
+  settings: z.array(z.any()).optional(),
+  themes: z.array(z.any()).optional(),
+  plan: z
+    .object({
+      directory: z.string().optional(),
+    })
+    .optional(),
+  migratedTo: z.string().optional(),
+});
+
 export interface ExtensionUpdateInfo {
   name: string;
   originalVersion: string;
@@ -66,4 +107,84 @@ export function loadInstallMetadata(
   } catch (_e) {
     return undefined;
   }
+}
+
+/**
+ * Loads a Gemini CLI extension manifest.
+ */
+export async function loadGeminiConfig(
+  manifestPath: string,
+  extensionDir: string,
+  workspaceDir: string,
+): Promise<ExtensionConfig> {
+  const content = await fs.promises.readFile(manifestPath, 'utf-8');
+  const json = JSON.parse(content) as unknown;
+  const result = geminiExtensionSchema.safeParse(json);
+  if (!result.success) {
+    throw new Error(`Invalid gemini-extension.json: ${result.error.message}`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const rawConfig = result.data as unknown as ExtensionConfig;
+
+  // Hydrate strings with basic context
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const config = recursivelyHydrateStrings(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    rawConfig as unknown as JsonObject,
+    {
+      extensionPath: extensionDir,
+      PLUGIN_ROOT: extensionDir,
+      workspacePath: workspaceDir,
+      '/': path.sep,
+      pathSeparator: path.sep,
+    },
+  ) as unknown as ExtensionConfig;
+
+  config.manifestType = 'gemini';
+  return config;
+}
+
+/**
+ * Factory for creating a GeminiCLIExtension from a Gemini config.
+ */
+export function createGeminiExtension(
+  config: ExtensionConfig,
+  extensionDir: string,
+  isActive: boolean,
+  id: string,
+  contextFiles: string[],
+  resolvedSettings: ResolvedExtensionSetting[],
+  installMetadata?: ExtensionInstallMetadata,
+  hooks?: GeminiCLIExtension['hooks'],
+  skills?: GeminiCLIExtension['skills'],
+  agents?: GeminiCLIExtension['agents'],
+  rules?: PolicyRule[],
+  checkers?: SafetyCheckerRule[],
+): GeminiCLIExtension {
+  return {
+    name: config.name,
+    version: config.version,
+    path: extensionDir,
+    isActive,
+    id,
+    installMetadata,
+    manifestType: 'gemini',
+    description: config.description,
+    author: config.author,
+    license: config.license,
+    contextFiles,
+    mcpServers: config.mcpServers,
+    excludeTools: config.excludeTools,
+    settings: config.settings,
+    resolvedSettings,
+    hooks,
+    skills,
+    agents,
+    themes: config.themes,
+    rules,
+    checkers,
+    plan: config.plan,
+    migratedTo: config.migratedTo,
+  };
 }

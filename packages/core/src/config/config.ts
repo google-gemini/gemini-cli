@@ -373,6 +373,10 @@ export interface GeminiCLIExtension {
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+  manifestType?: 'gemini' | 'open-plugin';
+  description?: string;
+  author?: string | { name: string; email?: string; url?: string };
+  license?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];

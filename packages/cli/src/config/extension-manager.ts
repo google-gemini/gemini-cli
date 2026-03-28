@@ -11,7 +11,19 @@ import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
+import {
+  loadInstallMetadata,
+  loadGeminiConfig,
+  createGeminiExtension,
+  type ExtensionConfig,
+} from './extension.js';
+import {
+  findManifest,
+  loadOpenPluginConfig,
+  createOpenPlugin,
+  type OpenPluginConfig,
+  OPEN_PLUGIN_NAME_REGEX,
+} from './plugin.js';
 import {
   isWorkspaceTrusted,
   loadTrustedFolders,
@@ -65,7 +77,6 @@ import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { ExtensionStorage } from './extensions/storage.js';
 import {
-  EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
   recursivelyHydrateStrings,
   type JsonObject,
@@ -292,6 +303,10 @@ Would you like to attempt to install via "git clone" instead?`,
 
       try {
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
+
+        if (!newExtensionConfig) {
+          throw new Error('Failed to load extension configuration');
+        }
 
         const newExtensionName = newExtensionConfig.name;
         const previousName = previousExtensionConfig?.name ?? newExtensionName;
@@ -757,23 +772,59 @@ Would you like to attempt to install via "git clone" instead?`,
       effectiveExtensionPath = installMetadata.source;
     }
 
-    try {
-      let config = await this.loadExtensionConfig(effectiveExtensionPath);
+    const manifestInfo = findManifest(effectiveExtensionPath);
+    if (!manifestInfo) {
+      debugLogger.warn(
+        `Warning: Skipping extension in ${effectiveExtensionPath}: No manifest found.`,
+      );
+      return null;
+    }
 
-      const extensionId = getExtensionId(config, installMetadata);
+    try {
+      // Bifurcate loading based on manifest type
+      if (manifestInfo.type === 'open-plugin') {
+        const config = await loadOpenPluginConfig(
+          manifestInfo.path,
+          effectiveExtensionPath,
+          this.workspaceDir,
+        );
+        validateName(config.name);
+        const extensionId = getExtensionId(config, installMetadata);
+        return await createOpenPlugin(
+          effectiveExtensionPath,
+          manifestInfo.path,
+          this.extensionEnablementManager.isEnabled(
+            config.name,
+            this.workspaceDir,
+          ),
+          extensionId,
+          this.workspaceDir,
+          installMetadata,
+        );
+      }
+
+      // Gemini CLI Extension loading path
+      const rawConfig = await loadGeminiConfig(
+        manifestInfo.path,
+        effectiveExtensionPath,
+        this.workspaceDir,
+      );
+      validateName(rawConfig.name);
+
+      const extensionId = getExtensionId(rawConfig, installMetadata);
 
       let userSettings: Record<string, string> = {};
       let workspaceSettings: Record<string, string> = {};
 
       if (this.settings.experimental.extensionConfig) {
         userSettings = await getScopedEnvContents(
-          config,
+          rawConfig,
           extensionId,
           ExtensionSettingScope.USER,
         );
         if (isWorkspaceTrusted(this.settings).isTrusted) {
           workspaceSettings = await getScopedEnvContents(
-            config,
+            rawConfig,
             extensionId,
             ExtensionSettingScope.WORKSPACE,
             this.workspaceDir,
@@ -782,7 +833,8 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       const customEnv = { ...userSettings, ...workspaceSettings };
-      config = resolveEnvVarsInObject(config, customEnv);
+      // config is already hydrated in loadGeminiConfig, but we might need to re-hydrate with customEnv
+      const config = resolveEnvVarsInObject(rawConfig, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
       if (config.settings && this.settings.experimental.extensionConfig) {
@@ -874,6 +926,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       const hydrationContext: VariableContext = {
         extensionPath: effectiveExtensionPath,
+        PLUGIN_ROOT: effectiveExtensionPath,
         workspacePath: this.workspaceDir,
         '/': path.sep,
         pathSeparator: path.sep,
@@ -957,30 +1010,23 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
 
-      return {
-        name: config.name,
-        version: config.version,
-        path: effectiveExtensionPath,
-        contextFiles,
-        installMetadata,
-        migratedTo: config.migratedTo,
-        mcpServers: config.mcpServers,
-        excludeTools: config.excludeTools,
-        hooks,
-        isActive: this.extensionEnablementManager.isEnabled(
+      return createGeminiExtension(
+        config,
+        effectiveExtensionPath,
+        this.extensionEnablementManager.isEnabled(
           config.name,
           this.workspaceDir,
         ),
-        id: getExtensionId(config, installMetadata),
-        settings: config.settings,
+        extensionId,
+        contextFiles,
         resolvedSettings,
+        installMetadata,
+        hooks,
         skills,
-        agents: agentLoadResult.agents,
-        themes: config.themes,
+        agentLoadResult.agents,
         rules,
         checkers,
-        plan: config.plan,
-      };
+      );
     } catch (e) {
       debugLogger.error(
         `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
@@ -1013,39 +1059,27 @@ Would you like to attempt to install via "git clone" instead?`,
   }
 
   async loadExtensionConfig(extensionDir: string): Promise<ExtensionConfig> {
-    const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
-    if (!fs.existsSync(configFilePath)) {
-      throw new Error(`Configuration file not found at ${configFilePath}`);
+    const manifestInfo = findManifest(extensionDir);
+    if (!manifestInfo) {
+      throw new Error(`Configuration file not found in ${extensionDir}`);
     }
-    try {
-      const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const rawConfig = JSON.parse(configContent) as ExtensionConfig;
-      if (!rawConfig.name || !rawConfig.version) {
-        throw new Error(
-          `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
-        );
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const config = recursivelyHydrateStrings(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        rawConfig as unknown as JsonObject,
-        {
-          extensionPath: extensionDir,
-          workspacePath: this.workspaceDir,
-          '/': path.sep,
-          pathSeparator: path.sep,
-        },
-      ) as unknown as ExtensionConfig;
 
+    if (manifestInfo.type === 'open-plugin') {
+      const config = await loadOpenPluginConfig(
+        manifestInfo.path,
+        extensionDir,
+        this.workspaceDir,
+      );
       validateName(config.name);
       return config;
-    } catch (e) {
-      throw new Error(
-        `Failed to load extension config from ${configFilePath}: ${getErrorMessage(
-          e,
-        )}`,
+    } else {
+      const config = await loadGeminiConfig(
+        manifestInfo.path,
+        extensionDir,
+        this.workspaceDir,
       );
+      validateName(config.name);
+      return config;
     }
   }
 
@@ -1279,9 +1313,9 @@ function getContextFileNames(config: ExtensionConfig): string[] {
 }
 
 function validateName(name: string) {
-  if (!/^[a-zA-Z0-9-]+$/.test(name)) {
+  if (!OPEN_PLUGIN_NAME_REGEX.test(name) && !/^[a-zA-Z0-9-]+$/.test(name)) {
     throw new Error(
-      `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.`,
+      `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), dashes (-), and dots (.) are allowed. Names must start and end with an alphanumeric character.`,
     );
   }
 }
@@ -1328,7 +1362,7 @@ export async function inferInstallMetadata(
 }
 
 export function getExtensionId(
-  config: ExtensionConfig,
+  config: ExtensionConfig | OpenPluginConfig,
   installMetadata?: ExtensionInstallMetadata,
 ): string {
   // IDs are created by hashing details of the installation source in order to

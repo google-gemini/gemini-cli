@@ -20,6 +20,11 @@ const UNMARSHALL_KEY_IGNORE_LIST: Set<string> = new Set<string>([
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
+export const OPEN_PLUGIN_CONFIG_FILENAME = 'plugin.json';
+export const HIDDEN_OPEN_PLUGIN_CONFIG_FILENAME = path.join(
+  '.plugin',
+  'plugin.json',
+);
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 export const EXTENSION_SETTINGS_FILENAME = '.env';
 
