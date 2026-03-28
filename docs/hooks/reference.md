@@ -177,6 +177,9 @@ case is response validation and automatic retries.
   - `continue`: Set to `false` to **stop the session** without retrying.
   - `hookSpecificOutput.clearContext`: If `true`, clears conversation history
     (LLM memory) while preserving UI display.
+  - `hookSpecificOutput.followUpPrompt`: If set, the prompt will be used to
+    start a new conversation turn. `followUpPrompt` will not run when the
+    `decision` is `"deny"`.
 - **Exit Code 2 (Retry)**: Rejects the response and triggers an automatic retry
   turn using `stderr` as the feedback prompt.
 

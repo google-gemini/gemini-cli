@@ -3598,6 +3598,7 @@ ${JSON.stringify(
           shouldStopExecution: () => true,
           getEffectiveReason: () => 'Stopped after agent',
           shouldClearContext: () => false,
+          getFollowUpPrompt: () => '',
           systemMessage: undefined,
         });
 
@@ -3629,12 +3630,14 @@ ${JSON.stringify(
             isBlockingDecision: () => true,
             getEffectiveReason: () => 'Please explain',
             shouldClearContext: () => false,
+            getFollowUpPrompt: () => '',
             systemMessage: undefined,
           })
           .mockResolvedValueOnce({
             shouldStopExecution: () => false,
             isBlockingDecision: () => false,
             shouldClearContext: () => false,
+            getFollowUpPrompt: () => '',
             systemMessage: undefined,
           });
 
@@ -3692,12 +3695,14 @@ ${JSON.stringify(
             isBlockingDecision: () => true,
             getEffectiveReason: () => 'Blocked and clearing context',
             shouldClearContext: () => true,
+            getFollowUpPrompt: () => '',
             systemMessage: undefined,
           })
           .mockResolvedValueOnce({
             shouldStopExecution: () => false,
             isBlockingDecision: () => false,
             shouldClearContext: () => false,
+            getFollowUpPrompt: () => '',
             systemMessage: undefined,
           });
 
@@ -3723,6 +3728,141 @@ ${JSON.stringify(
         expect(resetChatSpy).toHaveBeenCalledTimes(1);
 
         resetChatSpy.mockRestore();
+      });
+
+      it('should call start a new conversation turn when getFollowUpPrompt in AfterAgent hook returns a non-empty string', async () => {
+        mockHookSystem.fireAfterAgentEvent
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            getEffectiveReason: () => '',
+            shouldClearContext: () => false,
+            getFollowUpPrompt: () => 'Follow up prompt',
+            systemMessage: undefined,
+          })
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            shouldClearContext: () => false,
+            getFollowUpPrompt: () => '',
+            systemMessage: undefined,
+          });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+
+        await fromAsync(stream);
+
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          expect.anything(),
+          [{ text: 'Follow up prompt' }],
+          expect.anything(),
+          undefined,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
+      });
+
+      it('should clear context before starting follow-up prompt turn when shouldClearContext is true', async () => {
+        const resetChatSpy = vi
+          .spyOn(client, 'resetChat')
+          .mockResolvedValue(undefined);
+
+        mockHookSystem.fireAfterAgentEvent
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            getEffectiveReason: () => '',
+            shouldClearContext: () => true,
+            getFollowUpPrompt: () => 'Follow up prompt after clear',
+            systemMessage: undefined,
+          })
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            shouldClearContext: () => false,
+            getFollowUpPrompt: () => '',
+            systemMessage: undefined,
+          });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt-clear-followup',
+        );
+
+        await fromAsync(stream);
+
+        expect(resetChatSpy).toHaveBeenCalledTimes(1);
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          expect.anything(),
+          [{ text: 'Follow up prompt after clear' }],
+          expect.anything(),
+          undefined,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
+
+        resetChatSpy.mockRestore();
+      });
+
+      it('should prioritize blocking continuation over follow-up prompt when both are present', async () => {
+        mockHookSystem.fireAfterAgentEvent
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => true,
+            getEffectiveReason: () => 'Please explain',
+            shouldClearContext: () => false,
+            getFollowUpPrompt: () => 'Follow up prompt',
+            systemMessage: undefined,
+          })
+          .mockResolvedValueOnce({
+            shouldStopExecution: () => false,
+            isBlockingDecision: () => false,
+            shouldClearContext: () => false,
+            getFollowUpPrompt: () => '',
+            systemMessage: undefined,
+          });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'Response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt-both-continuations',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: expect.objectContaining({ reason: 'Please explain' }),
+          }),
+        );
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+        expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+          2,
+          expect.anything(),
+          [{ text: 'Please explain' }],
+          expect.anything(),
+          undefined,
+        );
+        expect(client['hookStateMap'].size).toBe(0);
       });
     });
   });
