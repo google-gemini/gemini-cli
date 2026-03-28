@@ -17,6 +17,7 @@ import {
   type EditorType,
   ApprovalMode,
   hasRedirection,
+  canShowAutoApproveCheckbox,
   debugLogger,
 } from '@google/gemini-cli-core';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
@@ -352,7 +353,11 @@ export const ToolConfirmationMessage: React.FC<
           value: ToolConfirmationOutcome.ProceedAlways,
           key: `Allow for this session`,
         });
-        if (allowPermanentApproval) {
+        const isAutoApprovable = canShowAutoApproveCheckbox(
+          confirmationDetails.command,
+          config.getApprovalMode(),
+        );
+        if (allowPermanentApproval && isAutoApprovable) {
           options.push({
             label: `Allow this command for all future sessions`,
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,

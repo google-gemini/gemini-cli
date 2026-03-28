@@ -4,15 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  beforeAll,
+} from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import {
   type SerializableConfirmationDetails,
   type ToolCallConfirmationDetails,
   type Config,
   ToolConfirmationOutcome,
+  initializeShellParsers,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import '../../../test-utils/customMatchers.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { act } from 'react';
@@ -29,6 +39,119 @@ vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
 });
 
 describe('ToolConfirmationMessage', () => {
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
+
+  describe('Auto-approve checkbox for exec tools', () => {
+    const mockSettingsWithPermanent = createMockSettings({
+      merged: { security: { enablePermanentToolApproval: true } },
+    });
+
+    const mockConfigWithPermanent = {
+      isTrustedFolder: () => true,
+      getIdeMode: () => false,
+      getDisableAlwaysAllow: () => false,
+      getApprovalMode: () => 'default',
+    } as unknown as Config;
+
+    it.each([
+      {
+        description: 'safe commands',
+        command: 'ls -la',
+        rootCommand: 'ls',
+        approvalMode: 'default',
+      },
+      {
+        description: 'edit commands in AUTO_EDIT mode',
+        command: 'mkdir test',
+        rootCommand: 'mkdir',
+        approvalMode: 'autoEdit',
+      },
+    ])(
+      'shows permanent approval option for $description',
+      async ({ command, rootCommand, approvalMode }) => {
+        const mockConfigDynamic = {
+          ...mockConfigWithPermanent,
+          getApprovalMode: () => approvalMode,
+        } as unknown as Config;
+
+        const exec: SerializableConfirmationDetails = {
+          type: 'exec',
+          title: 'Confirm Execution',
+          command,
+          rootCommand,
+          rootCommands: [rootCommand],
+        };
+
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ToolConfirmationMessage
+              callId="test-call-id"
+              confirmationDetails={exec}
+              config={mockConfigDynamic}
+              getPreferredEditor={vi.fn()}
+              availableTerminalHeight={30}
+              terminalWidth={80}
+            />,
+            { settings: mockSettingsWithPermanent },
+          );
+
+        await waitUntilReady();
+        expect(lastFrame()).toMatchSnapshot();
+        unmount();
+      },
+    );
+
+    it.each([
+      {
+        description: 'unsafe commands',
+        command: 'rm -rf /',
+        rootCommand: 'rm',
+        approvalMode: 'default',
+      },
+      {
+        description: 'edit commands in DEFAULT mode',
+        command: 'mkdir test',
+        rootCommand: 'mkdir',
+        approvalMode: 'default',
+      },
+    ])(
+      'hides permanent approval option for $description',
+      async ({ command, rootCommand, approvalMode }) => {
+        const mockConfigDynamic = {
+          ...mockConfigWithPermanent,
+          getApprovalMode: () => approvalMode,
+        } as unknown as Config;
+
+        const exec: SerializableConfirmationDetails = {
+          type: 'exec',
+          title: 'Confirm Execution',
+          command,
+          rootCommand,
+          rootCommands: [rootCommand],
+        };
+
+        const { lastFrame, waitUntilReady, unmount } =
+          await renderWithProviders(
+            <ToolConfirmationMessage
+              callId="test-call-id"
+              confirmationDetails={exec}
+              config={mockConfigDynamic}
+              getPreferredEditor={vi.fn()}
+              availableTerminalHeight={30}
+              terminalWidth={80}
+            />,
+            { settings: mockSettingsWithPermanent },
+          );
+
+        await waitUntilReady();
+        expect(lastFrame()).toMatchSnapshot();
+        unmount();
+      },
+    );
+  });
+
   const mockConfirm = vi.fn();
   vi.mocked(useToolActions).mockReturnValue({
     confirm: mockConfirm,

@@ -1,5 +1,47 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ToolConfirmationMessage > Auto-approve checkbox for exec tools > hides permanent approval option for 'edit commands in DEFAULT mode' 1`] = `
+"mkdir test
+Allow execution of: 'mkdir'?
+
+● 1. Allow once               
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > Auto-approve checkbox for exec tools > hides permanent approval option for 'unsafe commands' 1`] = `
+"rm -rf /
+Allow execution of: 'rm'?
+
+● 1. Allow once               
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > Auto-approve checkbox for exec tools > shows permanent approval option for 'edit commands in AUTO_EDIT mode' 1`] = `
+"mkdir test
+Allow execution of: 'mkdir'?
+
+● 1. Allow once                                
+  2. Allow for this session
+  3. Allow this command for all future sessions
+  4. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > Auto-approve checkbox for exec tools > shows permanent approval option for 'safe commands' 1`] = `
+"ls -la
+Allow execution of: 'ls'?
+
+● 1. Allow once                                
+  2. Allow for this session
+  3. Allow this command for all future sessions
+  4. No, suggest changes (esc)
+"
+`;
+
 exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should show "Allow for all future sessions" when trusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │
