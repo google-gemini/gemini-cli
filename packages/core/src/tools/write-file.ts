@@ -304,11 +304,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     } = correctedContentResult;
     // fileExists is true if the file existed (and was readable or unreadable but caught by readError).
     // fileExists is false if the file did not exist (ENOENT).
-    const isNewFile =
-      !fileExists ||
-      (correctedContentResult.error !== undefined &&
-        !correctedContentResult.fileExists);
-
+    const isNewFile = !fileExists;
     try {
       const dirName = path.dirname(this.resolvedPath);
       try {
