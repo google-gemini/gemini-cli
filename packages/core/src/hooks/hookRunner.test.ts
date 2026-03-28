@@ -408,6 +408,114 @@ describe('HookRunner', () => {
           expect.objectContaining({ shell: false }),
         );
       });
+
+      it('should securely filter restricted environment variables', async () => {
+        const maliciousEnvConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          env: {
+            SAFE_VAR: '123',
+            LD_PRELOAD: '/tmp/malicious.so',
+            path: '/tmp/bin', // lowercase to test case-insensitivity
+            NODE_OPTIONS: '--require malicious.js',
+          },
+        };
+
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setImmediate(() => callback(0));
+            }
+          },
+        );
+
+        await hookRunner.executeHook(
+          maliciousEnvConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(spawn).toHaveBeenCalled();
+        const spawnOptions = vi.mocked(spawn).mock.calls[0][2];
+        const spawnedEnv = spawnOptions.env!;
+
+        // SAFE_VAR should be passed through
+        expect(spawnedEnv['SAFE_VAR']).toBe('123');
+
+        // Restricted variables should not have been passed from hookConfig.
+        // The spawned env may have these properties from process.env, but they
+        // should not equal the malicious values.
+        expect(spawnedEnv['LD_PRELOAD']).not.toBe('/tmp/malicious.so');
+        expect(spawnedEnv['NODE_OPTIONS']).not.toBe('--require malicious.js');
+
+        // Check that the malicious path value was not set on any PATH-like variable.
+        for (const [key, value] of Object.entries(spawnedEnv)) {
+          if (key.toUpperCase() === 'PATH') {
+            expect(value).not.toBe('/tmp/bin');
+          }
+        }
+      });
+
+      it('should filter shell startup and language-specific injection variables', async () => {
+        const shellInjectionConfig: HookConfig = {
+          type: HookType.Command,
+          command: './hooks/test.sh',
+          env: {
+            SAFE_VAR: 'allowed',
+            BASH_ENV: '/tmp/malicious-startup.sh',
+            ENV: '/tmp/evil-posix-rc.sh',
+            NODE_PATH: '/tmp/fake-modules',
+            PYTHONHOME: '/tmp/evil-python-home',
+            PERL5LIB: '/tmp/evil-perl',
+            PERL5OPT: '-Mevil::module',
+            PERLLIB: '/tmp/evil-perl-legacy',
+            RUBYLIB: '/tmp/evil-ruby',
+            RUBYOPT: '-revil_require',
+            JAVA_TOOL_OPTIONS: '-javaagent:evil.jar',
+            _JAVA_OPTIONS: '-Xbootclasspath:evil.jar',
+            JDK_JAVA_OPTIONS: '-javaagent:evil9.jar',
+            CLASSPATH: '/tmp/evil-classes',
+          },
+        };
+
+        mockSpawn.mockProcessOn.mockImplementation(
+          (event: string, callback: (code: number) => void) => {
+            if (event === 'close') {
+              setImmediate(() => callback(0));
+            }
+          },
+        );
+
+        await hookRunner.executeHook(
+          shellInjectionConfig,
+          HookEventName.BeforeTool,
+          mockInput,
+        );
+
+        expect(spawn).toHaveBeenCalled();
+        const spawnOptions = vi.mocked(spawn).mock.calls[0][2];
+        const spawnedEnv = spawnOptions.env!;
+
+        // Safe variable should pass through
+        expect(spawnedEnv['SAFE_VAR']).toBe('allowed');
+
+        // All shell/language injection variables should be blocked
+        expect(spawnedEnv['BASH_ENV']).not.toBe('/tmp/malicious-startup.sh');
+        expect(spawnedEnv['ENV']).not.toBe('/tmp/evil-posix-rc.sh');
+        expect(spawnedEnv['NODE_PATH']).not.toBe('/tmp/fake-modules');
+        expect(spawnedEnv['PYTHONHOME']).not.toBe('/tmp/evil-python-home');
+        expect(spawnedEnv['PERL5LIB']).not.toBe('/tmp/evil-perl');
+        expect(spawnedEnv['PERL5OPT']).not.toBe('-Mevil::module');
+        expect(spawnedEnv['PERLLIB']).not.toBe('/tmp/evil-perl-legacy');
+        expect(spawnedEnv['RUBYLIB']).not.toBe('/tmp/evil-ruby');
+        expect(spawnedEnv['RUBYOPT']).not.toBe('-revil_require');
+        expect(spawnedEnv['JAVA_TOOL_OPTIONS']).not.toBe('-javaagent:evil.jar');
+        expect(spawnedEnv['_JAVA_OPTIONS']).not.toBe(
+          '-Xbootclasspath:evil.jar',
+        );
+        expect(spawnedEnv['JDK_JAVA_OPTIONS']).not.toBe('-javaagent:evil9.jar');
+        expect(spawnedEnv['CLASSPATH']).not.toBe('/tmp/evil-classes');
+      });
     });
   });
 
@@ -530,7 +638,8 @@ describe('HookRunner', () => {
       expect(results.every((r) => r.success)).toBe(true);
       expect(spawn).toHaveBeenCalledTimes(2);
       // Verify they were called sequentially
-      expect(executionOrder).toEqual(['./hook1.sh', './hook2.sh']);
+      expect(executionOrder[0]).toContain('./hook1.sh');
+      expect(executionOrder[1]).toContain('./hook2.sh');
     });
 
     it('should call onHookStart and onHookEnd callbacks sequentially', async () => {

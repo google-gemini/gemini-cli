@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn, execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   HookEventName,
   ConfigSource,
@@ -40,6 +40,55 @@ const DEFAULT_HOOK_TIMEOUT = 60000;
  */
 const EXIT_CODE_SUCCESS = 0;
 const EXIT_CODE_NON_BLOCKING_ERROR = 1;
+
+/**
+ * Restricted environment variables that cannot be overridden by hooks.
+ * Defined as a module-level constant to prevent GC churn on execution.
+ *
+ * This blocklist covers known sandbox-escape vectors across all major
+ * platforms (Linux, macOS, Windows) and language runtimes.
+ */
+const RESTRICTED_HOOK_ENV_KEYS = new Set([
+  // Core path override
+  'PATH',
+  // Node.js runtime injection
+  'NODE_OPTIONS',
+  'NODE_PATH',
+  // Shell startup injection (bash sources BASH_ENV in non-interactive mode)
+  'BASH_ENV',
+  'ENV',
+  // PowerShell module path injection (Windows)
+  'PSModulePath',
+  // Linux dynamic linker variables
+  'LD_PRELOAD',
+  'LD_LIBRARY_PATH',
+  'LD_AUDIT',
+  'LD_DEBUG',
+  // macOS dynamic linker variables
+  'DYLD_INSERT_LIBRARIES',
+  'DYLD_LIBRARY_PATH',
+  'DYLD_FORCE_FLAT_NAMESPACE',
+  'DYLD_PRINT_TO_FILE',
+  // Python runtime injection
+  'PYTHONPATH',
+  'PYTHONHOME',
+  'PYTHONSTARTUP',
+  // Perl runtime injection
+  'PERL5LIB',
+  'PERL5OPT',
+  'PERLLIB',
+  // Ruby runtime injection
+  'RUBYLIB',
+  'RUBYOPT',
+  // Java runtime injection
+  'JAVA_TOOL_OPTIONS',
+  '_JAVA_OPTIONS',
+  'JDK_JAVA_OPTIONS',
+  'CLASSPATH',
+  // Project-specific variables
+  'GEMINI_PROJECT_DIR',
+  'CLAUDE_PROJECT_DIR',
+]);
 
 /**
  * Hook runner that executes command hooks
@@ -331,6 +380,7 @@ export class HookRunner {
       let stdout = '';
       let stderr = '';
       let timedOut = false;
+      let forceKillTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
       const shellConfig = getShellConfiguration();
       let command = this.expandCommand(
@@ -344,12 +394,35 @@ export class HookRunner {
         command = `${command}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`;
       }
 
-      // Set up environment variables
-      const env = {
+      // Set up base environment variables
+      const baseEnv = {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
-        ...hookConfig.env,
+      };
+
+      // Sanitize user-provided hook environment variables to prevent RCE/sandbox escapes
+      const safeHookEnv: Record<string, string> = {};
+      if (hookConfig.env) {
+        for (const [key, value] of Object.entries(hookConfig.env)) {
+          if (!RESTRICTED_HOOK_ENV_KEYS.has(key.toUpperCase())) {
+            safeHookEnv[key] = String(value);
+          } else {
+            const hookId =
+              hookConfig.name ??
+              (hookConfig.type === 'command'
+                ? hookConfig.command
+                : hookConfig.type);
+            debugLogger.warn(
+              `Security: Blocked restricted environment variable '${key}' in hook '${hookId}'`,
+            );
+          }
+        }
+      }
+
+      const env = {
+        ...baseEnv,
+        ...safeHookEnv,
       };
 
       const child = spawn(
@@ -368,26 +441,17 @@ export class HookRunner {
         timedOut = true;
 
         if (process.platform === 'win32' && child.pid) {
-          try {
-            execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
-          } catch (_e) {
-            // Ignore errors if process is already dead or access denied
-            debugLogger.debug(`Taskkill failed: ${_e}`);
-          }
+          this.killProcessWindows(child.pid);
         } else {
           child.kill('SIGTERM');
         }
 
         // Force kill after 5 seconds
-        setTimeout(() => {
-          if (!child.killed) {
+        forceKillTimeoutHandle = setTimeout(() => {
+          // child.killed is false on Windows when using taskkill, rely on exit/signal codes
+          if (child.exitCode === null && child.signalCode === null) {
             if (process.platform === 'win32' && child.pid) {
-              try {
-                execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
-              } catch (_e) {
-                // Ignore
-                debugLogger.debug(`Taskkill failed: ${_e}`);
-              }
+              this.killProcessWindows(child.pid);
             } else {
               child.kill('SIGKILL');
             }
@@ -430,6 +494,7 @@ export class HookRunner {
       // Handle process exit
       child.on('close', (exitCode) => {
         clearTimeout(timeoutHandle);
+        if (forceKillTimeoutHandle) clearTimeout(forceKillTimeoutHandle);
         const duration = Date.now() - startTime;
 
         if (timedOut) {
@@ -485,6 +550,7 @@ export class HookRunner {
       // Handle process errors
       child.on('error', (error) => {
         clearTimeout(timeoutHandle);
+        if (forceKillTimeoutHandle) clearTimeout(forceKillTimeoutHandle);
         const duration = Date.now() - startTime;
 
         resolve({
@@ -513,6 +579,22 @@ export class HookRunner {
     return command
       .replace(/\$GEMINI_PROJECT_DIR/g, () => escapedCwd)
       .replace(/\$CLAUDE_PROJECT_DIR/g, () => escapedCwd); // For compatibility
+  }
+
+  /**
+   * Helper to force kill a child process tree on Windows
+   */
+  private killProcessWindows(pid: number): void {
+    const killer = spawn('taskkill', ['/pid', String(pid), '/f', '/t'], {
+      detached: true,
+      stdio: 'ignore',
+      timeout: 2000,
+    });
+    killer.on('error', (error) => {
+      // Ignore errors if process is already dead or access denied
+      debugLogger.debug(`Taskkill failed for pid ${pid}: ${error}`);
+    });
+    killer.unref();
   }
 
   /**
