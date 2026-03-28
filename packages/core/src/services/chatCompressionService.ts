@@ -467,7 +467,7 @@ export class ChatCompressionService {
       };
     } else {
       return {
-        newHistory: extraHistory,
+        newHistory: fullNewHistory,
         info: {
           originalTokenCount,
           newTokenCount,
