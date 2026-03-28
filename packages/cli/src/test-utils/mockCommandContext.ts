@@ -5,8 +5,14 @@
  */
 
 import { vi } from 'vitest';
+ Fix/copy-to-Capture-Slash-Command-Output
+import { type CommandContext, type LastOutput } from '../ui/commands/types.js';
+import type { LoadedSettings } from '../config/settings.js';
+import { mergeSettings } from '../config/settings.js';
+
 import type { CommandContext } from '../ui/commands/types.js';
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
+ main
 import type { GitService } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../ui/contexts/SessionContext.js';
 
@@ -61,10 +67,17 @@ export const createMockCommandContext = (
       toggleCorgiMode: vi.fn(),
       toggleShortcutsHelp: vi.fn(),
       toggleVimEnabled: vi.fn(),
+      reloadCommands: vi.fn(),
       openAgentConfigDialog: vi.fn(),
-      closeAgentConfigDialog: vi.fn(),
       extensionsUpdateState: new Map(),
-      setExtensionsUpdateState: vi.fn(),
+      dispatchExtensionStateUpdate: vi.fn(),
+      addConfirmUpdateExtensionRequest: vi.fn(),
+      setConfirmationRequest: vi.fn(),
+      removeComponent: vi.fn(),
+      toggleBackgroundShell: vi.fn(),
+      toggleDebugProfiler: vi.fn(),
+      getLastOutput: vi.fn().mockReturnValue(undefined),
+      setLastOutput: vi.fn<(output: LastOutput | undefined) => void>(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     session: {
