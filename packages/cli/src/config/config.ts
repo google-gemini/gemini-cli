@@ -1033,8 +1033,12 @@ export async function loadCliConfig(
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
-        disabledSkills: refreshedSettings.merged.skills.disabled,
+        disabledSkills: refreshedSettings.merged.skills?.disabled || [],
         agents: refreshedSettings.merged.agents,
+        model: refreshedSettings.merged.model?.name,
+        hooks: refreshedSettings.merged.hooks,
+        adminSkillsEnabled:
+          refreshedSettings.merged.admin?.skills?.enabled ?? true,
       };
     },
     enableConseca: settings.security?.enableConseca,

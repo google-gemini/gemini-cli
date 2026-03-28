@@ -3172,6 +3172,45 @@ describe('Config JIT Initialization', () => {
   });
 });
 
+describe('onReload state hydration', () => {
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    sessionId: 'test-session-id',
+    model: 'gemini-pro',
+    usageStatisticsEnabled: false,
+  };
+
+  it('updates model and hooks when onReload yields new values via reloadSkills polling', async () => {
+    const mockReloadResult = {
+      model: 'gemini-1.5-pro',
+      hooks: { BeforeModel: [] } as unknown as {
+        [K in HookEventName]?: HookDefinition[];
+      },
+    };
+    const config = new Config({
+      ...baseParams,
+      onReload: async () => mockReloadResult,
+    });
+
+    vi.spyOn(config.getSkillManager(), 'discoverSkills').mockResolvedValue();
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    expect(config.getModel()).toBe('gemini-pro');
+    expect(config.getHooks()).toBeUndefined();
+
+    await config.reloadSkills();
+
+    expect(config.getModel()).toBe('gemini-1.5-pro');
+    expect(config.getHooks()).toEqual(mockReloadResult.hooks);
+  });
+});
+
 describe('Plans Directory Initialization', () => {
   const baseParams: ConfigParameters = {
     sessionId: 'test-session',
