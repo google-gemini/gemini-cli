@@ -27,7 +27,7 @@ When the user asks to "start a new task" or "create a branch":
 1.  Identify the base directory (the parent of `main/`).
 2.  Use `git worktree add ../<branch-name> -b <branch-name>` from within `main/`.
 3.  **Mandatory Prep**: Run `npm install` inside the new worktree directory to ensure all dependencies are resolved.
-4.  **User Handoff & Education**: Instruct the user to move into the new directory, reload their session, and test their branch using the new fast build method: `npm run bundle; node bundle/gemini.js` (which replaces the slower `npm run build-and-start`).
+4.  **User Handoff & Education**: Instruct the user to move into the new directory, reload their session, and test their branch using the fast build alias: `gbuild` (which maps to `npm run bundle && node bundle/gemini.js`). If they don't have this alias configured, proactively offer to set it up in their `~/.zshrc` or `~/.bash_profile`.
 
 #### 2. Checking out a PR (Semantic Naming)
 When the user asks to "check out PR #123":

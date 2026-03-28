@@ -32,8 +32,11 @@ underlying "rigor."
     `preflight` inside `/ux-pr`), explain it as a benefit to the user: _"I'm
     running the full preflight now to ensure everything is correct for review."_
 4.  **Build Reminders**: Whenever you finish implementing a feature, fix, or
-    update, you MUST remind the user to test their changes by running:
-    `npm run bundle; node bundle/gemini.js`.
+    update, you MUST remind the user to test their changes by running their
+    `gbuild` alias. If the user does not have this alias configured, you MUST
+    proactively offer to run
+    `echo "alias gbuild='npm run bundle && node bundle/gemini.js'" >> ~/.zshrc`
+    (or `.bash_profile`) to set it up for them.
 5.  **PR Output**: After successfully creating or updating a PR, you MUST
     provide the GitHub PR link, the linked Issue link, and the `npx` command to
     test the PR branch (e.g., `npx @google/gemini-cli@pr-<number>`).

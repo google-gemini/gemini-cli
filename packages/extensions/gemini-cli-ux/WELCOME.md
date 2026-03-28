@@ -62,16 +62,21 @@ fails CI, run this to trigger the **`ux-git-skill`** submission protocol:
 
 ### **⚡️ Quick Start: Build & Run**
 
-To see your changes in action, use the new high-speed bundling process. This is
-significantly faster than the old `npm run build-and-start` method:
+To see your changes in action, use the new high-speed bundling process. We
+highly recommend setting up the `gbuild` alias in your shell profile (`~/.zshrc`
+or `~/.bash_profile`):
 
 ```bash
-# 1. Bundle your changes (FAST)
-npm run bundle
-
-# 2. Run your local build
-node bundle/gemini.js
+alias gbuild='npm run bundle && node bundle/gemini.js'
 ```
+
+Once set up, anytime you want to build and run your local branch, just type:
+
+```bash
+gbuild
+```
+
+_(You can ask me to set this alias up for you if you haven't already!)_
 
 ---
 
