@@ -17,7 +17,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync, cpSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
@@ -25,6 +25,28 @@ import { glob } from 'glob';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const bundleDir = join(root, 'bundle');
+
+/**
+ * Copy a directory to destination, replacing any existing content.
+ * @param {string} src - Source directory path
+ * @param {string} dest - Destination directory path
+ * @param {string} [logMessage] - Optional message to log after copy
+ */
+function copyAndReplaceDir(src, dest, logMessage) {
+  if (!existsSync(src)) {
+    return;
+  }
+  // rmSync with force:true handles non-existent paths gracefully.
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(src, dest, {
+    recursive: true,
+    dereference: true,
+    force: true,
+  });
+  if (logMessage) {
+    console.log(logMessage);
+  }
+}
 
 // Create the bundle directory if it doesn't exist
 if (!existsSync(bundleDir)) {
@@ -57,21 +79,16 @@ console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 // 3. Copy Documentation (docs/)
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
-if (existsSync(docsSrc)) {
-  cpSync(docsSrc, docsDest, { recursive: true, dereference: true });
-  console.log('Copied docs to bundle/docs/');
-}
+copyAndReplaceDir(docsSrc, docsDest, 'Copied docs to bundle/docs/');
 
 // 4. Copy Built-in Skills (packages/core/src/skills/builtin)
 const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
 const builtinSkillsDest = join(bundleDir, 'builtin');
-if (existsSync(builtinSkillsSrc)) {
-  cpSync(builtinSkillsSrc, builtinSkillsDest, {
-    recursive: true,
-    dereference: true,
-  });
-  console.log('Copied built-in skills to bundle/builtin/');
-}
+copyAndReplaceDir(
+  builtinSkillsSrc,
+  builtinSkillsDest,
+  'Copied built-in skills to bundle/builtin/',
+);
 
 // 5. Copy DevTools package so the external dynamic import resolves at runtime
 const devtoolsSrc = join(root, 'packages/devtools');
@@ -82,12 +99,10 @@ const devtoolsDest = join(
   'gemini-cli-devtools',
 );
 const devtoolsDistSrc = join(devtoolsSrc, 'dist');
+const devtoolsDistDest = join(devtoolsDest, 'dist');
 if (existsSync(devtoolsDistSrc)) {
   mkdirSync(devtoolsDest, { recursive: true });
-  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
-    recursive: true,
-    dereference: true,
-  });
+  copyAndReplaceDir(devtoolsDistSrc, devtoolsDistDest);
   copyFileSync(
     join(devtoolsSrc, 'package.json'),
     join(devtoolsDest, 'package.json'),
@@ -98,9 +113,10 @@ if (existsSync(devtoolsDistSrc)) {
 // 6. Copy bundled chrome-devtools-mcp
 const bundleMcpSrc = join(root, 'packages/core/dist/bundled');
 const bundleMcpDest = join(bundleDir, 'bundled');
-if (existsSync(bundleMcpSrc)) {
-  cpSync(bundleMcpSrc, bundleMcpDest, { recursive: true, dereference: true });
-  console.log('Copied bundled chrome-devtools-mcp to bundle/bundled/');
-}
+copyAndReplaceDir(
+  bundleMcpSrc,
+  bundleMcpDest,
+  'Copied bundled chrome-devtools-mcp to bundle/bundled/',
+);
 
 console.log('Assets copied to bundle/');
