@@ -56,3 +56,9 @@ priority = 50
 toolName = ["codebase_investigator", "cli_help", "get_internal_docs"]
 decision = "allow"
 priority = 50
+
+# Topic grouping tool is innocuous and used for UI organization.
+[[rule]]
+toolName = "update_topic"
+decision = "allow"
+priority = 50
