@@ -218,14 +218,17 @@ export class ChatRecordingService {
         }
         this.conversationFile = path.join(chatsDir, filename);
 
-        this.writeConversation({
-          sessionId: this.sessionId,
-          projectHash: this.projectHash,
-          startTime: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          messages: [],
-          kind: this.kind,
-        });
+        this.writeConversation(
+          {
+            sessionId: this.sessionId,
+            projectHash: this.projectHash,
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: [],
+            kind: this.kind,
+          },
+          { allowEmpty: true },
+        );
       }
 
       // Clear any queued data since this is a fresh start
@@ -514,19 +517,26 @@ export class ChatRecordingService {
    */
   private writeConversation(
     conversation: ConversationRecord,
-    { allowEmpty = false }: { allowEmpty?: boolean } = {},
+    { _allowEmpty = false }: { _allowEmpty?: boolean } = {},
   ): void {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0 && !allowEmpty) return;
 
       const newContent = JSON.stringify(conversation, null, 2);
       // Skip the disk write if nothing actually changed (e.g.
       // updateMessagesFromHistory found no matching tool calls to update).
       // Compare before updating lastUpdated so the timestamp doesn't
       // cause a false diff.
-      if (this.cachedLastConvData === newContent) return;
+      //if (this.cachedLastConvData === newContent) return;
+      // 2. MODIFY THE CACHE CHECK
+      // Only skip if we have actually written to this file once before
+      if (
+        this.cachedLastConvData === newContent &&
+        this.cachedConversation !== null
+      ) {
+        return;
+      }
       this.cachedConversation = conversation;
       conversation.lastUpdated = new Date().toISOString();
       const contentToWrite = JSON.stringify(conversation, null, 2);
