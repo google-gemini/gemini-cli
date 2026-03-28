@@ -8,123 +8,139 @@ import { describe, expect } from 'vitest';
 import { appEvalTest, AppEvalCase } from './app-test-helper.js';
 import { EvalPolicy } from './test-helper.js';
 
+/**
+ * Default config override for ask_user tests
+ */
+const defaultConfig = {
+  general: {
+    approvalMode: 'default',
+    enableAutoUpdate: false,
+    enableAutoUpdateNotification: false,
+  },
+};
+
+/**
+ * Utility: Merge configs safely
+ */
+function mergeConfig(overrides?: AppEvalCase['configOverrides']) {
+  return {
+    ...overrides,
+    general: {
+      ...defaultConfig.general,
+      ...overrides?.general,
+    },
+  };
+}
+
+/**
+ * Wrapper for ask_user eval tests
+ */
 function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
   return appEvalTest(policy, {
     ...evalCase,
-    configOverrides: {
-      ...evalCase.configOverrides,
-      general: {
-        ...evalCase.configOverrides?.general,
-        approvalMode: 'default',
-        enableAutoUpdate: false,
-        enableAutoUpdateNotification: false,
-      },
-    },
-    files: {
-      ...evalCase.files,
-    },
+    configOverrides: mergeConfig(evalCase.configOverrides),
+    files: evalCase.files ?? {},
   });
 }
 
+/**
+ * Utility: Expect tool confirmation exists
+ */
+async function expectToolCall(rig: any, tools: string | string[]) {
+  const confirmation = await rig.waitForPendingConfirmation(tools);
+  expect(confirmation, 'Expected a pending confirmation').toBeDefined();
+  return confirmation;
+}
+
+/**
+ * Utility: Ensure tool is ask_user
+ */
+function expectAskUser(confirmation: any, message?: string) {
+  expect(
+    confirmation?.toolName,
+    message || 'Expected ask_user to be called',
+  ).toBe('ask_user');
+}
+
 describe('ask_user', () => {
+  // ---------- Core Behavior Tests ----------
+
   askUserEvalTest('USUALLY_PASSES', {
-    name: 'Agent uses AskUser tool to present multiple choice options',
-    prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
-    setup: async (rig) => {
-      rig.setBreakpoint(['ask_user']);
-    },
+    name: 'Uses ask_user for multiple choice input',
+    prompt: `Use the ask_user tool to ask my favorite color with options: red, green, blue.`,
+    setup: async (rig) => rig.setBreakpoint(['ask_user']),
     assert: async (rig) => {
-      const confirmation = await rig.waitForPendingConfirmation('ask_user');
-      expect(
-        confirmation,
-        'Expected a pending confirmation for ask_user tool',
-      ).toBeDefined();
+      const confirmation = await expectToolCall(rig, 'ask_user');
+      expectAskUser(confirmation);
     },
   });
 
   askUserEvalTest('USUALLY_PASSES', {
-    name: 'Agent uses AskUser tool to clarify ambiguous requirements',
+    name: 'Uses ask_user for requirement clarification',
     files: {
       'package.json': JSON.stringify({ name: 'my-app', version: '1.0.0' }),
     },
-    prompt: `I want to build a new feature in this app. Ask me questions to clarify the requirements before proceeding.`,
-    setup: async (rig) => {
-      rig.setBreakpoint(['ask_user']);
-    },
+    prompt: `I want to build a feature. Ask clarifying questions before proceeding.`,
+    setup: async (rig) => rig.setBreakpoint(['ask_user']),
     assert: async (rig) => {
-      const confirmation = await rig.waitForPendingConfirmation('ask_user');
-      expect(
-        confirmation,
-        'Expected a pending confirmation for ask_user tool',
-      ).toBeDefined();
+      const confirmation = await expectToolCall(rig, 'ask_user');
+      expectAskUser(confirmation);
     },
   });
 
   askUserEvalTest('USUALLY_PASSES', {
-    name: 'Agent uses AskUser tool before performing significant ambiguous rework',
+    name: 'Uses ask_user before major ambiguous rework',
     files: {
-      'packages/core/src/index.ts': '// index\nexport const version = "1.0.0";',
-      'packages/core/src/util.ts': '// util\nexport function help() {}',
+      'packages/core/src/index.ts': 'export const version = "1.0.0";',
+      'packages/core/src/util.ts': 'export function help() {}',
       'packages/core/package.json': JSON.stringify({
         name: '@google/gemini-cli-core',
       }),
       'README.md': '# Gemini CLI',
     },
-    prompt: `I want to completely rewrite the core package to support the upcoming V2 architecture, but I haven't decided what that looks like yet. We need to figure out the requirements first. Can you ask me some questions to help nail down the design?`,
-    setup: async (rig) => {
-      rig.setBreakpoint(['enter_plan_mode', 'ask_user']);
-    },
+    prompt: `I want to rewrite the core package for V2 but requirements are unclear. Ask questions first.`,
+    setup: async (rig) =>
+      rig.setBreakpoint(['enter_plan_mode', 'ask_user']),
     assert: async (rig) => {
-      // It might call enter_plan_mode first.
-      let confirmation = await rig.waitForPendingConfirmation([
+      let confirmation = await expectToolCall(rig, [
         'enter_plan_mode',
         'ask_user',
       ]);
-      expect(confirmation, 'Expected a tool call confirmation').toBeDefined();
 
-      if (confirmation?.name === 'enter_plan_mode') {
+      // Handle intermediate planning step
+      if (confirmation?.toolName === 'enter_plan_mode') {
         rig.acceptConfirmation('enter_plan_mode');
-        confirmation = await rig.waitForPendingConfirmation('ask_user');
+        confirmation = await expectToolCall(rig, 'ask_user');
       }
 
-      expect(
-        confirmation?.toolName,
-        'Expected ask_user to be called to clarify the significant rework',
-      ).toBe('ask_user');
+      expectAskUser(
+        confirmation,
+        'Expected ask_user to clarify major rework',
+      );
     },
   });
 
-  // --- Regression Tests for Recent Fixes ---
+  // ---------- Regression Tests ----------
 
-  // Regression test for issue #20177: Ensure the agent does not use \`ask_user\` to
-  // confirm shell commands. Fixed via prompt refinements and tool definition
-  // updates to clarify that shell command confirmation is handled by the UI.
-  // See fix: https://github.com/google-gemini/gemini-cli/pull/20504
   askUserEvalTest('USUALLY_PASSES', {
-    name: 'Agent does NOT use AskUser to confirm shell commands',
+    name: 'Does NOT use ask_user for shell command confirmation',
     files: {
       'package.json': JSON.stringify({
         scripts: { build: 'echo building' },
       }),
     },
     prompt: `Run 'npm run build' in the current directory.`,
-    setup: async (rig) => {
-      rig.setBreakpoint(['run_shell_command', 'ask_user']);
-    },
+    setup: async (rig) =>
+      rig.setBreakpoint(['run_shell_command', 'ask_user']),
     assert: async (rig) => {
-      const confirmation = await rig.waitForPendingConfirmation([
+      const confirmation = await expectToolCall(rig, [
         'run_shell_command',
         'ask_user',
       ]);
 
       expect(
-        confirmation,
-        'Expected a pending confirmation for a tool',
-      ).toBeDefined();
-
-      expect(
         confirmation?.toolName,
-        'ask_user should not be called to confirm shell commands',
+        'ask_user should not be used for shell command confirmation',
       ).toBe('run_shell_command');
     },
   });
