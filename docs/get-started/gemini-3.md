@@ -1,6 +1,6 @@
 # Gemini 3 Pro and Gemini 3 Flash on Gemini CLI
 
-Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
+Learn about how you can use Gemini 3 Pro and Gemini 3 Flash on Gemini CLI.
 
 <!-- prettier-ignore -->
 > [!NOTE]

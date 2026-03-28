@@ -2272,6 +2272,16 @@
           "default": 200,
           "type": "number"
         },
+        "memoryBoundaryMarkers": {
+          "title": "Memory Boundary Markers",
+          "description": "File or directory names that mark the boundary for GEMINI.md discovery. The upward traversal stops at the first directory containing any of these markers. An empty array disables parent traversal.",
+          "markdownDescription": "File or directory names that mark the boundary for GEMINI.md discovery. The upward traversal stops at the first directory containing any of these markers. An empty array disables parent traversal.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[\n  \".git\"\n]`",
+          "default": [".git"],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "includeDirectories": {
           "title": "Include Directories",
           "description": "Additional directories to include in the workspace context. Missing directories will be skipped with a warning.",
@@ -2383,6 +2393,14 @@
               "markdownDescription": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "backgroundCompletionBehavior": {
+              "title": "Background Completion Behavior",
+              "description": "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+              "markdownDescription": "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `silent`",
+              "default": "silent",
+              "type": "string",
+              "enum": ["silent", "inject", "notify"]
             },
             "pager": {
               "title": "Pager",
