@@ -236,6 +236,10 @@ export class WindowsSandboxManager implements SandboxManager {
         false,
     };
 
+    const defaultNetwork =
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+    const networkAccess = defaultNetwork || mergedAdditional.network;
+
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the workspace.
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
@@ -251,7 +255,7 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
-    // Grant "Low Mandatory Level" read access to allowedPaths.
+    // Grant "Low Mandatory Level" read/write access to allowedPaths.
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       await this.grantLowIntegrityAccess(allowedPath);
@@ -342,10 +346,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
-    const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
-    const networkAccess = defaultNetwork || mergedAdditional.network;
-
     const args = [
       networkAccess ? '1' : '0',
       req.cwd,
@@ -395,7 +395,11 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      await spawnAsync('icacls', [
+        resolvedPath,
+        '/setintegritylevel',
+        '(OI)(CI)Low',
+      ]);
       this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(

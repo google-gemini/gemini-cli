@@ -187,7 +187,7 @@ export class LinuxSandboxManager implements SandboxManager {
       : false;
     const workspaceWrite = !isReadonlyMode || isApproved;
     const networkAccess =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
 
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
