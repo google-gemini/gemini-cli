@@ -17,8 +17,39 @@ describe('btwCommand', () => {
     expect(btwCommand.isSafeConcurrent).toBe(true);
   });
 
-  it('returns an error message when args are empty', () => {
-    const context = {} as CommandContext;
+  it('returns an error message when btw is not enabled in settings', () => {
+    const context = {
+      services: {
+        settings: {
+          merged: {
+            experimental: {
+              btw: false,
+            },
+          },
+        },
+      },
+    } as unknown as CommandContext;
+    const result = btwCommand.action!(context, 'question');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'error',
+      content:
+        '/btw is an experimental feature. To enable it, run `gemini settings set experimental.btw true`.',
+    });
+  });
+
+  it('returns an error message when args are empty and btw is enabled', () => {
+    const context = {
+      services: {
+        settings: {
+          merged: {
+            experimental: {
+              btw: true,
+            },
+          },
+        },
+      },
+    } as unknown as CommandContext;
     const result = btwCommand.action!(context, '   ');
     expect(result).toEqual({
       type: 'message',
@@ -27,8 +58,18 @@ describe('btwCommand', () => {
     });
   });
 
-  it('returns a btw action when query is provided', () => {
-    const context = {} as CommandContext;
+  it('returns a btw action when query is provided and btw is enabled', () => {
+    const context = {
+      services: {
+        settings: {
+          merged: {
+            experimental: {
+              btw: true,
+            },
+          },
+        },
+      },
+    } as unknown as CommandContext;
     const result = btwCommand.action!(context, ' what is this regex doing? ');
     expect(result).toEqual({
       type: 'btw',

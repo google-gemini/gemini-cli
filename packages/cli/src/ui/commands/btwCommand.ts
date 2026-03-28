@@ -12,7 +12,17 @@ export const btwCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   isSafeConcurrent: true,
-  action: (_context, args) => {
+  action: (context, args) => {
+    const isBtwEnabled = context.services.settings.merged.experimental?.btw;
+    if (!isBtwEnabled) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content:
+          '/btw is an experimental feature. To enable it, run `gemini settings set experimental.btw true`.',
+      };
+    }
+
     const query = args.trim();
     if (!query) {
       return {

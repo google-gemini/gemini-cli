@@ -74,7 +74,6 @@ import {
 import {
   getDisplayString,
   resolveModel,
-  isGemini2Model,
 } from '../config/models.js';
 import { getResponseText, partToString } from '../utils/partUtils.js';
 import { parseThought } from '../utils/thoughtUtils.js';
