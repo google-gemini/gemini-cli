@@ -258,6 +258,12 @@ export async function identifySessionsToDelete(
   allFiles: SessionFileEntry[],
   retentionConfig: SessionRetentionSettings,
 ): Promise<SessionFileEntry[]> {
+  const isValidSessionEntry = (
+    entry: SessionFileEntry,
+  ): entry is SessionFileEntry & {
+    sessionInfo: NonNullable<SessionFileEntry['sessionInfo']>;
+  } => entry.sessionInfo !== null;
+
   const sessionsToDelete: SessionFileEntry[] = [];
 
   // All corrupted files should be deleted
@@ -266,7 +272,7 @@ export async function identifySessionsToDelete(
   );
 
   // Now handle valid sessions based on retention policy
-  const validSessions = allFiles.filter((entry) => entry.sessionInfo !== null);
+  const validSessions = allFiles.filter(isValidSessionEntry);
   if (validSessions.length === 0) {
     return sessionsToDelete;
   }
@@ -289,18 +295,18 @@ export async function identifySessionsToDelete(
   // Sort valid sessions by lastUpdated (newest first) for count-based retention
   const sortedValidSessions = [...validSessions].sort(
     (a, b) =>
-      new Date(b.sessionInfo!.lastUpdated).getTime() -
-      new Date(a.sessionInfo!.lastUpdated).getTime(),
+      new Date(b.sessionInfo.lastUpdated).getTime() -
+      new Date(a.sessionInfo.lastUpdated).getTime(),
   );
 
   // Separate deletable sessions from the active session
   const deletableSessions = sortedValidSessions.filter(
-    (entry) => !entry.sessionInfo!.isCurrentSession,
+    (entry) => !entry.sessionInfo.isCurrentSession,
   );
 
   // Calculate how many deletable sessions to keep (accounting for the active session)
   const hasActiveSession = sortedValidSessions.some(
-    (e) => e.sessionInfo!.isCurrentSession,
+    (e) => e.sessionInfo.isCurrentSession,
   );
   const maxDeletableSessions =
     retentionConfig.maxCount && hasActiveSession
@@ -309,7 +315,7 @@ export async function identifySessionsToDelete(
 
   for (let i = 0; i < deletableSessions.length; i++) {
     const entry = deletableSessions[i];
-    const session = entry.sessionInfo!;
+    const session = entry.sessionInfo;
 
     let shouldDelete = false;
 
