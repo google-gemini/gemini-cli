@@ -21,8 +21,6 @@ import {
   RestTransportFactory,
   createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
-import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
-import * as grpc from '@grpc/grpc-js';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent, ProxyAgent } from 'undici';
 import { normalizeAgentCard } from './a2aUtils.js';
@@ -146,6 +144,11 @@ export class A2AClientManager {
     const grpcUrl =
       agentCard.additionalInterfaces?.find((i) => i.transport === 'GRPC')
         ?.url ?? agentCard.url;
+
+    const [{ GrpcTransportFactory }, grpc] = await Promise.all([
+      import('@a2a-js/sdk/client/grpc'),
+      import('@grpc/grpc-js'),
+    ]);
 
     const clientOptions = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,

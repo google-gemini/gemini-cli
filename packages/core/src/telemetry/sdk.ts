@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Only the lightweight API module is imported at the top level. It provides the
+// diag logger used during module initialization and the disable() helpers used
+// during shutdown. All heavy SDK, exporter, and instrumentation modules are
+// loaded dynamically inside initializeTelemetry() so they never appear in the
+// startup bundle when telemetry is not yet active.
 import {
   DiagLogLevel,
   diag,
@@ -12,29 +17,14 @@ import {
   metrics,
   propagation,
 } from '@opentelemetry/api';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
-import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
-import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
-import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import {
-  BatchSpanProcessor,
-  ConsoleSpanExporter,
-} from '@opentelemetry/sdk-trace-node';
-import {
+import type { NodeSDK } from '@opentelemetry/sdk-node';
+import type { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import type {
   BatchLogRecordProcessor,
-  ConsoleLogRecordExporter,
+  LogRecordExporter,
 } from '@opentelemetry/sdk-logs';
-import {
-  ConsoleMetricExporter,
-  PeriodicExportingMetricReader,
-} from '@opentelemetry/sdk-metrics';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
+import type { SpanExporter } from '@opentelemetry/sdk-trace-base';
+import type { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import type { JWTInput } from 'google-auth-library';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
@@ -45,11 +35,6 @@ import {
   FileMetricExporter,
   FileSpanExporter,
 } from './file-exporters.js';
-import {
-  GcpTraceExporter,
-  GcpMetricExporter,
-  GcpLogExporter,
-} from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { authEvents } from '../code_assist/oauth2.js';
@@ -205,6 +190,30 @@ export async function initializeTelemetry(
     return;
   }
 
+  // Dynamically load heavy SDK/exporter modules. This keeps them out of the
+  // startup bundle so that module parsing time is only paid when telemetry is
+  // actually initialized (typically after auth completes).
+  const [
+    { SemanticResourceAttributes },
+    { resourceFromAttributes },
+    { BatchSpanProcessor: BatchSpanProcessorImpl, ConsoleSpanExporter },
+    {
+      BatchLogRecordProcessor: BatchLogRecordProcessorImpl,
+      ConsoleLogRecordExporter,
+    },
+    { ConsoleMetricExporter, PeriodicExportingMetricReader: MetricReaderImpl },
+    { NodeSDK: NodeSDKImpl },
+    { HttpInstrumentation },
+  ] = await Promise.all([
+    import('@opentelemetry/semantic-conventions'),
+    import('@opentelemetry/resources'),
+    import('@opentelemetry/sdk-trace-node'),
+    import('@opentelemetry/sdk-logs'),
+    import('@opentelemetry/sdk-metrics'),
+    import('@opentelemetry/sdk-node'),
+    import('@opentelemetry/instrumentation-http'),
+  ]);
+
   const resource = resourceFromAttributes({
     [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
     [SemanticResourceAttributes.SERVICE_VERSION]: process.version,
@@ -246,18 +255,8 @@ export async function initializeTelemetry(
   const useDirectGcpExport =
     telemetryTarget === TelemetryTarget.GCP && !useCollector;
 
-  let spanExporter:
-    | OTLPTraceExporter
-    | OTLPTraceExporterHttp
-    | GcpTraceExporter
-    | FileSpanExporter
-    | ConsoleSpanExporter;
-  let logExporter:
-    | OTLPLogExporter
-    | OTLPLogExporterHttp
-    | GcpLogExporter
-    | FileLogExporter
-    | ConsoleLogRecordExporter;
+  let spanExporter: SpanExporter;
+  let logExporter: LogRecordExporter;
   let metricReader: PeriodicExportingMetricReader;
 
   if (useDirectGcpExport) {
@@ -267,44 +266,59 @@ export async function initializeTelemetry(
       'using',
       credentials ? 'provided credentials' : 'ADC',
     );
+    const { GcpTraceExporter, GcpLogExporter, GcpMetricExporter } =
+      await import('./gcp-exporters.js');
     spanExporter = new GcpTraceExporter(gcpProjectId, credentials);
     logExporter = new GcpLogExporter(gcpProjectId, credentials);
-    metricReader = new PeriodicExportingMetricReader({
+    metricReader = new MetricReaderImpl({
       exporter: new GcpMetricExporter(gcpProjectId, credentials),
       exportIntervalMillis: 30000,
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
+      const [
+        { OTLPTraceExporter: TraceHttp },
+        { OTLPLogExporter: LogHttp },
+        { OTLPMetricExporter: MetricHttp },
+      ] = await Promise.all([
+        import('@opentelemetry/exporter-trace-otlp-http'),
+        import('@opentelemetry/exporter-logs-otlp-http'),
+        import('@opentelemetry/exporter-metrics-otlp-http'),
+      ]);
       const buildUrl = (path: string) => {
         const url = new URL(parsedEndpoint);
-        // Join the existing pathname with the new path, handling trailing slashes.
         url.pathname = [url.pathname.replace(/\/$/, ''), path].join('/');
         return url.href;
       };
-      spanExporter = new OTLPTraceExporterHttp({
-        url: buildUrl('v1/traces'),
-      });
-      logExporter = new OTLPLogExporterHttp({
-        url: buildUrl('v1/logs'),
-      });
-      metricReader = new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporterHttp({
-          url: buildUrl('v1/metrics'),
-        }),
+      spanExporter = new TraceHttp({ url: buildUrl('v1/traces') });
+      logExporter = new LogHttp({ url: buildUrl('v1/logs') });
+      metricReader = new MetricReaderImpl({
+        exporter: new MetricHttp({ url: buildUrl('v1/metrics') }),
         exportIntervalMillis: 10000,
       });
     } else {
       // grpc
-      spanExporter = new OTLPTraceExporter({
+      const [
+        { OTLPTraceExporter: TraceGrpc },
+        { OTLPLogExporter: LogGrpc },
+        { OTLPMetricExporter: MetricGrpc },
+        { CompressionAlgorithm },
+      ] = await Promise.all([
+        import('@opentelemetry/exporter-trace-otlp-grpc'),
+        import('@opentelemetry/exporter-logs-otlp-grpc'),
+        import('@opentelemetry/exporter-metrics-otlp-grpc'),
+        import('@opentelemetry/otlp-exporter-base'),
+      ]);
+      spanExporter = new TraceGrpc({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
       });
-      logExporter = new OTLPLogExporter({
+      logExporter = new LogGrpc({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
       });
-      metricReader = new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter({
+      metricReader = new MetricReaderImpl({
+        exporter: new MetricGrpc({
           url: parsedEndpoint,
           compression: CompressionAlgorithm.GZIP,
         }),
@@ -314,24 +328,24 @@ export async function initializeTelemetry(
   } else if (telemetryOutfile) {
     spanExporter = new FileSpanExporter(telemetryOutfile);
     logExporter = new FileLogExporter(telemetryOutfile);
-    metricReader = new PeriodicExportingMetricReader({
+    metricReader = new MetricReaderImpl({
       exporter: new FileMetricExporter(telemetryOutfile),
       exportIntervalMillis: 10000,
     });
   } else {
     spanExporter = new ConsoleSpanExporter();
     logExporter = new ConsoleLogRecordExporter();
-    metricReader = new PeriodicExportingMetricReader({
+    metricReader = new MetricReaderImpl({
       exporter: new ConsoleMetricExporter(),
       exportIntervalMillis: 10000,
     });
   }
 
   // Store processor references for manual flushing
-  spanProcessor = new BatchSpanProcessor(spanExporter);
-  logRecordProcessor = new BatchLogRecordProcessor(logExporter);
+  spanProcessor = new BatchSpanProcessorImpl(spanExporter);
+  logRecordProcessor = new BatchLogRecordProcessorImpl(logExporter);
 
-  sdk = new NodeSDK({
+  sdk = new NodeSDKImpl({
     resource,
     spanProcessors: [spanProcessor],
     logRecordProcessors: [logRecordProcessor],
