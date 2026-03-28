@@ -49,6 +49,8 @@ export interface UIActions {
   closeAgentConfigDialog: () => void;
   openPermissionsDialog: (props?: PermissionsDialogProps) => void;
   closePermissionsDialog: () => void;
+  openSandboxSetupDialog: () => void;
+  closeSandboxSetupDialog: () => void;
   setShellModeActive: (value: boolean) => void;
   vimHandleInput: (key: Key) => boolean;
   handleIdePromptComplete: (result: IdeIntegrationNudgeResult) => void;

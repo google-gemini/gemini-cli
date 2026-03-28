@@ -24,6 +24,7 @@ import { EmptyWalletDialog } from './EmptyWalletDialog.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
+import { SandboxSetupDialog } from './SandboxSetupDialog.js';
 import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -359,6 +360,15 @@ export const DialogManager = ({
         onExit={uiActions.closePermissionsDialog}
         addItem={addItem}
         targetDirectory={uiState.permissionsDialogProps?.targetDirectory}
+      />
+    );
+  }
+
+  if (uiState.isSandboxSetupDialogOpen) {
+    return (
+      <SandboxSetupDialog
+        onExit={uiActions.closeSandboxSetupDialog}
+        settings={settings}
       />
     );
   }

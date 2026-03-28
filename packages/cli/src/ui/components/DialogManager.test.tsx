@@ -61,6 +61,9 @@ vi.mock('./IdeTrustChangeDialog.js', () => ({
 vi.mock('./AgentConfigDialog.js', () => ({
   AgentConfigDialog: () => <Text>AgentConfigDialog</Text>,
 }));
+vi.mock('./SandboxSetupDialog.js', () => ({
+  SandboxSetupDialog: () => <Text>SandboxSetupDialog</Text>,
+}));
 
 describe('DialogManager', () => {
   const defaultProps = {
@@ -97,6 +100,7 @@ describe('DialogManager', () => {
     isEditorDialogOpen: false,
     showPrivacyNotice: false,
     isPermissionsDialogOpen: false,
+    isSandboxSetupDialogOpen: false,
     isAgentConfigDialogOpen: false,
     selectedAgentName: undefined,
     selectedAgentDisplayName: undefined,
@@ -174,6 +178,7 @@ describe('DialogManager', () => {
     [{ isEditorDialogOpen: true }, 'EditorSettingsDialog'],
     [{ showPrivacyNotice: true }, 'PrivacyNotice'],
     [{ isPermissionsDialogOpen: true }, 'PermissionsModifyTrustDialog'],
+    [{ isSandboxSetupDialogOpen: true }, 'SandboxSetupDialog'],
     [
       {
         isAgentConfigDialogOpen: true,

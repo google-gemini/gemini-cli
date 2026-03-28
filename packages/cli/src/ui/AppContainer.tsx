@@ -330,6 +330,15 @@ export const AppContainer = (props: AppContainerProps) => {
     setPermissionsDialogProps(null);
   }, []);
 
+  const [isSandboxSetupDialogOpen, setIsSandboxSetupDialogOpen] =
+    useState(false);
+  const openSandboxSetupDialog = useCallback(() => {
+    setIsSandboxSetupDialogOpen(true);
+  }, []);
+  const closeSandboxSetupDialog = useCallback(() => {
+    setIsSandboxSetupDialogOpen(false);
+  }, []);
+
   const [isAgentConfigDialogOpen, setIsAgentConfigDialogOpen] = useState(false);
   const [selectedAgentName, setSelectedAgentName] = useState<
     string | undefined
@@ -888,6 +897,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openModelDialog,
       openAgentConfigDialog,
       openPermissionsDialog,
+      openSandboxSetupDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
         setTimeout(async () => {
@@ -928,6 +938,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCorgiMode,
       dispatchExtensionStateUpdate,
       openPermissionsDialog,
+      openSandboxSetupDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       setShortcutsHelpVisible,
@@ -2020,6 +2031,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isModelDialogOpen ||
     isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
+    isSandboxSetupDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
     isEditorDialogOpen ||
@@ -2233,6 +2245,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       selectedAgentDefinition,
       isPermissionsDialogOpen,
       permissionsDialogProps,
+      isSandboxSetupDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -2359,6 +2372,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       selectedAgentDefinition,
       isPermissionsDialogOpen,
       permissionsDialogProps,
+      isSandboxSetupDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -2482,6 +2496,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeAgentConfigDialog,
       openPermissionsDialog,
       closePermissionsDialog,
+      openSandboxSetupDialog,
+      closeSandboxSetupDialog,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -2575,6 +2591,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeAgentConfigDialog,
       openPermissionsDialog,
       closePermissionsDialog,
+      openSandboxSetupDialog,
+      closeSandboxSetupDialog,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,

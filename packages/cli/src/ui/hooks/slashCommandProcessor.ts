@@ -78,6 +78,7 @@ interface SlashCommandProcessorActions {
     definition: AgentDefinition,
   ) => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
+  openSandboxSetupDialog: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
@@ -529,6 +530,9 @@ export const useSlashCommandProcessor = (
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                         result.props as { targetDirectory?: string },
                       );
+                      return { type: 'handled' };
+                    case 'sandbox-setup':
+                      actions.openSandboxSetupDialog();
                       return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };

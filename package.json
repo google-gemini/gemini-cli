@@ -77,7 +77,10 @@
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0",
     "cross-spawn": "^7.0.6",
-    "minimatch": "^10.2.2"
+    "minimatch": "^10.2.2",
+    "@vscode/vsce": {
+      "minimatch": "^5.1.6"
+    }
   },
   "bin": {
     "gemini": "bundle/gemini.js"
