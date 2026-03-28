@@ -21,6 +21,7 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
+import { isTopicTool } from './messages/TopicMessage.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -80,7 +81,7 @@ export const MainContent = () => {
         if (item.type === 'user' || item.type === 'user_shell') {
           toolGroupInTurn = false;
         } else if (item.type === 'tool_group') {
-          toolGroupInTurn = true;
+          toolGroupInTurn = item.tools.some((t) => isTopicTool(t.name));
         } else if (
           (item.type === 'thinking' ||
             item.type === 'gemini' ||
