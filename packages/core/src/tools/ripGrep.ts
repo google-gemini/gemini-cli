@@ -8,7 +8,6 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -37,6 +36,7 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
+import { downloadRipGrep } from './downloadRipGrep.js';
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -65,11 +65,9 @@ let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
  *
  * Preference for system-installed ripgrep is blocked on:
  * - checksum verification of external binaries
- * - internalization of the get-ripgrep dependency
  *
  * See:
  * - feat(core): Prefer rg in system path (#11847)
- * - Move get-ripgrep to third_party (#12099)
  */
 async function ensureRipgrepAvailable(): Promise<string | null> {
   const existingPath = await resolveExistingRgPath();
