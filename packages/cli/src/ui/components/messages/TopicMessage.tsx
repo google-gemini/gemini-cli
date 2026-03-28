@@ -20,7 +20,8 @@ interface TopicMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
 }
 
-export const isTopicTool = (name: string): boolean => name === UPDATE_TOPIC_TOOL_NAME || name === UPDATE_TOPIC_DISPLAY_NAME;
+export const isTopicTool = (name: string): boolean =>
+  name === UPDATE_TOPIC_TOOL_NAME || name === UPDATE_TOPIC_DISPLAY_NAME;
 
 export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
   const rawTitle = args?.[TOPIC_PARAM_TITLE];
@@ -30,7 +31,7 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
   const intent = typeof rawIntent === 'string' ? rawIntent : undefined;
 
   return (
-    <Box flexDirection="row" marginLeft={2} marginBottom={1}>
+    <Box flexDirection="row" marginLeft={2}>
       <Text color={theme.text.primary} bold>
         {title || 'Topic'}
       </Text>

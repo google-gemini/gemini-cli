@@ -76,7 +76,6 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including update_topic 1`] = `
 "  Testing Topic -- This is the description
-
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  read_file Read a file                                                 │
 │                                                                          │
