@@ -102,6 +102,8 @@ export interface ShellExecutionConfig {
   scrollback?: number;
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
+  originalCommand?: string;
+  sessionId?: string;
 }
 
 /**
@@ -113,6 +115,8 @@ interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
+  command: string;
+  sessionId?: string;
 }
 
 interface ActiveChildProcess {
@@ -123,6 +127,8 @@ interface ActiveChildProcess {
     sniffChunks: Buffer[];
     binaryBytesReceived: number;
   };
+  command: string;
+  sessionId?: string;
 }
 
 const findLastContentLine = (
@@ -234,6 +240,20 @@ export class ShellExecutionService {
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static backgroundLogPids = new Set<number>();
   private static backgroundLogStreams = new Map<number, fs.WriteStream>();
+  private static backgroundProcessHistory = new Map<
+    string, // sessionId
+    Map<
+      number,
+      {
+        command: string;
+        status: 'running' | 'exited';
+        exitCode?: number | null;
+        signal?: number | null;
+        startTime: number;
+        endTime?: number;
+      }
+    >
+  >();
 
   static getLogDir(): string {
     return path.join(Storage.getGlobalTempDir(), 'background-processes');
@@ -498,10 +518,12 @@ export class ShellExecutionService {
         binaryBytesReceived: 0,
       };
 
-      if (child.pid) {
+      if (child.pid !== undefined) {
         this.activeChildProcesses.set(child.pid, {
           process: child,
           state,
+          command: shellExecutionConfig.originalCommand ?? commandToExecute,
+          sessionId: shellExecutionConfig.sessionId,
         });
       }
 
@@ -665,6 +687,17 @@ export class ShellExecutionService {
             exitCode,
             signal: exitSignal,
           };
+
+          const sessionId = shellExecutionConfig.sessionId ?? 'default';
+          const history =
+            ShellExecutionService.backgroundProcessHistory.get(sessionId);
+          const historyItem = history?.get(pid);
+          if (historyItem) {
+            historyItem.status = 'exited';
+            historyItem.exitCode = exitCode ?? undefined;
+            historyItem.signal = exitSignal ?? undefined;
+            historyItem.endTime = Date.now();
+          }
           onOutputEvent(event);
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -817,6 +850,8 @@ export class ShellExecutionService {
         ptyProcess,
         headlessTerminal,
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+        command: shellExecutionConfig.originalCommand ?? commandToExecute,
+        sessionId: shellExecutionConfig.sessionId,
       });
 
       const result = ExecutionLifecycleService.attachExecution(ptyPid, {
@@ -1074,6 +1109,17 @@ export class ShellExecutionService {
               exitCode,
               signal: signal ?? null,
             };
+
+            const sessionId = shellExecutionConfig.sessionId ?? 'default';
+            const history =
+              ShellExecutionService.backgroundProcessHistory.get(sessionId);
+            const historyItem = history?.get(ptyPid);
+            if (historyItem) {
+              historyItem.status = 'exited';
+              historyItem.exitCode = exitCode;
+              historyItem.signal = signal ?? null;
+              historyItem.endTime = Date.now();
+            }
             onOutputEvent(event);
 
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1218,12 +1264,48 @@ export class ShellExecutionService {
   static background(pid: number): void {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
+    const command =
+      activePty?.command ?? activeChild?.command ?? 'unknown command';
+    const sessionId = activePty?.sessionId ?? activeChild?.sessionId;
+
+    if (!sessionId) {
+      throw new Error('Session ID is required for background operations');
+    }
+
+    const MAX_BACKGROUND_PROCESS_HISTORY_SIZE = 100;
+    const history =
+      this.backgroundProcessHistory.get(sessionId) ??
+      new Map<
+        number,
+        {
+          command: string;
+          status: 'running' | 'exited';
+          exitCode?: number | null;
+          signal?: number | null;
+          startTime: number;
+          endTime?: number;
+        }
+      >();
+
+    if (history.size >= MAX_BACKGROUND_PROCESS_HISTORY_SIZE) {
+      const oldestPid = history.keys().next().value;
+      if (oldestPid !== undefined) {
+        history.delete(oldestPid);
+      }
+    }
+
+    history.set(pid, {
+      command,
+      status: 'running',
+      startTime: Date.now(),
+    });
+    this.backgroundProcessHistory.set(sessionId, history);
 
     // Set up background logging
     const logPath = this.getLogFilePath(pid);
     const logDir = this.getLogDir();
     try {
-      mkdirSync(logDir, { recursive: true });
+      mkdirSync(logDir, { recursive: true, mode: 0o700 });
       const stream = fs.createWriteStream(logPath, { flags: 'w' });
       stream.on('error', (err) => {
         debugLogger.warn('Background log stream error:', err);
@@ -1336,5 +1418,27 @@ export class ShellExecutionService {
         }
       }
     }
+  }
+
+  static listBackgroundProcesses(sessionId: string): Array<{
+    pid: number;
+    command: string;
+    status: 'running' | 'exited';
+    exitCode?: number | null;
+    signal?: number | null;
+  }> {
+    if (!sessionId) {
+      throw new Error('Session ID is required');
+    }
+    const history = this.backgroundProcessHistory.get(sessionId);
+    if (!history) return [];
+
+    return Array.from(history.entries()).map(([pid, info]) => ({
+      pid,
+      command: info.command,
+      status: info.status,
+      exitCode: info.exitCode,
+      signal: info.signal,
+    }));
   }
 }
