@@ -75,6 +75,7 @@ describe('ToolExecutor', () => {
     vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
       'TruncatedContent...',
     );
+    vi.spyOn(config, 'isAutoDistillationEnabled').mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -381,7 +382,9 @@ describe('ToolExecutor', () => {
 
   it('should truncate large shell output', async () => {
     // 1. Setup Config for Truncation
+
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
     vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
@@ -442,7 +445,10 @@ describe('ToolExecutor', () => {
 
   it('should truncate large MCP tool output with single text Part', async () => {
     // 1. Setup Config for Truncation
-    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(20);
+    vi.spyOn(config, 'isAutoDistillationEnabled').mockReturnValue(true);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
     vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const mcpToolName = 'get_big_text';
@@ -486,8 +492,9 @@ describe('ToolExecutor', () => {
     });
 
     // 4. Verify Truncation Logic
+    const stringifiedLongText = JSON.stringify([{ text: longText }], null, 2);
     expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
-      longText,
+      stringifiedLongText,
       mcpToolName,
       'call-mcp-trunc',
       expect.any(String),
@@ -495,9 +502,9 @@ describe('ToolExecutor', () => {
     );
 
     expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
-      longText,
+      stringifiedLongText,
       '/tmp/truncated_output.txt',
-      10,
+      20,
     );
 
     expect(result.status).toBe(CoreToolCallStatus.Success);
@@ -506,8 +513,10 @@ describe('ToolExecutor', () => {
     }
   });
 
-  it('should not truncate MCP tool output with multiple Parts', async () => {
-    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+  it('should truncate MCP tool output with multiple Parts', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(20);
+    vi.spyOn(config, 'isAutoDistillationEnabled').mockReturnValue(true);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const messageBus = createMockMessageBus();
     const mcpTool = new DiscoveredMCPTool(
@@ -547,9 +556,26 @@ describe('ToolExecutor', () => {
       onUpdateToolCall: vi.fn(),
     });
 
-    // Should NOT have been truncated
-    expect(fileUtils.saveTruncatedToolOutput).not.toHaveBeenCalled();
-    expect(fileUtils.formatTruncatedToolOutput).not.toHaveBeenCalled();
+    const longText1 = 'This is long text that exceeds the threshold.';
+    const stringifiedLongText = JSON.stringify(
+      [{ text: longText1 }, { text: 'second part' }],
+      null,
+      2,
+    );
+
+    // Should HAVE been truncated now
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      stringifiedLongText,
+      'get_big_text',
+      'call-mcp-multi',
+      expect.any(String),
+      'test-session-id',
+    );
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      stringifiedLongText,
+      '/tmp/truncated_output.txt',
+      20,
+    );
     expect(result.status).toBe(CoreToolCallStatus.Success);
   });
 
@@ -758,7 +784,9 @@ describe('ToolExecutor', () => {
 
   it('should truncate large shell output even on cancellation', async () => {
     // 1. Setup Config for Truncation
+
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
     vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });

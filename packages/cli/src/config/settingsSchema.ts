@@ -1946,6 +1946,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable local and remote subagents.',
         showInDialog: false,
       },
+      autoDistillation: {
+        type: 'boolean',
+        label: 'Auto Distillation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable automatic distillation for large tool outputs.',
+        showInDialog: true,
+      },
       worktrees: {
         type: 'boolean',
         label: 'Enable Git Worktrees',

@@ -6,9 +6,9 @@
 
 import {
   ToolErrorType,
+  runInDevTraceSpan,
   ToolOutputTruncatedEvent,
   logToolOutputTruncated,
-  runInDevTraceSpan,
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
   type ToolResult,
@@ -19,11 +19,13 @@ import {
 import { isAbortError } from '../utils/errors.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { ToolOutputDistillationService } from '../services/toolDistillationService.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
+
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import {
   CoreToolCallStatus,
@@ -196,6 +198,15 @@ export class ToolExecutor {
     call: ToolCall,
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    if (this.config.isAutoDistillationEnabled()) {
+      const distiller = new ToolOutputDistillationService(
+        this.config,
+        this.context.geminiClient,
+        this.context.promptId,
+      );
+      return distiller.distill(call.request.name, call.request.callId, content);
+    }
+
     const toolName = call.request.name;
     const callId = call.request.callId;
     let outputFile: string | undefined;
@@ -258,8 +269,6 @@ export class ToolExecutor {
             threshold,
           );
 
-          // We need to return a NEW array to avoid mutating the original toolResult if it matters,
-          // though here we are creating the response so it's probably fine to mutate or return new.
           const truncatedContent: Part[] = [
             { ...firstPart, text: truncatedText },
           ];

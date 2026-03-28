@@ -293,6 +293,7 @@ describe('WebFetchTool', () => {
         })),
       },
       isInteractive: () => false,
+      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 

@@ -680,6 +680,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  autoDistillation?: boolean;
   experimentalMemoryManager?: boolean;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
@@ -912,6 +913,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly autoDistillation: boolean;
   private readonly experimentalMemoryManager: boolean;
   private readonly experimentalAgentHistoryTruncation: boolean;
   private readonly experimentalAgentHistoryTruncationThreshold: number;
@@ -1121,6 +1123,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
+    this.autoDistillation = params.autoDistillation ?? false;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.experimentalAgentHistoryTruncation =
       params.experimentalAgentHistoryTruncation ?? false;
@@ -2302,6 +2305,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  isAutoDistillationEnabled(): boolean {
+    return this.autoDistillation;
   }
 
   isMemoryManagerEnabled(): boolean {

@@ -974,6 +974,7 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    autoDistillation: settings.experimental?.autoDistillation,
     experimentalMemoryManager: settings.experimental?.memoryManager,
     experimentalAgentHistoryTruncation:
       settings.experimental?.agentHistoryTruncation,
