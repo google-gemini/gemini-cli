@@ -5,7 +5,8 @@
  */
 
 import React from 'react';
-import { Box, type DOMElement } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
+import { theme } from '../../semantic-colors.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
@@ -24,6 +25,10 @@ import type { ToolMessageProps } from './ToolMessage.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
+import { Command } from '../../key/keyBindings.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
 import {
   type Config,
   ShellExecutionService,
@@ -34,6 +39,7 @@ import {
   calculateToolContentMaxLines,
   SHELL_CONTENT_OVERHEAD,
 } from '../../utils/toolLayoutUtils.js';
+import { cpLen } from '../../utils/textUtils.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   config?: Config;
@@ -148,6 +154,26 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     resultDisplay,
   );
 
+  const [isExpandedDescription, setIsExpandedDescription] =
+    React.useState(false);
+  const keyMatchers = useKeyMatchers();
+  const expandHintKey = formatCommand(Command.SHOW_MORE_LINES);
+
+  useKeypress(
+    (key) => {
+      // Allow expansion regardless of whether the shell is focused/executing
+      if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
+        setIsExpandedDescription((prev) => !prev);
+        return true;
+      }
+      return false;
+    },
+    // Scope the hotkey to the focused shell (while executing) or the most
+    // recent completed shell (`isExpandable` is only set on the last tool group).
+    // This ensures at most one ShellToolMessage responds to Ctrl+O at a time.
+    { isActive: isThisShellFocused || !!isExpandable },
+  );
+
   return (
     <>
       <StickyHeader
@@ -169,7 +195,20 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
+          isExpanded={isExpandedDescription}
         />
+
+        {/* 11 chars overhead for tool name + 10 for padding = ~25 overhead. If description + name is too long, or has newlines, show expand hint */}
+        {description &&
+          (cpLen(description) > terminalWidth - 25 ||
+            description.includes('\n')) && (
+            <Box marginLeft={1} flexShrink={0}>
+              <Text color={theme.ui.focus}>
+                (press {expandHintKey} to{' '}
+                {isExpandedDescription ? 'collapse' : 'expand'} command)
+              </Text>
+            </Box>
+          )}
 
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}
