@@ -36,6 +36,7 @@ export type ExecutionOutputEvent =
   | {
       type: 'data';
       chunk: string | AnsiOutput;
+      isCursorHidden?: boolean;
     }
   | {
       type: 'binary_detected';

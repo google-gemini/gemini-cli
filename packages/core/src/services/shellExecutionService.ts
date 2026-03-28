@@ -952,9 +952,13 @@ export class ShellExecutionService {
 
         if (output !== finalOutput) {
           output = finalOutput;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+          const isCursorHidden = (headlessTerminal as any)._core?.coreService
+            ?.isCursorHidden as boolean | undefined;
           const event: ShellOutputEvent = {
             type: 'data',
             chunk: finalOutput,
+            isCursorHidden,
           };
           onOutputEvent(event);
           ExecutionLifecycleService.emitEvent(ptyPid, event);
@@ -1303,7 +1307,14 @@ export class ShellExecutionService {
         startLine,
         endLine,
       );
-      const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+      const isCursorHidden = (activePty.headlessTerminal as any)._core
+        ?.coreService?.isCursorHidden as boolean | undefined;
+      const event: ShellOutputEvent = {
+        type: 'data',
+        chunk: bufferData,
+        isCursorHidden,
+      };
       ExecutionLifecycleService.emitEvent(pid, event);
     }
   }

@@ -299,10 +299,12 @@ describe('ShellExecutionService', () => {
       expect(result.output.trim()).toBe('file1.txt');
       expect(handle.pid).toBe(12345);
 
-      expect(onOutputEventMock).toHaveBeenCalledWith({
-        type: 'data',
-        chunk: createExpectedAnsiOutput('file1.txt'),
-      });
+      expect(onOutputEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'data',
+          chunk: createExpectedAnsiOutput('file1.txt'),
+        }),
+      );
     });
 
     it('should strip ANSI color codes from output', async () => {
