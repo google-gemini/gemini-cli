@@ -192,20 +192,34 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           }
 
           // Distribute any final fractional rounding remainders up to maxWidth
+          // Continue looping until budget is exhausted or no columns can grow
+          while (budget > 0) {
+            let distributed = false;
+            for (let i = 0; i < numColumns && budget > 0; i++) {
+              if (finalContentWidths[i]! < constraints[i]!.maxWidth) {
+                finalContentWidths[i]! += 1;
+                budget -= 1;
+                distributed = true;
+              }
+            }
+            // If we made a full pass without distributing, all eligible columns are at maxWidth
+            if (!distributed) break;
+          }
+        }
+
+        // 4. Distribute any absolute surplus remainder
+        // Only to columns that can still grow within their maxWidth constraints
+        while (budget > 0) {
+          let distributed = false;
           for (let i = 0; i < numColumns && budget > 0; i++) {
             if (finalContentWidths[i]! < constraints[i]!.maxWidth) {
               finalContentWidths[i]! += 1;
               budget -= 1;
+              distributed = true;
             }
           }
-        }
-
-        // 4. Distribute any absolute surplus remainder evenly
-        let index = 0;
-        while (budget > 0) {
-          finalContentWidths[index % numColumns]! += 1;
-          budget -= 1;
-          index++;
+          // If we made a full pass without distributing, all columns are at maxWidth
+          if (!distributed) break;
         }
       }
     }
