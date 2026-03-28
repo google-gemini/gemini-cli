@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { MessageType, type HistoryItem } from '../types.js';
+import { type CommandContext } from '../commands/types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 import {
   CoreToolCallStatus,
@@ -25,12 +26,18 @@ vi.mock('./messages/ToolGroupMessage.js', () => ({
 
 describe('<HistoryItemDisplay />', () => {
   const mockConfig = {} as unknown as Config;
+  const mockContext = {
+    ui: {
+      removeComponent: vi.fn(),
+    },
+  } as unknown as CommandContext;
   const baseItem = {
     id: 1,
     timestamp: 12345,
     isPending: false,
     terminalWidth: 80,
     config: mockConfig,
+    context: mockContext,
   };
 
   it('renders UserMessage for "user" type', async () => {
@@ -208,6 +215,7 @@ describe('<HistoryItemDisplay />', () => {
     const { lastFrame, unmount } = await renderWithProviders(
       <HistoryItemDisplay
         item={historyItem}
+        context={mockContext}
         terminalWidth={80}
         isPending={false}
       />,
@@ -245,6 +253,7 @@ describe('<HistoryItemDisplay />', () => {
     const { unmount } = await renderWithProviders(
       <HistoryItemDisplay
         item={historyItem}
+        context={mockContext}
         terminalWidth={80}
         isPending={false}
       />,
@@ -331,6 +340,7 @@ describe('<HistoryItemDisplay />', () => {
         const { lastFrame, unmount } = await renderWithProviders(
           <HistoryItemDisplay
             item={item}
+            context={mockContext}
             isPending={false}
             terminalWidth={80}
             availableTerminalHeight={10}
@@ -353,6 +363,7 @@ describe('<HistoryItemDisplay />', () => {
         const { lastFrame, unmount } = await renderWithProviders(
           <HistoryItemDisplay
             item={item}
+            context={mockContext}
             isPending={false}
             terminalWidth={80}
             availableTerminalHeight={10}
@@ -376,6 +387,7 @@ describe('<HistoryItemDisplay />', () => {
         const { lastFrame, unmount } = await renderWithProviders(
           <HistoryItemDisplay
             item={item}
+            context={mockContext}
             isPending={false}
             terminalWidth={80}
             availableTerminalHeight={10}
@@ -398,6 +410,7 @@ describe('<HistoryItemDisplay />', () => {
         const { lastFrame, unmount } = await renderWithProviders(
           <HistoryItemDisplay
             item={item}
+            context={mockContext}
             isPending={false}
             terminalWidth={80}
             availableTerminalHeight={10}

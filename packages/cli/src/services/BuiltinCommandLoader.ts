@@ -44,6 +44,7 @@ import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { modelCommand } from '../ui/commands/modelCommand.js';
 import { oncallCommand } from '../ui/commands/oncallCommand.js';
 import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
+import { perfCommand } from '../ui/commands/perfCommand.js';
 import { planCommand } from '../ui/commands/planCommand.js';
 import { policiesCommand } from '../ui/commands/policiesCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
@@ -183,6 +184,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
         : [mcpCommand]),
       memoryCommand,
       modelCommand,
+      perfCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       ...(this.config?.isPlanEnabled() ? [planCommand] : []),
       policiesCommand,

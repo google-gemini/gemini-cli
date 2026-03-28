@@ -10,6 +10,7 @@ import process from 'node:process';
 import * as path from 'node:path';
 import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
+import { perfCommand } from '../commands/stats.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
@@ -444,6 +445,24 @@ export async function parseArguments(
           description: 'Suppress the security warning when using --raw-output.',
         }),
     )
+    // Register MCP subcommands
+    .command(mcpCommand)
+    // Register Performance subcommands
+    .command(perfCommand)
+
+  if (settings.experimental?.extensionManagement) {
+    yargsInstance.command(extensionsCommand);
+  }
+
+  if (settings.skills?.enabled ?? true) {
+    yargsInstance.command(skillsCommand);
+  }
+  // Register hooks command if hooks are enabled
+  if (settings.hooksConfig.enabled) {
+    yargsInstance.command(hooksCommand);
+  }
+
+  yargsInstance
     .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()

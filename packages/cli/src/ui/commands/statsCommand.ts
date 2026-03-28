@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
+import { Dashboard } from '../dashboard.js';
 import type {
   HistoryItemStats,
   HistoryItemModelStats,
@@ -140,6 +142,19 @@ export const statsCommand: SlashCommand = {
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
       },
+    },
+    {
+      name: 'perf',
+      description: 'Show performance monitoring dashboard',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => ({
+        type: 'custom_dialog',
+        component: React.createElement(Dashboard, {
+          live: true,
+          onExit: () => context.ui.removeComponent(),
+        }),
+      }),
     },
   ],
 };

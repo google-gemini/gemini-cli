@@ -93,6 +93,8 @@ import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { runDeferredCommand } from './deferred.js';
 import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { PerformanceService } from './services/performance-service.js';
+import { StartupCollector } from '@google/gemini-cli-core';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -185,6 +187,9 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  const startupCollector = StartupCollector.getInstance();
+  startupCollector.markStart('cli_startup');
+
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
@@ -210,7 +215,9 @@ export async function main() {
   registerCleanup(() => slashCommandConflictHandler.stop());
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
+  startupCollector.markStart('load_settings');
   const settings = loadSettings();
+  startupCollector.markEnd('load_settings');
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
@@ -237,11 +244,6 @@ export async function main() {
       cleanupOpsHandle?.end();
     });
 
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argvPromise = parseArguments(settings.merged).finally(() => {
-    parseArgsHandle?.end();
-  });
-
   const rawStartupWarningsPromise = getStartupWarnings();
 
   // Report settings errors once during startup
@@ -257,7 +259,17 @@ export async function main() {
     );
   });
 
-  const argv = await argvPromise;
+  await Promise.all([
+    cleanupCheckpoints(),
+    cleanupToolOutputFiles(settings.merged),
+    cleanupBackgroundLogs(),
+  ]);
+
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
+  startupCollector.markStart('parse_arguments');
+  const argv = await parseArguments(settings.merged);
+  startupCollector.markEnd('parse_arguments');
+  parseArgsHandle?.end();
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -450,6 +462,11 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
+    PerformanceService.setupHooks();
+    registerSyncCleanup(() => {
+      PerformanceService.persistSync();
+    });
+
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
@@ -613,6 +630,7 @@ export async function main() {
     }
 
     cliStartupHandle?.end();
+    startupCollector.markEnd('cli_startup');
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
@@ -670,6 +688,12 @@ export async function main() {
         }
       }
     }
+
+    // Register SessionEnd hook for graceful exit
+    registerCleanup(async () => {
+      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+      await PerformanceService.persist();
+    });
 
     if (!input) {
       debugLogger.error(

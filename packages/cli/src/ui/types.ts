@@ -235,6 +235,11 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export type HistoryItemPerf = HistoryItemBase & {
+  type: 'perf';
+  live?: boolean;
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -383,6 +388,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemPerf
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -408,6 +414,7 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  PERF = 'perf',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',

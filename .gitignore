@@ -63,4 +63,7 @@ gemini-debug.log
 .eslintcache
 evals/logs/
 
+# GSoC Prototype Test Scripts
+run-dashboard.ts
+run-real-dashboard.ts
 temp_agents/

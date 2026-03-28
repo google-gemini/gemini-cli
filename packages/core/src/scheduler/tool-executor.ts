@@ -41,6 +41,11 @@ import {
   GEN_AI_TOOL_DESCRIPTION,
   GEN_AI_TOOL_NAME,
 } from '../telemetry/constants.js';
+import {
+  ToolExecutionCollector,
+  SessionCollector,
+  PersistenceManager,
+} from '../performance/index.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -187,6 +192,28 @@ export class ToolExecutor {
         }
 
         spanMetadata.output = completedToolCall;
+
+        // Record performance metrics
+        if (completedToolCall.durationMs !== undefined) {
+          ToolExecutionCollector.getInstance().recordExecution(
+            toolName,
+            completedToolCall.durationMs,
+            completedToolCall.status === CoreToolCallStatus.Success,
+            JSON.stringify(request.args),
+            completedToolCall.status === CoreToolCallStatus.Error
+              ? completedToolCall.response.error?.message
+              : undefined,
+          );
+
+          SessionCollector.getInstance().trackToolCall(
+            toolName,
+            completedToolCall.status === CoreToolCallStatus.Success,
+          );
+
+          // Persist metrics to disk so dashboard can see them in real-time
+          PersistenceManager.persist().catch(() => {});
+        }
+
         return completedToolCall;
       },
     );

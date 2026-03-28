@@ -90,6 +90,7 @@ export const MainContent = () => {
         ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
+            context={uiState.commandContext}
             availableTerminalHeight={
               uiState.constrainHeight || !isExpandable
                 ? staticAreaMaxItemHeight
@@ -140,6 +141,7 @@ export const MainContent = () => {
 
           return (
             <HistoryItemDisplay
+              context={uiState.commandContext}
               key={`pending-${i}`}
               availableTerminalHeight={
                 uiState.constrainHeight ? availableTerminalHeight : undefined
@@ -162,6 +164,7 @@ export const MainContent = () => {
       </Box>
     ),
     [
+      uiState,
       pendingHistoryItems,
       uiState.constrainHeight,
       availableTerminalHeight,
@@ -203,6 +206,7 @@ export const MainContent = () => {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
+            context={uiState.commandContext}
             availableTerminalHeight={
               uiState.constrainHeight || !item.isExpandable
                 ? staticAreaMaxItemHeight
@@ -223,12 +227,11 @@ export const MainContent = () => {
       }
     },
     [
+      uiState,
       showHeaderDetails,
       version,
       mainAreaWidth,
-      uiState.slashCommands,
       pendingItems,
-      uiState.constrainHeight,
       staticAreaMaxItemHeight,
     ],
   );

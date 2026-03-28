@@ -22,11 +22,13 @@ import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
+import Dashboard from '../dashboard.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
-import type { SlashCommand } from '../commands/types.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
 import { getMCPServerStatus } from '@google/gemini-cli-core';
+import type { MCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
 import { SkillsList } from './views/SkillsList.js';
 import { AgentsStatus } from './views/AgentsStatus.js';
@@ -40,6 +42,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
+  context: CommandContext;
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
@@ -52,6 +55,7 @@ interface HistoryItemDisplayProps {
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   item,
+  context,
   availableTerminalHeight,
   terminalWidth,
   isPending,
@@ -185,6 +189,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
+      {itemForDisplay.type === 'perf' && (
+        <Dashboard
+          live={itemForDisplay.live ?? false}
+          onExit={() => context.ui.removeComponent()}
+        />
+      )}
       {itemForDisplay.type === 'model' && (
         <ModelMessage model={itemForDisplay.model} />
       )}
@@ -228,7 +238,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         />
       )}
       {itemForDisplay.type === 'mcp_status' && (
-        <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
+        <McpStatus
+          {...itemForDisplay}
+          serverStatus={
+            getMCPServerStatus as (serverName: string) => MCPServerStatus
+          }
+        />
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
