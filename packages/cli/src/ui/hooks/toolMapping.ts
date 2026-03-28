@@ -40,7 +40,14 @@ export function mapToDisplay(
     const displayName = call.tool?.displayName ?? call.request.name;
 
     if (call.status === CoreToolCallStatus.Error) {
-      description = JSON.stringify(call.request.args);
+      // Truncate to avoid blowing out the tree-node
+      // row width when tools are called with large payloads (e.g. write_file
+      // with a full file body as an arg).
+      const rawArgs = JSON.stringify(call.request.args);
+      description =
+        rawArgs.length > 120
+          ? [...rawArgs].slice(0, 117).join('') + '...'
+          : rawArgs;
     } else {
       description = call.invocation.getDescription();
       renderOutputAsMarkdown = call.tool.isOutputMarkdown;
