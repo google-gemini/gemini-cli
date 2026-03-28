@@ -261,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
       },
       checkpointing: {
@@ -300,7 +300,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description:
-              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.',
             showInDialog: true,
           },
           modelRouting: {
@@ -1291,6 +1291,19 @@ const SETTINGS_SCHEMA = {
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
       },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
+      },
       includeDirectories: {
         type: 'array',
         label: 'Include Directories',
@@ -2139,6 +2152,46 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      agentHistoryTruncation: {
+        type: 'boolean',
+        label: 'Agent History Truncation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable truncation window logic for the Agent History Provider.',
+        showInDialog: true,
+      },
+      agentHistoryTruncationThreshold: {
+        type: 'number',
+        label: 'Agent History Truncation Threshold',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 30,
+        description:
+          'The maximum number of messages before history is truncated.',
+        showInDialog: true,
+      },
+      agentHistoryRetainedMessages: {
+        type: 'number',
+        label: 'Agent History Retained Messages',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 15,
+        description:
+          'The number of recent messages to retain after truncation.',
+        showInDialog: true,
+      },
+      agentHistorySummarization: {
+        type: 'boolean',
+        label: 'Agent History Summarization',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable summarization of truncated content via a small model for the Agent History Provider.',
         showInDialog: true,
       },
       topicUpdateNarration: {
@@ -3024,6 +3077,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               type: 'object',
               properties: {
                 useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
                 hasAccessToPreview: { type: 'boolean' },
                 requestedModels: {
