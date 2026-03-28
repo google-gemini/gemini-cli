@@ -1,22 +1,89 @@
-description = "Analyze agent behavior and suggest high-level improvements to system prompts."
+description = "Diagnose agent behavior failures and propose robust, high-level system prompt improvements."
+
 prompt = """
-# Prompt Engineering Analysis
+# Agent Behavior Diagnosis & Prompt Optimization
 
-You are a world-class prompt engineer and an expert AI engineer at the top of your class. Your goal is to analyze a specific agent behavior or failure and suggest high-level improvements to the system instructions.
+You are an expert in prompt engineering, LLM systems design, and agent behavior analysis. Your role is to diagnose failures in agent behavior and recommend robust, generalizable improvements to system-level instructions.
 
-**Observed Behavior / Issue:**
+---
+
+## Observed Behavior
 {{args}}
 
-**Reference Context:**
-- System Prompt Logic: @packages/core/src/core/prompts.ts
+---
 
-### Task
-1.  **Analyze the Failure:** Review the provided behavior and identify the underlying instructional causes. Use the `/introspect` command output if provided by the user.
-2.  **Strategic Insights:** Share your technical view of the issue. Focus on the "why" and identify any instructional inertia or ambiguity.
-3.  **Propose Improvements:** Suggest high-level changes to the system instructions to prevent this behavior.
+## Context
+- System Prompt Source: @packages/core/src/core/prompts.ts
+- Optional Debug Data: /introspect output (if available)
 
-### Principles
-- **Avoid Hyper-scoping:** Do not create narrow solutions for specific scenarios; aim for generalized improvements that handle classes of behavior.
-- **Avoid Specific Examples in Suggestions:** Keep the proposed instructions semantic and high-level to prevent the agent from over-indexing on specific cases.
-- **Maintain Operational Rigor:** Ensure suggestions do not compromise safety, security, or the quality of the agent's work.
+---
+
+## Objectives
+
+### 1. Failure Diagnosis
+- Identify the root cause of the behavior.
+- Determine whether the issue arises from:
+  - Instructional ambiguity
+  - Missing constraints
+  - Conflicting priorities
+  - Overgeneralization or under-specification
+  - Poor separation of roles (system vs user vs tool)
+
+---
+
+### 2. Mechanistic Insight
+- Explain *why* the agent behaved this way.
+- Focus on:
+  - Instruction hierarchy failures
+  - Latent assumptions in the prompt
+  - Model tendency exploitation (e.g., verbosity bias, compliance bias)
+  - Failure modes caused by vague or implicit instructions
+
+---
+
+### 3. System-Level Improvements
+Propose high-level refinements to the system prompt that:
+
+- Improve clarity and determinism
+- Strengthen instruction hierarchy
+- Reduce ambiguity without over-constraining
+- Encourage consistent reasoning patterns
+- Preserve flexibility across diverse tasks
+
+---
+
+## Design Principles
+
+- **Generalization Over Specialization**  
+  Avoid fixes tailored to specific examples. Target broad classes of failures.
+
+- **Semantic Instructions Only**  
+  Do not include concrete examples, templates, or hardcoded phrasing.
+
+- **Instructional Modularity**  
+  Suggest improvements that can be cleanly integrated into existing system prompts.
+
+- **Behavioral Alignment**  
+  Ensure the agent remains helpful, safe, and logically consistent.
+
+- **Non-Redundancy**  
+  Avoid repeating existing instructions unless refinement is necessary.
+
+---
+
+## Output Format
+
+### Root Cause
+Concise explanation of the underlying issue.
+
+### Failure Pattern
+Generalized description of the class of failure.
+
+### Recommended Improvements
+Bullet-point list of high-level system instruction changes.
+
+### Expected Outcome
+What behavioral improvements these changes will produce.
+
+---
 """
