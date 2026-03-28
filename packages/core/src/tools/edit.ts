@@ -57,6 +57,8 @@ import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
+import { verifySyntax } from '../utils/astUtils.js';
+import ts from 'typescript';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -72,7 +74,7 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
-  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy' | 'ast';
   matchRanges?: Array<{ start: number; end: number }>;
 }
 
@@ -286,7 +288,81 @@ async function calculateRegexReplacement(
     occurrences,
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
+    strategy: 'regex',
   };
+}
+
+async function calculateAstReplacement(
+  context: ReplacementContext,
+): Promise<ReplacementResult | null> {
+  const { currentContent, params } = context;
+  const { old_string, new_string, file_path } = params;
+
+  const ext = path.extname(file_path).toLowerCase();
+  if (!['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
+    return null;
+  }
+
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n').trim();
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  const sourceFile = ts.createSourceFile(
+    file_path,
+    currentContent,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+
+  const matches: Array<{ start: number; end: number }> = [];
+
+  function visit(node: ts.Node) {
+    const nodeText = node.getText(sourceFile).trim();
+    if (nodeText === normalizedSearch) {
+      matches.push({ start: node.getStart(sourceFile), end: node.getEnd() });
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  const occurrences = matches.length;
+
+  if (occurrences > 0 && (occurrences === 1 || params.allow_multiple)) {
+    // Sort matches by start position descending to replace from bottom to top
+    // so that the offsets for the remaining matches stay valid.
+    matches.sort((a, b) => b.start - a.start);
+
+    let modifiedCode = currentContent;
+    const newLines = normalizedReplace.split('\n');
+
+    for (const match of matches) {
+      // Determine the indentation of the line where the match starts
+      const { line } = ts.getLineAndCharacterOfPosition(sourceFile, match.start);
+      // We use the original currentContent to determine indentation to avoid
+      // issues with shifting lines, which is safe since we replace bottom-up.
+      const sourceLines = currentContent.split('\n');
+      const indentationMatch = sourceLines[line].match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+
+      const indentedReplace = applyIndentation(newLines, indentation).join('\n');
+
+      modifiedCode =
+        modifiedCode.substring(0, match.start) +
+        indentedReplace +
+        modifiedCode.substring(match.end);
+    }
+
+    return {
+      newContent: restoreTrailingNewline(currentContent, modifiedCode),
+      occurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+      strategy: 'ast',
+      matchRanges: matches.sort((a, b) => a.start - b.start),
+    };
+  }
+
+  return null;
 }
 
 export async function calculateReplacement(
@@ -326,6 +402,13 @@ export async function calculateReplacement(
     const event = new EditStrategyEvent('regex');
     logEditStrategy(config, event);
     return regexResult;
+  }
+
+  const astResult = await calculateAstReplacement(context);
+  if (astResult) {
+    const event = new EditStrategyEvent('ast');
+    logEditStrategy(config, event);
+    return astResult;
   }
 
   let fuzzyResult;
@@ -436,7 +519,7 @@ interface CalculatedEdit {
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
   originalLineEnding: '\r\n' | '\n';
-  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy' | 'ast';
   matchRanges?: Array<{ start: number; end: number }>;
 }
 
@@ -698,12 +781,26 @@ class EditToolInvocation
       abortSignal,
     });
 
-    const initialError = getErrorReplaceResult(
+    let initialError = getErrorReplaceResult(
       params,
       replacementResult.occurrences,
       replacementResult.finalOldString,
       replacementResult.finalNewString,
     );
+
+    if (!initialError) {
+      const syntaxResult = verifySyntax(
+        replacementResult.newContent,
+        this.resolvedPath,
+      );
+      if (!syntaxResult.valid) {
+        initialError = {
+          display: `Syntax error introduced by edit.`,
+          raw: `The proposed edit introduces the following syntax errors:\n${syntaxResult.error}\n\nPlease fix the edit to maintain valid syntax.`,
+          type: ToolErrorType.EDIT_PREPARATION_FAILURE,
+        };
+      }
+    }
 
     if (!initialError) {
       return {
