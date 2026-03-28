@@ -156,6 +156,7 @@ import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
   EXPAND_HINT_DURATION_MS,
+  MIN_CTRL_C_INTERVAL_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
@@ -1515,6 +1516,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
+  const lastCtrlCPressTimeRef = useRef<number>(0);
+
   const handleExitRepeat = useCallback(
     (count: number) => {
       if (count > 2) {
@@ -1527,10 +1530,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [config, handleSlashCommand],
   );
 
+  const handleCtrlCRepeat = useCallback(
+    (count: number) => {
+      const now = Date.now();
+      const timeSinceLastPress = now - lastCtrlCPressTimeRef.current;
+      lastCtrlCPressTimeRef.current = now;
+
+      if (count > 2) {
+        recordExitFail(config);
+      }
+      if (count > 1 && timeSinceLastPress > MIN_CTRL_C_INTERVAL_MS) {
+        void handleSlashCommand('/quit', undefined, undefined, false);
+      }
+    },
+    [config, handleSlashCommand],
+  );
+
   const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
     useRepeatedKeyPress({
       windowMs: WARNING_PROMPT_DURATION_MS,
-      onRepeat: handleExitRepeat,
+      onRepeat: handleCtrlCRepeat,
     });
 
   const { pressCount: ctrlDPressCount, handlePress: handleCtrlDPress } =
@@ -1538,7 +1557,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       windowMs: WARNING_PROMPT_DURATION_MS,
       onRepeat: handleExitRepeat,
     });
-
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
   >();
