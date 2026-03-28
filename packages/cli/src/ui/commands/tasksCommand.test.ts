@@ -25,8 +25,9 @@ describe('tasksCommand', () => {
   });
 
   it('should have correct name and altNames', () => {
-    expect(tasksCommand.name).toBe('shells');
-    expect(tasksCommand.altNames).toContain('bashes');
+    expect(tasksCommand.name).toBe('tasks');
+    expect(tasksCommand.altNames).toContain('bg');
+    expect(tasksCommand.altNames).toContain('background');
   });
 
   it('should auto-execute', () => {
