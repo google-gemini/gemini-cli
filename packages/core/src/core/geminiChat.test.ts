@@ -1107,6 +1107,66 @@ describe('GeminiChat', () => {
       );
       expect(geminiMessages.length).toBeGreaterThan(0);
     });
+
+    it('should not deadlock if generator is never iterated', async () => {
+      // mock a valid stream
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      // get generator but never iterate it
+      const _gen = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test message',
+        'prompt-id-deadlock',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      // deliberately not doing: for await (const chunk of gen) {}
+
+      // now try a second call — if deadlock exists, this hangs forever
+      const result = await Promise.race([
+        chat.sendMessageStream(
+          { model: 'test-model' },
+          'second message',
+          'prompt-id-deadlock-2',
+          new AbortController().signal,
+          LlmRole.MAIN,
+        ),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DEADLOCK DETECTED')), 3000),
+        ),
+      ]);
+      // only reaches here if no deadlock
+      expect(result).toBeDefined();
+    });
+
+    it('should not corrupt history if generator is never iterated', async () => {
+      const historyBefore = [...chat.getHistory()];
+
+      // get generator but never iterate it
+      const _gen = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'test message',
+        'prompt-id-history-corrupt',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      const historyAfter = chat.getHistory();
+
+      // history should be unchanged since generator was never consumed
+      expect(historyAfter).toEqual(historyBefore);
+    });
   });
 
   describe('addHistory', () => {

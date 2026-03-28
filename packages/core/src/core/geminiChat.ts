@@ -314,8 +314,6 @@ export class GeminiChat {
     const streamDonePromise = new Promise<void>((resolve) => {
       streamDoneResolver = resolve;
     });
-    this.sendPromise = streamDonePromise;
-
     const userContent = createUserContent(message);
     const { model } =
       this.context.config.modelConfigService.getResolvedConfig(modelConfigKey);
@@ -344,15 +342,14 @@ export class GeminiChat {
         displayContent: finalDisplayContent,
       });
     }
-
-    // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
-    const requestContents = this.getHistory(true);
-
     const streamWithRetries = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      this.sendPromise = streamDonePromise;
+      // Add user content to history ONCE before any attempts.
+      this.history.push(userContent);
       try {
+        const requestContents = this.getHistory(true);
         const maxAttempts = this.context.config.getMaxAttempts();
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
