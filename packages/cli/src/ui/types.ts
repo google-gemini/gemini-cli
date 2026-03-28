@@ -369,6 +369,7 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
+// Individually exported types extending HistoryItemBase
 export type HistoryItemWithoutId =
   | HistoryItemUser
   | HistoryItemUserShell
