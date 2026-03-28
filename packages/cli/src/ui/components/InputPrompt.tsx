@@ -1084,11 +1084,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                   // Only auto-execute if the command has no completion function
                   // (i.e., it doesn't require an argument to be selected)
-                  if (
-                    command &&
-                    isAutoExecutableCommand(command) &&
-                    !command.completion
-                  ) {
+                  if (command && !!command.action && !command.completion) {
                     const completedText =
                       completion.getCompletedText(suggestion);
 

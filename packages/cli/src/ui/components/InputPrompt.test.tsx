@@ -1409,7 +1409,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should autocomplete commands with autoExecute: false on Enter', async () => {
+  it('should auto-execute commands with autoExecute: false on Enter if they have an action', async () => {
     const shareCommand: SlashCommand = {
       name: 'share',
       kind: CommandKind.BUILT_IN,
@@ -1427,6 +1427,13 @@ describe('InputPrompt', () => {
       activeSuggestionIndex: 0,
       getCommandFromSuggestion: vi.fn().mockReturnValue(shareCommand),
       getCompletedText: vi.fn().mockReturnValue('/share'),
+      slashCompletionRange: {
+        completionStart: 1,
+        completionEnd: 3, // "/sh" -> start at 1, end at 3
+        getCommandFromSuggestion: vi.fn(),
+        isArgumentCompletion: false,
+        leafCommand: null,
+      },
     });
 
     props.buffer.setText('/sh');
@@ -1445,9 +1452,9 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should autocomplete to allow adding file argument
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+      // Should submit the full command
+      expect(props.onSubmit).toHaveBeenCalledWith('/share');
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();
   });
@@ -1528,7 +1535,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should autocomplete custom commands from .toml files on Enter', async () => {
+  it('should auto-execute custom commands from .toml files on Enter if they have an action', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
       kind: CommandKind.USER_FILE,
@@ -1546,6 +1553,13 @@ describe('InputPrompt', () => {
       activeSuggestionIndex: 0,
       getCommandFromSuggestion: vi.fn().mockReturnValue(customCommand),
       getCompletedText: vi.fn().mockReturnValue('/find-capital'),
+      slashCompletionRange: {
+        completionStart: 1,
+        completionEnd: 5, // "/find" -> start at 1, end at 5
+        getCommandFromSuggestion: vi.fn(),
+        isArgumentCompletion: false,
+        leafCommand: null,
+      },
     });
 
     props.buffer.setText('/find');
@@ -1564,9 +1578,9 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should autocomplete (not execute) since autoExecute is undefined
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+      // Should submit the full command
+      expect(props.onSubmit).toHaveBeenCalledWith('/find-capital');
+      expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
     });
     unmount();
   });
