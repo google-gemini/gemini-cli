@@ -991,6 +991,29 @@ describe('fileUtils', () => {
       expect(result.linesShown).toEqual([1, 2]);
     });
 
+    it('should return a structured error when startLine exceeds file length', async () => {
+      const lines = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`);
+      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
+
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        5000,
+      );
+
+      expect(result.error).toContain('start_line 5000 exceeds file length');
+      expect(result.errorType).toBe('invalid_tool_params');
+      expect(typeof result.llmContent).toBe('string');
+      expect(result.llmContent as string).toContain(
+        'start_line 5000 is out of range',
+      );
+      expect(result.llmContent as string).toContain('100 lines');
+      // Must not return an inverted or empty range as valid truncated content
+      expect(result.isTruncated).toBeUndefined();
+      expect(result.linesShown).toBeUndefined();
+    });
+
     it('should truncate long lines in text files', async () => {
       const longLine = 'a'.repeat(2500);
       actualNodeFs.writeFileSync(
