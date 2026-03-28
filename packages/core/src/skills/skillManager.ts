@@ -48,6 +48,7 @@ export class SkillManager {
     storage: Storage,
     extensions: GeminiCLIExtension[] = [],
     isTrusted: boolean = false,
+    additionalRoots: string[] = [],
   ): Promise<void> {
     this.clearSkills();
 
@@ -89,6 +90,26 @@ export class SkillManager {
       storage.getProjectAgentSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectAgentSkills);
+
+    // 5. Additional roots (e.g. from includeDirectories)
+    if (additionalRoots && additionalRoots.length > 0) {
+      for (const root of additionalRoots) {
+        // Direct search (looks for SKILL.md and */SKILL.md)
+        const rootSkills = await loadSkillsFromDir(root);
+        this.addSkillsWithPrecedence(rootSkills);
+
+        // Search in standard subdirectories inside the root
+        const agentSkills = await loadSkillsFromDir(
+          path.join(root, '.agents', 'skills'),
+        );
+        this.addSkillsWithPrecedence(agentSkills);
+
+        const geminiSkills = await loadSkillsFromDir(
+          path.join(root, '.gemini', 'skills'),
+        );
+        this.addSkillsWithPrecedence(geminiSkills);
+      }
+    }
   }
 
   /**

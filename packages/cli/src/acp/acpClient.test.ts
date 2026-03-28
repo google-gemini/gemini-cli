@@ -178,9 +178,10 @@ describe('GeminiAgent', () => {
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
-      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
       validatePathAccess: vi.fn().mockReturnValue(null),
+      getExtensions: vi.fn().mockReturnValue([]),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
       getWorkspaceContext: vi.fn().mockReturnValue({
         addReadOnlyPath: vi.fn(),
       }),
@@ -198,6 +199,9 @@ describe('GeminiAgent', () => {
         setClientName: vi.fn(),
       },
       setClientName: vi.fn(),
+      getSkillManager: vi.fn().mockReturnValue({
+        discoverSkills: vi.fn().mockResolvedValue(undefined),
+      }),
       get config() {
         return this;
       },
@@ -510,6 +514,27 @@ describe('GeminiAgent', () => {
     );
   });
 
+  it('should create a new session with additional roots', async () => {
+    const _meta = { additionalRoots: ['/extra/path'] };
+
+    await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+      _meta,
+    } as acp.NewSessionRequest & { _meta?: Record<string, unknown> });
+
+    expect(loadCliConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({
+          includeDirectories: expect.arrayContaining(['/extra/path']),
+        }),
+      }),
+      'test-session-id',
+      mockArgv,
+      { cwd: '/tmp' },
+    );
+  });
+
   it('should handle authentication failure gracefully', async () => {
     mockConfig.refreshAuth.mockRejectedValue(new Error('Auth failed'));
     const debugSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -577,6 +602,51 @@ describe('GeminiAgent', () => {
 
     expect(session.prompt).toHaveBeenCalled();
     expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should support additional roots mid-session in prompt', async () => {
+    const _meta = { additionalRoots: ['/extra/path'] };
+
+    // Mock chat.sendMessageStream to avoid crash
+    const mockChatInTest = {
+      sendMessageStream: vi
+        .fn()
+        .mockResolvedValue(
+          createMockStream([
+            {
+              type: StreamEventType.CHUNK,
+              value: { candidates: [{ content: { parts: [{ text: 'Hi' }] } }] },
+            },
+          ]),
+        ),
+    };
+    (
+      mockConfig.getGeminiClient().startChat as unknown as import('vitest').Mock
+    ).mockResolvedValue(mockChatInTest);
+
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+    const session = (
+      agent as unknown as { sessions: Map<string, Session> }
+    ).sessions.get('test-session-id');
+    if (!session) throw new Error('Session not found');
+
+    // Stub addDirectories and getDirectories on workspaceContext
+    const mockWorkspaceContext = mockConfig.getWorkspaceContext();
+    mockWorkspaceContext.addDirectories = vi.fn();
+    mockWorkspaceContext.getDirectories = vi
+      .fn()
+      .mockReturnValue(['/tmp', '/extra/path']);
+
+    await agent.prompt({
+      sessionId: 'test-session-id',
+      prompt: [],
+      _meta,
+    } as acp.PromptRequest & { _meta?: Record<string, unknown> });
+
+    expect(mockWorkspaceContext.addDirectories).toHaveBeenCalledWith([
+      '/extra/path',
+    ]);
+    expect(mockConfig.getSkillManager().discoverSkills).toHaveBeenCalled();
   });
 
   it('should delegate setMode to session', async () => {
