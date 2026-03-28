@@ -59,6 +59,7 @@ import {
   type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { activeChannels } from '../channels/types.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -708,6 +709,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  channels?: string[];
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -914,6 +916,7 @@ export class Config implements McpContext, AgentLoopContext {
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
+  private readonly channels: string[];
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
   private readonly experimentalAgentHistoryTruncation: boolean;
@@ -1222,6 +1225,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.channels = params.channels ?? [];
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -1400,6 +1404,26 @@ export class Config implements McpContext, AgentLoopContext {
       for (const result of results) {
         if (result.status === 'rejected') {
           debugLogger.error('Error initializing MCP clients:', result.reason);
+        }
+      }
+      // Report channel status after all MCP servers have initialized.
+      if (this.channels.length > 0) {
+        const active = this.channels.filter((name) => activeChannels.has(name));
+        if (active.length > 0) {
+          coreEvents.emitFeedback(
+            'info',
+            `Channels listening for messages: ${active.join(', ')}\nOnly use channels you trust — messages are injected into the conversation.`,
+            undefined,
+            { style: 'channel' },
+          );
+        }
+        for (const name of this.channels) {
+          if (!activeChannels.has(name)) {
+            coreEvents.emitFeedback(
+              'warning',
+              `Channel "${name}" was requested but the MCP server did not declare channel capability.`,
+            );
+          }
         }
       }
     });
@@ -2159,6 +2183,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getMcpEnabled(): boolean {
     return this.mcpEnabled;
+  }
+
+  getChannels(): string[] {
+    return this.channels;
   }
 
   getMcpEnablementCallbacks(): McpEnablementCallbacks | undefined {

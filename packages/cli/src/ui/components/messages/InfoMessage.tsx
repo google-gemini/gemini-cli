@@ -14,6 +14,7 @@ interface InfoMessageProps {
   secondaryText?: string;
   icon?: string;
   color?: string;
+  marginTop?: number;
   marginBottom?: number;
 }
 
@@ -22,6 +23,7 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
   secondaryText,
   icon,
   color,
+  marginTop,
   marginBottom,
 }) => {
   color ??= theme.status.warning;
@@ -29,7 +31,11 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
   const prefixWidth = prefix.length;
 
   return (
-    <Box flexDirection="row" marginTop={1} marginBottom={marginBottom ?? 0}>
+    <Box
+      flexDirection="row"
+      marginTop={marginTop ?? 1}
+      marginBottom={marginBottom ?? 0}
+    >
       <Box width={prefixWidth}>
         <Text color={color}>{prefix}</Text>
       </Box>
