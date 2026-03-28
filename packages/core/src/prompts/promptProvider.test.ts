@@ -61,6 +61,9 @@ describe('PromptProvider', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
+        getProjectTempTrackerDir: vi
+          .fn()
+          .mockReturnValue('/tmp/project-temp/tracker'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
@@ -99,6 +102,20 @@ describe('PromptProvider', () => {
     expect(prompt).toContain(
       `Instructions found in \`${DEFAULT_CONTEXT_FILENAME}\`, \`CUSTOM.md\` or \`ANOTHER.md\` files are foundational mandates.`,
     );
+  });
+
+  it('should include the task tracker storage location in the system prompt', () => {
+    vi.mocked(mockConfig.isTrackerEnabled).mockReturnValue(true);
+    const mockTrackerDir = '/mock/tracker/path';
+    vi.mocked(mockConfig.storage.getProjectTempTrackerDir).mockReturnValue(
+      mockTrackerDir,
+    );
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# TASK MANAGEMENT PROTOCOL');
+    expect(prompt).toContain(`located at \`${mockTrackerDir}\``);
   });
 
   it('should handle multiple context filenames in user memory section', () => {
