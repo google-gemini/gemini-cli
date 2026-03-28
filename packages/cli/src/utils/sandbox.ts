@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,6 +25,7 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  redactEnvironmentVariable,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -619,7 +620,10 @@ export async function start_sandbox(
       for (let env of process.env['SANDBOX_ENV'].split(',')) {
         if ((env = env.trim())) {
           if (env.includes('=')) {
-            debugLogger.log(`SANDBOX_ENV: ${env}`);
+            const [key, value] = env.split('=', 2);
+            debugLogger.log(
+              `SANDBOX_ENV: ${key}=${redactEnvironmentVariable(key, value)}`,
+            );
             args.push('--env', env);
           } else {
             throw new FatalSandboxError(
@@ -1019,7 +1023,14 @@ async function start_lxc_sandbox(
       ...finalEntrypoint,
     ];
 
-    debugLogger.log(`lxc exec args: ${args.join(' ')}`);
+    const redactedArgs = args.map((arg, i) => {
+      if (i > 0 && args[i - 1] === '--env' && arg.includes('=')) {
+        const [key, value] = arg.split('=', 2);
+        return `${key}=${redactEnvironmentVariable(key, value)}`;
+      }
+      return arg;
+    });
+    debugLogger.log(`lxc exec args: ${redactedArgs.join(' ')}`);
 
     process.stdin.pause();
     const sandboxProcess = spawn('lxc', args, {
