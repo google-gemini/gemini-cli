@@ -233,6 +233,15 @@ their corresponding top-level category object in your `settings.json` file.
     (Ready: ◇, Action Required: ✋, Working: ✦)
   - **Default:** `true`
 
+- **`ui.terminalTitleMaxLen`** (number):
+  - **Description:** Maximum length of the terminal window title.
+  - **Default:** `80`
+
+- **`ui.padWindowTitle`** (boolean):
+  - **Description:** Pad the terminal window title with spaces to a fixed length
+    to prevent taskbar jitter.
+  - **Default:** `true`
+
 - **`ui.showHomeDirectoryWarning`** (boolean):
   - **Description:** Show a warning when running Gemini CLI in the home
     directory.
