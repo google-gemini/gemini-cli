@@ -302,6 +302,7 @@ describe('handleAutoUpdate', () => {
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
         'Automatic update failed. Please try updating manually. (command: npm i -g @google/gemini-cli@2.0.0)',
+      updateCommand: 'npm i -g @google/gemini-cli@2.0.0',
     });
   });
 
@@ -326,6 +327,7 @@ describe('handleAutoUpdate', () => {
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-failed', {
       message:
         'Automatic update failed. Please try updating manually. (error: Spawn error)',
+      updateCommand: 'npm i -g @google/gemini-cli@2.0.0',
     });
   });
 
@@ -435,13 +437,16 @@ describe('setUpdateHandler', () => {
   });
 
   it('should handle update-failed event', () => {
-    updateEventEmitter.emit('update-failed', { message: 'Failed' });
+    updateEventEmitter.emit('update-failed', {
+      message: 'Failed',
+      updateCommand: 'npm install -g @google/gemini-cli@latest',
+    });
 
     expect(setUpdateInfo).toHaveBeenCalledWith(null);
     expect(addItem).toHaveBeenCalledWith(
       {
         type: MessageType.ERROR,
-        text: 'Automatic update failed. Please try updating manually',
+        text: 'Automatic update failed. Please try updating manually:\n  npm install -g @google/gemini-cli@latest',
       },
       expect.any(Number),
     );
