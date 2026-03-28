@@ -57,6 +57,7 @@ export class PromptProvider {
     const skills = context.config.getSkillManager().getSkills();
     const toolNames = context.toolRegistry.getAllToolNames();
     const enabledToolNames = new Set(toolNames);
+
     const approvedPlanPath = context.config.getApprovedPlanPath();
 
     const desiredModel = resolveModel(
@@ -71,7 +72,6 @@ export class PromptProvider {
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
-    // --- Context Gathering ---
     let planModeToolsList = '';
     if (isPlanMode) {
       const allTools = context.toolRegistry.getAllTools();
@@ -232,7 +232,18 @@ export class PromptProvider {
     );
 
     // Sanitize erratic newlines from composition
-    const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+    let sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
+
+    // Context Reinjection (Active Topic)
+    if (context.config.isTopicUpdateNarrationEnabled()) {
+      const activeTopic = context.config.topicState.getTopic();
+      if (activeTopic) {
+        const sanitizedTopic = activeTopic
+          .replace(/\n/g, ' ')
+          .replace(/\]/g, '');
+        sanitizedPrompt += `\n\n[Active Topic: ${sanitizedTopic}]`;
+      }
+    }
 
     // Write back to file if requested
     this.maybeWriteSystemMd(
