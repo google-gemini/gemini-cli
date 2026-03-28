@@ -29,7 +29,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, execPromise } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -42,14 +42,44 @@ function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
 }
 
+async function resolveSystemRgPath(): Promise<string | null> {
+  try {
+    const { stdout } = await execPromise('command -v rg');
+    const systemPath = stdout.trim();
+    if (systemPath) {
+      return systemPath;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 async function resolveExistingRgPath(): Promise<string | null> {
   const binDir = Storage.getGlobalBinDir();
-  for (const fileName of getRgCandidateFilenames()) {
+  const candidates = getRgCandidateFilenames();
+
+  // 1. On Android (Termux), prioritize system ripgrep to avoid library compatibility issues
+  if (process.platform === 'android') {
+    const systemPath = await resolveSystemRgPath();
+    if (systemPath) {
+      return systemPath;
+    }
+  }
+
+  // 2. Otherwise, look for the managed binary downloaded into the global bin directory
+  for (const fileName of candidates) {
     const candidatePath = path.join(binDir, fileName);
     if (await fileExists(candidatePath)) {
       return candidatePath;
     }
   }
+
+  // 3. Fallback for other platforms (e.g. Linux, macOS) if managed binary is missing
+  if (process.platform !== 'android') {
+    return resolveSystemRgPath();
+  }
+
   return null;
 }
 
@@ -58,17 +88,18 @@ let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
  * Ensures a ripgrep binary is available.
  *
  * NOTE:
- * - The Gemini CLI currently prefers a managed ripgrep binary downloaded
- *   into its global bin directory.
- * - Even if ripgrep is available on the system PATH, it is intentionally
- *   not used at this time.
+ * - On Android (Termux), the system's ripgrep binary is preferred to avoid
+ *   library compatibility issues.
+ * - On other platforms, the Gemini CLI prefers a managed ripgrep binary
+ *   downloaded into its global bin directory.
+ * - If the managed binary is missing on non-Android platforms, it falls
+ *   back to searching for ripgrep on the system PATH.
  *
- * Preference for system-installed ripgrep is blocked on:
+ * Preference for system-installed ripgrep on all platforms is blocked on:
  * - checksum verification of external binaries
  * - internalization of the get-ripgrep dependency
  *
  * See:
- * - feat(core): Prefer rg in system path (#11847)
  * - Move get-ripgrep to third_party (#12099)
  */
 async function ensureRipgrepAvailable(): Promise<string | null> {

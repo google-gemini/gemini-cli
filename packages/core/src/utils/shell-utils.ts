@@ -963,3 +963,25 @@ export async function* execStreaming(
     });
   }
 }
+
+/**
+ * Executes a command and returns a promise that resolves with the stdout and stderr.
+ * Use for simple commands where buffering the entire output is acceptable.
+ *
+ * @param command The command to execute.
+ * @returns A promise that resolves with stdout and stderr.
+ */
+export async function execPromise(
+  command: string,
+): Promise<{ stdout: string; stderr: string }> {
+  const { exec } = await import('node:child_process');
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
