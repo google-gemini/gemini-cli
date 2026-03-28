@@ -9,7 +9,6 @@ import readline from 'node:readline';
 import process from 'node:process';
 import { coreEvents } from './events.js';
 import { getConsentForOauth } from './authConsent.js';
-import { FatalAuthenticationError } from './errors.js';
 import { writeToStdout } from './stdio.js';
 import { isHeadlessMode } from './headless.js';
 
@@ -87,12 +86,25 @@ describe('getConsentForOauth', () => {
       expect(result).toBe(false);
     });
 
-    it('should throw FatalAuthenticationError when no UI listeners are present', async () => {
+    it('should emit consent request and wait even if no UI listeners are present (backlog)', async () => {
       vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(0);
+      const emitSpy = vi.spyOn(coreEvents, 'emitConsentRequest');
 
-      await expect(getConsentForOauth('Login required.')).rejects.toThrow(
-        FatalAuthenticationError,
+      const promise = getConsentForOauth('Login required.');
+
+      expect(emitSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt:
+            'Login required. Opening authentication page in your browser. \n\nDo you want to continue?',
+        }),
       );
+
+      // Simulate listener draining the backlog later and confirming
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload = emitSpy.mock.calls[0][0] as any;
+      payload.onConfirm(true);
+
+      expect(await promise).toBe(true);
     });
   });
 

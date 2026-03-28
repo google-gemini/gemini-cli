@@ -136,9 +136,9 @@ describe('OAuthCredentialStorage', () => {
         mockError,
       );
 
-      await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
-        'Failed to load OAuth credentials',
-      );
+      await expect(
+        OAuthCredentialStorage.loadCredentials(),
+      ).resolves.toBeNull();
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
         'Failed to load OAuth credentials',
@@ -153,9 +153,9 @@ describe('OAuthCredentialStorage', () => {
       );
       vi.spyOn(fs, 'readFile').mockRejectedValue(mockError);
 
-      await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
-        'Failed to load OAuth credentials',
-      );
+      await expect(
+        OAuthCredentialStorage.loadCredentials(),
+      ).resolves.toBeNull();
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
         'Failed to load OAuth credentials',
@@ -186,9 +186,9 @@ describe('OAuthCredentialStorage', () => {
       );
       vi.spyOn(fs, 'readFile').mockResolvedValue('invalid json');
 
-      await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
-        'Failed to load OAuth credentials',
-      );
+      await expect(
+        OAuthCredentialStorage.loadCredentials(),
+      ).resolves.toBeNull();
     });
 
     it('should not delete the old file if saving migrated credentials fails', async () => {
@@ -202,9 +202,9 @@ describe('OAuthCredentialStorage', () => {
         new Error('Save failed'),
       );
 
-      await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
-        'Failed to load OAuth credentials',
-      );
+      await expect(
+        OAuthCredentialStorage.loadCredentials(),
+      ).resolves.toBeNull();
 
       expect(fs.rm).not.toHaveBeenCalled();
     });
@@ -306,12 +306,12 @@ describe('OAuthCredentialStorage', () => {
         mockError,
       );
 
-      await expect(OAuthCredentialStorage.clearCredentials()).rejects.toThrow(
-        'Failed to clear OAuth credentials',
-      );
+      await expect(
+        OAuthCredentialStorage.clearCredentials(),
+      ).resolves.toBeUndefined();
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
-        'Failed to clear OAuth credentials',
+        'Failed to clear OAuth credentials: Deletion error',
         mockError,
       );
     });
