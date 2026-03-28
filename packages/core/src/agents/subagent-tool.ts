@@ -13,7 +13,6 @@ import {
   type ToolCallConfirmationDetails,
   isTool,
   type ToolLiveOutput,
-  type ExecuteOptions,
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
@@ -162,7 +161,6 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    options?: ExecuteOptions,
   ): Promise<ToolResult> {
     const validationError = SchemaValidator.validate(
       this.definition.inputConfig.inputSchema,
@@ -191,7 +189,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       },
       async ({ metadata }) => {
         metadata.input = this.params;
-        const result = await invocation.execute(signal, updateOutput, options);
+        const result = await invocation.execute(signal, updateOutput);
         metadata.output = result;
         return result;
       },

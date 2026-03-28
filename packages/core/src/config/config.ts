@@ -36,6 +36,8 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { UpdateTopicTool } from '../tools/topicTool.js';
+import { TopicState } from './topicState.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -729,6 +731,7 @@ export class Config implements McpContext, AgentLoopContext {
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
+  readonly topicState = new TopicState();
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -3371,6 +3374,10 @@ export class Config implements McpContext, AgentLoopContext {
         registerFn();
       }
     };
+
+    maybeRegister(UpdateTopicTool, () =>
+      registry.registerTool(new UpdateTopicTool(this, this.messageBus)),
+    );
 
     maybeRegister(LSTool, () =>
       registry.registerTool(new LSTool(this, this.messageBus)),
