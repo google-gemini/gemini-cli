@@ -84,7 +84,8 @@ async function defaultSessionView(context: CommandContext) {
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'Check session stats. Usage: /stats [session|model|tools]',
+  description:
+    'Check session stats. Usage: /stats [session|model|tools|performance]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   isSafeConcurrent: true,
@@ -139,6 +140,17 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'performance',
+      description: 'Show performance metrics',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: (context: CommandContext) => {
+        context.ui.addItem({
+          type: MessageType.PERFORMANCE_STATS,
+        });
       },
     },
   ],
