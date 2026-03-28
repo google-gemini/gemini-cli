@@ -640,6 +640,7 @@ export interface ConfigParameters {
   useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
+  shellBackgroundCompletionBehavior?: string;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -843,6 +844,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
+  private readonly shellBackgroundCompletionBehavior:
+    | 'inject'
+    | 'notify'
+    | 'silent';
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
@@ -1181,6 +1186,14 @@ export class Config implements McpContext, AgentLoopContext {
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
+
+    const requestedBehavior = params.shellBackgroundCompletionBehavior;
+    if (requestedBehavior === 'inject' || requestedBehavior === 'notify') {
+      this.shellBackgroundCompletionBehavior = requestedBehavior;
+    } else {
+      this.shellBackgroundCompletionBehavior = 'silent';
+    }
+
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -1190,6 +1203,7 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig: this.sanitizationConfig,
       sandboxManager: this._sandboxManager,
       sandboxConfig: this.sandbox,
+      backgroundCompletionBehavior: this.shellBackgroundCompletionBehavior,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -3162,6 +3176,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getEnableInteractiveShell(): boolean {
     return this.enableInteractiveShell;
+  }
+
+  getShellBackgroundCompletionBehavior(): 'inject' | 'notify' | 'silent' {
+    return this.shellBackgroundCompletionBehavior;
   }
 
   getSkipNextSpeakerCheck(): boolean {

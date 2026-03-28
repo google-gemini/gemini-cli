@@ -102,6 +102,7 @@ export interface ShellExecutionConfig {
   scrollback?: number;
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
+  backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
 }
 
 /**
@@ -539,7 +540,8 @@ export class ShellExecutionService {
                 : 'successfully';
               return `[Background command completed ${status}. Output saved to ${logPath}]`;
             },
-            completionBehavior: 'silent',
+            completionBehavior:
+              shellExecutionConfig.backgroundCompletionBehavior || 'silent',
           })
         : undefined;
 
@@ -877,7 +879,8 @@ export class ShellExecutionService {
             : 'successfully';
           return `[Background command completed ${status}. Output saved to ${logPath}]`;
         },
-        completionBehavior: 'silent',
+        completionBehavior:
+          shellExecutionConfig.backgroundCompletionBehavior || 'silent',
       }).result;
 
       let processingChain = Promise.resolve();
