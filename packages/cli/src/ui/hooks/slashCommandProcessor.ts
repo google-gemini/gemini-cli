@@ -84,7 +84,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
-  toggleBackgroundShell: () => void;
+  toggleBackgroundTasks: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
@@ -242,7 +242,7 @@ export const useSlashCommandProcessor = (
           actions.addConfirmUpdateExtensionRequest,
         setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
-        toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleBackgroundTasks: actions.toggleBackgroundTasks,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {

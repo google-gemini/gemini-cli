@@ -6,13 +6,13 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 
-export const shellsCommand: SlashCommand = {
-  name: 'shells',
-  altNames: ['bashes'],
+export const tasksCommand: SlashCommand = {
+  name: 'tasks',
+  altNames: ['bg', 'background'],
   kind: CommandKind.BUILT_IN,
-  description: 'Toggle background shells view',
+  description: 'Toggle background tasks view',
   autoExecute: true,
   action: async (context) => {
-    context.ui.toggleBackgroundShell();
+    context.ui.toggleBackgroundTasks();
   },
 };

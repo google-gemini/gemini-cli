@@ -16,7 +16,7 @@ import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
-import { TopicState } from '../tools/topicTool.js';
+import { TopicState } from '../config/topicState.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';

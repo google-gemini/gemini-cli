@@ -179,11 +179,18 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./shellCommandProcessor.js', () => ({
-  useShellCommandProcessor: vi.fn().mockReturnValue({
+vi.mock('./useExecutionLifecycle.js', () => ({
+  useExecutionLifecycle: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
     activeShellPtyId: null,
     lastShellOutputTime: 0,
+    backgroundTaskCount: 0,
+    isBackgroundTaskVisible: false,
+    toggleBackgroundTasks: vi.fn(),
+    backgroundCurrentExecution: vi.fn(),
+    backgroundTasks: new Map(),
+    dismissBackgroundTask: vi.fn(),
+    registerBackgroundTask: vi.fn(),
   }),
 }));
 

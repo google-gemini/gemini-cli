@@ -232,8 +232,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     terminalWidth,
     activePtyId,
     history,
-    backgroundShells,
-    backgroundShellHeight,
+    backgroundTasks,
+    backgroundTaskHeight,
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
@@ -1262,7 +1262,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
         if (
           activePtyId ||
-          (backgroundShells.size > 0 && backgroundShellHeight > 0)
+          (backgroundTasks.size > 0 && backgroundTaskHeight > 0)
         ) {
           setEmbeddedShellFocused(true);
           return true;
@@ -1325,8 +1325,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setBannerVisible,
       activePtyId,
       setEmbeddedShellFocused,
-      backgroundShells.size,
-      backgroundShellHeight,
+      backgroundTasks.size,
+      backgroundTaskHeight,
       streamingState,
       handleEscPress,
       registerPlainTabPress,
