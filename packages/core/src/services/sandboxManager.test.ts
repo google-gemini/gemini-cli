@@ -385,5 +385,14 @@ describe('SandboxManager', () => {
         expect(manager).toBeInstanceOf(expected);
       },
     );
+
+    it('should return WindowsSandboxManager if sandboxing is enabled on win32', () => {
+      vi.spyOn(os, 'platform').mockReturnValue('win32');
+      const manager = createSandboxManager(
+        { enabled: true },
+        { workspace: '/workspace' },
+      );
+      expect(manager).toBeInstanceOf(WindowsSandboxManager);
+    });
   });
 });
