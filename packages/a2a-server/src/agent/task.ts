@@ -877,22 +877,20 @@ export class Task {
   }
 
   private async _handleToolConfirmationPart(part: Part): Promise<boolean> {
-    if (
-      part.kind !== 'data' ||
-      !part.data ||
-      // eslint-disable-next-line no-restricted-syntax
-      typeof part.data['callId'] !== 'string' ||
-      // eslint-disable-next-line no-restricted-syntax
-      typeof part.data['outcome'] !== 'string'
-    ) {
-      return false;
-    }
-    if (!part.data['outcome']) {
+    if (part.kind !== 'data' || !part.data) {
       return false;
     }
 
     const callId = part.data['callId'];
     const outcomeString = part.data['outcome'];
+
+    if (typeof callId !== 'string' || typeof outcomeString !== 'string') {
+      return false;
+    }
+
+    if (!outcomeString) {
+      return false;
+    }
 
     this.toolsAlreadyConfirmed.add(callId);
 
