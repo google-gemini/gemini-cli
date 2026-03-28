@@ -202,7 +202,7 @@ async function calculateFlexibleReplacement(
       sourceLines.splice(
         i,
         searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
+        newBlockWithIndent.join('\n') + '\n',
       );
       i += replaceLines.length;
     } else {

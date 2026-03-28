@@ -30,6 +30,8 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  runInDevTraceSpan,
+  GeminiCliOperation,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -62,7 +64,19 @@ export async function runNonInteractive({
   prompt_id,
   resumedSessionData,
 }: RunNonInteractiveParams): Promise<void> {
-  return promptIdContext.run(prompt_id, async () => {
+  return promptIdContext.run(prompt_id, () =>
+    runInDevTraceSpan(
+      { operation: GeminiCliOperation.UserPrompt },
+      async ({ metadata }) => {
+        if (config.getTelemetryLogPromptsEnabled()) {
+          metadata.input = input;
+        }
+        return runBody();
+      },
+    ),
+  );
+
+  async function runBody(): Promise<void> {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
       interactive: false,
@@ -531,5 +545,5 @@ export async function runNonInteractive({
     if (errorToHandle) {
       handleError(errorToHandle, config);
     }
-  });
+  }
 }

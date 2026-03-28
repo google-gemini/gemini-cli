@@ -336,6 +336,14 @@ describe('EditTool', () => {
         occurrences: 1,
       },
       {
+        name: 'preserve the line after a flexible replacement (no newline drop)',
+        content: '  hello\n    world\n  end\n',
+        old_string: 'hello\nworld',
+        new_string: 'goodbye\nmoon',
+        expected: '  goodbye\n  moon\n  end\n',
+        occurrences: 1,
+      },
+      {
         name: 'return 0 occurrences if no match is found',
         content: 'hello world',
         old_string: 'nomatch',
