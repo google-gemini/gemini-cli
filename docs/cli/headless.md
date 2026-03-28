@@ -36,13 +36,22 @@ Returns a stream of newline-delimited JSON (JSONL) events.
 
 ## Exit codes
 
-The CLI returns standard exit codes to indicate the result of the headless
-execution:
+Gemini CLI uses the following exit codes to indicate why the tool terminated
+unexpectedly. You can use these codes to handle errors in scripts and automation
+workflows.
 
-- `0`: Success.
-- `1`: General error or API failure.
-- `42`: Input error (invalid prompt or arguments).
-- `53`: Turn limit exceeded.
+| Exit code | Error type                 | Description                                                                                         |
+| --------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| 41        | `FatalAuthenticationError` | An error occurred during the authentication process.                                                |
+| 42        | `FatalInputError`          | Invalid or missing input was provided to the CLI. (non-interactive mode only)                       |
+| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (e.g., Docker, Podman, or Seatbelt).              |
+| 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
+| 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
+| 54        | `FatalToolExecutionError`  | An error occurred during tool execution.                                                            |
+| 130       | `FatalCancellationError`   | The operation was canceled by the user (e.g., SIGINT).                                              |
+
+Exit code 0 indicates that Gemini CLI finished successfully. Exit code 1
+indicates a general error or API failure occurred.
 
 ## Next steps
 

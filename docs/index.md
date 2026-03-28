@@ -113,13 +113,12 @@ Deep technical documentation and API specifications.
 
 Support, release history, and legal information.
 
-- **[FAQ](./resources/faq.md):** Answers to frequently asked questions.
+- **[FAQ](./resources/faq.md):** Answers to frequently asked questions,
+  including troubleshooting questions.
 - **[Quota and pricing](./resources/quota-and-pricing.md):** Limits and billing
   details.
 - **[Terms and privacy](./resources/tos-privacy.md):** Official notices and
   terms.
-- **[Troubleshooting](./resources/troubleshooting.md):** Common issues and
-  solutions.
 - **[Uninstall](./resources/uninstall.md):** How to uninstall Gemini CLI.
 
 ## Development

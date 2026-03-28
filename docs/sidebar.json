@@ -237,10 +237,6 @@
             "label": "Terms and privacy",
             "slug": "docs/resources/tos-privacy"
           },
-          {
-            "label": "Troubleshooting",
-            "slug": "docs/resources/troubleshooting"
-          },
           { "label": "Uninstall", "slug": "docs/resources/uninstall" }
         ]
       }
