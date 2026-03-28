@@ -43,6 +43,10 @@
             "slug": "docs/cli/tutorials/session-management"
           },
           {
+            "label": "Teleport sessions between machines",
+            "slug": "docs/cli/teleportation"
+          },
+          {
             "label": "Plan tasks with todos",
             "slug": "docs/cli/tutorials/task-planning"
           },
@@ -150,6 +154,7 @@
           { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
           { "label": "Settings", "slug": "docs/cli/settings" },
           { "label": "Telemetry", "slug": "docs/cli/telemetry" },
+          { "label": "Teleportation", "slug": "docs/cli/teleportation" },
           { "label": "Token caching", "slug": "docs/cli/token-caching" }
         ]
       },
