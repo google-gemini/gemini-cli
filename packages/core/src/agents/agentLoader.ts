@@ -20,8 +20,7 @@ import type { A2AAuthConfig } from './auth-provider/types.js';
 import { MCPServerConfig } from '../config/config.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
-import { getErrorMessage } from '../utils/errors.js';
-
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 /**
  * Error thrown when an agent definition is invalid or cannot be loaded.
  */
@@ -596,14 +595,53 @@ export async function loadAgentsFromDirectory(
 
   const files = dirEntries.filter(
     (entry) =>
-      entry.isFile() &&
+      (entry.isFile() || entry.isSymbolicLink()) &&
       !entry.name.startsWith('_') &&
       entry.name.endsWith('.md'),
   );
 
+  const resolvedDir = path.resolve(dir);
+  const seenPaths = new Set<string>();
+
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
+      let realPath: string;
+      try {
+        realPath = await fs.realpath(filePath);
+      } catch (e) {
+        if (entry.isSymbolicLink()) {
+          const message =
+            isNodeError(e) && e.code === 'ENOENT'
+              ? 'Symlink target does not exist'
+              : `Failed to resolve symlink: ${getErrorMessage(e)}`;
+          result.errors.push(new AgentLoadError(filePath, message));
+          continue;
+        }
+        throw e;
+      }
+
+      // Security: reject symlinks pointing outside the agents directory
+      const relative = path.relative(resolvedDir, realPath);
+      if (
+        entry.isSymbolicLink() &&
+        (relative.startsWith('..') || path.isAbsolute(relative))
+      ) {
+        result.errors.push(
+          new AgentLoadError(
+            filePath,
+            `Symlink points outside agents directory: ${realPath}`,
+          ),
+        );
+        continue;
+      }
+
+      // Dedup: skip if we already loaded this resolved path
+      if (seenPaths.has(realPath)) {
+        continue;
+      }
+      seenPaths.add(realPath);
+
       const content = await fs.readFile(filePath, 'utf-8');
       const hash = crypto.createHash('sha256').update(content).digest('hex');
       const agentDefs = await parseAgentMarkdown(filePath, content);
