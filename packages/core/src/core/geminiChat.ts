@@ -521,7 +521,10 @@ export class GeminiChat {
     // Track initial active model to detect fallback changes
     const initialActiveModel = this.context.config.getActiveModel();
 
-    const apiCall = async () => {
+    const requestTimeoutMs =
+      this.context.config.getRequestTimeoutMs() ?? 300_000;
+
+    const apiCall = async (signal?: AbortSignal) => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
       const useGemini3_1FlashLite =
@@ -568,7 +571,7 @@ export class GeminiChat {
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
-        abortSignal,
+        abortSignal: signal,
       };
 
       let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
@@ -680,6 +683,7 @@ export class GeminiChat {
       authType: this.context.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.context.config.getRetryFetchErrors(),
       signal: abortSignal,
+      overallTimeoutMs: requestTimeoutMs,
       maxAttempts:
         availabilityMaxAttempts ?? this.context.config.getMaxAttempts(),
       getAvailabilityContext,

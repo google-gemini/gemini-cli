@@ -104,6 +104,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  requestTimeout?: number;
   isCommand: boolean | undefined;
 }
 
@@ -442,6 +443,11 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('request-timeout', {
+          type: 'number',
+          description:
+            'Maximum time (in milliseconds) to wait for a request to complete, including retries.',
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -1017,6 +1023,7 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     billing: settings.billing,
     maxAttempts: settings.general?.maxAttempts,
+    requestTimeoutMs: argv.requestTimeout ?? settings.general?.requestTimeoutMs,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,

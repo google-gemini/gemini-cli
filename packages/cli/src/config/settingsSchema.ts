@@ -335,6 +335,16 @@ const SETTINGS_SCHEMA = {
           'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
         showInDialog: true,
       },
+      requestTimeoutMs: {
+        type: 'number',
+        label: 'Request Timeout (ms)',
+        category: 'General',
+        requiresRestart: false,
+        default: 300000,
+        description:
+          'Maximum time (in milliseconds) to wait for a request to complete, including retries. Default: 300,000 (5 minutes).',
+        showInDialog: true,
+      },
       debugKeystrokeLogging: {
         type: 'boolean',
         label: 'Debug Keystroke Logging',

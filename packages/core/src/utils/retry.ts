@@ -37,6 +37,7 @@ export interface RetryOptions {
   signal?: AbortSignal;
   getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
   onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
+  overallTimeoutMs?: number;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -196,7 +197,7 @@ export function isRetryableError(
  * @throws The last error encountered if all attempts fail.
  */
 export async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
+  fn: (signal?: AbortSignal) => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
   if (options?.signal?.aborted) {
@@ -224,6 +225,7 @@ export async function retryWithBackoff<T>(
     signal,
     getAvailabilityContext,
     onRetry,
+    overallTimeoutMs,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -232,98 +234,106 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
+  const startTime = Date.now();
+  let overallSignal = signal;
+  let timeoutId: NodeJS.Timeout | undefined;
 
-  while (attempt < maxAttempts) {
-    if (signal?.aborted) {
-      throw createAbortError();
+  if (overallTimeoutMs) {
+    const timeoutController = new AbortController();
+    timeoutId = setTimeout(() => timeoutController.abort(), overallTimeoutMs);
+    if (signal) {
+      // AbortSignal.any is available in Node.js >= 20.3.0
+      // For compatibility with earlier Node 20.x, we could use manually manually.
+      // But the project says recommended ~20.19.0.
+      if (typeof AbortSignal.any === 'function') {
+        overallSignal = AbortSignal.any([signal, timeoutController.signal]);
+      } else {
+        // Fallback for older Node.js 20 versions
+        signal.addEventListener('abort', () => timeoutController.abort(), {
+          once: true,
+        });
+        overallSignal = timeoutController.signal;
+      }
+    } else {
+      overallSignal = timeoutController.signal;
     }
-    attempt++;
-    try {
-      const result = await fn();
+  }
 
-      if (
-        shouldRetryOnContent &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        shouldRetryOnContent(result as GenerateContentResponse)
-      ) {
-        const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
-        const delayWithJitter = Math.max(0, currentDelay + jitter);
-        if (onRetry) {
-          onRetry(attempt, new Error('Invalid content'), delayWithJitter);
-        }
-        await delay(delayWithJitter, signal);
-        currentDelay = Math.min(maxDelayMs, currentDelay * 2);
-        continue;
-      }
-
-      const successContext = getAvailabilityContext?.();
-      if (successContext) {
-        successContext.service.markHealthy(successContext.policy.model);
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw error;
-      }
-
-      const classifiedError = classifyGoogleError(error);
-
-      const errorCode = getErrorStatus(error);
-
-      if (
-        classifiedError instanceof TerminalQuotaError ||
-        classifiedError instanceof ModelNotFoundError
-      ) {
-        if (onPersistent429) {
-          try {
-            const fallbackModel = await onPersistent429(
-              authType,
-              classifiedError,
-            );
-            if (fallbackModel) {
-              attempt = 0; // Reset attempts and retry with the new model.
-              currentDelay = initialDelayMs;
-              continue;
-            }
-          } catch (fallbackError) {
-            debugLogger.warn('Fallback to Flash model failed:', fallbackError);
-          }
-        }
-        // Terminal/not_found already recorded; nothing else to mark here.
-        throw classifiedError; // Throw if no fallback or fallback failed.
-      }
-
-      // Handle ValidationRequiredError - user needs to verify before proceeding
-      if (classifiedError instanceof ValidationRequiredError) {
-        if (onValidationRequired) {
-          try {
-            const intent = await onValidationRequired(classifiedError);
-            if (intent === 'verify') {
-              // User verified, retry the request
-              attempt = 0;
-              currentDelay = initialDelayMs;
-              continue;
-            }
-            // 'change_auth' or 'cancel' - mark as handled and throw
-            classifiedError.userHandled = true;
-          } catch (validationError) {
-            debugLogger.warn('Validation handler failed:', validationError);
-          }
-        }
-        throw classifiedError;
-      }
-
-      const is500 =
-        errorCode !== undefined && errorCode >= 500 && errorCode < 600;
-
-      if (classifiedError instanceof RetryableQuotaError || is500) {
-        if (attempt >= maxAttempts) {
-          const errorMessage =
-            classifiedError instanceof Error ? classifiedError.message : '';
-          debugLogger.warn(
-            `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
+  try {
+    while (attempt < maxAttempts) {
+      if (overallSignal?.aborted) {
+        if (overallTimeoutMs && Date.now() - startTime >= overallTimeoutMs) {
+          throw new Error(
+            `Operation timed out after ${overallTimeoutMs}ms and ${attempt} attempts.`,
           );
+        }
+        throw createAbortError();
+      }
+      attempt++;
+      try {
+        const result = await Promise.race([
+          fn(overallSignal),
+          new Promise<never>((_, reject) => {
+            const onAbort = () => {
+              if (
+                overallTimeoutMs &&
+                Date.now() - startTime >= overallTimeoutMs
+              ) {
+                reject(
+                  new Error(
+                    `Operation timed out after ${overallTimeoutMs}ms and ${attempt - 1} attempts.`,
+                  ),
+                );
+              } else {
+                reject(createAbortError());
+              }
+            };
+            if (overallSignal?.aborted) {
+              onAbort();
+            } else {
+              overallSignal?.addEventListener('abort', onAbort, { once: true });
+            }
+          }),
+        ]);
+
+        if (
+          shouldRetryOnContent &&
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          shouldRetryOnContent(result as GenerateContentResponse)
+        ) {
+          const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
+          const delayWithJitter = Math.max(0, currentDelay + jitter);
+          if (onRetry) {
+            onRetry(attempt, new Error('Invalid content'), delayWithJitter);
+          }
+          await delay(delayWithJitter, overallSignal);
+          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+          continue;
+        }
+
+        const successContext = getAvailabilityContext?.();
+        if (successContext) {
+          successContext.service.markHealthy(successContext.policy.model);
+        }
+
+        return result;
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.name === 'AbortError' ||
+            error.message.includes('Operation timed out'))
+        ) {
+          throw error;
+        }
+
+        const classifiedError = classifyGoogleError(error);
+
+        const errorCode = getErrorStatus(error);
+
+        if (
+          classifiedError instanceof TerminalQuotaError ||
+          classifiedError instanceof ModelNotFoundError
+        ) {
           if (onPersistent429) {
             try {
               const fallbackModel = await onPersistent429(
@@ -336,67 +346,124 @@ export async function retryWithBackoff<T>(
                 continue;
               }
             } catch (fallbackError) {
-              debugLogger.warn('Model fallback failed:', fallbackError);
+              debugLogger.warn(
+                'Fallback to Flash model failed:',
+                fallbackError,
+              );
             }
           }
-          throw classifiedError instanceof RetryableQuotaError
-            ? classifiedError
-            : error;
+          // Terminal/not_found already recorded; nothing else to mark here.
+          throw classifiedError; // Throw if no fallback or fallback failed.
         }
 
+        // Handle ValidationRequiredError - user needs to verify before proceeding
+        if (classifiedError instanceof ValidationRequiredError) {
+          if (onValidationRequired) {
+            try {
+              const intent = await onValidationRequired(classifiedError);
+              if (intent === 'verify') {
+                // User verified, retry the request
+                attempt = 0;
+                currentDelay = initialDelayMs;
+                continue;
+              }
+              // 'change_auth' or 'cancel' - mark as handled and throw
+              classifiedError.userHandled = true;
+            } catch (validationError) {
+              debugLogger.warn('Validation handler failed:', validationError);
+            }
+          }
+          throw classifiedError;
+        }
+
+        const is500 =
+          errorCode !== undefined && errorCode >= 500 && errorCode < 600;
+
+        if (classifiedError instanceof RetryableQuotaError || is500) {
+          if (attempt >= maxAttempts) {
+            const errorMessage =
+              classifiedError instanceof Error ? classifiedError.message : '';
+            debugLogger.warn(
+              `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
+            );
+            if (onPersistent429) {
+              try {
+                const fallbackModel = await onPersistent429(
+                  authType,
+                  classifiedError,
+                );
+                if (fallbackModel) {
+                  attempt = 0; // Reset attempts and retry with the new model.
+                  currentDelay = initialDelayMs;
+                  continue;
+                }
+              } catch (fallbackError) {
+                debugLogger.warn('Model fallback failed:', fallbackError);
+              }
+            }
+            throw classifiedError instanceof RetryableQuotaError
+              ? classifiedError
+              : error;
+          }
+
+          if (
+            classifiedError instanceof RetryableQuotaError &&
+            classifiedError.retryDelayMs !== undefined
+          ) {
+            currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
+            // Positive jitter up to +20% while respecting server minimum delay
+            const jitter = currentDelay * 0.2 * Math.random();
+            const delayWithJitter = currentDelay + jitter;
+            debugLogger.warn(
+              `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
+            );
+            if (onRetry) {
+              onRetry(attempt, error, delayWithJitter);
+            }
+            await delay(delayWithJitter, overallSignal);
+            currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+            continue;
+          } else {
+            const errorStatus = getErrorStatus(error);
+            logRetryAttempt(attempt, error, errorStatus);
+
+            // Exponential backoff with jitter for non-quota errors
+            const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
+            const delayWithJitter = Math.max(0, currentDelay + jitter);
+            if (onRetry) {
+              onRetry(attempt, error, delayWithJitter);
+            }
+            await delay(delayWithJitter, overallSignal);
+            currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+            continue;
+          }
+        }
+
+        // Generic retry logic for other errors
         if (
-          classifiedError instanceof RetryableQuotaError &&
-          classifiedError.retryDelayMs !== undefined
+          attempt >= maxAttempts ||
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          !shouldRetryOnError(error as Error, retryFetchErrors)
         ) {
-          currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
-          // Positive jitter up to +20% while respecting server minimum delay
-          const jitter = currentDelay * 0.2 * Math.random();
-          const delayWithJitter = currentDelay + jitter;
-          debugLogger.warn(
-            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
-          );
-          if (onRetry) {
-            onRetry(attempt, error, delayWithJitter);
-          }
-          await delay(delayWithJitter, signal);
-          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
-          continue;
-        } else {
-          const errorStatus = getErrorStatus(error);
-          logRetryAttempt(attempt, error, errorStatus);
-
-          // Exponential backoff with jitter for non-quota errors
-          const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
-          const delayWithJitter = Math.max(0, currentDelay + jitter);
-          if (onRetry) {
-            onRetry(attempt, error, delayWithJitter);
-          }
-          await delay(delayWithJitter, signal);
-          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
-          continue;
+          throw error;
         }
-      }
 
-      // Generic retry logic for other errors
-      if (
-        attempt >= maxAttempts ||
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        !shouldRetryOnError(error as Error, retryFetchErrors)
-      ) {
-        throw error;
-      }
+        const errorStatus = getErrorStatus(error);
+        logRetryAttempt(attempt, error, errorStatus);
 
-      const errorStatus = getErrorStatus(error);
-      logRetryAttempt(attempt, error, errorStatus);
-
-      // Exponential backoff with jitter for non-quota errors
-      const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
-      const delayWithJitter = Math.max(0, currentDelay + jitter);
-      if (onRetry) {
-        onRetry(attempt, error, delayWithJitter);
+        // Exponential backoff with jitter for non-quota errors
+        const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
+        const delayWithJitter = Math.max(0, currentDelay + jitter);
+        if (onRetry) {
+          onRetry(attempt, error, delayWithJitter);
+        }
+        await delay(delayWithJitter, overallSignal);
+        currentDelay = Math.min(maxDelayMs, currentDelay * 2);
       }
-      await delay(delayWithJitter, signal);
-      currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+    }
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
     }
   }
 

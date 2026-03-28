@@ -27,7 +27,7 @@ const createFailingFunction = (
   successValue: string = 'success',
 ) => {
   let attempts = 0;
-  return vi.fn(async () => {
+  return vi.fn(async (_signal?: AbortSignal) => {
     attempts++;
     if (attempts <= failures) {
       // Simulate a retryable error
@@ -633,6 +633,38 @@ describe('retryWithBackoff', () => {
       expect.objectContaining({ name: 'AbortError' }),
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+  it('should throw timeout error when overallTimeoutMs is exceeded', async () => {
+    let internalSignal: AbortSignal | undefined;
+    const mockFn = vi.fn(async (signal?: AbortSignal) => {
+      internalSignal = signal;
+      // Simulation of work that respects the signal
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(resolve, 200);
+        signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timeout);
+            reject(new Error('Aborted'));
+          },
+          { once: true },
+        );
+      });
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 10,
+      overallTimeoutMs: 100,
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    await expect(promise).rejects.toThrow(
+      'Operation timed out after 100ms and 0 attempts.',
+    );
+    expect(internalSignal?.aborted).toBe(true);
   });
   it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
     const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
