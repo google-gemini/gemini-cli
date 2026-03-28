@@ -989,6 +989,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200, // maxDirs
+      ['.git'], // boundaryMarkers
     );
   });
 
@@ -1018,6 +1019,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200,
+      ['.git'], // boundaryMarkers
     );
   });
 
@@ -1046,6 +1048,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200,
+      ['.git'], // boundaryMarkers
     );
   });
 });
@@ -1122,12 +1125,7 @@ describe('mergeExcludeTools', () => {
     ]);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
-    const config = await loadCliConfig(
-      settings,
-
-      'test-session',
-      argv,
-    );
+    const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getExcludeTools()).toEqual(
       new Set(['tool1', 'tool2', 'tool3', 'tool4', 'tool5']),
     );

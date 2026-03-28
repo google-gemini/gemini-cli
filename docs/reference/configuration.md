@@ -723,6 +723,11 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {
           "model": "gemini-3-pro-preview"
         }
+      },
+      "agent-history-provider-summarizer": {
+        "modelConfig": {
+          "model": "gemini-3-flash-preview"
+        }
       }
     }
     ```
@@ -1335,6 +1340,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
+- **`context.memoryBoundaryMarkers`** (array):
+  - **Description:** File or directory names that mark the boundary for
+    GEMINI.md discovery. The upward traversal stops at the first directory
+    containing any of these markers. An empty array disables parent traversal.
+  - **Default:**
+
+    ```json
+    [".git"]
+    ```
+
+  - **Requires restart:** Yes
+
 - **`context.includeDirectories`** (array):
   - **Description:** Additional directories to include in the workspace context.
     Missing directories will be skipped with a warning.
@@ -1727,6 +1744,28 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Replace the built-in save_memory tool with a memory manager
     subagent that supports adding, removing, de-duplicating, and organizing
     memories.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistoryTruncation`** (boolean):
+  - **Description:** Enable truncation window logic for the Agent History
+    Provider.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistoryTruncationThreshold`** (number):
+  - **Description:** The maximum number of messages before history is truncated.
+  - **Default:** `30`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistoryRetainedMessages`** (number):
+  - **Description:** The number of recent messages to retain after truncation.
+  - **Default:** `15`
+  - **Requires restart:** Yes
+
+- **`experimental.agentHistorySummarization`** (boolean):
+  - **Description:** Enable summarization of truncated content via a small model
+    for the Agent History Provider.
   - **Default:** `false`
   - **Requires restart:** Yes
 

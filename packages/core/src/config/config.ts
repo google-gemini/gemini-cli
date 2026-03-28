@@ -36,6 +36,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { UpdateTopicTool, TopicState } from '../tools/topicTool.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -681,6 +682,11 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   experimentalMemoryManager?: boolean;
+  experimentalAgentHistoryTruncation?: boolean;
+  experimentalAgentHistoryTruncationThreshold?: number;
+  experimentalAgentHistoryRetainedMessages?: number;
+  experimentalAgentHistorySummarization?: boolean;
+  memoryBoundaryMarkers?: string[];
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -723,6 +729,7 @@ export class Config implements McpContext, AgentLoopContext {
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
+  readonly topicState = new TopicState();
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -909,6 +916,11 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly experimentalAgentHistoryTruncation: boolean;
+  private readonly experimentalAgentHistoryTruncationThreshold: number;
+  private readonly experimentalAgentHistoryRetainedMessages: number;
+  private readonly experimentalAgentHistorySummarization: boolean;
+  private readonly memoryBoundaryMarkers: readonly string[];
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -944,7 +956,9 @@ export class Config implements McpContext, AgentLoopContext {
           networkAccess: false,
         };
 
-    this._sandboxManager = createSandboxManager(this.sandbox, params.targetDir);
+    this._sandboxManager = createSandboxManager(this.sandbox, {
+      workspace: params.targetDir,
+    });
 
     if (
       !(this._sandboxManager instanceof NoopSandboxManager) &&
@@ -965,8 +979,10 @@ export class Config implements McpContext, AgentLoopContext {
       'default';
     this._sandboxManager = createSandboxManager(
       this.sandbox,
-      params.targetDir,
-      this._sandboxPolicyManager,
+      {
+        workspace: params.targetDir,
+        policyManager: this._sandboxPolicyManager,
+      },
       initialApprovalMode,
     );
 
@@ -1114,6 +1130,15 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.experimentalAgentHistoryTruncation =
+      params.experimentalAgentHistoryTruncation ?? false;
+    this.experimentalAgentHistoryTruncationThreshold =
+      params.experimentalAgentHistoryTruncationThreshold ?? 30;
+    this.experimentalAgentHistoryRetainedMessages =
+      params.experimentalAgentHistoryRetainedMessages ?? 15;
+    this.experimentalAgentHistorySummarization =
+      params.experimentalAgentHistorySummarization ?? false;
+    this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -1618,8 +1643,10 @@ export class Config implements McpContext, AgentLoopContext {
   private refreshSandboxManager(): void {
     this._sandboxManager = createSandboxManager(
       this.sandbox,
-      this.targetDir,
-      this._sandboxPolicyManager,
+      {
+        workspace: this.targetDir,
+        policyManager: this._sandboxPolicyManager,
+      },
       this.getApprovalMode(),
     );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
@@ -2288,8 +2315,28 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalJitContext;
   }
 
+  getMemoryBoundaryMarkers(): readonly string[] {
+    return this.memoryBoundaryMarkers;
+  }
+
   isMemoryManagerEnabled(): boolean {
     return this.experimentalMemoryManager;
+  }
+
+  isExperimentalAgentHistoryTruncationEnabled(): boolean {
+    return this.experimentalAgentHistoryTruncation;
+  }
+
+  getExperimentalAgentHistoryTruncationThreshold(): number {
+    return this.experimentalAgentHistoryTruncationThreshold;
+  }
+
+  getExperimentalAgentHistoryRetainedMessages(): number {
+    return this.experimentalAgentHistoryRetainedMessages;
+  }
+
+  isExperimentalAgentHistorySummarizationEnabled(): boolean {
+    return this.experimentalAgentHistorySummarization;
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
@@ -3308,6 +3355,10 @@ export class Config implements McpContext, AgentLoopContext {
         registerFn();
       }
     };
+
+    maybeRegister(UpdateTopicTool, () =>
+      registry.registerTool(new UpdateTopicTool(this, this.messageBus)),
+    );
 
     maybeRegister(LSTool, () =>
       registry.registerTool(new LSTool(this, this.messageBus)),
