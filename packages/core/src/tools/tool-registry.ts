@@ -24,6 +24,7 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import { z } from 'zod';
 import {
   DISCOVERED_TOOL_PREFIX,
   TOOL_LEGACY_ALIASES,
@@ -33,6 +34,30 @@ import {
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
+
+const jsonRecordSchema = z.record(z.string(), z.unknown());
+
+const functionDeclarationSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  parametersJsonSchema: jsonRecordSchema.optional(),
+});
+
+const wrappedSnakeSchema = z.object({
+  function_declarations: z.array(functionDeclarationSchema),
+});
+
+const wrappedCamelSchema = z.object({
+  functionDeclarations: z.array(functionDeclarationSchema),
+});
+
+const discoveredItemSchema = z.union([
+  functionDeclarationSchema,
+  wrappedSnakeSchema,
+  wrappedCamelSchema,
+]);
+
+const discoveredItemsSchema = z.array(discoveredItemSchema);
 
 class DiscoveredToolInvocation extends BaseToolInvocation<
   ToolParams,
@@ -302,11 +327,13 @@ export class ToolRegistry {
         }
 
         if (priorityA === 2) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const serverA = (toolA as DiscoveredMCPTool).serverName;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const serverB = (toolB as DiscoveredMCPTool).serverName;
-          return serverA.localeCompare(serverB);
+          if (
+            toolA instanceof DiscoveredMCPTool &&
+            toolB instanceof DiscoveredMCPTool
+          ) {
+            return toolA.serverName.localeCompare(toolB.serverName);
+          }
+          return 0;
         }
 
         return 0;
@@ -450,48 +477,36 @@ export class ToolRegistry {
       });
 
       // execute discovery command and extract function declarations (w/ or w/o "tool" wrappers)
+      const discoveredItems = discoveredItemsSchema.parse(
+        JSON.parse(stdout.trim()),
+      );
+
       const functions: FunctionDeclaration[] = [];
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const discoveredItems = JSON.parse(stdout.trim());
 
-      if (!discoveredItems || !Array.isArray(discoveredItems)) {
-        throw new Error(
-          'Tool discovery command did not return a JSON array of tools.',
-        );
-      }
-
-      for (const tool of discoveredItems) {
-        if (tool && typeof tool === 'object') {
-          if (Array.isArray(tool['function_declarations'])) {
-            functions.push(...tool['function_declarations']);
-          } else if (Array.isArray(tool['functionDeclarations'])) {
-            functions.push(...tool['functionDeclarations']);
-          } else if (tool['name']) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            functions.push(tool as FunctionDeclaration);
-          }
+      for (const item of discoveredItems) {
+        if ('function_declarations' in item) {
+          functions.push(...item.function_declarations);
+        } else if ('functionDeclarations' in item) {
+          functions.push(...item.functionDeclarations);
+        } else {
+          functions.push(item);
         }
       }
-      // register each function as a tool
+
       for (const func of functions) {
-        if (!func.name) {
-          debugLogger.warn('Discovered a tool with no name. Skipping.');
-          continue;
-        }
-        const parameters =
-          func.parametersJsonSchema &&
-          typeof func.parametersJsonSchema === 'object' &&
-          !Array.isArray(func.parametersJsonSchema)
-            ? func.parametersJsonSchema
-            : {};
+        if (!func.name) continue;
+
+        const parameters = jsonRecordSchema.parse(
+          func.parametersJsonSchema ?? {},
+        );
+
         this.registerTool(
           new DiscoveredTool(
             this.config,
             func.name,
             DISCOVERED_TOOL_PREFIX + func.name,
             func.description ?? '',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            parameters as Record<string, unknown>,
+            parameters,
             this.messageBus,
           ),
         );
@@ -729,8 +744,8 @@ export class ToolRegistry {
   getToolsByServer(serverName: string): AnyDeclarativeTool[] {
     const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.getActiveTools()) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
+       
+      if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
         serverTools.push(tool);
       }
     }
