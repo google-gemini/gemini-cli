@@ -38,6 +38,20 @@ process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
 process.env.TERM_PROGRAM = 'generic';
 
 import './src/test-utils/customMatchers.js';
+// Silence debugLogger globally — prevents test noise from custom logger
+// that bypasses Vitest's silent:true config
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    debugLogger: {
+      log: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+  };
+});
 
 let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
