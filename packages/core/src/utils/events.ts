@@ -195,6 +195,7 @@ export enum CoreEvent {
   QuotaChanged = 'quota-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
+  ChannelMessage = 'channel-message',
 }
 
 /**
@@ -202,6 +203,20 @@ export enum CoreEvent {
  */
 export interface EditorSelectedPayload {
   editor?: EditorType;
+}
+
+/**
+ * Payload for channel messages received from MCP servers.
+ * Enables external channels (e.g. Telegram, Slack) to push messages
+ * into a running Gemini CLI session.
+ */
+export interface ChannelMessagePayload {
+  /** Name of the MCP server that sent the notification */
+  serverName: string;
+  /** The message content to inject into the conversation */
+  content: string;
+  /** Optional metadata (chat_id, user, timestamp, etc.) */
+  meta?: Record<string, string>;
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -228,6 +243,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
+  [CoreEvent.ChannelMessage]: [ChannelMessagePayload];
 }
 
 type EventBacklogItem = {
@@ -384,6 +400,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  /**
+   * Notifies subscribers that a channel message has been received from an MCP server.
+   */
+  emitChannelMessage(payload: ChannelMessagePayload): void {
+    this._emitOrQueue(CoreEvent.ChannelMessage, payload);
   }
 
   emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {

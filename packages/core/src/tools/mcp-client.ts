@@ -478,6 +478,60 @@ export class McpClient implements McpProgressReporter {
         }
       },
     );
+
+    // Handle channel messages from MCP servers (e.g. Telegram, Slack).
+    // MCP servers can push messages into the conversation by sending a
+    // notification with method "notifications/channel".
+    const existingFallback = this.client.fallbackNotificationHandler;
+    this.client.fallbackNotificationHandler = async (notification: {
+      method: string;
+      params?: Record<string, unknown>;
+    }) => {
+      if (notification.method === 'notifications/channel') {
+        const params = notification.params ?? {};
+        const rawContent = params['content'];
+        const content = isString(rawContent) ? rawContent : '';
+        const rawMeta = params['meta'];
+        const meta: Record<string, string> = isStringRecord(rawMeta)
+          ? rawMeta
+          : {};
+
+        if (content) {
+          debugLogger.log(
+            `📨 Channel message from '${this.serverName}': ${content.slice(0, 100)}...`,
+          );
+
+          // Format as a channel block for the model.
+          // Sanitize untrusted input to prevent prompt injection via
+          // crafted metadata values or content that breaks out of the XML block.
+          const escapeAttr = (s: string) =>
+            s
+              .replace(/&/g, '&amp;')
+              .replace(/"/g, '&quot;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+          const metaAttrs = Object.entries(meta)
+            .map(([k, v]) => `${escapeAttr(k)}="${escapeAttr(v)}"`)
+            .join(' ');
+          const safeContent = content.replace(
+            /<\/channel>/gi,
+            '&lt;/channel&gt;',
+          );
+          const formatted = `<channel source="${escapeAttr(this.serverName)}" ${metaAttrs}>\n${safeContent}\n</channel>`;
+
+          coreEvents.emitChannelMessage({
+            serverName: this.serverName,
+            content: formatted,
+            meta,
+          });
+        }
+      }
+
+      // Chain to any existing fallback handler
+      if (existingFallback) {
+        await existingFallback(notification);
+      }
+    };
   }
 
   /**
@@ -877,6 +931,25 @@ export function getMCPDiscoveryState(): MCPDiscoveryState {
  * @param errorString The error message string
  * @returns The www-authenticate header value if found, null otherwise
  */
+function isString(value: unknown): value is string {
+  return Object.prototype.toString.call(value) === '[object String]';
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (value === null || value === undefined || Array.isArray(value)) {
+    return false;
+  }
+  if (Object.prototype.toString.call(value) !== '[object Object]') {
+    return false;
+  }
+  for (const v of Object.values(Object(value))) {
+    if (Object.prototype.toString.call(v) !== '[object String]') {
+      return false;
+    }
+  }
+  return true;
+}
+
 function extractWWWAuthenticateHeader(errorString: string): string | null {
   // Try multiple patterns to extract the header
   const patterns = [
