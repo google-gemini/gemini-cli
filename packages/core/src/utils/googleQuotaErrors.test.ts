@@ -285,6 +285,30 @@ describe('classifyGoogleError', () => {
     );
   });
 
+  it('should return RetryableQuotaError for Cloud Code MODEL_CAPACITY_EXHAUSTED', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'No capacity available for model gemini-3.1-pro-preview on the server',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'MODEL_CAPACITY_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            model: 'gemini-3.1-pro-preview',
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).message).toBe(
+      'No capacity available for model gemini-3.1-pro-preview on the server',
+    );
+  });
+
   it('should return TerminalQuotaError for Cloud Code RATE_LIMIT_EXCEEDED with retry delay over 5 minutes', () => {
     const apiError: GoogleApiError = {
       code: 429,

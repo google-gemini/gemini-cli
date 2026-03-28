@@ -568,7 +568,7 @@ describe('retryWithBackoff', () => {
     });
 
     it('should use retryDelayMs from RetryableQuotaError', async () => {
-      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const onRetry = vi.fn();
       const mockFn = vi.fn().mockImplementation(async () => {
         throw new RetryableQuotaError('Per-minute limit', {} as any, 12.345);
       });
@@ -576,6 +576,7 @@ describe('retryWithBackoff', () => {
       const promise = retryWithBackoff(mockFn, {
         maxAttempts: 2,
         initialDelayMs: 100,
+        onRetry,
       });
 
       // Attach the rejection expectation *before* running timers
@@ -584,13 +585,64 @@ describe('retryWithBackoff', () => {
       await vi.runAllTimersAsync();
       await assertionPromise;
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(
-        expect.any(Function),
+      expect(onRetry).toHaveBeenCalledWith(
+        1,
+        expect.any(RetryableQuotaError),
         expect.any(Number),
       );
-      const calledDelayMs = setTimeoutSpy.mock.calls[0][1];
+      const calledDelayMs = onRetry.mock.calls[0][2];
       expect(calledDelayMs).toBeGreaterThanOrEqual(12345);
       expect(calledDelayMs).toBeLessThanOrEqual(12345 * 1.2);
+    });
+
+    it('should trigger immediate fallback for MODEL_CAPACITY_EXHAUSTED errors', async () => {
+      const fallbackCallback = vi
+        .fn()
+        .mockResolvedValue('gemini-3-flash-preview');
+
+      let fallbackOccurred = false;
+      const mockFn = vi.fn().mockImplementation(async () => {
+        if (!fallbackOccurred) {
+          throw new RetryableQuotaError(
+            'No capacity available for model gemini-3.1-pro-preview on the server',
+            {
+              code: 429,
+              message:
+                'No capacity available for model gemini-3.1-pro-preview on the server',
+              details: [
+                {
+                  '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                  reason: 'MODEL_CAPACITY_EXHAUSTED',
+                  domain: 'cloudcode-pa.googleapis.com',
+                  metadata: {
+                    model: 'gemini-3.1-pro-preview',
+                  },
+                },
+              ],
+            } as any,
+          );
+        }
+        return 'success';
+      });
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 3,
+        initialDelayMs: 100,
+        onPersistent429: async (authType?: string, error?: unknown) => {
+          fallbackOccurred = true;
+          return await fallbackCallback(authType, error);
+        },
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).resolves.toBe('success');
+      expect(fallbackCallback).toHaveBeenCalledWith(
+        AuthType.LOGIN_WITH_GOOGLE,
+        expect.any(RetryableQuotaError),
+      );
+      expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
     it.each([[AuthType.USE_GEMINI], [AuthType.USE_VERTEX_AI], [undefined]])(

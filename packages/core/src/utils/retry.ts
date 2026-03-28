@@ -10,6 +10,7 @@ import {
   RetryableQuotaError,
   ValidationRequiredError,
   classifyGoogleError,
+  isModelCapacityExhaustedError,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
@@ -292,6 +293,28 @@ export async function retryWithBackoff<T>(
         }
         // Terminal/not_found already recorded; nothing else to mark here.
         throw classifiedError; // Throw if no fallback or fallback failed.
+      }
+
+      if (
+        classifiedError instanceof RetryableQuotaError &&
+        isModelCapacityExhaustedError(classifiedError)
+      ) {
+        if (onPersistent429) {
+          try {
+            const fallbackModel = await onPersistent429(
+              authType,
+              classifiedError,
+            );
+            if (fallbackModel) {
+              attempt = 0; // Reset attempts and retry with the new model.
+              currentDelay = initialDelayMs;
+              continue;
+            }
+          } catch (fallbackError) {
+            debugLogger.warn('Capacity fallback failed:', fallbackError);
+          }
+        }
+        throw classifiedError;
       }
 
       // Handle ValidationRequiredError - user needs to verify before proceeding
