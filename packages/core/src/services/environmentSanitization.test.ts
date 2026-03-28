@@ -42,6 +42,17 @@ describe('sanitizeEnvironment', () => {
     expect(sanitized).toEqual(env);
   });
 
+  it('should allow SSH_AUTH_SOCK despite containing "AUTH"', () => {
+    const env = {
+      SSH_AUTH_SOCK: '/tmp/ssh-agent.sock',
+      SOME_OTHER_AUTH_VAR: 'some-value',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual({
+      SSH_AUTH_SOCK: '/tmp/ssh-agent.sock',
+    });
+  });
+
   it('should preserve TERM and COLORTERM even in strict sanitization mode', () => {
     const env = {
       GITHUB_SHA: 'abc123',
