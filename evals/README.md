@@ -202,9 +202,29 @@ Results for evaluations are available on GitHub Actions:
 - **CI Evals**: Included in the
   [E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
   workflow. These must pass 100% for every PR.
+- **PR Impact Analysis**: Run automatically on PRs that modify prompts, tools,
+  or agent logic via the
+  [Evals: PR Impact](https://github.com/google-gemini/gemini-cli/actions/workflows/eval-pr.yml)
+  workflow. This provides a "before and after" comparison of behavioral eval
+  stability and will fail the PR if regressions are detected.
 - **Nightly Evals**: Run daily via the
   [Evals: Nightly](https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml)
   workflow. These track the long-term health and stability of model steering.
+
+### PR Impact Report
+
+When a PR triggers the impact analysis, a bot will post a table to the PR
+commenting on the change in pass rates for critical models (e.g. Gemini 3.1 Pro
+and Gemini 3 Flash).
+
+- **Baseline**: The pass rate from the latest successful nightly run on `main`.
+- **Current**: The pass rate on the PR branch (based on a "lite" run of 1
+  attempt).
+- **Impact**: A delta showing if stability improved (🟢), regressed (🔴), or
+  remained stable (⚪).
+
+A PR that introduces a regression (🔴) in any behavioral evaluation will fail
+this check and require investigation before merging.
 
 ### Nightly Report Format
 

@@ -1,0 +1,113 @@
+name: 'Evals: PR Impact'
+
+on:
+  pull_request:
+    paths:
+      - 'packages/core/src/prompts/**'
+      - 'packages/core/src/tools/**'
+      - 'packages/core/src/agents/**'
+      - 'evals/**'
+
+permissions:
+  contents: 'read'
+  checks: 'write'
+  pull-requests: 'write'
+
+jobs:
+  eval-impact:
+    name: 'Eval Impact Analysis'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Run Evals (3 Attempts with Clean State)'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          RUN_EVALS: 'true'
+        run: |
+          MODELS=("gemini-3.1-pro-preview-customtools" "gemini-3-flash-preview")
+          # Create a persistent logs dir outside the workspace that won't be git-cleaned
+          FINAL_LOGS_DIR="/tmp/eval-impact-logs"
+          mkdir -p "$FINAL_LOGS_DIR"
+          
+          for model in "${MODELS[@]}"; do
+            for attempt in {1..3}; do
+              echo "::group::Running $model (Attempt $attempt)"
+              DIR_NAME="eval-logs-$model-$attempt"
+              
+              # Run the tests
+              GEMINI_MODEL=$model npm run test:all_evals -- --outputFile.json="report.json" || true
+              
+              # Move the report to the persistent location
+              mkdir -p "$FINAL_LOGS_DIR/$DIR_NAME"
+              if [ -f "report.json" ]; then
+                mv report.json "$FINAL_LOGS_DIR/$DIR_NAME/report.json"
+              fi
+              
+              # FORCE CLEAN: Return to a perfectly pristine state
+              git clean -xfd
+              npm run build
+              
+              echo "::endgroup::"
+            done
+          done
+          
+          # Move all logs back into the workspace for the aggregation script
+          mkdir -p evals/logs
+          cp -r "$FINAL_LOGS_DIR"/* evals/logs/
+
+      - name: 'Generate Impact Report'
+        id: 'generate-report'
+        if: 'always()'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          if [ ! -d "evals/logs" ]; then
+            echo "No logs found, skipping report generation."
+            exit 0
+          fi
+          echo "<!-- eval-impact-report -->" > report.md
+          node scripts/aggregate_evals.js evals/logs --compare-main --pr-comment >> report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          
+          # Check for blockers in the report
+          if grep -q "🔴" report.md; then
+            echo "BLOCKER_DETECTED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: 'Comment on PR'
+        if: 'always()'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          if [ ! -f "report.md" ]; then
+            exit 0
+          fi
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          EXISTING_COMMENT=$(gh pr view $PR_NUMBER --json comments --jq '.comments[] | select(.body | contains("eval-impact-report")) | .id' | head -n 1)
+          
+          if [ -n "$EXISTING_COMMENT" ]; then
+            gh pr comment $PR_NUMBER --body-file report.md
+          else
+            gh pr comment $PR_NUMBER --body-file report.md
+          fi
+
+      - name: 'Block PR on Stable Regression'
+        if: "env.BLOCKER_DETECTED == 'true'"
+        run: |
+          echo "Fatal regressions detected in ALWAYS_PASSES behavioral evaluations."
+          exit 1

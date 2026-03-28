@@ -11,8 +11,32 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
 
-const artifactsDir = process.argv[2] || '.';
-const MAX_HISTORY = 10;
+const args = process.argv.slice(2);
+const artifactsDir = args.find((arg) => !arg.startsWith('--')) || '.';
+const isPrComment = args.includes('--pr-comment');
+const MAX_HISTORY = 7;
+
+// Extract policies from the source code
+function getTestPolicies() {
+  const policies = {};
+  try {
+    const evalFiles = fs
+      .readdirSync('evals')
+      .filter((f) => f.endsWith('.eval.ts'));
+    for (const file of evalFiles) {
+      const content = fs.readFileSync(path.join('evals', file), 'utf-8');
+      const matches = content.matchAll(
+        /evalTest\s*\(\s*['"](ALWAYS_PASSES|USUALLY_PASSES)['"]\s*,\s*\{\s*name:\s*['"](.+?)['"]/g,
+      );
+      for (const match of matches) {
+        policies[match[2]] = match[1];
+      }
+    }
+  } catch {
+    // Ignore errors in policy extraction
+  }
+  return policies;
+}
 
 // Find all report.json files recursively
 function findReports(dir) {
@@ -34,7 +58,6 @@ function findReports(dir) {
 
 function getModelFromPath(reportPath) {
   const parts = reportPath.split(path.sep);
-  // Find the part that starts with 'eval-logs-'
   const artifactDir = parts.find((p) => p.startsWith('eval-logs-'));
   if (!artifactDir) return 'unknown';
 
@@ -42,13 +65,12 @@ function getModelFromPath(reportPath) {
   if (matchNew) return matchNew[1];
 
   const matchOld = artifactDir.match(/^eval-logs-(\d+)$/);
-  if (matchOld) return 'gemini-2.5-pro'; // Legacy default
+  if (matchOld) return 'gemini-2.5-pro';
 
   return 'unknown';
 }
 
 function getStats(reports) {
-  // Structure: { [model]: { [testName]: { passed, failed, total } } }
   const statsByModel = {};
 
   for (const reportPath of reports) {
@@ -87,35 +109,41 @@ function fetchHistoricalData() {
   const history = [];
 
   try {
-    // Determine branch
+    try {
+      execSync('gh --version', { stdio: 'ignore' });
+    } catch {
+      if (!isPrComment) {
+        console.warn(
+          'Warning: GitHub CLI (gh) not found. Historical data will be unavailable.',
+        );
+      }
+      return history;
+    }
+
     const branch = 'main';
 
-    // Get recent runs
     const cmd = `gh run list --workflow evals-nightly.yml --branch "${branch}" --limit ${
-      MAX_HISTORY + 5
+      MAX_HISTORY + 10
     } --json databaseId,createdAt,url,displayTitle,status,conclusion`;
     const runsJson = execSync(cmd, { encoding: 'utf-8' });
     let runs = JSON.parse(runsJson);
 
-    // Filter out current run
     const currentRunId = process.env.GITHUB_RUN_ID;
     if (currentRunId) {
       runs = runs.filter((r) => r.databaseId.toString() !== currentRunId);
     }
 
-    // Filter for runs that likely have artifacts (completed) and take top N
-    // We accept 'failure' too because we want to see stats.
-    runs = runs.filter((r) => r.status === 'completed').slice(0, MAX_HISTORY);
+    runs = runs
+      .filter((r) => r.status === 'completed')
+      .slice(0, MAX_HISTORY + 5);
 
-    // Fetch artifacts for each run
     for (const run of runs) {
+      if (history.length >= MAX_HISTORY) break;
+
       const tmpDir = fs.mkdtempSync(
         path.join(os.tmpdir(), `gemini-evals-${run.databaseId}-`),
       );
       try {
-        // Download report.json files.
-        // The artifacts are named 'eval-logs-X' or 'eval-logs-MODEL-X'.
-        // We use -p to match pattern.
         execSync(
           `gh run download ${run.databaseId} -p "eval-logs-*" -D "${tmpDir}"`,
           { stdio: 'ignore' },
@@ -123,16 +151,25 @@ function fetchHistoricalData() {
 
         const runReports = findReports(tmpDir);
         if (runReports.length > 0) {
-          history.push({
-            run,
-            stats: getStats(runReports), // Now returns stats grouped by model
+          const stats = getStats(runReports);
+
+          let totalPassed = 0;
+          let totalTests = 0;
+          Object.values(stats).forEach((modelStats) => {
+            Object.values(modelStats).forEach((s) => {
+              totalPassed += s.passed;
+              totalTests += s.total;
+            });
           });
+
+          if (totalTests > 0 && totalPassed === 0) {
+            continue;
+          }
+
+          history.push({ run, stats });
         }
-      } catch (error) {
-        console.error(
-          `Failed to download or process artifacts for run ${run.databaseId}:`,
-          error,
-        );
+      } catch {
+        // Ignore download errors
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
@@ -145,18 +182,28 @@ function fetchHistoricalData() {
 }
 
 function generateMarkdown(currentStatsByModel, history) {
-  console.log('### Evals Nightly Summary\n');
-  console.log(
-    'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
-  );
-
-  // Reverse history to show oldest first
   const reversedHistory = [...history].reverse();
-
   const models = Object.keys(currentStatsByModel).sort();
+  const policies = getTestPolicies();
+
+  const getConsolidatedBaseline = (model) => {
+    const consolidated = {};
+    for (const item of history) {
+      const stats = item.stats[model];
+      if (!stats) continue;
+      for (const [name, stat] of Object.entries(stats)) {
+        if (!consolidated[name]) {
+          consolidated[name] = { passed: 0, total: 0 };
+        }
+        consolidated[name].passed += stat.passed;
+        consolidated[name].total += stat.total;
+      }
+    }
+    return Object.keys(consolidated).length > 0 ? consolidated : null;
+  };
 
   const getPassRate = (statsForModel) => {
-    if (!statsForModel) return '-';
+    if (!statsForModel) return null;
     const totalStats = Object.values(statsForModel).reduce(
       (acc, stats) => {
         acc.passed += stats.passed;
@@ -166,85 +213,188 @@ function generateMarkdown(currentStatsByModel, history) {
       { passed: 0, total: 0 },
     );
     return totalStats.total > 0
-      ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
-      : '-';
+      ? (totalStats.passed / totalStats.total) * 100
+      : null;
   };
+
+  const formatPassRate = (rate) =>
+    rate === null ? '-' : rate.toFixed(1) + '%';
+
+  if (isPrComment) {
+    console.log('### 🤖 Model Steering Impact Report\n');
+
+    let blockerRegression = false;
+    for (const model of models) {
+      const currentStats = currentStatsByModel[model];
+      const baselineStats = getConsolidatedBaseline(model);
+      for (const [name, curr] of Object.entries(currentStats)) {
+        const policy = policies[name] || 'USUALLY_PASSES';
+        const currRate = (curr.passed / curr.total) * 100;
+        const base = baselineStats ? baselineStats[name] : null;
+        const baseRate = base ? (base.passed / base.total) * 100 : null;
+
+        if (policy === 'ALWAYS_PASSES' && currRate < 100) {
+          blockerRegression = true;
+        } else if (
+          policy === 'USUALLY_PASSES' &&
+          baseRate !== null &&
+          baseRate > 90 &&
+          currRate < 60
+        ) {
+          blockerRegression = true; // Significant drop in a highly stable test
+        }
+      }
+    }
+
+    if (blockerRegression) {
+      console.log('**Status: 🔴 Regression Detected (Blocking)**\n');
+      console.log(
+        'This PR has introduced regressions in stable behavioral evaluations. These must be resolved before merging.\n',
+      );
+    } else {
+      console.log('**Status: ✅ Stable**\n');
+      console.log(
+        'Behavioral evaluations remain stable compared to the `main` baseline.\n',
+      );
+    }
+
+    console.log(
+      `> **Note:** Baseline is averaged from the last ${history.length} healthy nightly runs on \`main\`.\n`,
+    );
+  } else {
+    console.log('### Evals Nightly Summary\n');
+  }
 
   for (const model of models) {
     const currentStats = currentStatsByModel[model];
-    const totalPassRate = getPassRate(currentStats);
+    const currentPassRate = getPassRate(currentStats);
+    const baselineStats = getConsolidatedBaseline(model);
+    const baselinePassRate = getPassRate(baselineStats);
 
     console.log(`#### Model: ${model}`);
-    console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
 
-    // Header
-    let header = '| Test Name |';
-    let separator = '| :--- |';
-    let passRateRow = '| **Overall Pass Rate** |';
-
-    for (const item of reversedHistory) {
-      header += ` [${item.run.databaseId}](${item.run.url}) |`;
-      separator += ' :---: |';
-      passRateRow += ` **${getPassRate(item.stats[model])}** |`;
-    }
-
-    // Add Current column last
-    header += ' Current |';
-    separator += ' :---: |';
-    passRateRow += ` **${totalPassRate}** |`;
-
-    console.log(header);
-    console.log(separator);
-    console.log(passRateRow);
-
-    // Collect all test names for this model
     const allTestNames = new Set(Object.keys(currentStats));
-    for (const item of reversedHistory) {
-      if (item.stats[model]) {
-        Object.keys(item.stats[model]).forEach((name) =>
-          allTestNames.add(name),
-        );
-      }
+    if (baselineStats) {
+      Object.keys(baselineStats).forEach((name) => allTestNames.add(name));
     }
+
+    const rows = [];
+    let stableCount = 0;
 
     for (const name of Array.from(allTestNames).sort()) {
+      const policy = policies[name] || 'USUALLY_PASSES';
       const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
-      let row = `| [${name}](${searchUrl}) |`;
+      const curr = currentStats[name];
+      const base = baselineStats ? baselineStats[name] : null;
 
-      // History
-      for (const item of reversedHistory) {
-        const stat = item.stats[model] ? item.stats[model][name] : null;
-        if (stat) {
-          const passRate = ((stat.passed / stat.total) * 100).toFixed(0) + '%';
-          row += ` ${passRate} |`;
-        } else {
-          row += ' - |';
+      const currRate = curr ? (curr.passed / curr.total) * 100 : null;
+      const baseRate = base ? (base.passed / base.total) * 100 : null;
+      const delta =
+        currRate !== null && baseRate !== null ? currRate - baseRate : null;
+
+      // Smart Noise Filtering
+      let status = '⚪ Stable';
+      let isInteresting = false;
+
+      if (policy === 'ALWAYS_PASSES') {
+        if (currRate !== null && currRate < 100) {
+          status = '🔴 Regression';
+          isInteresting = true;
+        }
+      } else {
+        // USUALLY_PASSES: Only interesting if drop is > 30% OR it's a new failure
+        if (delta !== null && delta < -30) {
+          status = '🔴 Regression';
+          isInteresting = true;
+        } else if (delta !== null && delta > 30) {
+          status = '🟢 Improved';
+          isInteresting = true;
+        } else if (baseRate !== null && baseRate > 80 && currRate === 0) {
+          status = '🔴 Regression';
+          isInteresting = true;
         }
       }
 
-      // Current
-      const curr = currentStats[name];
-      if (curr) {
-        const passRate = ((curr.passed / curr.total) * 100).toFixed(0) + '%';
-        row += ` ${passRate} |`;
-      } else {
-        row += ' - |';
+      // Always show new or missing tests
+      if (currRate === null || baseRate === null) isInteresting = true;
+
+      if (isPrComment && !isInteresting) {
+        stableCount++;
+        continue;
       }
 
-      console.log(row);
+      let row = `| [${name}](${searchUrl}) | ${policy === 'ALWAYS_PASSES' ? '🔒' : '🎲'} |`;
+
+      if (!isPrComment) {
+        for (const item of reversedHistory) {
+          const stat = item.stats[model] ? item.stats[model][name] : null;
+          row += ` ${stat ? ((stat.passed / stat.total) * 100).toFixed(0) + '%' : '-'} |`;
+        }
+      } else if (baselinePassRate !== null) {
+        row += ` ${formatPassRate(baseRate)} |`;
+      }
+
+      row += ` ${formatPassRate(currRate)} | ${status} |`;
+      rows.push(row);
+    }
+
+    if (isPrComment && baselinePassRate !== null) {
+      const delta = currentPassRate - baselinePassRate;
+      const deltaStr =
+        Math.abs(delta) < 5
+          ? ' (Stable)'
+          : ` (${delta > 0 ? '↑' : '↓'} ${Math.abs(delta).toFixed(1)}%)`;
+      console.log(
+        `**Pass Rate: ${formatPassRate(currentPassRate)}** vs. ${formatPassRate(baselinePassRate)} Baseline${deltaStr}\n`,
+      );
+    }
+
+    if (isPrComment && rows.length === 0) {
+      console.log('✅ All behavioral evaluations are stable.\n');
+      continue;
+    }
+
+    let header = `| Test Name | Policy |`;
+    let separator = `| :--- | :---: |`;
+
+    if (!isPrComment) {
+      for (const item of reversedHistory) {
+        header += ` [${item.run.databaseId}](${item.run.url}) |`;
+        separator += ' :---: |';
+      }
+    } else if (baselinePassRate !== null) {
+      header += ' Baseline |';
+      separator += ' :---: |';
+    }
+
+    header += ' Current | Impact |';
+    separator += ' :---: | :---: |';
+
+    console.log(header);
+    console.log(separator);
+    rows.forEach((row) => console.log(row));
+
+    if (isPrComment && stableCount > 0) {
+      console.log(
+        `\n> **Note:** ${stableCount} stable tests were hidden from this report.\n`,
+      );
     }
     console.log('\n');
   }
-}
 
-// --- Main ---
+  if (isPrComment) {
+    console.log(
+      '---\n💡 **Policy Key:** 🔒 `ALWAYS_PASSES` (PR Blocker) | 🎲 `USUALLY_PASSES` (Informational)\n',
+    );
+    console.log(
+      '💡 To investigate regressions locally, run: `gemini /fix-behavioral-eval`',
+    );
+  }
+}
 
 const currentReports = findReports(artifactsDir);
 if (currentReports.length === 0) {
   console.log('No reports found.');
-  // We don't exit here because we might still want to see history if available,
-  // but practically if current has no reports, something is wrong.
-  // Sticking to original behavior roughly, but maybe we can continue.
   process.exit(0);
 }
 
