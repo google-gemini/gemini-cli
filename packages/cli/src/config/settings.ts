@@ -1070,13 +1070,36 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    const settingsToSave = settingsFile.originalSettings;
+    // Preserve externally-added settings: re-read the file from disk and
+    // adopt any top-level keys that originalSettings does not already track.
+    // This prevents sync-by-omission in the format-preserving writer from
+    // deleting keys that were added while the CLI was running (e.g. hooks).
+    const settingsToSave: Record<string, unknown> = {
+      ...settingsFile.originalSettings,
+    };
+    if (fs.existsSync(settingsFile.path)) {
+      try {
+        const diskContent = fs.readFileSync(settingsFile.path, 'utf-8');
+        const parsed: unknown = JSON.parse(stripJsonComments(diskContent));
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          !Array.isArray(parsed)
+        ) {
+          for (const [key, value] of Object.entries(parsed)) {
+            if (!Object.prototype.hasOwnProperty.call(settingsToSave, key)) {
+              settingsToSave[key] = value;
+            }
+          }
+        }
+      } catch {
+        // If the file can't be read or parsed, proceed with in-memory
+        // settings only. This matches existing error-tolerance behavior.
+      }
+    }
 
     // Use the format-preserving update function
-    updateSettingsFilePreservingFormat(
-      settingsFile.path,
-      settingsToSave as Record<string, unknown>,
-    );
+    updateSettingsFilePreservingFormat(settingsFile.path, settingsToSave);
   } catch (error) {
     const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(

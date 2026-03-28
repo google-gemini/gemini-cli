@@ -1627,7 +1627,7 @@ describe('Settings Loading and Merging', () => {
         saveSettings(settings1.user);
 
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
+        expect(mockedRead).toHaveBeenCalledTimes(11); // +1 for preserving external settings on save
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1651,8 +1651,8 @@ describe('Settings Loading and Merging', () => {
         const settings2W1 = loadSettings(workspace1);
         const settings2W2 = loadSettings(workspace2);
 
-        // Both workspace caches should have been cleared and re-read from disk (+10 reads)
-        expect(mockedRead).toHaveBeenCalledTimes(20);
+        // Both workspace caches should have been cleared and re-read from disk (+10 reads + 1 for preserving external settings)
+        expect(mockedRead).toHaveBeenCalledTimes(21);
         expect(settings1W1).not.toBe(settings2W1);
         expect(settings1W2).not.toBe(settings2W2);
       });
@@ -2600,6 +2600,81 @@ describe('Settings Loading and Merging', () => {
         'error',
         'Failed to save settings: Write failed',
         error,
+      );
+    });
+
+    it('should preserve externally-added top-level keys from disk', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const settingsFile = createMockSettings({ ui: { theme: 'light' } }).user;
+      settingsFile.path = path.resolve('/mock/settings.json');
+
+      // File exists on disk with an extra top-level key added externally
+      (vi.mocked(fs.existsSync) as Mock).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockReturnValue(
+        JSON.stringify({
+          ui: { theme: 'dark' },
+          hooks: { afterTurn: [{ command: 'echo done' }] },
+        }),
+      );
+
+      saveSettings(settingsFile);
+
+      // The saved output should include the in-memory ui.theme (takes
+      // precedence) AND the externally-added hooks key
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        path.resolve('/mock/settings.json'),
+        expect.objectContaining({
+          ui: { theme: 'light' },
+          hooks: { afterTurn: [{ command: 'echo done' }] },
+        }),
+      );
+    });
+
+    it('should not overwrite tracked keys with disk values', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const settingsFile = createMockSettings({
+        ui: { theme: 'light' },
+        sandbox: true,
+      }).user;
+      settingsFile.path = path.resolve('/mock/settings.json');
+
+      // Disk has different values for tracked keys
+      (vi.mocked(fs.existsSync) as Mock).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockReturnValue(
+        JSON.stringify({
+          ui: { theme: 'dark' },
+          sandbox: false,
+        }),
+      );
+
+      saveSettings(settingsFile);
+
+      // In-memory values should take precedence over disk values
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        path.resolve('/mock/settings.json'),
+        expect.objectContaining({
+          ui: { theme: 'light' },
+          sandbox: true,
+        }),
+      );
+    });
+
+    it('should handle unparseable disk file gracefully', () => {
+      const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
+      const settingsFile = createMockSettings({ ui: { theme: 'light' } }).user;
+      settingsFile.path = path.resolve('/mock/settings.json');
+
+      (vi.mocked(fs.existsSync) as Mock).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockReturnValue('not valid json {{{');
+
+      saveSettings(settingsFile);
+
+      // Should still save without crashing
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        path.resolve('/mock/settings.json'),
+        expect.objectContaining({
+          ui: { theme: 'light' },
+        }),
       );
     });
   });
