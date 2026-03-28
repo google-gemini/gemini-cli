@@ -389,10 +389,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
-    const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
-    const networkAccess = defaultNetwork || mergedAdditional.network;
-
     const finalArgs = [
       networkAccess ? '1' : '0',
       req.cwd,
