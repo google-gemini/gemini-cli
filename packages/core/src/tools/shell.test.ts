@@ -868,6 +868,22 @@ describe('ShellTool', () => {
   });
 
   describe('getConfirmationDetails', () => {
+    it('should deduplicate repeated command names in chained commands', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'git status && git diff && git log --oneline';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe('git');
+      }
+    });
+
     it('should annotate sub-commands with redirection correctly', async () => {
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       const command = 'mkdir -p baz && echo "hello" > baz/test.md && ls';
@@ -915,6 +931,24 @@ describe('ShellTool', () => {
       expect(details).not.toBe(false);
       if (details && details.type === 'exec') {
         expect(details.rootCommand).toBe('ls, grep');
+      }
+    });
+
+    it('should keep redirection annotations while deduplicating command names', async () => {
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      const command = 'echo "hello" > first.txt && echo "world" > second.txt';
+      const invocation = shellTool.build({ command });
+
+      // @ts-expect-error - getConfirmationDetails is protected
+      const details = await invocation.getConfirmationDetails(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'exec') {
+        expect(details.rootCommand).toBe(
+          'echo, redirection (>), redirection (>)',
+        );
       }
     });
   });

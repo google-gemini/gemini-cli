@@ -53,6 +53,37 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
+const SHELL_DETAIL_ANNOTATION_PREFIXES = [
+  'redirection (',
+  'heredoc (',
+  'herestring (',
+];
+
+function isShellDetailAnnotation(name: string): boolean {
+  return SHELL_DETAIL_ANNOTATION_PREFIXES.some((prefix) =>
+    name.startsWith(prefix),
+  );
+}
+
+function formatRootCommandDisplay(details: Array<{ name: string }>): string {
+  const seenCommandNames = new Set<string>();
+
+  return details
+    .filter((detail) => {
+      if (isShellDetailAnnotation(detail.name)) {
+        return true;
+      }
+
+      if (seenCommandNames.has(detail.name)) {
+        return false;
+      }
+
+      seenCommandNames.add(detail.name);
+      return true;
+    })
+    .map((detail) => detail.name)
+    .join(', ');
+}
 
 export interface ShellToolParams {
   command: string;
@@ -178,9 +209,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         rootCommandDisplay += ', redirection';
       }
     } else {
-      rootCommandDisplay = parsed.details
-        .map((detail) => detail.name)
-        .join(', ');
+      rootCommandDisplay = formatRootCommandDisplay(parsed.details);
     }
 
     const rootCommands = [...new Set(getCommandRoots(command))];
