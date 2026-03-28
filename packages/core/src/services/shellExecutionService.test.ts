@@ -2050,4 +2050,38 @@ describe('ShellExecutionService environment variables', () => {
 
     vi.unstubAllEnvs();
   });
+
+  it('should handle invalid GIT_CONFIG_COUNT gracefully by defaulting to 0', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_COUNT', 'invalid_value');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-invalid-git-config-count',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false, // non-interactive
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+
+    // Should default to 0 when GIT_CONFIG_COUNT is invalid (not NaN)
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '1');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'credential.helper');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', '');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
 });

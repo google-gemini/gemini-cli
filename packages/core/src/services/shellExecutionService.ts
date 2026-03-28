@@ -412,7 +412,8 @@ export class ShellExecutionService {
         baseEnv[key] = process.env[key];
       }
 
-      const gitConfigCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+      const parsedCount = parseInt(baseEnv['GIT_CONFIG_COUNT'] || '0', 10);
+      const gitConfigCount = Number.isNaN(parsedCount) ? 0 : parsedCount;
       const newKey = `GIT_CONFIG_KEY_${gitConfigCount}`;
       const newValue = `GIT_CONFIG_VALUE_${gitConfigCount}`;
 
