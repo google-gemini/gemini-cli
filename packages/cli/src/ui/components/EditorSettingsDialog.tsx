@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -71,13 +71,21 @@ export function EditorSettingsDialog({
         (item: EditorDisplay) => item.type === currentPreference,
       )
     : 0;
-  if (editorIndex === -1) {
-    coreEvents.emitFeedback(
-      'error',
-      `Editor is not supported: ${currentPreference}`,
-    );
+  const isUnsupportedEditor = editorIndex === -1;
+  if (isUnsupportedEditor) {
     editorIndex = 0;
   }
+
+  const reportedInvalidEditors = useRef(new Set<string>());
+  useEffect(() => {
+    if (isUnsupportedEditor && currentPreference && !reportedInvalidEditors.current.has(currentPreference)) {
+      coreEvents.emitFeedback(
+        'error',
+        `Editor is not supported: ${currentPreference}`,
+      );
+      reportedInvalidEditors.current.add(currentPreference);
+    }
+  }, [isUnsupportedEditor, currentPreference]);
 
   const scopeItems: Array<{
     label: string;
