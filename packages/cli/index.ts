@@ -15,6 +15,14 @@ import { runExitCleanup } from './src/utils/cleanup.js';
 // Suppress known race condition error in node-pty on Windows
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
 process.on('uncaughtException', (error) => {
+  const majorVersion = parseInt(process.versions.node.split('.')[0], 10);
+
+  if (majorVersion < 20) {
+    console.error(
+      '❌ Gemini CLI requires Node.js v20 or higher. Please upgrade your Node.js version.',
+    );
+    process.exit(1);
+  }
   if (
     process.platform === 'win32' &&
     error instanceof Error &&
