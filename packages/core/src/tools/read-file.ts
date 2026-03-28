@@ -39,6 +39,10 @@ import {
   appendJitContext,
   appendJitContextToParts,
 } from './jit-context.js';
+import {
+  detectPromptInjection,
+  wrapWithInjectionWarning,
+} from '../utils/prompt-injection-detector.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -153,6 +157,17 @@ Action: To read more of the file, you can use the 'start_line' and 'end_line' pa
 ${result.llmContent}`;
     } else {
       llmContent = result.llmContent || '';
+    }
+
+    if (typeof llmContent === 'string' && llmContent.length > 0) {
+      const detection = detectPromptInjection(llmContent);
+      if (detection.suspicious) {
+        llmContent = wrapWithInjectionWarning(
+          llmContent,
+          detection.reasons,
+          this.params.file_path,
+        );
+      }
     }
 
     const lines =
