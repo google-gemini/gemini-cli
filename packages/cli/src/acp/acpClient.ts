@@ -662,7 +662,7 @@ export class Session {
               } else if ('fileName' in toolCall.resultDisplay) {
                 toolCallContent.push({
                   type: 'diff',
-                  path: toolCall.resultDisplay.fileName,
+                  path: toolCall.resultDisplay.filePath,
                   oldText: toolCall.resultDisplay.originalContent,
                   newText: toolCall.resultDisplay.newContent,
                 });
