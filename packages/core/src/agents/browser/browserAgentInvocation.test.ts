@@ -59,7 +59,7 @@ describe('BrowserAgentInvocation', () => {
           },
         },
         browser: {
-          headless: false,
+          headless: true,
           sessionMode: 'isolated',
         },
       },
