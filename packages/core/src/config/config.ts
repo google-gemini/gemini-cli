@@ -23,7 +23,6 @@ import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { UPDATE_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -2113,10 +2112,6 @@ export class Config implements McpContext, AgentLoopContext {
     );
     for (const tool of policyExclusions) {
       excludeToolsSet.add(tool);
-    }
-
-    if (!this.isTopicUpdateNarrationEnabled()) {
-      excludeToolsSet.add(UPDATE_TOPIC_TOOL_NAME);
     }
 
     return excludeToolsSet;

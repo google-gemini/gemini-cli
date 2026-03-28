@@ -281,6 +281,12 @@ describe('PromptProvider', () => {
       vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
         false,
       );
+      // Simulate registry behavior where it filters out update_topic
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue(
+        [],
+      );
+      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([]);
+
       const provider = new PromptProvider();
 
       const prompt = provider.getCoreSystemPrompt(mockConfig);
