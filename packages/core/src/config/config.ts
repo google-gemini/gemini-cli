@@ -727,7 +727,7 @@ export class Config implements McpContext, AgentLoopContext {
   private _sessionId: string;
   private readonly clientName: string | undefined;
   private clientVersion: string;
-  private fileSystemService: FileSystemService;
+  private fileSystemService!: FileSystemService;
   private trackerService?: TrackerService;
   readonly topicState = new TopicState();
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -735,6 +735,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
+  private sandboxForbiddenPaths: string[] | undefined;
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
@@ -763,7 +764,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
-  private _sandboxManager: SandboxManager;
+  private _sandboxManager!: SandboxManager;
   private readonly _sandboxPolicyManager: SandboxPolicyManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
@@ -956,49 +957,15 @@ export class Config implements McpContext, AgentLoopContext {
           networkAccess: false,
         };
 
-    this._sandboxManager = createSandboxManager(this.sandbox, {
-      workspace: params.targetDir,
-    });
-
-    if (
-      !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox.enabled
-    ) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        params.targetDir,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
+    this.targetDir = path.resolve(params.targetDir);
 
     this._sandboxPolicyManager = new SandboxPolicyManager();
     const initialApprovalMode =
       params.approvalMode ??
       params.policyEngineConfig?.approvalMode ??
       'default';
-    this._sandboxManager = createSandboxManager(
-      this.sandbox,
-      {
-        workspace: params.targetDir,
-        policyManager: this._sandboxPolicyManager,
-      },
-      initialApprovalMode,
-    );
+    this.rebuildSandboxEnvironment(initialApprovalMode);
 
-    if (
-      !(this._sandboxManager instanceof NoopSandboxManager) &&
-      this.sandbox?.enabled
-    ) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        params.targetDir,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
-
-    this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
@@ -1368,6 +1335,13 @@ export class Config implements McpContext, AgentLoopContext {
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
+
+    if (this.getSandboxEnabled()) {
+      this.sandboxForbiddenPaths =
+        await this.getFileService().getIgnoredPaths();
+      this.rebuildSandboxEnvironment();
+    }
+
     if (this.getCheckpointingEnabled()) {
       await this.getGitService();
     }
@@ -1640,16 +1614,36 @@ export class Config implements McpContext, AgentLoopContext {
     return this._geminiClient;
   }
 
-  private refreshSandboxManager(): void {
+  private rebuildSandboxEnvironment(initialApprovalMode?: string): void {
+    const approvalMode =
+      initialApprovalMode ??
+      (this.policyEngine ? this.getApprovalMode() : 'default');
+
     this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
         workspace: this.targetDir,
+        forbiddenPaths: this.sandboxForbiddenPaths,
         policyManager: this._sandboxPolicyManager,
       },
-      this.getApprovalMode(),
+      approvalMode,
     );
-    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+
+    if (this.shellExecutionConfig) {
+      this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+    }
+
+    if (
+      !(this._sandboxManager instanceof NoopSandboxManager) &&
+      this.sandbox?.enabled
+    ) {
+      this.fileSystemService = new SandboxedFileSystemService(
+        this._sandboxManager,
+        this.targetDir,
+      );
+    } else {
+      this.fileSystemService = new StandardFileSystemService();
+    }
   }
 
   get sandboxPolicyManager() {
@@ -2472,7 +2466,7 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     this.policyEngine.setApprovalMode(mode);
-    this.refreshSandboxManager();
+    this.rebuildSandboxEnvironment();
 
     const isPlanModeTransition =
       currentMode !== mode &&
