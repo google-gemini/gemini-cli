@@ -22,11 +22,11 @@ With hooks, you can:
 
 ### Getting started
 
-- **[Writing hooks guide](../hooks/writing-hooks)**: A tutorial on creating your
-  first hook with comprehensive examples.
-- **[Best practices](../hooks/best-practices)**: Guidelines on security,
+- **[Writing hooks guide](../hooks/writing-hooks.md)**: A tutorial on creating
+  your first hook with comprehensive examples.
+- **[Best practices](../hooks/best-practices.md)**: Guidelines on security,
   performance, and debugging.
-- **[Hooks reference](../hooks/reference)**: The definitive technical
+- **[Hooks reference](../hooks/reference.md)**: The definitive technical
   specification of I/O schemas and exit codes.
 
 ## Core concepts
