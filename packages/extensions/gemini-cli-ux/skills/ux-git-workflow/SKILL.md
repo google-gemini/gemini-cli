@@ -133,7 +133,7 @@ If operating in a sibling worktree (e.g., `feature-xyz/`):
   - **Action**: Use `git rebase -i` or `git reset --soft` to organize commits into these tiers. Ensure refactors are ALWAYS isolated from logic.
 - **Push**: `git push origin HEAD --force-with-lease`.
 - **Draft PR**: If creating a new PR, you MUST create it as a draft by default (e.g., `gh pr create --draft`).
-- **MANDATORY FINAL OUTPUT**: You MUST provide the full, clickable **GitHub PR link** (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`) AND the **Issue URL** (e.g., `https://github.com/google-gemini/gemini-cli/issues/12345`) as the final output of this skill. This allows the user to immediately verify the update and track the associated task.
+- **MANDATORY FINAL OUTPUT**: You MUST provide the full, clickable **GitHub PR link** (e.g., `https://github.com/google-gemini/gemini-cli/pull/23487`), the **Issue URL** (e.g., `https://github.com/google-gemini/gemini-cli/issues/12345`), AND the **npx command** to test the PR branch directly (e.g., `npx @google/gemini-cli@pr-<number>`) as the final output of this skill. This allows the user to immediately verify the update and track the associated task.
 
 #### 10. CI Verification & Remediation Loop (The Slog)
 - **Context**: Getting PRs ready for review is typically a "slog" due to CI checks failing in the GitHub environment even after passing local presubmit tests.

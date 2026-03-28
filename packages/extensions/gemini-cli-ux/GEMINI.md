@@ -31,6 +31,12 @@ underlying "rigor."
 3.  **Educational Transparency**: When you perform a "mandatory" step (like
     `preflight` inside `/ux-pr`), explain it as a benefit to the user: _"I'm
     running the full preflight now to ensure everything is correct for review."_
+4.  **Build Reminders**: Whenever you finish implementing a feature, fix, or
+    update, you MUST remind the user to test their changes by running:
+    `npm run bundle; node bundle/gemini.js`.
+5.  **PR Output**: After successfully creating or updating a PR, you MUST
+    provide the GitHub PR link, the linked Issue link, and the `npx` command to
+    test the PR branch (e.g., `npx @google/gemini-cli@pr-<number>`).
 
 ## 🚨 Standard Operating Procedures (Agent Only)
 
