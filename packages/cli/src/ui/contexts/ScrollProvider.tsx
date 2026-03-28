@@ -16,6 +16,7 @@ import {
 } from 'react';
 import { getBoundingBox, type DOMElement } from 'ink';
 import { useMouse, type MouseEvent } from '../hooks/useMouse.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 export interface ScrollState {
   scrollTop: number;
@@ -125,8 +126,34 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  const scrollMomentumRef = useRef({
+    count: 0,
+    lastTime: 0,
+  });
+
   const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
-    const delta = direction === 'up' ? -1 : 1;
+    let multiplier = 1;
+    const now = Date.now();
+
+    if (!terminalCapabilityManager.isGhosttyTerminal()) {
+      const timeSinceLastScroll = now - scrollMomentumRef.current.lastTime;
+      // 50ms threshold to consider scrolls consecutive
+      if (timeSinceLastScroll < 50) {
+        scrollMomentumRef.current.count += 1;
+        if (scrollMomentumRef.current.count > 50) {
+          // Accelerate up to 5x
+          multiplier = Math.min(
+            5,
+            1 + (scrollMomentumRef.current.count - 50) * 0.5,
+          );
+        }
+      } else {
+        scrollMomentumRef.current.count = 0;
+      }
+    }
+    scrollMomentumRef.current.lastTime = now;
+
+    const delta = (direction === 'up' ? -1 : 1) * Math.floor(multiplier);
     const candidates = findScrollableCandidates(
       mouseEvent,
       scrollablesRef.current,
