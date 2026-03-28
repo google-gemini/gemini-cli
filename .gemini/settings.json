@@ -1,11 +1,12 @@
 {
   "experimental": {
-    "plan": true,
-    "extensionReloading": true,
-    "modelSteering": true,
-    "memoryManager": true
+    "plan": true,                // Enables experimental plan features
+    "extensionReloading": true,  // Allows extensions/plugins to reload dynamically
+    "modelSteering": true,       // Lets you control or steer the AI model behavior
+    "memoryManager": true        // Enables experimental memory management features
   },
   "general": {
-    "devtools": true
+    "devtools": true             // Enables developer tools for debugging
   }
 }
+
