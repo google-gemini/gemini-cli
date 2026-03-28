@@ -106,6 +106,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/json-stable-stringify": "^1.1.0",
     "@types/picomatch": "^4.0.1",
+    "@vitest/coverage-v8": "^4.1.2",
     "chrome-devtools-mcp": "^0.19.0",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
