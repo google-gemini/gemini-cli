@@ -5,8 +5,8 @@
  */
 
 import { describe, expect } from 'vitest';
-import { appEvalTest, AppEvalCase } from './app-test-helper.js';
-import { EvalPolicy } from './test-helper.js';
+import { appEvalTest, type AppEvalCase } from './app-test-helper.js';
+import type { EvalPolicy } from './test-helper.js';
 
 function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
   return appEvalTest(policy, {
@@ -14,6 +14,7 @@ function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
     configOverrides: {
       ...evalCase.configOverrides,
       general: {
+        // @ts-expect-error - accessing index signature with bracket notation
         ...evalCase.configOverrides?.general,
         approvalMode: 'default',
         enableAutoUpdate: false,

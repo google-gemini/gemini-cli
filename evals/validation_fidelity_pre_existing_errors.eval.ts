@@ -5,7 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, safeParseArgs } from './test-helper.js';
 
 describe('validation_fidelity_pre_existing_errors', () => {
   evalTest('USUALLY_PASSES', {
@@ -55,10 +55,12 @@ export function multiply(a: number, b: number): number {
 
       // Verify it did the work in math.ts
       const mathRefactor = replaceCalls.some((log) => {
-        const args = JSON.parse(log.toolRequest.args);
+        const args = safeParseArgs<{ file_path?: string; new_string?: string }>(
+          log.toolRequest.args,
+        );
         return (
-          args.file_path.endsWith('src/math.ts') &&
-          args.new_string.includes('sum')
+          args?.file_path?.endsWith('src/math.ts') &&
+          args?.new_string?.includes('sum')
         );
       });
       expect(mathRefactor, 'Agent should have refactored math.ts').toBe(true);
@@ -67,8 +69,12 @@ export function multiply(a: number, b: number): number {
         (log) => log.toolRequest.name === 'run_shell_command',
       );
       const ranValidation = shellCalls.some((log) => {
-        const cmd = JSON.parse(log.toolRequest.args).command.toLowerCase();
-        return cmd.includes('build') || cmd.includes('tsc');
+        const args = safeParseArgs<{ command?: string }>(log.toolRequest.args);
+        if (!args?.command) return false;
+        return (
+          args.command.toLowerCase().includes('build') ||
+          args.command.toLowerCase().includes('tsc')
+        );
       });
 
       expect(ranValidation, 'Agent should have attempted validation').toBe(

@@ -5,7 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, safeParseArgs } from './test-helper.js';
 
 /**
  * Evals to verify that the agent uses search tools efficiently (frugally)
@@ -13,16 +13,10 @@ import { evalTest } from './test-helper.js';
  * This ensures the agent doesn't flood the context window with unnecessary search results.
  */
 describe('Frugal Search', () => {
-  const getGrepParams = (call: any): any => {
-    let args = call.toolRequest.args;
-    if (typeof args === 'string') {
-      try {
-        args = JSON.parse(args);
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-    return args;
+  const getGrepParams = (call: {
+    toolRequest: { args: string };
+  }): Record<string, unknown> | null => {
+    return safeParseArgs(call.toolRequest.args);
   };
 
   /**
@@ -50,25 +44,18 @@ describe('Frugal Search', () => {
     },
     assert: async (rig) => {
       const toolCalls = rig.readToolLogs();
-      const getParams = (call: any) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-        return args;
-      };
 
       // Check for wasteful full file reads
       const fullReads = toolCalls.filter((call) => {
         if (call.toolRequest.name !== 'read_file') return false;
-        const args = getParams(call);
+        const args = safeParseArgs<{
+          file_path?: string;
+          end_line?: number;
+        }>(call.toolRequest.args);
+        if (!args) return false;
         return (
-          args.file_path === 'src/legacy_processor.ts' &&
-          (args.end_line === undefined || args.end_line === null)
+          args['file_path'] === 'src/legacy_processor.ts' &&
+          (args['end_line'] === undefined || args['end_line'] === null)
         );
       });
 
@@ -79,15 +66,19 @@ describe('Frugal Search', () => {
 
       // Check that it actually tried to find it using appropriate tools
       const validAttempts = toolCalls.filter((call) => {
-        const args = getParams(call);
+        const args = safeParseArgs<{
+          file_path?: string;
+          end_line?: number;
+        }>(call.toolRequest.args);
+        if (!args) return false;
         if (call.toolRequest.name === 'grep_search') {
           return true;
         }
 
         if (
           call.toolRequest.name === 'read_file' &&
-          args.file_path === 'src/legacy_processor.ts' &&
-          args.end_line !== undefined
+          args['file_path'] === 'src/legacy_processor.ts' &&
+          args['end_line'] !== undefined
         ) {
           return true;
         }

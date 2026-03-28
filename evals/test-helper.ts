@@ -19,6 +19,37 @@ import {
 } from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
+export { normalizePath } from '@google/gemini-cli-test-utils';
+
+export interface ToolLogEntry {
+  toolRequest: {
+    name: string;
+    args: string;
+    prompt_id?: string;
+  };
+}
+
+export function safeParseArgs<T = Record<string, unknown>>(
+  args: string | unknown,
+): T | null {
+  if (typeof args === 'string') {
+    try {
+      return JSON.parse(args) as T;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof args === 'object' && args !== null) {
+    return args as T;
+  }
+  return null;
+}
+
+export function parseToolArgs(
+  call: ToolLogEntry,
+): Record<string, unknown> | null {
+  return safeParseArgs(call.toolRequest.args);
+}
 
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These

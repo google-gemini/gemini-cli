@@ -5,7 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { evalTest, safeParseArgs } from './test-helper.js';
 
 describe('validation_fidelity', () => {
   evalTest('USUALLY_PASSES', {
@@ -67,7 +67,9 @@ test('formats log correctly', () => {
       );
 
       const hasBuildOrTsc = shellCalls.some((log) => {
-        const cmd = JSON.parse(log.toolRequest.args).command.toLowerCase();
+        const args = safeParseArgs<{ command?: string }>(log.toolRequest.args);
+        if (!args?.command) return false;
+        const cmd = args.command.toLowerCase();
         return (
           cmd.includes('npm run build') ||
           cmd.includes('tsc') ||
