@@ -14,6 +14,7 @@ export interface BackgroundShell {
   binaryBytesReceived: number;
   status: 'running' | 'exited';
   exitCode?: number;
+  isCursorHidden?: boolean;
 }
 
 export interface ShellState {
@@ -21,11 +22,12 @@ export interface ShellState {
   lastShellOutputTime: number;
   backgroundShells: Map<number, BackgroundShell>;
   isBackgroundShellVisible: boolean;
+  isCursorHidden?: boolean;
 }
 
 export type ShellAction =
   | { type: 'SET_ACTIVE_PTY'; pid: number | null }
-  | { type: 'SET_OUTPUT_TIME'; time: number }
+  | { type: 'SET_OUTPUT_TIME'; time: number; isCursorHidden?: boolean }
   | { type: 'SET_VISIBILITY'; visible: boolean }
   | { type: 'TOGGLE_VISIBILITY' }
   | {
@@ -35,7 +37,12 @@ export type ShellAction =
       initialOutput: string | AnsiOutput;
     }
   | { type: 'UPDATE_SHELL'; pid: number; update: Partial<BackgroundShell> }
-  | { type: 'APPEND_SHELL_OUTPUT'; pid: number; chunk: string | AnsiOutput }
+  | {
+      type: 'APPEND_SHELL_OUTPUT';
+      pid: number;
+      chunk: string | AnsiOutput;
+      isCursorHidden?: boolean;
+    }
   | { type: 'SYNC_BACKGROUND_SHELLS' }
   | { type: 'DISMISS_SHELL'; pid: number };
 
@@ -54,7 +61,11 @@ export function shellReducer(
     case 'SET_ACTIVE_PTY':
       return { ...state, activeShellPtyId: action.pid };
     case 'SET_OUTPUT_TIME':
-      return { ...state, lastShellOutputTime: action.time };
+      return {
+        ...state,
+        lastShellOutputTime: action.time,
+        isCursorHidden: action.isCursorHidden,
+      };
     case 'SET_VISIBILITY':
       return { ...state, isBackgroundShellVisible: action.visible };
     case 'TOGGLE_VISIBILITY':
@@ -103,6 +114,9 @@ export function shellReducer(
         newOutput = action.chunk;
       }
       shell.output = newOutput;
+      if (action.isCursorHidden !== undefined) {
+        shell.isCursorHidden = action.isCursorHidden;
+      }
 
       const nextState = { ...state, lastShellOutputTime: Date.now() };
 

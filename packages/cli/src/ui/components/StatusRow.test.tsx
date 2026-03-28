@@ -13,6 +13,7 @@ import { type TextBuffer } from '../components/shared/text-buffer.js';
 import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { type ThoughtSummary } from '../types.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
+import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
 vi.mock('../hooks/useComposerStatus.js', () => ({
   useComposerStatus: vi.fn(),
@@ -106,7 +107,7 @@ describe('<StatusRow />', () => {
     );
 
     await waitUntilReady();
-    expect(lastFrame()).toContain('! Shell awaiting input (Tab to focus)');
+    expect(lastFrame()).toContain(INTERACTIVE_SHELL_WAITING_PHRASE);
   });
 
   it('renders tip with absolute positioning when it fits but might collide (verification of container logic)', async () => {

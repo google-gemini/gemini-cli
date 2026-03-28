@@ -21,6 +21,7 @@ interface ShellInactivityStatusProps {
   pendingToolCalls: TrackedToolCall[];
   embeddedShellFocused: boolean;
   isInteractiveShellEnabled: boolean;
+  isCursorHidden?: boolean;
 }
 
 export type InactivityStatus = 'none' | 'action_required' | 'silent_working';
@@ -41,6 +42,7 @@ export const useShellInactivityStatus = ({
   pendingToolCalls,
   embeddedShellFocused,
   isInteractiveShellEnabled,
+  isCursorHidden,
 }: ShellInactivityStatusProps): ShellInactivityStatus => {
   const { operationStartTime, isRedirectionActive } = useTurnActivityMonitor(
     streamingState,
@@ -49,7 +51,10 @@ export const useShellInactivityStatus = ({
   );
 
   const isAwaitingFocus =
-    !!activePtyId && !embeddedShellFocused && isInteractiveShellEnabled;
+    !!activePtyId &&
+    !embeddedShellFocused &&
+    isInteractiveShellEnabled &&
+    !isCursorHidden;
 
   // Derive whether output was produced by comparing the last output time to when the operation started.
   const hasProducedOutput = lastOutputTime > operationStartTime;

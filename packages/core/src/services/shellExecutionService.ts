@@ -46,6 +46,19 @@ import {
 } from './executionLifecycleService.js';
 const { Terminal } = pkg;
 
+/**
+ * Internal interfaces to access non-public xterm properties.
+ */
+interface XTermCore {
+  coreService: {
+    isCursorHidden: boolean;
+  };
+}
+
+interface XTermInternal {
+  _core?: XTermCore;
+}
+
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 /**
@@ -952,9 +965,14 @@ export class ShellExecutionService {
 
         if (output !== finalOutput) {
           output = finalOutput;
+          const isCursorHidden =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (headlessTerminal as unknown as XTermInternal)._core?.coreService
+              ?.isCursorHidden;
           const event: ShellOutputEvent = {
             type: 'data',
             chunk: finalOutput,
+            isCursorHidden,
           };
           onOutputEvent(event);
           ExecutionLifecycleService.emitEvent(ptyPid, event);
@@ -1303,7 +1321,15 @@ export class ShellExecutionService {
         startLine,
         endLine,
       );
-      const event: ShellOutputEvent = { type: 'data', chunk: bufferData };
+      const isCursorHidden =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (activePty.headlessTerminal as unknown as XTermInternal)._core
+          ?.coreService?.isCursorHidden;
+      const event: ShellOutputEvent = {
+        type: 'data',
+        chunk: bufferData,
+        isCursorHidden,
+      };
       ExecutionLifecycleService.emitEvent(pid, event);
     }
   }

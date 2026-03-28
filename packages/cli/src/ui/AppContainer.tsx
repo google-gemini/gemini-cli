@@ -1108,6 +1108,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     toggleBackgroundShell,
     backgroundCurrentShell,
     backgroundShells,
+    isCursorHidden,
     dismissBackgroundShell,
     retryStatus,
   } = useGeminiStream(
@@ -1177,6 +1178,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pendingToolCalls,
     embeddedShellFocused,
     isInteractiveShellEnabled: config.isInteractiveShellEnabled(),
+    isCursorHidden,
   });
 
   const shouldShowActionRequiredTitle = inactivityStatus === 'action_required';
@@ -2326,6 +2328,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settingsNonce,
       backgroundShells,
       activeBackgroundShellPid,
+      isCursorHidden,
       backgroundShellHeight,
       isBackgroundShellListOpen,
       adminSettingsChanged,
@@ -2454,6 +2457,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellListOpen,
       activeBackgroundShellPid,
       backgroundShells,
+      isCursorHidden,
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,

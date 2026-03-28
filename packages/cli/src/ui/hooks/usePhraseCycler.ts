@@ -11,7 +11,7 @@ import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 export const PHRASE_CHANGE_INTERVAL_MS = 10000;
 export const WITTY_PHRASE_CHANGE_INTERVAL_MS = 5000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
-  '! Shell awaiting input (Tab to focus)';
+  'Shell awaiting input (Tab to focus)';
 
 /**
  * Custom hook to manage cycling through loading phrases.
