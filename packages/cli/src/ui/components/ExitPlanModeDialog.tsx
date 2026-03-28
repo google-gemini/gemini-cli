@@ -5,6 +5,8 @@
  */
 
 import type React from 'react';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
 import { useEffect, useState, useCallback } from 'react';
 import { Box, Text, useStdin } from 'ink';
 import {
@@ -156,12 +158,27 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const handleOpenEditor = useCallback(async () => {
     try {
+      const getHash = async () => {
+        try {
+          const content = await fs.readFile(planPath);
+          return crypto.createHash('sha256').update(content).digest('hex');
+        } catch {
+          return null;
+        }
+      };
+
+      const hashBefore = await getHash();
+
       await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
 
-      onFeedback(
-        'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
-      );
-      refresh();
+      const hashAfter = await getHash();
+
+      if (hashBefore !== hashAfter) {
+        onFeedback(
+          'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
+        );
+        refresh();
+      }
     } catch (err) {
       debugLogger.error('Failed to open plan in editor:', err);
     }
