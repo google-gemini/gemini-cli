@@ -53,6 +53,13 @@ describe('GrepTool', () => {
       getFileExclusions: () => ({
         getGlobExcludes: () => [],
       }),
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+        maxFileCount: 1000,
+        searchTimeout: 30000,
+        customIgnoreFilePaths: [],
+      }),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
@@ -337,6 +344,13 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          maxFileCount: 1000,
+          searchTimeout: 30000,
+          customIgnoreFilePaths: [],
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -413,6 +427,13 @@ describe('GrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          maxFileCount: 1000,
+          searchTimeout: 30000,
+          customIgnoreFilePaths: [],
         }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
@@ -617,6 +638,13 @@ describe('GrepTool', () => {
           createMockWorkspaceContext(tempRootDir, ['/another/dir']),
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          maxFileCount: 1000,
+          searchTimeout: 30000,
+          customIgnoreFilePaths: [],
         }),
       } as unknown as Config;
 

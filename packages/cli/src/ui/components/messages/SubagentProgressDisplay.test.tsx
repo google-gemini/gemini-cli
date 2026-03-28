@@ -8,11 +8,6 @@ import { render, cleanup } from '../../../test-utils/render.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 import type { SubagentProgress } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Text } from 'ink';
-
-vi.mock('ink-spinner', () => ({
-  default: () => <Text>⠋</Text>,
-}));
 
 describe('<SubagentProgressDisplay />', () => {
   afterEach(() => {

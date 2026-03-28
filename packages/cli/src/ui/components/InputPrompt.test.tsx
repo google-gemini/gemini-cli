@@ -61,7 +61,7 @@ import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
-import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
   AppEvent,
@@ -163,6 +163,18 @@ describe('InputPrompt', () => {
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
+  const GlobalEscapeHandler = ({ onEscape }: { onEscape: () => void }) => {
+    useKeypress(
+      (key) => {
+        if (key.name !== 'escape') return false;
+        onEscape();
+        return true;
+      },
+      { isActive: true, priority: false },
+    );
+    return null;
+  };
+
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
@@ -179,6 +191,7 @@ describe('InputPrompt', () => {
     setCleanUiDetailsVisible: mockSetCleanUiDetailsVisible,
     toggleCleanUiDetailsVisible: mockToggleCleanUiDetailsVisible,
     revealCleanUiDetailsTemporarily: mockRevealCleanUiDetailsTemporarily,
+    addMessage: vi.fn(),
   };
 
   beforeEach(() => {
@@ -340,6 +353,8 @@ describe('InputPrompt', () => {
     vi.mocked(clipboardy.read).mockResolvedValue('');
 
     props = {
+      onQueueMessage: vi.fn(),
+
       buffer: mockBuffer,
       onSubmit: vi.fn(),
       userMessages: [],
@@ -1087,6 +1102,76 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('queues a message when Tab is pressed during generation', async () => {
+    props.buffer.setText('A new prompt');
+    props.streamingState = StreamingState.Responding;
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() => {
+      expect(props.onQueueMessage).toHaveBeenCalledWith('A new prompt');
+      expect(props.buffer.text).toBe('');
+    });
+    unmount();
+  });
+
+  it('shows an error when attempting to queue a slash command', async () => {
+    props.buffer.setText('/clear');
+    props.streamingState = StreamingState.Responding;
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() => {
+      expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+        'Slash commands cannot be queued',
+      );
+      expect(props.onQueueMessage).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('shows an error when attempting to queue a shell command', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('ls');
+    props.streamingState = StreamingState.Responding;
+
+    const { stdin, unmount } = await renderWithProviders(
+      <InputPrompt {...props} />,
+      {
+        uiActions,
+      },
+    );
+
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    await waitFor(() => {
+      expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+        'Shell commands cannot be queued',
+      );
+      expect(props.onQueueMessage).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
   it('should not submit on Enter when the buffer is empty or only contains whitespace', async () => {
     props.buffer.setText('   '); // Set buffer to whitespace
 
@@ -2767,6 +2852,54 @@ describe('InputPrompt', () => {
 
         expect(props.setShellModeActive).toHaveBeenCalledWith(false);
       });
+      unmount();
+    });
+
+    it('should not propagate ESC to global cancellation handler when shell mode is active (responding)', async () => {
+      props.shellModeActive = true;
+      props.streamingState = StreamingState.Responding;
+      const onGlobalEscape = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalEscapeHandler onEscape={onGlobalEscape} />
+          <InputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      });
+      expect(onGlobalEscape).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should allow ESC to reach global cancellation handler when responding and no overlay is active', async () => {
+      props.shellModeActive = false;
+      props.streamingState = StreamingState.Responding;
+      const onGlobalEscape = vi.fn();
+
+      const { stdin, unmount } = await renderWithProviders(
+        <>
+          <GlobalEscapeHandler onEscape={onGlobalEscape} />
+          <InputPrompt {...props} />
+        </>,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(onGlobalEscape).toHaveBeenCalledTimes(1);
+      });
+      expect(props.setShellModeActive).not.toHaveBeenCalled();
       unmount();
     });
 

@@ -218,6 +218,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-3-flash-preview',
       },
     },
+    'chat-compression-3.1-flash-lite': {
+      modelConfig: {
+        model: 'gemini-3.1-flash-lite-preview',
+      },
+    },
     'chat-compression-2.5-pro': {
       modelConfig: {
         model: 'gemini-2.5-pro',
@@ -236,6 +241,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'chat-compression-default': {
       modelConfig: {
         model: 'gemini-3-pro-preview',
+      },
+    },
+    'agent-history-provider-summarizer': {
+      modelConfig: {
+        model: 'gemini-3-flash-preview',
       },
     },
   },
@@ -436,6 +446,15 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     'auto-gemini-2.5': {
       default: 'gemini-2.5-pro',
     },
+    'gemini-3.1-flash-lite-preview': {
+      default: 'gemini-3.1-flash-lite-preview',
+      contexts: [
+        {
+          condition: { useGemini3_1FlashLite: false },
+          target: 'gemini-2.5-flash-lite',
+        },
+      ],
+    },
     flash: {
       default: 'gemini-3-flash-preview',
       contexts: [
@@ -447,6 +466,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     'flash-lite': {
       default: 'gemini-2.5-flash-lite',
+      contexts: [
+        {
+          condition: { useGemini3_1FlashLite: true },
+          target: 'gemini-3.1-flash-lite-preview',
+        },
+      ],
     },
   },
   classifierIdResolutions: {
