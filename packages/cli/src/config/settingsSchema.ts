@@ -1459,7 +1459,7 @@ const SETTINGS_SCHEMA = {
             showInDialog: true,
           },
           backgroundCompletionBehavior: {
-            type: 'string',
+            type: 'enum',
             label: 'Background Completion Behavior',
             category: 'Tools',
             requiresRestart: false,
