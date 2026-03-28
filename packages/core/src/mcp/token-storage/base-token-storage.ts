@@ -13,9 +13,12 @@ export abstract class BaseTokenStorage implements TokenStorage {
     this.serviceName = serviceName;
   }
 
-  abstract getCredentials(serverName: string): Promise<OAuthCredentials | null>;
+  abstract getCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<OAuthCredentials | null>;
   abstract setCredentials(credentials: OAuthCredentials): Promise<void>;
-  abstract deleteCredentials(serverName: string): Promise<void>;
+  abstract deleteCredentials(serverName: string, mcpServerUrl?: string): Promise<void>;
   abstract listServers(): Promise<string[]>;
   abstract getAllCredentials(): Promise<Map<string, OAuthCredentials>>;
   abstract clearAll(): Promise<void>;

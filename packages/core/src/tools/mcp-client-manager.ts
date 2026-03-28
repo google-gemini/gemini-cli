@@ -631,8 +631,13 @@ export class McpClientManager {
    * This is the cleanup method to be called on application exit.
    */
   async stop(): Promise<void> {
+    const pidsToKill: number[] = [];
+
     const disconnectionPromises = Array.from(this.clients.entries()).map(
       async ([name, client]) => {
+        const pid = client.getPid();
+        if (pid) pidsToKill.push(pid);
+
         try {
           await client.disconnect();
         } catch (error) {
@@ -646,6 +651,20 @@ export class McpClientManager {
     );
 
     await Promise.all(disconnectionPromises);
+
+    // Hard kill any processes that are still running after graceful disconnect
+    for (const pid of pidsToKill) {
+      try {
+        // Check if process is still running
+        process.kill(pid, 0);
+        // If it didn't throw, it's still there. Force it.
+        debugLogger.log(`Hard killing lingering MCP process ${pid}`);
+        process.kill(pid, 'SIGKILL');
+      } catch {
+        // Process is already gone, which is good
+      }
+    }
+
     this.clients.clear();
   }
 

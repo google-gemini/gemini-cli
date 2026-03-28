@@ -9,6 +9,21 @@ if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
+// Polyfill for File if it's not available (needed for undici in older Node/Vitest environments)
+if (typeof File === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (global as any).File = class File extends Blob {
+    name: string;
+    lastModified: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(parts: any[], name: string, options?: any) {
+      super(parts, options);
+      this.name = name;
+      this.lastModified = options?.lastModified || Date.now();
+    }
+  };
+}
+
 import { setSimulate429 } from './src/utils/testUtils.js';
 import { vi, afterEach } from 'vitest';
 import { coreEvents } from './src/utils/events.js';

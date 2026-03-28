@@ -88,6 +88,7 @@ describe('HybridTokenStorage', () => {
 
       expect(mockKeychainStorage.getCredentials).toHaveBeenCalledWith(
         'test-server',
+        undefined,
       );
       expect(await storage.getStorageType()).toBe(TokenStorageType.KEYCHAIN);
     });
@@ -101,6 +102,7 @@ describe('HybridTokenStorage', () => {
 
       expect(mockKeychainStorage.getCredentials).toHaveBeenCalledWith(
         'test-server',
+        undefined,
       );
       expect(await forceStorage.getStorageType()).toBe(
         TokenStorageType.ENCRYPTED_FILE,
@@ -126,6 +128,7 @@ describe('HybridTokenStorage', () => {
       expect(result).toEqual(credentials);
       expect(mockKeychainStorage.getCredentials).toHaveBeenCalledWith(
         'test-server',
+        undefined,
       );
     });
   });
@@ -159,6 +162,7 @@ describe('HybridTokenStorage', () => {
 
       expect(mockKeychainStorage.deleteCredentials).toHaveBeenCalledWith(
         'test-server',
+        undefined,
       );
     });
   });

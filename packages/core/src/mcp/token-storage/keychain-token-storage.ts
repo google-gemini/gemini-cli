@@ -24,7 +24,10 @@ export class KeychainTokenStorage
     this.keychainService = new KeychainService(serviceName);
   }
 
-  async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
+  async getCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<OAuthCredentials | null> {
     try {
       const sanitizedName = this.sanitizeServerName(serverName);
       const data = await this.keychainService.getPassword(sanitizedName);
@@ -37,6 +40,11 @@ export class KeychainTokenStorage
       const credentials = JSON.parse(data) as OAuthCredentials;
 
       if (this.isTokenExpired(credentials)) {
+        return null;
+      }
+
+      // If URL is provided, validate it matches the stored credential
+      if (mcpServerUrl && credentials.mcpServerUrl !== mcpServerUrl) {
         return null;
       }
 
@@ -62,8 +70,20 @@ export class KeychainTokenStorage
     await this.keychainService.setPassword(sanitizedName, data);
   }
 
-  async deleteCredentials(serverName: string): Promise<void> {
+  async deleteCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<void> {
+    // If URL is provided, we check it before deleting if possible.
+    // However, keychain typically keys by account name.
+    // For now, we delete by name but could be more granular if we changed the keying logic.
     const sanitizedName = this.sanitizeServerName(serverName);
+
+    if (mcpServerUrl) {
+      const creds = await this.getCredentials(serverName, mcpServerUrl);
+      if (!creds) return; // Nothing to delete that matches this URL
+    }
+
     const deleted = await this.keychainService.deletePassword(sanitizedName);
 
     if (!deleted) {

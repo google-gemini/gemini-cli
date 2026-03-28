@@ -60,9 +60,12 @@ export class HybridTokenStorage extends BaseTokenStorage {
     return this.storageInitPromise;
   }
 
-  async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
+  async getCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<OAuthCredentials | null> {
     const storage = await this.getStorage();
-    return storage.getCredentials(serverName);
+    return storage.getCredentials(serverName, mcpServerUrl);
   }
 
   async setCredentials(credentials: OAuthCredentials): Promise<void> {
@@ -70,9 +73,12 @@ export class HybridTokenStorage extends BaseTokenStorage {
     await storage.setCredentials(credentials);
   }
 
-  async deleteCredentials(serverName: string): Promise<void> {
+  async deleteCredentials(
+    serverName: string,
+    mcpServerUrl?: string,
+  ): Promise<void> {
     const storage = await this.getStorage();
-    await storage.deleteCredentials(serverName);
+    await storage.deleteCredentials(serverName, mcpServerUrl);
   }
 
   async listServers(): Promise<string[]> {
