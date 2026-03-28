@@ -90,7 +90,11 @@ type BeforeAgentHookReturn =
       type: GeminiEventType.AgentExecutionBlocked;
       value: { reason: string; systemMessage?: string };
     }
-  | { additionalContext: string | undefined }
+  | {
+      type: 'continue';
+      additionalContext: string | undefined;
+      systemMessage: string | undefined;
+    }
   | undefined;
 
 export class GeminiClient {
@@ -207,10 +211,11 @@ export class GeminiClient {
     }
 
     const additionalContext = hookOutput?.getAdditionalContext();
-    if (additionalContext) {
-      return { additionalContext };
-    }
-    return undefined;
+    return {
+      type: 'continue',
+      additionalContext,
+      systemMessage: hookOutput?.systemMessage,
+    };
   }
 
   private async fireAfterAgentHookSafe(
@@ -917,6 +922,12 @@ export class GeminiClient {
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionStopped
         ) {
+          if (hookResult.value.systemMessage) {
+            yield {
+              type: GeminiEventType.SystemMessage,
+              value: hookResult.value.systemMessage,
+            };
+          }
           // Add user message to history before returning so it's kept in the transcript
           this.getChat().addHistory(createUserContent(request));
           yield hookResult;
@@ -925,9 +936,21 @@ export class GeminiClient {
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionBlocked
         ) {
+          if (hookResult.value.systemMessage) {
+            yield {
+              type: GeminiEventType.SystemMessage,
+              value: hookResult.value.systemMessage,
+            };
+          }
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
-        } else if ('additionalContext' in hookResult) {
+        } else if ('type' in hookResult && hookResult.type === 'continue') {
+          if (hookResult.systemMessage) {
+            yield {
+              type: GeminiEventType.SystemMessage,
+              value: hookResult.systemMessage,
+            };
+          }
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
             const requestArray = Array.isArray(request) ? request : [request];
@@ -965,6 +988,13 @@ export class GeminiClient {
 
         // Cast to AfterAgentHookOutput for access to shouldClearContext()
         const afterAgentOutput = hookOutput as AfterAgentHookOutput | undefined;
+
+        if (afterAgentOutput?.systemMessage) {
+          yield {
+            type: GeminiEventType.SystemMessage,
+            value: afterAgentOutput.systemMessage,
+          };
+        }
 
         if (afterAgentOutput?.shouldStopExecution()) {
           const contextCleared = afterAgentOutput.shouldClearContext();

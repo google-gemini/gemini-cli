@@ -42,6 +42,7 @@ export class HookAggregator {
   ): AggregatedHookResult {
     const allOutputs: HookOutput[] = [];
     const errors: Error[] = [];
+    const stderrs: string[] = [];
     let totalDuration = 0;
 
     // Collect all outputs and errors
@@ -55,10 +56,23 @@ export class HookAggregator {
       if (result.output) {
         allOutputs.push(result.output);
       }
+
+      if (result.stderr?.trim()) {
+        stderrs.push(result.stderr.trim());
+      }
     }
 
     // Merge outputs using event-specific strategy
     const mergedOutput = this.mergeOutputs(allOutputs, eventName);
+
+    // Append collected stderrs to systemMessage if any
+    if (stderrs.length > 0 && mergedOutput) {
+      const existingMsg = mergedOutput.systemMessage || '';
+      mergedOutput.systemMessage = existingMsg
+        ? `${existingMsg}\n${stderrs.join('\n')}`
+        : stderrs.join('\n');
+    }
+
     const finalOutput = mergedOutput
       ? this.createSpecificHookOutput(mergedOutput, eventName)
       : undefined;

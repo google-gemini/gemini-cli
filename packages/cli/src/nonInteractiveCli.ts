@@ -365,6 +365,10 @@ export async function runNonInteractive({
             }
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
+          } else if (event.type === GeminiEventType.SystemMessage) {
+            if (config.getOutputFormat() === OutputFormat.TEXT) {
+              process.stderr.write(`[INFO] ${event.value}\n`);
+            }
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
             const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {

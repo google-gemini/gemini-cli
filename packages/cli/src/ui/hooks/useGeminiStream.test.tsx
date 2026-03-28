@@ -3335,6 +3335,61 @@ describe('useGeminiStream', () => {
       );
     });
 
+    it('should handle SystemMessage event', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.SystemMessage,
+            value: 'This is a system message',
+          };
+          yield { type: ServerGeminiEventType.Content, value: 'test content' };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
+        })(),
+      );
+
+      const { result } = await renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('test sys msg');
+      });
+
+      await waitFor(
+        () => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: MessageType.INFO,
+              text: 'This is a system message',
+            },
+            expect.any(Number),
+          );
+        },
+        { timeout: 5000 },
+      );
+    });
+
     it('should update lastOutputTime on Gemini thought and content events', async () => {
       vi.useFakeTimers();
       const startTime = 1000000;

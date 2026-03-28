@@ -3559,6 +3559,40 @@ ${JSON.stringify(
         expect(mockTurnRunFn).not.toHaveBeenCalled();
       });
 
+      it('should yield SystemMessage in BeforeAgent when hook returns decision: allow with a systemMessage', async () => {
+        mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => false,
+          getEffectiveReason: () => '',
+          getAdditionalContext: () => undefined,
+          systemMessage: 'Allowed with a reason',
+        });
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          setTools: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'response' };
+        });
+
+        const request = [{ text: 'Hello' }];
+        const stream = client.sendMessageStream(
+          request,
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.SystemMessage,
+          value: 'Allowed with a reason',
+        });
+      });
+
       it('should block execution in BeforeAgent when hook returns decision: block', async () => {
         mockHookSystem.fireBeforeAgentEvent.mockResolvedValue({
           shouldStopExecution: () => false,
@@ -3723,6 +3757,31 @@ ${JSON.stringify(
         expect(resetChatSpy).toHaveBeenCalledTimes(1);
 
         resetChatSpy.mockRestore();
+      });
+
+      it('should yield SystemMessage in AfterAgent when hook returns a systemMessage', async () => {
+        mockHookSystem.fireAfterAgentEvent.mockResolvedValue({
+          shouldStopExecution: () => false,
+          isBlockingDecision: () => false,
+          getEffectiveReason: () => '',
+          systemMessage: 'After agent message',
+        });
+
+        mockTurnRunFn.mockImplementation(async function* () {
+          yield { type: GeminiEventType.Content, value: 'response' };
+        });
+
+        const stream = client.sendMessageStream(
+          { text: 'Hi' },
+          new AbortController().signal,
+          'test-prompt',
+        );
+        const events = await fromAsync(stream);
+
+        expect(events).toContainEqual({
+          type: GeminiEventType.SystemMessage,
+          value: 'After agent message',
+        });
       });
     });
   });
