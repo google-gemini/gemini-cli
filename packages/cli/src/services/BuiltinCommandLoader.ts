@@ -32,6 +32,7 @@ import { docsCommand } from '../ui/commands/docsCommand.js';
 import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
+import { forkCommand } from '../ui/commands/forkCommand.js';
 import { footerCommand } from '../ui/commands/footerCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { shortcutsCommand } from '../ui/commands/shortcutsCommand.js';
@@ -156,6 +157,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
       footerCommand,
+      forkCommand,
       shortcutsCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),
       rewindCommand,

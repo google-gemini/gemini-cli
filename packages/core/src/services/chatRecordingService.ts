@@ -26,6 +26,7 @@ import type { ToolResultDisplay } from '../tools/tools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
+export const CHATS_DIR_NAME = 'chats';
 
 /**
  * Warning message shown when recording is disabled due to disk full.
@@ -178,7 +179,7 @@ export class ChatRecordingService {
         this.sessionId = this.context.promptId;
         let chatsDir = path.join(
           this.context.config.storage.getProjectTempDir(),
-          'chats',
+          CHATS_DIR_NAME,
         );
 
         // subagents are nested under the complete parent session id
@@ -612,6 +613,46 @@ export class ChatRecordingService {
   }
 
   /**
+   * Creates a fork (independent copy) of the current conversation as a new
+   * session file. The original session is unchanged.
+   *
+   * @returns The 8-character short ID of the forked session, or null if
+   *          there is no conversation to fork.
+   */
+  fork(): string | null {
+    if (!this.conversationFile) return null;
+
+    const conversation = this.readConversation();
+    if (!conversation || conversation.messages.length === 0) {
+      return null;
+    }
+
+    const forkSessionId = randomUUID();
+    const shortId = forkSessionId.slice(0, 8);
+    const timestamp = new Date().toISOString().slice(0, 16).replace(/:/g, '-');
+    const filename = `${SESSION_FILE_PREFIX}${timestamp}-${shortId}.json`;
+
+    const forked: ConversationRecord = {
+      ...conversation,
+      sessionId: forkSessionId,
+      startTime: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+    };
+
+    const chatsDir = path.join(
+      this.context.config.storage.getProjectTempDir(),
+      CHATS_DIR_NAME,
+    );
+    fs.mkdirSync(chatsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(chatsDir, filename),
+      JSON.stringify(forked, null, 2),
+    );
+
+    return shortId;
+  }
+
+  /**
    * Gets the path to the current conversation file.
    * Returns null if the service hasn't been initialized yet or recording is disabled.
    */
@@ -629,7 +670,7 @@ export class ChatRecordingService {
   async deleteSession(sessionIdOrBasename: string): Promise<void> {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
-      const chatsDir = path.join(tempDir, 'chats');
+      const chatsDir = path.join(tempDir, CHATS_DIR_NAME);
 
       const shortId = this.deriveShortId(sessionIdOrBasename);
 
