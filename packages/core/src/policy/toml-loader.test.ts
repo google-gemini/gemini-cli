@@ -474,6 +474,35 @@ name = "allowed-path"
       expect(result.checkers[0].priority).toBe(1.1); // tier 1 + 100/1000
       expect(result.checkers[0].source).toBe('Default: test.toml');
     });
+    it('should support symlinked policy directories', async () => {
+      const realDir = path.join(tempDir, 'real-policies');
+      const symlinkDir = path.join(tempDir, 'symlinked-policies');
+      await fs.mkdir(realDir);
+      await fs.writeFile(
+        path.join(realDir, 'test.toml'),
+        '[[rule]]\ntoolName = "test"\ndecision = "allow"\npriority = 100\n',
+      );
+      await fs.symlink(realDir, symlinkDir);
+
+      const result = await loadPoliciesFromToml([symlinkDir], () => 1);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('test');
+    });
+
+    it('should support symlinked policy files inside a directory', async () => {
+      const realFile = path.join(tempDir, 'real.toml');
+      const policiesDir = path.join(tempDir, 'policies');
+      await fs.mkdir(policiesDir);
+      await fs.writeFile(
+        realFile,
+        '[[rule]]\ntoolName = "test-file"\ndecision = "allow"\npriority = 100\n',
+      );
+      await fs.symlink(realFile, path.join(policiesDir, 'link.toml'));
+
+      const result = await loadPoliciesFromToml([policiesDir], () => 1);
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('test-file');
+    });
   });
 
   describe('Negative Tests', () => {

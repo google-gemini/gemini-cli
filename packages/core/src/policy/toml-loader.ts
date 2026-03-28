@@ -168,7 +168,11 @@ export async function readPolicyFiles(
       baseDir = policyPath;
       const dirEntries = await fs.readdir(policyPath, { withFileTypes: true });
       filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+        .filter(
+          (entry) =>
+            (entry.isFile() || entry.isSymbolicLink()) &&
+            entry.name.endsWith('.toml'),
+        )
         .map((entry) => entry.name);
     } else if (stats.isFile() && policyPath.endsWith('.toml')) {
       baseDir = path.dirname(policyPath);
