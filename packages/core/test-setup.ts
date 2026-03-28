@@ -10,7 +10,7 @@ if (process.env.NO_COLOR !== undefined) {
 }
 
 import { setSimulate429 } from './src/utils/testUtils.js';
-import { vi, afterEach } from 'vitest';
+import { vi, beforeEach, afterEach } from 'vitest';
 import { coreEvents } from './src/utils/events.js';
 
 // Increase max listeners to avoid warnings in large test suites
@@ -19,7 +19,17 @@ coreEvents.setMaxListeners(100);
 // Disable 429 simulation globally for all tests
 setSimulate429(false);
 
+// Silence noisy console output from passing tests. Tests that intentionally
+// test logging behavior should use vi.mocked(console.log) or similar.
+// console.error is intentionally left unmocked so real errors are visible.
+beforeEach(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'debug').mockImplementation(() => {});
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
 
