@@ -246,15 +246,8 @@ export const useGeminiStream = (
   const previousApprovalModeRef = useRef<ApprovalMode>(
     config.getApprovalMode(),
   );
-  const [isResponding, setIsRespondingState] = useState<boolean>(false);
-  const isRespondingRef = useRef<boolean>(false);
-  const setIsResponding = useCallback(
-    (value: boolean) => {
-      setIsRespondingState(value);
-      isRespondingRef.current = value;
-    },
-    [setIsRespondingState],
-  );
+  const [isResponding, isRespondingRef, setIsResponding] =
+    useStateAndRef<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -279,13 +272,16 @@ export const useGeminiStream = (
 
   useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
+      if (turnCancelledRef.current || !isRespondingRef.current) {
+        return;
+      }
       setRetryStatus(payload);
     };
     coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, []);
+  }, [isRespondingRef]);
 
   const [
     toolCalls,
@@ -744,6 +740,7 @@ export const useGeminiStream = (
       return;
     }
     turnCancelledRef.current = true;
+    setRetryStatus(null);
 
     // A full cancellation means no tools have produced a final result yet.
     // This determines if we show a generic "Request cancelled" message.
@@ -1670,7 +1667,6 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
-      settings.merged.billing?.overageStrategy,
       setIsResponding,
     ],
   );
