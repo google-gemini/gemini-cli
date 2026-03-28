@@ -156,6 +156,40 @@ function parseOtlpEndpoint(
   }
 }
 
+/**
+ * Resolve the GCP project ID from environment variables, with a fallback
+ * to the gcloud CLI configuration. This ensures the correct project ID
+ * is always passed explicitly to GCP exporters, avoiding issues where
+ * individual exporters (especially the trace exporter) resolve the
+ * project differently from their internal GoogleAuth instances.
+ */
+export async function resolveGcpProjectId(): Promise<string | undefined> {
+  const envProjectId =
+    process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT'];
+  if (envProjectId) return envProjectId;
+
+  // Fallback: resolve from gcloud CLI configuration.
+  try {
+    const { execSync } = await import('node:child_process');
+    const projectId = execSync('gcloud config get-value project', {
+      encoding: 'utf-8',
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    if (projectId && projectId !== '(unset)') {
+      debugLogger.log(
+        'Resolved GCP project ID from gcloud config:',
+        projectId,
+      );
+      return projectId;
+    }
+  } catch {
+    // gcloud not available or not configured, continue without it.
+  }
+  return undefined;
+}
+
 export async function initializeTelemetry(
   config: Config,
   credentials?: JWTInput,
@@ -240,11 +274,11 @@ export async function initializeTelemetry(
   const telemetryOutfile = config.getTelemetryOutfile();
   const useOtlp = !!parsedEndpoint && !telemetryOutfile;
 
-  const gcpProjectId =
-    process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
-    process.env['GOOGLE_CLOUD_PROJECT'];
   const useDirectGcpExport =
     telemetryTarget === TelemetryTarget.GCP && !useCollector;
+  const gcpProjectId = useDirectGcpExport
+    ? await resolveGcpProjectId()
+    : undefined;
 
   let spanExporter:
     | OTLPTraceExporter
