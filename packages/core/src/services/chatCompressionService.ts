@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
@@ -151,32 +151,35 @@ async function truncateHistoryToBudget(
 
         if (part.functionResponse) {
           const responseObj = part.functionResponse.response;
+          const tokens = estimateTokenCountSync([part]);
           // Ensure we have a string representation to truncate.
           // If the response is an object, we try to extract a primary string field (output or content).
           let contentStr: string;
+          let truncatedResponse = responseObj;
           if (typeof responseObj === 'string') {
             contentStr = responseObj;
+            truncatedResponse = '';
           } else if (responseObj && typeof responseObj === 'object') {
             if (
               'output' in responseObj &&
-              // eslint-disable-next-line no-restricted-syntax
+               
               typeof responseObj['output'] === 'string'
             ) {
               contentStr = responseObj['output'];
+              truncatedResponse = { ...responseObj, output: '' };
             } else if (
               'content' in responseObj &&
-              // eslint-disable-next-line no-restricted-syntax
+               
               typeof responseObj['content'] === 'string'
             ) {
               contentStr = responseObj['content'];
+              truncatedResponse = { ...responseObj, content: '' };
             } else {
               contentStr = JSON.stringify(responseObj, null, 2);
             }
           } else {
             contentStr = JSON.stringify(responseObj, null, 2);
           }
-
-          const tokens = estimateTokenCountSync([{ text: contentStr }]);
 
           if (
             functionResponseTokenCounter + tokens >
@@ -189,6 +192,7 @@ async function truncateHistoryToBudget(
                 part.functionResponse.name ?? 'unknown_tool',
                 config.getNextCompressionTruncationId(),
                 config.storage.getProjectTempDir(),
+                config.getSessionId(),
               );
 
               const truncatedMessage = formatTruncatedToolOutput(
@@ -197,17 +201,46 @@ async function truncateHistoryToBudget(
                 config.getTruncateToolOutputThreshold(),
               );
 
-              newParts.unshift({
+              if (typeof responseObj === 'string') {
+                truncatedResponse = truncatedMessage;
+              } else if (responseObj && typeof responseObj === 'object') {
+                if (
+                  'output' in responseObj &&
+                  typeof responseObj['output'] === 'string'
+                ) {
+                  truncatedResponse = {
+                    ...responseObj,
+                    output: truncatedMessage,
+                  };
+                } else if (
+                  'content' in responseObj &&
+                  typeof responseObj['content'] === 'string'
+                ) {
+                  truncatedResponse = {
+                    ...responseObj,
+                    content: truncatedMessage,
+                  };
+                } else {
+                  // Fallback for objects without output/content fields
+                  truncatedResponse = { output: truncatedMessage };
+                }
+              } else {
+                truncatedResponse = { output: truncatedMessage };
+              }
+
+              const truncatedPart: Part = {
                 functionResponse: {
                   // eslint-disable-next-line @typescript-eslint/no-misused-spread
                   ...part.functionResponse,
-                  response: { output: truncatedMessage },
+                  response: truncatedResponse,
                 },
-              });
+              };
 
-              // Count the small truncated placeholder towards the budget.
+              newParts.unshift(truncatedPart);
+
+              // Count the reconstructed part towards the budget.
               functionResponseTokenCounter += estimateTokenCountSync([
-                { text: truncatedMessage },
+                truncatedPart,
               ]);
             } catch (error) {
               // Fallback: if truncation fails, keep the original part to avoid data loss in the chat.
