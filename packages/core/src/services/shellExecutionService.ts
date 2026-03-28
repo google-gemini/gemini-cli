@@ -398,8 +398,8 @@ export class ShellExecutionService {
         [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
           GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
         TERM: 'xterm-256color',
-        PAGER: 'cat',
-        GIT_PAGER: 'cat',
+        PAGER: isWindows ? 'cat' : 'sh -c "cat" sh',
+        GIT_PAGER: isWindows ? 'cat' : 'sh -c "cat" sh',
       };
 
       const {
@@ -737,12 +737,15 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
+      const isWindows = os.platform() === 'win32';
       const env = {
         ...process.env,
         GEMINI_CLI: '1',
         TERM: 'xterm-256color',
-        PAGER: shellExecutionConfig.pager ?? 'cat',
-        GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
+        PAGER:
+          shellExecutionConfig.pager ?? (isWindows ? 'cat' : 'sh -c "cat" sh'),
+        GIT_PAGER:
+          shellExecutionConfig.pager ?? (isWindows ? 'cat' : 'sh -c "cat" sh'),
       };
 
       // Specifically allow GIT_CONFIG_* variables to pass through sanitization

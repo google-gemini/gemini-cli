@@ -284,7 +284,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         expect.objectContaining({
-          pager: 'cat',
+          pager: os.platform() === 'win32' ? 'cat' : 'sh -c "cat" sh',
           sanitizationConfig: {},
           sandboxManager: expect.any(Object),
         }),
@@ -313,7 +313,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         expect.objectContaining({
-          pager: 'cat',
+          pager: os.platform() === 'win32' ? 'cat' : 'sh -c "cat" sh',
           sanitizationConfig: {},
           sandboxManager: expect.any(Object),
         }),
@@ -338,7 +338,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         expect.objectContaining({
-          pager: 'cat',
+          pager: os.platform() === 'win32' ? 'cat' : 'sh -c "cat" sh',
           sanitizationConfig: {},
           sandboxManager: expect.any(Object),
         }),
@@ -388,7 +388,7 @@ describe('ShellTool', () => {
           expect.any(AbortSignal),
           false,
           {
-            pager: 'cat',
+            pager: os.platform() === 'win32' ? 'cat' : 'sh -c "cat" sh',
             sanitizationConfig: {},
             sandboxManager: new NoopSandboxManager(),
           },

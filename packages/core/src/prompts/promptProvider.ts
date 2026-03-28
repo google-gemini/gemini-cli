@@ -55,7 +55,7 @@ export class PromptProvider {
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = context.config.getSkillManager().getSkills();
-    const toolNames = context.toolRegistry.getAllToolNames();
+    const toolNames = context.toolRegistry.getAllToolNames?.() ?? [];
     const enabledToolNames = new Set(toolNames);
     const approvedPlanPath = context.config.getApprovedPlanPath();
 
@@ -73,7 +73,7 @@ export class PromptProvider {
     // --- Context Gathering ---
     let planModeToolsList = '';
     if (isPlanMode) {
-      const allTools = context.toolRegistry.getAllTools();
+      const allTools = context.toolRegistry.getAllTools?.() ?? [];
       planModeToolsList = allTools
         .map((t) => {
           if (t instanceof DiscoveredMCPTool) {
@@ -128,6 +128,8 @@ export class PromptProvider {
           hasHierarchicalMemory,
           contextFilenames,
           topicUpdateNarration: context.config.isTopicUpdateNarrationEnabled(),
+          enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+          enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
         })),
         subAgents: this.withSection('agentContexts', () =>
           context.config

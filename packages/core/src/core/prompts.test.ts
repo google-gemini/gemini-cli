@@ -457,7 +457,7 @@ describe('Core System Prompt (prompts.ts)', () => {
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).toContain(
-          'Use the `tilth` CLI command (for structural maps and symbol discovery), `grep_search` and `glob` search tools extensively',
+          'Use the `tilth` CLI command (for structural maps, symbol discovery, and AST-aware outlines), `grep_search` and `glob` search tools extensively',
         );
       }
       expect(prompt).toMatchSnapshot();
@@ -553,6 +553,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       vi.mocked(mockConfig.toolRegistry.getAllTools).mockReturnValue(
         subsetTools,
+      );
+      vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue(
+        subsetTools.map((t) => t.name),
       );
 
       const prompt = getCoreSystemPrompt(mockConfig);

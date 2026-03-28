@@ -274,7 +274,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           this.context.config.getEnableInteractiveShell(),
           {
             ...shellExecutionConfig,
-            pager: 'cat',
+            pager: os.platform() === 'win32' ? 'cat' : 'sh -c "cat" sh',
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
               this.context.config.sanitizationConfig,

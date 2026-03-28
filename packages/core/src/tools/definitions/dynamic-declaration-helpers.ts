@@ -37,7 +37,7 @@ export function getShellToolDescription(
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).`
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\` on Windows or \`PAGER='sh -c "cat" sh'\` on other platforms).`
     : '';
 
   const returnedInfo = `
