@@ -280,14 +280,7 @@ export class LinuxSandboxManager implements SandboxManager {
       if (!fs.existsSync(resolved)) continue;
       const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
-        if (
-          !workspaceWrite &&
-          normalizedAllowedPath.startsWith(normalizedWorkspace + '/')
-        ) {
-          bwrapArgs.push('--ro-bind-try', resolved, resolved);
-        } else {
-          bwrapArgs.push('--bind-try', resolved, resolved);
-        }
+        bwrapArgs.push(bindFlag, resolved, resolved);
       }
     }
 

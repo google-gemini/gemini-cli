@@ -1671,6 +1671,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this._sandboxPolicyManager;
   }
 
+  getSandboxConfig(): SandboxConfig | undefined {
+    return this.sandbox;
+  }
+
   get sandboxManager(): SandboxManager {
     return this._sandboxManager;
   }
