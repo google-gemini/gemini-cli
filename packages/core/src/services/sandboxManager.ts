@@ -22,6 +22,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import type { ShellExecutionResult } from './shellExecutionService.js';
+import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -40,14 +41,22 @@ export interface SandboxPermissions {
 export interface ExecutionPolicy {
   /** Additional absolute paths to grant full read/write access to. */
   allowedPaths?: string[];
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
   /** Whether network access is allowed. */
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
   /** Additional granular permissions to grant to this command. */
   additionalPermissions?: SandboxPermissions;
+}
+
+/**
+ * Configuration for the sandbox mode behavior.
+ */
+export interface SandboxModeConfig {
+  readonly?: boolean;
+  network?: boolean;
+  approvedTools?: string[];
+  allowOverrides?: boolean;
 }
 
 /**
@@ -59,6 +68,12 @@ export interface GlobalSandboxOptions {
    * This directory is granted full read and write access.
    */
   workspace: string;
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
+  /** The current sandbox mode behavior from config. */
+  modeConfig?: SandboxModeConfig;
+  /** The policy manager for persistent approvals. */
+  policyManager?: SandboxPolicyManager;
 }
 
 /**
