@@ -520,4 +520,33 @@ describe('ScrollProvider', () => {
 
     expect(scrollBy).toHaveBeenCalled();
   });
+
+  describe('Infinite Loop Prevention', () => {
+    it('should NOT infinite loop when entry changes on every render', () => {
+      const TestLoop = () => {
+        const elementRef = useRef<DOMElement>(null);
+        // Entry object is NOT memoized, changes on every render
+        const entry = {
+          ref: elementRef as RefObject<DOMElement>,
+          getScrollState: () => ({
+            scrollTop: 0,
+            scrollHeight: 100,
+            innerHeight: 10,
+          }),
+          scrollBy: () => {},
+          hasFocus: () => true,
+          flashScrollbar: () => {},
+        };
+        useScrollable(entry, true);
+        return <Box ref={elementRef} />;
+      };
+
+      render(
+        <ScrollProvider>
+          <TestLoop />
+        </ScrollProvider>,
+      );
+      // If we reach here without a stack overflow, the test passes
+    });
+  });
 });
