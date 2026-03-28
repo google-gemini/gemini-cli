@@ -7,6 +7,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
+import type * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import {
   loadServerHierarchicalMemory,
@@ -15,6 +16,7 @@ import {
   getEnvironmentMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
+  deduplicatePathsByFileIdentity,
 } from './memoryDiscovery.js';
 import {
   setGeminiMdFilename,
@@ -808,6 +810,33 @@ included directory memory
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(repoFile);
+    });
+
+    it('should deduplicate paths by file identity (case-insensitive deduplication)', async () => {
+      const repoDir = await createEmptyDir(path.join(testRootDir, 'repo'));
+      const file1 = path.join(repoDir, 'GEMINI.md');
+      const file2 = path.join(repoDir, 'gemini.md');
+
+      await createTestFile(file1, 'content');
+
+      // Mock stat to return same dev and ino for both paths
+      const mockStats = {
+        dev: BigInt(1),
+        ino: BigInt(123),
+        isFile: () => true,
+        isDirectory: () => false,
+      };
+
+      const statSpy = vi
+        .spyOn(fsPromises, 'stat')
+        .mockResolvedValue(mockStats as unknown as fsSync.Stats);
+
+      const { paths } = await deduplicatePathsByFileIdentity([file1, file2]);
+
+      expect(paths).toHaveLength(1);
+      expect(paths[0]).toBe(file1);
+
+      statSpy.mockRestore();
     });
 
     it('should recognize .git as a file (submodules/worktrees)', async () => {
