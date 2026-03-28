@@ -787,7 +787,18 @@ export class GeminiClient {
     }
 
     if (loopDetectedAbort) {
-      controller.abort();
+      // Defer abort to next microtask so the stream's async iterator can
+      // settle and re-attach its error listeners before the AbortSignal fires.
+      // Without this, node-fetch emits a synchronous 'error' event during a
+      // listener gap, causing an uncaught exception (see #20106).
+      await Promise.resolve();
+      try {
+        controller.abort();
+      } catch (e) {
+        if (!isAbortError(e)) {
+          throw e;
+        }
+      }
       return turn;
     }
 
@@ -1264,7 +1275,18 @@ export class GeminiClient {
     displayContent?: PartListUnion,
     controllerToAbort?: AbortController,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    controllerToAbort?.abort();
+    // Wrap abort in try-catch to gracefully handle AbortError that may
+    // be thrown when the stream's async iterator has detached its error
+    // listeners during yield suspension (see #20106).
+    if (controllerToAbort) {
+      try {
+        controllerToAbort.abort();
+      } catch (e) {
+        if (!isAbortError(e)) {
+          throw e;
+        }
+      }
+    }
 
     // Clear the detection flag so the recursive turn can proceed, but the count remains 1.
     this.loopDetector.clearDetection();
