@@ -16,7 +16,6 @@ import { exitCli } from '../utils.js';
 import { getMcpServersFromConfig } from './list.js';
 
 const GREEN = '\x1b[32m';
-const YELLOW = '\x1b[33m';
 const RED = '\x1b[31m';
 const RESET = '\x1b[0m';
 
@@ -25,22 +24,35 @@ interface Args {
   session?: boolean;
 }
 
-async function handleEnable(args: Args): Promise<void> {
-  const manager = McpServerEnablementManager.getInstance();
+async function resolveAndValidateServer(args: Args): Promise<boolean> {
   const name = normalizeServerId(args.name);
+  const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
+  if (blockedServerNames.map(normalizeServerId).includes(name)) {
+    debugLogger.log(
+      `${RED}Error:${RESET} MCP server '${args.name}' is blocked by administrator.`,
+    );
+    return false;
+  }
 
-  // Check settings blocks
-  const settings = loadSettings();
-
-  // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
-  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
-  if (!normalizedServerNames.includes(name)) {
+  // Check all known servers (active + blocked) for existence
+  const allKnownServers = [...Object.keys(mcpServers), ...blockedServerNames];
+  if (!allKnownServers.map(normalizeServerId).includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
     );
-    return;
+    return false;
   }
+
+  return true;
+}
+
+async function handleEnable(args: Args): Promise<void> {
+  const manager = McpServerEnablementManager.getInstance();
+  const name = normalizeServerId(args.name);
+  const settings = loadSettings();
+
+  const isValid = await resolveAndValidateServer(args);
+  if (!isValid) return;
 
   const result = await canLoadServer(name, {
     adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
@@ -48,10 +60,8 @@ async function handleEnable(args: Args): Promise<void> {
     excludedList: settings.merged.mcp?.excluded,
   });
 
-  if (
-    !result.allowed &&
-    (result.blockType === 'allowlist' || result.blockType === 'excludelist')
-  ) {
+  if (!result.allowed) {
+    if (result.blockType === 'admin') {
     debugLogger.log(`${RED}Error:${RESET} ${result.reason}`);
     return;
   }
@@ -63,27 +73,14 @@ async function handleEnable(args: Args): Promise<void> {
     await manager.enable(name);
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' enabled.`);
   }
-
-  if (result.blockType === 'admin') {
-    debugLogger.log(
-      `${YELLOW}Warning:${RESET} MCP servers are disabled by administrator.`,
-    );
-  }
 }
 
 async function handleDisable(args: Args): Promise<void> {
   const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
-  // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
-  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
-  if (!normalizedServerNames.includes(name)) {
-    debugLogger.log(
-      `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
-    );
-    return;
-  }
+  const isValid = await resolveAndValidateServer(args);
+  if (!isValid) return;
 
   if (args.session) {
     manager.disableForSession(name);
