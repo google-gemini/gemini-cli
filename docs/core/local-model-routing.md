@@ -105,7 +105,7 @@ Download complete.
 #### MacOS
 
 ```bash
-$ ./lit.lit.macos_arm64 pull gemma3-1b-gpu-custom
+$ ./lit.macos_arm64 pull gemma3-1b-gpu-custom
 
 [Legal] The model you are about to download is governed by
 the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
