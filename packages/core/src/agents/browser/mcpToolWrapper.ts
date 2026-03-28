@@ -33,6 +33,13 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { suspendInputBlocker, resumeInputBlocker } from './inputBlocker.js';
 import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
 import { BROWSER_AGENT_NAME } from './browserAgentDefinition.js';
+import {
+  buildPreClickListenerScript,
+  buildClickAnimationScript,
+  buildScrollAnimationScript,
+  SCROLL_DOWN_KEYS,
+  SCROLL_UP_KEYS,
+} from './cursorAnimations.js';
 
 /**
  * Tools that interact with page elements and require the input blocker
@@ -64,6 +71,7 @@ class McpToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
     private readonly blockFileUploads: boolean = false,
+    private readonly showCursorAnimations: boolean = false,
   ) {
     super(
       params,
@@ -132,6 +140,12 @@ class McpToolInvocation extends BaseToolInvocation<
         await suspendInputBlocker(this.browserManager, signal);
       }
 
+      // Pre-click animation: inject a one-shot mousedown listener BEFORE
+      // click/hover so the animation fires at the exact moment of click.
+      if (this.showCursorAnimations) {
+        await this.injectPreClickAnimation();
+      }
+
       const result: McpToolCallResult = await this.browserManager.callTool(
         this.toolName,
         this.params,
@@ -156,6 +170,12 @@ class McpToolInvocation extends BaseToolInvocation<
       // Resume input blocker after interactive tool completes.
       if (this.needsBlockerSuspend) {
         await resumeInputBlocker(this.browserManager, signal);
+      }
+
+      // Post-execution animations (click_at coordinates, scroll indicators).
+      // Fire-and-forget — errors never block tool execution.
+      if (this.showCursorAnimations && !result.isError) {
+        this.injectPostExecutionAnimation().catch(() => {});
       }
 
       if (result.isError) {
@@ -192,6 +212,69 @@ class McpToolInvocation extends BaseToolInvocation<
       };
     }
   }
+
+  /**
+   * Injects a one-shot pre-click listener for click/hover tools.
+   * The listener captures the exact click coordinates from the DOM event
+   * and plays a ripple animation at that position.
+   */
+  private async injectPreClickAnimation(): Promise<void> {
+    if (
+      this.toolName !== 'click' &&
+      this.toolName !== 'hover' &&
+      this.toolName !== 'click_at'
+    ) {
+      return;
+    }
+    // For click_at, we handle animation post-execution since we know coords.
+    if (this.toolName === 'click_at') return;
+
+    try {
+      await this.browserManager.callTool(
+        'evaluate_script',
+        { function: buildPreClickListenerScript() },
+        new AbortController().signal,
+      );
+    } catch {
+      // Animation failure must never block the actual tool call.
+    }
+  }
+
+  /**
+   * Injects post-execution animations:
+   * - For click_at: ripple at the known (x, y) coordinates.
+   * - For press_key with scroll keys: directional scroll indicator.
+   */
+  private async injectPostExecutionAnimation(): Promise<void> {
+    let script: string | undefined;
+
+    if (this.toolName === 'click_at') {
+      const x = Number(this.params['x'] ?? 0);
+      const y = Number(this.params['y'] ?? 0);
+      if (!isNaN(x) && !isNaN(y)) {
+        script = buildClickAnimationScript(x, y);
+      }
+    } else if (this.toolName === 'press_key') {
+      const key = String(this.params['key'] ?? '');
+      if (SCROLL_DOWN_KEYS.has(key)) {
+        script = buildScrollAnimationScript('down');
+      } else if (SCROLL_UP_KEYS.has(key)) {
+        script = buildScrollAnimationScript('up');
+      }
+    }
+
+    if (!script) return;
+
+    try {
+      await this.browserManager.callTool(
+        'evaluate_script',
+        { function: script },
+        new AbortController().signal,
+      );
+    } catch {
+      // Animation failure must never block the actual tool call.
+    }
+  }
 }
 
 /**
@@ -209,6 +292,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
     private readonly blockFileUploads: boolean = false,
+    private readonly showCursorAnimations: boolean = false,
   ) {
     super(
       name,
@@ -240,6 +324,7 @@ class McpDeclarativeTool extends DeclarativeTool<
       this.messageBus,
       this.shouldDisableInput,
       this.blockFileUploads,
+      this.showCursorAnimations,
     );
   }
 }
@@ -263,13 +348,15 @@ export async function createMcpDeclarativeTools(
   messageBus: MessageBus,
   shouldDisableInput: boolean = false,
   blockFileUploads: boolean = false,
+  showCursorAnimations: boolean = false,
 ): Promise<McpDeclarativeTool[]> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
 
   debugLogger.log(
     `Creating ${mcpTools.length} declarative tools for browser agent` +
-      (shouldDisableInput ? ' (input blocker enabled)' : ''),
+      (shouldDisableInput ? ' (input blocker enabled)' : '') +
+      (showCursorAnimations ? ' (cursor animations enabled)' : ''),
   );
 
   const tools: McpDeclarativeTool[] = mcpTools.map((mcpTool) => {
@@ -287,6 +374,7 @@ export async function createMcpDeclarativeTools(
       messageBus,
       shouldDisableInput,
       blockFileUploads,
+      showCursorAnimations,
     );
   });
 

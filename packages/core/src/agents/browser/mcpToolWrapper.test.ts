@@ -354,4 +354,161 @@ describe('mcpToolWrapper', () => {
       );
     });
   });
+
+  describe('Cursor Animations', () => {
+    beforeEach(() => {
+      // Add press_key and click_at tools for animation tests
+      mockMcpTools.push(
+        {
+          name: 'press_key',
+          description: 'Press a key',
+          inputSchema: {
+            type: 'object',
+            properties: { key: { type: 'string' } },
+            required: ['key'],
+          },
+        },
+        {
+          name: 'click_at',
+          description: 'Click at coordinates',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' },
+            },
+            required: ['x', 'y'],
+          },
+        },
+      );
+    });
+
+    it('should inject pre-click listener for click tool when animations enabled', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false, // shouldDisableInput
+        false, // blockFileUploads
+        true, // showCursorAnimations
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: '42' });
+      await invocation.execute(new AbortController().signal);
+
+      // Should have called evaluate_script for pre-click listener + the actual click
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('mousedown'),
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('should inject click_at animation after execution with coordinates', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const clickAtTool = tools.find((t) => t.name === 'click_at')!;
+      const invocation = clickAtTool.build({ x: 150, y: 200 });
+      await invocation.execute(new AbortController().signal);
+
+      // Should have called the actual click_at + evaluate_script for post animation
+      const evalCalls = (
+        mockBrowserManager.callTool as ReturnType<typeof vi.fn>
+      ).mock.calls.filter((c: unknown[]) => c[0] === 'evaluate_script');
+      expect(evalCalls.length).toBeGreaterThanOrEqual(1);
+      expect(
+        evalCalls.some((c: unknown[]) =>
+          String(
+            (c[1] as Record<string, unknown>)?.['function'] ?? '',
+          ).includes('150'),
+        ),
+      ).toBe(true);
+    });
+
+    it('should inject scroll animation for press_key with scroll keys', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const pressKeyTool = tools.find((t) => t.name === 'press_key')!;
+      const invocation = pressKeyTool.build({ key: 'ArrowDown' });
+      await invocation.execute(new AbortController().signal);
+
+      // Should have called evaluate_script for scroll animation
+      const evalCalls = (
+        mockBrowserManager.callTool as ReturnType<typeof vi.fn>
+      ).mock.calls.filter((c: unknown[]) => c[0] === 'evaluate_script');
+      expect(evalCalls.length).toBeGreaterThanOrEqual(1);
+      expect(
+        evalCalls.some((c: unknown[]) =>
+          String(
+            (c[1] as Record<string, unknown>)?.['function'] ?? '',
+          ).includes('__gemini_scroll_panel'),
+        ),
+      ).toBe(true);
+    });
+
+    it('should NOT inject animations when showCursorAnimations is false', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        false,
+        false, // showCursorAnimations disabled
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: '42' });
+      await invocation.execute(new AbortController().signal);
+
+      // Should only call the actual click tool, not evaluate_script
+      const evalCalls = (
+        mockBrowserManager.callTool as ReturnType<typeof vi.fn>
+      ).mock.calls.filter((c: unknown[]) => c[0] === 'evaluate_script');
+      expect(evalCalls.length).toBe(0);
+    });
+
+    it('should not block tool execution when animation injection fails', async () => {
+      // Make evaluate_script fail
+      (
+        mockBrowserManager.callTool as ReturnType<typeof vi.fn>
+      ).mockImplementation(async (toolName: string) => {
+        if (toolName === 'evaluate_script') {
+          throw new Error('Animation injection failed');
+        }
+        return {
+          content: [{ type: 'text', text: 'Tool result' }],
+          isError: false,
+        };
+      });
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: '42' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Tool should still succeed despite animation failure
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toBe('Tool result');
+    });
+  });
 });
