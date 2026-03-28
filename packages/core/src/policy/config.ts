@@ -285,6 +285,7 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
+  interactive: boolean = true,
 ): Promise<PolicyEngineConfig> {
   const systemPoliciesDir = path.resolve(Storage.getSystemPoliciesDir());
   const userPoliciesDir = path.resolve(Storage.getUserPoliciesDir());
@@ -524,7 +525,10 @@ export async function createPolicyEngineConfig(
   return {
     rules,
     checkers,
-    defaultDecision: PolicyDecision.ASK_USER,
+    defaultDecision: interactive
+      ? PolicyDecision.ASK_USER
+      : PolicyDecision.DENY,
+    nonInteractive: !interactive,
     approvalMode,
     disableAlwaysAllow: settings.disableAlwaysAllow,
   };
@@ -537,6 +541,7 @@ interface TomlRule {
   priority?: number;
   commandPrefix?: string | string[];
   argsPattern?: string;
+  allowRedirection?: boolean;
   // Index signature to satisfy Record type if needed for toml.stringify
   [key: string]: unknown;
 }
@@ -581,6 +586,7 @@ export function createPolicyUpdater(
               argsPattern: new RegExp(pattern),
               mcpName: message.mcpName,
               source: 'Dynamic (Confirmed)',
+              allowRedirection: message.allowRedirection,
             });
           }
         }
@@ -617,6 +623,7 @@ export function createPolicyUpdater(
           argsPattern,
           mcpName: message.mcpName,
           source: 'Dynamic (Confirmed)',
+          allowRedirection: message.allowRedirection,
         });
       }
 
@@ -679,6 +686,10 @@ export function createPolicyUpdater(
             } else if (message.argsPattern) {
               // message.argsPattern was already validated above
               newRule.argsPattern = message.argsPattern;
+            }
+
+            if (message.allowRedirection !== undefined) {
+              newRule.allowRedirection = message.allowRedirection;
             }
 
             // Add to rules

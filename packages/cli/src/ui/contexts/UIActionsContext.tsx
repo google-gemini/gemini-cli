@@ -70,6 +70,7 @@ export interface UIActions {
   handleResumeSession: (session: SessionInfo) => Promise<void>;
   handleDeleteSession: (session: SessionInfo) => Promise<void>;
   setQueueErrorMessage: (message: string | null) => void;
+  addMessage: (message: string) => void;
   popAllMessages: () => string | undefined;
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
