@@ -1,5 +1,9 @@
 # Gemini CLI Strict Development Rules
 
+This file is the single source of truth for agent-assisted review rules in this
+repository. If you want to add, remove, or change review guidance, update this
+file and ensure all review entry points continue to reference it.
+
 These rules apply strictly to all code modifications and additions within the
 Gemini CLI project.
 
