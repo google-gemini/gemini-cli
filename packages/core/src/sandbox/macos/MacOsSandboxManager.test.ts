@@ -72,7 +72,7 @@ describe('MacOsSandboxManager', () => {
         allowedPaths: mockAllowedPaths,
         networkAccess: mockNetworkAccess,
         forbiddenPaths: [],
-        workspaceWrite: true,
+        workspaceWrite: false,
         additionalPermissions: {
           fileSystem: {
             read: [],
@@ -137,6 +137,36 @@ describe('MacOsSandboxManager', () => {
       expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
         expect.objectContaining({ networkAccess: true }),
       );
+    });
+
+    describe('virtual commands', () => {
+      it('should translate __read to /bin/cat', async () => {
+        const result = await manager.prepareCommand({
+          command: '__read',
+          args: ['file.txt'],
+          cwd: mockWorkspace,
+          env: {},
+        });
+
+        expect(result.args[result.args.length - 2]).toBe('/bin/cat');
+        expect(result.args[result.args.length - 1]).toBe('file.txt');
+      });
+
+      it('should translate __write to /bin/sh -c cat', async () => {
+        const result = await manager.prepareCommand({
+          command: '__write',
+          args: ['file.txt'],
+          cwd: mockWorkspace,
+          env: {},
+        });
+
+        // args are: [...sandboxArgs, '--', '/bin/sh', '-c', 'cat > "$1"', '_', 'file.txt']
+        expect(result.args[result.args.length - 5]).toBe('/bin/sh');
+        expect(result.args[result.args.length - 4]).toBe('-c');
+        expect(result.args[result.args.length - 3]).toBe('cat > "$1"');
+        expect(result.args[result.args.length - 2]).toBe('_');
+        expect(result.args[result.args.length - 1]).toBe('file.txt');
+      });
     });
 
     describe('governance files', () => {

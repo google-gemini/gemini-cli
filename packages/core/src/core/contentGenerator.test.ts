@@ -10,6 +10,7 @@ import {
   AuthType,
   createContentGeneratorConfig,
   type ContentGenerator,
+  validateBaseUrl,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -742,5 +743,35 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBe('gateway-placeholder-key');
     expect(config.vertexai).toBe(false);
+  });
+});
+
+describe('validateBaseUrl', () => {
+  it('should accept a valid HTTPS URL', () => {
+    expect(() => validateBaseUrl('https://my-proxy.example.com')).not.toThrow();
+  });
+
+  it('should accept HTTP for localhost', () => {
+    expect(() => validateBaseUrl('http://localhost:8080')).not.toThrow();
+  });
+
+  it('should accept HTTP for 127.0.0.1', () => {
+    expect(() => validateBaseUrl('http://127.0.0.1:3000')).not.toThrow();
+  });
+
+  it('should accept HTTP for ::1', () => {
+    expect(() => validateBaseUrl('http://[::1]:8080')).not.toThrow();
+  });
+
+  it('should reject HTTP for non-local hosts', () => {
+    expect(() => validateBaseUrl('http://my-proxy.example.com')).toThrow(
+      'Custom base URL must use HTTPS unless it is localhost.',
+    );
+  });
+
+  it('should reject an invalid URL', () => {
+    expect(() => validateBaseUrl('not-a-url')).toThrow(
+      'Invalid custom base URL: not-a-url',
+    );
   });
 });

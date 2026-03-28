@@ -466,4 +466,45 @@ describe('WindowsSandboxManager', () => {
       fs.rmSync(conflictPath, { recursive: true, force: true });
     }
   });
+
+  it('should translate __write to PowerShell safely using $args', async () => {
+    const filePath = path.join(testCwd, 'test.txt');
+    const req: SandboxRequest = {
+      command: '__write',
+      args: [filePath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    // [network, cwd, --forbidden-manifest, manifestPath, command, ...args]
+    expect(result.args[4]).toBe('PowerShell.exe');
+    expect(result.args[7]).toBe('-Command');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '$Input | Out-File -FilePath $args[0] -Encoding utf8',
+    );
+    expect(result.args[9]).toBe(filePath);
+  });
+
+  it('should safely handle special characters in __write path', async () => {
+    const maliciousPath = path.join(testCwd, 'foo"; echo bar; ".txt');
+    const req: SandboxRequest = {
+      command: '__write',
+      args: [maliciousPath],
+      cwd: testCwd,
+      env: {},
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    expect(result.args[4]).toBe('PowerShell.exe');
+    const psCommand = result.args[8];
+    expect(psCommand).toBe(
+      '$Input | Out-File -FilePath $args[0] -Encoding utf8',
+    );
+    // The malicious path should be passed as a separate argument, not interpolated
+    expect(result.args[9]).toBe(maliciousPath);
+  });
 });

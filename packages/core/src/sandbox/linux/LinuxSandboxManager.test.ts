@@ -350,6 +350,59 @@ describe('LinuxSandboxManager', () => {
         const binds = bwrapArgs.filter((a) => a === workspace);
         expect(binds.length).toBe(2);
       });
+
+      it('should bind the parent directory of a non-existent path', async () => {
+        vi.mocked(fs.existsSync).mockImplementation((p) => {
+          if (p === '/home/user/workspace/new-file.txt') return false;
+          return true;
+        });
+
+        const bwrapArgs = await getBwrapArgs({
+          command: '__write',
+          args: ['/home/user/workspace/new-file.txt'],
+          cwd: workspace,
+          env: {},
+          policy: {
+            allowedPaths: ['/home/user/workspace/new-file.txt'],
+          },
+        });
+
+        const parentDir = '/home/user/workspace';
+        const bindIndex = bwrapArgs.lastIndexOf(parentDir);
+        expect(bindIndex).not.toBe(-1);
+        expect(bwrapArgs[bindIndex - 2]).toBe('--bind-try');
+      });
+    });
+
+    describe('virtual commands', () => {
+      it('should translate __read to cat', async () => {
+        const bwrapArgs = await getBwrapArgs({
+          command: '__read',
+          args: ['file.txt'],
+          cwd: workspace,
+          env: {},
+        });
+
+        // args are: [...bwrapBaseArgs, '--', 'cat', 'file.txt']
+        expect(bwrapArgs[bwrapArgs.length - 2]).toBe('cat');
+        expect(bwrapArgs[bwrapArgs.length - 1]).toBe('file.txt');
+      });
+
+      it('should translate __write to sh -c cat', async () => {
+        const bwrapArgs = await getBwrapArgs({
+          command: '__write',
+          args: ['file.txt'],
+          cwd: workspace,
+          env: {},
+        });
+
+        // args are: [...bwrapBaseArgs, '--', 'sh', '-c', 'cat > "$1"', '_', 'file.txt']
+        expect(bwrapArgs[bwrapArgs.length - 5]).toBe('sh');
+        expect(bwrapArgs[bwrapArgs.length - 4]).toBe('-c');
+        expect(bwrapArgs[bwrapArgs.length - 3]).toBe('cat > "$1"');
+        expect(bwrapArgs[bwrapArgs.length - 2]).toBe('_');
+        expect(bwrapArgs[bwrapArgs.length - 1]).toBe('file.txt');
+      });
     });
 
     describe('forbiddenPaths', () => {
