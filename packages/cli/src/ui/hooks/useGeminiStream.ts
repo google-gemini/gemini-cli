@@ -40,6 +40,8 @@ import {
   Kind,
   ACTIVATE_SKILL_TOOL_NAME,
   shouldHideToolCall,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -107,6 +109,9 @@ interface BackgroundedToolInfo {
   command: string;
   initialOutput: string;
 }
+
+const isTopicTool = (name: string): boolean =>
+  name === UPDATE_TOPIC_TOOL_NAME || name === UPDATE_TOPIC_DISPLAY_NAME;
 
 enum StreamProcessingStatus {
   Completed,
@@ -489,7 +494,17 @@ export const useGeminiStream = (
       addItem(historyItem);
 
       setPushedToolCallIds(newPushed);
-      setIsFirstToolInGroup(false);
+
+      // If this batch ONLY contains topics, and we were the first in the group,
+      // the NEXT batch is still effectively the first VISIBLE bordered tool in the group.
+      if (
+        isFirstToolInGroupRef.current &&
+        toolsToPush.every((tc) => isTopicTool(tc.request.name))
+      ) {
+        // Keep it true!
+      } else {
+        setIsFirstToolInGroup(false);
+      }
     }
   }, [
     toolCalls,
@@ -502,7 +517,6 @@ export const useGeminiStream = (
     isShellFocused,
     backgroundShells,
   ]);
-
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
       (tc) => !pushedToolCallIds.has(tc.request.callId),
@@ -519,15 +533,26 @@ export const useGeminiStream = (
     );
 
     if (remainingTools.length > 0) {
+      // Should we draw a top border? Yes if NO previous tools were drawn,
+      // OR if ALL previously drawn tools were topics (which don't draw top borders).
+      let needsTopBorder = pushedToolCallIds.size === 0;
+      if (!needsTopBorder) {
+        const allPushedWereTopics = toolCalls
+          .filter((tc) => pushedToolCallIds.has(tc.request.callId))
+          .every((tc) => isTopicTool(tc.request.name));
+        if (allPushedWereTopics) {
+          needsTopBorder = true;
+        }
+      }
+
       items.push(
         mapTrackedToolCallsToDisplay(remainingTools, {
-          borderTop: pushedToolCallIds.size === 0,
+          borderTop: needsTopBorder,
           borderBottom: false, // Stay open to connect with the slice below
           ...appearance,
         }),
       );
     }
-
     // Always show a bottom border slice if we have ANY tools in the batch
     // and we haven't finished pushing the whole batch to history yet.
     // Once all tools are terminal and pushed, the last history item handles the closing border.
