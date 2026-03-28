@@ -401,6 +401,29 @@ describe('ShellTool', () => {
       await promise;
     });
 
+    it('should NOT report "moved to background" if an is_background command exits before the delay', async () => {
+      vi.useFakeTimers();
+      const invocation = shellTool.build({
+        command: 'echo fast',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      resolveShellExecution({
+        output: 'fast output',
+        backgrounded: false,
+      });
+
+      const result = await promise;
+
+      expect(result.llmContent).toBe(
+        'Output: fast output\nProcess Group PGID: 12345',
+      );
+      expect(result.returnDisplay).toBe('fast output');
+
+      await vi.runAllTimersAsync();
+    });
+
     itWindowsOnly(
       'should not wrap command on windows',
       async () => {

@@ -430,7 +430,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
-      } else if (this.params.is_background || result.backgrounded) {
+      } else if (result.backgrounded) {
         llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         data = {
           pid: result.pid,
@@ -475,7 +475,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (this.context.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (this.params.is_background || result.backgrounded) {
+        if (result.backgrounded) {
           returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         } else if (result.aborted) {
           const cancelMsg = timeoutMessage || 'Command cancelled by user.';
