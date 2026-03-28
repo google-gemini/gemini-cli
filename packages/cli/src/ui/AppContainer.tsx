@@ -1079,7 +1079,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useEffect(() => {
     const hintListener = (text: string, source: InjectionSource) => {
-      if (source !== 'user_steering') {
+      if (source !== 'user_steering' && source !== 'background_completion') {
         return;
       }
       pendingHintsRef.current.push(text);
