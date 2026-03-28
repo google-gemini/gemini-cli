@@ -292,6 +292,7 @@ describe('Gemini Client (client.ts)', () => {
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
+      getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
     } as unknown as Config;
     mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 
@@ -716,9 +717,9 @@ describe('Gemini Client (client.ts)', () => {
   describe('sendMessageStream', () => {
     it('calls AgentHistoryProvider.manageHistory when history truncation is enabled', async () => {
       // Arrange
-      mockConfig.isExperimentalAgentHistoryTruncationEnabled = vi
+      mockConfig.getContextManagementConfig = vi
         .fn()
-        .mockReturnValue(true);
+        .mockReturnValue({ enabled: true });
       const manageHistorySpy = vi
         .spyOn(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -109,6 +109,7 @@ export function createMockConfig(
         enableEnvironmentVariableRedaction: false,
       },
     }),
+    isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
     isExperimentalAgentHistoryTruncationEnabled: vi.fn().mockReturnValue(false),
     getExperimentalAgentHistoryTruncationThreshold: vi.fn().mockReturnValue(50),
     getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(30),

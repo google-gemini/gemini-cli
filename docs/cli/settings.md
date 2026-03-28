@@ -155,21 +155,18 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                           | Setting                                        | Description                                                                                                                                               | Default |
-| ---------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Enable Tool Output Masking         | `experimental.toolOutputMasking.enabled`       | Enables tool output masking to save tokens.                                                                                                               | `true`  |
-| Enable Git Worktrees               | `experimental.worktrees`                       | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
-| Use OSC 52 Paste                   | `experimental.useOSC52Paste`                   | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Use OSC 52 Copy                    | `experimental.useOSC52Copy`                    | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Plan                               | `experimental.plan`                            | Enable Plan Mode.                                                                                                                                         | `true`  |
-| Model Steering                     | `experimental.modelSteering`                   | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
-| Direct Web Fetch                   | `experimental.directWebFetch`                  | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
-| Memory Manager Agent               | `experimental.memoryManager`                   | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
-| Agent History Truncation           | `experimental.agentHistoryTruncation`          | Enable truncation window logic for the Agent History Provider.                                                                                            | `false` |
-| Agent History Truncation Threshold | `experimental.agentHistoryTruncationThreshold` | The maximum number of messages before history is truncated.                                                                                               | `30`    |
-| Agent History Retained Messages    | `experimental.agentHistoryRetainedMessages`    | The number of recent messages to retain after truncation.                                                                                                 | `15`    |
-| Agent History Summarization        | `experimental.agentHistorySummarization`       | Enable summarization of truncated content via a small model for the Agent History Provider.                                                               | `false` |
-| Topic & Update Narration           | `experimental.topicUpdateNarration`            | Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.                                      | `false` |
+| UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
+| Enable Git Worktrees       | `experimental.worktrees`                 | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
+| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
+| Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
+| Plan                       | `experimental.plan`                      | Enable Plan Mode.                                                                                                                                         | `true`  |
+| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
+| Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
+| Memory Manager Agent       | `experimental.memoryManager`             | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
+| Enable Context Management  | `experimental.contextManagement`         | Enable logic for context management.                                                                                                                      | `false` |
+| Topic & Update Narration   | `experimental.topicUpdateNarration`      | Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.                                      | `false` |
 
 ### Skills
 
@@ -183,5 +180,18 @@ they appear in the UI.
 | ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
 | Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
 | Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
+
+### ContextManagement
+
+| UI Label                     | Setting                                                     | Description                                                                                                | Default |
+| ---------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------- |
+| Truncation Threshold         | `contextManagement.historyWindow.truncationThreshold`       | The maximum number of messages before history is truncated.                                                | `25`    |
+| Retained Messages            | `contextManagement.historyWindow.retainedMessages`          | The number of recent messages to retain after truncation.                                                  | `20`    |
+| Target Retained Tokens       | `contextManagement.historyWindow.targetRetainedTokens`      | The target number of tokens to retain in the session history.                                              | `40000` |
+| Normal Token Limit           | `contextManagement.messageLimits.normalTokenLimit`          | The target number of tokens to budget for a normal conversation turn.                                      | `2500`  |
+| Maximum Token Limit          | `contextManagement.messageLimits.maximumTokenLimit`         | The maximum number of tokens a single conversation turn can consume before truncation.                     | `12000` |
+| Normalization Head Ratio     | `contextManagement.messageLimits.normalizationHeadRatio`    | The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).                      | `0.25`  |
+| Tool Truncation Threshold    | `contextManagement.toolDistillation.truncationThreshold`    | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation. | `40000` |
+| Tool Summarization Threshold | `contextManagement.toolDistillation.summarizationThreshold` | Threshold above which truncated tool outputs will be summarized by an LLM.                                 | `80000` |
 
 <!-- SETTINGS-AUTOGEN:END -->

@@ -11,6 +11,7 @@ import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
 import type { ConversationRecord } from '../services/chatRecordingService.js';
+import type { AgentHistoryProviderConfig } from '../services/types.js';
 export type { ConversationRecord };
 import {
   AuthType,
@@ -200,6 +201,24 @@ export interface TelemetrySettings {
 
 export interface OutputSettings {
   format?: OutputFormat;
+}
+
+export interface ContextManagementConfig {
+  enabled: boolean;
+  historyWindow: {
+    truncationThreshold: number;
+    retainedMessages: number;
+    targetRetainedTokens: number;
+  };
+  messageLimits: {
+    normalTokenLimit: number;
+    maximumTokenLimit: number;
+    normalizationHeadRatio: number;
+  };
+  toolDistillation: {
+    truncationThreshold: number;
+    summarizationThreshold: number;
+  };
 }
 
 export interface ToolOutputMaskingConfig {
@@ -671,6 +690,7 @@ export interface ConfigParameters {
   enableHooks?: boolean;
   enableHooksUI?: boolean;
   experiments?: Experiments;
+  contextManagement?: Partial<ContextManagementConfig>;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
@@ -680,11 +700,16 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  autoDistillation?: boolean;
   experimentalMemoryManager?: boolean;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
   experimentalAgentHistorySummarization?: boolean;
+  experimentalAgentHistoryTargetRetainedTokens?: number;
+  experimentalAgentHistoryNormalMessageTokens?: number;
+  experimentalAgentHistoryMaximumMessageTokens?: number;
+  experimentalAgentHistoryNormalizationHeadRatio?: number;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -910,13 +935,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
-
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
-  private readonly experimentalAgentHistoryTruncation: boolean;
-  private readonly experimentalAgentHistoryTruncationThreshold: number;
-  private readonly experimentalAgentHistoryRetainedMessages: number;
-  private readonly experimentalAgentHistorySummarization: boolean;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -924,6 +944,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
+  private readonly contextManagement: ContextManagementConfig;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
@@ -1122,14 +1143,35 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
-    this.experimentalAgentHistoryTruncation =
-      params.experimentalAgentHistoryTruncation ?? false;
-    this.experimentalAgentHistoryTruncationThreshold =
-      params.experimentalAgentHistoryTruncationThreshold ?? 30;
-    this.experimentalAgentHistoryRetainedMessages =
-      params.experimentalAgentHistoryRetainedMessages ?? 15;
-    this.experimentalAgentHistorySummarization =
-      params.experimentalAgentHistorySummarization ?? false;
+    this.contextManagement = {
+      enabled: params.contextManagement?.enabled ?? true,
+      historyWindow: {
+        truncationThreshold:
+          params.contextManagement?.historyWindow?.truncationThreshold ?? 25,
+        retainedMessages:
+          params.contextManagement?.historyWindow?.retainedMessages ?? 20,
+        targetRetainedTokens:
+          params.contextManagement?.historyWindow?.targetRetainedTokens ??
+          40000,
+      },
+      messageLimits: {
+        normalTokenLimit:
+          params.contextManagement?.messageLimits?.normalTokenLimit ?? 2500,
+        maximumTokenLimit:
+          params.contextManagement?.messageLimits?.maximumTokenLimit ?? 12000,
+        normalizationHeadRatio:
+          params.contextManagement?.messageLimits?.normalizationHeadRatio ??
+          0.25,
+      },
+      toolDistillation: {
+        truncationThreshold:
+          params.contextManagement?.toolDistillation?.truncationThreshold ??
+          40000,
+        summarizationThreshold:
+          params.contextManagement?.toolDistillation?.summarizationThreshold ??
+          80000,
+      },
+    };
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2304,24 +2346,34 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalJitContext;
   }
 
+  isAutoDistillationEnabled(): boolean {
+    return this.contextManagement.enabled;
+  }
+
   isMemoryManagerEnabled(): boolean {
     return this.experimentalMemoryManager;
   }
 
-  isExperimentalAgentHistoryTruncationEnabled(): boolean {
-    return this.experimentalAgentHistoryTruncation;
+  getContextManagementConfig(): ContextManagementConfig {
+    return this.contextManagement;
   }
 
-  getExperimentalAgentHistoryTruncationThreshold(): number {
-    return this.experimentalAgentHistoryTruncationThreshold;
-  }
-
-  getExperimentalAgentHistoryRetainedMessages(): number {
-    return this.experimentalAgentHistoryRetainedMessages;
-  }
-
-  isExperimentalAgentHistorySummarizationEnabled(): boolean {
-    return this.experimentalAgentHistorySummarization;
+  get agentHistoryProviderConfig(): AgentHistoryProviderConfig {
+    return {
+      isTruncationEnabled: this.contextManagement.enabled,
+      isSummarizationEnabled: this.contextManagement.enabled,
+      truncationThreshold:
+        this.contextManagement.historyWindow.truncationThreshold,
+      retainedMessages: this.contextManagement.historyWindow.retainedMessages,
+      targetRetainedTokens:
+        this.contextManagement.historyWindow.targetRetainedTokens,
+      normalMessageTokens:
+        this.contextManagement.messageLimits.normalTokenLimit,
+      maximumMessageTokens:
+        this.contextManagement.messageLimits.maximumTokenLimit,
+      normalizationHeadRatio:
+        this.contextManagement.messageLimits.normalizationHeadRatio,
+    };
   }
 
   isTopicUpdateNarrationEnabled(): boolean {
@@ -3205,6 +3257,14 @@ export class Config implements McpContext, AgentLoopContext {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
+  }
+
+  getToolTruncationThreshold(): number {
+    return this.contextManagement.toolDistillation.truncationThreshold;
+  }
+
+  getToolSummarizationThreshold(): number {
+    return this.contextManagement.toolDistillation.summarizationThreshold;
   }
 
   getNextCompressionTruncationId(): number {
