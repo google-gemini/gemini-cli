@@ -317,8 +317,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
             switch (event.type) {
               case 'data':
                 if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
+                // PTY mode emits AnsiOutput (full terminal snapshot) —
+                // overwrite. Pipe mode emits partial strings — accumulate
+                // so intermediate chunks aren't lost between throttled
+                // UI updates.
+                if (typeof event.chunk === 'string') {
+                  cumulativeOutput =
+                    typeof cumulativeOutput === 'string'
+                      ? cumulativeOutput + event.chunk
+                      : event.chunk;
+                } else {
+                  cumulativeOutput = event.chunk;
+                }
+                // Throttle UI updates to avoid excessive re-renders when
+                // commands produce high-volume output (e.g. thousands of
+                // warning lines).
+                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                  shouldUpdate = true;
+                }
                 break;
               case 'binary_detected':
                 isBinaryStream = true;
