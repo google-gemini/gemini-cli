@@ -118,6 +118,7 @@ export interface IndividualToolCallDisplay {
   callId: string;
   parentCallId?: string;
   name: string;
+  args?: Record<string, unknown>;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
