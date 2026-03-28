@@ -104,6 +104,7 @@ export interface CliArgs {
   startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
+  backgroundCompletionBehavior: string | undefined;
   isCommand: boolean | undefined;
 }
 
@@ -442,6 +443,13 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('background-completion-behavior', {
+          type: 'string',
+          nargs: 1,
+          choices: ['silent', 'inject', 'notify'],
+          description:
+            "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
         }),
     )
     .version(await getVersion()) // This will enable the --version flag based on package.json
@@ -1000,8 +1008,11 @@ export async function loadCliConfig(
     useAlternateBuffer: settings.ui?.useAlternateBuffer,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
-    shellBackgroundCompletionBehavior: settings.tools?.shell
-      ?.backgroundCompletionBehavior as string | undefined,
+    shellBackgroundCompletionBehavior:
+      argv.backgroundCompletionBehavior ??
+      (settings.tools?.shell?.backgroundCompletionBehavior as
+        | string
+        | undefined),
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
