@@ -30,6 +30,8 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  runInDevTraceSpan,
+  GeminiCliOperation,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -183,350 +185,367 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
-    try {
-      consolePatcher.patch();
+    await runInDevTraceSpan(
+      { operation: GeminiCliOperation.UserPrompt },
+      async ({ metadata: spanMetadata }) => {
+        spanMetadata.input = input;
+        try {
+          consolePatcher.patch();
 
-      if (
-        config.getRawOutput() &&
-        !config.getAcceptRawOutputRisk() &&
-        config.getOutputFormat() === OutputFormat.TEXT
-      ) {
-        process.stderr.write(
-          '[WARNING] --raw-output is enabled. Model output is not sanitized and may contain harmful ANSI sequences (e.g. for phishing or command injection). Use --accept-raw-output-risk to suppress this warning.\n',
-        );
-      }
-
-      // Setup stdin cancellation listener
-      setupStdinCancellation();
-
-      coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
-      coreEvents.drainBacklogs();
-
-      // Handle EPIPE errors when the output is piped to a command that closes early.
-      process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EPIPE') {
-          // Exit gracefully if the pipe is closed.
-          process.exit(0);
-        }
-      });
-
-      const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
-        context: config,
-        messageBus: config.getMessageBus(),
-        getPreferredEditor: () => undefined,
-        schedulerId: ROOT_SCHEDULER_ID,
-      });
-
-      // Initialize chat.  Resume if resume data is passed.
-      if (resumedSessionData) {
-        await geminiClient.resumeChat(
-          convertSessionToClientHistory(
-            resumedSessionData.conversation.messages,
-          ),
-          resumedSessionData,
-        );
-      }
-
-      // Emit init event for streaming JSON
-      if (streamFormatter) {
-        streamFormatter.emitEvent({
-          type: JsonStreamEventType.INIT,
-          timestamp: new Date().toISOString(),
-          session_id: config.getSessionId(),
-          model: config.getModel(),
-        });
-      }
-
-      let query: Part[] | undefined;
-
-      if (isSlashCommand(input)) {
-        const slashCommandResult = await handleSlashCommand(
-          input,
-          abortController,
-          config,
-          settings,
-        );
-        // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
-        if (slashCommandResult) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          query = slashCommandResult as Part[];
-        }
-      }
-
-      if (!query) {
-        const { processedQuery, error } = await handleAtCommand({
-          query: input,
-          config,
-          addItem: (_item, _timestamp) => 0,
-          onDebugMessage: () => {},
-          messageId: Date.now(),
-          signal: abortController.signal,
-          escapePastedAtSymbols: false,
-        });
-        if (error || !processedQuery) {
-          // An error occurred during @include processing (e.g., file not found).
-          // The error message is already logged by handleAtCommand.
-          throw new FatalInputError(
-            error || 'Exiting due to an error processing the @ command.',
-          );
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        query = processedQuery as Part[];
-      }
-
-      // Emit user message event for streaming JSON
-      if (streamFormatter) {
-        streamFormatter.emitEvent({
-          type: JsonStreamEventType.MESSAGE,
-          timestamp: new Date().toISOString(),
-          role: 'user',
-          content: input,
-        });
-      }
-
-      let currentMessages: Content[] = [{ role: 'user', parts: query }];
-
-      let turnCount = 0;
-      while (true) {
-        turnCount++;
-        if (
-          config.getMaxSessionTurns() >= 0 &&
-          turnCount > config.getMaxSessionTurns()
-        ) {
-          handleMaxTurnsExceededError(config);
-        }
-        const toolCallRequests: ToolCallRequestInfo[] = [];
-
-        const responseStream = geminiClient.sendMessageStream(
-          currentMessages[0]?.parts || [],
-          abortController.signal,
-          prompt_id,
-          undefined,
-          false,
-          turnCount === 1 ? input : undefined,
-        );
-
-        let responseText = '';
-        for await (const event of responseStream) {
-          if (abortController.signal.aborted) {
-            handleCancellationError(config);
+          if (
+            config.getRawOutput() &&
+            !config.getAcceptRawOutputRisk() &&
+            config.getOutputFormat() === OutputFormat.TEXT
+          ) {
+            process.stderr.write(
+              '[WARNING] --raw-output is enabled. Model output is not sanitized and may contain harmful ANSI sequences (e.g. for phishing or command injection). Use --accept-raw-output-risk to suppress this warning.\n',
+            );
           }
 
-          if (event.type === GeminiEventType.Content) {
-            const isRaw =
-              config.getRawOutput() || config.getAcceptRawOutputRisk();
-            const output = isRaw ? event.value : stripAnsi(event.value);
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.MESSAGE,
-                timestamp: new Date().toISOString(),
-                role: 'assistant',
-                content: output,
-                delta: true,
-              });
-            } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              responseText += output;
-            } else {
-              if (event.value) {
-                textOutput.write(output);
+          // Setup stdin cancellation listener
+          setupStdinCancellation();
+
+          coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+          coreEvents.drainBacklogs();
+
+          // Handle EPIPE errors when the output is piped to a command that closes early.
+          process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code === 'EPIPE') {
+              // Exit gracefully if the pipe is closed.
+              process.exit(0);
+            }
+          });
+
+          const geminiClient = config.getGeminiClient();
+          const scheduler = new Scheduler({
+            context: config,
+            messageBus: config.getMessageBus(),
+            getPreferredEditor: () => undefined,
+            schedulerId: ROOT_SCHEDULER_ID,
+          });
+
+          // Initialize chat.  Resume if resume data is passed.
+          if (resumedSessionData) {
+            await geminiClient.resumeChat(
+              convertSessionToClientHistory(
+                resumedSessionData.conversation.messages,
+              ),
+              resumedSessionData,
+            );
+          }
+
+          // Emit init event for streaming JSON
+          if (streamFormatter) {
+            streamFormatter.emitEvent({
+              type: JsonStreamEventType.INIT,
+              timestamp: new Date().toISOString(),
+              session_id: config.getSessionId(),
+              model: config.getModel(),
+            });
+          }
+
+          let query: Part[] | undefined;
+
+          if (isSlashCommand(input)) {
+            const slashCommandResult = await handleSlashCommand(
+              input,
+              abortController,
+              config,
+              settings,
+            );
+            // If a slash command is found and returns a prompt, use it.
+            // Otherwise, slashCommandResult falls through to the default prompt
+            // handling.
+            if (slashCommandResult) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              query = slashCommandResult as Part[];
+            }
+          }
+
+          if (!query) {
+            const { processedQuery, error } = await handleAtCommand({
+              query: input,
+              config,
+              addItem: (_item, _timestamp) => 0,
+              onDebugMessage: () => {},
+              messageId: Date.now(),
+              signal: abortController.signal,
+              escapePastedAtSymbols: false,
+            });
+            if (error || !processedQuery) {
+              // An error occurred during @include processing (e.g., file not found).
+              // The error message is already logged by handleAtCommand.
+              throw new FatalInputError(
+                error || 'Exiting due to an error processing the @ command.',
+              );
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            query = processedQuery as Part[];
+          }
+
+          // Emit user message event for streaming JSON
+          if (streamFormatter) {
+            streamFormatter.emitEvent({
+              type: JsonStreamEventType.MESSAGE,
+              timestamp: new Date().toISOString(),
+              role: 'user',
+              content: input,
+            });
+          }
+
+          let currentMessages: Content[] = [{ role: 'user', parts: query }];
+
+          let turnCount = 0;
+          while (true) {
+            turnCount++;
+            if (
+              config.getMaxSessionTurns() >= 0 &&
+              turnCount > config.getMaxSessionTurns()
+            ) {
+              handleMaxTurnsExceededError(config);
+            }
+            const toolCallRequests: ToolCallRequestInfo[] = [];
+
+            const responseStream = geminiClient.sendMessageStream(
+              currentMessages[0]?.parts || [],
+              abortController.signal,
+              prompt_id,
+              undefined,
+              false,
+              turnCount === 1 ? input : undefined,
+            );
+
+            let responseText = '';
+            for await (const event of responseStream) {
+              if (abortController.signal.aborted) {
+                handleCancellationError(config);
+              }
+
+              if (event.type === GeminiEventType.Content) {
+                const isRaw =
+                  config.getRawOutput() || config.getAcceptRawOutputRisk();
+                const output = isRaw ? event.value : stripAnsi(event.value);
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.MESSAGE,
+                    timestamp: new Date().toISOString(),
+                    role: 'assistant',
+                    content: output,
+                    delta: true,
+                  });
+                } else if (config.getOutputFormat() === OutputFormat.JSON) {
+                  responseText += output;
+                } else {
+                  if (event.value) {
+                    textOutput.write(output);
+                  }
+                }
+              } else if (event.type === GeminiEventType.ToolCallRequest) {
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.TOOL_USE,
+                    timestamp: new Date().toISOString(),
+                    tool_name: event.value.name,
+                    tool_id: event.value.callId,
+                    parameters: event.value.args,
+                  });
+                }
+                toolCallRequests.push(event.value);
+              } else if (event.type === GeminiEventType.LoopDetected) {
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.ERROR,
+                    timestamp: new Date().toISOString(),
+                    severity: 'warning',
+                    message: 'Loop detected, stopping execution',
+                  });
+                }
+              } else if (event.type === GeminiEventType.MaxSessionTurns) {
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.ERROR,
+                    timestamp: new Date().toISOString(),
+                    severity: 'error',
+                    message: 'Maximum session turns exceeded',
+                  });
+                }
+              } else if (event.type === GeminiEventType.Error) {
+                throw event.value.error;
+              } else if (event.type === GeminiEventType.AgentExecutionStopped) {
+                const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
+                if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`${stopMessage}\n`);
+                }
+                // Emit final result event for streaming JSON if needed
+                if (streamFormatter) {
+                  const metrics = uiTelemetryService.getMetrics();
+                  const durationMs = Date.now() - startTime;
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.RESULT,
+                    timestamp: new Date().toISOString(),
+                    status: 'success',
+                    stats: streamFormatter.convertToStreamStats(
+                      metrics,
+                      durationMs,
+                    ),
+                  });
+                }
+                return;
+              } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
+                const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
+                if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`[WARNING] ${blockMessage}\n`);
+                }
               }
             }
-          } else if (event.type === GeminiEventType.ToolCallRequest) {
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.TOOL_USE,
-                timestamp: new Date().toISOString(),
-                tool_name: event.value.name,
-                tool_id: event.value.callId,
-                parameters: event.value.args,
-              });
-            }
-            toolCallRequests.push(event.value);
-          } else if (event.type === GeminiEventType.LoopDetected) {
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.ERROR,
-                timestamp: new Date().toISOString(),
-                severity: 'warning',
-                message: 'Loop detected, stopping execution',
-              });
-            }
-          } else if (event.type === GeminiEventType.MaxSessionTurns) {
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.ERROR,
-                timestamp: new Date().toISOString(),
-                severity: 'error',
-                message: 'Maximum session turns exceeded',
-              });
-            }
-          } else if (event.type === GeminiEventType.Error) {
-            throw event.value.error;
-          } else if (event.type === GeminiEventType.AgentExecutionStopped) {
-            const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`${stopMessage}\n`);
-            }
-            // Emit final result event for streaming JSON if needed
-            if (streamFormatter) {
-              const metrics = uiTelemetryService.getMetrics();
-              const durationMs = Date.now() - startTime;
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.RESULT,
-                timestamp: new Date().toISOString(),
-                status: 'success',
-                stats: streamFormatter.convertToStreamStats(
-                  metrics,
-                  durationMs,
-                ),
-              });
-            }
-            return;
-          } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
-            const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`[WARNING] ${blockMessage}\n`);
-            }
-          }
-        }
 
-        if (toolCallRequests.length > 0) {
-          textOutput.ensureTrailingNewline();
-          const completedToolCalls = await scheduler.schedule(
-            toolCallRequests,
-            abortController.signal,
-          );
-          const toolResponseParts: Part[] = [];
-
-          for (const completedToolCall of completedToolCalls) {
-            const toolResponse = completedToolCall.response;
-            const requestInfo = completedToolCall.request;
-
-            if (streamFormatter) {
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.TOOL_RESULT,
-                timestamp: new Date().toISOString(),
-                tool_id: requestInfo.callId,
-                status:
-                  completedToolCall.status === 'error' ? 'error' : 'success',
-                output:
-                  typeof toolResponse.resultDisplay === 'string'
-                    ? toolResponse.resultDisplay
-                    : undefined,
-                error: toolResponse.error
-                  ? {
-                      type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                      message: toolResponse.error.message,
-                    }
-                  : undefined,
-              });
-            }
-
-            if (toolResponse.error) {
-              handleToolError(
-                requestInfo.name,
-                toolResponse.error,
-                config,
-                toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                typeof toolResponse.resultDisplay === 'string'
-                  ? toolResponse.resultDisplay
-                  : undefined,
+            if (toolCallRequests.length > 0) {
+              textOutput.ensureTrailingNewline();
+              const completedToolCalls = await scheduler.schedule(
+                toolCallRequests,
+                abortController.signal,
               );
-            }
+              const toolResponseParts: Part[] = [];
 
-            if (toolResponse.responseParts) {
-              toolResponseParts.push(...toolResponse.responseParts);
-            }
-          }
+              for (const completedToolCall of completedToolCalls) {
+                const toolResponse = completedToolCall.response;
+                const requestInfo = completedToolCall.request;
 
-          // Record tool calls with full metadata before sending responses to Gemini
-          try {
-            const currentModel =
-              geminiClient.getCurrentSequenceModel() ?? config.getModel();
-            geminiClient
-              .getChat()
-              .recordCompletedToolCalls(currentModel, completedToolCalls);
+                if (streamFormatter) {
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.TOOL_RESULT,
+                    timestamp: new Date().toISOString(),
+                    tool_id: requestInfo.callId,
+                    status:
+                      completedToolCall.status === 'error'
+                        ? 'error'
+                        : 'success',
+                    output:
+                      typeof toolResponse.resultDisplay === 'string'
+                        ? toolResponse.resultDisplay
+                        : undefined,
+                    error: toolResponse.error
+                      ? {
+                          type:
+                            toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
+                          message: toolResponse.error.message,
+                        }
+                      : undefined,
+                  });
+                }
 
-            await recordToolCallInteractions(config, completedToolCalls);
-          } catch (error) {
-            debugLogger.error(
-              `Error recording completed tool call information: ${error}`,
-            );
-          }
+                if (toolResponse.error) {
+                  handleToolError(
+                    requestInfo.name,
+                    toolResponse.error,
+                    config,
+                    toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
+                    typeof toolResponse.resultDisplay === 'string'
+                      ? toolResponse.resultDisplay
+                      : undefined,
+                  );
+                }
 
-          // Check if any tool requested to stop execution immediately
-          const stopExecutionTool = completedToolCalls.find(
-            (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
-          );
+                if (toolResponse.responseParts) {
+                  toolResponseParts.push(...toolResponse.responseParts);
+                }
+              }
 
-          if (stopExecutionTool && stopExecutionTool.response.error) {
-            const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error.message}`;
+              // Record tool calls with full metadata before sending responses to Gemini
+              try {
+                const currentModel =
+                  geminiClient.getCurrentSequenceModel() ?? config.getModel();
+                geminiClient
+                  .getChat()
+                  .recordCompletedToolCalls(currentModel, completedToolCalls);
 
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
-              process.stderr.write(`${stopMessage}\n`);
-            }
+                await recordToolCallInteractions(config, completedToolCalls);
+              } catch (error) {
+                debugLogger.error(
+                  `Error recording completed tool call information: ${error}`,
+                );
+              }
 
-            // Emit final result event for streaming JSON
-            if (streamFormatter) {
-              const metrics = uiTelemetryService.getMetrics();
-              const durationMs = Date.now() - startTime;
-              streamFormatter.emitEvent({
-                type: JsonStreamEventType.RESULT,
-                timestamp: new Date().toISOString(),
-                status: 'success',
-                stats: streamFormatter.convertToStreamStats(
-                  metrics,
-                  durationMs,
-                ),
-              });
-            } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              const formatter = new JsonFormatter();
-              const stats = uiTelemetryService.getMetrics();
-              textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
+              // Check if any tool requested to stop execution immediately
+              const stopExecutionTool = completedToolCalls.find(
+                (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
               );
+
+              if (stopExecutionTool && stopExecutionTool.response.error) {
+                const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error.message}`;
+
+                if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`${stopMessage}\n`);
+                }
+
+                // Emit final result event for streaming JSON
+                if (streamFormatter) {
+                  const metrics = uiTelemetryService.getMetrics();
+                  const durationMs = Date.now() - startTime;
+                  streamFormatter.emitEvent({
+                    type: JsonStreamEventType.RESULT,
+                    timestamp: new Date().toISOString(),
+                    status: 'success',
+                    stats: streamFormatter.convertToStreamStats(
+                      metrics,
+                      durationMs,
+                    ),
+                  });
+                } else if (config.getOutputFormat() === OutputFormat.JSON) {
+                  const formatter = new JsonFormatter();
+                  const stats = uiTelemetryService.getMetrics();
+                  textOutput.write(
+                    formatter.format(
+                      config.getSessionId(),
+                      responseText,
+                      stats,
+                    ),
+                  );
+                } else {
+                  textOutput.ensureTrailingNewline(); // Ensure a final newline
+                }
+                return;
+              }
+
+              currentMessages = [{ role: 'user', parts: toolResponseParts }];
             } else {
-              textOutput.ensureTrailingNewline(); // Ensure a final newline
+              // Emit final result event for streaming JSON
+              if (streamFormatter) {
+                const metrics = uiTelemetryService.getMetrics();
+                const durationMs = Date.now() - startTime;
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.RESULT,
+                  timestamp: new Date().toISOString(),
+                  status: 'success',
+                  stats: streamFormatter.convertToStreamStats(
+                    metrics,
+                    durationMs,
+                  ),
+                });
+              } else if (config.getOutputFormat() === OutputFormat.JSON) {
+                const formatter = new JsonFormatter();
+                const stats = uiTelemetryService.getMetrics();
+                textOutput.write(
+                  formatter.format(config.getSessionId(), responseText, stats),
+                );
+              } else {
+                textOutput.ensureTrailingNewline(); // Ensure a final newline
+              }
+              return;
             }
-            return;
           }
+        } catch (error) {
+          errorToHandle = error;
+          spanMetadata.error = error;
+        } finally {
+          // Cleanup stdin cancellation before other cleanup
+          cleanupStdinCancellation();
 
-          currentMessages = [{ role: 'user', parts: toolResponseParts }];
-        } else {
-          // Emit final result event for streaming JSON
-          if (streamFormatter) {
-            const metrics = uiTelemetryService.getMetrics();
-            const durationMs = Date.now() - startTime;
-            streamFormatter.emitEvent({
-              type: JsonStreamEventType.RESULT,
-              timestamp: new Date().toISOString(),
-              status: 'success',
-              stats: streamFormatter.convertToStreamStats(metrics, durationMs),
-            });
-          } else if (config.getOutputFormat() === OutputFormat.JSON) {
-            const formatter = new JsonFormatter();
-            const stats = uiTelemetryService.getMetrics();
-            textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
-            );
-          } else {
-            textOutput.ensureTrailingNewline(); // Ensure a final newline
-          }
-          return;
+          consolePatcher.cleanup();
+          coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
         }
-      }
-    } catch (error) {
-      errorToHandle = error;
-    } finally {
-      // Cleanup stdin cancellation before other cleanup
-      cleanupStdinCancellation();
-
-      consolePatcher.cleanup();
-      coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
-    }
+      },
+    );
 
     if (errorToHandle) {
       handleError(errorToHandle, config);
