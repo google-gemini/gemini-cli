@@ -21,6 +21,42 @@ describe('detectOmissionPlaceholders', () => {
     expect(detectOmissionPlaceholders('// rest of methods ...')).toEqual([
       'rest of methods ...',
     ]);
+    expect(detectOmissionPlaceholders('# rest of code ...')).toEqual([
+      'rest of code ...',
+    ]);
+    expect(detectOmissionPlaceholders('/* rest of code ... */')).toEqual([
+      'rest of code ...',
+    ]);
+  });
+
+  it('detects placeholders in # comment style', () => {
+    expect(detectOmissionPlaceholders('# rest of methods ...')).toEqual([
+      'rest of methods ...',
+    ]);
+    expect(detectOmissionPlaceholders('# unchanged code ...')).toEqual([
+      'unchanged code ...',
+    ]);
+    expect(detectOmissionPlaceholders('  # rest of code ...')).toEqual([
+      'rest of code ...',
+    ]);
+  });
+
+  it('detects placeholders in /* */ comment style', () => {
+    expect(detectOmissionPlaceholders('/* rest of methods ... */')).toEqual([
+      'rest of methods ...',
+    ]);
+    expect(detectOmissionPlaceholders('/* unchanged code ... */')).toEqual([
+      'unchanged code ...',
+    ]);
+    expect(
+      detectOmissionPlaceholders('  /* rest of code ... */'),
+    ).toEqual(['rest of code ...']);
+  });
+
+  it('detects /* comment without closing */', () => {
+    expect(detectOmissionPlaceholders('/* rest of code ...')).toEqual([
+      'rest of code ...',
+    ]);
   });
 
   it('detects case-insensitive placeholders', () => {
@@ -52,6 +88,12 @@ describe('detectOmissionPlaceholders', () => {
   it('does not detect omission phrase when inline in a comment', () => {
     expect(
       detectOmissionPlaceholders('return value; // rest of methods ...'),
+    ).toEqual([]);
+    expect(
+      detectOmissionPlaceholders('x = 1 # rest of methods ...'),
+    ).toEqual([]);
+    expect(
+      detectOmissionPlaceholders('int x = 0; /* rest of code ... */'),
     ).toEqual([]);
   });
 
