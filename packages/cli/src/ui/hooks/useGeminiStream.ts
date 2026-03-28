@@ -26,7 +26,6 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
-  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -38,6 +37,9 @@ import {
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
+  Kind,
+  ACTIVATE_SKILL_TOOL_NAME,
+  shouldHideToolCall,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -64,7 +66,12 @@ import type {
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType } from '../types.js';
+import {
+  StreamingState,
+  MessageType,
+  mapCoreStatusToDisplayStatus,
+  ToolCallStatus,
+} from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
@@ -408,7 +415,8 @@ export const useGeminiStream = (
   // Push completed tools to history as they finish
   useEffect(() => {
     const toolsToPush: TrackedToolCall[] = [];
-    for (const tc of toolCalls) {
+    for (let i = 0; i < toolCalls.length; i++) {
+      const tc = toolCalls[i];
       if (pushedToolCallIdsRef.current.has(tc.request.callId)) continue;
 
       if (
@@ -416,6 +424,40 @@ export const useGeminiStream = (
         tc.status === 'error' ||
         tc.status === 'cancelled'
       ) {
+        // TODO(#22883): This lookahead logic is a tactical UI fix to prevent parallel agents
+        // from tearing visually when they finish at slightly different times.
+        // Architecturally, `useGeminiStream` should not be responsible for stitching
+        // together semantic batches using timing/refs. `packages/core` should be
+        // refactored to emit structured `ToolBatch` or `Turn` objects, and this layer
+        // should simply render those semantic boundaries.
+        // If this is an agent tool, look ahead to ensure all subsequent
+        // contiguous agents in the same batch are also finished before pushing.
+        const isAgent = tc.tool?.kind === Kind.Agent;
+        if (isAgent) {
+          let contigAgentsComplete = true;
+          for (let j = i + 1; j < toolCalls.length; j++) {
+            const nextTc = toolCalls[j];
+            if (nextTc.tool?.kind === Kind.Agent) {
+              if (
+                nextTc.status !== 'success' &&
+                nextTc.status !== 'error' &&
+                nextTc.status !== 'cancelled'
+              ) {
+                contigAgentsComplete = false;
+                break;
+              }
+            } else {
+              // End of the contiguous agent block
+              break;
+            }
+          }
+
+          if (!contigAgentsComplete) {
+            // Wait for the entire contiguous block of agents to finish
+            break;
+          }
+        }
+
         toolsToPush.push(tc);
       } else {
         // Stop at first non-terminal tool to preserve order
@@ -425,26 +467,26 @@ export const useGeminiStream = (
 
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
-      let isFirst = isFirstToolInGroupRef.current;
 
       for (const tc of toolsToPush) {
         newPushed.add(tc.request.callId);
-        const isLastInBatch = tc === toolCalls[toolCalls.length - 1];
-
-        const historyItem = mapTrackedToolCallsToDisplay(tc, {
-          borderTop: isFirst,
-          borderBottom: isLastInBatch,
-          ...getToolGroupBorderAppearance(
-            { type: 'tool_group', tools: toolCalls },
-            activeShellPtyId,
-            !!isShellFocused,
-            [],
-            backgroundShells,
-          ),
-        });
-        addItem(historyItem);
-        isFirst = false;
       }
+
+      const isLastInBatch =
+        toolsToPush[toolsToPush.length - 1] === toolCalls[toolCalls.length - 1];
+
+      const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
+        borderTop: isFirstToolInGroupRef.current,
+        borderBottom: isLastInBatch,
+        ...getToolGroupBorderAppearance(
+          { type: 'tool_group', tools: toolCalls },
+          activeShellPtyId,
+          !!isShellFocused,
+          [],
+          backgroundShells,
+        ),
+      });
+      addItem(historyItem);
 
       setPushedToolCallIds(newPushed);
       setIsFirstToolInGroup(false);
@@ -504,19 +546,42 @@ export const useGeminiStream = (
 
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
-      // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
-      const isInProgress =
-        tc.status !== 'success' &&
-        tc.status !== 'error' &&
-        tc.status !== 'cancelled';
-      if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
+      const displayName = tc.tool?.displayName ?? tc.request.name;
+
+      let hasResultDisplay = false;
+      if (
+        tc.status === CoreToolCallStatus.Success ||
+        tc.status === CoreToolCallStatus.Error ||
+        tc.status === CoreToolCallStatus.Cancelled
+      ) {
+        hasResultDisplay = !!tc.response?.resultDisplay;
+      } else if (tc.status === CoreToolCallStatus.Executing) {
+        hasResultDisplay = !!tc.liveOutput;
+      }
+
+      // AskUser tools and Plan Mode write/edit are handled by this logic
+      if (
+        shouldHideToolCall({
+          displayName,
+          status: tc.status,
+          approvalMode: tc.approvalMode,
+          hasResultDisplay,
+          parentCallId: tc.request.parentCallId,
+        })
+      ) {
         return false;
       }
-      return (
-        tc.status !== 'scheduled' &&
-        tc.status !== 'validating' &&
-        tc.status !== 'awaiting_approval'
-      );
+
+      // ToolGroupMessage explicitly hides Confirming tools because they are
+      // rendered in the interactive ToolConfirmationQueue instead.
+      const displayStatus = mapCoreStatusToDisplayStatus(tc.status);
+      if (displayStatus === ToolCallStatus.Confirming) {
+        return false;
+      }
+
+      // ToolGroupMessage now shows all non-canceled tools, so they are visible
+      // in pending and we need to draw the closing border for them.
+      return true;
     });
 
     if (
@@ -1622,7 +1687,7 @@ export const useGeminiStream = (
       ) {
         let awaitingApprovalCalls = toolCalls.filter(
           (call): call is TrackedWaitingToolCall =>
-            call.status === 'awaiting_approval',
+            call.status === 'awaiting_approval' && !call.request.forcedAsk,
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
@@ -1686,6 +1751,36 @@ export const useGeminiStream = (
       );
       if (clientTools.length > 0) {
         markToolsAsSubmitted(clientTools.map((t) => t.request.callId));
+
+        if (geminiClient) {
+          for (const tool of clientTools) {
+            // Only manually record skill activations in the chat history.
+            // Other client-initiated tools (like save_memory) update the system
+            // prompt/context and don't strictly need to be in the history.
+            if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
+              continue;
+            }
+
+            // Add both the call (model turn) and the result (user turn) to history.
+            // Client-initiated calls are essentially "synthetic" turns that let
+            // subsequent model calls understand what just happened in the UI.
+            await geminiClient.addHistory({
+              role: 'model',
+              parts: [
+                {
+                  functionCall: {
+                    name: tool.request.name,
+                    args: tool.request.args,
+                  },
+                },
+              ],
+            });
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: tool.response.responseParts,
+            });
+          }
+        }
       }
 
       // Identify new, successful save_memory calls that we haven't processed yet.

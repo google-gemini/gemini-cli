@@ -169,13 +169,13 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -583,6 +583,35 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
@@ -697,6 +726,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
 - completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+- blocked: Subtask is blocked and cannot be completed at this time.
 
 
 ## Methodology for using this tool
@@ -766,6 +796,7 @@ The agent did not use the todo list because this task could be completed by a ti
                 "in_progress",
                 "completed",
                 "cancelled",
+                "blocked",
               ],
               "type": "string",
             },
@@ -956,13 +987,13 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "name": "exit_plan_mode",
   "parametersJsonSchema": {
     "properties": {
-      "plan_path": {
-        "description": "The file path to the finalized plan (e.g., "/mock/plans/feature-x.md"). This path MUST be within the designated plans directory: /mock/plans/",
+      "plan_filename": {
+        "description": "The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.",
         "type": "string",
       },
     },
     "required": [
-      "plan_path",
+      "plan_filename",
     ],
     "type": "object",
   },
@@ -1346,6 +1377,35 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
+      "additional_permissions": {
+        "description": "Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".",
+        "properties": {
+          "fileSystem": {
+            "properties": {
+              "read": {
+                "description": "List of additional absolute paths to allow reading.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "write": {
+                "description": "List of additional absolute paths to allow writing.",
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "network": {
+            "description": "Set to true to enable network access for this command.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
       "command": {
         "description": "Exact bash command to execute as \`bash -c <command>\`",
         "type": "string",
@@ -1451,6 +1511,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
 - completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
+- blocked: Subtask is blocked and cannot be completed at this time.
 
 
 ## Methodology for using this tool
@@ -1520,6 +1581,7 @@ The agent did not use the todo list because this task could be completed by a ti
                 "in_progress",
                 "completed",
                 "cancelled",
+                "blocked",
               ],
               "type": "string",
             },

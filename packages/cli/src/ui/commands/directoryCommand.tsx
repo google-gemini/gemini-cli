@@ -60,7 +60,7 @@ async function finishAddingDirectories(
   }
 
   if (added.length > 0) {
-    const gemini = config.getGeminiClient();
+    const gemini = config.geminiClient;
     if (gemini) {
       await gemini.addDirectoryContext();
 
@@ -110,9 +110,9 @@ export const directoryCommand: SlashCommand = {
 
         // Filter out existing directories
         let filteredSuggestions = suggestions;
-        if (context.services.config) {
+        if (context.services.agentContext?.config) {
           const workspaceContext =
-            context.services.config.getWorkspaceContext();
+            context.services.agentContext.config.getWorkspaceContext();
           const existingDirs = new Set(
             workspaceContext.getDirectories().map((dir) => path.resolve(dir)),
           );
@@ -144,11 +144,11 @@ export const directoryCommand: SlashCommand = {
       action: async (context: CommandContext, args: string) => {
         const {
           ui: { addItem },
-          services: { config, settings },
+          services: { agentContext, settings },
         } = context;
         const [...rest] = args.split(' ');
 
-        if (!config) {
+        if (!agentContext) {
           addItem({
             type: MessageType.ERROR,
             text: 'Configuration is not available.',
@@ -156,7 +156,7 @@ export const directoryCommand: SlashCommand = {
           return;
         }
 
-        if (config.isRestrictiveSandbox()) {
+        if (agentContext.config.isRestrictiveSandbox()) {
           return {
             type: 'message' as const,
             messageType: 'error' as const,
@@ -181,7 +181,7 @@ export const directoryCommand: SlashCommand = {
         const errors: string[] = [];
         const alreadyAdded: string[] = [];
 
-        const workspaceContext = config.getWorkspaceContext();
+        const workspaceContext = agentContext.config.getWorkspaceContext();
         const currentWorkspaceDirs = workspaceContext.getDirectories();
         const pathsToProcess: string[] = [];
 
@@ -252,7 +252,7 @@ export const directoryCommand: SlashCommand = {
                   trustedDirs={added}
                   errors={errors}
                   finishAddingDirectories={finishAddingDirectories}
-                  config={config}
+                  config={agentContext.config}
                   addItem={addItem}
                 />
               ),
@@ -264,7 +264,12 @@ export const directoryCommand: SlashCommand = {
           errors.push(...result.errors);
         }
 
-        await finishAddingDirectories(config, addItem, added, errors);
+        await finishAddingDirectories(
+          agentContext.config,
+          addItem,
+          added,
+          errors,
+        );
         return;
       },
     },
@@ -275,16 +280,16 @@ export const directoryCommand: SlashCommand = {
       action: async (context: CommandContext) => {
         const {
           ui: { addItem },
-          services: { config },
+          services: { agentContext },
         } = context;
-        if (!config) {
+        if (!agentContext) {
           addItem({
             type: MessageType.ERROR,
             text: 'Configuration is not available.',
           });
           return;
         }
-        const workspaceContext = config.getWorkspaceContext();
+        const workspaceContext = agentContext.config.getWorkspaceContext();
         const directories = workspaceContext.getDirectories();
         const directoryList = directories.map((dir) => `- ${dir}`).join('\n');
         addItem({

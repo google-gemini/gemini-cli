@@ -314,7 +314,7 @@ describe('createPolicyEngineConfig', () => {
   it('should allow all tools in YOLO mode', async () => {
     const config = await createPolicyEngineConfig({}, ApprovalMode.YOLO);
     const rule = config.rules?.find(
-      (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
+      (r) => r.decision === PolicyDecision.ALLOW && r.toolName === '*',
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBeCloseTo(1.998, 5);
@@ -513,7 +513,7 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const wildcardRule = config.rules?.find(
-      (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
+      (r) => r.toolName === '*' && r.decision === PolicyDecision.ALLOW,
     );
     const writeToolRules = config.rules?.filter(
       (r) =>
@@ -628,6 +628,34 @@ name = "invalid-name"
     expect(
       config.rules?.find((r) => r.toolName === 'write_file'),
     ).toBeUndefined();
+  });
+
+  it('should support mcpName in policy rules from TOML', async () => {
+    mockPolicyFile(
+      nodePath.join(MOCK_DEFAULT_DIR, 'mcp.toml'),
+      `
+  [[rule]]
+  toolName = "my-tool"
+  mcpName = "my-server"
+  decision = "allow"
+  priority = 150
+  `,
+    );
+
+    const config = await createPolicyEngineConfig(
+      {},
+      ApprovalMode.DEFAULT,
+      MOCK_DEFAULT_DIR,
+    );
+
+    const rule = config.rules?.find(
+      (r) =>
+        r.toolName === 'mcp_my-server_my-tool' &&
+        r.mcpName === 'my-server' &&
+        r.decision === PolicyDecision.ALLOW,
+    );
+    expect(rule).toBeDefined();
+    expect(rule?.priority).toBeCloseTo(1.15, 5);
   });
 
   it('should have default ASK_USER rule for discovered tools', async () => {

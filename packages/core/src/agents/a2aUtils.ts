@@ -16,6 +16,7 @@ import type {
   AgentInterface,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
+import type { SubagentActivityItem } from './types.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
 
@@ -123,17 +124,39 @@ export class A2AResultReassembler {
 
   private pushMessage(message: Message | undefined) {
     if (!message) return;
-    const text = extractPartsText(message.parts, '\n');
+    const text = extractPartsText(message.parts, '');
     if (text && this.messageLog[this.messageLog.length - 1] !== text) {
       this.messageLog.push(text);
     }
   }
 
   /**
+   * Returns an array of activity items representing the current reassembled state.
+   */
+  toActivityItems(): SubagentActivityItem[] {
+    const isAuthRequired = this.messageLog.includes(AUTH_REQUIRED_MSG);
+    return [
+      isAuthRequired
+        ? {
+            id: 'auth-required',
+            type: 'thought',
+            content: AUTH_REQUIRED_MSG,
+            status: 'running',
+          }
+        : {
+            id: 'pending',
+            type: 'thought',
+            content: 'Working...',
+            status: 'running',
+          },
+    ];
+  }
+
+  /**
    * Returns a human-readable string representation of the current reassembled state.
    */
   toString(): string {
-    const joinedMessages = this.messageLog.join('\n\n');
+    const joinedMessages = this.messageLog.join('');
 
     const artifactsOutput = Array.from(this.artifacts.keys())
       .map((id) => {
