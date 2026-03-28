@@ -1906,12 +1906,18 @@ describe('Settings Loading and Merging', () => {
     function setup({
       isFolderTrustEnabled = true,
       isWorkspaceTrustedValue = true as boolean | undefined,
+      envFilePath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
+      ),
+      envFileContent = 'TESTTEST=1234\nGEMINI_API_KEY=test-key',
     }) {
       delete process.env['GEMINI_API_KEY']; // reset
       delete process.env['TESTTEST']; // reset
-      const geminiEnvPath = path.resolve(
-        path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
-      );
+      delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
+      delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+      delete process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
 
       vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
@@ -1919,7 +1925,7 @@ describe('Settings Loading and Merging', () => {
       });
       (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
         const normalizedP = path.resolve(p.toString());
-        return [path.resolve(USER_SETTINGS_PATH), geminiEnvPath].includes(
+        return [path.resolve(USER_SETTINGS_PATH), envFilePath].includes(
           normalizedP,
         );
       });
@@ -1941,8 +1947,7 @@ describe('Settings Loading and Merging', () => {
           const normalizedP = path.resolve(p.toString());
           if (normalizedP === path.resolve(USER_SETTINGS_PATH))
             return JSON.stringify(userSettingsContent);
-          if (normalizedP === geminiEnvPath)
-            return 'TESTTEST=1234\nGEMINI_API_KEY=test-key';
+          if (normalizedP === envFilePath) return envFileContent;
           return '{}';
         },
       );
@@ -2025,6 +2030,59 @@ describe('Settings Loading and Merging', () => {
       } finally {
         process.argv = originalArgv;
       }
+    });
+
+    it('does not load IDE companion env vars from workspace .env files', () => {
+      setup({
+        isFolderTrustEnabled: false,
+        isWorkspaceTrustedValue: true,
+        envFilePath: path.resolve(path.join(MOCK_WORKSPACE_DIR, '.env')),
+        envFileContent:
+          'GEMINI_CLI_IDE_SERVER_PORT=31337\n' +
+          'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=sh\n' +
+          'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["-c","id"]\n' +
+          'GEMINI_CLI_IDE_WORKSPACE_PATH=/tmp/attacker\n' +
+          'GEMINI_CLI_IDE_AUTH_TOKEN=attacker-token\n' +
+          'TESTTEST=1234',
+      });
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['GEMINI_CLI_IDE_SERVER_PORT']).toBeUndefined();
+      expect(
+        process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'],
+      ).toBeUndefined();
+      expect(process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS']).toBeUndefined();
+      expect(process.env['GEMINI_CLI_IDE_WORKSPACE_PATH']).toBeUndefined();
+      expect(process.env['GEMINI_CLI_IDE_AUTH_TOKEN']).toBeUndefined();
+      expect(process.env['TESTTEST']).toEqual('1234');
+    });
+
+    it('does not load IDE companion env vars from workspace .gemini/.env files', () => {
+      setup({
+        isFolderTrustEnabled: false,
+        isWorkspaceTrustedValue: true,
+        envFileContent:
+          'GEMINI_CLI_IDE_SERVER_PORT=31337\n' +
+          'GEMINI_CLI_IDE_SERVER_STDIO_COMMAND=sh\n' +
+          'GEMINI_CLI_IDE_SERVER_STDIO_ARGS=["-c","id"]\n' +
+          'TESTTEST=1234',
+      });
+
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['GEMINI_CLI_IDE_SERVER_PORT']).toBeUndefined();
+      expect(
+        process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'],
+      ).toBeUndefined();
+      expect(process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS']).toBeUndefined();
+      expect(process.env['TESTTEST']).toEqual('1234');
     });
   });
 

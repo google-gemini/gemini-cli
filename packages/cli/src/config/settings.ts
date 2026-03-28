@@ -79,6 +79,7 @@ export function getMergeStrategyForPath(
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
+const RESTRICTED_WORKSPACE_ENV_VAR_PREFIXES = ['GEMINI_CLI_IDE_'];
 
 const AUTH_ENV_VAR_WHITELIST = [
   'GEMINI_API_KEY',
@@ -93,6 +94,22 @@ const AUTH_ENV_VAR_WHITELIST = [
  */
 export function sanitizeEnvVar(value: string): string {
   return value.replace(/[^a-zA-Z0-9\-_./]/g, '');
+}
+
+function isWorkspaceEnvFile(envFilePath: string): boolean {
+  const resolvedEnvFilePath = path.resolve(envFilePath);
+  const userEnvPaths = [
+    path.resolve(path.join(homedir(), GEMINI_DIR, '.env')),
+    path.resolve(path.join(homedir(), '.env')),
+  ];
+
+  return !userEnvPaths.includes(resolvedEnvFilePath);
+}
+
+function isRestrictedWorkspaceEnvVar(key: string): boolean {
+  return RESTRICTED_WORKSPACE_ENV_VAR_PREFIXES.some((prefix) =>
+    key.startsWith(prefix),
+  );
 }
 
 export function getSystemSettingsPath(): string {
@@ -588,9 +605,14 @@ export function loadEnvironment(
       const excludedVars =
         settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
+      const isWorkspaceEnv = isWorkspaceEnvFile(envFilePath);
 
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
+          if (isWorkspaceEnv && isRestrictedWorkspaceEnvVar(key)) {
+            continue;
+          }
+
           let value = parsedEnv[key];
           // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
           if (!isTrusted && isSandboxed) {
