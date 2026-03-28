@@ -164,6 +164,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: 'Check status of IDE integration',
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
+    argsSpec: { max: 0 },
     action: async (): Promise<SlashCommandActionReturn> => {
       const { messageType, content } =
         await getIdeStatusMessageWithFiles(ideClient);
@@ -180,6 +181,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: `Install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
+    argsSpec: { max: 0 },
     action: async (context) => {
       const installer = getIdeInstaller(currentIDE);
       if (!installer) {
@@ -260,6 +262,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: 'Enable IDE integration',
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
+    argsSpec: { max: 0 },
     action: async (context: CommandContext) => {
       context.services.settings.setValue(
         SettingScope.User,
@@ -286,6 +289,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: 'Disable IDE integration',
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
+    argsSpec: { max: 0 },
     action: async (context: CommandContext) => {
       context.services.settings.setValue(
         SettingScope.User,

@@ -357,6 +357,7 @@ const panelCommand: SlashCommand = {
   description: 'Display all registered hooks with their status',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: panelAction,
 };
 
@@ -365,6 +366,7 @@ const enableCommand: SlashCommand = {
   description: 'Enable a hook by name',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: enableAction,
   completion: completeDisabledHookNames,
 };
@@ -374,6 +376,7 @@ const disableCommand: SlashCommand = {
   description: 'Disable a hook by name',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { min: 1, max: 1 },
   action: disableAction,
   completion: completeEnabledHookNames,
 };
@@ -384,6 +387,7 @@ const enableAllCommand: SlashCommand = {
   description: 'Enable all disabled hooks',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: enableAllAction,
 };
 
@@ -393,6 +397,7 @@ const disableAllCommand: SlashCommand = {
   description: 'Disable all enabled hooks',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: disableAllAction,
 };
 

@@ -21,6 +21,7 @@ const setModelCommand: SlashCommand = {
     'Set the model to use. Usage: /model set <model-name> [--persist]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { min: 1 },
   action: async (context: CommandContext, args: string) => {
     const parts = args.trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) {
@@ -52,6 +53,7 @@ const manageModelCommand: SlashCommand = {
   description: 'Opens a dialog to configure the model',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext) => {
     if (context.services.agentContext?.config) {
       await context.services.agentContext.config.refreshUserQuota();

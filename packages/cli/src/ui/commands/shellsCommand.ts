@@ -12,6 +12,7 @@ export const shellsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   description: 'Toggle background shells view',
   autoExecute: true,
+  argsSpec: { max: 0 },
   action: async (context) => {
     context.ui.toggleBackgroundShell();
   },

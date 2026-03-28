@@ -30,6 +30,7 @@ export const bugCommand: SlashCommand = {
   description: 'Submit a bug report',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  argsSpec: { max: 0 },
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const bugDescription = (args || '').trim();
     const agentContext = context.services.agentContext;
