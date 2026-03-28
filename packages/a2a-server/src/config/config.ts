@@ -41,8 +41,10 @@ export async function loadConfig(
   settings: Settings,
   extensionLoader: ExtensionLoader,
   taskId: string,
+  workspaceDirs: string[] = [process.cwd()],
 ): Promise<Config> {
-  const workspaceDir = process.cwd();
+  const workspaceDir = workspaceDirs[0];
+  const includeDirectories = workspaceDirs.slice(1);
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
 
   const folderTrust =
@@ -98,6 +100,8 @@ export async function loadConfig(
     },
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
+    includeDirectories,
+    loadMemoryFromIncludeDirectories: true,
     telemetry: {
       enabled: settings.telemetry?.enabled,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -139,7 +143,8 @@ export async function loadConfig(
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
       workspaceDir,
-      [workspaceDir],
+      workspaceDirs,
+      false,
       fileService,
       extensionLoader,
       folderTrust,
@@ -197,31 +202,46 @@ export async function loadConfig(
   return config;
 }
 
-export function setTargetDir(agentSettings: AgentSettings | undefined): string {
+export function getWorkspaceDirs(
+  agentSettings: AgentSettings | undefined,
+): string[] {
   const originalCWD = process.cwd();
-  const targetDir =
-    process.env['CODER_AGENT_WORKSPACE_PATH'] ??
-    (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent
-      ? agentSettings.workspacePath
-      : undefined);
 
-  if (!targetDir) {
-    return originalCWD;
+  const envPath = process.env['CODER_AGENT_WORKSPACE_PATH'];
+  let targetDirs: string[] = [];
+
+  if (envPath) {
+    targetDirs = envPath.split(path.delimiter).filter((p) => p.trim());
+  } else if (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent) {
+    if (
+      agentSettings.workspacePaths &&
+      agentSettings.workspacePaths.length > 0
+    ) {
+      targetDirs = agentSettings.workspacePaths;
+    } else if (agentSettings.workspacePath) {
+      targetDirs = [agentSettings.workspacePath];
+    }
+  }
+
+  if (targetDirs.length === 0) {
+    return [originalCWD];
   }
 
   logger.info(
-    `[CoderAgentExecutor] Overriding workspace path to: ${targetDir}`,
+    `[CoderAgentExecutor] Overriding workspace paths to:\n- ${targetDirs.join(
+      '\n- ',
+    )}`,
   );
 
+  const resolvedPaths = targetDirs.map((dir) => path.resolve(dir));
   try {
-    const resolvedPath = path.resolve(targetDir);
-    process.chdir(resolvedPath);
-    return resolvedPath;
+    process.chdir(resolvedPaths[0]);
+    return resolvedPaths;
   } catch (e) {
     logger.error(
-      `[CoderAgentExecutor] Error resolving workspace path: ${e}, returning original os.cwd()`,
+      `[CoderAgentExecutor] Error resolving workspace path ${resolvedPaths[0]}: ${e}, returning original os.cwd()`,
     );
-    return originalCWD;
+    return [originalCWD];
   }
 }
 

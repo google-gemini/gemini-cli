@@ -6,8 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, getWorkspaceDirs } from './config.js';
 import type { Settings } from './settings.js';
+import { CoderAgentEvent, type AgentSettings } from '../types.js';
 import {
   type ExtensionLoader,
   FileDiscoveryService,
@@ -73,6 +74,61 @@ vi.mock('../utils/logger.js', () => ({
     error: vi.fn(),
   },
 }));
+
+describe('getWorkspaceDirs', () => {
+  const originalCWD = process.cwd();
+
+  let chdirSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    chdirSpy = vi.spyOn(process, 'chdir').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    chdirSpy.mockRestore();
+    process.chdir(originalCWD);
+  });
+
+  it('should fall back to original cwd if no settings or env provided', () => {
+    const result = getWorkspaceDirs(undefined);
+    expect(result).toEqual([originalCWD]);
+  });
+
+  it('should parse CODER_AGENT_WORKSPACE_PATH properly', () => {
+    const p1 = path.resolve('/tmp/a');
+    const p2 = path.resolve('/tmp/b');
+    vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', `${p1}${path.delimiter}${p2}`);
+    const result = getWorkspaceDirs(undefined);
+    expect(result).toEqual([p1, p2]);
+  });
+
+  it('should respect workspacePaths from agent settings over workspacePath', () => {
+    const p1 = path.resolve('/tmp/a');
+    const p2 = path.resolve('/tmp/b');
+    const p3 = path.resolve('/tmp/c');
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: p1,
+      workspacePaths: [p2, p3],
+    };
+    const result = getWorkspaceDirs(settings);
+    // Should prioritize workspacePaths
+    expect(result).toEqual([p2, p3]);
+  });
+
+  it('should respect workspacePath if workspacePaths is empty', () => {
+    const p1 = path.resolve('/tmp/a');
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: p1,
+      workspacePaths: [],
+    };
+    const result = getWorkspaceDirs(settings);
+    expect(result).toEqual([p1]);
+  });
+});
 
 describe('loadConfig', () => {
   const mockSettings = {} as Settings;
