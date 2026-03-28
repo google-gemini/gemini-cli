@@ -640,8 +640,8 @@ export async function saveTruncatedToolOutput(
   }
   const outputFile = path.join(toolOutputDir, fileName);
 
-  await fsPromises.mkdir(toolOutputDir, { recursive: true });
-  await fsPromises.writeFile(outputFile, content);
+  await fsPromises.mkdir(toolOutputDir, { recursive: true, mode: 0o700 });
+  await fsPromises.writeFile(outputFile, content, { mode: 0o600 });
 
   return { outputFile };
 }
