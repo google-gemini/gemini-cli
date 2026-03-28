@@ -1,1 +1,5 @@
-action: 'log'
+action: 'fix'
+requireStatusChecks:
+  strict: true
+  contexts:
+    - 'docs_pr_check'
