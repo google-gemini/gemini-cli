@@ -388,8 +388,11 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       e &&
       typeof e === 'object' &&
       'code' in e &&
-      (e.code === 'ENOENT' || e.code === 'EISDIR')
+      (e.code === 'ENOENT' || e.code === 'EISDIR' || e.code === 'ENAMETOOLONG')
     ) {
+      if (e.code === 'ENAMETOOLONG') {
+        return p;
+      }
       try {
         const stat = fs.lstatSync(p);
         if (stat.isSymbolicLink()) {
