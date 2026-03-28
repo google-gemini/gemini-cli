@@ -37,6 +37,7 @@ import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
 import { requestStorage } from '../http/requestStorage.js';
 import { pushTaskStateFailed } from '../utils/executor_utils.js';
+import { resumeSessionHistory } from '../utils/session_utils.js';
 
 /**
  * Provides a wrapper for Task. Passes data from Task to SDKTask.
@@ -154,6 +155,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       agentSettings.autoExecute,
     );
     await runtimeTask.geminiClient.initialize();
+    await resumeSessionHistory(runtimeTask.geminiClient, taskId);
 
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);
     this.tasks.set(taskId, wrapper);
