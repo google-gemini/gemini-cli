@@ -90,7 +90,7 @@ export interface CommandContext {
      */
     setConfirmationRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
-    toggleBackgroundShell: () => void;
+    toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
   };
   // Session-specific data

@@ -35,6 +35,23 @@ const mockShellOnExit = vi.hoisted(() =>
     ) => () => void
   >(() => vi.fn()),
 );
+const mockLifecycleSubscribe = vi.hoisted(() =>
+  vi.fn<
+    (pid: number, listener: (event: ShellOutputEvent) => void) => () => void
+  >(() => vi.fn()),
+);
+const mockLifecycleOnExit = vi.hoisted(() =>
+  vi.fn<
+    (
+      pid: number,
+      callback: (exitCode: number, signal?: number) => void,
+    ) => () => void
+  >(() => vi.fn()),
+);
+const mockLifecycleKill = vi.hoisted(() => vi.fn());
+const mockLifecycleBackground = vi.hoisted(() => vi.fn());
+const mockLifecycleOnBackground = vi.hoisted(() => vi.fn());
+const mockLifecycleOffBackground = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -47,6 +64,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       background: mockShellBackground,
       subscribe: mockShellSubscribe,
       onExit: mockShellOnExit,
+    },
+    ExecutionLifecycleService: {
+      subscribe: mockLifecycleSubscribe,
+      onExit: mockLifecycleOnExit,
+      kill: mockLifecycleKill,
+      background: mockLifecycleBackground,
+      onBackground: mockLifecycleOnBackground,
+      offBackground: mockLifecycleOffBackground,
     },
     isBinary: mockIsBinary,
   };
@@ -68,9 +93,9 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('node:crypto');
 
 import {
-  useShellCommandProcessor,
+  useExecutionLifecycle,
   OUTPUT_UPDATE_INTERVAL_MS,
-} from './shellCommandProcessor.js';
+} from './useExecutionLifecycle.js';
 import {
   type Config,
   type GeminiClient,
@@ -83,7 +108,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
-describe('useShellCommandProcessor', () => {
+describe('useExecutionLifecycle', () => {
   let addItemToHistoryMock: Mock;
   let setPendingHistoryItemMock: Mock;
   let onExecMock: Mock;
@@ -140,7 +165,7 @@ describe('useShellCommandProcessor', () => {
   });
 
   const renderProcessorHook = async () => {
-    let hookResult: ReturnType<typeof useShellCommandProcessor>;
+    let hookResult: ReturnType<typeof useExecutionLifecycle>;
     let renderCount = 0;
     function TestComponent({
       isWaitingForConfirmation,
@@ -148,7 +173,7 @@ describe('useShellCommandProcessor', () => {
       isWaitingForConfirmation?: boolean;
     }) {
       renderCount++;
-      hookResult = useShellCommandProcessor(
+      hookResult = useExecutionLifecycle(
         addItemToHistoryMock,
         setPendingHistoryItemMock,
         onExecMock,
@@ -772,11 +797,11 @@ describe('useShellCommandProcessor', () => {
       const { result } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
 
-      expect(result.current.backgroundShellCount).toBe(1);
-      const shell = result.current.backgroundShells.get(1001);
+      expect(result.current.backgroundTaskCount).toBe(1);
+      const shell = result.current.backgroundTasks.get(1001);
       expect(shell).toEqual(
         expect.objectContaining({
           pid: 1001,
@@ -784,8 +809,11 @@ describe('useShellCommandProcessor', () => {
           output: 'initial',
         }),
       );
-      expect(mockShellOnExit).toHaveBeenCalledWith(1001, expect.any(Function));
-      expect(mockShellSubscribe).toHaveBeenCalledWith(
+      expect(mockLifecycleOnExit).toHaveBeenCalledWith(
+        1001,
+        expect.any(Function),
+      );
+      expect(mockLifecycleSubscribe).toHaveBeenCalledWith(
         1001,
         expect.any(Function),
       );
@@ -795,55 +823,55 @@ describe('useShellCommandProcessor', () => {
       const { result } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
 
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
 
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
 
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
 
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
 
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
     });
 
     it('should show info message when toggling background shells if none are active', async () => {
       const { result } = await renderProcessorHook();
 
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
 
       expect(addItemToHistoryMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'info',
-          text: 'No background shells are currently active.',
+          text: 'No background tasks are currently active.',
         }),
         expect.any(Number),
       );
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
     });
 
     it('should dismiss a background shell and remove it from state', async () => {
       const { result } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
 
       await act(async () => {
-        await result.current.dismissBackgroundShell(1001);
+        await result.current.dismissBackgroundTask(1001);
       });
 
-      expect(mockShellKill).toHaveBeenCalledWith(1001);
-      expect(result.current.backgroundShellCount).toBe(0);
-      expect(result.current.backgroundShells.has(1001)).toBe(false);
+      expect(mockLifecycleKill).toHaveBeenCalledWith(1001);
+      expect(result.current.backgroundTaskCount).toBe(0);
+      expect(result.current.backgroundTasks.has(1001)).toBe(false);
     });
 
     it('should handle backgrounding the current shell', async () => {
@@ -867,7 +895,7 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.activeShellPtyId).toBe(555);
 
       act(() => {
-        result.current.backgroundCurrentShell();
+        result.current.backgroundCurrentExecution();
       });
 
       expect(mockShellBackground).toHaveBeenCalledWith(555);
@@ -887,19 +915,19 @@ describe('useShellCommandProcessor', () => {
       // Wait for promise resolution
       await act(async () => await onExecMock.mock.calls[0][0]);
 
-      expect(result.current.backgroundShellCount).toBe(1);
+      expect(result.current.backgroundTaskCount).toBe(1);
       expect(result.current.activeShellPtyId).toBeNull();
     });
 
-    it('should persist background shell on successful exit and mark as exited', async () => {
+    it('should auto-dismiss background task on successful exit', async () => {
       const { result } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(888, 'auto-exit', '');
+        result.current.registerBackgroundTask(888, 'auto-exit', '');
       });
 
       // Find the exit callback registered
-      const exitCallback = mockShellOnExit.mock.calls.find(
+      const exitCallback = mockLifecycleOnExit.mock.calls.find(
         (call) => call[0] === 888,
       )?.[1];
       expect(exitCallback).toBeDefined();
@@ -910,22 +938,19 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      // Should NOT be removed, but updated
-      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
-      expect(result.current.backgroundShells.has(888)).toBe(true); // Map has it
-      const shell = result.current.backgroundShells.get(888);
-      expect(shell?.status).toBe('exited');
-      expect(shell?.exitCode).toBe(0);
+      // Should be auto-dismissed from the panel
+      expect(result.current.backgroundTaskCount).toBe(0);
+      expect(result.current.backgroundTasks.has(888)).toBe(false);
     });
 
-    it('should persist background shell on failed exit', async () => {
+    it('should auto-dismiss background task on failed exit', async () => {
       const { result } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(999, 'fail-exit', '');
+        result.current.registerBackgroundTask(999, 'fail-exit', '');
       });
 
-      const exitCallback = mockShellOnExit.mock.calls.find(
+      const exitCallback = mockLifecycleOnExit.mock.calls.find(
         (call) => call[0] === 999,
       )?.[1];
       expect(exitCallback).toBeDefined();
@@ -936,34 +961,26 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      // Should NOT be removed, but updated
-      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
-      const shell = result.current.backgroundShells.get(999);
-      expect(shell?.status).toBe('exited');
-      expect(shell?.exitCode).toBe(1);
-
-      // Now dismiss it
-      await act(async () => {
-        await result.current.dismissBackgroundShell(999);
-      });
-      expect(result.current.backgroundShellCount).toBe(0);
+      // Should be auto-dismissed from the panel
+      expect(result.current.backgroundTaskCount).toBe(0);
+      expect(result.current.backgroundTasks.has(999)).toBe(false);
     });
 
     it('should NOT trigger re-render on background shell output when visible', async () => {
       const { result, getRenderCount } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
 
       // Show the background shells
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
 
       const initialRenderCount = getRenderCount();
 
-      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+      const subscribeCallback = mockLifecycleSubscribe.mock.calls.find(
         (call) => call[0] === 1001,
       )?.[1];
       expect(subscribeCallback).toBeDefined();
@@ -975,7 +992,7 @@ describe('useShellCommandProcessor', () => {
       }
 
       expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
-      const shell = result.current.backgroundShells.get(1001);
+      const shell = result.current.backgroundTasks.get(1001);
       expect(shell?.output).toBe('initial + updated');
     });
 
@@ -983,13 +1000,13 @@ describe('useShellCommandProcessor', () => {
       const { result, getRenderCount } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
 
       // Ensure background shells are hidden (default)
       const initialRenderCount = getRenderCount();
 
-      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+      const subscribeCallback = mockLifecycleSubscribe.mock.calls.find(
         (call) => call[0] === 1001,
       )?.[1];
       expect(subscribeCallback).toBeDefined();
@@ -1001,7 +1018,7 @@ describe('useShellCommandProcessor', () => {
       }
 
       expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
-      const shell = result.current.backgroundShells.get(1001);
+      const shell = result.current.backgroundTasks.get(1001);
       expect(shell?.output).toBe('initial + updated');
     });
 
@@ -1009,17 +1026,17 @@ describe('useShellCommandProcessor', () => {
       const { result, getRenderCount } = await renderProcessorHook();
 
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
 
       // Show the background shells
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
 
       const initialRenderCount = getRenderCount();
 
-      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+      const subscribeCallback = mockLifecycleSubscribe.mock.calls.find(
         (call) => call[0] === 1001,
       )?.[1];
       expect(subscribeCallback).toBeDefined();
@@ -1031,7 +1048,7 @@ describe('useShellCommandProcessor', () => {
       }
 
       expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
-      const shell = result.current.backgroundShells.get(1001);
+      const shell = result.current.backgroundTasks.get(1001);
       expect(shell?.isBinary).toBe(true);
       expect(shell?.binaryBytesReceived).toBe(1024);
     });
@@ -1041,12 +1058,12 @@ describe('useShellCommandProcessor', () => {
 
       // 1. Register and show background shell
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
 
       // 2. Simulate model responding (not waiting for confirmation)
       act(() => {
@@ -1054,7 +1071,7 @@ describe('useShellCommandProcessor', () => {
       });
 
       // Should stay visible
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
     });
 
     it('should hide background shell when waiting for confirmation and restore after delay', async () => {
@@ -1062,12 +1079,12 @@ describe('useShellCommandProcessor', () => {
 
       // 1. Register and show background shell
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
 
       // 2. Simulate tool confirmation showing up
       act(() => {
@@ -1075,7 +1092,7 @@ describe('useShellCommandProcessor', () => {
       });
 
       // Should be hidden
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
 
       // 3. Simulate confirmation accepted (waiting for PTY start)
       act(() => {
@@ -1083,11 +1100,11 @@ describe('useShellCommandProcessor', () => {
       });
 
       // Should STAY hidden during the 300ms gap
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
 
       // 4. Wait for restore delay
       await waitFor(() =>
-        expect(result.current.isBackgroundShellVisible).toBe(true),
+        expect(result.current.isBackgroundTaskVisible).toBe(true),
       );
     });
 
@@ -1096,12 +1113,12 @@ describe('useShellCommandProcessor', () => {
 
       // 1. Register and show background shell
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
 
       // 2. Start foreground shell
       act(() => {
@@ -1112,7 +1129,7 @@ describe('useShellCommandProcessor', () => {
       await waitFor(() => expect(result.current.activeShellPtyId).toBe(12345));
 
       // Should be hidden automatically
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
 
       // 3. Complete foreground shell
       act(() => {
@@ -1123,7 +1140,7 @@ describe('useShellCommandProcessor', () => {
 
       // Should be restored automatically (after delay)
       await waitFor(() =>
-        expect(result.current.isBackgroundShellVisible).toBe(true),
+        expect(result.current.isBackgroundTaskVisible).toBe(true),
       );
     });
 
@@ -1132,25 +1149,25 @@ describe('useShellCommandProcessor', () => {
 
       // 1. Register and show background shell
       act(() => {
-        result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
+        result.current.registerBackgroundTask(1001, 'bg-cmd', 'initial');
       });
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
 
       // 2. Start foreground shell
       act(() => {
         result.current.handleShellCommand('ls', new AbortController().signal);
       });
       await waitFor(() => expect(result.current.activeShellPtyId).toBe(12345));
-      expect(result.current.isBackgroundShellVisible).toBe(false);
+      expect(result.current.isBackgroundTaskVisible).toBe(false);
 
       // 3. Manually toggle visibility (e.g. user wants to peek)
       act(() => {
-        result.current.toggleBackgroundShell();
+        result.current.toggleBackgroundTasks();
       });
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      expect(result.current.isBackgroundTaskVisible).toBe(true);
 
       // 4. Complete foreground shell
       act(() => {
@@ -1161,7 +1178,7 @@ describe('useShellCommandProcessor', () => {
       // It should NOT change visibility because manual toggle cleared the auto-restore flag
       // After delay it should stay true (as it was manually toggled to true)
       await waitFor(() =>
-        expect(result.current.isBackgroundShellVisible).toBe(true),
+        expect(result.current.isBackgroundTaskVisible).toBe(true),
       );
     });
   });

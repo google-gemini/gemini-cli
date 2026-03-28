@@ -7,6 +7,7 @@
 import type { InjectionService } from '../config/injectionService.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeOutput } from '../utils/textUtils.js';
 
 export type ExecutionMethod =
   | 'lydell-node-pty'
@@ -59,12 +60,16 @@ export interface ExecutionCompletionOptions {
 
 export interface ExternalExecutionRegistration {
   executionMethod: ExecutionMethod;
+  /** Human-readable label for the background task UI (e.g. the command string). */
+  label?: string;
   initialOutput?: string;
   getBackgroundOutput?: () => string;
   getSubscriptionSnapshot?: () => string | AnsiOutput | undefined;
   writeInput?: (input: string) => void;
   kill?: () => void;
   isActive?: () => boolean;
+  formatInjection?: FormatInjectionFn;
+  completionBehavior?: CompletionBehavior;
 }
 
 /**
@@ -77,14 +82,40 @@ export type FormatInjectionFn = (
   error: Error | null,
 ) => string | null;
 
+/**
+ * Controls what happens when a backgrounded execution completes:
+ * - `'inject'`  — full formatted output is injected into the conversation; task auto-dismisses from UI.
+ * - `'notify'`  — a short pointer (e.g. "output saved to /tmp/...") is injected; task auto-dismisses from UI.
+ * - `'silent'`  — nothing is injected; task stays in the UI until manually dismissed.
+ *
+ * The distinction between `inject` and `notify` is semantic for now (both inject + dismiss),
+ * but enables the system to treat them differently in the future (e.g. LLM-decided injection).
+ */
+export type CompletionBehavior = 'inject' | 'notify' | 'silent';
+
 interface ManagedExecutionBase {
   executionMethod: ExecutionMethod;
+  label?: string;
   output: string;
   backgrounded?: boolean;
   formatInjection?: FormatInjectionFn;
+  completionBehavior?: CompletionBehavior;
   getBackgroundOutput?: () => string;
   getSubscriptionSnapshot?: () => string | AnsiOutput | undefined;
 }
+
+/**
+ * Payload emitted when an execution is moved to the background.
+ */
+export interface BackgroundStartInfo {
+  executionId: number;
+  executionMethod: ExecutionMethod;
+  label: string;
+  output: string;
+  completionBehavior: CompletionBehavior;
+}
+
+export type BackgroundStartListener = (info: BackgroundStartInfo) => void;
 
 /**
  * Payload emitted when a previously-backgrounded execution settles.
@@ -96,6 +127,7 @@ export interface BackgroundCompletionInfo {
   error: Error | null;
   /** Pre-formatted injection text from the execution creator, or `null` if skipped. */
   injectionText: string | null;
+  completionBehavior: CompletionBehavior;
 }
 
 export type BackgroundCompletionListener = (
@@ -124,6 +156,16 @@ const NON_PROCESS_EXECUTION_ID_START = 2_000_000_000;
 export class ExecutionLifecycleService {
   private static readonly EXIT_INFO_TTL_MS = 5 * 60 * 1000;
   private static nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
+  private static injectionService: InjectionService | null = null;
+
+  /**
+   * Connects the lifecycle service to the injection service so that
+   * backgrounded executions are reinjected into the model conversation
+   * directly from the backend — no UI hop needed.
+   */
+  static setInjectionService(service: InjectionService): void {
+    this.injectionService = service;
+  }
 
   private static activeExecutions = new Map<number, ManagedExecutionState>();
   private static activeResolvers = new Map<
@@ -140,14 +182,22 @@ export class ExecutionLifecycleService {
   >();
   private static backgroundCompletionListeners =
     new Set<BackgroundCompletionListener>();
-  private static injectionService: InjectionService | null = null;
+
+  private static backgroundStartListeners = new Set<BackgroundStartListener>();
 
   /**
-   * Wires a singleton InjectionService so that backgrounded executions
-   * can inject their output directly without routing through the UI layer.
+   * Registers a listener that fires when any execution is moved to the background.
+   * This is the hook for the UI to automatically discover backgrounded executions.
    */
-  static setInjectionService(service: InjectionService): void {
-    this.injectionService = service;
+  static onBackground(listener: BackgroundStartListener): void {
+    this.backgroundStartListeners.add(listener);
+  }
+
+  /**
+   * Unregisters a background start listener.
+   */
+  static offBackground(listener: BackgroundStartListener): void {
+    this.backgroundStartListeners.delete(listener);
   }
 
   /**
@@ -222,6 +272,7 @@ export class ExecutionLifecycleService {
     this.exitedExecutionInfo.clear();
     this.backgroundCompletionListeners.clear();
     this.injectionService = null;
+    this.backgroundStartListeners.clear();
     this.nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
   }
 
@@ -239,6 +290,7 @@ export class ExecutionLifecycleService {
 
     this.activeExecutions.set(executionId, {
       executionMethod: registration.executionMethod,
+      label: registration.label,
       output: registration.initialOutput ?? '',
       kind: 'external',
       getBackgroundOutput: registration.getBackgroundOutput,
@@ -246,6 +298,8 @@ export class ExecutionLifecycleService {
       writeInput: registration.writeInput,
       kill: registration.kill,
       isActive: registration.isActive,
+      formatInjection: registration.formatInjection,
+      completionBehavior: registration.completionBehavior,
     });
 
     return {
@@ -259,15 +313,19 @@ export class ExecutionLifecycleService {
     onKill?: () => void,
     executionMethod: ExecutionMethod = 'none',
     formatInjection?: FormatInjectionFn,
+    label?: string,
+    completionBehavior?: CompletionBehavior,
   ): ExecutionHandle {
     const executionId = this.allocateExecutionId();
 
     this.activeExecutions.set(executionId, {
       executionMethod,
+      label,
       output: initialOutput,
       kind: 'virtual',
       onKill,
       formatInjection,
+      completionBehavior,
       getBackgroundOutput: () => {
         const state = this.activeExecutions.get(executionId);
         return state?.output ?? initialOutput;
@@ -325,25 +383,32 @@ export class ExecutionLifecycleService {
 
     // Fire background completion listeners if this was a backgrounded execution.
     if (execution.backgrounded && !result.aborted) {
-      const injectionText = execution.formatInjection
-        ? execution.formatInjection(result.output, result.error)
-        : null;
-      const info: BackgroundCompletionInfo = {
-        executionId,
-        executionMethod: execution.executionMethod,
-        output: result.output,
-        error: result.error,
-        injectionText,
-      };
+      const behavior =
+        execution.completionBehavior ??
+        (execution.formatInjection ? 'inject' : 'silent');
+      const rawInjection =
+        behavior !== 'silent' && execution.formatInjection
+          ? execution.formatInjection(result.output, result.error)
+          : null;
 
-      // Inject directly into the model conversation if injection text is
-      // available and the injection service has been wired up.
+      const injectionText = rawInjection ? sanitizeOutput(rawInjection) : null;
+
+      // Inject directly into the model conversation from the backend.
       if (injectionText && this.injectionService) {
         this.injectionService.addInjection(
           injectionText,
           'background_completion',
         );
       }
+
+      const info: BackgroundCompletionInfo = {
+        executionId,
+        executionMethod: execution.executionMethod,
+        output: result.output,
+        error: result.error,
+        injectionText,
+        completionBehavior: behavior,
+      };
 
       for (const listener of this.backgroundCompletionListeners) {
         try {
@@ -434,6 +499,21 @@ export class ExecutionLifecycleService {
 
     this.activeResolvers.delete(executionId);
     execution.backgrounded = true;
+
+    // Notify listeners that an execution was moved to the background.
+    const info: BackgroundStartInfo = {
+      executionId,
+      executionMethod: execution.executionMethod,
+      label:
+        execution.label ?? `${execution.executionMethod} (ID: ${executionId})`,
+      output,
+      completionBehavior:
+        execution.completionBehavior ??
+        (execution.formatInjection ? 'inject' : 'silent'),
+    };
+    for (const listener of this.backgroundStartListeners) {
+      listener(info);
+    }
   }
 
   static subscribe(

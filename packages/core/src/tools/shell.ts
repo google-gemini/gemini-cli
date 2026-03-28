@@ -357,6 +357,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
               this.context.config.sanitizationConfig,
             sandboxManager: this.context.config.sandboxManager,
             additionalPermissions: this.params[PARAM_ADDITIONAL_PERMISSIONS],
+            backgroundCompletionBehavior:
+              this.context.config.getShellBackgroundCompletionBehavior(),
           },
         );
 

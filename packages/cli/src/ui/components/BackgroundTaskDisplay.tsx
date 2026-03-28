@@ -17,7 +17,7 @@ import {
   type AnsiToken,
 } from '@google/gemini-cli-core';
 import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
-import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
+import { type BackgroundTask } from '../hooks/useExecutionLifecycle.js';
 import { Command } from '../key/keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { formatCommand } from '../key/keybindingUtils.js';
@@ -34,8 +34,8 @@ import {
 } from './shared/RadioButtonSelect.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
-interface BackgroundShellDisplayProps {
-  shells: Map<number, BackgroundShell>;
+interface BackgroundTaskDisplayProps {
+  shells: Map<number, BackgroundTask>;
   activePid: number;
   width: number;
   height: number;
@@ -61,19 +61,19 @@ const formatShellCommandForDisplay = (command: string, maxWidth: number) => {
     : commandFirstLine;
 };
 
-export const BackgroundShellDisplay = ({
+export const BackgroundTaskDisplay = ({
   shells,
   activePid,
   width,
   height,
   isFocused,
   isListOpenProp,
-}: BackgroundShellDisplayProps) => {
+}: BackgroundTaskDisplayProps) => {
   const keyMatchers = useKeyMatchers();
   const {
-    dismissBackgroundShell,
-    setActiveBackgroundShellPid,
-    setIsBackgroundShellListOpen,
+    dismissBackgroundTask,
+    setActiveBackgroundTaskPid,
+    setIsBackgroundTaskListOpen,
   } = useUIActions();
   const activeShell = shells.get(activePid);
   const [output, setOutput] = useState<string | AnsiOutput>(
@@ -152,13 +152,13 @@ export const BackgroundShellDisplay = ({
         // RadioButtonSelect handles Enter -> onSelect
 
         if (keyMatchers[Command.BACKGROUND_SHELL_ESCAPE](key)) {
-          setIsBackgroundShellListOpen(false);
+          setIsBackgroundTaskListOpen(false);
           return true;
         }
 
         if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
           if (highlightedPid) {
-            void dismissBackgroundShell(highlightedPid);
+            void dismissBackgroundTask(highlightedPid);
             // If we killed the active one, the list might update via props
           }
           return true;
@@ -166,9 +166,9 @@ export const BackgroundShellDisplay = ({
 
         if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
           if (highlightedPid) {
-            setActiveBackgroundShellPid(highlightedPid);
+            setActiveBackgroundTaskPid(highlightedPid);
           }
-          setIsBackgroundShellListOpen(false);
+          setIsBackgroundTaskListOpen(false);
           return true;
         }
         return false;
@@ -179,12 +179,12 @@ export const BackgroundShellDisplay = ({
       }
 
       if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
-        void dismissBackgroundShell(activeShell.pid);
+        void dismissBackgroundTask(activeShell.pid);
         return true;
       }
 
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
-        setIsBackgroundShellListOpen(true);
+        setIsBackgroundTaskListOpen(true);
         return true;
       }
 
@@ -339,8 +339,8 @@ export const BackgroundShellDisplay = ({
             items={items}
             initialIndex={initialIndex >= 0 ? initialIndex : 0}
             onSelect={(pid) => {
-              setActiveBackgroundShellPid(pid);
-              setIsBackgroundShellListOpen(false);
+              setActiveBackgroundTaskPid(pid);
+              setIsBackgroundTaskListOpen(false);
             }}
             onHighlight={(pid) => setHighlightedPid(pid)}
             isFocused={isFocused}

@@ -49,7 +49,7 @@ export const useComposerStatus = () => {
   );
 
   const showLoadingIndicator =
-    (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
+    (!uiState.embeddedShellFocused || uiState.isBackgroundTaskVisible) &&
     uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
 

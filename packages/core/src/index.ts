@@ -164,12 +164,6 @@ export * from './services/executionLifecycleService.js';
 // Export Injection Service
 export * from './config/injectionService.js';
 
-// Export Execution Lifecycle Service
-export * from './services/executionLifecycleService.js';
-
-// Export Injection Service
-export * from './config/injectionService.js';
-
 // Export base tool definitions
 export * from './tools/tools.js';
 export * from './tools/tool-error.js';

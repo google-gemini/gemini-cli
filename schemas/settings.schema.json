@@ -2394,6 +2394,14 @@
               "default": true,
               "type": "boolean"
             },
+            "backgroundCompletionBehavior": {
+              "title": "Background Completion Behavior",
+              "description": "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+              "markdownDescription": "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `silent`",
+              "default": "silent",
+              "type": "string",
+              "enum": ["silent", "inject", "notify"]
+            },
             "pager": {
               "title": "Pager",
               "description": "The pager command to use for shell output. Defaults to `cat`.",
