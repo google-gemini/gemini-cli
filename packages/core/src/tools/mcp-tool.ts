@@ -116,6 +116,31 @@ export function isMcpToolAnnotation(
 
 type ToolParams = Record<string, unknown>;
 
+/**
+ * Normalize an MCP tool's input schema so the top-level type is always
+ * "object".  Many providers (and the Gemini API itself in strict mode)
+ * require tool parameter schemas to have type:'object' at root.  MCP
+ * servers may omit this or supply a non-object type.
+ */
+export function normalizeToolSchema(schema: unknown): Record<string, unknown> {
+  const fallback: Record<string, unknown> = { type: 'object', properties: {} };
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return fallback;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- narrowed by typeof+Array guards above
+  const obj = schema as Record<string, unknown>;
+
+  const properties = obj['properties'];
+  const hasValidProperties =
+    properties && typeof properties === 'object' && !Array.isArray(properties);
+
+  return {
+    ...obj,
+    type: 'object',
+    properties: hasValidProperties ? properties : {},
+  };
+}
+
 // Discriminated union for MCP Content Blocks to ensure type safety.
 type McpTextBlock = {
   type: 'text';
@@ -367,12 +392,14 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   ToolParams,
   ToolResult
 > {
+  override readonly parameterSchema: Record<string, unknown>;
+
   constructor(
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
     readonly serverToolName: string,
     description: string,
-    override readonly parameterSchema: unknown,
+    rawParameterSchema: unknown,
     messageBus: MessageBus,
     readonly trust?: boolean,
     isReadOnly?: boolean,
@@ -382,6 +409,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly extensionId?: string,
     private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
+    const normalized = normalizeToolSchema(rawParameterSchema);
     super(
       nameOverride ??
         generateValidName(
@@ -390,13 +418,14 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Kind.Other,
-      parameterSchema,
+      normalized,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput,
       extensionName,
       extensionId,
     );
+    this.parameterSchema = normalized;
     this._isReadOnly = isReadOnly;
   }
 

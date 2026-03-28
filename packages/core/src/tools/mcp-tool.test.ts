@@ -19,7 +19,8 @@ import {
   DiscoveredMCPTool,
   generateValidName,
   formatMcpToolName,
-} from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+  normalizeToolSchema,
+} from './mcp-tool.js';
 import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -1110,6 +1111,123 @@ describe('MCP Tool Naming Regression Fixes', () => {
 
       const qn = tool.getFullyQualifiedName();
       expect(qn).toBe('mcp_123-server_tool');
+    });
+  });
+});
+
+describe('normalizeToolSchema', () => {
+  it('should return fallback for undefined', () => {
+    expect(normalizeToolSchema(undefined)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should return fallback for null', () => {
+    expect(normalizeToolSchema(null)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should return fallback for primitive values', () => {
+    expect(normalizeToolSchema('string')).toEqual({
+      type: 'object',
+      properties: {},
+    });
+    expect(normalizeToolSchema(42)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+    expect(normalizeToolSchema(true)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should return fallback for arrays', () => {
+    expect(normalizeToolSchema([{ type: 'string' }])).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should inject type:"object" when type is missing', () => {
+    const schema = { properties: { name: { type: 'string' } } };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: { name: { type: 'string' } },
+    });
+  });
+
+  it('should inject type:"object" when type is non-object', () => {
+    const schema = { type: 'string', properties: { x: { type: 'number' } } };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: { x: { type: 'number' } },
+    });
+  });
+
+  it('should add empty properties when missing and type is wrong', () => {
+    const schema = { type: 'array' };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should preserve a valid schema unchanged', () => {
+    const schema = {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Search query' } },
+      required: ['query'],
+    };
+    expect(normalizeToolSchema(schema)).toEqual(schema);
+  });
+
+  it('should preserve additional fields like description and required', () => {
+    const schema = {
+      description: 'Tool params',
+      required: ['a'],
+      properties: { a: { type: 'string' } },
+    };
+    const result = normalizeToolSchema(schema);
+    expect(result).toEqual({
+      description: 'Tool params',
+      required: ['a'],
+      type: 'object',
+      properties: { a: { type: 'string' } },
+    });
+  });
+
+  it('should return fallback for empty object', () => {
+    expect(normalizeToolSchema({})).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should fix null properties even when type is already object', () => {
+    const schema = { type: 'object', properties: null };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should fix non-object properties when type is already object', () => {
+    const schema = { type: 'object', properties: 'invalid' };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
+    });
+  });
+
+  it('should fix array properties when type is already object', () => {
+    const schema = { type: 'object', properties: [{ type: 'string' }] };
+    expect(normalizeToolSchema(schema)).toEqual({
+      type: 'object',
+      properties: {},
     });
   });
 });

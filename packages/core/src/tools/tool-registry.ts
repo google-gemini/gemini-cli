@@ -17,7 +17,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
-import { DiscoveredMCPTool } from './mcp-tool.js';
+import { DiscoveredMCPTool, normalizeToolSchema } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
@@ -491,8 +491,8 @@ export class ToolRegistry {
             func.name,
             DISCOVERED_TOOL_PREFIX + func.name,
             func.description ?? '',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            parameters as Record<string, unknown>,
+             
+            normalizeToolSchema(parameters),
             this.messageBus,
           ),
         );
