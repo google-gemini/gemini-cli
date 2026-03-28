@@ -64,7 +64,7 @@ describe('<LoadingIndicator />', () => {
   });
 
   it('should not show cancel and timer when idle even if a phrase exists', async () => {
-    const { lastFrame, waitUntilReady } = renderWithContext(
+    const { lastFrame, waitUntilReady } = await renderWithContext(
       <LoadingIndicator currentLoadingPhrase="Retrying..." elapsedTime={5} />,
       StreamingState.Idle,
     );

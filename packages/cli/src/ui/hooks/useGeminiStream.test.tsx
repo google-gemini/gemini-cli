@@ -1732,7 +1732,7 @@ describe('useGeminiStream', () => {
     });
 
     it('should ignore late retry events after cancellation', async () => {
-      const { result } = renderTestHook();
+      const { result } = await renderTestHook();
       const retryPayload = {
         model: 'gemini-2.5-pro',
         attempt: 2,
