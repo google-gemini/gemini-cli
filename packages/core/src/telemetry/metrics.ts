@@ -502,10 +502,12 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
     unit: 'ms',
     valueType: ValueType.INT,
     assign: (h: Histogram) => (toolExecutionBreakdownHistogram = h),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+     
     attributes: {} as {
-      function_name: string;
-      phase: ToolExecutionPhase;
+      function_name?: string;
+      toolName?: string;
+      phase?: ToolExecutionPhase;
+      status?: 'success' | 'error';
     },
   },
   [TOKEN_EFFICIENCY]: {
