@@ -82,9 +82,9 @@ export const useLoadingIndicator = ({
   const retryPhrase = retryStatus
     ? errorVerbosity === 'low'
       ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
-        ? "This is taking a bit longer, we're still on it."
+        ? 'System busy. Retrying...'
         : null
-      : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+      : `Retrying ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
     : null;
 
   return {

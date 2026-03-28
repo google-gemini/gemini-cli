@@ -1048,7 +1048,7 @@ describe('useGeminiStream', () => {
     ).toBe(false);
     expect(
       infoTexts.some((text) =>
-        text.includes('This request failed. Press F12 for diagnostics'),
+        text.includes('Request failed. Press F12 for diagnostics'),
       ),
     ).toBe(false);
   });
@@ -1108,15 +1108,13 @@ describe('useGeminiStream', () => {
       ([item]) => (item as { text?: string }).text ?? '',
     );
     const noteIndex = infoTexts.findIndex((text) =>
-      text.includes(
-        'Some internal tool attempts failed before this final error',
-      ),
+      text.includes('Previous tool attempts failed'),
     );
     const stopIndex = infoTexts.findIndex((text) =>
       text.includes('Agent execution stopped: Stop reason from hook'),
     );
     const failureHintIndex = infoTexts.findIndex((text) =>
-      text.includes('This request failed. Press F12 for diagnostics'),
+      text.includes('Request failed. Press F12 for diagnostics'),
     );
     expect(noteIndex).toBeGreaterThanOrEqual(0);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
