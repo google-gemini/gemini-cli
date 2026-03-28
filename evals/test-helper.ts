@@ -338,14 +338,28 @@ export async function prepareLogDir(name: string) {
  * Symlinks node_modules to the test directory to speed up tests that need to run tools.
  */
 export function symlinkNodeModules(testDir: string) {
-  const rootNodeModules = path.join(process.cwd(), 'node_modules');
-  const testNodeModules = path.join(testDir, 'node_modules');
+  const rootNodeModules = path.resolve(process.cwd(), 'node_modules');
+  const testNodeModules = path.resolve(testDir, 'node_modules');
   if (
     testDir &&
     fs.existsSync(rootNodeModules) &&
     !fs.existsSync(testNodeModules)
   ) {
-    fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+    try {
+      // On Windows, directory symlinks require Developer Mode or elevation.
+      // Junctions work without either, but require an absolute target path.
+      const type = process.platform === 'win32' ? 'junction' : 'dir';
+      fs.symlinkSync(rootNodeModules, testNodeModules, type);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'EPERM' || code === 'EACCES') {
+        console.warn(
+          `[evals] Could not link node_modules into test dir (${code}); continuing without symlink.`,
+        );
+        return;
+      }
+      throw err;
+    }
   }
 }
 
