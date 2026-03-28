@@ -3442,6 +3442,33 @@
         "useCliAuth": {
           "type": "boolean",
           "description": "Whether to use CLI authentication for telemetry (only for in-process exporters)."
+        },
+        "performanceMonitoring": {
+          "description": "Performance monitoring configuration.",
+          "$ref": "#/$defs/PerformanceMonitoringOptions"
+        }
+      }
+    },
+    "PerformanceMonitoringOptions": {
+      "type": "object",
+      "description": "Performance monitoring configuration for Gemini CLI.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enables performance monitoring."
+        },
+        "traceSamplingRate": {
+          "type": "number",
+          "description": "Sampling rate for traces (0.0 to 1.0)."
+        },
+        "memoryProfiling": {
+          "type": "boolean",
+          "description": "Enables memory profiling."
+        },
+        "disableExporter": {
+          "type": "boolean",
+          "description": "Disables export of OpenTelemetry data."
         }
       }
     },
