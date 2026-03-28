@@ -115,8 +115,19 @@ policy.** A subset that prove to be highly stable over time may be promoted to
   settings).
 - `assert`: An async function that takes the test rig and the result of the run
   and asserts that the result is correct.
+
+> **Note:** The `rig` parameter is an instance of `TestRig` from
+> `@google/gemini-cli-test-utils`. It provides utilities to inspect the agent's
+> state, files written, and tool calls made during the evaluation. For available
+> methods and properties, see
+> [`test-rig.ts`](../packages/test-utils/src/test-rig.ts).
+
 - `log`: An optional boolean that, if set to `true`, will log the tool calls to
   a file in the `evals/logs` directory.
+- `approvalMode`: An optional string that controls how tool confirmations are
+  handled during the evaluation. Defaults to `'yolo'`, which means all tool
+  calls are auto-approved so evals can run non-interactively without requiring
+  manual confirmation.
 
 ### Example
 
@@ -175,6 +186,12 @@ of the individual executions passed.
 
 Googlers can schedule a manual run against their branch by clicking the link
 above.
+
+> **Note for external contributors:** If you are not a Googler, you do not have
+> access to manually trigger the nightly workflow. This is expected — simply
+> open your pull request with your changes and leave a comment asking a
+> maintainer to trigger the nightly eval run for you. Maintainers are happy to
+> help once they have done an initial review of your PR.
 
 Tests should score at least 66% with key models including Gemini 3.1 pro, Gemini
 3.0 pro, and Gemini 3 flash prior to check in and they must pass 100% of the
