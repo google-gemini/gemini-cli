@@ -1,4 +1,12 @@
-name: 'Trigger Docs Rebuild'
+name: 'Trigger Docs Rebuild'            - name: Summary Issues
+  # You may pin to the exact commit or the version.
+  # uses: sourcegraph/summary-issues@9a33468abb4f7415f4dad4424f7ad8aee136fbe9
+  uses: sourcegraph/summary-issues@v1.2.1
+  with:
+    # The newest comment on an issue that matches this regular expression is used in the summary. If not provided, the most recent comment is always used.
+    summaryCommentRegex: # optional
+
+          
 on:
   push:
     branches:
