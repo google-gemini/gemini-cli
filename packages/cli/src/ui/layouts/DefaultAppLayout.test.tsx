@@ -25,7 +25,7 @@ const mockUIState = {
   dialogsVisible: false,
   streamingState: StreamingState.Idle,
   isBackgroundShellListOpen: false,
-  mainControlsRef: { current: null },
+  mainControlsRef: vi.fn(),
   customDialog: null,
   historyManager: { addItem: vi.fn() },
   history: [],
