@@ -438,15 +438,21 @@ export function useCommandCompletion({
       const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
 
+      const isAlreadyComplete =
+        completedText === (buffer.lines[cursorRow] || '');
+
       let shouldAddSpace = true;
       if (completionMode === CompletionMode.SLASH) {
         const command =
           slashCompletionRange.getCommandFromSuggestion(suggestion);
         // Don't add a space if the command has an action (can be executed)
         // and doesn't have a completion function (doesn't REQUIRE more arguments)
+        // UNLESS it's already complete in the buffer, in which case the user
+        // probably wants a space to start typing subcommands or arguments.
         const isExecutableCommand = !!(command && command.action);
         const requiresArguments = !!(command && command.completion);
-        shouldAddSpace = !isExecutableCommand || requiresArguments;
+        shouldAddSpace =
+          !isExecutableCommand || requiresArguments || isAlreadyComplete;
       }
 
       if (
