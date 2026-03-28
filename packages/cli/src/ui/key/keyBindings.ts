@@ -105,6 +105,9 @@ export enum Command {
   UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
   SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'background.unfocusWarning',
+
+  // Voice Input
+  VOICE_INPUT = 'input.voice',
 }
 
 /**
@@ -402,6 +405,8 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  // Voice Input — triggered by double-space on empty input (see InputPrompt.tsx)
+  [Command.VOICE_INPUT, []],
 ]);
 
 interface CommandCategory {
@@ -529,6 +534,10 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
     ],
   },
+  {
+    title: 'Voice Input',
+    commands: [Command.VOICE_INPUT],
+  },
 ];
 
 /**
@@ -638,6 +647,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from background shell.',
+
+  // Voice Input
+  [Command.VOICE_INPUT]:
+    'Toggle voice input recording (press space twice rapidly).',
 };
 
 const keybindingsSchema = z.array(

@@ -22,6 +22,7 @@ import {
 } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
+import { VoiceContext } from './contexts/VoiceContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -115,6 +116,7 @@ import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
+import { useVoiceInput, type VoiceInputConfig } from './hooks/useVoiceInput.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
 import { Command } from './key/keyMatchers.js';
@@ -207,6 +209,28 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
+
+  const rawProvider = settings.merged.voice?.provider;
+  const voiceConfig = useMemo<VoiceInputConfig>(
+    () => ({
+      provider:
+        rawProvider === 'gemini' || rawProvider === 'whisper'
+          ? rawProvider
+          : undefined,
+      whisperPath: settings.merged.voice?.whisperPath,
+      silenceThreshold: settings.merged.voice?.silenceThreshold,
+      config,
+    }),
+    [
+      rawProvider,
+      settings.merged.voice?.whisperPath,
+      settings.merged.voice?.silenceThreshold,
+      config,
+    ],
+  );
+  const voice = useVoiceInput(
+    settings.merged.voice?.enabled ? voiceConfig : undefined,
+  );
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -913,6 +937,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      toggleVoice: voice.toggleRecording,
     }),
     [
       setAuthState,
@@ -932,6 +957,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      voice,
     ],
   );
 
@@ -1690,6 +1716,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
+      if (voice.state.isRecording || voice.state.isTranscribing) {
+        if (key.name === 'escape') {
+          void voice.cancelRecording();
+          return true;
+        }
+        if (keyMatchers[Command.QUIT](key)) {
+          void voice.cancelRecording();
+          return true;
+        }
+      }
+
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
@@ -1759,6 +1796,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
+        return true;
+      } else if (keyMatchers[Command.VOICE_INPUT](key)) {
+        void voice.toggleRecording();
         return true;
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
@@ -1888,6 +1928,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.devtools,
       showErrorDetails,
       triggerExpandHint,
+      voice,
       keyMatchers,
       isHelpDismissKey,
     ],
@@ -2641,7 +2682,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
           >
             <ToolActionsProvider config={config} toolCalls={allToolCalls}>
               <ShellFocusContext.Provider value={isFocused}>
-                <App key={`app-${forceRerenderKey}`} />
+                <VoiceContext.Provider value={voice}>
+                  <App key={`app-${forceRerenderKey}`} />
+                </VoiceContext.Provider>
               </ShellFocusContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>

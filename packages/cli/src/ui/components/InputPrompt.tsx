@@ -77,6 +77,11 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import {
+  useVoiceContext,
+  onVoiceTranscript,
+} from '../contexts/VoiceContext.js';
+import Spinner from 'ink-spinner';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
@@ -268,6 +273,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
+  // Double-space voice trigger: track last space press time (only fires on empty input)
+  const lastSpacePressRef = useRef<number>(0);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -354,6 +361,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     },
     [],
   );
+
+  // Voice input hook - MUST be before handleSubmit
+  // NOTE: Transcript is delivered via events, not context, to avoid infinite render loops
+  const {
+    isEnabled: voiceEnabled,
+    state: voiceState,
+    toggleRecording,
+    cancelRecording,
+  } = useVoiceContext();
+  // Handle voice transcript via event listener (not context) to avoid re-renders
+  useEffect(() => {
+    const handleTranscript = (transcript: string) => {
+      // Insert transcribed text at cursor position with trailing space for next input
+      buffer.insert(transcript + ' ');
+    };
+
+    return onVoiceTranscript(handleTranscript);
+  }, [buffer]);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -692,6 +717,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation;
 
+      // Hide the shortcuts panel if voice is active or if other keys are pressed
+      if (shortcutsHelpVisible) {
+        setShortcutsHelpVisible(false);
+      }
+
+      // Cancel active voice transcription if escape is hit
+      if (key.name === 'escape') {
+        if (voiceState.isRecording || voiceState.isTranscribing) {
+          void cancelRecording();
+          resetEscapeState();
+          return true;
+        }
+      }
       const isQueueMessageKey = keyMatchers[Command.QUEUE_MESSAGE](key);
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
@@ -752,7 +790,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         resetPlainTabPress();
       }
-
       if (key.name === 'paste') {
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
@@ -855,6 +892,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.ESCAPE](key)) {
+        if (voiceState.isRecording) {
+          void cancelRecording();
+          return true;
+        }
+
         const cancelSearch = (
           setActive: (active: boolean) => void,
           resetCompletion: () => void,
@@ -909,9 +951,55 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.QUIT](key)) {
+        if (voiceState.isRecording) {
+          void cancelRecording();
+          return true;
+        }
+      }
+
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         setBannerVisible(false);
         onClearScreen();
+        return true;
+      }
+
+      // Reset double-space timer on any non-space key
+      if (key.sequence !== ' ') {
+        lastSpacePressRef.current = 0;
+      }
+
+      // Double-space triggers voice recording.
+      if (voiceEnabled && key.sequence === ' ') {
+        const now = Date.now();
+        const delta = now - lastSpacePressRef.current;
+
+        // If they are just holding down the spacebar, the OS will send repeated keys
+        // very quickly (e.g. every 30ms). We don't want to trigger voice on continuous hold.
+        if (delta > 50 && delta < 300) {
+          lastSpacePressRef.current = 0;
+
+          // The first space was already inserted into the buffer on the previous keypress
+          // (because we let it pass through to keep typing feeling responsive).
+          // We must manually delete that first space now before starting recording.
+          if (buffer.text.length > 0 && buffer.text.endsWith(' ')) {
+            buffer.setText(buffer.text.slice(0, -1));
+          }
+
+          void toggleRecording();
+          return true; // Consume the second space
+        }
+
+        lastSpacePressRef.current = now;
+
+        // Consume the first space only if the buffer is empty to avoid leading whitespace.
+        // If not empty, let it through so normal typing isn't delayed.
+        if (buffer.text.length === 0) {
+          return true;
+        }
+      }
+      if (voiceEnabled && keyMatchers[Command.VOICE_INPUT](key)) {
+        void toggleRecording();
         return true;
       }
 
@@ -1335,6 +1423,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shouldShowSuggestions,
       isShellSuggestionsVisible,
       forceShowShellSuggestions,
+      voiceEnabled,
+      toggleRecording,
+      cancelRecording,
+      voiceState.isRecording,
+      voiceState.isTranscribing,
       keyMatchers,
       isHelpDismissKey,
       settings,
@@ -1510,6 +1603,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  // Voice input status
+  // ⚠️ Voice state intentionally overrides mode indicators
+  // (recording must always be visible regardless of approval mode)
+  if (voiceState.isRecording) {
+    statusColor = theme.status.error;
+    statusText = 'Recording... (Space Space or Esc to stop)';
+  } else if (voiceState.isTranscribing) {
+    statusColor = theme.status.warning;
+    statusText = 'Transcribing...';
+  }
+
+  // Dynamic placeholder reflecting voice state
+  const effectivePlaceholder = voiceState.isRecording
+    ? 'Speak now...'
+    : voiceState.isTranscribing
+      ? 'Transcribing your speech...'
+      : placeholder;
+
   const suggestionsNode = shouldShowSuggestions ? (
     <Box paddingRight={2}>
       <SuggestionsDisplay
@@ -1585,30 +1696,36 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   (r:){' '}
                 </Text>
               ) : (
-                '!'
+                '! '
               )
             ) : commandSearchActive ? (
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
-              '*'
+              '* '
+            ) : voiceState.isRecording ? (
+              '● '
+            ) : voiceState.isTranscribing ? (
+              <>
+                <Spinner type="dots" />{' '}
+              </>
             ) : (
-              '>'
-            )}{' '}
+              '> '
+            )}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
+            {buffer.text.length === 0 && effectivePlaceholder ? (
               showCursor ? (
                 <Text
                   terminalCursorFocus={showCursor}
                   terminalCursorPosition={0}
                 >
-                  {chalk.inverse(placeholder.slice(0, 1))}
+                  {chalk.inverse(effectivePlaceholder.slice(0, 1))}
                   <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
+                    {effectivePlaceholder.slice(1)}
                   </Text>
                 </Text>
               ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
+                <Text color={theme.text.secondary}>{effectivePlaceholder}</Text>
               )
             ) : (
               linesToRender

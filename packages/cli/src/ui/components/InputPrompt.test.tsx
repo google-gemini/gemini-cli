@@ -3654,7 +3654,7 @@ describe('InputPrompt', () => {
         });
 
         // Simulate left mouse press at calculated coordinates.
-        // Without left border: inner box is at x=3, y=1 based on padding(1)+prompt(2) and border-top(1).
+        // Without left border: inner box is at x=2, y=1 based on padding(1)+prompt(1) and border-top(1).
         await act(async () => {
           stdin.write(`\x1b[<0;${mouseCol};${mouseRow}M`);
         });

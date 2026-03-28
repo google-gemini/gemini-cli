@@ -828,6 +828,64 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  voice: {
+    type: 'object',
+    label: 'Voice Input',
+    category: 'General',
+    requiresRestart: false,
+    default: {},
+    description:
+      'Settings for voice input. Note: Voice input is not natively supported in WSL2 (Windows Subsystem for Linux).',
+    showInDialog: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Voice Input',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable voice input support. Note: Voice input is not natively supported in WSL2 (Windows Subsystem for Linux).',
+        showInDialog: true,
+      },
+      provider: {
+        type: 'enum',
+        label: 'Transcription Backend',
+        category: 'General',
+        requiresRestart: false,
+        default: 'gemini',
+        description:
+          'Transcription backend: "gemini" (default, zero-install) or "whisper" (local).',
+        showInDialog: true,
+        options: [
+          { value: 'gemini', label: 'Gemini (Cloud)' },
+          { value: 'whisper', label: 'Whisper (Local)' },
+        ],
+      },
+      whisperPath: {
+        type: 'string',
+        label: 'Whisper Binary Path',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description:
+          'Path to the whisper executable. Only used when provider is "whisper".',
+        showInDialog: true,
+      },
+      silenceThreshold: {
+        type: 'number',
+        label: 'Silence Detection Threshold',
+        category: 'General',
+        requiresRestart: false,
+        default: 80,
+        description:
+          'RMS energy threshold (0–1000) below which audio is discarded as silence. ' +
+          'Lower values allow quieter speech such as whispering. 0 disables silence detection.',
+        showInDialog: true,
+      },
+    },
+  },
+
   ide: {
     type: 'object',
     label: 'IDE',
