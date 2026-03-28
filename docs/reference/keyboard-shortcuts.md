@@ -86,12 +86,13 @@ available combinations.
 
 #### Text Input
 
-| Command                    | Action                                                     | Keys                                                                                |
-| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `input.submit`             | Submit the current prompt.                                 | `Enter`                                                                             |
-| `input.newline`            | Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| `input.openExternalEditor` | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
-| `input.paste`              | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                    | Action                                                                    | Keys                                                                                |
+| -------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`             | Submit the current prompt.                                                | `Enter`                                                                             |
+| `input.queueMessage`       | Queue the current prompt to be processed after the current task finishes. | `Tab`                                                                               |
+| `input.newline`            | Insert a newline without submitting.                                      | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor` | Open the current prompt or the plan in an external editor.                | `Ctrl+X`                                                                            |
+| `input.paste`              | Paste from the clipboard.                                                 | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 

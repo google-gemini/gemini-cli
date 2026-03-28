@@ -152,6 +152,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
+          onQueueMessage={uiActions.addMessage}
           placeholder={
             vimEnabled
               ? vimMode === 'INSERT'

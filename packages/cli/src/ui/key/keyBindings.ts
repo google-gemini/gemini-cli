@@ -74,6 +74,7 @@ export enum Command {
 
   // Text Input
   SUBMIT = 'input.submit',
+  QUEUE_MESSAGE = 'input.queueMessage',
   NEWLINE = 'input.newline',
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
@@ -354,6 +355,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
   [Command.SUBMIT, [new KeyBinding('enter')]],
+  [Command.QUEUE_MESSAGE, [new KeyBinding('tab')]],
   [
     Command.NEWLINE,
     [
@@ -488,6 +490,7 @@ export const commandCategories: readonly CommandCategory[] = [
     title: 'Text Input',
     commands: [
       Command.SUBMIT,
+      Command.QUEUE_MESSAGE,
       Command.NEWLINE,
       Command.OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
@@ -593,6 +596,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
 
   // Text Input
   [Command.SUBMIT]: 'Submit the current prompt.',
+  [Command.QUEUE_MESSAGE]:
+    'Queue the current prompt to be processed after the current task finishes.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
     'Open the current prompt or the plan in an external editor.',
