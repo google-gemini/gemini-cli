@@ -9,7 +9,8 @@ import type { Content } from '@google/genai';
 export function isFunctionResponse(content: Content): boolean {
   return (
     content.role === 'user' &&
-    !!content.parts &&
+    Array.isArray(content.parts) &&
+    content.parts.length > 0 &&
     content.parts.every((part) => !!part.functionResponse)
   );
 }
@@ -17,7 +18,8 @@ export function isFunctionResponse(content: Content): boolean {
 export function isFunctionCall(content: Content): boolean {
   return (
     content.role === 'model' &&
-    !!content.parts &&
+    Array.isArray(content.parts) &&
+    content.parts.length > 0 &&
     content.parts.every((part) => !!part.functionCall)
   );
 }

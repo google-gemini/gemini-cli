@@ -2079,6 +2079,23 @@ describe('AppContainer State Management', () => {
     });
 
     describe('CTRL+C', () => {
+      it('should not trigger quit flow when input buffer has text', async () => {
+        mockedUseTextBuffer.mockReturnValue({
+          text: 'hello world',
+          setText: vi.fn(),
+          lines: ['hello world'],
+          cursor: [0, 11],
+          handleInput: vi.fn().mockReturnValue(false),
+        });
+        await setupKeypressTest();
+
+        pressKey('\x03'); // Ctrl+C
+
+        expect(mockCancelOngoingRequest).not.toHaveBeenCalled();
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+
       it('should cancel ongoing request on first press', async () => {
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
