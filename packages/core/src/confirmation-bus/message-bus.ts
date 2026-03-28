@@ -19,6 +19,13 @@ export class MessageBus extends EventEmitter {
   ) {
     super();
     this.debug = debug;
+
+    //Register a default handler here so that fire-and-forget publish() calls never produce an unhandled 'error' event
+    this.on('error', (err: unknown) => {
+      debugLogger.debug(
+        `[MESSAGE_BUS] Unhandled publish error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
   }
 
   private isValidMessage(message: Message): boolean {
@@ -193,9 +200,16 @@ export class MessageBus extends EventEmitter {
       // Subscribe to responses
       this.subscribe<TResponse>(responseType, responseHandler);
 
-      // Publish the request with correlation ID
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, @typescript-eslint/no-unsafe-type-assertion
-      this.publish({ ...request, correlationId } as TRequest);
+      // Publish the request with correlation ID.  If publish() fails (e.g.
+      // isValidMessage rejects, policy check throws), propagate the error
+      // immediately instead of silently hanging until the 60-second timeout.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      this.publish({ ...request, correlationId } as TRequest).catch(
+        (err: unknown) => {
+          cleanup();
+          reject(err instanceof Error ? err : new Error(String(err)));
+        },
+      );
     });
   }
 }
