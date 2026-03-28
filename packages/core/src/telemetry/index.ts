@@ -160,3 +160,17 @@ export {
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
 export { startupProfiler, StartupProfiler } from './startupProfiler.js';
 export * from './constants.js';
+export {
+  captureLeakSnapshot,
+  calculateGrowth,
+  analyzeSnapshots,
+  formatLeakReport,
+} from './three-snapshot-leak-detector.js';
+export type {
+  LeakDetectorSnapshot,
+  HeapSpaceEntry,
+  GrowthDelta,
+  SuspectedLeak,
+  LeakDetectionResult,
+  LeakDetectorConfig,
+} from './three-snapshot-leak-detector.js';
