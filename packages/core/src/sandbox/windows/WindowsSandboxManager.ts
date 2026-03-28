@@ -34,6 +34,7 @@ import {
   isStrictlyApproved,
 } from './commandSafety.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,8 +67,8 @@ export class WindowsSandboxManager implements SandboxManager {
     return isDangerousCommand(args);
   }
 
-  parseDenials(_result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return undefined; // TODO: Implement Windows-specific denial parsing
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parseWindowsSandboxDenials(result);
   }
 
   /**
@@ -256,6 +257,10 @@ export class WindowsSandboxManager implements SandboxManager {
         false,
     };
 
+    const defaultNetwork =
+      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+    const networkAccess = defaultNetwork || mergedAdditional.network;
+
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the workspace.
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
@@ -277,7 +282,7 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(includeDir);
     }
 
-    // Grant "Low Mandatory Level" read access to allowedPaths.
+    // Grant "Low Mandatory Level" read/write access to allowedPaths.
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       const resolved = await tryRealpath(allowedPath);
@@ -437,7 +442,11 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      await spawnAsync('icacls', [
+        resolvedPath,
+        '/setintegritylevel',
+        '(OI)(CI)Low',
+      ]);
       this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(

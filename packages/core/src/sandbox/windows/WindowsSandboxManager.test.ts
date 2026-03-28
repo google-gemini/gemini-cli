@@ -158,7 +158,7 @@ describe('WindowsSandboxManager', () => {
     expect(icaclsArgs).toContainEqual([
       persistentPath,
       '/setintegritylevel',
-      'Low',
+      '(OI)(CI)Low',
     ]);
   });
 
@@ -227,13 +227,13 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         path.resolve(testCwd),
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
 
       expect(icaclsArgs).toContainEqual([
         path.resolve(allowedPath),
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     } finally {
       fs.rmSync(allowedPath, { recursive: true, force: true });
@@ -273,7 +273,7 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         path.resolve(extraWritePath),
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     } finally {
       fs.rmSync(extraWritePath, { recursive: true, force: true });
@@ -308,7 +308,7 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).not.toContainEqual([
         uncPath,
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     },
   );
@@ -343,12 +343,12 @@ describe('WindowsSandboxManager', () => {
       expect(icaclsArgs).toContainEqual([
         longPath,
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
       expect(icaclsArgs).toContainEqual([
         devicePath,
         '/setintegritylevel',
-        'Low',
+        '(OI)(CI)Low',
       ]);
     },
   );

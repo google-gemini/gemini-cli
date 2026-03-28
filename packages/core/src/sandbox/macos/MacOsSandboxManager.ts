@@ -90,7 +90,7 @@ export class MacOsSandboxManager implements SandboxManager {
 
     const workspaceWrite = !isReadonlyMode || isApproved;
     const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
 
     // Fetch persistent approvals for this command
     const commandName = await getFullCommandName(currentReq);
