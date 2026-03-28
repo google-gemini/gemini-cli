@@ -787,7 +787,13 @@ export class GeminiClient {
     }
 
     if (loopDetectedAbort) {
-      controller.abort();
+      // Delay the abort slightly to allow the current event loop iteration
+      // (and the generator yield) to complete.
+      // This prevents the underlying stream (and node-fetch) from synchronously
+      // emitting an unhandled 'error' event while the ReadableStreamToAsyncIterable
+      // wrapper has temporarily detached its listeners.
+      // See Issue #20106.
+      setTimeout(() => controller.abort(), 0);
       return turn;
     }
 
