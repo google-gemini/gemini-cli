@@ -920,6 +920,32 @@ describe('loadCliConfig', () => {
 
     expect(config.isInteractive()).toBe(false);
   });
+
+  it('should pass environmentVariableRedaction.allowed into sanitization config', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      security: {
+        environmentVariableRedaction: {
+          allowed: ['MY_ALLOWED_VAR', 'ANOTHER_SAFE_VAR'],
+          blocked: ['MY_BLOCKED_VAR'],
+          enabled: true,
+        },
+      },
+    });
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.sanitizationConfig.allowedEnvironmentVariables).toEqual([
+      'MY_ALLOWED_VAR',
+      'ANOTHER_SAFE_VAR',
+    ]);
+    expect(config.sanitizationConfig.blockedEnvironmentVariables).toEqual([
+      'MY_BLOCKED_VAR',
+    ]);
+    expect(config.sanitizationConfig.enableEnvironmentVariableRedaction).toBe(
+      true,
+    );
+  });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
