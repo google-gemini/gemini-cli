@@ -33,23 +33,11 @@ import {
   isDangerousCommand,
   isStrictlyApproved,
 } from './commandSafety.js';
-import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-export interface WindowsSandboxOptions extends GlobalSandboxOptions {
-  /** The current sandbox mode behavior from config. */
-  modeConfig?: {
-    readonly?: boolean;
-    network?: boolean;
-    approvedTools?: string[];
-    allowOverrides?: boolean;
-  };
-  /** The policy manager for persistent approvals. */
-  policyManager?: SandboxPolicyManager;
-}
 
 /**
  * A SandboxManager implementation for Windows that uses Restricted Tokens,
@@ -62,7 +50,7 @@ export class WindowsSandboxManager implements SandboxManager {
   private readonly allowedCache = new Set<string>();
   private readonly deniedCache = new Set<string>();
 
-  constructor(private readonly options: WindowsSandboxOptions) {
+  constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
   }
 
@@ -79,8 +67,8 @@ export class WindowsSandboxManager implements SandboxManager {
     return isDangerousCommand(args);
   }
 
-  parseDenials(_result: ShellExecutionResult): ParsedSandboxDenial | undefined {
-    return undefined; // TODO: Implement Windows-specific denial parsing
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parseWindowsSandboxDenials(result);
   }
 
   /**
@@ -248,6 +236,10 @@ export class WindowsSandboxManager implements SandboxManager {
         false,
     };
 
+    const defaultNetwork =
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+    const networkAccess = defaultNetwork || mergedAdditional.network;
+
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the workspace.
     // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
@@ -263,7 +255,7 @@ export class WindowsSandboxManager implements SandboxManager {
       await this.grantLowIntegrityAccess(this.options.workspace);
     }
 
-    // Grant "Low Mandatory Level" read access to allowedPaths.
+    // Grant "Low Mandatory Level" read/write access to allowedPaths.
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
     for (const allowedPath of allowedPaths) {
       await this.grantLowIntegrityAccess(allowedPath);
@@ -309,7 +301,7 @@ export class WindowsSandboxManager implements SandboxManager {
     // is restricted to avoid host corruption. External commands rely on
     // Low Integrity read/write restrictions, while internal commands
     // use the manifest for enforcement.
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const forbiddenPath of forbiddenPaths) {
       try {
         await this.denyLowIntegrityAccess(forbiddenPath);
@@ -353,10 +345,6 @@ export class WindowsSandboxManager implements SandboxManager {
     // 5. Construct the helper command
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
-
-    const defaultNetwork =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
-    const networkAccess = defaultNetwork || mergedAdditional.network;
 
     const args = [
       networkAccess ? '1' : '0',
@@ -407,7 +395,11 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      await spawnAsync('icacls', [
+        resolvedPath,
+        '/setintegritylevel',
+        '(OI)(CI)Low',
+      ]);
       this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
