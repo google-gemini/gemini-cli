@@ -420,7 +420,9 @@ describe('useSlashCompletion', () => {
         // 'review' should be first because it is an exact match
         expect(result.current.suggestions[0].label).toBe('review');
 
-        const labels = result.current.suggestions.map((s) => s.label);
+        const labels = result.current.suggestions.map(
+          (s: Suggestion) => s.label,
+        );
         expect(labels).toContain('review');
         expect(labels).toContain('review-frontend');
         expect(labels).toContain('oncall:pr-review');
@@ -429,7 +431,7 @@ describe('useSlashCompletion', () => {
       unmount();
     });
 
-    it('should show the same selectable auto/checkpoint menu for /chat and /resume', async () => {
+    describe('Auto/checkpoint menu behaviors', () => {
       const checkpointSubCommands = [
         createTestCommand({
           name: 'list',
@@ -441,6 +443,11 @@ describe('useSlashCompletion', () => {
           name: 'save',
           description: 'Save checkpoint',
           suggestionGroup: 'checkpoints',
+          action: vi.fn(),
+        }),
+        createTestCommand({
+          name: 'resume',
+          description: 'Resume checkpoint',
           action: vi.fn(),
         }),
       ];
@@ -460,57 +467,82 @@ describe('useSlashCompletion', () => {
         }),
       ];
 
-      const { result: chatResult, unmount: unmountChat } = await renderHook(
-        () =>
+      it('should show the same selectable auto/checkpoint menu for /chat and /resume', async () => {
+        const { result: chatResult, unmount: unmountChat } = await renderHook(
+          () =>
+            useTestHarnessForSlashCompletion(
+              true,
+              '/chat ',
+              slashCommands,
+              mockCommandContext,
+            ),
+        );
+
+        await resolveMatch();
+
+        await waitFor(() => {
+          expect(chatResult.current.suggestions[0]).toMatchObject({
+            label: 'list',
+            sectionTitle: 'auto',
+            submitValue: '/chat',
+          });
+        });
+
+        const { result: resumeResult, unmount: unmountResume } =
+          await renderHook(() =>
+            useTestHarnessForSlashCompletion(
+              true,
+              '/resume ',
+              slashCommands,
+              mockCommandContext,
+            ),
+          );
+
+        await resolveMatch();
+
+        await waitFor(() => {
+          expect(resumeResult.current.suggestions[0]).toMatchObject({
+            label: 'list',
+            sectionTitle: 'auto',
+            submitValue: '/resume',
+          });
+        });
+
+        const chatCheckpointLabels = chatResult.current.suggestions
+          .slice(1)
+          .map((s) => s.label);
+        const resumeCheckpointLabels = resumeResult.current.suggestions
+          .slice(1)
+          .map((s) => s.label);
+
+        expect(chatCheckpointLabels).toEqual(resumeCheckpointLabels);
+
+        unmountChat();
+        unmountResume();
+      });
+
+      it('should not inject the auto/checkpoint menu if it does not match the partial subcommand', async () => {
+        const { result, unmount } = await renderHook(() =>
           useTestHarnessForSlashCompletion(
             true,
-            '/chat ',
+            '/chat r',
             slashCommands,
             mockCommandContext,
           ),
-      );
+        );
 
-      await resolveMatch();
+        await resolveMatch();
 
-      await waitFor(() => {
-        expect(chatResult.current.suggestions[0]).toMatchObject({
-          label: 'list',
-          sectionTitle: 'auto',
-          submitValue: '/chat',
+        await waitFor(() => {
+          const labels = result.current.suggestions.map(
+            (s: Suggestion) => s.label,
+          );
+          expect(labels).not.toContain('list');
+          expect(labels).toContain('resume');
         });
+
+        unmount();
       });
-
-      const { result: resumeResult, unmount: unmountResume } = await renderHook(
-        () =>
-          useTestHarnessForSlashCompletion(
-            true,
-            '/resume ',
-            slashCommands,
-            mockCommandContext,
-          ),
-      );
-
-      await resolveMatch();
-
-      await waitFor(() => {
-        expect(resumeResult.current.suggestions[0]).toMatchObject({
-          label: 'list',
-          sectionTitle: 'auto',
-          submitValue: '/resume',
-        });
-      });
-
-      const chatCheckpointLabels = chatResult.current.suggestions
-        .slice(1)
-        .map((s) => s.label);
-      const resumeCheckpointLabels = resumeResult.current.suggestions
-        .slice(1)
-        .map((s) => s.label);
-
-      expect(chatCheckpointLabels).toEqual(resumeCheckpointLabels);
-
-      unmountChat();
-      unmountResume();
     });
 
     it('should sort exact altName matches to the top', async () => {
