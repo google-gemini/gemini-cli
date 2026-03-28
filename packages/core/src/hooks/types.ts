@@ -7,6 +7,8 @@
 import type {
   GenerateContentResponse,
   GenerateContentParameters,
+  Content,
+  Part,
   ToolConfig as GenAIToolConfig,
   ToolListUnion,
 } from '@google/genai';
@@ -270,8 +272,7 @@ export class DefaultHookOutput implements HookOutput {
         return undefined;
       }
 
-      // Sanitize by escaping < and > to prevent tag injection
-      return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return context;
     }
     return undefined;
   }
@@ -374,6 +375,8 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
   override applyLLMRequestModifications(
     target: GenerateContentParameters,
   ): GenerateContentParameters {
+    let resultTarget = target;
+
     if (this.hookSpecificOutput && 'llm_request' in this.hookSpecificOutput) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const hookRequest = this.hookSpecificOutput[
@@ -386,13 +389,114 @@ export class BeforeModelHookOutput extends DefaultHookOutput {
           hookRequest as LLMRequest,
           target,
         );
-        return {
+        resultTarget = {
           ...target,
           ...sdkRequest,
         };
       }
     }
-    return target;
+
+    const additionalContext = this.getAdditionalContext();
+    if (additionalContext) {
+      const originalContents = resultTarget.contents;
+      let contents: Content[];
+
+      const isPart = (obj: unknown): obj is Part =>
+        typeof obj === 'object' &&
+        obj !== null &&
+        !('role' in obj) &&
+        !('parts' in obj);
+
+      if (Array.isArray(originalContents)) {
+        const first = originalContents[0];
+        if (
+          first &&
+          typeof first !== 'string' &&
+          ('role' in first || 'parts' in first)
+        ) {
+          // It's already Content[]
+          contents = originalContents.map((c) => {
+            const contentObj =
+              typeof c === 'string'
+                ? { role: 'user', parts: [{ text: c }] }
+                : c;
+            if (
+              typeof contentObj === 'object' &&
+              contentObj !== null &&
+              ('role' in contentObj || 'parts' in contentObj)
+            ) {
+              return {
+                role:
+                  'role' in contentObj && typeof contentObj.role === 'string'
+                    ? contentObj.role
+                    : 'user',
+                parts:
+                  'parts' in contentObj && Array.isArray(contentObj.parts)
+                    ? [...contentObj.parts]
+                    : [],
+              };
+            }
+            return { role: 'user', parts: [] };
+          });
+        } else {
+          // It's Part[] or (Part | string)[]
+          const parts: Part[] = originalContents.reduce((acc, c) => {
+            if (typeof c === 'string') {
+              acc.push({ text: c });
+            } else if (isPart(c)) {
+              acc.push(c); // Safe because it lacks Content fields
+            }
+            return acc;
+          }, [] as Part[]);
+          contents = [{ role: 'user', parts }];
+        }
+      } else if (typeof originalContents === 'string') {
+        contents = [{ role: 'user', parts: [{ text: originalContents }] }];
+      } else if (
+        originalContents &&
+        typeof originalContents === 'object' &&
+        ('role' in originalContents || 'parts' in originalContents)
+      ) {
+        const c = originalContents;
+        contents = [
+          {
+            role: 'role' in c && typeof c.role === 'string' ? c.role : 'user',
+            parts: 'parts' in c && Array.isArray(c.parts) ? [...c.parts] : [],
+          },
+        ];
+      } else if (isPart(originalContents)) {
+        // It's a single Part
+        contents = [{ role: 'user', parts: [originalContents] }]; // Safe because it lacks Content fields
+      } else {
+        contents = [];
+      }
+
+      const wrappedContext = `\n\n${additionalContext}`;
+
+      let lastUserMessageIndex = -1;
+      for (let i = contents.length - 1; i >= 0; i--) {
+        if (contents[i].role === 'user') {
+          lastUserMessageIndex = i;
+          break;
+        }
+      }
+
+      if (lastUserMessageIndex !== -1) {
+        if (!contents[lastUserMessageIndex].parts) {
+          contents[lastUserMessageIndex].parts = [];
+        }
+        contents[lastUserMessageIndex].parts!.push({ text: wrappedContext });
+      } else {
+        contents.push({ role: 'user', parts: [{ text: wrappedContext }] });
+      }
+
+      resultTarget = {
+        ...resultTarget,
+        contents,
+      };
+    }
+
+    return resultTarget;
   }
 }
 
@@ -683,6 +787,7 @@ export interface BeforeModelOutput extends HookOutput {
     hookEventName: 'BeforeModel';
     llm_request?: Partial<LLMRequest>;
     llm_response?: LLMResponse;
+    additionalContext?: string;
   };
 }
 

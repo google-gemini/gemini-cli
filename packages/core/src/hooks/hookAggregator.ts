@@ -58,7 +58,7 @@ export class HookAggregator {
     }
 
     // Merge outputs using event-specific strategy
-    const mergedOutput = this.mergeOutputs(allOutputs, eventName);
+    const mergedOutput = this.mergeOutputs(results, eventName);
     const finalOutput = mergedOutput
       ? this.createSpecificHookOutput(mergedOutput, eventName)
       : undefined;
@@ -79,10 +79,11 @@ export class HookAggregator {
    * consistent default behaviors (e.g., default decision='allow' for OR logic)
    */
   private mergeOutputs(
-    outputs: HookOutput[],
+    results: HookExecutionResult[],
     eventName: HookEventName,
   ): HookOutput | undefined {
-    if (outputs.length === 0) {
+    const resultsWithOutput = results.filter((r) => r.output);
+    if (resultsWithOutput.length === 0) {
       return undefined;
     }
 
@@ -92,28 +93,25 @@ export class HookAggregator {
       case HookEventName.BeforeAgent:
       case HookEventName.AfterAgent:
       case HookEventName.SessionStart:
-        return this.mergeWithOrDecision(outputs);
+        return this.mergeWithOrDecision(resultsWithOutput);
 
       case HookEventName.BeforeModel:
       case HookEventName.AfterModel:
-        return this.mergeWithFieldReplacement(outputs);
+        return this.mergeWithFieldReplacement(resultsWithOutput);
 
       case HookEventName.BeforeToolSelection:
-        return this.mergeToolSelectionOutputs(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          outputs as BeforeToolSelectionOutput[],
-        );
+        return this.mergeToolSelectionOutputs(resultsWithOutput);
 
       default:
         // For other events, use simple merge
-        return this.mergeSimple(outputs);
+        return this.mergeSimple(resultsWithOutput);
     }
   }
 
   /**
    * Merge outputs with OR decision logic and message concatenation
    */
-  private mergeWithOrDecision(outputs: HookOutput[]): HookOutput {
+  private mergeWithOrDecision(results: HookExecutionResult[]): HookOutput {
     const merged: HookOutput = {
       continue: true,
       suppressOutput: false,
@@ -128,7 +126,9 @@ export class HookAggregator {
     let hasAskDecision = false;
     let hasContinueFalse = false;
 
-    for (const output of outputs) {
+    for (const result of results) {
+      const output = result.output!;
+
       // Handle continue flag
       if (output.continue === false) {
         hasContinueFalse = true;
@@ -184,7 +184,7 @@ export class HookAggregator {
       }
 
       // Collect additional context from hook-specific outputs
-      this.extractAdditionalContext(output, additionalContexts);
+      this.extractAdditionalContext(result, additionalContexts);
     }
 
     // Set final decision if no blocking or ask decision was found
@@ -219,10 +219,18 @@ export class HookAggregator {
   /**
    * Merge outputs with later fields replacing earlier fields
    */
-  private mergeWithFieldReplacement(outputs: HookOutput[]): HookOutput {
+  private mergeWithFieldReplacement(
+    results: HookExecutionResult[],
+  ): HookOutput {
     let merged: HookOutput = {};
+    const additionalContexts: string[] = [];
 
-    for (const output of outputs) {
+    for (const result of results) {
+      const output = result.output!;
+
+      // Collect additional context
+      this.extractAdditionalContext(result, additionalContexts);
+
       // Later outputs override earlier ones
       merged = {
         ...merged,
@@ -231,6 +239,14 @@ export class HookAggregator {
           ...merged.hookSpecificOutput,
           ...output.hookSpecificOutput,
         },
+      };
+    }
+
+    // Add merged additional context
+    if (additionalContexts.length > 0) {
+      merged.hookSpecificOutput = {
+        ...(merged.hookSpecificOutput || {}),
+        additionalContext: additionalContexts.join('\n'),
       };
     }
 
@@ -251,7 +267,7 @@ export class HookAggregator {
    * If one hook restricts and another re-enables, the union takes the re-enabled tool.
    */
   private mergeToolSelectionOutputs(
-    outputs: BeforeToolSelectionOutput[],
+    results: HookExecutionResult[],
   ): BeforeToolSelectionOutput {
     const merged: BeforeToolSelectionOutput = {};
 
@@ -259,7 +275,9 @@ export class HookAggregator {
     let hasNoneMode = false;
     let hasAnyMode = false;
 
-    for (const output of outputs) {
+    for (const result of results) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const output = result.output as BeforeToolSelectionOutput;
       const toolConfig = output.hookSpecificOutput?.toolConfig;
       if (!toolConfig) {
         continue;
@@ -314,11 +332,11 @@ export class HookAggregator {
   /**
    * Simple merge for events without special logic
    */
-  private mergeSimple(outputs: HookOutput[]): HookOutput {
+  private mergeSimple(results: HookExecutionResult[]): HookOutput {
     let merged: HookOutput = {};
 
-    for (const output of outputs) {
-      merged = { ...merged, ...output };
+    for (const result of results) {
+      merged = { ...merged, ...result.output! };
     }
 
     return merged;
@@ -351,10 +369,10 @@ export class HookAggregator {
    * Extract additional context from hook-specific outputs
    */
   private extractAdditionalContext(
-    output: HookOutput,
+    result: HookExecutionResult,
     contexts: string[],
   ): void {
-    const specific = output.hookSpecificOutput;
+    const specific = result.output?.hookSpecificOutput;
     if (!specific) {
       return;
     }
@@ -365,7 +383,15 @@ export class HookAggregator {
       // eslint-disable-next-line no-restricted-syntax
       typeof specific['additionalContext'] === 'string'
     ) {
-      contexts.push(specific['additionalContext']);
+      const hookName =
+        result.hookConfig.name || result.hookConfig.command || 'unknown-hook';
+      // Sanitize the context text before wrapping to prevent tag injection
+      const contextText = specific['additionalContext']
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      contexts.push(
+        `<hook_context hook="${hookName}">\n${contextText}\n</hook_context>`,
+      );
     }
   }
 }

@@ -423,6 +423,54 @@ describe('HookAggregator', () => {
       const llmRequest = output.hookSpecificOutput?.llm_request;
       expect(llmRequest?.['model']).toBe('model2'); // Later value wins
     });
+
+    it('should aggregate additionalContext for BeforeModel hooks', () => {
+      const results: HookExecutionResult[] = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'h1',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeModel,
+          success: true,
+          output: {
+            hookSpecificOutput: {
+              hookEventName: 'BeforeModel',
+              additionalContext: 'Context 1',
+            },
+          },
+          duration: 10,
+        },
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'h2',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeModel,
+          success: true,
+          output: {
+            hookSpecificOutput: {
+              hookEventName: 'BeforeModel',
+              additionalContext: 'Context 2',
+            },
+          },
+          duration: 10,
+        },
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.BeforeModel,
+      );
+
+      expect(
+        aggregated.finalOutput?.hookSpecificOutput?.['additionalContext'],
+      ).toBe(
+        '<hook_context hook="h1">\nContext 1\n</hook_context>\n<hook_context hook="h2">\nContext 2\n</hook_context>',
+      );
+    });
   });
 
   describe('extractAdditionalContext', () => {
@@ -470,7 +518,40 @@ describe('HookAggregator', () => {
       expect(aggregated.success).toBe(true);
       expect(
         aggregated.finalOutput?.hookSpecificOutput?.['additionalContext'],
-      ).toBe('Context from hook 1\nContext from hook 2');
+      ).toBe(
+        '<hook_context hook="test-command">\nContext from hook 1\n</hook_context>\n<hook_context hook="test-command">\nContext from hook 2\n</hook_context>',
+      );
+    });
+
+    it('should sanitize additional context by escaping < and > tags', () => {
+      const results: HookExecutionResult[] = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'test-hook',
+          },
+          eventName: HookEventName.AfterTool,
+          success: true,
+          output: {
+            hookSpecificOutput: {
+              hookEventName: 'AfterTool',
+              additionalContext: 'context with <b>bold</b> and <script> tags',
+            },
+          },
+          duration: 10,
+        },
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.AfterTool,
+      );
+
+      expect(
+        aggregated.finalOutput?.hookSpecificOutput?.['additionalContext'],
+      ).toBe(
+        '<hook_context hook="test-hook">\ncontext with &lt;b&gt;bold&lt;/b&gt; and &lt;script&gt; tags\n</hook_context>',
+      );
     });
   });
 });

@@ -655,10 +655,9 @@ describe('HookRunner', () => {
 
       // Verify that the second hook received modified input
       const secondHookInput = JSON.parse(
-        vi.mocked(mockSpawn.stdin.write).mock.calls[1][0],
+        vi.mocked(mockSpawn.stdin.write).mock.calls[1][0] as string,
       );
-      expect(secondHookInput.prompt).toContain('Original prompt');
-      expect(secondHookInput.prompt).toContain('Context from hook 1');
+      expect(secondHookInput.prompt).toBe('Original prompt');
     });
 
     it('should pass modified LLM request from one hook to the next for BeforeModel', async () => {
