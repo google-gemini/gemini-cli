@@ -303,6 +303,7 @@ export class HookEventHandler {
         coreEvents.emitHookStart({
           hookName: this.getHookName(config),
           eventName,
+          source: config.source,
           hookIndex: index + 1,
           totalHooks: plan.hookConfigs.length,
         });
