@@ -1072,6 +1072,35 @@ export function saveSettings(settingsFile: SettingsFile): void {
 
     const settingsToSave = settingsFile.originalSettings;
 
+    // Re-read disk to preserve top-level keys added externally (e.g. hooks,
+    // security) while the CLI was running.  originalSettings is a startup
+    // snapshot, so any key it doesn't track would be deleted by the
+    // sync-by-omission semantics of applyKeyDiff.  See #23138.
+    try {
+      if (fs.existsSync(settingsFile.path)) {
+        const diskContent = fs.readFileSync(settingsFile.path, 'utf-8');
+        const parsed: unknown = JSON.parse(diskContent);
+        if (
+          parsed !== null &&
+          typeof parsed === 'object' &&
+          !Array.isArray(parsed)
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const diskSettings = parsed as Record<string, unknown>;
+           
+          const target = settingsToSave as Record<string, unknown>;
+          for (const key of Object.keys(diskSettings)) {
+            if (!Object.prototype.hasOwnProperty.call(target, key)) {
+              target[key] = diskSettings[key];
+            }
+          }
+        }
+      }
+    } catch {
+      // Disk read/parse failure is non-fatal — fall back to saving without
+      // the merge.  The save itself must never be blocked.
+    }
+
     // Use the format-preserving update function
     updateSettingsFilePreservingFormat(
       settingsFile.path,
