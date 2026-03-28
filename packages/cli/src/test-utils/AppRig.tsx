@@ -705,6 +705,10 @@ export class AppRig {
     return stripAnsi(this.renderResult.stdout.lastFrame() || '');
   }
 
+  generateSvg(): string {
+    return this.renderResult?.generateSvg() ?? '';
+  }
+
   async waitForOutput(pattern: string | RegExp, timeout = 30000) {
     await this.waitUntil(
       () => {
@@ -716,6 +720,33 @@ export class AppRig {
       {
         timeout,
         message: `Timed out waiting for output: ${pattern}\nLast frame:\n${this.lastFrame}`,
+      },
+    );
+  }
+
+  async waitForComponent(componentName: string, timeout = 30000) {
+    await this.waitUntil(
+      () => {
+        const rootNode = this.renderResult?.rootNode;
+        if (!rootNode) return false;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const find = (node: any): boolean => {
+          if (node.internal_componentName === componentName) return true;
+          if (node.internal_testId === componentName) return true;
+          if (node.childNodes) {
+            for (const child of node.childNodes) {
+              if (child.nodeName !== '#text' && find(child)) return true;
+            }
+          }
+          return false;
+        };
+
+        return find(rootNode);
+      },
+      {
+        timeout,
+        message: `Timed out waiting for component: ${componentName}`,
       },
     );
   }
