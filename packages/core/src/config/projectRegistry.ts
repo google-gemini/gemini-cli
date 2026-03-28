@@ -84,7 +84,7 @@ export class ProjectRegistry {
 
     try {
       const content = JSON.stringify(data, null, 2);
-      const tmpPath = `${this.registryPath}.tmp`;
+      const tmpPath = `${this.registryPath}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
       await fs.promises.writeFile(tmpPath, content, 'utf8');
       await fs.promises.rename(tmpPath, this.registryPath);
     } catch (error) {
