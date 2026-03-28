@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text, useStdout } from 'ink';
+import { Box, Text, useStdout, useIsScreenReaderEnabled } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
@@ -176,6 +176,7 @@ const ModelUsageTable: React.FC<{
 }) => {
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 84;
+  const screenReaderEnabled = useIsScreenReaderEnabled();
   const rows = buildModelRows(
     models,
     config,
@@ -214,6 +215,10 @@ const ModelUsageTable: React.FC<{
     color: string,
     totalSteps = 20,
   ) => {
+    if (screenReaderEnabled) {
+      return null;
+    }
+
     let filledSteps = Math.round(usedFraction * totalSteps);
 
     // If something is used (fraction > 0) but rounds to 0, show 1 tick.
