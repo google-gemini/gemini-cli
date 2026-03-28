@@ -305,6 +305,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Display memory usage information in the UI
   - **Default:** `false`
 
+- **`ui.truncateToolDescriptions`** (boolean):
+  - **Description:** Whether to truncate long tool descriptions to a single line
+    in the UI.
+  - **Default:** `true`
+
 - **`ui.showLineNumbers`** (boolean):
   - **Description:** Show line numbers in the chat.
   - **Default:** `true`

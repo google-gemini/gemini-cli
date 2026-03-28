@@ -25,6 +25,7 @@ import {
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
 import { Command } from '../../key/keyBindings.js';
+import { useSettingsStore } from '../../contexts/SettingsContext.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -223,9 +224,20 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   // Hide description for completed Ask User tools (the result display speaks for itself)
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
+  const { settings } = useSettingsStore();
+  const truncate = settings.merged.ui?.truncateToolDescriptions ?? true;
+
   return (
-    <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
-      <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
+    <Box
+      overflow="hidden"
+      height={truncate ? 1 : undefined}
+      flexGrow={1}
+      flexShrink={1}
+    >
+      <Text
+        strikethrough={status === ToolCallStatus.Canceled}
+        wrap={truncate ? 'truncate' : 'wrap'}
+      >
         <Text color={nameColor} bold>
           {name}
         </Text>
