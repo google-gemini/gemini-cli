@@ -639,6 +639,8 @@ export interface ConfigParameters {
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
   useAlternateBuffer?: boolean;
+  useTerminalBuffer?: boolean;
+  useRenderProcess?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -848,6 +850,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
+  private readonly useTerminalBuffer: boolean;
+  private readonly useRenderProcess: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly extensionRegistryURI: string | undefined;
@@ -1182,6 +1186,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
+    this.useTerminalBuffer = params.useTerminalBuffer ?? false;
+    this.useRenderProcess = params.useRenderProcess ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -3160,6 +3166,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getUseAlternateBuffer(): boolean {
     return this.useAlternateBuffer;
+  }
+
+  getUseTerminalBuffer(): boolean {
+    return this.useTerminalBuffer;
+  }
+
+  getUseRenderProcess(): boolean {
+    return this.useRenderProcess;
   }
 
   getEnableInteractiveShell(): boolean {
