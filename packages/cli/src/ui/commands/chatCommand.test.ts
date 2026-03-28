@@ -157,13 +157,31 @@ describe('chatCommand', () => {
       mockContext.services.logger.checkpointExists = mockCheckpointExists;
     });
 
-    it('should return an error if tag is missing', async () => {
+    it('should auto-generate a tag if one is not provided', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
+      mockGetHistory.mockReturnValue(history);
+
       const result = await saveCommand?.action?.(mockContext, '  ');
-      expect(result).toEqual({
+
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
+        { history, authType: expect.any(String) },
+        expect.stringMatching(/^manual-\d{8}-\d{6}$/),
+      );
+
+      // result content will contain the matched string
+      expect(result).toMatchObject({
         type: 'message',
-        messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
+        messageType: 'info',
       });
+
+      if (result?.type === 'message') {
+        expect(result.content).toMatch(
+          /^Conversation checkpoint saved with tag: manual-\d{8}-\d{6}\.$/,
+        );
+      }
     });
 
     it('should inform if conversation history is empty or only contains system context', async () => {
@@ -256,7 +274,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume resume <tag>',
+        content: 'Missing tag. Usage: /chat resume <tag>',
       });
     });
 
@@ -390,7 +408,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume delete <tag>',
+        content: 'Missing tag. Usage: /chat delete <tag>',
       });
     });
 

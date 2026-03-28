@@ -89,18 +89,19 @@ const listCommand: SlashCommand = {
 
 const saveCommand: SlashCommand = {
   name: 'save',
+  altNames: ['store', 'save-session'],
   description:
-    'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
+    'Save the current conversation as a checkpoint. Usage: /chat save [tag]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const tag = args.trim();
+    let tag = args.trim();
     if (!tag) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
-      };
+      const now = new Date();
+      // Generate a timezone-aware local ISO string chunk like '20250110-143022'
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const timeString = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      tag = `manual-${timeString}`;
     }
 
     const { logger } = context.services;
@@ -120,7 +121,7 @@ const saveCommand: SlashCommand = {
             ' already exists. Do you want to overwrite it?',
           ),
           originalInvocation: {
-            raw: context.invocation?.raw || `/resume save ${tag}`,
+            raw: context.invocation?.raw || `/chat save ${tag}`,
           },
         };
       }
@@ -160,7 +161,7 @@ const resumeCheckpointCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
   description:
-    'Resume a conversation from a checkpoint. Usage: /resume resume <tag>',
+    'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args) => {
@@ -169,7 +170,7 @@ const resumeCheckpointCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume resume <tag>',
+        content: 'Missing tag. Usage: /chat resume <tag>',
       };
     }
 
@@ -239,7 +240,7 @@ const resumeCheckpointCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete a conversation checkpoint. Usage: /resume delete <tag>',
+  description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args): Promise<MessageActionReturn> => {
@@ -248,7 +249,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume delete <tag>',
+        content: 'Missing tag. Usage: /chat delete <tag>',
       };
     }
 
@@ -281,7 +282,7 @@ const deleteCommand: SlashCommand = {
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
-    'Share the current conversation to a markdown or json file. Usage: /resume share <file>',
+    'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
