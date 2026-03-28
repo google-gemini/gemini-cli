@@ -66,18 +66,23 @@ export const CodebaseInvestigatorAgent = (
     name: 'codebase_investigator',
     kind: 'local',
     displayName: 'Codebase Investigator Agent',
-    description:
-      `The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. ` +
-      `Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation or to answer questions about the codebase that require investigation. ` +
-      `It returns a structured report with key file paths, symbols, and actionable architectural insights.`,
+    description: `Analyzes codebase structure, dependencies, and architecture. Use for:
+- Root-cause analysis of bugs and issues
+- Understanding complex system design
+- Planning refactoring and migrations
+- Analyzing feature implementation impact
+Returns a structured report with relevant files, symbols, and architectural insights.`,
     inputConfig: {
       inputSchema: {
         type: 'object',
         properties: {
           objective: {
             type: 'string',
-            description: `A comprehensive and detailed description of the user's ultimate goal.
-          You must include original user's objective as well as questions and any extra context and questions you may have.`,
+            description: `A clear, specific description of what to investigate. Include:
+- The user's goal or problem to solve
+- Any relevant context or error messages
+- Specific files or components to focus on (if known)
+- Questions you need answered about the codebase`,
           },
         },
         required: ['objective'],
@@ -129,7 +134,22 @@ export const CodebaseInvestigatorAgent = (
 <objective>
 \${objective}
 </objective>`,
-      systemPrompt: `You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in reverse-engineering complex software projects. You are a sub-agent within a larger development system.
+      systemPrompt: `## ⚠️ CRITICAL: Input Interface
+
+When invoked, you receive a JSON function argument with this field:
+- \`objective\` (string, REQUIRED): A clear description of what to investigate
+
+The objective may include:
+- The user's goal or problem to solve
+- Relevant context or error messages
+- Specific files or components to focus on
+- Questions about the codebase
+
+You do not have access to the user's message directly. Your only instruction is in the objective field above.
+
+---
+
+You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in reverse-engineering complex software projects. You are a sub-agent within a larger development system.
 Your **SOLE PURPOSE** is to build a complete mental model of the code relevant to a given investigation. You must identify all relevant files, understand their roles, and foresee the direct architectural consequences of potential changes.
 You are a sub-agent in a larger system. Your only responsibility is to provide deep, actionable context.
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
