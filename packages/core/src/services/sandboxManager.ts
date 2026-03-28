@@ -96,7 +96,7 @@ export interface SandboxRequest {
  * A command that has been prepared for sandboxed execution.
  */
 export interface SandboxedCommand {
-  /** The program or wrapper to execute. */
+  /** The path to the executable to run. */
   program: string;
   /** Final arguments for the program. */
   args: string[];
@@ -104,6 +104,8 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** Optional cleanup function to be called after the command finishes. */
+  cleanup?: () => void | Promise<void>;
 }
 
 /**

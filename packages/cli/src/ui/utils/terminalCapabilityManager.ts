@@ -5,6 +5,8 @@
  */
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
+import { execSync } from 'node:child_process';
 import {
   debugLogger,
   enableKittyKeyboardProtocol,
@@ -86,6 +88,51 @@ export class TerminalCapabilityManager {
 
   private constructor() {}
 
+  private detectWindowsConsoleBackground(): void {
+    if (os.platform() !== 'win32') return;
+
+    try {
+      // If we're not in Windows Terminal (WT_SESSION), try to get background from conhost
+      if (!process.env['WT_SESSION']) {
+        const output = execSync(
+          'powershell.exe -NoProfile -Command "[Console]::BackgroundColor.ToString()"',
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+        );
+        const colorName = output.trim();
+        if (colorName) {
+          // Map standard .NET ConsoleColor names to approximate hex values
+          const colorMap: Record<string, string> = {
+            Black: '#000000',
+            DarkBlue: '#00008b',
+            DarkGreen: '#006400',
+            DarkCyan: '#008b8b',
+            DarkRed: '#8b0000',
+            DarkMagenta: '#8b008b',
+            DarkYellow: '#808000',
+            Gray: '#c0c0c0',
+            DarkGray: '#a9a9a9',
+            Blue: '#0000ff',
+            Green: '#00ff00',
+            Cyan: '#00ffff',
+            Red: '#ff0000',
+            Magenta: '#ff00ff',
+            Yellow: '#ffff00',
+            White: '#ffffff',
+          };
+          const hex = colorMap[colorName];
+          if (hex) {
+            this.terminalBackgroundColor = hex;
+            debugLogger.log(
+              `Detected Windows Console background color (${colorName}): ${this.terminalBackgroundColor}`,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugLogger.warn('Failed to detect Windows Console background color:', e);
+    }
+  }
+
   static getInstance(): TerminalCapabilityManager {
     if (!this.instance) {
       this.instance = new TerminalCapabilityManager();
@@ -146,7 +193,12 @@ export class TerminalCapabilityManager {
 
       // A somewhat long timeout is acceptable as all terminals should respond
       // to the device attributes query used as a sentinel.
-      timeoutId = setTimeout(cleanup, 1000);
+      timeoutId = setTimeout(() => {
+        if (!this.terminalBackgroundColor) {
+          this.detectWindowsConsoleBackground();
+        }
+        cleanup();
+      }, 1000);
 
       const onData = (data: Buffer) => {
         buffer += data.toString();

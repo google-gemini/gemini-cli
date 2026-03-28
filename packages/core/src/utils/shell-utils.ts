@@ -11,6 +11,7 @@ import { quote, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
+  execSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 
@@ -567,6 +568,15 @@ export function parseCommandDetails(
   return null;
 }
 
+function hasPwsh(): boolean {
+  try {
+    execSync('where.exe pwsh', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Determines the appropriate shell configuration for the current platform.
  *
@@ -590,6 +600,15 @@ export function getShellConfiguration(): ShellConfiguration {
           shell: 'powershell',
         };
       }
+    }
+
+    // Prioritize PowerShell 7 (pwsh.exe) if available in PATH
+    if (hasPwsh()) {
+      return {
+        executable: 'pwsh.exe',
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
     }
 
     // Default to PowerShell for all other Windows configurations.

@@ -41,98 +41,9 @@ import {
 } from '../utils/commandSafety.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
-let cachedBpfPath: string | undefined;
-
-function getSeccompBpfPath(): string {
-  if (cachedBpfPath) return cachedBpfPath;
-
-  const arch = os.arch();
-  let AUDIT_ARCH: number;
-  let SYS_ptrace: number;
-
-  if (arch === 'x64') {
-    AUDIT_ARCH = 0xc000003e; // AUDIT_ARCH_X86_64
-    SYS_ptrace = 101;
-  } else if (arch === 'arm64') {
-    AUDIT_ARCH = 0xc00000b7; // AUDIT_ARCH_AARCH64
-    SYS_ptrace = 117;
-  } else if (arch === 'arm') {
-    AUDIT_ARCH = 0x40000028; // AUDIT_ARCH_ARM
-    SYS_ptrace = 26;
-  } else if (arch === 'ia32') {
-    AUDIT_ARCH = 0x40000003; // AUDIT_ARCH_I386
-    SYS_ptrace = 26;
-  } else {
-    throw new Error(`Unsupported architecture for seccomp filter: ${arch}`);
-  }
-
-  const EPERM = 1;
-  const SECCOMP_RET_KILL_PROCESS = 0x80000000;
-  const SECCOMP_RET_ERRNO = 0x00050000;
-  const SECCOMP_RET_ALLOW = 0x7fff0000;
-
-  const instructions = [
-    { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
-    { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_KILL_PROCESS }, // Kill
-
-    { code: 0x20, jt: 0, jf: 0, k: 0 }, // Load nr
-    { code: 0x15, jt: 0, jf: 1, k: SYS_ptrace }, // If ptrace, jump to ERRNO
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ERRNO | EPERM }, // ERRNO
-
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW }, // Allow
-  ];
-
-  const buf = Buffer.alloc(8 * instructions.length);
-  for (let i = 0; i < instructions.length; i++) {
-    const inst = instructions[i];
-    const offset = i * 8;
-    buf.writeUInt16LE(inst.code, offset);
-    buf.writeUInt8(inst.jt, offset + 2);
-    buf.writeUInt8(inst.jf, offset + 3);
-    buf.writeUInt32LE(inst.k, offset + 4);
-  }
-
-  const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
-  const bpfPath = join(tempDir, 'seccomp.bpf');
-  fs.writeFileSync(bpfPath, buf);
-  cachedBpfPath = bpfPath;
-
-  // Cleanup on exit
-  process.on('exit', () => {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      // Ignore errors
-    }
-  });
-
-  return bpfPath;
-}
-
-/**
- * Ensures a file or directory exists.
- */
-function touch(filePath: string, isDirectory: boolean) {
-  try {
-    // If it exists (even as a broken symlink), do nothing
-    if (fs.lstatSync(filePath)) return;
-  } catch {
-    // Ignore ENOENT
-  }
-
-  if (isDirectory) {
-    fs.mkdirSync(filePath, { recursive: true });
-  } else {
-    fs.mkdirSync(dirname(filePath), { recursive: true });
-    fs.closeSync(fs.openSync(filePath, 'a'));
-  }
-}
-
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
-
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
 
@@ -150,12 +61,12 @@ export class LinuxSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
-  private getMaskFilePath(): string {
+  private getMaskFilePath(): { maskPath: string; cleanup: () => void } {
     if (
       LinuxSandboxManager.maskFilePath &&
       fs.existsSync(LinuxSandboxManager.maskFilePath)
     ) {
-      return LinuxSandboxManager.maskFilePath;
+      return { maskPath: LinuxSandboxManager.maskFilePath, cleanup: () => {} };
     }
     const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
     const maskPath = join(tempDir, 'mask');
@@ -163,16 +74,97 @@ export class LinuxSandboxManager implements SandboxManager {
     fs.chmodSync(maskPath, 0);
     LinuxSandboxManager.maskFilePath = maskPath;
 
-    // Cleanup on exit
-    process.on('exit', () => {
+    const cleanup = () => {
       try {
         fs.rmSync(tempDir, { recursive: true, force: true });
       } catch {
         // Ignore errors
       }
-    });
+    };
 
-    return maskPath;
+    return { maskPath, cleanup };
+  }
+
+  private getSeccompBpfPath(): { bpfPath: string; cleanup: () => void } {
+    const arch = os.arch();
+    let AUDIT_ARCH: number;
+    let SYS_ptrace: number;
+
+    if (arch === 'x64') {
+      AUDIT_ARCH = 0xc000003e; // AUDIT_ARCH_X86_64
+      SYS_ptrace = 101;
+    } else if (arch === 'arm64') {
+      AUDIT_ARCH = 0xc00000b7; // AUDIT_ARCH_AARCH64
+      SYS_ptrace = 117;
+    } else if (arch === 'arm') {
+      AUDIT_ARCH = 0x40000028; // AUDIT_ARCH_ARM
+      SYS_ptrace = 26;
+    } else if (arch === 'ia32') {
+      AUDIT_ARCH = 0x40000003; // AUDIT_ARCH_I386
+      SYS_ptrace = 26;
+    } else {
+      throw new Error(`Unsupported architecture for seccomp filter: ${arch}`);
+    }
+
+    const EPERM = 1;
+    const SECCOMP_RET_KILL_PROCESS = 0x80000000;
+    const SECCOMP_RET_ERRNO = 0x00050000;
+    const SECCOMP_RET_ALLOW = 0x7fff0000;
+
+    const instructions = [
+      { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
+      { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_KILL_PROCESS }, // Kill
+
+      { code: 0x20, jt: 0, jf: 0, k: 0 }, // Load nr
+      { code: 0x15, jt: 0, jf: 1, k: SYS_ptrace }, // If ptrace, jump to ERRNO
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ERRNO | EPERM }, // ERRNO
+
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW }, // Allow
+    ];
+
+    const buf = Buffer.alloc(8 * instructions.length);
+    for (let i = 0; i < instructions.length; i++) {
+      const inst = instructions[i];
+      const offset = i * 8;
+      buf.writeUInt16LE(inst.code, offset);
+      buf.writeUInt8(inst.jt, offset + 2);
+      buf.writeUInt8(inst.jf, offset + 3);
+      buf.writeUInt32LE(inst.k, offset + 4);
+    }
+
+    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
+    const bpfPath = join(tempDir, 'seccomp.bpf');
+    fs.writeFileSync(bpfPath, buf);
+
+    const cleanup = () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    };
+
+    return { bpfPath, cleanup };
+  }
+
+  /**
+   * Ensures a file or directory exists.
+   */
+  private touch(filePath: string, isDirectory: boolean) {
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      if (fs.lstatSync(filePath)) return;
+    } catch {
+      // Ignore ENOENT
+    }
+
+    if (isDirectory) {
+      fs.mkdirSync(filePath, { recursive: true });
+    } else {
+      fs.mkdirSync(dirname(filePath), { recursive: true });
+      fs.closeSync(fs.openSync(filePath, 'a'));
+    }
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
@@ -217,6 +209,11 @@ export class LinuxSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
+    // Ensure we don't leak D-Bus or other session-sensitive variables that could facilitate sandbox escapes.
+    if (sanitizedEnv['DBUS_SESSION_BUS_ADDRESS']) {
+      sanitizedEnv['DBUS_SESSION_BUS_ADDRESS'] = '';
+    }
+
     const bwrapArgs: string[] = [
       '--unshare-all',
       '--new-session', // Isolate session
@@ -237,6 +234,10 @@ export class LinuxSandboxManager implements SandboxManager {
       '/proc',
       '--tmpfs', // Provides an isolated, writable /tmp directory
       '/tmp',
+      '--tmpfs', // Isolate /dev/shm to prevent shared memory leaks
+      '/dev/shm',
+      '--tmpfs', // Isolate /run/user/ID if it exists in the environment
+      '/run',
     );
 
     const workspacePath = tryRealpath(this.options.workspace);
@@ -314,7 +315,7 @@ export class LinuxSandboxManager implements SandboxManager {
 
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
+      this.touch(filePath, file.isDirectory);
       const realPath = tryRealpath(filePath);
       bwrapArgs.push('--ro-bind', filePath, filePath);
       if (realPath !== filePath) {
@@ -355,11 +356,11 @@ export class LinuxSandboxManager implements SandboxManager {
     }
 
     // Mask secret files (.env, .env.*)
-    bwrapArgs.push(
-      ...(await this.getSecretFilesArgs(req.policy?.allowedPaths)),
-    );
+    const { args: secretArgs, cleanup: secretCleanup } =
+      await this.getSecretFilesArgs(req.policy?.allowedPaths);
+    bwrapArgs.push(...secretArgs);
 
-    const bpfPath = getSeccompBpfPath();
+    const { bpfPath, cleanup: bpfCleanup } = this.getSeccompBpfPath();
 
     bwrapArgs.push('--seccomp', '9');
     bwrapArgs.push('--', req.command, ...req.args);
@@ -372,20 +373,29 @@ export class LinuxSandboxManager implements SandboxManager {
       ...bwrapArgs,
     ];
 
+    const cleanup = () => {
+      secretCleanup();
+      bpfCleanup();
+    };
+
     return {
       program: 'sh',
       args: shArgs,
       env: sanitizedEnv,
       cwd: req.cwd,
+      cleanup,
     };
   }
 
   /**
    * Generates bubblewrap arguments to mask secret files.
    */
-  private async getSecretFilesArgs(allowedPaths?: string[]): Promise<string[]> {
+  private async getSecretFilesArgs(allowedPaths?: string[]): Promise<{
+    args: string[];
+    cleanup: () => void;
+  }> {
     const args: string[] = [];
-    const maskPath = this.getMaskFilePath();
+    const { maskPath, cleanup } = this.getMaskFilePath();
     const paths = sanitizePaths(allowedPaths) || [];
     const searchDirs = new Set([this.options.workspace, ...paths]);
     const findPatterns = getSecretFileFindArgs();
@@ -441,6 +451,6 @@ export class LinuxSandboxManager implements SandboxManager {
         );
       }
     }
-    return args;
+    return { args, cleanup };
   }
 }

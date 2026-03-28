@@ -7,6 +7,7 @@
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+import { detectSystemProxy } from './proxy-utils.js';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
@@ -31,13 +32,33 @@ export class PrivateIpError extends Error {
   }
 }
 
-// Configure default global dispatcher with higher timeouts
-setGlobalDispatcher(
-  new Agent({
-    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-    bodyTimeout: DEFAULT_BODY_TIMEOUT,
-  }),
-);
+/**
+ * Initializes the global network dispatcher for undici.
+ * It will automatically detect system proxy settings and use a ProxyAgent if found.
+ * Otherwise, it will use a connection pool for better performance.
+ */
+export function initializeGlobalDispatcher() {
+  const systemProxy = detectSystemProxy();
+
+  if (systemProxy) {
+    setGlobalProxy(systemProxy.proxyUrl);
+    return;
+  }
+
+  // Use a pool for connection reuse if no proxy is found.
+  // We use a high connection limit as the CLI can be concurrent.
+  setGlobalDispatcher(
+    new Agent({
+      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
+      bodyTimeout: DEFAULT_BODY_TIMEOUT,
+      pipelining: 1,
+      connections: 100,
+    }),
+  );
+}
+
+// Default initialization
+initializeGlobalDispatcher();
 
 /**
  * Sanitizes a hostname by stripping IPv6 brackets if present.

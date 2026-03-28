@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  AdminControlsSettings,
   type StartupWarning,
   WarningPriority,
   type Config,
@@ -30,9 +31,9 @@ import {
   SessionEndReason,
   ValidationCancelledError,
   ValidationRequiredError,
-  type AdminControlsSettings,
   debugLogger,
   isHeadlessMode,
+  initializeGlobalDispatcher,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -186,6 +187,9 @@ export async function startInteractiveUI(
 
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
+
+  // Initialize network early (proxy detection, connection pooling)
+  initializeGlobalDispatcher();
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
   // sandbox mode, we re-fetch the admin controls from the server once we enter

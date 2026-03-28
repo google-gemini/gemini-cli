@@ -17,7 +17,7 @@ using System.Text;
 /**
  * A native C# helper for the Gemini CLI sandbox on Windows.
  * This helper uses Restricted Tokens and Job Objects to isolate processes.
- * It also supports internal commands for safe file I/O within the sandbox.
+ * It also supports internal commands for safe file I/O and native permission management.
  */
 public class GeminiSandbox {
     // P/Invoke constants and structures
@@ -144,10 +144,127 @@ public class GeminiSandbox {
     private const int TokenIntegrityLevel = 25;
     private const uint SE_GROUP_INTEGRITY = 0x00000020;
 
+    // Native Permission Management Constants
+    private const int SE_FILE_OBJECT = 1;
+    private const int DACL_SECURITY_INFORMATION = 0x00000004;
+    private const int SACL_SECURITY_INFORMATION = 0x00000008;
+    private const int LABEL_SECURITY_INFORMATION = 0x00000010;
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern uint SetNamedSecurityInfo(
+        string pObjectName,
+        int ObjectType,
+        int SecurityInfo,
+        IntPtr psidOwner,
+        IntPtr psidGroup,
+        IntPtr pDacl,
+        IntPtr pSacl);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+        string StringSecurityDescriptor,
+        uint StringSDRevision,
+        out IntPtr SecurityDescriptor,
+        out uint SecurityDescriptorSize);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool GetSecurityDescriptorSacl(
+        IntPtr pSecurityDescriptor,
+        out bool lpbSaclPresent,
+        out IntPtr pSacl,
+        out bool lpbSaclDefaulted);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr LocalFree(IntPtr hMem);
+
+    private static void SetLowIntegrity(string path) {
+        // SDDL for Mandatory Label: SACL (S:), Mandatory Label (ML), No-Write-Up (NW), Low Integrity (LW)
+        // (ML;OICI;NW;;;LW) handles inheritance for containers.
+        bool isDirectory = Directory.Exists(path);
+        string sddl = isDirectory ? "S:(ML;OICI;NW;;;LW)" : "S:(ML;;NW;;;LW)";
+        IntPtr pSD = IntPtr.Zero;
+        
+        try {
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptor(sddl, 1, out pSD, out _)) {
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            }
+
+            if (!GetSecurityDescriptorSacl(pSD, out _, out IntPtr pSacl, out _)) {
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            }
+
+            uint result = SetNamedSecurityInfo(
+                path,
+                SE_FILE_OBJECT,
+                LABEL_SECURITY_INFORMATION,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                pSacl);
+
+            if (result != 0) {
+                throw new System.ComponentModel.Win32Exception((int)result);
+            }
+        } finally {
+            if (pSD != IntPtr.Zero) LocalFree(pSD);
+        }
+    }
+
+    private static void DenyLowIntegrityAccess(string path) {
+        // We use the high-level .NET Security classes for complex ACL manipulation
+        // S-1-16-4096 is Low Integrity
+        SecurityIdentifier lowIntegritySid = new SecurityIdentifier("S-1-16-4096");
+        
+        bool isDirectory = Directory.Exists(path);
+        if (isDirectory) {
+            DirectorySecurity ds = Directory.GetAccessControl(path);
+            ds.AddAccessRule(new FileSystemAccessRule(
+                lowIntegritySid,
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Deny));
+            Directory.SetAccessControl(path, ds);
+        } else {
+            FileSecurity fs = File.GetAccessControl(path);
+            fs.AddAccessRule(new FileSystemAccessRule(
+                lowIntegritySid,
+                FileSystemRights.FullControl,
+                AccessControlType.Deny));
+            File.SetAccessControl(path, fs);
+        }
+    }
+
     static int Main(string[] args) {
-        if (args.Length < 3) {
+        if (args.Length < 1) {
             Console.WriteLine("Usage: GeminiSandbox.exe <network:0|1> <cwd> [--forbidden-manifest <path>] <command> [args...]");
-            Console.WriteLine("Internal commands: __read <path>, __write <path>");
+            Console.WriteLine("Internal commands: __read <path>, __write <path>, __grant <path>, __deny <path>");
+            return 1;
+        }
+
+        // Handle internal maintenance commands first
+        if (args[0] == "__grant") {
+            if (args.Length < 2) return 1;
+            try {
+                SetLowIntegrity(args[1]);
+                return 0;
+            } catch (Exception e) {
+                Console.Error.WriteLine(e.Message);
+                return 1;
+            }
+        } else if (args[0] == "__deny") {
+            if (args.Length < 2) return 1;
+            try {
+                DenyLowIntegrityAccess(args[1]);
+                return 0;
+            } catch (Exception e) {
+                Console.Error.WriteLine(e.Message);
+                return 1;
+            }
+        }
+
+        if (args.Length < 3) {
+            Console.WriteLine("Error: Missing arguments for execution mode");
             return 1;
         }
 
@@ -179,7 +296,7 @@ public class GeminiSandbox {
 
         IntPtr hToken = IntPtr.Zero;
         IntPtr hRestrictedToken = IntPtr.Zero;
-        IntPtr lowIntegritySid = IntPtr.Zero;
+        IntPtr lowIntegritySidPtr = IntPtr.Zero;
 
         try {
             // 1. Create Restricted Token
@@ -196,9 +313,9 @@ public class GeminiSandbox {
 
             // 2. Lower Integrity Level to Low
             // S-1-16-4096 is the SID for "Low Mandatory Level"
-            if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySid)) {
+            if (ConvertStringSidToSid("S-1-16-4096", out lowIntegritySidPtr)) {
                 TOKEN_MANDATORY_LABEL tml = new TOKEN_MANDATORY_LABEL();
-                tml.Label.Sid = lowIntegritySid;
+                tml.Label.Sid = lowIntegritySidPtr;
                 tml.Label.Attributes = SE_GROUP_INTEGRITY;
                 int tmlSize = Marshal.SizeOf(tml);
                 IntPtr pTml = Marshal.AllocHGlobal(tmlSize);
