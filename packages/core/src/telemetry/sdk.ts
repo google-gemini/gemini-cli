@@ -15,9 +15,12 @@ import {
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
-import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
-import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
+import { OTLPTraceExporter as OTLPTraceExporterHttpJson } from '@opentelemetry/exporter-trace-otlp-http';
+import { OTLPLogExporter as OTLPLogExporterHttpJson } from '@opentelemetry/exporter-logs-otlp-http';
+import { OTLPMetricExporter as OTLPMetricExporterHttpJson } from '@opentelemetry/exporter-metrics-otlp-http';
+import { OTLPTraceExporter as OTLPTraceExporterHttpProto } from '@opentelemetry/exporter-trace-otlp-proto';
+import { OTLPLogExporter as OTLPLogExporterHttpProto } from '@opentelemetry/exporter-logs-otlp-proto';
+import { OTLPMetricExporter as OTLPMetricExporterHttpProto } from '@opentelemetry/exporter-metrics-otlp-proto';
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
@@ -133,7 +136,7 @@ async function flushTelemetryBuffer(): Promise<void> {
 
 function parseOtlpEndpoint(
   otlpEndpointSetting: string | undefined,
-  protocol: 'grpc' | 'http',
+  protocol: 'grpc' | 'http' | 'http/protobuf',
 ): string | undefined {
   if (!otlpEndpointSetting) {
     return undefined;
@@ -148,7 +151,7 @@ function parseOtlpEndpoint(
       // The `origin` property provides this, stripping any path, query, or hash.
       return url.origin;
     }
-    // For http, use the full href.
+    // For http and http/protobuf, use the full href.
     return url.href;
   } catch (error) {
     diag.error('Invalid OTLP endpoint URL provided:', trimmedEndpoint, error);
@@ -248,13 +251,15 @@ export async function initializeTelemetry(
 
   let spanExporter:
     | OTLPTraceExporter
-    | OTLPTraceExporterHttp
+    | OTLPTraceExporterHttpJson
+    | OTLPTraceExporterHttpProto
     | GcpTraceExporter
     | FileSpanExporter
     | ConsoleSpanExporter;
   let logExporter:
     | OTLPLogExporter
-    | OTLPLogExporterHttp
+    | OTLPLogExporterHttpJson
+    | OTLPLogExporterHttpProto
     | GcpLogExporter
     | FileLogExporter
     | ConsoleLogRecordExporter;
@@ -275,26 +280,45 @@ export async function initializeTelemetry(
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
+      // HTTP with JSON encoding
       const buildUrl = (path: string) => {
         const url = new URL(parsedEndpoint);
-        // Join the existing pathname with the new path, handling trailing slashes.
         url.pathname = [url.pathname.replace(/\/$/, ''), path].join('/');
         return url.href;
       };
-      spanExporter = new OTLPTraceExporterHttp({
+      spanExporter = new OTLPTraceExporterHttpJson({
         url: buildUrl('v1/traces'),
       });
-      logExporter = new OTLPLogExporterHttp({
+      logExporter = new OTLPLogExporterHttpJson({
         url: buildUrl('v1/logs'),
       });
       metricReader = new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporterHttp({
+        exporter: new OTLPMetricExporterHttpJson({
+          url: buildUrl('v1/metrics'),
+        }),
+        exportIntervalMillis: 10000,
+      });
+    } else if (otlpProtocol === 'http/protobuf') {
+      // HTTP with binary Protobuf encoding
+      const buildUrl = (path: string) => {
+        const url = new URL(parsedEndpoint);
+        url.pathname = [url.pathname.replace(/\/$/, ''), path].join('/');
+        return url.href;
+      };
+      spanExporter = new OTLPTraceExporterHttpProto({
+        url: buildUrl('v1/traces'),
+      });
+      logExporter = new OTLPLogExporterHttpProto({
+        url: buildUrl('v1/logs'),
+      });
+      metricReader = new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporterHttpProto({
           url: buildUrl('v1/metrics'),
         }),
         exportIntervalMillis: 10000,
       });
     } else {
-      // grpc
+      // gRPC
       spanExporter = new OTLPTraceExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,

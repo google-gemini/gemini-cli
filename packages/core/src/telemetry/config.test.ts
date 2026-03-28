@@ -160,6 +160,51 @@ describe('telemetry/config helpers', () => {
       expect(resolved.otlpEndpoint).toBe('http://otel:4317');
     });
 
+    it('supports http protocol', async () => {
+      const env = {
+        GEMINI_TELEMETRY_OTLP_PROTOCOL: 'http',
+      } as Record<string, string>;
+      const resolved = await resolveTelemetrySettings({ env });
+      expect(resolved.otlpProtocol).toBe('http');
+    });
+
+    it('supports http/protobuf protocol', async () => {
+      const env = {
+        GEMINI_TELEMETRY_OTLP_PROTOCOL: 'http/protobuf',
+      } as Record<string, string>;
+      const resolved = await resolveTelemetrySettings({ env });
+      expect(resolved.otlpProtocol).toBe('http/protobuf');
+    });
+
+    it('falls back to OTEL_EXPORTER_OTLP_PROTOCOL when GEMINI var is missing', async () => {
+      const env = {
+        OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
+      } as Record<string, string>;
+      const resolved = await resolveTelemetrySettings({ env });
+      expect(resolved.otlpProtocol).toBe('http/protobuf');
+    });
+
+    it('respects priority: argv > GEMINI_TELEMETRY > OTEL_EXPORTER > settings', async () => {
+      const settings = { otlpProtocol: 'grpc' as const };
+      const env = {
+        GEMINI_TELEMETRY_OTLP_PROTOCOL: 'http',
+        OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
+      } as Record<string, string>;
+      const argv = { telemetryOtlpProtocol: 'grpc' };
+
+      // Test env precedence over OTEL_EXPORTER
+      const resolvedEnv = await resolveTelemetrySettings({ env, settings });
+      expect(resolvedEnv.otlpProtocol).toBe('http');
+
+      // Test argv precedence over all
+      const resolvedArgv = await resolveTelemetrySettings({
+        argv,
+        env,
+        settings,
+      });
+      expect(resolvedArgv.otlpProtocol).toBe('grpc');
+    });
+
     it('throws on unknown protocol values', async () => {
       const env = { GEMINI_TELEMETRY_OTLP_PROTOCOL: 'unknown' } as Record<
         string,

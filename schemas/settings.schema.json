@@ -3424,8 +3424,8 @@
         },
         "otlpProtocol": {
           "type": "string",
-          "description": "Protocol for OTLP exporters.",
-          "enum": ["grpc", "http"]
+          "description": "Protocol for OTLP exporters. Use 'http' for JSON encoding or 'http/protobuf' for binary Protobuf encoding.",
+          "enum": ["grpc", "http", "http/protobuf"]
         },
         "logPrompts": {
           "type": "boolean",
