@@ -403,19 +403,30 @@ export async function readGeminiMdFiles(
 
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
-          const isTestEnv =
-            process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
-          if (!isTestEnv) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            logger.warn(
-              `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
+          const isEISDIR = error instanceof Error && (error as NodeJS.ErrnoException).code === 'EISDIR';
+
+          if (isEISDIR) {
+            // A directory exists where a GEMINI.md file is expected.
+            // This is valid in some project structures — skip it silently.
+            debugLogger.debug(
+              '[DEBUG] [MemoryDiscovery] Skipping directory at GEMINI.md path:',
+              filePath,
+            );
+          } else {
+            const isTestEnv =
+              process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
+            if (!isTestEnv) {
+              const message =
+                error instanceof Error ? error.message : String(error);
+              logger.warn(
+                `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
+              );
+            }
+            debugLogger.debug(
+              '[DEBUG] [MemoryDiscovery] Failed to read:',
+              filePath,
             );
           }
-          debugLogger.debug(
-            '[DEBUG] [MemoryDiscovery] Failed to read:',
-            filePath,
-          );
           return { filePath, content: null }; // Still include it with null content
         }
       },
