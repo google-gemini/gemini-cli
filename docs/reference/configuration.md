@@ -1287,18 +1287,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
-- **`context.memoryBoundaryMarkers`** (array):
-  - **Description:** File or directory names that mark the boundary for
-    GEMINI.md discovery. The upward traversal stops at the first directory
-    containing any of these markers. An empty array disables parent traversal.
-  - **Default:**
-
-    ```json
-    [".git"]
-    ```
-
-  - **Requires restart:** Yes
-
 - **`context.includeDirectories`** (array):
   - **Description:** Additional directories to include in the workspace context.
     Missing directories will be skipped with a warning.

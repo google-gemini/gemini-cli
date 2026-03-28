@@ -989,7 +989,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200, // maxDirs
-      ['.git'], // boundaryMarkers
     );
   });
 
@@ -1019,7 +1018,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200,
-      ['.git'], // boundaryMarkers
     );
   });
 
@@ -1048,7 +1046,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200,
-      ['.git'], // boundaryMarkers
     );
   });
 });

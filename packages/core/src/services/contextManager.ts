@@ -51,10 +51,9 @@ export class ContextManager {
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
       this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths(
-            [...this.config.getWorkspaceContext().getDirectories()],
-            this.config.getMemoryBoundaryMarkers(),
-          )
+        ? getEnvironmentMemoryPaths([
+            ...this.config.getWorkspaceContext().getDirectories(),
+          ])
         : Promise.resolve([]),
     ]);
 
@@ -77,7 +76,6 @@ export class ContextManager {
     const allContents = await readGeminiMdFiles(
       allPaths,
       this.config.getImportFormat(),
-      this.config.getMemoryBoundaryMarkers(),
     );
 
     const loadedFilePaths = allContents
@@ -135,7 +133,6 @@ export class ContextManager {
       trustedRoots,
       this.loadedPaths,
       this.loadedFileIdentities,
-      this.config.getMemoryBoundaryMarkers(),
     );
 
     if (result.files.length === 0) {
