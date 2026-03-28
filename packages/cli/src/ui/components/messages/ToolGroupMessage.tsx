@@ -81,7 +81,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const {
     activePtyId,
     embeddedShellFocused,
-    backgroundShells,
+    backgroundTasks,
     pendingHistoryItems,
   } = useUIState();
 
@@ -92,14 +92,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         activePtyId,
         embeddedShellFocused,
         pendingHistoryItems,
-        backgroundShells,
+        backgroundTasks,
       ),
     [
       item,
       activePtyId,
       embeddedShellFocused,
       pendingHistoryItems,
-      backgroundShells,
+      backgroundTasks,
     ],
   );
 

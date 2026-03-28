@@ -179,7 +179,7 @@ vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./shellCommandProcessor.js', () => ({
+vi.mock('./useExecutionLifecycle.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
     handleShellCommand: vi.fn(),
     activeShellPtyId: null,

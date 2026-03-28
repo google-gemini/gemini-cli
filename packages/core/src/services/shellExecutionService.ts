@@ -240,6 +240,23 @@ export class ShellExecutionService {
     return path.join(Storage.getGlobalTempDir(), 'background-processes');
   }
 
+  private static formatShellBackgroundCompletion(
+    pid: number,
+    behavior: string,
+    output: string,
+    error?: Error,
+  ): string {
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const status = error ? `with error: ${error.message}` : 'successfully';
+
+    if (behavior === 'inject') {
+      const truncated = truncateString(output, 5000);
+      return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
+    }
+
+    return `[Background command completed ${status}. Output saved to ${logPath}]`;
+  }
+
   static getLogFilePath(pid: number): string {
     return path.join(this.getLogDir(), `background-${pid}.log`);
   }
@@ -533,21 +550,13 @@ export class ShellExecutionService {
                 return false;
               }
             },
-            formatInjection: (output, error) => {
-              const behavior =
-                shellExecutionConfig.backgroundCompletionBehavior || 'silent';
-              const logPath = ShellExecutionService.getLogFilePath(child.pid!);
-              const status = error
-                ? `with error: ${error.message}`
-                : 'successfully';
-
-              if (behavior === 'inject') {
-                const truncated = truncateString(output, 5000);
-                return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
-              }
-
-              return `[Background command completed ${status}. Output saved to ${logPath}]`;
-            },
+            formatInjection: (output, error) =>
+              ShellExecutionService.formatShellBackgroundCompletion(
+                child.pid!,
+                shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+                output,
+                error ?? undefined,
+              ),
             completionBehavior:
               shellExecutionConfig.backgroundCompletionBehavior || 'silent',
           })
@@ -880,21 +889,13 @@ export class ShellExecutionService {
           );
           return bufferData.length > 0 ? bufferData : undefined;
         },
-        formatInjection: (output, error) => {
-          const behavior =
-            shellExecutionConfig.backgroundCompletionBehavior || 'silent';
-          const logPath = ShellExecutionService.getLogFilePath(ptyPid);
-          const status = error
-            ? `with error: ${error.message}`
-            : 'successfully';
-
-          if (behavior === 'inject') {
-            const truncated = truncateString(output, 5000);
-            return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
-          }
-
-          return `[Background command completed ${status}. Output saved to ${logPath}]`;
-        },
+        formatInjection: (output, error) =>
+          ShellExecutionService.formatShellBackgroundCompletion(
+            ptyPid,
+            shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+            output,
+            error ?? undefined,
+          ),
         completionBehavior:
           shellExecutionConfig.backgroundCompletionBehavior || 'silent',
       }).result;

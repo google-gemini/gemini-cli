@@ -391,10 +391,7 @@ export class ExecutionLifecycleService {
           ? execution.formatInjection(result.output, result.error)
           : null;
 
-      const injectionText =
-        behavior === 'inject' && rawInjection
-          ? sanitizeOutput(rawInjection)
-          : rawInjection;
+      const injectionText = rawInjection ? sanitizeOutput(rawInjection) : null;
 
       // Inject directly into the model conversation from the backend.
       if (injectionText && this.injectionService) {

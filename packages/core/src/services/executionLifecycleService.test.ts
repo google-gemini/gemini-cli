@@ -549,7 +549,7 @@ describe('ExecutionLifecycleService', () => {
       const info = listener.mock.calls[0][0];
       expect(info.completionBehavior).toBe('notify');
       expect(info.injectionText).toBe(
-        '[Command completed. Output saved to /tmp/bg.log]',
+        '<output>\n[Command completed. Output saved to /tmp/bg.log]\n</output>',
       );
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
@@ -629,7 +629,7 @@ describe('ExecutionLifecycleService', () => {
       expect(listener).toHaveBeenCalledTimes(1);
       const info = listener.mock.calls[0][0];
       expect(info.completionBehavior).toBe('notify');
-      expect(info.injectionText).toBe('[notify message]');
+      expect(info.injectionText).toBe('<output>\n[notify message]\n</output>');
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
     });
@@ -689,7 +689,7 @@ describe('ExecutionLifecycleService', () => {
         'background_completion',
       );
 
-      // 2. Test 'notify' (should NOT be wrapped in <output> tag by default)
+      // 2. Test 'notify' (should also be wrapped in <output> tag)
       injectionListener.mockClear();
       const handleNotify = ExecutionLifecycleService.createExecution(
         '',
@@ -705,7 +705,7 @@ describe('ExecutionLifecycleService', () => {
       ExecutionLifecycleService.completeExecution(handleNotify.pid!);
 
       expect(injectionListener).toHaveBeenCalledWith(
-        'Pointer to logs',
+        '<output>\nPointer to logs\n</output>',
         'background_completion',
       );
     });
