@@ -84,7 +84,8 @@ export class ProjectRegistry {
 
     try {
       const content = JSON.stringify(data, null, 2);
-      const tmpPath = `${this.registryPath}.tmp`;
+      // Use a randomized tmp path to avoid ENOENT crashes when save() is called concurrently
+      const tmpPath = `${this.registryPath}.${Math.random().toString(36).substring(2, 8)}.tmp`;
       await fs.promises.writeFile(tmpPath, content, 'utf8');
       await fs.promises.rename(tmpPath, this.registryPath);
     } catch (error) {

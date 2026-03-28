@@ -35,6 +35,7 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
+import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
@@ -104,8 +105,11 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
+    let sessionMode: 'persistent' | 'isolated' | 'existing' = 'persistent';
+    let visionEnabled = false;
 
     try {
       if (updateOutput) {
@@ -149,6 +153,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       );
       const { definition } = result;
       browserManager = result.browserManager;
+      visionEnabled = result.visionEnabled;
+      sessionMode = result.sessionMode;
 
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -297,6 +303,24 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      let taskSuccess = false;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(output.result);
+
+        taskSuccess = parsed?.success === true;
+      } catch {
+        // non-JSON result -> treat as unknown, default false
+      }
+
+      recordBrowserAgentTaskOutcome(this.config, {
+        success: taskSuccess,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless: !!this.config.getBrowserAgentConfig().customConfig.headless,
+        duration_ms: Date.now() - invocationStartMs,
+      });
+
       const displayResult = safeJsonToMarkdown(output.result);
 
       const resultContent = `Browser agent finished.
@@ -334,6 +358,15 @@ ${displayResult}
         rawErrorMessage.includes('Aborted');
       const errorMessage = sanitizeErrorMessage(rawErrorMessage);
 
+      // Record error outcome for telemetry
+      recordBrowserAgentTaskOutcome(this.config, {
+        success: false,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless: !!this.config.getBrowserAgentConfig().customConfig.headless,
+        duration_ms: Date.now() - invocationStartMs,
+      });
+
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {
         if (item.status === 'running') {
@@ -368,6 +401,7 @@ ${displayResult}
       // Clean up input blocker, but keep browserManager alive for persistent sessions
       if (browserManager) {
         await removeInputBlocker(browserManager);
+        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }
