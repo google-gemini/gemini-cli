@@ -935,8 +935,11 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
-        expect.any(Object),
+        ['-NoProfile', '-NonInteractive', '-Command', 'dir "foo bar"'],
+        expect.objectContaining({
+          handleFlowControl: false,
+          useConpty: true,
+        }),
       );
     });
 
@@ -952,7 +955,9 @@ describe('ShellExecutionService', () => {
           '-c',
           'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
         ],
-        expect.any(Object),
+        expect.objectContaining({
+          handleFlowControl: true,
+        }),
       );
     });
   });
@@ -1517,7 +1522,7 @@ describe('ShellExecutionService child_process fallback', () => {
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
+        ['-NoProfile', '-NonInteractive', '-Command', 'dir "foo bar"'],
         expect.objectContaining({
           shell: false,
           detached: false,
