@@ -26,6 +26,61 @@ export interface UseLoadingIndicatorProps {
   maxLength?: number;
 }
 
+/**
+ * Returns true if the model name looks like a Pro model.
+ * Avoids importing core model utilities into UI code.
+ */
+function isLikelyProModel(model: string): boolean {
+  return model.toLowerCase().includes('pro');
+}
+
+/**
+ * Formats a delay in milliseconds as a short human-readable string.
+ * e.g. 4500 → "5s", 65000 → "1m 5s"
+ */
+function formatRetryDelay(delayMs: number): string {
+  const totalSeconds = Math.ceil(delayMs / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
+/**
+ * Builds a contextual retry message based on error type and model.
+ * For quota/capacity errors on Pro models, provides actionable guidance.
+ */
+function buildRetryPhrase(
+  retryStatus: RetryAttemptPayload,
+  errorVerbosity: 'low' | 'full',
+): string | null {
+  const { attempt, maxAttempts, delayMs, errorCode, model } = retryStatus;
+  const isQuotaError = errorCode === 'QUOTA_EXCEEDED';
+  const isProModelUsed = isLikelyProModel(model);
+  const attemptStr = `Attempt ${attempt + 1}/${maxAttempts}`;
+
+  if (errorVerbosity === 'low') {
+    if (attempt < LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD) {
+      return null;
+    }
+    if (isQuotaError && isProModelUsed) {
+      return 'Pro model is at capacity. Try /model flash to switch, or wait.';
+    }
+    return "This is taking a bit longer, we're still on it.";
+  }
+
+  // Full verbosity: contextual, actionable messages.
+  const modelName = getDisplayString(model);
+  const delayStr = formatRetryDelay(delayMs);
+  if (isQuotaError && isProModelUsed) {
+    return `${modelName} is at capacity — retrying in ${delayStr} (${attemptStr}) · try /model flash to switch`;
+  }
+
+  return `Trying to reach ${modelName} — retrying in ${delayStr} (${attemptStr})`;
+}
+
 export const useLoadingIndicator = ({
   streamingState,
   shouldShowFocusHint,
@@ -80,11 +135,7 @@ export const useLoadingIndicator = ({
   }, [streamingState, elapsedTimeFromTimer]);
 
   const retryPhrase = retryStatus
-    ? errorVerbosity === 'low'
-      ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
-        ? "This is taking a bit longer, we're still on it."
-        : null
-      : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+    ? buildRetryPhrase(retryStatus, errorVerbosity)
     : null;
 
   return {
