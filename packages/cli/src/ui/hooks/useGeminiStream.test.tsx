@@ -394,6 +394,7 @@ describe('useGeminiStream', () => {
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
     loadedSettings: LoadedSettings = mockLoadedSettings,
+    onLoopTurnCompleted?: () => void,
   ) => {
     const client = geminiClient || mockConfig.getGeminiClient();
     let lastToolCalls = initialToolCalls;
@@ -475,6 +476,9 @@ describe('useGeminiStream', () => {
           mockSetShellInputFocused,
           80,
           24,
+          undefined,
+          undefined,
+          onLoopTurnCompleted,
         ),
       {
         initialProps,
@@ -3401,6 +3405,66 @@ describe('useGeminiStream', () => {
 
       vi.useRealTimers();
     });
+  });
+
+  it('strips the loop stop marker from visible output and notifies completion for loop-generated turns', async () => {
+    const onLoopTurnCompleted = vi.fn();
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: '[[GEMINI_',
+        };
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: 'LOOP_DONE]]  Loop finished.',
+        };
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { reason: 'STOP' },
+        };
+      })(),
+    );
+
+    const { result } = await renderTestHook(
+      [],
+      undefined,
+      mockLoadedSettings,
+      onLoopTurnCompleted,
+    );
+
+    await act(async () => {
+      await result.current.submitQuery([{ text: 'hidden loop prompt' }], {
+        displayContent: 'continue',
+        isLoopGenerated: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(onLoopTurnCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      [{ text: 'hidden loop prompt' }],
+      expect.any(AbortSignal),
+      expect.any(String),
+      undefined,
+      false,
+      'continue',
+    );
+
+    const visibleTexts = mockAddItem.mock.calls
+      .map(([item]) =>
+        item && typeof item === 'object' && 'text' in item ? item.text : null,
+      )
+      .filter((text): text is string => typeof text === 'string');
+
+    expect(
+      visibleTexts.some((text) => text.includes('[[GEMINI_LOOP_DONE]]')),
+    ).toBe(false);
+    expect(visibleTexts.some((text) => text.includes('Loop finished.'))).toBe(
+      true,
+    );
   });
 
   describe('Loop Detection Confirmation', () => {

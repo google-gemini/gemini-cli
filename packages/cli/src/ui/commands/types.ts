@@ -92,6 +92,7 @@ export interface CommandContext {
     removeComponent: () => void;
     toggleBackgroundTasks: () => void;
     toggleShortcutsHelp: () => void;
+    scheduleLoop?: (schedule: LoopSchedule) => boolean;
   };
   // Session-specific data
   session: {
@@ -101,6 +102,12 @@ export interface CommandContext {
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
+}
+
+export interface LoopSchedule {
+  intervalMs: number;
+  intervalSpec: string;
+  prompt: string;
 }
 
 /** The return type for a command action that results in the app quitting. */
