@@ -100,10 +100,18 @@ the default way that the CLI executes tools that might have side effects.
 - **Directly from the registry:** You can run the published sandbox image
   directly. This is useful for environments where you only have Docker and want
   to run the CLI.
+
   ```bash
+
+  > **Note:** Replace `0.1.1` with the latest sandbox
+  > image version. Using an outdated tag may cause
+  > errors. Check the latest version on the
+  > [releases page](https://github.com/google-gemini/gemini-cli/releases).
+
   # Run the published sandbox image
   docker run --rm -it us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1
   ```
+
 - **Using the `--sandbox` flag:** If you have Gemini CLI installed locally
   (using the standard installation described above), you can instruct it to run
   inside the sandbox container.
