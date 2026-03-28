@@ -542,7 +542,7 @@ export class ShellExecutionService {
                 : 'successfully';
 
               if (behavior === 'inject') {
-                const truncated = truncateString(output, 20000);
+                const truncated = truncateString(output, 5000);
                 return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
               }
 
@@ -889,7 +889,7 @@ export class ShellExecutionService {
             : 'successfully';
 
           if (behavior === 'inject') {
-            const truncated = truncateString(output, 20000);
+            const truncated = truncateString(output, 5000);
             return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
           }
 
