@@ -52,6 +52,7 @@ import {
 import clipboardy from 'clipboardy';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { useShellCommandExpansion } from '../hooks/useShellCommandExpansion.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
@@ -75,6 +76,16 @@ vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('clipboardy');
 vi.mock('../utils/clipboardUtils.js');
 vi.mock('../hooks/useKittyKeyboardProtocol.js');
+vi.mock('../hooks/useShellCommandExpansion.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../hooks/useShellCommandExpansion.js')
+    >();
+  return {
+    ...actual,
+    useShellCommandExpansion: vi.fn(),
+  };
+});
 vi.mock('../utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
 }));
@@ -160,6 +171,10 @@ describe('InputPrompt', () => {
   let mockCommandCompletion: UseCommandCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
   let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
+  let mockShellCommandExpansion: {
+    isExpanding: boolean;
+    expandShellCommand: ReturnType<typeof vi.fn>;
+  };
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
@@ -182,6 +197,7 @@ describe('InputPrompt', () => {
     useReverseSearchCompletion,
   );
   const mockedUseKittyKeyboardProtocol = vi.mocked(useKittyKeyboardProtocol);
+  const mockedUseShellCommandExpansion = vi.mocked(useShellCommandExpansion);
   const mockSetEmbeddedShellFocused = vi.fn();
   const mockSetCleanUiDetailsVisible = vi.fn();
   const mockToggleCleanUiDetailsVisible = vi.fn();
@@ -349,6 +365,11 @@ describe('InputPrompt', () => {
       enabled: false,
       checking: false,
     });
+    mockShellCommandExpansion = {
+      isExpanding: false,
+      expandShellCommand: vi.fn(),
+    };
+    mockedUseShellCommandExpansion.mockReturnValue(mockShellCommandExpansion);
 
     vi.mocked(clipboardy.read).mockResolvedValue('');
 
@@ -368,6 +389,7 @@ describe('InputPrompt', () => {
         getWorkspaceContext: () => ({
           getDirectories: () => ['/test/project/src'],
         }),
+        getGeminiClient: vi.fn(),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -459,6 +481,80 @@ describe('InputPrompt', () => {
         'ls -l',
       );
       expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
+    });
+    unmount();
+  });
+
+  it('should expand a natural-language shell request inline instead of submitting it', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('? delete all .log files older than 7 days');
+    mockShellCommandExpansion.expandShellCommand.mockResolvedValue({
+      status: 'expanded',
+      command: 'find . -name "*.log" -mtime +7 -delete',
+    });
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      expect(mockShellCommandExpansion.expandShellCommand).toHaveBeenCalledWith(
+        '? delete all .log files older than 7 days',
+      );
+      expect(props.buffer.setText).toHaveBeenLastCalledWith(
+        'find . -name "*.log" -mtime +7 -delete',
+      );
+    });
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(mockShellHistory.addCommandToHistory).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should not open shortcuts help with ? on an empty prompt in shell mode', async () => {
+    props.shellModeActive = true;
+    props.buffer.handleInput = vi.fn((key: Key) => {
+      if (key.sequence === '?' && key.insertable) {
+        props.buffer.setText('?');
+        return true;
+      }
+      return false;
+    });
+
+    const setShortcutsHelpVisible = vi.fn();
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions: { setShortcutsHelpVisible },
+    });
+
+    await act(async () => {
+      stdin.write('?');
+    });
+
+    await waitFor(() => {
+      expect(setShortcutsHelpVisible).not.toHaveBeenCalled();
+      expect(props.buffer.setText).toHaveBeenLastCalledWith('?');
+    });
+    unmount();
+  });
+
+  it('should show a hint when a shell-mode prompt starts with ?', async () => {
+    props.shellModeActive = true;
+    const emitSpy = vi.spyOn(appEvents, 'emit');
+    props.buffer.setText('?');
+
+    const { unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await waitFor(() => {
+      expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+        message: 'Press Enter to generate an editable shell command.',
+        type: TransientMessageType.Hint,
+      });
     });
     unmount();
   });

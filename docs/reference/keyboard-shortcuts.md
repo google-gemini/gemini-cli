@@ -214,6 +214,9 @@ a `key` combination.
   The panel also auto-hides while the agent is running/streaming or when
   action-required dialogs are shown. Press `?` again to close the panel and
   insert a `?` into the prompt.
+- `?` at the start of a shell-mode prompt: Expand a natural-language request
+  into an editable shell command inline. The generated command is inserted into
+  the prompt and is not executed until you press `Enter` again.
 - `Tab` + `Tab` (while typing in the prompt): Toggle between minimal and full UI
   details when no completion/search interaction is active. The selected mode is
   remembered for future sessions. Full UI remains the default on first run, and
