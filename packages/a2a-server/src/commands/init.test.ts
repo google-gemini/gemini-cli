@@ -176,8 +176,35 @@ describe('InitCommand', () => {
                 coderAgent: {
                   kind: CoderAgentEvent.StateAgentSettingsEvent,
                   workspacePath: mockWorkspacePath,
+                  workspacePaths: [mockWorkspacePath],
                   autoExecute: true,
                 },
+              },
+            }),
+          }),
+          eventBus,
+        );
+      });
+
+      it('passes workspacePaths to the agent executor when handling multiple workspaces', async () => {
+        process.env['CODER_AGENT_WORKSPACE_PATHS'] =
+          `/tmp/test-workspace1${path.delimiter}/tmp/test-workspace2`;
+        await command.execute(context, []);
+
+        expect(mockExecute).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userMessage: expect.objectContaining({
+              metadata: {
+                coderAgent: expect.objectContaining({
+                  kind: CoderAgentEvent.StateAgentSettingsEvent,
+                  workspacePath: path.resolve('/tmp/test-workspace1'),
+                  workspacePaths: [
+                    path.resolve('/tmp/test-workspace1'),
+                    path.resolve('/tmp/test-workspace2'),
+                    mockWorkspacePath,
+                  ],
+                  autoExecute: true,
+                }),
               },
             }),
           }),
