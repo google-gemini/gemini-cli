@@ -103,10 +103,8 @@ export class AddMemoryCommand implements Command {
       const abortController = new AbortController();
       const signal = abortController.signal;
       await tool.buildAndExecute(result.toolArgs, signal, undefined, {
-        shellExecutionConfig: {
-          sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
-          sandboxManager: loopContext.sandboxManager,
-        },
+        sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+        sandboxManager: loopContext.sandboxManager,
       });
       await refreshMemory(context.config);
       return {
