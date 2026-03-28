@@ -1627,7 +1627,7 @@ describe('Settings Loading and Merging', () => {
         saveSettings(settings1.user);
 
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
+        expect(mockedRead).toHaveBeenCalledTimes(11); // +1 for preserving external settings on save
         expect(settings1).not.toBe(settings2);
       });
 
@@ -1651,8 +1651,8 @@ describe('Settings Loading and Merging', () => {
         const settings2W1 = loadSettings(workspace1);
         const settings2W2 = loadSettings(workspace2);
 
-        // Both workspace caches should have been cleared and re-read from disk (+10 reads)
-        expect(mockedRead).toHaveBeenCalledTimes(20);
+        // Both workspace caches should have been cleared and re-read from disk (+10 reads + 1 for preserving external settings on save)
+        expect(mockedRead).toHaveBeenCalledTimes(21);
         expect(settings1W1).not.toBe(settings2W1);
         expect(settings1W2).not.toBe(settings2W2);
       });
@@ -2601,6 +2601,220 @@ describe('Settings Loading and Merging', () => {
         'Failed to save settings: Write failed',
         error,
       );
+    });
+
+    describe('External modification preservation', () => {
+      it('should merge CLI changes with external file modifications and CLI takes precedence', () => {
+        const mockFsExistsSync = vi.mocked(fs.existsSync);
+        const mockFsReadFileSync = vi.mocked(fs.readFileSync);
+        const mockUpdateSettings = vi.mocked(
+          updateSettingsFilePreservingFormat,
+        );
+
+        const settingsPath = path.resolve('/mock/settings.json');
+
+        // File has both old values and external keys added by hooks
+        const currentFileContent = JSON.stringify({
+          model: { name: 'gemini-1.5-pro' },
+          ui: { theme: 'light' },
+          externalKey: 'added-by-hook',
+          externalNested: { data: 'from-hook' },
+        });
+
+        mockFsExistsSync.mockReturnValue(true);
+        mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+          if (p === settingsPath) {
+            return currentFileContent;
+          }
+          return '{}';
+        });
+
+        // CLI updates model and ui settings
+        const settingsFile = createMockSettings({
+          model: { name: 'gemini-2.5-flash' },
+          ui: { theme: 'dark' },
+        }).user;
+        settingsFile.path = settingsPath;
+
+        saveSettings(settingsFile);
+
+        // Verify merged settings: CLI values override, external keys preserved
+        expect(mockUpdateSettings).toHaveBeenCalledWith(
+          settingsPath,
+          expect.objectContaining({
+            model: { name: 'gemini-2.5-flash' },
+            ui: { theme: 'dark' },
+            externalKey: 'added-by-hook',
+            externalNested: { data: 'from-hook' },
+          }),
+        );
+      });
+
+      it('should handle non-existent files and preserve complex nested structures', () => {
+        const mockFsExistsSync = vi.mocked(fs.existsSync);
+        const mockFsReadFileSync = vi.mocked(fs.readFileSync);
+        const mockUpdateSettings = vi.mocked(
+          updateSettingsFilePreservingFormat,
+        );
+
+        const newFilePath = path.resolve('/mock/new/settings.json');
+        const existingFilePath = path.resolve('/mock/existing/settings.json');
+
+        // Test 1: Non-existent file should skip merge and save directly
+        mockFsExistsSync.mockImplementation(
+          (p: fs.PathLike) => p === existingFilePath,
+        );
+
+        const newFileSettings = createMockSettings({
+          ui: { theme: 'dark' },
+        }).user;
+        newFileSettings.path = newFilePath;
+
+        saveSettings(newFileSettings);
+
+        // Should save CLI settings without merge
+        expect(mockUpdateSettings).toHaveBeenCalledWith(
+          newFilePath,
+          expect.objectContaining({ ui: { theme: 'dark' } }),
+        );
+
+        mockUpdateSettings.mockClear();
+
+        // Test 2: Existing file with external top-level keys not managed by CLI
+        const complexFileContent = JSON.stringify({
+          mcpServers: {
+            'external-server': {
+              command: 'external-cmd',
+              args: ['--arg1', '--arg2'],
+            },
+          },
+          customHookData: {
+            nested: {
+              deep: {
+                value: 'preserved',
+              },
+            },
+          },
+        });
+
+        mockFsExistsSync.mockImplementation(
+          (p: fs.PathLike) => p === existingFilePath,
+        );
+        mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+          if (p === existingFilePath) {
+            return complexFileContent;
+          }
+          return '{}';
+        });
+
+        const complexSettings = createMockSettings({
+          mcpServers: {
+            'cli-server': { command: 'cli-cmd' },
+          },
+        }).user;
+        complexSettings.path = existingFilePath;
+
+        saveSettings(complexSettings);
+
+        // Should preserve external top-level keys (customHookData) that CLI doesn't manage
+        // but CLI-managed keys get replaced (shallow merge at top level)
+        expect(mockUpdateSettings).toHaveBeenCalledWith(
+          existingFilePath,
+          expect.objectContaining({
+            mcpServers: {
+              'cli-server': { command: 'cli-cmd' },
+            },
+            customHookData: {
+              nested: { deep: { value: 'preserved' } },
+            },
+          }),
+        );
+      });
+
+      it('should handle JSON parse errors gracefully and emit warning', () => {
+        const mockFsExistsSync = vi.mocked(fs.existsSync);
+        const mockFsReadFileSync = vi.mocked(fs.readFileSync);
+        const mockUpdateSettings = vi.mocked(
+          updateSettingsFilePreservingFormat,
+        );
+        const mockEmitFeedback = mockCoreEvents.emitFeedback;
+
+        const settingsPath = path.resolve('/mock/settings.json');
+
+        // File has invalid JSON
+        mockFsExistsSync.mockReturnValue(true);
+        mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+          if (p === settingsPath) {
+            return 'invalid json {';
+          }
+          return '{}';
+        });
+
+        const settingsFile = createMockSettings({
+          ui: { theme: 'dark' },
+        }).user;
+        settingsFile.path = settingsPath;
+
+        saveSettings(settingsFile);
+
+        // Should emit a warning about parse failure
+        expect(mockEmitFeedback).toHaveBeenCalledWith(
+          'warning',
+          expect.stringContaining('Could not parse existing settings file'),
+          expect.any(Error),
+        );
+
+        // Should still save CLI settings
+        expect(mockUpdateSettings).toHaveBeenCalledWith(
+          settingsPath,
+          expect.objectContaining({
+            ui: { theme: 'dark' },
+          }),
+        );
+      });
+
+      it('should prevent sync-by-omission from deleting external keys', () => {
+        const mockFsExistsSync = vi.mocked(fs.existsSync);
+        const mockFsReadFileSync = vi.mocked(fs.readFileSync);
+        const mockUpdateSettings = vi.mocked(
+          updateSettingsFilePreservingFormat,
+        );
+
+        const settingsPath = path.resolve('/mock/settings.json');
+
+        // File has both CLI-managed and external keys
+        const currentFileContent = JSON.stringify({
+          ui: { theme: 'dark' },
+          externalHookField: { data: 'important' },
+          anotherExternal: 'value',
+        });
+
+        mockFsExistsSync.mockReturnValue(true);
+        mockFsReadFileSync.mockImplementation((p: fs.PathOrFileDescriptor) => {
+          if (p === settingsPath) {
+            return currentFileContent;
+          }
+          return '{}';
+        });
+
+        // CLI only tracks ui settings
+        const settingsFile = createMockSettings({
+          ui: { theme: 'light' },
+        }).user;
+        settingsFile.path = settingsPath;
+
+        saveSettings(settingsFile);
+
+        // Verify merged settings include external keys
+        // This ensures applyKeyDiff() won't delete them during sync-by-omission
+        const callArgs = mockUpdateSettings.mock.calls[0][1];
+        expect(callArgs).toHaveProperty('externalHookField');
+        expect(callArgs).toHaveProperty('anotherExternal');
+        expect(callArgs).toHaveProperty('ui');
+
+        // The merged object passed to updateSettingsFilePreservingFormat
+        // contains all keys, so applyKeyDiff() will see them and not delete
+      });
     });
   });
 
