@@ -269,6 +269,50 @@ export type HistoryItemExtensionsList = HistoryItemBase & {
   extensions: GeminiCLIExtension[];
 };
 
+export interface PerfSnapshot {
+  uptimeMs: number;
+  duration: string;
+  memory: {
+    heapUsedMB: number;
+    heapTotalMB: number;
+    rssMB: number;
+    externalMB: number;
+  };
+  memoryWarnings: string[];
+  toolPerf: Array<{
+    name: string;
+    calls: number;
+    avgMs: number;
+    totalMs: number;
+    successRate: number;
+  }>;
+  apiPerf: Array<{
+    model: string;
+    requests: number;
+    avgLatencyMs: number;
+    totalLatencyMs: number;
+    errorRate: number;
+    inputTokens: number;
+    outputTokens: number;
+    cachedTokens: number;
+  }>;
+  totalToolCalls: number;
+  totalToolTime: number;
+  totalApiRequests: number;
+  totalApiTime: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCachedTokens: number;
+  totalLinesAdded: number;
+  totalLinesRemoved: number;
+}
+
+export type HistoryItemPerfDashboard = HistoryItemBase & {
+  type: 'perf_dashboard';
+  view: 'overview' | 'memory' | 'tools' | 'api';
+  snapshot: PerfSnapshot;
+};
+
 export interface ChatDetail {
   name: string;
   mtime: string;
@@ -393,7 +437,8 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint;
+  | HistoryItemHint
+  | HistoryItemPerfDashboard;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -408,6 +453,7 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  PERF_DASHBOARD = 'perf_dashboard',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
