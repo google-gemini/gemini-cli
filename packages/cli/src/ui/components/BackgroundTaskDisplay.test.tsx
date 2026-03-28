@@ -6,8 +6,8 @@
 
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
-import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
+import { BackgroundTaskDisplay } from './BackgroundTaskDisplay.js';
+import { type BackgroundTask } from '../hooks/useExecutionLifecycle.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
@@ -15,15 +15,15 @@ import { ScrollProvider } from '../contexts/ScrollProvider.js';
 import { Box } from 'ink';
 
 // Mock dependencies
-const mockDismissBackgroundShell = vi.fn();
-const mockSetActiveBackgroundShellPid = vi.fn();
-const mockSetIsBackgroundShellListOpen = vi.fn();
+const mockDismissBackgroundTask = vi.fn();
+const mockSetActiveBackgroundTaskPid = vi.fn();
+const mockSetIsBackgroundTaskListOpen = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
-    dismissBackgroundShell: mockDismissBackgroundShell,
-    setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
-    setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
+    dismissBackgroundTask: mockDismissBackgroundTask,
+    setActiveBackgroundTaskPid: mockSetActiveBackgroundTaskPid,
+    setIsBackgroundTaskListOpen: mockSetIsBackgroundTaskListOpen,
   }),
 }));
 
@@ -86,14 +86,14 @@ vi.mock('./shared/ScrollableList.js', () => ({
       data,
       renderItem,
     }: {
-      data: BackgroundShell[];
+      data: BackgroundTask[];
       renderItem: (props: {
-        item: BackgroundShell;
+        item: BackgroundTask;
         index: number;
       }) => React.ReactNode;
     }) => (
       <Box flexDirection="column">
-        {data.map((item: BackgroundShell, index: number) => (
+        {data.map((item: BackgroundTask, index: number) => (
           <Box key={index}>{renderItem({ item, index })}</Box>
         ))}
       </Box>
@@ -116,9 +116,9 @@ const createMockKey = (overrides: Partial<Key>): Key => ({
   ...overrides,
 });
 
-describe('<BackgroundShellDisplay />', () => {
-  const mockShells = new Map<number, BackgroundShell>();
-  const shell1: BackgroundShell = {
+describe('<BackgroundTaskDisplay />', () => {
+  const mockShells = new Map<number, BackgroundTask>();
+  const shell1: BackgroundTask = {
     pid: 1001,
     command: 'npm start',
     output: 'Starting server...',
@@ -126,7 +126,7 @@ describe('<BackgroundShellDisplay />', () => {
     binaryBytesReceived: 0,
     status: 'running',
   };
-  const shell2: BackgroundShell = {
+  const shell2: BackgroundTask = {
     pid: 1002,
     command: 'tail -f log.txt',
     output: 'Log entry 1',
@@ -147,7 +147,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { lastFrame, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -167,7 +167,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 100;
     const { lastFrame, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -187,7 +187,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { lastFrame, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -207,7 +207,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { rerender, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -227,7 +227,7 @@ describe('<BackgroundShellDisplay />', () => {
 
     rerender(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={100}
@@ -250,7 +250,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { lastFrame, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -270,7 +270,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -287,13 +287,13 @@ describe('<BackgroundShellDisplay />', () => {
       simulateKey({ name: 'down' });
     });
 
-    // Simulate Ctrl+L (handled by BackgroundShellDisplay)
+    // Simulate Ctrl+L (handled by BackgroundTaskDisplay)
     await act(async () => {
       simulateKey({ name: 'l', ctrl: true });
     });
 
-    expect(mockSetActiveBackgroundShellPid).toHaveBeenCalledWith(shell2.pid);
-    expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
+    expect(mockSetActiveBackgroundTaskPid).toHaveBeenCalledWith(shell2.pid);
+    expect(mockSetIsBackgroundTaskListOpen).toHaveBeenCalledWith(false);
     unmount();
   });
 
@@ -301,7 +301,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -325,7 +325,7 @@ describe('<BackgroundShellDisplay />', () => {
       simulateKey({ name: 'k', ctrl: true });
     });
 
-    expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell2.pid);
+    expect(mockDismissBackgroundTask).toHaveBeenCalledWith(shell2.pid);
     unmount();
   });
 
@@ -333,7 +333,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell1.pid}
           width={width}
@@ -349,7 +349,7 @@ describe('<BackgroundShellDisplay />', () => {
       simulateKey({ name: 'k', ctrl: true });
     });
 
-    expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell1.pid);
+    expect(mockDismissBackgroundTask).toHaveBeenCalledWith(shell1.pid);
     unmount();
   });
 
@@ -358,7 +358,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { lastFrame, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={shell2.pid}
           width={width}
@@ -375,7 +375,7 @@ describe('<BackgroundShellDisplay />', () => {
   });
 
   it('keeps exit code status color even when selected', async () => {
-    const exitedShell: BackgroundShell = {
+    const exitedShell: BackgroundTask = {
       pid: 1003,
       command: 'exit 0',
       output: '',
@@ -389,7 +389,7 @@ describe('<BackgroundShellDisplay />', () => {
     const width = 80;
     const { lastFrame, unmount } = await render(
       <ScrollProvider>
-        <BackgroundShellDisplay
+        <BackgroundTaskDisplay
           shells={mockShells}
           activePid={exitedShell.pid}
           width={width}
