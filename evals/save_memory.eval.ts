@@ -27,10 +27,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: 'blue',
-        testName: `${TEST_PREFIX}${rememberingFavoriteColor}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: 'blue',
+          testName: `${TEST_PREFIX}${rememberingFavoriteColor}`,
+        }),
+      ).toBe(true);
     },
   });
   const rememberingCommandRestrictions = 'Agent remembers command restrictions';
@@ -45,10 +47,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/not run npm commands|remember|ok/i],
-        testName: `${TEST_PREFIX}${rememberingCommandRestrictions}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/not run npm commands|remember|ok/i],
+          testName: `${TEST_PREFIX}${rememberingCommandRestrictions}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -64,10 +68,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/always|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${rememberingWorkflow}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/always|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${rememberingWorkflow}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -88,10 +94,12 @@ describe('save_memory', () => {
       ).toBe(false);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        testName: `${TEST_PREFIX}${ignoringTemporaryInformation}`,
-        forbiddenContent: [/remember|will do/i],
-      });
+      expect(
+        checkModelOutputContent(result, {
+          testName: `${TEST_PREFIX}${ignoringTemporaryInformation}`,
+          forbiddenContent: [/remember|will do/i],
+        }),
+      ).toBe(true);
     },
   });
 
@@ -107,10 +115,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/Buddy/i],
-        testName: `${TEST_PREFIX}${rememberingPetName}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/Buddy/i],
+          testName: `${TEST_PREFIX}${rememberingPetName}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -126,10 +136,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/npm run dev|start server|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${rememberingCommandAlias}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/npm run dev|start server|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${rememberingCommandAlias}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -165,10 +177,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${rememberingCodingStyle}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${rememberingCodingStyle}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -221,10 +235,12 @@ describe('save_memory', () => {
       );
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/June 15th|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${rememberingBirthday}`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/June 15th|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${rememberingBirthday}`,
+        }),
+      ).toBe(true);
     },
   });
 
