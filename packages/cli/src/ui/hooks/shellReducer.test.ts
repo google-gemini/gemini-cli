@@ -11,6 +11,10 @@ import {
   type ShellState,
   type ShellAction,
 } from './shellReducer.js';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 describe('shellReducer', () => {
   it('should return the initial state', () => {
@@ -189,5 +193,76 @@ describe('shellReducer', () => {
     const state = shellReducer(registeredState, action);
     expect(state.backgroundShells.has(1001)).toBe(false);
     expect(state.isBackgroundShellVisible).toBe(false); // Auto-hide if last shell
+  });
+
+  it('should NOT truncate output when below the size threshold', () => {
+    const existingOutput = 'x'.repeat(MAX_SHELL_OUTPUT_SIZE - 1);
+    const chunk = 'y';
+    // combined length = MAX_SHELL_OUTPUT_SIZE, well below MAX + BUFFER
+    const shellState: ShellState = {
+      ...initialState,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'tail -f log',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk,
+    };
+    const state = shellReducer(shellState, action);
+    const output = state.backgroundShells.get(1001)?.output;
+    expect(typeof output).toBe('string');
+    expect((output as string).length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    expect((output as string).endsWith(chunk)).toBe(true);
+  });
+
+  it('should truncate output to MAX_SHELL_OUTPUT_SIZE when threshold is exceeded', () => {
+    // existing output is already at MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+    const existingOutput = 'a'.repeat(
+      MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER,
+    );
+    const chunk = 'b'.repeat(100);
+    // combined length = MAX + BUFFER + 100, which exceeds the threshold
+    const shellState: ShellState = {
+      ...initialState,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'tail -f log',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk,
+    };
+    const state = shellReducer(shellState, action);
+    const output = state.backgroundShells.get(1001)?.output;
+    expect(typeof output).toBe('string');
+    // After truncation the result should be exactly MAX_SHELL_OUTPUT_SIZE chars
+    expect((output as string).length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    // The newest chunk should be preserved at the end
+    expect((output as string).endsWith(chunk)).toBe(true);
   });
 });
