@@ -15,6 +15,7 @@ import type {
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
+import { TopicMessage, isTopicTool } from './TopicMessage.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
@@ -215,6 +216,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         const tool = group;
         const isShellToolCall = isShellTool(tool.name);
+        const isTopicToolCall = isTopicTool(tool.name);
 
         const commonProps = {
           ...tool,
@@ -234,7 +236,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={contentWidth}
           >
-            {isShellToolCall ? (
+            {isTopicToolCall ? (
+              <TopicMessage {...commonProps} />
+            ) : isShellToolCall ? (
               <ShellToolMessage {...commonProps} config={config} />
             ) : (
               <ToolMessage {...commonProps} />
