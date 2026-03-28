@@ -61,6 +61,7 @@ export function getAllGeminiMdFilenames(): string[] {
 
 interface SaveMemoryParams {
   fact: string;
+  target?: string;
   modified_by_user?: boolean;
   modified_content?: string;
 }
@@ -82,17 +83,52 @@ function ensureNewlineSeparation(currentContent: string): string {
 }
 
 /**
- * Reads the current content of the memory file
+ * Reads the current content of a memory file.
  */
-async function readMemoryFileContent(): Promise<string> {
+async function readMemoryFileContent(filePath: string): Promise<string> {
   try {
-    return await fs.readFile(getGlobalMemoryFilePath(), 'utf-8');
+    return await fs.readFile(filePath, 'utf-8');
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const error = err as Error & { code?: string };
     if (!(error instanceof Error) || error.code !== 'ENOENT') throw err;
     return '';
   }
+}
+
+/**
+ * Validates the target path for a non-global memory save.
+ * Returns an error message string if invalid, or null if valid.
+ */
+export function validateTargetPath(target: string): string | null {
+  if (!path.isAbsolute(target)) {
+    return `Parameter "target" must be an absolute path. Got: "${target}"`;
+  }
+
+  const basename = path.basename(target);
+  const validFilenames = getAllGeminiMdFilenames();
+  if (!validFilenames.includes(basename)) {
+    return `Parameter "target" must point to a ${getCurrentGeminiMdFilename()} file. Got basename: "${basename}"`;
+  }
+
+  // Normalize and reject path traversal
+  const normalized = path.normalize(target);
+  if (normalized.includes('..')) {
+    return `Parameter "target" must not contain path traversal segments (".."). Got: "${target}"`;
+  }
+
+  return null;
+}
+
+/**
+ * Resolves the memory file path from the optional target parameter.
+ * Returns the global memory file path when target is undefined.
+ */
+export function resolveMemoryFilePath(target: string | undefined): string {
+  if (!target) {
+    return getGlobalMemoryFilePath();
+  }
+  return path.normalize(target);
 }
 
 /**
@@ -146,6 +182,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
 > {
   private static readonly allowlist: Set<string> = new Set();
   private proposedNewContent: string | undefined;
+  private readonly resolvedFilePath: string;
 
   constructor(
     params: SaveMemoryParams,
@@ -154,24 +191,24 @@ class MemoryToolInvocation extends BaseToolInvocation<
     displayName?: string,
   ) {
     super(params, messageBus, toolName, displayName);
+    this.resolvedFilePath = resolveMemoryFilePath(params.target);
   }
 
   getDescription(): string {
-    const memoryFilePath = getGlobalMemoryFilePath();
-    return `in ${tildeifyPath(memoryFilePath)}`;
+    return `in ${tildeifyPath(this.resolvedFilePath)}`;
   }
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
-    const memoryFilePath = getGlobalMemoryFilePath();
+    const memoryFilePath = this.resolvedFilePath;
     const allowlistKey = memoryFilePath;
 
     if (MemoryToolInvocation.allowlist.has(allowlistKey)) {
       return false;
     }
 
-    const currentContent = await readMemoryFileContent();
+    const currentContent = await readMemoryFileContent(memoryFilePath);
     const { fact, modified_by_user, modified_content } = this.params;
 
     // If an attacker injects modified_content, use it for the diff
@@ -212,7 +249,28 @@ class MemoryToolInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const { fact, modified_by_user, modified_content } = this.params;
+    const { fact, target, modified_by_user, modified_content } = this.params;
+    const memoryFilePath = this.resolvedFilePath;
+
+    // For non-global targets, verify the file already exists.
+    if (target) {
+      try {
+        await fs.access(memoryFilePath);
+      } catch {
+        const errorMsg = `Target file does not exist: "${tildeifyPath(memoryFilePath)}". Omit the "target" parameter to save to the global memory, or create the file first using write_file.`;
+        return {
+          llmContent: JSON.stringify({
+            success: false,
+            error: errorMsg,
+          }),
+          returnDisplay: `Error saving memory: ${errorMsg}`,
+          error: {
+            message: errorMsg,
+            type: ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
+          },
+        };
+      }
+    }
 
     try {
       let contentToWrite: string;
@@ -233,17 +291,17 @@ class MemoryToolInvocation extends BaseToolInvocation<
           // This case can be hit in flows without a confirmation step (e.g., --auto-confirm).
           // As a fallback, we recompute the content now. This is safe because
           // computeNewContent sanitizes the input.
-          const currentContent = await readMemoryFileContent();
+          const currentContent = await readMemoryFileContent(memoryFilePath);
           this.proposedNewContent = computeNewContent(currentContent, fact);
         }
         contentToWrite = this.proposedNewContent;
         successMessage = `Okay, I've remembered that: "${sanitizedFact}"`;
       }
 
-      await fs.mkdir(path.dirname(getGlobalMemoryFilePath()), {
+      await fs.mkdir(path.dirname(memoryFilePath), {
         recursive: true,
       });
-      await fs.writeFile(getGlobalMemoryFilePath(), contentToWrite, 'utf-8');
+      await fs.writeFile(memoryFilePath, contentToWrite, 'utf-8');
 
       return {
         llmContent: JSON.stringify({
@@ -296,6 +354,13 @@ export class MemoryTool
       return 'Parameter "fact" must be a non-empty string.';
     }
 
+    if (params.target !== undefined) {
+      const targetError = validateTargetPath(params.target);
+      if (targetError) {
+        return targetError;
+      }
+    }
+
     return null;
   }
 
@@ -319,11 +384,13 @@ export class MemoryTool
 
   getModifyContext(_abortSignal: AbortSignal): ModifyContext<SaveMemoryParams> {
     return {
-      getFilePath: (_params: SaveMemoryParams) => getGlobalMemoryFilePath(),
-      getCurrentContent: async (_params: SaveMemoryParams): Promise<string> =>
-        readMemoryFileContent(),
+      getFilePath: (params: SaveMemoryParams) =>
+        resolveMemoryFilePath(params.target),
+      getCurrentContent: async (params: SaveMemoryParams): Promise<string> =>
+        readMemoryFileContent(resolveMemoryFilePath(params.target)),
       getProposedContent: async (params: SaveMemoryParams): Promise<string> => {
-        const currentContent = await readMemoryFileContent();
+        const filePath = resolveMemoryFilePath(params.target);
+        const currentContent = await readMemoryFileContent(filePath);
         const { fact, modified_by_user, modified_content } = params;
         // Ensure the editor is populated with the same content
         // that the confirmation diff would show.

@@ -18,7 +18,8 @@ describe('renderOperationalGuidelines - memoryManagerEnabled', () => {
   it('should include standard memory tool guidance when memoryManagerEnabled is false', () => {
     const result = renderOperationalGuidelines(baseOptions);
     expect(result).toContain('save_memory');
-    expect(result).toContain('persistent user-related information');
+    expect(result).toContain('persistent information only');
+    expect(result).toContain('NEVER use `write_file` or `replace`');
     expect(result).not.toContain('subagent');
   });
 
@@ -29,6 +30,7 @@ describe('renderOperationalGuidelines - memoryManagerEnabled', () => {
     });
     expect(result).toContain('save_memory');
     expect(result).toContain('subagent');
+    expect(result).not.toContain('NEVER use `write_file` or `replace`');
     expect(result).not.toContain('persistent user-related information');
   });
 });
