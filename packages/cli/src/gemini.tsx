@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  AdminControlsSettings,
+import {
+  type AdminControlsSettings,
   type StartupWarning,
   WarningPriority,
   type Config,
@@ -198,13 +198,6 @@ export async function main() {
   const adminControlsListner = setupAdminControlsListener();
   registerCleanup(adminControlsListner.cleanup);
 
-  const cleanupStdio = patchStdio();
-  registerSyncCleanup(() => {
-    // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
-    cleanupStdio();
-  });
-
   setupUnhandledRejectionHandler();
 
   setupSignalHandlers();
@@ -212,6 +205,14 @@ export async function main() {
   const slashCommandConflictHandler = new SlashCommandConflictHandler();
   slashCommandConflictHandler.start();
   registerCleanup(() => slashCommandConflictHandler.stop());
+
+  // We patch stdio late to allow early startup errors to be visible.
+  const cleanupStdio = patchStdio();
+  registerSyncCleanup(() => {
+    // This is needed to ensure we don't lose any buffered output.
+    initializeOutputListenersAndFlush();
+    cleanupStdio();
+  });
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
