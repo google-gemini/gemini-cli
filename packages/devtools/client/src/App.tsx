@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks';
+import { useDevToolsData, type ConsoleLog, type NetworkLog } from './hooks.ts';
 
 type ThemeMode = 'light' | 'dark' | null; // null means follow system
 
@@ -134,7 +134,6 @@ export default function App() {
               if (!networkMap.has(id)) {
                 networkMap.set(id, {
                   ...payload,
-                  type,
                   timestamp,
                   id,
                 } as NetworkLog);
@@ -144,8 +143,7 @@ export default function App() {
                 networkMap.set(id, {
                   ...existing,
                   ...payload,
-                  // Ensure we don't overwrite the original timestamp or type
-                  type: existing.type,
+                  // Ensure we don't overwrite the original timestamp
                   timestamp: existing.timestamp,
                 } as NetworkLog);
               }
