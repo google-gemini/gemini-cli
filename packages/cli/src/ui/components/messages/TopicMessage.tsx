@@ -35,7 +35,7 @@ export const TopicMessage: React.FC<TopicMessageProps> = ({ args }) => {
       <Text color={theme.text.primary} bold>
         {title || 'Topic'}
       </Text>
-      {intent && <Text color={theme.text.secondary}> -- {intent}</Text>}
+      {intent && <Text color={theme.text.secondary}> — {intent}</Text>}
     </Box>
   );
 };
