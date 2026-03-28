@@ -10,7 +10,6 @@ import fsPromises from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   NoopSandboxManager,
-  LocalSandboxManager,
   sanitizePaths,
   findSecretFiles,
   isSecretFile,
@@ -364,38 +363,36 @@ describe('SandboxManager', () => {
 
   describe('createSandboxManager', () => {
     it('should return NoopSandboxManager if sandboxing is disabled', () => {
-      const manager = createSandboxManager({ enabled: false }, '/workspace');
+      const manager = createSandboxManager(
+        { enabled: false },
+        { workspace: '/workspace' },
+      );
       expect(manager).toBeInstanceOf(NoopSandboxManager);
     });
 
     it.each([
       { platform: 'linux', expected: LinuxSandboxManager },
       { platform: 'darwin', expected: MacOsSandboxManager },
+      { platform: 'win32', expected: WindowsSandboxManager },
     ] as const)(
       'should return $expected.name if sandboxing is enabled and platform is $platform',
       ({ platform, expected }) => {
         vi.spyOn(os, 'platform').mockReturnValue(platform);
-        const manager = createSandboxManager({ enabled: true }, '/workspace');
+        const manager = createSandboxManager(
+          { enabled: true },
+          { workspace: '/workspace' },
+        );
         expect(manager).toBeInstanceOf(expected);
       },
     );
 
-    it("should return WindowsSandboxManager if sandboxing is enabled with 'windows-native' command on win32", () => {
+    it('should return WindowsSandboxManager if sandboxing is enabled on win32', () => {
       vi.spyOn(os, 'platform').mockReturnValue('win32');
       const manager = createSandboxManager(
-        { enabled: true, command: 'windows-native' },
-        '/workspace',
+        { enabled: true },
+        { workspace: '/workspace' },
       );
       expect(manager).toBeInstanceOf(WindowsSandboxManager);
-    });
-
-    it('should return LocalSandboxManager on win32 if command is not windows-native', () => {
-      vi.spyOn(os, 'platform').mockReturnValue('win32');
-      const manager = createSandboxManager(
-        { enabled: true, command: 'docker' as unknown as 'windows-native' },
-        '/workspace',
-      );
-      expect(manager).toBeInstanceOf(LocalSandboxManager);
     });
   });
 });

@@ -25,7 +25,6 @@ import {
 } from '../../services/environmentSanitization.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { spawnAsync } from '../../utils/shell-utils.js';
-import { type SandboxPolicyManager } from '../../policy/sandboxPolicyManager.js';
 import {
   isStrictlyApproved,
   verifySandboxOverrides,
@@ -134,20 +133,10 @@ function touch(filePath: string, isDirectory: boolean) {
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
 
-export interface LinuxSandboxOptions extends GlobalSandboxOptions {
-  modeConfig?: {
-    readonly?: boolean;
-    network?: boolean;
-    approvedTools?: string[];
-    allowOverrides?: boolean;
-  };
-  policyManager?: SandboxPolicyManager;
-}
-
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
 
-  constructor(private readonly options: LinuxSandboxOptions) {}
+  constructor(private readonly options: GlobalSandboxOptions) {}
 
   isKnownSafeCommand(args: string[]): boolean {
     return isKnownSafeCommand(args);
@@ -198,7 +187,7 @@ export class LinuxSandboxManager implements SandboxManager {
       : false;
     const workspaceWrite = !isReadonlyMode || isApproved;
     const networkAccess =
-      this.options.modeConfig?.network ?? req.policy?.networkAccess ?? false;
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
 
     const persistentPermissions = allowOverrides
       ? this.options.policyManager?.getCommandPermissions(commandName)
@@ -333,7 +322,7 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    const forbiddenPaths = sanitizePaths(req.policy?.forbiddenPaths) || [];
+    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     for (const p of forbiddenPaths) {
       let resolved: string;
       try {
