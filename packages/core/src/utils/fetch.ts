@@ -182,6 +182,14 @@ export async function fetchWithTimeout(
     return response;
   } catch (error) {
     if (isNodeError(error) && error.code === 'ABORT_ERR') {
+      // If the caller's own signal was already aborted, this is a user-initiated
+      // cancellation (e.g. Ctrl+C), not an internal timeout. Re-throw as a plain
+      // AbortError so the retry layer does NOT treat it as a retryable ETIMEDOUT.
+      if (options?.signal?.aborted) {
+        const abortError = new Error('The operation was aborted.');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
     }
     throw new FetchError(getErrorMessage(error), undefined, { cause: error });
