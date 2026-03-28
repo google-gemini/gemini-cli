@@ -2033,7 +2033,7 @@ describe('loadCliConfig with includeDirectories', () => {
     vi.restoreAllMocks();
   });
 
-  it.skip('should combine and resolve paths from settings and CLI arguments', async () => {
+  it('should combine and resolve paths from settings and CLI arguments', async () => {
     const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
     process.argv = [
       'node',
@@ -2069,6 +2069,25 @@ describe('loadCliConfig with includeDirectories', () => {
     expect(config.getPendingIncludeDirectories()).toHaveLength(
       expected.length - 1,
     );
+  });
+
+  it('should resolve relative includeDirectories to absolute paths', async () => {
+    const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      context: {
+        includeDirectories: ['../sibling-project', './sub-dir'],
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const pending = config.getPendingIncludeDirectories();
+    expect(pending).toContain(path.resolve(mockCwd, '../sibling-project'));
+    expect(pending).toContain(path.resolve(mockCwd, './sub-dir'));
+    // Must be absolute — relative paths would break trust checks
+    for (const dir of pending) {
+      expect(path.isAbsolute(dir)).toBe(true);
+    }
   });
 });
 

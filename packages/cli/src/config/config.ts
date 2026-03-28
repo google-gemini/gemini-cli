@@ -573,8 +573,8 @@ export async function loadCliConfig(
 
   //changes the includeDirectories to be absolute paths based on the cwd, and also include any additional directories specified via CLI args
   const includeDirectories = (settings.context?.includeDirectories || [])
-    .map(resolvePath)
-    .concat((argv.includeDirectories || []).map(resolvePath));
+    .map((p) => path.resolve(cwd, resolvePath(p)))
+    .concat((argv.includeDirectories || []).map((p) => path.resolve(cwd, resolvePath(p))));
 
   // When running inside VSCode with multiple workspace folders,
   // automatically add the other folders as include directories
