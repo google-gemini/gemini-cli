@@ -19,7 +19,10 @@ import { Config, type ConfigParameters } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
-import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
+import {
+  DISCOVERED_TOOL_PREFIX,
+  UPDATE_TOPIC_TOOL_NAME,
+} from './tool-names.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import {
   mcpToTool,
@@ -799,6 +802,36 @@ describe('ToolRegistry', () => {
       const allTools = toolRegistry.getAllTools();
       const toolNames = allTools.map((t) => t.name);
       expect(toolNames).not.toContain('mcp_test-server_write-mcp-tool');
+    });
+
+    it('should exclude topic tool when narration is disabled in config', () => {
+      const topicTool = new MockTool({
+        name: UPDATE_TOPIC_TOOL_NAME,
+        displayName: 'Topic Tool',
+      });
+      toolRegistry.registerTool(topicTool);
+
+      vi.spyOn(config, 'isTopicUpdateNarrationEnabled').mockReturnValue(false);
+      mockConfigGetExcludedTools.mockReturnValue(new Set());
+
+      expect(toolRegistry.getAllToolNames()).not.toContain(
+        UPDATE_TOPIC_TOOL_NAME,
+      );
+      expect(toolRegistry.getTool(UPDATE_TOPIC_TOOL_NAME)).toBeUndefined();
+    });
+
+    it('should NOT exclude topic tool when narration is enabled in config', () => {
+      const topicTool = new MockTool({
+        name: UPDATE_TOPIC_TOOL_NAME,
+        displayName: 'Topic Tool',
+      });
+      toolRegistry.registerTool(topicTool);
+
+      vi.spyOn(config, 'isTopicUpdateNarrationEnabled').mockReturnValue(true);
+      mockConfigGetExcludedTools.mockReturnValue(new Set());
+
+      expect(toolRegistry.getAllToolNames()).toContain(UPDATE_TOPIC_TOOL_NAME);
+      expect(toolRegistry.getTool(UPDATE_TOPIC_TOOL_NAME)).toBe(topicTool);
     });
   });
 

@@ -243,6 +243,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         model: 'gemini-3-pro-preview',
       },
     },
+    'agent-history-provider-summarizer': {
+      modelConfig: {
+        model: 'gemini-3-flash-preview',
+      },
+    },
   },
   overrides: [
     {
