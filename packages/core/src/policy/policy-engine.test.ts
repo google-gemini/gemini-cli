@@ -2994,6 +2994,40 @@ describe('PolicyEngine', () => {
       // Read-only MCP tool allowed by annotation rule (matched via _serverName)
       expect(excluded.has('mcp_mcp-server_read_tool')).toBe(false);
     });
+    it('should exclude tool when subagent-scoped DENY rule matches the provided subagent', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'some_tool',
+            decision: PolicyDecision.DENY,
+            subagent: 'test-subagent',
+            priority: 100,
+          },
+        ],
+      });
+
+      const allTools = new Set(['some_tool']);
+
+      // Without subagent: rule does not match, tool is NOT excluded
+      const excludedWithout = engine.getExcludedTools(undefined, allTools);
+      expect(excludedWithout.has('some_tool')).toBe(false);
+
+      // With matching subagent: rule matches, tool IS excluded
+      const excludedWith = engine.getExcludedTools(
+        undefined,
+        allTools,
+        'test-subagent',
+      );
+      expect(excludedWith.has('some_tool')).toBe(true);
+
+      // With different subagent: rule does not match, tool is NOT excluded
+      const excludedOther = engine.getExcludedTools(
+        undefined,
+        allTools,
+        'other-subagent',
+      );
+      expect(excludedOther.has('some_tool')).toBe(false);
+    });
   });
 
   describe('YOLO mode with ask_user tool', () => {

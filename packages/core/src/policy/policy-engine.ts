@@ -817,6 +817,7 @@ export class PolicyEngine {
   getExcludedTools(
     toolMetadata?: Map<string, Record<string, unknown>>,
     allToolNames?: Set<string>,
+    subagent?: string,
   ): Set<string> {
     const excludedTools = new Set<string>();
 
@@ -852,6 +853,7 @@ export class PolicyEngine {
           this.approvalMode,
           this.nonInteractive,
           annotations,
+          subagent,
         );
 
         if (appliesToTool) {
