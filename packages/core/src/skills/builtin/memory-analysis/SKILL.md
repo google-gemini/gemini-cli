@@ -108,6 +108,50 @@ When the diff identifies a leaking constructor, search the codebase for these an
 - **With `perfetto-export`**: After analysis, activate `perfetto-export` to convert heap data into a visual timeline trace for `ui.perfetto.dev`
 - **With `cpu-profiling`**: If GC time is high in CPU profiles, that's a signal to investigate memory — activate this skill as follow-up
 
+## Security Model
+
+Profiling an external process requires attaching a CDP WebSocket to its `--inspect` port.
+This opens real attack surface in sandboxed or multi-user workspaces — an area the issue
+explicitly calls out and that no other prototype addresses.
+
+### Threat model
+
+| Threat | Mitigation |
+|--------|------------|
+| Inspector port reachable from network | Bind exclusively to `127.0.0.1`; never `0.0.0.0` |
+| Port hijacking / squatting | Use ephemeral port (`--inspect=127.0.0.1:0`), read assigned port from `stderr` |
+| User unaware a debug port is open | Explicit consent prompt before attaching to any PID |
+| Port left open after analysis | Disconnect CDP session and kill `--inspect` subprocess on skill teardown |
+| Env-var injection via tool arguments | Follow the `hookConfig.env` filtering precedent (PR #22504) — sanitise all env overrides before process spawn |
+
+### Consent prompt (planned implementation)
+
+Before attaching to an external process the CLI will display:
+
+```
+⚠  Memory Analysis — inspector access requested
+   Target: node server.js  (PID 12345)
+   This opens a CDP WebSocket on 127.0.0.1:<ephemeral> for the duration of the analysis.
+   Confirm? [y/N]
+```
+
+The consent check is skipped only when the workspace `GEMINI.md` has explicitly
+allowlisted `memory-analysis` inspector access for a named script.
+
+### Ephemeral port lifecycle
+
+```
+spawn  node --inspect=127.0.0.1:0 <target>
+  └─ read  "Debugger listening on ws://127.0.0.1:<PORT>" from stderr
+  └─ open  CDP WebSocket to 127.0.0.1:<PORT>
+  └─ [capture snapshots]
+  └─ session.disconnect()
+  └─ close WebSocket, kill subprocess, verify port no longer bound
+```
+
+This is consistent with the existing sandbox profiles in `bundle/sandbox-macos-*.sb`
+which restrict the CLI to loopback-only networking during tool execution.
+
 ## Detailed References
 
 - [V8 Heap Snapshot Format](v8-heap-format.md) — Structure of `.heapsnapshot` JSON, node/edge types, string table

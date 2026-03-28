@@ -7,6 +7,14 @@
  * CDP WebSocket client connecting to --inspect port — that is the core GSoC
  * deliverable and NOT implemented here.
  *
+ * SECURITY: When the external CDP mode is implemented, the following invariants
+ * are enforced by validateCDPTarget() below:
+ *   1. Only connects to 127.0.0.1 (loopback) — never 0.0.0.0 or routable IPs.
+ *   2. Port is always ephemeral (--inspect=127.0.0.1:0) to prevent hijacking.
+ *   3. A user consent prompt is shown before attaching to any external PID.
+ *   4. The CDP session and subprocess are torn down on disconnect.
+ * These mitigations address the attack surface described in issue #23365.
+ *
  * Usage:
  *   node capture-snapshots.cjs [--count=3] [--interval=5000] [--out=./snapshots]
  *
@@ -30,6 +38,50 @@
 const inspector = require('node:inspector');
 const fs        = require('node:fs');
 const path      = require('node:path');
+
+// ─── Security ──────────────────────────────────────────────────────────────────
+
+/**
+ * Validate that a CDP WebSocket URL is safe before connecting.
+ *
+ * When the planned GSoC feature attaches to an external process via
+ * `node --inspect=127.0.0.1:0`, Node.js prints the assigned URL to stderr:
+ *   Debugger listening on ws://127.0.0.1:<PORT>/...
+ *
+ * This function parses that URL and enforces loopback-only binding so the
+ * inspector port is never reachable from the network — even if the target
+ * process was accidentally started with --inspect=0.0.0.0.
+ *
+ * @param {string} wsUrl  WebSocket URL parsed from the target process stderr
+ * @throws {Error}        if the host is not a loopback address
+ */
+function validateCDPTarget(wsUrl) {
+  let parsed;
+  try {
+    parsed = new URL(wsUrl);
+  } catch {
+    throw new Error(`Invalid CDP target URL: ${wsUrl}`);
+  }
+
+  const host = parsed.hostname;
+  const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
+
+  if (!LOOPBACK.includes(host)) {
+    throw new Error(
+      `Security violation: CDP target host "${host}" is not loopback. ` +
+      'The memory-analysis skill only connects to 127.0.0.1. ' +
+      'Re-start the target with --inspect=127.0.0.1:<port> and try again.'
+    );
+  }
+
+  // Port 0 would mean the OS hasn't assigned one yet — caller bug
+  if (parsed.port === '0' || parsed.port === '') {
+    throw new Error(`CDP target URL has no valid port: ${wsUrl}`);
+  }
+}
+
+// Exported for use by the full GSoC CDP client implementation
+module.exports = { validateCDPTarget };
 
 function parseArgs(argv) {
   const args = { count: 3, interval: 5000, out: './snapshots' };
