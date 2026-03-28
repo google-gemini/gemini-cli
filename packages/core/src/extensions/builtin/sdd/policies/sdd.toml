@@ -13,3 +13,11 @@ commandPrefix = ["git status", "git diff", "ls", "mkdir", "cp", "mv", "git init"
 decision = "ask_user"
 priority = 100 # prioritize over other extension policies
 modes = ["plan"]
+
+# Allow tracker tools in plan mode
+[[rule]]
+toolName = ["tracker_create_task", "tracker_update_task", "tracker_list_tasks", "tracker_get_task", "tracker_add_dependency", "tracker_visualize"]
+decision = "ask_user"
+priority = 100
+modes = ["plan"]
+

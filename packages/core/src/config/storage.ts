@@ -32,6 +32,7 @@ export class Storage {
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
+  private customTrackerDir: string | undefined;
 
   constructor(targetDir: string, sessionId?: string) {
     this.targetDir = targetDir;
@@ -40,6 +41,10 @@ export class Storage {
 
   setCustomPlansDir(dir: string | undefined): void {
     this.customPlansDir = dir;
+  }
+
+  setCustomTrackerDir(dir: string | undefined): void {
+    this.customTrackerDir = dir;
   }
 
   static getGlobalGeminiDir(): string {
@@ -326,6 +331,26 @@ export class Storage {
       return resolvedPath;
     }
     return this.getProjectTempPlansDir();
+  }
+
+  getTrackerDir(): string {
+    if (this.customTrackerDir) {
+      const resolvedPath = path.resolve(
+        this.getProjectRoot(),
+        this.customTrackerDir,
+      );
+      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+      const realResolvedPath = resolveToRealPath(resolvedPath);
+
+      if (!isSubpath(realProjectRoot, realResolvedPath)) {
+        throw new Error(
+          `Custom tracker directory '${this.customTrackerDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+        );
+      }
+
+      return resolvedPath;
+    }
+    return this.getProjectTempTrackerDir();
   }
 
   getProjectTempTasksDir(): string {

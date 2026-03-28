@@ -184,6 +184,10 @@ export interface PlanSettings {
   modelRouting?: boolean;
 }
 
+export interface TrackerSettings {
+  directory?: string;
+}
+
 export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
@@ -375,6 +379,10 @@ export interface GeminiCLIExtension {
      */
     directory?: string;
   };
+  /**
+   * Task tracking configuration contributed by this extension.
+   */
+  tracker?: TrackerSettings;
   /**
    * Used to migrate an extension to a new repository source.
    */
@@ -657,6 +665,7 @@ export interface ConfigParameters {
   plan?: boolean;
   tracker?: boolean;
   planSettings?: PlanSettings;
+  trackerSettings?: TrackerSettings;
   worktreeSettings?: WorktreeSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -1136,6 +1145,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this._sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
+    this.storage.setCustomTrackerDir(params.trackerSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -2541,9 +2551,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   getTrackerService(): TrackerService {
     if (!this.trackerService) {
-      this.trackerService = new TrackerService(
-        this.storage.getProjectTempTrackerDir(),
-      );
+      this.trackerService = new TrackerService(this.storage.getTrackerDir());
     }
     return this.trackerService;
   }
