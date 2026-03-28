@@ -33,9 +33,11 @@ describe('Tool Output Masking Behavioral Evals', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should attempt to read the redirected full output file when information is masked',
     params: {
-      security: {
-        folderTrust: {
-          enabled: true,
+      settings: {
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
         },
       },
     },
@@ -169,9 +171,11 @@ Output too large. Full output available at: ${outputFilePath}
   evalTest('USUALLY_PASSES', {
     name: 'should NOT read the full output file when the information is already in the preview',
     params: {
-      security: {
-        folderTrust: {
-          enabled: true,
+      settings: {
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
         },
       },
     },
