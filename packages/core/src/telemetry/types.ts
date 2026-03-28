@@ -416,8 +416,13 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       model: this.model,
       prompt_id: this.prompt.prompt_id,
-      request_text: this.request_text,
     };
+    if (
+      config.getTelemetryLogPromptsEnabled() &&
+      this.request_text !== undefined
+    ) {
+      attributes['request_text'] = this.request_text;
+    }
     if (this.role) {
       attributes['role'] = this.role;
     }
@@ -685,7 +690,7 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     if (this.role) {
       attributes['role'] = this.role;
     }
-    if (this.response_text) {
+    if (config.getTelemetryLogPromptsEnabled() && this.response_text) {
       attributes['response_text'] = this.response_text;
     }
     if (this.status_code) {
@@ -707,12 +712,15 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       'gen_ai.response.id': this.response.response_id,
       'gen_ai.response.finish_reasons': this.finish_reasons,
-      'gen_ai.output.messages': JSON.stringify(
-        toOutputMessages(this.response.candidates),
-      ),
       ...toGenerateContentConfigAttributes(this.prompt.generate_content_config),
       ...getConventionAttributes(this),
     };
+
+    if (config.getTelemetryLogPromptsEnabled() && this.response.candidates) {
+      attributes['gen_ai.output.messages'] = JSON.stringify(
+        toOutputMessages(this.response.candidates),
+      );
+    }
 
     if (this.prompt.server) {
       attributes['server.address'] = this.prompt.server.address;
