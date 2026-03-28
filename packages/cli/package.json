@@ -13,7 +13,8 @@
     "gemini": "dist/index.js"
   },
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+    "copy:assets": "node ../../scripts/copy_files.js",
+    "build": "tsc -b && npm run copy:assets",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
@@ -73,6 +74,7 @@
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
+    "@google/gemini-cli-devtools": "file:../devtools",
     "@types/command-exists": "^1.2.3",
     "@types/hast": "^3.0.4",
     "@types/node": "^20.11.24",

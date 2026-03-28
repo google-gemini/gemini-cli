@@ -3,16 +3,17 @@
   "version": "0.36.0-nightly.20260317.2f90b4653",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./dist/src/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "npm run build:client && tsc -p tsconfig.build.json",
+    "copy:assets": "node ../../scripts/copy_files.js",
+    "build": "npm run build:client && tsc -b tsconfig.build.json && npm run copy:assets",
     "build:client": "node esbuild.client.js"
   },
   "files": [

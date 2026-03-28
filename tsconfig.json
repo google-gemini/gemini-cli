@@ -27,5 +27,15 @@
     "target": "es2022",
     "types": ["node", "vitest/globals"],
     "jsx": "react-jsx"
-  }
+  },
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/cli" },
+    { "path": "packages/sdk" },
+    { "path": "packages/a2a-server" },
+    { "path": "packages/test-utils" },
+    { "path": "packages/devtools/tsconfig.build.json" },
+    { "path": "packages/vscode-ide-companion" }
+  ]
 }

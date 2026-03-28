@@ -2,6 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
+    "composite": true,
+    "declaration": true,
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "types": ["node", "vitest/globals"]
@@ -14,5 +16,8 @@
     "./package.json"
   ],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../core" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../devtools/tsconfig.build.json" }
+  ]
 }

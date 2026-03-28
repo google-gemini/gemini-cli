@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,8 +31,19 @@ if (!existsSync(join(root, 'node_modules'))) {
 }
 
 // build all workspaces/packages
+console.log('Generating commit info...');
 execSync('npm run generate', { stdio: 'inherit', cwd: root });
-execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
+
+console.log('Building TypeScript packages (incremental)...');
+execSync('npx tsc -b', { stdio: 'inherit', cwd: root });
+
+console.log(
+  'Running asset copy and package-specific build steps in parallel...',
+);
+execSync('npx npm-run-all --parallel build:assets build:clients build:devs', {
+  stdio: 'inherit',
+  cwd: root,
+});
 
 // also build container image if sandboxing is enabled
 // skip (-s) npm install + build since we did that above
@@ -52,4 +63,16 @@ try {
   }
 } catch {
   // ignore
+}
+
+// Final step: update the .last_build timestamp for all packages to ensure
+// they are newer than any files modified during the build (like git-commit.ts).
+console.log('Updating build timestamps...');
+const packagesDir = join(root, 'packages');
+const packages = readdirSync(packagesDir);
+for (const pkg of packages) {
+  const distDir = join(packagesDir, pkg, 'dist');
+  if (existsSync(distDir) && statSync(distDir).isDirectory()) {
+    writeFileSync(join(distDir, '.last_build'), '');
+  }
 }

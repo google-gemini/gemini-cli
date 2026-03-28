@@ -13,7 +13,8 @@
     "gemini-cli-a2a-server": "dist/a2a-server.mjs"
   },
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+    "copy:assets": "node ../../scripts/copy_files.js",
+    "build": "tsc -b && npm run copy:assets",
     "start": "node dist/src/http/server.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",

@@ -81,6 +81,14 @@ if (packageName === 'core') {
   if (fs.existsSync(builtinSkillsSource)) {
     fs.cpSync(builtinSkillsSource, builtinSkillsTarget, { recursive: true });
   }
+
+  // Copy documentation for the core package
+  const docsSource = path.join(process.cwd(), '..', '..', 'docs');
+  const docsTarget = path.join(process.cwd(), 'dist', 'docs');
+  if (fs.existsSync(docsSource)) {
+    fs.cpSync(docsSource, docsTarget, { recursive: true, dereference: true });
+    console.log('Copied documentation to dist/docs');
+  }
 }
 
 console.log('Successfully copied files.');
