@@ -17,6 +17,7 @@ import {
   InvalidStreamError,
   StreamEventType,
   SYNTHETIC_THOUGHT_SIGNATURE,
+  sanitizeContentsForApi,
   type StreamEvent,
 } from './geminiChat.js';
 import {
@@ -2578,6 +2579,142 @@ describe('GeminiChat', () => {
     });
   });
 
+  describe('sanitizeContentsForApi', () => {
+    it('should strip id from functionResponse parts', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'find_restaurant',
+                response: { name: 'Vesuvio' },
+              },
+            },
+          ],
+        },
+      ];
+
+      expect(sanitizeContentsForApi(contents)).toEqual([
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'find_restaurant',
+                response: { name: 'Vesuvio' },
+              },
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('should not modify parts without functionResponse', () => {
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
+
+      const sanitizedContents = sanitizeContentsForApi(contents);
+
+      expect(sanitizedContents[0]).toBe(contents[0]);
+    });
+
+    it('should not modify functionResponse without id', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'find_restaurant',
+                response: { name: 'Vesuvio' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const sanitizedContents = sanitizeContentsForApi(contents);
+
+      expect(sanitizedContents[0]).toBe(contents[0]);
+    });
+
+    it('should not mutate the original contents when stripping functionResponse ids', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'find_restaurant',
+                response: { name: 'Vesuvio' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const sanitizedContents = sanitizeContentsForApi(contents);
+
+      expect(sanitizedContents[0]).not.toBe(contents[0]);
+      expect(
+        sanitizedContents[0]?.parts?.[0]?.functionResponse,
+      ).not.toHaveProperty('id');
+      expect(contents[0]?.parts?.[0]?.functionResponse?.id).toBe('call-1');
+    });
+
+    it('should handle multiple functionResponse parts in one content', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'tool-1',
+                response: { ok: true },
+              },
+            },
+            { text: 'side text' },
+            {
+              functionResponse: {
+                id: 'call-2',
+                name: 'tool-2',
+                response: { ok: false },
+              },
+            },
+          ],
+        },
+      ];
+
+      expect(sanitizeContentsForApi(contents)).toEqual([
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'tool-1',
+                response: { ok: true },
+              },
+            },
+            { text: 'side text' },
+            {
+              functionResponse: {
+                name: 'tool-2',
+                response: { ok: false },
+              },
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('should handle empty contents array', () => {
+      expect(sanitizeContentsForApi([])).toEqual([]);
+    });
   describe('recordCompletedToolCalls', () => {
     it('should use originalRequestName and originalRequestArgs if present', () => {
       const completedCall: CompletedToolCall = {
