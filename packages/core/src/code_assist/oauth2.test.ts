@@ -836,7 +836,11 @@ describe('oauth2', () => {
         );
 
         const mockHttpServer = {
-          listen: vi.fn(),
+          listen: vi.fn(
+            (_port: number, _host: string, callback?: () => void) => {
+              if (callback) callback();
+            },
+          ),
           close: vi.fn(),
           on: vi.fn(),
           address: () => ({ port: 3000 }),
@@ -847,17 +851,19 @@ describe('oauth2', () => {
 
         // Mock setTimeout to trigger timeout immediately
         const originalSetTimeout = global.setTimeout;
-        global.setTimeout = vi.fn(
-          (callback) => (callback(), {} as unknown as NodeJS.Timeout),
-        ) as unknown as typeof setTimeout;
+        try {
+          global.setTimeout = vi.fn(
+            (callback) => (callback(), {} as unknown as NodeJS.Timeout),
+          ) as unknown as typeof setTimeout;
 
-        await expect(
-          getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
-        ).rejects.toThrow(
-          'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. Please try again or use NO_BROWSER=true for manual authentication.',
-        );
-
-        global.setTimeout = originalSetTimeout;
+          await expect(
+            getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
+          ).rejects.toThrow(
+            'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. Please try again or use NO_BROWSER=true for manual authentication.',
+          );
+        } finally {
+          global.setTimeout = originalSetTimeout;
+        }
       });
 
       it('should clear the authorization timeout immediately upon successful web login to prevent memory leaks', async () => {
@@ -1055,15 +1061,37 @@ describe('oauth2', () => {
 
       it('should handle unexpected requests (like /favicon.ico) without crashing', async () => {
         const mockAuthUrl = 'https://example.com/auth';
+        const mockCode = 'test-code';
+        const mockState = 'test-state';
+        const mockTokens = {
+          access_token: 'test-access-token',
+          refresh_token: 'test-refresh-token',
+        };
         const mockOAuth2Client = {
           generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+          getToken: vi.fn().mockResolvedValue({ tokens: mockTokens }),
+          getAccessToken: vi
+            .fn()
+            .mockResolvedValue({ token: 'test-access-token' }),
           on: vi.fn(),
+          credentials: {},
         } as unknown as OAuth2Client;
+        mockOAuth2Client.setCredentials = vi
+          .fn()
+          .mockImplementation((creds) => {
+            mockOAuth2Client.credentials = creds;
+          });
         vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
 
+        vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
         vi.mocked(open).mockImplementation(
           async () => ({ on: vi.fn() }) as never,
         );
+
+        (global.fetch as Mock).mockResolvedValue({
+          ok: true,
+          json: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
+        } as unknown as Response);
 
         let requestCallback!: http.RequestListener;
         let serverListeningCallback: (value: unknown) => void;
@@ -1094,27 +1122,35 @@ describe('oauth2', () => {
         await serverListeningPromise;
 
         // Simulate an unexpected request, like a browser requesting a favicon
-        const mockReq = {
+        const faviconReq = {
           url: '/favicon.ico',
+        } as http.IncomingMessage;
+        const faviconRes = {
+          writeHead: vi.fn(),
+          end: vi.fn(),
+        } as unknown as http.ServerResponse;
+
+        requestCallback(faviconReq, faviconRes);
+
+        // Non-callback requests should get a 404 without killing the server
+        expect(faviconRes.writeHead).toHaveBeenCalledWith(404);
+        expect(faviconRes.end).toHaveBeenCalledWith('Not found');
+        expect(mockHttpServer.close).not.toHaveBeenCalled();
+
+        // Now send the real OAuth callback — the server should still be running
+        const mockReq = {
+          url: `/oauth2callback?code=${mockCode}&state=${mockState}`,
         } as http.IncomingMessage;
         const mockRes = {
           writeHead: vi.fn(),
           end: vi.fn(),
         } as unknown as http.ServerResponse;
 
-        await expect(async () => {
-          requestCallback(mockReq, mockRes);
-          await clientPromise;
-        }).rejects.toThrow(
-          'OAuth callback not received. Unexpected request: /favicon.ico',
-        );
+        requestCallback(mockReq, mockRes);
 
-        // Assert that we correctly redirected to the failure page
-        expect(mockRes.writeHead).toHaveBeenCalledWith(301, {
-          Location:
-            'https://developers.google.com/gemini-code-assist/auth_failure_gemini',
-        });
-        expect(mockRes.end).toHaveBeenCalled();
+        // Auth should succeed despite the earlier favicon request
+        const client = await clientPromise;
+        expect(client).toBe(mockOAuth2Client);
       });
 
       it('should handle token exchange failure with descriptive error', async () => {
@@ -1335,9 +1371,13 @@ describe('oauth2', () => {
           async () => ({ on: vi.fn() }) as never,
         );
 
-        // Mock createServer to return a server that doesn't do anything (keeps promise pending)
+        // Mock createServer to return a server whose listen callback fires
         const mockHttpServer = {
-          listen: vi.fn(),
+          listen: vi.fn(
+            (_port: number, _host: string, callback?: () => void) => {
+              if (callback) callback();
+            },
+          ),
           close: vi.fn(),
           on: vi.fn(),
           address: () => ({ port: 3000 }),
@@ -1401,7 +1441,11 @@ describe('oauth2', () => {
         );
 
         const mockHttpServer = {
-          listen: vi.fn(),
+          listen: vi.fn(
+            (_port: number, _host: string, callback?: () => void) => {
+              if (callback) callback();
+            },
+          ),
           close: vi.fn(),
           on: vi.fn(),
           address: () => ({ port: 3000 }),

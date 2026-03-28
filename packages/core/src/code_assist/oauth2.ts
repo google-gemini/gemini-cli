@@ -489,115 +489,146 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
 }
 
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
-  const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
   const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
   // authorization code interception attacks.
-  const redirectUri = `http://127.0.0.1:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
-  const authUrl = client.generateAuthUrl({
-    redirect_uri: redirectUri,
-    access_type: 'offline',
-    scope: OAUTH_SCOPE,
-    state,
+
+  // Determine which port to listen on (0 = OS-assigned)
+  let listenPort = 0;
+  const portStr = process.env['OAUTH_CALLBACK_PORT'];
+  if (portStr) {
+    const envPort = parseInt(portStr, 10);
+    if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
+      throw new FatalAuthenticationError(
+        `Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`,
+      );
+    }
+    listenPort = envPort;
+  }
+
+  // Guard against concurrent/duplicate request handling
+  let handled = false;
+
+  let resolveLogin!: () => void;
+  let rejectLogin!: (err: Error) => void;
+  const loginCompletePromise = new Promise<void>((resolve, reject) => {
+    resolveLogin = resolve;
+    rejectLogin = reject;
   });
 
-  const loginCompletePromise = new Promise<void>((resolve, reject) => {
-    const server = http.createServer(async (req, res) => {
-      try {
-        if (req.url!.indexOf('/oauth2callback') === -1) {
-          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-          res.end();
-          reject(
-            new FatalAuthenticationError(
-              'OAuth callback not received. Unexpected request: ' + req.url,
-            ),
-          );
-          return;
-        }
-        // acquire the code from the querystring, and close the web server.
-        const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
-        if (qs.get('error')) {
-          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-          res.end();
+  // Use a variable that will be set once the server is bound.
+  // It is safe to read inside request handlers because no requests can
+  // arrive before the 'listening' event fires.
+  let actualPort = 0;
 
-          const errorCode = qs.get('error');
-          const errorDescription =
-            qs.get('error_description') || 'No additional details provided';
-          reject(
-            new FatalAuthenticationError(
-              `Google OAuth error: ${errorCode}. ${errorDescription}`,
-            ),
-          );
-        } else if (qs.get('state') !== state) {
-          res.end('State mismatch. Possible CSRF attack');
-
-          reject(
-            new FatalAuthenticationError(
-              'OAuth state mismatch. Possible CSRF attack or browser session issue.',
-            ),
-          );
-        } else if (qs.get('code')) {
-          try {
-            const { tokens } = await client.getToken({
-              code: qs.get('code')!,
-              redirect_uri: redirectUri,
-            });
-            client.setCredentials(tokens);
-
-            // Retrieve and cache Google Account ID during authentication
-            try {
-              await fetchAndCacheUserInfo(client);
-            } catch (error) {
-              debugLogger.warn(
-                'Failed to retrieve Google Account ID during authentication:',
-                getErrorMessage(error),
-              );
-              // Don't fail the auth flow if Google Account ID retrieval fails
-            }
-
-            res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
-            res.end();
-            resolve();
-          } catch (error) {
-            res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
-            res.end();
-            reject(
-              new FatalAuthenticationError(
-                `Failed to exchange authorization code for tokens: ${getErrorMessage(error)}`,
-              ),
-            );
-          }
-        } else {
-          reject(
-            new FatalAuthenticationError(
-              'No authorization code received from Google OAuth. Please try authenticating again.',
-            ),
-          );
-        }
-      } catch (e) {
-        // Provide more specific error message for unexpected errors during OAuth flow
-        if (e instanceof FatalAuthenticationError) {
-          reject(e);
-        } else {
-          reject(
-            new FatalAuthenticationError(
-              `Unexpected error during OAuth authentication: ${getErrorMessage(e)}`,
-            ),
-          );
-        }
-      } finally {
-        server.close();
+  const server = http.createServer(async (req, res) => {
+    try {
+      // Ignore non-callback requests (e.g., favicon.ico) without
+      // rejecting the promise or closing the server.
+      if (req.url!.indexOf('/oauth2callback') === -1) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
       }
-    });
 
-    server.listen(port, host, () => {
-      // Server started successfully
-    });
+      // Prevent duplicate handling of the callback
+      if (handled) {
+        res.writeHead(200);
+        res.end('Already processed');
+        return;
+      }
+      handled = true;
 
+      const redirectUri = `http://127.0.0.1:${actualPort}/oauth2callback`;
+      // acquire the code from the querystring, and close the web server.
+      const qs = new url.URL(req.url!, `http://127.0.0.1:${actualPort}`)
+        .searchParams;
+      if (qs.get('error')) {
+        res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
+        res.end();
+        server.close();
+
+        const errorCode = qs.get('error');
+        const errorDescription =
+          qs.get('error_description') || 'No additional details provided';
+        rejectLogin(
+          new FatalAuthenticationError(
+            `Google OAuth error: ${errorCode}. ${errorDescription}`,
+          ),
+        );
+      } else if (qs.get('state') !== state) {
+        res.end('State mismatch. Possible CSRF attack');
+        server.close();
+
+        rejectLogin(
+          new FatalAuthenticationError(
+            'OAuth state mismatch. Possible CSRF attack or browser session issue.',
+          ),
+        );
+      } else if (qs.get('code')) {
+        try {
+          const { tokens } = await client.getToken({
+            code: qs.get('code')!,
+            redirect_uri: redirectUri,
+          });
+          client.setCredentials(tokens);
+
+          // Retrieve and cache Google Account ID during authentication
+          try {
+            await fetchAndCacheUserInfo(client);
+          } catch (error) {
+            debugLogger.warn(
+              'Failed to retrieve Google Account ID during authentication:',
+              getErrorMessage(error),
+            );
+            // Don't fail the auth flow if Google Account ID retrieval fails
+          }
+
+          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_SUCCESS_URL });
+          res.end();
+          server.close();
+          resolveLogin();
+        } catch (error) {
+          res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
+          res.end();
+          server.close();
+          rejectLogin(
+            new FatalAuthenticationError(
+              `Failed to exchange authorization code for tokens: ${getErrorMessage(error)}`,
+            ),
+          );
+        }
+      } else {
+        server.close();
+        rejectLogin(
+          new FatalAuthenticationError(
+            'No authorization code received from Google OAuth. Please try authenticating again.',
+          ),
+        );
+      }
+    } catch (e) {
+      server.close();
+      // Provide more specific error message for unexpected errors during OAuth flow
+      if (e instanceof FatalAuthenticationError) {
+        rejectLogin(e);
+      } else {
+        rejectLogin(
+          new FatalAuthenticationError(
+            `Unexpected error during OAuth authentication: ${getErrorMessage(e)}`,
+          ),
+        );
+      }
+    }
+  });
+
+  // Bind the server and wait for the port assignment before generating the
+  // auth URL.  This eliminates the TOCTOU race where a separate temporary
+  // server was used to discover an available port.
+  actualPort = await new Promise<number>((resolve, reject) => {
     server.on('error', (err) => {
       reject(
         new FatalAuthenticationError(
@@ -605,6 +636,31 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         ),
       );
     });
+    server.listen(listenPort, host, () => {
+      const address = server.address();
+      if (address === null || typeof address === 'string') {
+        reject(new FatalAuthenticationError('Failed to get server address'));
+        return;
+      }
+      resolve(address.port);
+    });
+  });
+
+  // Also propagate server errors that occur after binding to the login promise
+  server.on('error', (err) => {
+    rejectLogin(
+      new FatalAuthenticationError(
+        `OAuth callback server error: ${getErrorMessage(err)}`,
+      ),
+    );
+  });
+
+  const redirectUri = `http://127.0.0.1:${actualPort}/oauth2callback`;
+  const authUrl = client.generateAuthUrl({
+    redirect_uri: redirectUri,
+    access_type: 'offline',
+    scope: OAUTH_SCOPE,
+    state,
   });
 
   return {
