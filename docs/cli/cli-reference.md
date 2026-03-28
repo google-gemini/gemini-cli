@@ -37,6 +37,9 @@ These commands are available within the interactive REPL.
 | `/memory reload`     | Reload context files (e.g., `GEMINI.md`) |
 | `/mcp reload`        | Restart and reload MCP servers           |
 | `/extensions reload` | Reload all active extensions             |
+| `/task run "goal"`   | Start structured task workflow           |
+| `/task status`       | Show active task workflow status         |
+| `/task list`         | List recent task workflow runs           |
 | `/help`              | Show help for all commands               |
 | `/quit`              | Exit the interactive session             |
 

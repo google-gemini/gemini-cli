@@ -452,6 +452,26 @@ Slash commands provide meta-level control over the CLI itself.
 - **Description:** Open a dialog that lets you change the visual theme of Gemini
   CLI.
 
+### `/task`
+
+- **Description:** Run and manage structured task workflows that guide the model
+  through plan, execute, verify, and summarize phases.
+- **Sub-commands:**
+  - **`run "<goal>"`**:
+    - **Description:** Start a new task workflow for the provided goal.
+  - **`status`**:
+    - **Description:** Show the current task, including task ID, trace ID, and
+      phase sequence.
+  - **`list`**:
+    - **Description:** List recent task workflow runs with status and trace IDs.
+  - **`resume`**:
+    - **Description:** Resume the most recent task workflow and continue
+      execution.
+  - **`cancel`**:
+    - **Description:** Cancel the active task workflow.
+  - **`clear`**:
+    - **Description:** Clear the active task workflow state.
+
 ### `/tools`
 
 - **Description:** Display a list of tools that are currently available within
