@@ -90,7 +90,7 @@ export class ExtensionRegistryClient {
 
     const fzf = new AsyncFzf(allExtensions, {
       selector: (ext: RegistryExtension) =>
-        `${ext.extensionName} ${ext.extensionDescription} ${ext.fullName}`,
+        `${ext.extensionName} ${ext.extensionDescription} ${ext.repoDescription} ${ext.fullName}`,
       fuzzy: true,
     });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

@@ -29,6 +29,7 @@ import {
   ExtensionManager,
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
+import { ExtensionRegistryClient } from '../../config/extensionRegistryClient.js';
 import { SettingScope } from '../../config/settings.js';
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
@@ -300,7 +301,6 @@ async function exploreAction(
 
   const extensionsUrl = 'https://geminicli.com/extensions/';
 
-  // Only check for NODE_ENV for explicit test mode, not for unit test framework
   if (process.env['NODE_ENV'] === 'test') {
     context.ui.addItem({
       type: MessageType.INFO,
@@ -327,6 +327,69 @@ async function exploreAction(
         text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
       });
     }
+  }
+}
+
+async function searchAction(
+  context: CommandContext,
+  args: string,
+): Promise<void> {
+  const registryURI = context.services.config?.getExtensionRegistryURI();
+  const client = new ExtensionRegistryClient(registryURI);
+
+  try {
+    const searchTerm = args.trim();
+    let extensions = await client.searchExtensions(searchTerm);
+
+    const isSearch = searchTerm.length > 0;
+    if (!isSearch) {
+      // If no search term, just show top 10 ranked extensions
+      extensions = extensions.sort((a, b) => a.rank - b.rank).slice(0, 10);
+    }
+
+    if (extensions.length === 0) {
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: `No extensions found matching "${searchTerm}".`,
+      });
+      return;
+    }
+
+    const output = extensions
+      .map((ext) => {
+        const description =
+          ext.extensionDescription || ext.repoDescription || '';
+        let entry = `* ${ext.extensionName} (${ext.fullName})\n  ${description}`;
+        const capabilities: string[] = [];
+        if (ext.hasMCP) capabilities.push('MCP');
+        if (ext.hasSkills) capabilities.push('Skills');
+        if (ext.hasHooks) capabilities.push('Hooks');
+        if (ext.hasContext) capabilities.push('Context');
+        if (ext.hasCustomCommands) capabilities.push('Commands');
+
+        if (capabilities.length > 0) {
+          entry += ` [${capabilities.join(', ')}]`;
+        }
+        entry += `\n  Install: /extensions install ${ext.url}`;
+        return entry;
+      })
+      .join('\n\n');
+
+    const header = isSearch
+      ? `Found ${extensions.length} extensions matching "${searchTerm}":`
+      : `Top ${extensions.length} available extensions:`;
+
+    const footer = `\n\nRun "/extensions explore" to view the full gallery in your browser.`;
+
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `${header}\n\n${output}${footer}`,
+    });
+  } catch (error) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to fetch extensions: ${getErrorMessage(error)}\nRun "/extensions explore" to view available extensions in your browser.`,
+    });
   }
 }
 
@@ -852,6 +915,14 @@ const exploreExtensionsCommand: SlashCommand = {
   action: exploreAction,
 };
 
+const searchExtensionsCommand: SlashCommand = {
+  name: 'search',
+  description: 'Search for available extensions from the gallery',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: searchAction,
+};
+
 const reloadCommand: SlashCommand = {
   name: 'reload',
   altNames: ['restart'],
@@ -892,6 +963,7 @@ export function extensionsCommand(
       listExtensionsCommand,
       updateExtensionsCommand,
       exploreExtensionsCommand,
+      searchExtensionsCommand,
       reloadCommand,
       ...conditionalCommands,
     ],

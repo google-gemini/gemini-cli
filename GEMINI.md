@@ -87,3 +87,13 @@ powerful tool for developers.
 - Documentation is located in the `docs/` directory.
 - Suggest documentation updates when code changes render existing documentation
   obsolete or incomplete.
+
+## Extension Management
+
+- Gemini CLI supports programmatic extension management.
+- Use `/extensions search <query>` to find available extensions in the gallery.
+- Use `/extensions list` to see installed extensions.
+- Use `/extensions install <url>` to install an extension (e.g., from a GitHub
+  URL found via search).
+- If a user asks for a capability that isn't built-in, proactively search for
+  extensions that might provide it.
