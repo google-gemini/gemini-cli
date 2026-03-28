@@ -121,6 +121,9 @@ vi.mock('../utils/errorReporting', () => ({ reportError: vi.fn() }));
 vi.mock('../utils/nextSpeakerChecker', () => ({
   checkNextSpeaker: vi.fn().mockResolvedValue(null),
 }));
+vi.mock('../utils/memoryChecker', () => ({
+  checkMemoryConsolidation: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('../utils/generateContentResponseUtilities', () => ({
   getResponseText: (result: GenerateContentResponse) =>
     result.candidates?.[0]?.content?.parts?.map((part) => part.text).join('') ||
@@ -275,6 +278,7 @@ describe('Gemini Client (client.ts)', () => {
         },
       },
       isInteractive: vi.fn().mockReturnValue(false),
+      isMemoryManagerEnabled: vi.fn().mockReturnValue(false),
       getExperiments: () => {},
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
