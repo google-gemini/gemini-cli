@@ -323,26 +323,9 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     // 4. Forbidden paths manifest
-    // We use a manifest file to avoid command-line length limits.
-    const allForbidden = Array.from(
-      new Set([...secretsToBlock, ...forbiddenPaths]),
-    );
-    const tempDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
-    );
-    const manifestPath = path.join(tempDir, 'manifest.txt');
-    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
+    const { manifestPath, cleanup } =
+      this.generateForbiddenManifest(secretsToBlock);
 
-    // Cleanup on exit
-    process.on('exit', () => {
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {
-        // Ignore errors
-      }
-    });
-
-    // 5. Construct the helper command
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
 
@@ -352,7 +335,7 @@ export class WindowsSandboxManager implements SandboxManager {
       '--forbidden-manifest',
       manifestPath,
       req.command,
-      ...req.args,
+      ...(req.args || []),
     ];
 
     return {
@@ -360,11 +343,40 @@ export class WindowsSandboxManager implements SandboxManager {
       args,
       env: sanitizedEnv,
       cwd: req.cwd,
+      cleanup,
     };
   }
 
   /**
-   * Grants "Low Mandatory Level" access to a path using icacls.
+   * Generates a manifest file of forbidden paths for the native helper.
+   */
+  private generateForbiddenManifest(secretsToBlock: string[]): {
+    manifestPath: string;
+    cleanup: () => void;
+  } {
+    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
+    const allForbidden = Array.from(
+      new Set([...secretsToBlock, ...forbiddenPaths]),
+    );
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
+    );
+    const manifestPath = path.join(tempDir, 'manifest.txt');
+    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
+
+    const cleanup = () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore errors
+      }
+    };
+
+    return { manifestPath, cleanup };
+  }
+
+  /**
+   * Grants "Low Mandatory Level" access to a path using the native helper.
    */
   private async grantLowIntegrityAccess(targetPath: string): Promise<void> {
     if (os.platform() !== 'win32') {
@@ -395,15 +407,11 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      await spawnAsync('icacls', [
-        resolvedPath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      await spawnAsync(this.helperPath, ['__grant', resolvedPath]);
       this.allowedCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
-        'WindowsSandboxManager: icacls failed for',
+        'WindowsSandboxManager: Native grant failed for',
         resolvedPath,
         e,
       );
@@ -411,7 +419,7 @@ export class WindowsSandboxManager implements SandboxManager {
   }
 
   /**
-   * Explicitly denies access to a path for Low Integrity processes using icacls.
+   * Explicitly denies access to a path for Low Integrity processes using the native helper.
    */
   private async denyLowIntegrityAccess(targetPath: string): Promise<void> {
     if (os.platform() !== 'win32') {
@@ -428,18 +436,7 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    // S-1-16-4096 is the SID for "Low Mandatory Level" (Low Integrity)
-    const LOW_INTEGRITY_SID = '*S-1-16-4096';
-
-    // icacls flags: (OI) Object Inherit, (CI) Container Inherit, (F) Full Access Deny.
-    // Omit /T (recursive) for performance; (OI)(CI) ensures inheritance for new items.
-    // Windows dynamically evaluates existing items, though deep explicit Allow ACEs
-    // could potentially bypass this inherited Deny rule.
-    const DENY_ALL_INHERIT = '(OI)(CI)(F)';
-
-    // icacls fails on non-existent paths, so we cannot explicitly deny
-    // paths that do not yet exist (unlike macOS/Linux).
-    // Skip to prevent sandbox initialization failure.
+    // Check if the path exists
     try {
       await fs.promises.stat(resolvedPath);
     } catch (e: unknown) {
@@ -450,15 +447,11 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      await spawnAsync('icacls', [
-        resolvedPath,
-        '/deny',
-        `${LOW_INTEGRITY_SID}:${DENY_ALL_INHERIT}`,
-      ]);
+      await spawnAsync(this.helperPath, ['__deny', resolvedPath]);
       this.deniedCache.add(resolvedPath);
     } catch (e) {
       throw new Error(
-        `Failed to deny access to forbidden path: ${resolvedPath}. ${
+        `Failed to deny access to forbidden path using native helper: ${resolvedPath}. ${
           e instanceof Error ? e.message : String(e)
         }`,
       );

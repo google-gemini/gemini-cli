@@ -369,6 +369,7 @@ export class ShellExecutionService {
     args: string[];
     env: Record<string, string | undefined>;
     cwd: string;
+    cleanup?: () => void | Promise<void>;
   }> {
     const sandboxManager =
       shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
@@ -474,6 +475,7 @@ export class ShellExecutionService {
       args: sandboxedCommand.args,
       env: sandboxedCommand.env,
       cwd: sandboxedCommand.cwd ?? cwd,
+      cleanup: sandboxedCommand.cleanup,
     };
   }
 

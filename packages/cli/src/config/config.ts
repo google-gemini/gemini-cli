@@ -448,6 +448,7 @@ export async function parseArguments(
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
+    .completion()
     .strict()
     .demandCommand(0, 0) // Allow base command to run with no subcommands
     .exitProcess(false);
