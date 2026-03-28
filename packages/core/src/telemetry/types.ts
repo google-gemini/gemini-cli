@@ -1840,6 +1840,7 @@ export type TelemetryEvent =
   | ApiRequestEvent
   | ApiErrorEvent
   | ApiResponseEvent
+  | ThoughtEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
   | LoopDetectionDisabledEvent
@@ -2226,7 +2227,36 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_PLAN_EXECUTION = 'gemini_cli.plan.execution';
+export const EVENT_THOUGHT = 'gemini_cli.thought';
+export class ThoughtEvent implements BaseTelemetryEvent {
+  'event.name': 'thought';
+  'event.timestamp': string;
+  subject?: string;
+
+  constructor(subject?: string) {
+    this['event.name'] = 'thought';
+    this['event.timestamp'] = new Date().toISOString();
+    this.subject = subject;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_THOUGHT,
+      'event.timestamp': this['event.timestamp'],
+    };
+    if (this.subject) {
+      attributes['subject'] = this.subject;
+    }
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Assistant thought${this.subject ? `: ${this.subject}` : ''}.`;
+  }
+}
+
+export const EVENT_PLAN_EXECUTION = 'gemini_cli.plan_execution';
 export class PlanExecutionEvent implements BaseTelemetryEvent {
   eventName = 'plan_execution';
   approval_mode: ApprovalMode;
