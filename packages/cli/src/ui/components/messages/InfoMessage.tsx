@@ -33,15 +33,13 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
       <Box width={prefixWidth}>
         <Text color={color}>{prefix}</Text>
       </Box>
-      <Box flexGrow={1} flexDirection="column">
-        {text.split('\n').map((line, index) => (
-          <Text wrap="wrap" key={index}>
-            <RenderInline text={line} defaultColor={color} />
-            {index === text.split('\n').length - 1 && secondaryText && (
-              <Text color={theme.text.secondary}> {secondaryText}</Text>
-            )}
-          </Text>
-        ))}
+      <Box flexGrow={1}>
+        <Text wrap="wrap">
+          <RenderInline text={text} defaultColor={color} />
+          {secondaryText && (
+            <Text color={theme.text.secondary}> {secondaryText}</Text>
+          )}
+        </Text>
       </Box>
     </Box>
   );
