@@ -21,6 +21,7 @@ interface AboutBoxProps {
   ideClient: string;
   userEmail?: string;
   tier?: string;
+  showEmailWarning?: boolean;
 }
 
 export const AboutBox: React.FC<AboutBoxProps> = ({
@@ -33,6 +34,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
   ideClient,
   userEmail,
   tier,
+  showEmailWarning,
 }) => {
   const settings = useSettings();
   const showUserIdentity = settings.merged.ui.showUserIdentity;
@@ -51,6 +53,15 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
           About Gemini CLI
         </Text>
       </Box>
+      {showEmailWarning && (
+        <Box marginBottom={1}>
+          <Text color="yellow">
+            {
+              '⚠️  This output contains sensitive information (email address). Be careful when sharing it publicly.'
+            }
+          </Text>
+        </Box>
+      )}
       <Box flexDirection="row">
         <Box width="35%">
           <Text bold color={theme.text.link}>

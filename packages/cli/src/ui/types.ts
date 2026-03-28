@@ -197,6 +197,8 @@ export type HistoryItemAbout = HistoryItemBase & {
   ideClient: string;
   userEmail?: string;
   tier?: string;
+  /** If true, a privacy warning is shown because the email was detected but not redacted (--full mode) or is about to be redacted. */
+  showEmailWarning?: boolean;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -438,6 +440,8 @@ export type Message =
       gcpProject: string;
       ideClient: string;
       userEmail?: string;
+      tier?: string;
+      showEmailWarning?: boolean;
       content?: string; // Optional content, not really used for ABOUT
     }
   | {
