@@ -383,7 +383,10 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
   [Command.TOGGLE_COPY_MODE, [new KeyBinding('ctrl+s')]],
   [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
-  [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
+  [
+    Command.CYCLE_APPROVAL_MODE,
+    [new KeyBinding('shift+tab'), new KeyBinding('f10')],
+  ],
   [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
   [Command.EXPAND_PASTE, [new KeyBinding('ctrl+o')]],
   [Command.FOCUS_SHELL_INPUT, [new KeyBinding('tab')]],
