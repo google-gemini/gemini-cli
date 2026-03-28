@@ -689,7 +689,7 @@ describe('RipGrepTool', () => {
       });
       const result = await invocation.execute(abortSignal);
 
-      expect(result.returnDisplay).toContain('(limited)');
+      expect(result.returnDisplay).toContain('truncated at');
     }, 10000);
 
     it('should filter out files based on FileDiscoveryService even if ripgrep returns them', async () => {
@@ -1940,13 +1940,13 @@ describe('RipGrepTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Found 2 matches');
-      expect(result.llmContent).toContain(
-        'results limited to 2 matches for performance',
-      );
+      expect(result.llmContent).toContain('RESULTS TRUNCATED');
       expect(result.llmContent).toContain('L1: match 1');
       expect(result.llmContent).toContain('L2: match 2');
       expect(result.llmContent).not.toContain('L3: match 3');
-      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+      expect(result.returnDisplay).toBe(
+        'Found 2 matches (truncated at 2, more exist)',
+      );
     });
 
     it('should return only file paths when names_only is true', async () => {

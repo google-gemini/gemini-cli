@@ -5,3 +5,4 @@
  */
 export const DEFAULT_TOTAL_MAX_MATCHES = 100;
 export const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
+export const DEFAULT_GLOB_MAX_RESULTS = 500;
