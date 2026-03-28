@@ -984,6 +984,14 @@ export async function loadCliConfig(
       settings.experimental?.agentHistoryRetainedMessages,
     experimentalAgentHistorySummarization:
       settings.experimental?.agentHistorySummarization,
+    experimentalAgentHistoryTargetRetainedTokens:
+      settings.experimental?.agentHistoryTargetRetainedTokens,
+    experimentalAgentHistoryNormalMessageTokens:
+      settings.experimental?.agentHistoryNormalMessageTokens,
+    experimentalAgentHistoryMaximumMessageTokens:
+      settings.experimental?.agentHistoryMaximumMessageTokens,
+    experimentalAgentHistoryNormalizationHeadRatio:
+      settings.experimental?.agentHistoryNormalizationHeadRatio,
     modelSteering: settings.experimental?.modelSteering,
     topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,

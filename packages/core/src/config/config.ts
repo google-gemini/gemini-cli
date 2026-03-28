@@ -11,6 +11,7 @@ import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
 import type { ConversationRecord } from '../services/chatRecordingService.js';
+import type { AgentHistoryProviderConfig } from '../services/types.js';
 export type { ConversationRecord };
 import {
   AuthType,
@@ -686,6 +687,10 @@ export interface ConfigParameters {
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
   experimentalAgentHistorySummarization?: boolean;
+  experimentalAgentHistoryTargetRetainedTokens?: number;
+  experimentalAgentHistoryNormalMessageTokens?: number;
+  experimentalAgentHistoryMaximumMessageTokens?: number;
+  experimentalAgentHistoryNormalizationHeadRatio?: number;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -919,6 +924,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly experimentalAgentHistoryTruncationThreshold: number;
   private readonly experimentalAgentHistoryRetainedMessages: number;
   private readonly experimentalAgentHistorySummarization: boolean;
+  private readonly experimentalAgentHistoryTargetRetainedTokens: number;
+  private readonly experimentalAgentHistoryNormalMessageTokens: number;
+  private readonly experimentalAgentHistoryMaximumMessageTokens: number;
+  private readonly experimentalAgentHistoryNormalizationHeadRatio: number;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -1133,6 +1142,14 @@ export class Config implements McpContext, AgentLoopContext {
       params.experimentalAgentHistoryRetainedMessages ?? 15;
     this.experimentalAgentHistorySummarization =
       params.experimentalAgentHistorySummarization ?? false;
+    this.experimentalAgentHistoryTargetRetainedTokens =
+      params.experimentalAgentHistoryTargetRetainedTokens ?? 60000;
+    this.experimentalAgentHistoryNormalMessageTokens =
+      params.experimentalAgentHistoryNormalMessageTokens ?? 2500;
+    this.experimentalAgentHistoryMaximumMessageTokens =
+      params.experimentalAgentHistoryMaximumMessageTokens ?? 10000;
+    this.experimentalAgentHistoryNormalizationHeadRatio =
+      params.experimentalAgentHistoryNormalizationHeadRatio ?? 0.2;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.injectionService = new InjectionService(() =>
@@ -2329,6 +2346,36 @@ export class Config implements McpContext, AgentLoopContext {
 
   isExperimentalAgentHistorySummarizationEnabled(): boolean {
     return this.experimentalAgentHistorySummarization;
+  }
+
+  getExperimentalAgentHistoryTargetRetainedTokens(): number {
+    return this.experimentalAgentHistoryTargetRetainedTokens;
+  }
+
+  getExperimentalAgentHistoryNormalMessageTokens(): number {
+    return this.experimentalAgentHistoryNormalMessageTokens;
+  }
+
+  getExperimentalAgentHistoryMaximumMessageTokens(): number {
+    return this.experimentalAgentHistoryMaximumMessageTokens;
+  }
+
+  get agentHistoryProviderConfig(): AgentHistoryProviderConfig {
+    return {
+      isTruncationEnabled: this.experimentalAgentHistoryTruncation,
+      isSummarizationEnabled: this.experimentalAgentHistorySummarization,
+      truncationThreshold: this.experimentalAgentHistoryTruncationThreshold,
+      retainedMessages: this.experimentalAgentHistoryRetainedMessages,
+      targetRetainedTokens: this.experimentalAgentHistoryTargetRetainedTokens,
+      normalMessageTokens: this.experimentalAgentHistoryNormalMessageTokens,
+      maximumMessageTokens: this.experimentalAgentHistoryMaximumMessageTokens,
+      normalizationHeadRatio:
+        this.experimentalAgentHistoryNormalizationHeadRatio,
+    };
+  }
+
+  getExperimentalAgentHistoryNormalizationHeadRatio(): number {
+    return this.experimentalAgentHistoryNormalizationHeadRatio;
   }
 
   isTopicUpdateNarrationEnabled(): boolean {

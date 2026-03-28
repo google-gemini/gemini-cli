@@ -13,7 +13,6 @@ import {
 } from '../index.js';
 import type { PartListUnion } from '@google/genai';
 import { type GeminiClient } from '../core/client.js';
-import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
@@ -134,20 +133,21 @@ export class ToolOutputDistillationService {
       threshold,
     );
 
-    // If the output is massively oversized, attempt to generate a structural map
+    // If the output is massively oversized, attempt to generate an intent summary
     const summarizationThreshold = threshold * SUMMARIZATION_THRESHOLD;
+
     if (
       originalContentLength > summarizationThreshold &&
       originalContentLength <= MAX_DISTILLATION_SIZE
     ) {
-      const summaryText = await this.generateStructuralMap(
+      const intentSummary = await this.generateIntentSummary(
         toolName,
         stringifiedContent,
-        Math.floor(summarizationThreshold),
+        Math.floor(MAX_DISTILLATION_SIZE),
       );
 
-      if (summaryText) {
-        truncatedText += `\n\n--- Structural Map of Truncated Content ---\n${summaryText}`;
+      if (intentSummary) {
+        truncatedText += `\n\n--- Strategic Significance of Truncated Content ---\n${intentSummary}`;
       }
     }
 
@@ -169,10 +169,10 @@ export class ToolOutputDistillationService {
   }
 
   /**
-   * Calls a fast, internal model (Flash-Lite) to provide a high-level summary
-   * of the truncated content's structure.
+   * Calls the secondary model to distill the strategic "why" signals and intent
+   * of the truncated content before it is offloaded.
    */
-  private async generateStructuralMap(
+  private async generateIntentSummary(
     toolName: string,
     stringifiedContent: string,
     maxPreviewLen: number,
@@ -181,19 +181,16 @@ export class ToolOutputDistillationService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-      const promptText = `The following output from the tool '${toolName}' is extremely large and has been truncated. Please provide a very brief, high-level structural map of its contents (e.g., key sections, JSON schema outline, or line number ranges for major components). Keep the summary under 10 lines. Do not attempt to summarize the specific data values, just the structure so another agent knows what is inside.
+      const promptText = `The following output from the tool '${toolName}' is large and has been truncated. Please distill the strategic significance of this output. What are the key findings or signals that the agent should know about this data before it is offloaded? Focus on the "why" and intent. Keep the summary under 10 lines. Do not attempt to summarize all specific data values, just the strategic insights so another agent knows what was found.
 
 Output to summarize:
 ${stringifiedContent.slice(0, maxPreviewLen)}...`;
 
       const summaryResponse = await this.geminiClient.generateContent(
-        {
-          model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-          overrideScope: 'internal-summarizer',
-        },
-        [{ parts: [{ text: promptText }] }],
+        { model: 'agent-history-provider-summarizer' },
+        [{ role: 'user', parts: [{ text: promptText }] }],
         controller.signal,
-        LlmRole.MAIN,
+        LlmRole.UTILITY_COMPRESSOR,
       );
 
       clearTimeout(timeoutId);
@@ -202,7 +199,7 @@ ${stringifiedContent.slice(0, maxPreviewLen)}...`;
     } catch (e) {
       // Fail gracefully, summarization is a progressive enhancement
       debugLogger.debug(
-        'Failed to generate structural map for truncated output:',
+        'Failed to generate intent summary for truncated output:',
         e,
       );
       return undefined;

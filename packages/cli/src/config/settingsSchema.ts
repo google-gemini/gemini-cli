@@ -2190,6 +2190,46 @@ const SETTINGS_SCHEMA = {
           'Enable summarization of truncated content via a small model for the Agent History Provider.',
         showInDialog: true,
       },
+      agentHistoryTargetRetainedTokens: {
+        type: 'number',
+        label: 'Target Retained Tokens',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 60000,
+        description:
+          'The target number of tokens to retain in the session history.',
+        showInDialog: true,
+      },
+      agentHistoryNormalMessageTokens: {
+        type: 'number',
+        label: 'Normal Message Tokens',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 2500,
+        description:
+          'The target number of tokens to budget for a normal conversation turn.',
+        showInDialog: true,
+      },
+      agentHistoryMaximumMessageTokens: {
+        type: 'number',
+        label: 'Maximum Message Tokens',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 10000,
+        description:
+          'The maximum number of tokens a single conversation turn can consume before truncation.',
+        showInDialog: true,
+      },
+      agentHistoryNormalizationHeadRatio: {
+        type: 'number',
+        label: 'Normalization Head Ratio',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 0.2,
+        description:
+          'The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).',
+        showInDialog: true,
+      },
       topicUpdateNarration: {
         type: 'boolean',
         label: 'Topic & Update Narration',
