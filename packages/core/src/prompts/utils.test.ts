@@ -5,16 +5,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
 import {
   resolvePathFromEnv,
-  isSectionEnabled,
   applySubstitutions,
+  isSectionEnabled,
 } from './utils.js';
-import type { Config } from '../config/config.js';
-import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 vi.mock('../utils/paths.js', () => ({
-  homedir: vi.fn().mockReturnValue('/mock/home'),
+  homedir: vi.fn(() => '/mock/home'),
 }));
 
 vi.mock('../utils/debugLogger.js', () => ({
@@ -24,138 +24,295 @@ vi.mock('../utils/debugLogger.js', () => ({
 }));
 
 vi.mock('./snippets.js', () => ({
-  renderSubAgents: vi.fn().mockReturnValue('mocked-sub-agents'),
+  renderSubAgents: vi.fn(
+    (agents: Array<{ name: string; description: string }>) =>
+      agents.map((a) => `[${a.name}]: ${a.description}`).join('\n'),
+  ),
 }));
 
 vi.mock('./snippets.legacy.js', () => ({
-  renderSubAgents: vi.fn().mockReturnValue('mocked-legacy-sub-agents'),
+  renderSubAgents: vi.fn(
+    (agents: Array<{ name: string; description: string }>) =>
+      agents.map((a) => `legacy[${a.name}]: ${a.description}`).join('\n'),
+  ),
 }));
 
 describe('resolvePathFromEnv', () => {
-  it('should return default values for undefined input', () => {
-    const result = resolvePathFromEnv(undefined);
-    expect(result).toEqual({
+  it('returns default result for undefined input', () => {
+    expect(resolvePathFromEnv(undefined)).toEqual({
       isSwitch: false,
       value: null,
       isDisabled: false,
     });
   });
 
-  it('should return default values for empty string input', () => {
-    const result = resolvePathFromEnv('');
-    expect(result).toEqual({
+  it('returns default result for empty string', () => {
+    expect(resolvePathFromEnv('')).toEqual({
       isSwitch: false,
       value: null,
       isDisabled: false,
     });
   });
 
-  it('should return default values for whitespace-only input', () => {
-    const result = resolvePathFromEnv('   ');
-    expect(result).toEqual({
+  it('returns default result for whitespace-only string', () => {
+    expect(resolvePathFromEnv('   ')).toEqual({
       isSwitch: false,
       value: null,
       isDisabled: false,
     });
   });
 
-  it('should recognize "true" as an enabled switch', () => {
-    const result = resolvePathFromEnv('true');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: 'true',
-      isDisabled: false,
+  describe('boolean switch values', () => {
+    it('recognizes "true" as an enabled switch', () => {
+      expect(resolvePathFromEnv('true')).toEqual({
+        isSwitch: true,
+        value: 'true',
+        isDisabled: false,
+      });
+    });
+
+    it('recognizes "1" as an enabled switch', () => {
+      expect(resolvePathFromEnv('1')).toEqual({
+        isSwitch: true,
+        value: '1',
+        isDisabled: false,
+      });
+    });
+
+    it('recognizes "false" as a disabled switch', () => {
+      expect(resolvePathFromEnv('false')).toEqual({
+        isSwitch: true,
+        value: 'false',
+        isDisabled: true,
+      });
+    });
+
+    it('recognizes "0" as a disabled switch', () => {
+      expect(resolvePathFromEnv('0')).toEqual({
+        isSwitch: true,
+        value: '0',
+        isDisabled: true,
+      });
+    });
+
+    it('is case-insensitive for switch values', () => {
+      expect(resolvePathFromEnv('TRUE')).toEqual({
+        isSwitch: true,
+        value: 'true',
+        isDisabled: false,
+      });
+      expect(resolvePathFromEnv('False')).toEqual({
+        isSwitch: true,
+        value: 'false',
+        isDisabled: true,
+      });
+    });
+
+    it('trims whitespace before checking switch values', () => {
+      expect(resolvePathFromEnv('  true  ')).toEqual({
+        isSwitch: true,
+        value: 'true',
+        isDisabled: false,
+      });
     });
   });
 
-  it('should recognize "1" as an enabled switch', () => {
-    const result = resolvePathFromEnv('1');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: '1',
-      isDisabled: false,
-    });
-  });
-
-  it('should recognize "false" as a disabled switch', () => {
-    const result = resolvePathFromEnv('false');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: 'false',
-      isDisabled: true,
-    });
-  });
-
-  it('should recognize "0" as a disabled switch', () => {
-    const result = resolvePathFromEnv('0');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: '0',
-      isDisabled: true,
-    });
-  });
-
-  it('should handle case-insensitive switch values', () => {
-    const result = resolvePathFromEnv('TRUE');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: 'true',
-      isDisabled: false,
-    });
-  });
-
-  it('should handle case-insensitive FALSE', () => {
-    const result = resolvePathFromEnv('FALSE');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: 'false',
-      isDisabled: true,
-    });
-  });
-
-  it('should trim whitespace before evaluating switch values', () => {
-    const result = resolvePathFromEnv('  true  ');
-    expect(result).toEqual({
-      isSwitch: true,
-      value: 'true',
-      isDisabled: false,
-    });
-  });
-
-  it('should resolve a regular path', () => {
-    const result = resolvePathFromEnv('/some/absolute/path');
-    expect(result.isSwitch).toBe(false);
-    expect(result.value).toBe('/some/absolute/path');
-    expect(result.isDisabled).toBe(false);
-  });
-
-  it('should resolve a tilde path to the home directory', () => {
-    const result = resolvePathFromEnv('~/my/custom/path');
-    expect(result.isSwitch).toBe(false);
-    expect(result.value).toContain('/mock/home');
-    expect(result.value).toContain('my/custom/path');
-    expect(result.isDisabled).toBe(false);
-  });
-
-  it('should resolve a bare tilde to the home directory', () => {
-    const result = resolvePathFromEnv('~');
-    expect(result.isSwitch).toBe(false);
-    expect(result.value).toBe('/mock/home');
-    expect(result.isDisabled).toBe(false);
-  });
-
-  it('should handle home directory resolution failure gracefully', async () => {
-    const { homedir } = await import('../utils/paths.js');
-    vi.mocked(homedir).mockImplementationOnce(() => {
-      throw new Error('No home directory');
+  describe('path resolution', () => {
+    it('resolves a relative path to an absolute path', () => {
+      const result = resolvePathFromEnv('some/relative/path');
+      expect(result.isSwitch).toBe(false);
+      expect(result.isDisabled).toBe(false);
+      expect(result.value).toBe(path.resolve('some/relative/path'));
     });
 
-    const result = resolvePathFromEnv('~/some/path');
-    expect(result).toEqual({
-      isSwitch: false,
-      value: null,
-      isDisabled: false,
+    it('resolves an absolute path as-is', () => {
+      const result = resolvePathFromEnv('/absolute/path');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve('/absolute/path'),
+        isDisabled: false,
+      });
     });
+
+    it('expands ~ to home directory', () => {
+      const result = resolvePathFromEnv('~/my/config');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve('/mock/home/my/config'),
+        isDisabled: false,
+      });
+    });
+
+    it('expands bare ~ to home directory', () => {
+      const result = resolvePathFromEnv('~');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve('/mock/home'),
+        isDisabled: false,
+      });
+    });
+
+    it('returns null when homedir throws an error', async () => {
+      const { homedir } = await import('../utils/paths.js');
+      vi.mocked(homedir).mockImplementationOnce(() => {
+        throw new Error('No home directory');
+      });
+
+      const result = resolvePathFromEnv('~/some/path');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: null,
+        isDisabled: false,
+      });
+    });
+
+    it('trims whitespace from paths', () => {
+      const result = resolvePathFromEnv('  /some/path  ');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve('/some/path'),
+        isDisabled: false,
+      });
+    });
+
+    it('does not expand ~username/ paths (only ~/ is expanded)', () => {
+      // ~someuser/path does NOT start with ~/ or equal ~, so it falls through
+      // to path.resolve(), treating it as a relative path from cwd.
+      const result = resolvePathFromEnv('~someuser/path');
+      expect(result.isSwitch).toBe(false);
+      expect(result.isDisabled).toBe(false);
+      expect(result.value).toBe(path.resolve('~someuser/path'));
+    });
+  });
+});
+
+describe('applySubstitutions', () => {
+  let mockContext: AgentLoopContext;
+
+  beforeEach(() => {
+    const mockToolRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue([]),
+    };
+    mockContext = {
+      config: {
+        getAgentRegistry: vi.fn().mockReturnValue({
+          getAllDefinitions: vi.fn().mockReturnValue([]),
+        }),
+      },
+      toolRegistry: mockToolRegistry,
+    } as unknown as AgentLoopContext;
+  });
+
+  it('replaces ${AgentSkills} with the skills prompt', () => {
+    const result = applySubstitutions(
+      'Skills: ${AgentSkills}',
+      mockContext,
+      'skill1, skill2',
+    );
+    expect(result).toBe('Skills: skill1, skill2');
+  });
+
+  it('replaces multiple ${AgentSkills} occurrences', () => {
+    const result = applySubstitutions(
+      '${AgentSkills} and ${AgentSkills}',
+      mockContext,
+      'skills',
+    );
+    expect(result).toBe('skills and skills');
+  });
+
+  it('replaces ${SubAgents} with rendered sub-agent content', () => {
+    vi.mocked(mockContext.config.getAgentRegistry).mockReturnValue({
+      getAllDefinitions: vi.fn().mockReturnValue([
+        { name: 'agent1', description: 'desc1' },
+        { name: 'agent2', description: 'desc2' },
+      ]),
+    } as never);
+
+    const result = applySubstitutions('Agents: ${SubAgents}', mockContext, '');
+    // isGemini3 defaults to false, so legacy snippets are used
+    expect(result).toBe('Agents: legacy[agent1]: desc1\nlegacy[agent2]: desc2');
+  });
+
+  it('uses non-legacy snippets when isGemini3 is true', () => {
+    vi.mocked(mockContext.config.getAgentRegistry).mockReturnValue({
+      getAllDefinitions: vi
+        .fn()
+        .mockReturnValue([{ name: 'agent1', description: 'desc1' }]),
+    } as never);
+
+    const result = applySubstitutions(
+      'Agents: ${SubAgents}',
+      mockContext,
+      '',
+      true,
+    );
+    expect(result).toBe('Agents: [agent1]: desc1');
+  });
+
+  it('replaces ${AvailableTools} with tool list', () => {
+    vi.mocked(mockContext.toolRegistry.getAllToolNames).mockReturnValue([
+      'read',
+      'write',
+      'shell',
+    ]);
+
+    const result = applySubstitutions(
+      'Tools:\n${AvailableTools}',
+      mockContext,
+      '',
+    );
+    expect(result).toBe('Tools:\n- read\n- write\n- shell');
+  });
+
+  it('shows fallback message when no tools are available', () => {
+    const result = applySubstitutions(
+      'Tools: ${AvailableTools}',
+      mockContext,
+      '',
+    );
+    expect(result).toBe('Tools: No tools are currently available.');
+  });
+
+  it('replaces ${toolName_ToolName} placeholders with tool names', () => {
+    vi.mocked(mockContext.toolRegistry.getAllToolNames).mockReturnValue([
+      'ReadFile',
+      'EditFile',
+    ]);
+
+    const result = applySubstitutions(
+      'Use ${ReadFile_ToolName} to read and ${EditFile_ToolName} to edit.',
+      mockContext,
+      '',
+    );
+    expect(result).toBe('Use ReadFile to read and EditFile to edit.');
+  });
+
+  it('replaces multiple occurrences of the same _ToolName placeholder', () => {
+    vi.mocked(mockContext.toolRegistry.getAllToolNames).mockReturnValue([
+      'ReadFile',
+    ]);
+
+    const result = applySubstitutions(
+      'Use ${ReadFile_ToolName} here and ${ReadFile_ToolName} there',
+      mockContext,
+      '',
+    );
+    expect(result).toBe('Use ReadFile here and ReadFile there');
+  });
+
+  it('returns original string when no placeholders are present', () => {
+    const result = applySubstitutions(
+      'No substitutions here.',
+      mockContext,
+      '',
+    );
+    expect(result).toBe('No substitutions here.');
+  });
+
+  it('handles empty prompt string', () => {
+    const result = applySubstitutions('', mockContext, '');
+    expect(result).toBe('');
   });
 });
 
@@ -164,149 +321,57 @@ describe('isSectionEnabled', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should return true when the env var is not set', () => {
-    expect(isSectionEnabled('SOME_KEY')).toBe(true);
+  it('returns true when env var is not set', () => {
+    expect(isSectionEnabled('TOOLS')).toBe(true);
   });
 
-  it('should return true when the env var is set to "1"', () => {
-    vi.stubEnv('GEMINI_PROMPT_SOME_KEY', '1');
-    expect(isSectionEnabled('SOME_KEY')).toBe(true);
+  it('returns true when env var is empty string', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', '');
+    expect(isSectionEnabled('TOOLS')).toBe(true);
   });
 
-  it('should return true when the env var is set to "true"', () => {
-    vi.stubEnv('GEMINI_PROMPT_SOME_KEY', 'true');
-    expect(isSectionEnabled('SOME_KEY')).toBe(true);
+  it('returns false when env var is "0"', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', '0');
+    expect(isSectionEnabled('TOOLS')).toBe(false);
   });
 
-  it('should return false when the env var is set to "0"', () => {
-    vi.stubEnv('GEMINI_PROMPT_SOME_KEY', '0');
-    expect(isSectionEnabled('SOME_KEY')).toBe(false);
+  it('returns false when env var is "false"', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', 'false');
+    expect(isSectionEnabled('TOOLS')).toBe(false);
   });
 
-  it('should return false when the env var is set to "false"', () => {
-    vi.stubEnv('GEMINI_PROMPT_SOME_KEY', 'false');
-    expect(isSectionEnabled('SOME_KEY')).toBe(false);
+  it('returns false when env var is "FALSE" (case-insensitive)', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', 'FALSE');
+    expect(isSectionEnabled('TOOLS')).toBe(false);
   });
 
-  it('should handle case-insensitive key conversion', () => {
-    vi.stubEnv('GEMINI_PROMPT_MY_SECTION', '0');
-    expect(isSectionEnabled('my_section')).toBe(false);
+  it('returns false when env var is "False" (mixed case)', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', 'False');
+    expect(isSectionEnabled('TOOLS')).toBe(false);
   });
 
-  it('should handle whitespace around the env var value', () => {
-    vi.stubEnv('GEMINI_PROMPT_SOME_KEY', '  false  ');
-    expect(isSectionEnabled('SOME_KEY')).toBe(false);
+  it('returns true when env var is "1"', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', '1');
+    expect(isSectionEnabled('TOOLS')).toBe(true);
   });
 
-  it('should return true for any non-falsy value', () => {
-    vi.stubEnv('GEMINI_PROMPT_SOME_KEY', 'enabled');
-    expect(isSectionEnabled('SOME_KEY')).toBe(true);
-  });
-});
-
-describe('applySubstitutions', () => {
-  let mockConfig: Config;
-
-  beforeEach(() => {
-    mockConfig = {
-      get config() {
-        return this;
-      },
-      toolRegistry: {
-        getAllToolNames: vi.fn().mockReturnValue([]),
-        getAllTools: vi.fn().mockReturnValue([]),
-      },
-      getAgentRegistry: vi.fn().mockReturnValue({
-        getAllDefinitions: vi.fn().mockReturnValue([]),
-      }),
-      getToolRegistry: vi.fn().mockReturnValue({
-        getAllToolNames: vi.fn().mockReturnValue([]),
-      }),
-    } as unknown as Config;
+  it('returns true when env var is "true"', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', 'true');
+    expect(isSectionEnabled('TOOLS')).toBe(true);
   });
 
-  it('should replace ${AgentSkills} with the skills prompt', () => {
-    const result = applySubstitutions(
-      'Skills: ${AgentSkills}',
-      mockConfig,
-      'my-skills-content',
-    );
-    expect(result).toBe('Skills: my-skills-content');
+  it('returns true when env var is any other string', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', 'enabled');
+    expect(isSectionEnabled('TOOLS')).toBe(true);
   });
 
-  it('should replace multiple ${AgentSkills} occurrences', () => {
-    const result = applySubstitutions(
-      '${AgentSkills} and ${AgentSkills}',
-      mockConfig,
-      'skills',
-    );
-    expect(result).toBe('skills and skills');
+  it('converts key to uppercase for env var lookup', () => {
+    vi.stubEnv('GEMINI_PROMPT_LOWERCASEKEY', '0');
+    expect(isSectionEnabled('lowercasekey')).toBe(false);
   });
 
-  it('should replace ${SubAgents} with rendered sub-agents content', () => {
-    const result = applySubstitutions(
-      'Agents: ${SubAgents}',
-      mockConfig,
-      '',
-      true,
-    );
-    expect(result).toContain('mocked-sub-agents');
-  });
-
-  it('should use legacy snippets when isGemini3 is false', () => {
-    const result = applySubstitutions(
-      'Agents: ${SubAgents}',
-      mockConfig,
-      '',
-      false,
-    );
-    expect(result).toContain('mocked-legacy-sub-agents');
-  });
-
-  it('should replace ${AvailableTools} with tool names list', () => {
-    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
-      getAllToolNames: vi.fn().mockReturnValue(['read_file', 'write_file']),
-      getAllTools: vi.fn().mockReturnValue([]),
-    } as unknown as ToolRegistry;
-
-    const result = applySubstitutions(
-      'Tools: ${AvailableTools}',
-      mockConfig,
-      '',
-    );
-    expect(result).toContain('- read_file');
-    expect(result).toContain('- write_file');
-  });
-
-  it('should show no tools message when no tools available', () => {
-    const result = applySubstitutions(
-      'Tools: ${AvailableTools}',
-      mockConfig,
-      '',
-    );
-    expect(result).toContain('No tools are currently available.');
-  });
-
-  it('should replace tool-specific ${toolName_ToolName} variables', () => {
-    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
-      getAllToolNames: vi.fn().mockReturnValue(['read_file']),
-      getAllTools: vi.fn().mockReturnValue([]),
-    } as unknown as ToolRegistry;
-
-    const result = applySubstitutions(
-      'Use ${read_file_ToolName} to read',
-      mockConfig,
-      '',
-    );
-    expect(result).toBe('Use read_file to read');
-  });
-
-  it('should handle a prompt with no substitution placeholders', () => {
-    const result = applySubstitutions(
-      'A plain prompt with no variables.',
-      mockConfig,
-      '',
-    );
-    expect(result).toBe('A plain prompt with no variables.');
+  it('trims whitespace around the env var value', () => {
+    vi.stubEnv('GEMINI_PROMPT_TOOLS', '  false  ');
+    expect(isSectionEnabled('TOOLS')).toBe(false);
   });
 });
