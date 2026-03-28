@@ -60,6 +60,7 @@ import { shellsCommand } from '../ui/commands/shellsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
+import { updateCommand } from '../ui/commands/updateCommand.js';
 import { upgradeCommand } from '../ui/commands/upgradeCommand.js';
 
 /**
@@ -197,6 +198,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       statsCommand,
       themeCommand,
       toolsCommand,
+      updateCommand,
       ...(this.config?.isSkillsSupportEnabled()
         ? this.config?.getSkillManager()?.isAdminEnabled() === false
           ? [
