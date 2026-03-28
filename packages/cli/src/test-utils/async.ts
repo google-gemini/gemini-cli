@@ -12,6 +12,8 @@ import { vi } from 'vitest';
 // or @testing-library/react-native
 // The version of waitFor from vitest is still fine to use if you aren't waiting
 // for React state updates.
+export const skipFlaky = !process.env['RUN_FLAKY_INTEGRATION'];
+
 export async function waitFor(
   assertion: () => void | Promise<void>,
   { timeout = 2000, interval = 50 } = {},

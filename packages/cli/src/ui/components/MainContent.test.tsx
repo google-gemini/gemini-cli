@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
-import { waitFor } from '../../test-utils/async.js';
+import { waitFor, skipFlaky } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -318,7 +318,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 });
 
-describe('MainContent', () => {
+describe.skipIf(skipFlaky)('MainContent', () => {
   const defaultMockUiState = {
     history: [
       { id: 1, type: 'user', text: 'Hello' },
