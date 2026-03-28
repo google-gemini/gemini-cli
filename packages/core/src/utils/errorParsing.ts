@@ -8,6 +8,7 @@ import { isApiError, isStructuredError } from './quotaErrorDetection.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { decodeByteCodedString } from './byteDecoder.js';
 
 const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
   '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
@@ -40,7 +41,8 @@ export function parseAndFormatApiError(
   fallbackModel?: string,
 ): string {
   if (isStructuredError(error)) {
-    let text = `[API Error: ${error.message}]`;
+    const decodedMessage = decodeByteCodedString(error.message);
+    let text = `[API Error: ${decodedMessage}]`;
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
     }
@@ -49,12 +51,14 @@ export function parseAndFormatApiError(
 
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
-    const jsonStart = error.indexOf('{');
+    // Try to decode byte-coded strings before looking for JSON
+    const decodedError = decodeByteCodedString(error);
+    const jsonStart = decodedError.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return `[API Error: ${decodedError}]`; // Not a JSON error, return as is.
     }
 
-    const jsonString = error.substring(jsonStart);
+    const jsonString = decodedError.substring(jsonStart);
 
     try {
       const parsedError = JSON.parse(jsonString) as unknown;
@@ -78,7 +82,7 @@ export function parseAndFormatApiError(
     } catch (_e) {
       // Not a valid JSON, fall through and return the original message.
     }
-    return `[API Error: ${error}]`;
+    return `[API Error: ${decodedError}]`;
   }
 
   return '[API Error: An unknown error occurred.]';

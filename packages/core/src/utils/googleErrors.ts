@@ -9,6 +9,8 @@
  * This file contains types and functions for parsing structured Google API errors.
  */
 
+import { decodeByteCodedString } from './byteDecoder.js';
+
 /**
  * Sanitize a JSON string before parsing to handle known SSE stream corruption.
  * SSE stream parsing can inject stray commas — the observed pattern is a comma
@@ -157,8 +159,12 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
 
   // If error is a string, try to parse it.
   if (typeof errorObj === 'string') {
+    // Try to decode byte-coded strings (e.g. from Uint8Array.toString())
+    // before attempting JSON parse.
+    errorObj = decodeByteCodedString(errorObj);
+
     try {
-      errorObj = JSON.parse(sanitizeJsonString(errorObj));
+      errorObj = JSON.parse(sanitizeJsonString(errorObj as string));
     } catch (_) {
       // Not a JSON string, can't parse.
       return null;
@@ -281,6 +287,10 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
     let data = gaxiosError.response.data;
 
     if (typeof data === 'string') {
+      // Try to decode byte-coded strings (e.g. from Uint8Array.toString())
+      // before attempting JSON parse.
+      data = decodeByteCodedString(data);
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(sanitizeJsonString(data));
@@ -331,6 +341,10 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     let data = apiError.message;
 
     if (typeof data === 'string') {
+      // Try to decode byte-coded strings (e.g. from Uint8Array.toString())
+      // before attempting JSON parse.
+      data = decodeByteCodedString(data);
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(sanitizeJsonString(data));
@@ -371,3 +385,4 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
   }
   return outerError;
 }
+
