@@ -6,6 +6,8 @@
 
 import { tokenLimit } from '@google/gemini-cli-core';
 
+export const TOKEN_BUDGET_WARNING_THRESHOLD = 0.8;
+
 export function getContextUsagePercentage(
   promptTokenCount: number,
   model: string | undefined,
