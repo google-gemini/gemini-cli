@@ -48,6 +48,11 @@ export const ALL_ITEMS = [
     description: 'Unique identifier for the current session',
   },
   {
+    id: 'auth',
+    header: '/auth',
+    description: 'Current authentication info',
+  },
+  {
     id: 'code-changes',
     header: 'diff',
     description: 'Lines added/removed in the session (not shown when zero)',
@@ -70,6 +75,7 @@ export const DEFAULT_ORDER = [
   'quota',
   'memory-usage',
   'session-id',
+  'auth',
   'code-changes',
   'token-count',
 ];
