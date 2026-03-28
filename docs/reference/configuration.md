@@ -1311,6 +1311,18 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
+- **`context.memoryBoundaryMarkers`** (array):
+  - **Description:** File or directory names that mark the boundary for
+    GEMINI.md discovery. The upward traversal stops at the first directory
+    containing any of these markers. An empty array disables parent traversal.
+  - **Default:**
+
+    ```json
+    [".git"]
+    ```
+
+  - **Requires restart:** Yes
+
 - **`context.includeDirectories`** (array):
   - **Description:** Additional directories to include in the workspace context.
     Missing directories will be skipped with a warning.
@@ -1377,6 +1389,14 @@ their corresponding top-level category object in your `settings.json` file.
     to child_process still applies.
   - **Default:** `true`
   - **Requires restart:** Yes
+
+- **`tools.shell.backgroundCompletionBehavior`** (enum):
+  - **Description:** Controls what happens when a background shell command
+    finishes. 'silent' (default): quietly exits in background. 'inject':
+    automatically returns output to agent. 'notify': shows brief message in
+    chat.
+  - **Default:** `"silent"`
+  - **Values:** `"silent"`, `"inject"`, `"notify"`
 
 - **`tools.shell.pager`** (string):
   - **Description:** The pager command to use for shell output. Defaults to
