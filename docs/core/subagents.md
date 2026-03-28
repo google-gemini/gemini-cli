@@ -290,6 +290,7 @@ it yourself; just report it.
 | `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                     |
 | `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
 | `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
+| `mcpServers`   | object | No       | Configuration for inline Model Context Protocol (MCP) servers isolated to this specific agent.                                                                                                                |
 | `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
@@ -316,6 +317,102 @@ Each subagent runs in its own isolated context loop. This means:
 - **Recursion protection:** To prevent infinite loops and excessive token usage,
   subagents **cannot** call other subagents. If a subagent is granted the `*`
   tool wildcard, it will still be unable to see or invoke other agents.
+
+## Subagent tool isolation
+
+Subagent tool isolation moves Gemini CLI away from a single global tool
+registry. By providing isolated execution environments, you can ensure that
+subagents only interact with the parts of the system they are designed for. This
+prevents unintended side effects, improves reliability by avoiding state
+contamination, and enables fine-grained permission control.
+
+With this feature, you can:
+
+- **Specify tool access:** Define exactly which tools an agent can access using
+  a `tools` list in the agent definition.
+- **Define inline MCP servers:** Configure Model Context Protocol (MCP) servers
+  (which provide a standardized way to connect AI models to external tools and
+  data sources) directly in the subagent's markdown frontmatter, isolating them
+  to that specific agent.
+- **Maintain state isolation:** Use an isolated `MessageBus` for communication,
+  as tools are cloned for each subagent.
+- **Apply subagent-specific policies:** Enforce granular policy rules based on
+  the executing subagent's name using TOML configuration.
+
+### Configuring isolated tools and servers
+
+You can configure tool isolation for a subagent by updating its markdown
+frontmatter. This allows you to explicitly state which tools the subagent can
+use, rather than relying on the global registry.
+
+Add an `mcpServers` object to define inline MCP servers that are unique to the
+agent.
+
+**Example:**
+
+```yaml
+---
+name: my-isolated-agent
+tools:
+  - grep_search
+  - read_file
+mcpServers:
+  my-custom-server:
+    command: 'node'
+    args: ['path/to/server.js']
+---
+```
+
+### Subagent-specific policies
+
+You can enforce fine-grained control over subagents using the Policy Engine's
+TOML configuration. This prevents subagents from inheriting universal rules that
+might be too permissive or restrictive for their specific tasks.
+
+To restrict a policy rule to a specific subagent, add the `subagent` property to
+the `[[rules]]` block in your `policy.toml` file.
+
+**Example:**
+
+```toml
+[[rules]]
+name = "Allow docs-writer to read docs"
+subagent = "docs-writer"
+description = "Permit reading files in the docs directory."
+action = "allow"
+tools = ["read_file"]
+args = { file_path = "^docs/.*" }
+```
+
+In this configuration, the policy rule only triggers if the executing subagent's
+name matches `docs-writer`. Rules without the `subagent` property apply
+universally to all agents. The `LocalAgentExecutor` automatically injects the
+subagent's context into the tool execution flow to ensure accurate policy
+enforcement.
+
+### How it works
+
+The subagent tool isolation architecture relies on several core components
+working together to sandbox the subagent's execution environment.
+
+- **Agent loader:** When loading the agent from markdown, the loader parses the
+  new `mcpServers` configurations and supports cloning the necessary tools from
+  the global registry, preparing them for isolated use.
+- **Multi-registry architecture:** The core `McpClient` and `McpClientManager`
+  support multiple simultaneous `RegistrySet` instances (for tools, prompts, and
+  resources). A connection-pooling mechanism keys MCP clients by a hash of their
+  configuration to prevent collisions and ensure that isolated servers are
+  reused safely where appropriate.
+- **Execution wiring:** The `LocalAgentExecutor` is responsible for
+  instantiating and using private registries during each subagent execution. It
+  carefully unregisters these isolated registries after a subagent finishes to
+  prevent memory leaks. It also dynamically overrides the `MessageBus` to inject
+  subagent context for policy enforcement.
+- **Tool filtering:** The main agent's `ToolRegistry` filters tools to ensure
+  that the main agent only sees its permitted tools and remains entirely unaware
+  of internal tools provisioned for subagents.
+- **Context-aware enforcement:** The `PolicyEngine` evaluates the subagent
+  context during tool execution and applies rules based on the `subagent` key.
 
 ## Managing subagents
 
