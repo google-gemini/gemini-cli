@@ -26,16 +26,26 @@ describe('tokenLimit', () => {
     expect(tokenLimit(PREVIEW_GEMINI_FLASH_MODEL)).toBe(1_048_576);
   });
 
-  it('should return the default token limit for an unknown model', () => {
-    expect(tokenLimit('unknown-model')).toBe(DEFAULT_TOKEN_LIMIT);
+  it('should return a safe default for unknown models', () => {
+    expect(tokenLimit('unknown-model')).toBe(128_000);
   });
 
-  it('should return the default token limit if no model is provided', () => {
+  it('should return the Gemini default if no model is provided', () => {
     // @ts-expect-error testing invalid input
     expect(tokenLimit(undefined)).toBe(DEFAULT_TOKEN_LIMIT);
   });
 
   it('should have the correct default token limit value', () => {
     expect(DEFAULT_TOKEN_LIMIT).toBe(1_048_576);
+  });
+
+  it('should return correct limits for OpenAI-compatible models', () => {
+    expect(tokenLimit('claude-opus-4')).toBe(200_000);
+    expect(tokenLimit('claude-3-5-sonnet-20241022')).toBe(200_000);
+    expect(tokenLimit('gpt-4o')).toBe(128_000);
+    expect(tokenLimit('gpt-4-turbo')).toBe(128_000);
+    expect(tokenLimit('o1-preview')).toBe(200_000);
+    expect(tokenLimit('o3-mini')).toBe(200_000);
+    expect(tokenLimit('codex-mini-latest')).toBe(200_000);
   });
 });

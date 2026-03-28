@@ -56,7 +56,11 @@ export async function checkForUpdates(
       return null;
     }
     // Skip update check when running from source (development mode)
-    if (process.env['DEV'] === 'true') {
+    // or via an OpenAI-compatible proxy (different distribution channel)
+    if (
+      process.env['DEV'] === 'true' ||
+      process.env['OPENAI_COMPATIBLE_ENDPOINT']
+    ) {
       return null;
     }
     const packageJson = await getPackageJson(__dirname);

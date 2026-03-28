@@ -28,6 +28,7 @@ import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { OpenAIContentGenerator } from './openaiContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -63,6 +64,7 @@ export enum AuthType {
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
   GATEWAY = 'gateway',
+  OPENAI_COMPATIBLE = 'openai-compatible',
 }
 
 /**
@@ -74,6 +76,13 @@ export enum AuthType {
  * 3. GEMINI_API_KEY -> USE_GEMINI
  */
 export function getAuthTypeFromEnv(): AuthType | undefined {
+  // OpenAI-compatible endpoint takes priority when explicitly configured
+  if (
+    process.env['OPENAI_COMPATIBLE_ENDPOINT'] &&
+    process.env['OPENAI_COMPATIBLE_API_KEY']
+  ) {
+    return AuthType.OPENAI_COMPATIBLE;
+  }
   if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
     return AuthType.LOGIN_WITH_GOOGLE;
   }
@@ -156,6 +165,14 @@ export async function createContentGeneratorConfig(
     contentGeneratorConfig.apiKey = apiKey || 'gateway-placeholder-key';
     contentGeneratorConfig.vertexai = false;
 
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.OPENAI_COMPATIBLE) {
+    contentGeneratorConfig.apiKey =
+      process.env['OPENAI_COMPATIBLE_API_KEY'] ?? '';
+    contentGeneratorConfig.baseUrl =
+      process.env['OPENAI_COMPATIBLE_ENDPOINT'] ?? '';
     return contentGeneratorConfig;
   }
 
@@ -290,6 +307,27 @@ export async function createContentGenerator(
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
+
+    if (config.authType === AuthType.OPENAI_COMPATIBLE) {
+      if (!config.baseUrl || !config.apiKey) {
+        throw new Error(
+          'OPENAI_COMPATIBLE requires OPENAI_COMPATIBLE_ENDPOINT and OPENAI_COMPATIBLE_API_KEY',
+        );
+      }
+      const openaiModel =
+        process.env['OPENAI_COMPATIBLE_MODEL'] ||
+        gcConfig.getModel() ||
+        'gpt-4o';
+      return new LoggingContentGenerator(
+        new OpenAIContentGenerator({
+          baseUrl: config.baseUrl,
+          apiKey: config.apiKey,
+          defaultModel: openaiModel,
+        }),
+        gcConfig,
+      );
+    }
+
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
     );
