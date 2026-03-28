@@ -614,6 +614,18 @@ export async function main() {
 
     cliStartupHandle?.end();
 
+    // Handle --save-session flag natively here, BEFORE checking for interactive UI
+    const saveSessionName = config.getSaveSession();
+    if (saveSessionName) {
+      const { ChatRecordingService } = await import('@google/gemini-cli-core');
+      const chatRecordingService = new ChatRecordingService(config);
+      chatRecordingService.initialize(resumedSessionData);
+      chatRecordingService.saveSummary(saveSessionName);
+      writeToStdout(`Session saved as: ${saveSessionName}\n`);
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
       // Earlier initialization phases (like TerminalCapabilityManager resolving
@@ -675,6 +687,8 @@ export async function main() {
     registerCleanup(async () => {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
+
+    // (removed save-session from here)
 
     if (!input) {
       debugLogger.error(

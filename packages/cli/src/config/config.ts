@@ -94,6 +94,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
   listSessions: boolean | undefined;
+  saveSession: string | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
@@ -399,6 +400,11 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'List available sessions for the current project and exit.',
+        })
+        .option('save-session', {
+          type: 'string',
+          description:
+            'Save/rename the current session with the given name and exit.',
         })
         .option('delete-session', {
           type: 'string',
@@ -958,6 +964,7 @@ export async function loadCliConfig(
 
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
+    saveSession: argv.saveSession,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
