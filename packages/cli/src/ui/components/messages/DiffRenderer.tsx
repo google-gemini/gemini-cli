@@ -91,6 +91,7 @@ interface DiffRendererProps {
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
+const MAX_RENDERABLE_DIFF_LINES = 20000;
 
 export const DiffRenderer: React.FC<DiffRendererProps> = ({
   diffContent,
@@ -225,11 +226,33 @@ const renderDiffContent = (
     );
   }
 
-  const maxLineNumber = Math.max(
-    0,
-    ...displayableLines.map((l) => l.oldLine ?? 0),
-    ...displayableLines.map((l) => l.newLine ?? 0),
-  );
+  if (displayableLines.length > MAX_RENDERABLE_DIFF_LINES) {
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={semanticTheme.border.default}
+        padding={1}
+        flexDirection="column"
+      >
+        <Text color={semanticTheme.status.warning}>
+          Diff is too large to render safely.
+        </Text>
+        <Text dimColor>
+          {`Showing summary only (${displayableLines.length} lines).`}
+        </Text>
+      </Box>
+    );
+  }
+
+  let maxLineNumber = 0;
+  for (const line of displayableLines) {
+    if (line.oldLine !== undefined) {
+      maxLineNumber = Math.max(maxLineNumber, line.oldLine);
+    }
+    if (line.newLine !== undefined) {
+      maxLineNumber = Math.max(maxLineNumber, line.newLine);
+    }
+  }
   const gutterWidth = Math.max(1, maxLineNumber.toString().length);
 
   const fileExtension = filename?.split('.').pop() || null;
