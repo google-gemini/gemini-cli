@@ -42,3 +42,20 @@ function extractRecursiveMessage(input: string): string {
   }
   return input;
 }
+
+export function getAcpErrorDetails(error: unknown): unknown {
+  try {
+    const json = JSON.stringify(error);
+    if (json && json !== '{}') {
+      return error;
+    }
+  } catch {
+    return undefined;
+  }
+
+  try {
+    return String(error);
+  } catch {
+    return undefined;
+  }
+}

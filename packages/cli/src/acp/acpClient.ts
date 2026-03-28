@@ -54,7 +54,7 @@ import {
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
-import { getAcpErrorMessage } from './acpErrors.js';
+import { getAcpErrorDetails, getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
 
 function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
@@ -236,6 +236,7 @@ export class GeminiAgent {
           throw new acp.RequestError(
             -32602,
             `Malformed gateway payload: ${result.error.message}`,
+            getAcpErrorDetails(result.error),
           );
         }
       }
@@ -250,7 +251,11 @@ export class GeminiAgent {
         headers,
       );
     } catch (e) {
-      throw new acp.RequestError(-32000, getAcpErrorMessage(e));
+      throw new acp.RequestError(
+        -32000,
+        getAcpErrorMessage(e),
+        getAcpErrorDetails(e),
+      );
     }
     this.settings.setValue(
       SettingScope.User,
@@ -277,6 +282,7 @@ export class GeminiAgent {
 
     let isAuthenticated = false;
     let authErrorMessage = '';
+    let authErrorDetails = undefined;
     try {
       await config.refreshAuth(
         authType,
@@ -298,6 +304,7 @@ export class GeminiAgent {
     } catch (e) {
       isAuthenticated = false;
       authErrorMessage = getAcpErrorMessage(e);
+      authErrorDetails = getAcpErrorDetails(e);
       debugLogger.error(
         `Authentication failed: ${e instanceof Error ? e.stack : e}`,
       );
@@ -307,6 +314,7 @@ export class GeminiAgent {
       throw new acp.RequestError(
         -32000,
         authErrorMessage || 'Authentication required.',
+        authErrorDetails,
       );
     }
 
@@ -445,7 +453,7 @@ export class GeminiAgent {
       );
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
-      throw acp.RequestError.authRequired();
+      throw acp.RequestError.authRequired(getAcpErrorDetails(e));
     }
 
     // 3. Set the ACP FileSystemService (if supported) before config initialization
@@ -842,6 +850,7 @@ export class Session {
           throw new acp.RequestError(
             429,
             'Rate limit exceeded. Try again later.',
+            getAcpErrorDetails(error),
           );
         }
 
@@ -886,6 +895,7 @@ export class Session {
         throw new acp.RequestError(
           getErrorStatus(error) || 500,
           getAcpErrorMessage(error),
+          getAcpErrorDetails(error),
         );
       }
 
