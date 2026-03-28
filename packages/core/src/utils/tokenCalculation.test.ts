@@ -208,6 +208,31 @@ describe('tokenCalculation', () => {
       expect(tokens).toBeLessThan(1600);
     });
 
+    it('should use fixed estimate for MCP image blocks in functionResponse', () => {
+      const massiveBase64 = 'a'.repeat(1_000_000); // 1M chars
+      const parts: Part[] = [
+        {
+          functionResponse: {
+            name: 'mcp_tool',
+            id: '123',
+            response: {
+              type: 'array',
+              items: [
+                { type: 'text', text: 'Here is the plot:' },
+                { type: 'image', data: massiveBase64, mimeType: 'image/png' },
+              ]
+            } as Record<string, unknown>,
+          },
+        },
+      ];
+
+      const tokens = estimateTokenCountSync(parts);
+      // If it stringified the base64, it would be > 250,000 tokens.
+      // With the fix, it should be ~3000 (IMAGE_TOKEN_ESTIMATE) + small overhead.
+      expect(tokens).toBeGreaterThan(3000);
+      expect(tokens).toBeLessThan(3100);
+    });
+
     it('should handle Gemini 3 multimodal nested parts in functionResponse', () => {
       const parts: Part[] = [
         {

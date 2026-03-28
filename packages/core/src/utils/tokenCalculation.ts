@@ -70,6 +70,31 @@ function estimateMediaTokens(part: Part): number | undefined {
 }
 
 /**
+ * Helper to estimate tokens for an array of tool response items.
+ * Prevents massive overestimation for large Base64 image data.
+ */
+function estimateToolResponseArrayTokens(responseArray: unknown[]): number {
+  let tokens = 0;
+  for (const item of responseArray) {
+    if (
+      item &&
+      typeof item === 'object' &&
+      'type' in item &&
+      (item as { type?: unknown }).type === 'image' &&
+      'data' in item &&
+      typeof (item as { data?: unknown }).data === 'string' &&
+      String((item as { data?: unknown }).data).length > 1024
+    ) {
+      // Image block with large data (e.g. MCP Base64): use fixed estimate
+      tokens += IMAGE_TOKEN_ESTIMATE;
+    } else {
+      tokens += JSON.stringify(item).length / 4;
+    }
+  }
+  return tokens;
+}
+
+/**
  * Heuristic estimation for tool responses, avoiding massive string copies
  * and accounting for nested Gemini 3 multimodal parts.
  */
@@ -83,8 +108,12 @@ function estimateFunctionResponseTokens(part: Part, depth: number): number {
   if (typeof response === 'string') {
     totalTokens += response.length / 4;
   } else if (response !== undefined && response !== null) {
-    // For objects, stringify only the payload, not the whole Part object.
-    totalTokens += JSON.stringify(response).length / 4;
+    if (Array.isArray(response)) {
+      totalTokens += estimateToolResponseArrayTokens(response);
+    } else {
+      // For other objects, stringify only the payload, not the whole Part object.
+      totalTokens += JSON.stringify(response).length / 4;
+    }
   }
 
   // Gemini 3: Handle nested multimodal parts recursively.
