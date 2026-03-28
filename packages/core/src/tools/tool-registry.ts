@@ -326,14 +326,11 @@ export class ToolRegistry {
           return priorityA - priorityB;
         }
 
-        if (priorityA === 2) {
-          if (
-            toolA instanceof DiscoveredMCPTool &&
-            toolB instanceof DiscoveredMCPTool
-          ) {
-            return toolA.serverName.localeCompare(toolB.serverName);
-          }
-          return 0;
+        if (
+          toolA instanceof DiscoveredMCPTool &&
+          toolB instanceof DiscoveredMCPTool
+        ) {
+          return toolA.serverName.localeCompare(toolB.serverName);
         }
 
         return 0;
@@ -744,7 +741,6 @@ export class ToolRegistry {
   getToolsByServer(serverName: string): AnyDeclarativeTool[] {
     const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.getActiveTools()) {
-       
       if (tool instanceof DiscoveredMCPTool && tool.serverName === serverName) {
         serverTools.push(tool);
       }
