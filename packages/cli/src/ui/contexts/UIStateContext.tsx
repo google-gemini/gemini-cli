@@ -217,6 +217,7 @@ export interface UIState {
   settingsNonce: number;
   backgroundShells: Map<number, BackgroundShell>;
   activeBackgroundShellPid: number | null;
+  isCursorHidden?: boolean;
   backgroundShellHeight: number;
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;

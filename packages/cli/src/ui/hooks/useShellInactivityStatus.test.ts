@@ -106,4 +106,17 @@ describe('useShellInactivityStatus', () => {
     });
     expect(result.current.shouldShowFocusHint).toBe(false);
   });
+
+  it('should suppress all inactivity indicators when cursor is hidden', async () => {
+    const { result } = await renderHook(() =>
+      useShellInactivityStatus({ ...defaultProps, isCursorHidden: true }),
+    );
+
+    // After 30s, status should still be 'none' and focus hint false
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    expect(result.current.inactivityStatus).toBe('none');
+    expect(result.current.shouldShowFocusHint).toBe(false);
+  });
 });

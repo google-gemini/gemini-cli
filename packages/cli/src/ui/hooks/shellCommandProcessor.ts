@@ -242,7 +242,12 @@ export const useShellCommandProcessor = (
       // Subscribe to future updates (data only)
       const dataUnsubscribe = ShellExecutionService.subscribe(pid, (event) => {
         if (event.type === 'data') {
-          dispatch({ type: 'APPEND_SHELL_OUTPUT', pid, chunk: event.chunk });
+          dispatch({
+            type: 'APPEND_SHELL_OUTPUT',
+            pid,
+            chunk: event.chunk,
+            isCursorHidden: event.isCursorHidden,
+          });
         } else if (event.type === 'binary_detected') {
           dispatch({ type: 'UPDATE_SHELL', pid, update: { isBinary: true } });
         } else if (event.type === 'binary_progress') {
@@ -381,6 +386,8 @@ export const useShellCommandProcessor = (
                     pid: executionPid,
                     chunk:
                       event.type === 'data' ? event.chunk : cumulativeStdout,
+                    isCursorHidden:
+                      event.type === 'data' ? event.isCursorHidden : undefined,
                   });
                   return;
                 }
@@ -396,7 +403,12 @@ export const useShellCommandProcessor = (
                 }
 
                 if (shouldUpdate) {
-                  dispatch({ type: 'SET_OUTPUT_TIME', time: Date.now() });
+                  dispatch({
+                    type: 'SET_OUTPUT_TIME',
+                    time: Date.now(),
+                    isCursorHidden:
+                      event.type === 'data' ? event.isCursorHidden : undefined,
+                  });
                   setPendingHistoryItem((prevItem) => {
                     if (prevItem?.type === 'tool_group') {
                       return {
@@ -550,5 +562,6 @@ export const useShellCommandProcessor = (
     registerBackgroundShell,
     dismissBackgroundShell,
     backgroundShells: state.backgroundShells,
+    isCursorHidden: state.isCursorHidden,
   };
 };
