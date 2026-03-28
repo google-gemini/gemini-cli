@@ -43,7 +43,7 @@ describe('getFsErrorMessage', () => {
         message: 'EACCES: permission denied',
         path: '/etc/gemini-cli/settings.json',
         expected:
-          "Permission denied: cannot access '/etc/gemini-cli/settings.json'. Check file permissions or run with elevated privileges.",
+          "Permission denied: cannot access '/etc/gemini-cli/settings.json'. Check file permissions or run with elevated privileges.\nAction: Run 'ls -l /etc/gemini-cli/settings.json' to check permissions.",
       },
       {
         code: 'EACCES',
@@ -56,7 +56,7 @@ describe('getFsErrorMessage', () => {
         message: 'ENOENT: no such file or directory',
         path: '/nonexistent/file.txt',
         expected:
-          "File or directory not found: '/nonexistent/file.txt'. Check if the path exists and is spelled correctly.",
+          "File or directory not found: '/nonexistent/file.txt'. Check if the path exists and is spelled correctly.\nAction: Run 'ls' in the parent directory to see available files.",
       },
       {
         code: 'ENOENT',
