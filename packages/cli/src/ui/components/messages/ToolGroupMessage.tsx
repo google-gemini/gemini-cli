@@ -15,6 +15,7 @@ import type {
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
+import { TopicMessage, isTopicTool } from './TopicMessage.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
@@ -192,7 +193,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
     >
       {groupedTools.map((group, index) => {
-        const isFirst = index === 0;
+        let isFirst = index === 0;
+        if (!isFirst) {
+          // Check if all previous tools were topics
+          let allPreviousWereTopics = true;
+          for (let i = 0; i < index; i++) {
+            const prevGroup = groupedTools[i];
+            if (Array.isArray(prevGroup) || !isTopicTool(prevGroup.name)) {
+              allPreviousWereTopics = false;
+              break;
+            }
+          }
+          isFirst = allPreviousWereTopics;
+        }
+
         const resolvedIsFirst =
           borderTopOverride !== undefined
             ? borderTopOverride && isFirst
@@ -215,6 +229,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         const tool = group;
         const isShellToolCall = isShellTool(tool.name);
+        const isTopicToolCall = isTopicTool(tool.name);
 
         const commonProps = {
           ...tool,
@@ -234,7 +249,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={contentWidth}
           >
-            {isShellToolCall ? (
+            {isTopicToolCall ? (
+              <TopicMessage {...commonProps} />
+            ) : isShellToolCall ? (
               <ShellToolMessage {...commonProps} config={config} />
             ) : (
               <ToolMessage {...commonProps} />
@@ -262,26 +279,26 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           </Box>
         );
       })}
-      {
-        /*
-            We have to keep the bottom border separate so it doesn't get
-            drawn over by the sticky header directly inside it.
-           */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
-          borderBottomOverride !== false && (
-            <Box
-              height={0}
-              width={contentWidth}
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={borderBottomOverride ?? true}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              borderStyle="round"
-            />
-          )
-      }
+      {/*
+          We have to keep the bottom border separate so it doesn't get
+          drawn over by the sticky header directly inside it.
+         */}
+      {(visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
+        borderBottomOverride !== false &&
+        (visibleToolCalls.length === 0 ||
+          !visibleToolCalls.every((tool) => isTopicTool(tool.name))) && (
+          <Box
+            height={0}
+            width={contentWidth}
+            borderLeft={true}
+            borderRight={true}
+            borderTop={false}
+            borderBottom={borderBottomOverride ?? true}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+            borderStyle="round"
+          />
+        )}
     </Box>
   );
 
