@@ -9,14 +9,14 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import type { Keychain } from './keychainTypes.js';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { getUserConfigDir } from '../utils/paths.js';
 
 export class FileKeychain implements Keychain {
   private readonly tokenFilePath: string;
   private readonly encryptionKey: Buffer;
 
   constructor() {
-    const configDir = path.join(homedir(), GEMINI_DIR);
+    const configDir = getUserConfigDir();
     this.tokenFilePath = path.join(configDir, 'gemini-credentials.json');
     this.encryptionKey = this.deriveEncryptionKey();
   }

@@ -22,7 +22,7 @@ import { type ExtensionInstallMetadata } from '../config.js';
 import { KeychainService } from '../../services/keychainService.js';
 import { isNodeError, getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { homedir, GEMINI_DIR } from '../../utils/paths.js';
+import { getUserConfigDir } from '../../utils/paths.js';
 import stableStringify from 'json-stable-stringify';
 import {
   type IExtensionIntegrity,
@@ -45,7 +45,7 @@ class IntegrityKeyManager {
   private cachedSecretKey: string | null = null;
 
   constructor() {
-    const configDir = path.join(homedir(), GEMINI_DIR);
+    const configDir = getUserConfigDir();
     this.fallbackKeyPath = path.join(configDir, INTEGRITY_KEY_FILENAME);
     this.keychainService = new KeychainService(KEYCHAIN_SERVICE_NAME);
   }
@@ -114,7 +114,7 @@ class ExtensionIntegrityStore {
   private readonly integrityStorePath: string;
 
   constructor(private readonly keyManager: IntegrityKeyManager) {
-    const configDir = path.join(homedir(), GEMINI_DIR);
+    const configDir = getUserConfigDir();
     this.integrityStorePath = path.join(configDir, INTEGRITY_FILENAME);
   }
 

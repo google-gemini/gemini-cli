@@ -32,7 +32,7 @@ const MemoryManagerSchema = z.object({
  * and organizing memories in the global GEMINI.md file.
  *
  * Users can override this agent by placing a custom save_memory.md
- * in ~/.gemini/agents/ or .gemini/agents/.
+ * in ~/.config/gemini-cli/agents/ or .gemini/agents/.
  */
 export const MemoryManagerAgent = (
   config: Config,

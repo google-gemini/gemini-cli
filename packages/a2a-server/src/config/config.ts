@@ -18,7 +18,6 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
-  homedir,
   GitService,
   fetchAdminControlsOnce,
   getCodeAssistServer,
@@ -31,6 +30,7 @@ import {
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
+  Storage,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -232,7 +232,7 @@ export function loadEnvironment(): void {
   }
 }
 
-function findEnvFile(startDir: string): string | null {
+export function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
@@ -246,14 +246,9 @@ function findEnvFile(startDir: string): string | null {
     }
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
-      // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
-      if (fs.existsSync(homeGeminiEnvPath)) {
-        return homeGeminiEnvPath;
-      }
-      const homeEnvPath = path.join(homedir(), '.env');
-      if (fs.existsSync(homeEnvPath)) {
-        return homeEnvPath;
+      const userGeminiEnvPath = path.join(Storage.getGlobalGeminiDir(), '.env');
+      if (fs.existsSync(userGeminiEnvPath)) {
+        return userGeminiEnvPath;
       }
       return null;
     }

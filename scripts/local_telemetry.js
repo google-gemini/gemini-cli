@@ -70,7 +70,7 @@ service:
 
 async function main() {
   // 1. Ensure binaries are available, downloading if necessary.
-  // Binaries are stored in the project's .gemini/otel/bin directory
+  // Binaries are stored under Gemini CLI's global temp tree
   // to avoid modifying the user's system.
   if (!fileExists(BIN_DIR)) fs.mkdirSync(BIN_DIR, { recursive: true });
 

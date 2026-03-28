@@ -9,6 +9,7 @@ import {
   ApprovalMode,
   PolicyDecision,
   PolicyEngine,
+  Storage,
 } from '@google/gemini-cli-core';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
@@ -413,14 +414,14 @@ describe('Policy Engine Integration Tests', () => {
             ApprovalMode.PLAN,
           );
           const engine = new PolicyEngine(config);
+          const tempRoot = Storage.getGlobalTempDir();
 
           // Valid plan file paths
           const validPaths = [
-            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/my-plan.md',
-            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/feature_auth.md',
-            '/home/user/.gemini/tmp/new-temp_dir_123/session-1/plans/plan.md', // new style of temp directory
-            'C:\\Users\\user\\.gemini\\tmp\\project-id\\session-id\\plans\\plan.md',
-            'D:\\gemini-cli\\.gemini\\tmp\\project-id\\session-1\\plans\\plan.md', // no session ID
+            `${tempRoot}/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/my-plan.md`,
+            `${tempRoot}/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/feature_auth.md`,
+            `${tempRoot}/new-temp_dir_123/session-1/plans/plan.md`,
+            `${tempRoot}/project-id/plans/plan.md`,
           ];
 
           for (const file_path of validPaths) {
@@ -442,13 +443,14 @@ describe('Policy Engine Integration Tests', () => {
             ApprovalMode.PLAN,
           );
           const engine = new PolicyEngine(config);
+          const tempRoot = Storage.getGlobalTempDir();
 
           const invalidPaths = [
             '/project/src/file.ts', // Workspace
-            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
-            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal (Unix)
-            'C:\\Users\\user\\.gemini\\tmp\\id\\session\\plans\\..\\..\\..\\Windows\\System32\\config\\SAM', // Path traversal (Windows)
-            '/home/user/.gemini/non-tmp/new-temp_dir_123/plans/plan.md', // outside of temp dir
+            `${tempRoot}/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js`, // Wrong extension
+            `${tempRoot}/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md`, // Path traversal
+            `${tempRoot}/id/session/plans/plan.txt`,
+            `${tempRoot.replace(/tmp$/, 'non-tmp')}/new-temp_dir_123/plans/plan.md`, // outside of temp dir
           ];
 
           for (const file_path of invalidPaths) {

@@ -30,6 +30,7 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { PolicyDecision } from '../policy/types.js';
+import { Storage } from '../config/storage.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
 
@@ -115,6 +116,51 @@ describe('AgentRegistry', () => {
   });
 
   describe('initialize', () => {
+    it('adds exact save_memory policy rules for a custom selected user config dir', async () => {
+      const config = makeMockedConfig({
+        enableAgents: true,
+        experimentalMemoryManager: true,
+      });
+      vi.spyOn(Storage, 'getGlobalGeminiDir').mockReturnValue(
+        '/tmp/custom-xdg/gemini-cli',
+      );
+      vi.spyOn(config.getWorkspaceContext(), 'addDirectory').mockImplementation(
+        () => {},
+      );
+      const registry = new TestableAgentRegistry(config);
+      const addRuleSpy = vi.spyOn(config.getPolicyEngine(), 'addRule');
+
+      await registry.initialize();
+
+      const dynamicRules = addRuleSpy.mock.calls
+        .map(([rule]) => rule)
+        .filter(
+          (rule) =>
+            rule.source === 'AgentRegistry (Memory Manager Dynamic)' &&
+            rule.subagent === 'save_memory',
+        );
+
+      expect(dynamicRules).toHaveLength(6);
+
+      const readRule = dynamicRules.find(
+        (rule) => rule.toolName === 'read_file',
+      );
+      expect(readRule?.argsPattern?.source).toMatch(
+        /custom\\-xdg.*gemini\\-cli/,
+      );
+      expect(readRule?.argsPattern?.source).not.toMatch(
+        /home\/user\/code\/gemini\\-cli/,
+      );
+
+      const globRule = dynamicRules.find((rule) => rule.toolName === 'glob');
+      expect(globRule?.argsPattern?.source).toMatch(
+        /custom\\-xdg.*gemini\\-cli/,
+      );
+      expect(globRule?.argsPattern?.source).not.toMatch(
+        /home\/user\/code\/gemini\\-cli/,
+      );
+    });
+
     // TODO: Add this test once we actually have a built-in agent configured.
     // it('should load built-in agents upon initialization', async () => {
     //   expect(registry.getAllDefinitions()).toHaveLength(0);

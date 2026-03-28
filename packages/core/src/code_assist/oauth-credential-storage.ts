@@ -9,8 +9,16 @@ import { HybridTokenStorage } from '../mcp/token-storage/hybrid-token-storage.js
 import { OAUTH_FILE } from '../config/storage.js';
 import type { OAuthCredentials } from '../mcp/token-storage/types.js';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import {
+  GEMINI_CLI_HOME_ENV,
+  GEMINI_CONFIG_DIR_ENV,
+  GEMINI_DIR,
+  getUserConfigDir,
+  normalizePath,
+  resolveToRealPath,
+} from '../utils/paths.js';
 import { coreEvents } from '../utils/events.js';
 
 const KEYCHAIN_SERVICE_NAME = 'gemini-cli-oauth';
@@ -89,9 +97,9 @@ export class OAuthCredentialStorage {
     try {
       await this.storage.deleteCredentials(MAIN_ACCOUNT_KEY);
 
-      // Also try to remove the old file if it exists
-      const oldFilePath = path.join(homedir(), GEMINI_DIR, OAUTH_FILE);
-      await fs.rm(oldFilePath, { force: true }).catch(() => {});
+      for (const oldFilePath of this.getFileBasedCredentialCandidates()) {
+        await fs.rm(oldFilePath, { force: true }).catch(() => {});
+      }
     } catch (error: unknown) {
       coreEvents.emitFeedback(
         'error',
@@ -106,34 +114,65 @@ export class OAuthCredentialStorage {
    * Migrate credentials from old file-based storage to keychain
    */
   private static async migrateFromFileStorage(): Promise<Credentials | null> {
-    const oldFilePath = path.join(homedir(), GEMINI_DIR, OAUTH_FILE);
-
-    let credsJson: string;
-    try {
-      credsJson = await fs.readFile(oldFilePath, 'utf-8');
-    } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        // File doesn't exist, so no migration.
-        return null;
+    for (const oldFilePath of this.getFileBasedCredentialCandidates()) {
+      let credsJson: string;
+      try {
+        credsJson = await fs.readFile(oldFilePath, 'utf-8');
+      } catch (error: unknown) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'ENOENT'
+        ) {
+          continue;
+        }
+        throw error;
       }
-      // Other read errors should propagate.
-      throw error;
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const credentials: Credentials = JSON.parse(credsJson);
+
+      // Save to new storage
+      await this.saveCredentials(credentials);
+
+      // Remove old file after successful migration
+      await fs.rm(oldFilePath, { force: true }).catch(() => {});
+
+      return credentials;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const credentials: Credentials = JSON.parse(credsJson);
+    return null;
+  }
 
-    // Save to new storage
-    await this.saveCredentials(credentials);
+  private static getFileBasedCredentialCandidates(): string[] {
+    const selectedDir = getUserConfigDir();
+    const candidates = [path.join(selectedDir, OAUTH_FILE)];
 
-    // Remove old file after successful migration
-    await fs.rm(oldFilePath, { force: true }).catch(() => {});
+    if (
+      process.env[GEMINI_CLI_HOME_ENV] ||
+      process.env[GEMINI_CONFIG_DIR_ENV]
+    ) {
+      return candidates;
+    }
 
-    return credentials;
+    const homeDir = os.homedir();
+    if (!homeDir) {
+      return candidates;
+    }
+
+    const legacyDir = path.join(homeDir, GEMINI_DIR);
+    if (!this.isSameDirectory(selectedDir, legacyDir)) {
+      candidates.push(path.join(legacyDir, OAUTH_FILE));
+    }
+
+    return candidates;
+  }
+
+  private static isSameDirectory(dirA: string, dirB: string): boolean {
+    return (
+      normalizePath(resolveToRealPath(dirA)) ===
+      normalizePath(resolveToRealPath(dirB))
+    );
   }
 }

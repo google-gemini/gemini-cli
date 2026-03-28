@@ -335,8 +335,12 @@ gemini
 
 ### Using MCP Servers
 
-Configure MCP servers in `~/.gemini/settings.json` to extend Gemini CLI with
-custom tools:
+Configure MCP servers in your user settings file in the
+[configuration directory](./docs/reference/configuration.md#configuration-directory),
+usually `~/.config/gemini-cli` on Unix-like systems. If you need an exact path,
+set `$GEMINI_CONFIG_DIR`. Gemini CLI creates the configuration directory if it
+does not exist. To migrate legacy settings, move or merge
+`~/.gemini/settings.json` into `settings.json` in that directory:
 
 ```text
 > @github List my open pull requests
