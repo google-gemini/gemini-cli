@@ -193,7 +193,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
     >
       {groupedTools.map((group, index) => {
-        const isFirst = index === 0;
+        let isFirst = index === 0;
+        if (!isFirst) {
+          // Check if all previous tools were topics
+          let allPreviousWereTopics = true;
+          for (let i = 0; i < index; i++) {
+            const prevGroup = groupedTools[i];
+            if (Array.isArray(prevGroup) || !isTopicTool(prevGroup.name)) {
+              allPreviousWereTopics = false;
+              break;
+            }
+          }
+          isFirst = allPreviousWereTopics;
+        }
+
         const resolvedIsFirst =
           borderTopOverride !== undefined
             ? borderTopOverride && isFirst
