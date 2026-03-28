@@ -393,7 +393,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const app: AppProps = useApp();
 
   // Additional hooks moved from App.tsx
-  const { stats: sessionStats } = useSessionStats();
+  const { stats: sessionStats, getPromptCount } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
 
   // Layout measurements
@@ -1132,6 +1132,50 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
   );
 
+  const lastSummarizedTurnRef = useRef<number>(0);
+  const lastSessionIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (lastSessionIdRef.current !== sessionStats.sessionId) {
+      // New session has started, reset summarization state.
+      lastSessionIdRef.current = sessionStats.sessionId;
+      lastSummarizedTurnRef.current = sessionStats.alias ? 1000000 : 0;
+    }
+
+    // Only run background summary refinement if the session doesn't have an alias yet.
+    if (sessionStats.alias) {
+      return;
+    }
+
+    if (streamingState === StreamingState.Idle) {
+      const promptCount = getPromptCount();
+      const milestones = [1, 3, 7, 11, 17];
+
+      if (
+        milestones.includes(promptCount) &&
+        promptCount > lastSummarizedTurnRef.current
+      ) {
+        lastSummarizedTurnRef.current = promptCount;
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        (async () => {
+          const { ChatRecordingService } = await import(
+            '@google/gemini-cli-core'
+          );
+          const chatRecordingService = new ChatRecordingService(config);
+          const currentSessionPath =
+            chatRecordingService.getConversationFilePath();
+          await generateSummary(config, currentSessionPath ?? undefined).catch(
+            (e: unknown) => {
+              debugLogger.warn(
+                `Background summary (turn ${promptCount}) failed:`,
+                e instanceof Error ? e : String(e),
+              );
+            },
+          );
+        })();
+      }
+    }
+  }, [streamingState, config, sessionStats, getPromptCount]);
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],

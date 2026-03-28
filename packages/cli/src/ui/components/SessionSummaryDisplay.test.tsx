@@ -49,11 +49,13 @@ const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const renderWithMockedStats = async (
   metrics: SessionMetrics,
   sessionId = 'test-session',
+  alias?: string,
   worktreeSettings?: WorktreeSettings,
 ) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId,
+      alias,
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -186,6 +188,22 @@ describe('<SessionSummaryDisplay />', () => {
       unmount();
     });
 
+    it('renders both alias and session ID when alias is present', async () => {
+      const uuidSessionId = '1234-abcd-5678-efgh';
+      const alias = 'my-alias';
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        uuidSessionId,
+        alias,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain(
+        'gemini --resume my-alias (1234-abcd-5678-efgh)',
+      );
+      unmount();
+    });
+
     it('sanitizes a malicious session ID in the footer (powershell)', async () => {
       getShellConfigurationMock.mockReturnValue({
         executable: 'powershell.exe',
@@ -217,6 +235,7 @@ describe('<SessionSummaryDisplay />', () => {
       const { lastFrame, unmount } = await renderWithMockedStats(
         emptyMetrics,
         'test-session',
+        undefined,
         worktreeSettings,
       );
       const output = lastFrame();
@@ -224,6 +243,33 @@ describe('<SessionSummaryDisplay />', () => {
       expect(output).toContain('To resume work in this worktree:');
       expect(output).toContain(
         'cd /path/to/foo-bar && gemini --resume test-session',
+      );
+      expect(output).toContain(
+        'To remove manually: git worktree remove /path/to/foo-bar',
+      );
+      unmount();
+    });
+
+    it('renders both alias and worktree instructions when both are present', async () => {
+      const worktreeSettings: WorktreeSettings = {
+        name: 'foo-bar',
+        path: '/path/to/foo-bar',
+        baseSha: 'base-sha',
+      };
+      const alias = 'my-feat';
+      const uuid = 'test-uuid';
+
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        uuid,
+        alias,
+        worktreeSettings,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('To resume work in this worktree:');
+      expect(output).toContain(
+        'cd /path/to/foo-bar && gemini --resume my-feat (test-uuid)',
       );
       expect(output).toContain(
         'To remove manually: git worktree remove /path/to/foo-bar',

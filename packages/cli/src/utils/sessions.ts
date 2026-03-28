@@ -33,6 +33,8 @@ export async function listSessions(config: Config): Promise<void> {
     `\nAvailable sessions for this project (${sessions.length}):\n`,
   );
 
+  const columns = process.stdout.columns || 100;
+
   sessions
     .sort(
       (a, b) =>
@@ -41,13 +43,25 @@ export async function listSessions(config: Config): Promise<void> {
     .forEach((session, index) => {
       const current = session.isCurrentSession ? ', current' : '';
       const time = formatRelativeTime(session.lastUpdated);
-      const title =
-        session.displayName.length > 100
-          ? session.displayName.slice(0, 97) + '...'
-          : session.displayName;
-      writeToStdout(
-        `  ${index + 1}. ${title} (${time}${current}) [${session.id}]\n`,
+      const identifiers = session.alias
+        ? `${session.alias}, ${session.id}`
+        : session.id;
+
+      const prefix = `  ${index + 1}. `;
+      const suffix = ` (${time}${current}) [${identifiers}]`;
+
+      // Calculate available space for the title, ensuring at least 10 chars
+      const availableTitleLength = Math.max(
+        10,
+        columns - prefix.length - suffix.length,
       );
+
+      const title =
+        session.displayName.length > availableTitleLength
+          ? session.displayName.slice(0, availableTitleLength - 3) + '...'
+          : session.displayName;
+
+      writeToStdout(`${prefix}${title}${suffix}\n`);
     });
 }
 

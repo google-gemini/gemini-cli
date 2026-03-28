@@ -47,9 +47,11 @@ sessions.
   gemini --resume 1
   ```
 
-- **Resume by ID:** You can also provide the full session UUID:
+- **Resume by ID or Alias:** You can also provide the full session UUID or a
+  human-friendly alias:
   ```bash
   gemini --resume a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  gemini --resume my-feature-branch
   ```
 
 ### From the interactive interface
@@ -121,8 +123,8 @@ Output example:
 ```text
 Available sessions for this project (3):
 
-  1. Fix bug in auth (2 days ago) [a1b2c3d4]
-  2. Refactor database schema (5 hours ago) [e5f67890]
+  1. Fix bug in auth (2 days ago) [fix-auth, a1b2c3d4]
+  2. Refactor database schema (5 hours ago) [db-refactor, e5f67890]
   3. Update documentation (Just now) [abcd1234]
 ```
 

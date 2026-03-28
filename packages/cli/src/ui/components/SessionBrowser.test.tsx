@@ -185,6 +185,16 @@ describe('SessionBrowser component', () => {
       isCurrentSession: true,
       index: 1,
     });
+    const session3 = createSession({
+      id: 'ghi789',
+      file: 'ghi789',
+      alias: 'my-long-alias',
+      displayName:
+        'This is a very long conversation name that should definitely be truncated because it exceeds the terminal width',
+      lastUpdated: '2025-01-01T10:00:00Z',
+      messageCount: 1,
+      index: 2,
+    });
 
     const config = createMockConfig();
     const onResumeSession = vi.fn();
@@ -197,7 +207,7 @@ describe('SessionBrowser component', () => {
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}
-        testSessions={[session1, session2]}
+        testSessions={[session1, session2, session3]}
       />,
     );
 

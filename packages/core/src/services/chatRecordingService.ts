@@ -104,6 +104,7 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  alias?: string;
   /** Workspace directories added during the session via /dir add */
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
@@ -617,6 +618,18 @@ export class ChatRecordingService {
    */
   getConversationFilePath(): string | null {
     return this.conversationFile;
+  }
+
+  /**
+   * Sets the summary and alias for the current active conversation.
+   * Updates both the in-memory cache and writes the changes to disk.
+   */
+  setSummaryAndAlias(summary: string, alias: string): void {
+    if (!this.conversationFile) return;
+    this.updateConversation((conversation) => {
+      conversation.summary = summary;
+      conversation.alias = alias;
+    });
   }
 
   /**

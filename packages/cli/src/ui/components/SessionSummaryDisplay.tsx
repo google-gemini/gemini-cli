@@ -23,13 +23,17 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
 
   const worktreeSettings = config.getWorktreeSettings();
 
-  const escapedSessionId = escapeShellArg(stats.sessionId, shell);
-  let footer = `To resume this session: gemini --resume ${escapedSessionId}`;
+  const resumeId = stats.alias || stats.sessionId;
+  const aliasSuffix = stats.alias ? ` (${stats.sessionId})` : '';
+  const escapedResumeId = escapeShellArg(resumeId, shell);
+
+  let footer = `To resume this session: gemini --resume ${escapedResumeId}${aliasSuffix}`;
 
   if (worktreeSettings) {
+    const escapedWorktreePath = escapeShellArg(worktreeSettings.path, shell);
     footer =
-      `To resume work in this worktree: cd ${escapeShellArg(worktreeSettings.path, shell)} && gemini --resume ${escapedSessionId}\n` +
-      `To remove manually: git worktree remove ${escapeShellArg(worktreeSettings.path, shell)}`;
+      `To resume work in this worktree: cd ${escapedWorktreePath} && gemini --resume ${escapedResumeId}${aliasSuffix}\n` +
+      `To remove manually: git worktree remove ${escapedWorktreePath}`;
   }
 
   return (

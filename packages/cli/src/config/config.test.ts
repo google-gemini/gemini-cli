@@ -655,6 +655,20 @@ describe('parseArguments', () => {
     }
   });
 
+  it('should return RESUME_LATEST constant when --resume latest is passed', async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--resume', 'latest'];
+
+    try {
+      const argv = await parseArguments(createTestMergedSettings());
+      expect(argv.resume).toBe(RESUME_LATEST);
+      expect(argv.resume).toBe('latest');
+    } finally {
+      process.stdin.isTTY = originalIsTTY;
+    }
+  });
+
   it('should support comma-separated values for --allowed-tools', async () => {
     process.argv = [
       'node',

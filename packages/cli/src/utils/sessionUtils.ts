@@ -20,7 +20,7 @@ import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
- * Used when --resume is passed without a value to select the most recent session.
+ * Used when --resume is passed with "latest" value.
  */
 export const RESUME_LATEST = 'latest';
 
@@ -64,7 +64,7 @@ export class SessionError extends Error {
     const dirInfo = chatsDir ? ` in ${chatsDir}` : '';
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      `Invalid session identifier "${identifier}".\n  Searched for sessions${dirInfo}.\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, --resume {alias}, or --resume latest.`,
     );
   }
 }
@@ -109,6 +109,8 @@ export interface SessionInfo {
   index: number;
   /** AI-generated summary of the session (if available) */
   summary?: string;
+  /** AI-generated slugified alias (if available) */
+  alias?: string;
   /** Full concatenated content (only loaded when needed for search) */
   fullContent?: string;
   /** Processed messages with normalized roles (only loaded when needed) */
@@ -322,6 +324,7 @@ export const getAllSessionFiles = async (
             isCurrentSession,
             index: 0, // Will be set after sorting valid sessions
             summary: content.summary,
+            alias: content.alias,
             fullContent,
             messages,
           };
@@ -439,6 +442,14 @@ export class SessionSelector {
     );
     if (sessionByUuid) {
       return sessionByUuid;
+    }
+
+    // Try to find by alias
+    const sessionByAlias = sortedSessions.find(
+      (session) => session.alias === identifier,
+    );
+    if (sessionByAlias) {
+      return sessionByAlias;
     }
 
     // Parse as index number (1-based) - only allow numeric indexes

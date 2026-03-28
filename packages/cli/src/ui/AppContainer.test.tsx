@@ -425,7 +425,10 @@ describe('AppContainer State Management', () => {
       isVimEnabled: false,
       toggleVimEnabled: vi.fn(),
     });
-    mockedUseSessionStats.mockReturnValue({ stats: {} });
+    mockedUseSessionStats.mockReturnValue({
+      stats: {},
+      getPromptCount: vi.fn().mockReturnValue(0),
+    });
     mockedUseTextBuffer.mockReturnValue({
       text: '',
       setText: vi.fn(),

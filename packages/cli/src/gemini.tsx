@@ -634,7 +634,6 @@ export async function main() {
       );
       return;
     }
-
     await config.initialize();
     startupProfiler.flush(config);
 

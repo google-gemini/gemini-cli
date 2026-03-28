@@ -329,6 +329,83 @@ describe('listSessions', () => {
       expect.stringContaining('How do I add dark mode to my React application'),
     );
   });
+
+  it('should display both alias and uuid in brackets when alias is available', async () => {
+    // Arrange
+    const now = new Date('2025-01-20T12:00:00.000Z');
+    const mockSessions: SessionInfo[] = [
+      {
+        id: 'uuid-123',
+        file: 'session-file',
+        fileName: 'session-file.json',
+        startTime: now.toISOString(),
+        lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test message',
+        firstUserMessage: 'Test message',
+        isCurrentSession: false,
+        index: 1,
+        alias: 'my-cool-alias',
+      },
+    ];
+
+    mockListSessions.mockResolvedValue(mockSessions);
+
+    // Act
+    await listSessions(mockConfig);
+
+    // Assert
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '1. Test message (some time ago) [my-cool-alias, uuid-123]',
+      ),
+    );
+  });
+
+  it('should truncate long display names based on terminal width', async () => {
+    // Arrange
+    const now = new Date('2025-01-20T12:00:00.000Z');
+    const originalColumns = process.stdout.columns;
+    process.stdout.columns = 80; // Set a specific terminal width for the test
+
+    const mockSessions: SessionInfo[] = [
+      {
+        id: 'uuid-1234567890',
+        file: 'session-file',
+        fileName: 'session-file.json',
+        startTime: now.toISOString(),
+        lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName:
+          'This is a very very extremely incredibly long display name that will definitely exceed the terminal width and must be dynamically truncated to fit properly on one single line.',
+        firstUserMessage:
+          'This is a very very extremely incredibly long display name that will definitely exceed the terminal width and must be dynamically truncated to fit properly on one single line.',
+        isCurrentSession: false,
+        index: 1,
+        alias: 'my-long-alias',
+      },
+    ];
+
+    mockListSessions.mockResolvedValue(mockSessions);
+
+    // Act
+    await listSessions(mockConfig);
+
+    // Assert
+    // Total prefix is: "  1. " (5 chars)
+    // Time is: "some time ago" (13 chars)
+    // Suffix is: " (some time ago) [my-long-alias, uuid-1234567890]\n" (51 chars total for suffix including parenthesis and brackets)
+    // 80 - 5 - 50 = 25 chars available for the title.
+    // The title should be sliced to 25 - 3 = 22 characters, plus '...'
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '  1. This is a very very ext... (some time ago) [my-long-alias, uuid-1234567890]\n',
+      ),
+    );
+
+    // Restore original columns
+    process.stdout.columns = originalColumns;
+  });
 });
 
 describe('deleteSession', () => {

@@ -143,6 +143,7 @@ export type { SessionMetrics, ModelMetrics };
 
 export interface SessionStatsState {
   sessionId: string;
+  alias?: string;
   sessionStartTime: Date;
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
@@ -187,6 +188,7 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [stats, setStats] = useState<SessionStatsState>({
     sessionId,
+    alias: uiTelemetryService.getAlias(),
     sessionStartTime: new Date(),
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
@@ -197,13 +199,16 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     const handleUpdate = ({
       metrics,
       lastPromptTokenCount,
+      alias,
     }: {
       metrics: SessionMetrics;
       lastPromptTokenCount: number;
+      alias?: string;
     }) => {
       setStats((prevState) => {
         if (
           prevState.lastPromptTokenCount === lastPromptTokenCount &&
+          prevState.alias === alias &&
           areMetricsEqual(prevState.metrics, metrics)
         ) {
           return prevState;
@@ -212,6 +217,7 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
           ...prevState,
           metrics,
           lastPromptTokenCount,
+          alias,
         };
       });
     };
@@ -220,6 +226,7 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
       setStats((prevState) => ({
         ...prevState,
         sessionId: newSessionId || prevState.sessionId,
+        alias: undefined,
         sessionStartTime: new Date(),
         promptCount: 0,
       }));

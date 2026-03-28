@@ -29,7 +29,11 @@ Examples:
 Conversation:
 {conversation}
 
-Summary (max 80 chars):`;
+Provide your response in JSON format with two fields:
+1. "summary": The 80-character sentence (e.g., "Add dark mode to the app")
+2. "alias": A 2-3 word URL-friendly slug in lowercase (e.g., "add-dark-mode")
+
+Response JSON:`;
 
 /**
  * Options for generating a session summary.
@@ -41,6 +45,14 @@ export interface GenerateSummaryOptions {
 }
 
 /**
+ * The result of generating a session summary and alias.
+ */
+export interface SummaryResult {
+  summary: string;
+  alias: string;
+}
+
+/**
  * Service for generating AI summaries of chat sessions.
  * Uses Gemini Flash Lite to create concise, user-intent-focused summaries.
  */
@@ -48,12 +60,12 @@ export class SessionSummaryService {
   constructor(private readonly baseLlmClient: BaseLlmClient) {}
 
   /**
-   * Generate a 1-line summary of a chat session focusing on user intent.
+   * Generate a summary and alias of a chat session focusing on user intent.
    * Returns null if generation fails for any reason.
    */
   async generateSummary(
     options: GenerateSummaryOptions,
-  ): Promise<string | null> {
+  ): Promise<SummaryResult | null> {
     const {
       messages,
       maxMessages = DEFAULT_MAX_MESSAGES,
@@ -128,24 +140,77 @@ export class SessionSummaryService {
           role: LlmRole.UTILITY_SUMMARIZER,
         });
 
-        const summary = getResponseText(response);
+        const rawResponse = getResponseText(response);
 
-        if (!summary || summary.trim().length === 0) {
-          debugLogger.debug('[SessionSummary] Empty summary returned');
+        if (!rawResponse || rawResponse.trim().length === 0) {
+          debugLogger.debug('[SessionSummary] Empty response returned');
           return null;
         }
 
-        // Clean the summary
-        let cleanedSummary = summary
-          .replace(/\n+/g, ' ') // Collapse newlines to spaces
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .trim(); // Trim after all processing
+        // Clean and parse JSON
+        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const result = JSON.parse(jsonMatch[0]) as unknown;
+            if (
+              typeof result === 'object' &&
+              result !== null &&
+              'summary' in result &&
+              typeof result.summary === 'string' &&
+              'alias' in result &&
+              typeof result.alias === 'string'
+            ) {
+              // Basic cleanup of summary
+              let cleanedSummary = result.summary
+                .replace(/\n+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              cleanedSummary = cleanedSummary.replace(/^["']|["']$/g, '');
 
-        // Remove quotes if the model added them
-        cleanedSummary = cleanedSummary.replace(/^["']|["']$/g, '');
+              // Basic cleanup of alias (ensure slug format)
+              const cleanedAlias = result.alias
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '');
 
-        debugLogger.debug(`[SessionSummary] Generated: "${cleanedSummary}"`);
-        return cleanedSummary;
+              debugLogger.debug(
+                `[SessionSummary] Generated summary: "${cleanedSummary}", alias: "${cleanedAlias}"`,
+              );
+              return {
+                summary: cleanedSummary,
+                alias: cleanedAlias,
+              };
+            }
+          } catch (e) {
+            debugLogger.debug(
+              `[SessionSummary] JSON parsing failed, falling back to raw text: ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+        }
+
+        // Fallback: If no JSON or parsing fails, use the first line as summary
+        let rawSummary = rawResponse.split('\n')[0].trim();
+        rawSummary = rawSummary.replace(/^["']|["']$/g, '');
+
+        if (rawSummary.length > 0) {
+          const generatedAlias = rawSummary
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
+            .split('-')
+            .slice(0, 3)
+            .join('-');
+
+          debugLogger.debug(
+            `[SessionSummary] Fallback summary: "${rawSummary}", alias: "${generatedAlias}"`,
+          );
+          return {
+            summary: rawSummary,
+            alias: generatedAlias,
+          };
+        }
+
+        return null;
       } finally {
         clearTimeout(timeoutId);
       }
