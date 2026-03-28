@@ -10,5 +10,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    silent: true,
+    reporters: ['default', 'junit'],
+    outputFile: {
+      junit: 'junit.xml',
+    },
   },
 });

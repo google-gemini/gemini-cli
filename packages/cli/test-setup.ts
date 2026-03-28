@@ -40,6 +40,8 @@ process.env.TERM_PROGRAM = 'generic';
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
+let consoleLogSpy: vi.SpyInstance;
+let consoleWarnSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
 beforeEach(() => {
@@ -47,6 +49,9 @@ beforeEach(() => {
   themeManager.resetForTesting();
 
   actWarnings = [];
+  // Silence console.log and console.warn to keep test output clean.
+  consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
     const firstArg = args[0];
     if (
@@ -86,6 +91,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  consoleLogSpy.mockRestore();
+  consoleWarnSpy.mockRestore();
   consoleErrorSpy.mockRestore();
 
   vi.unstubAllEnvs();
