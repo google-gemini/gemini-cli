@@ -1339,6 +1339,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.customExcludePatterns`** (array):
+  - **Description:** Additional glob patterns to exclude from file searches
+    (e.g. "**/\*.test.ts", "**/dist/\*\*").
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `tools`
 
 - **`tools.sandbox`** (string):
