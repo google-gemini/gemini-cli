@@ -28,6 +28,7 @@ import { type Tool, SdkTool } from './tool.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type {
+  AgentLogger,
   SessionContext,
   GeminiCliAgentOptions,
   SystemInstructions,
@@ -41,6 +42,7 @@ export class GeminiCliSession {
   private readonly tools: Array<Tool<any>>;
   private readonly skillRefs: SkillReference[];
   private readonly instructions: SystemInstructions | undefined;
+  private readonly logger: AgentLogger;
   private client: GeminiClient | undefined;
   private initialized = false;
 
@@ -50,6 +52,14 @@ export class GeminiCliSession {
     private readonly agent: GeminiCliAgent,
     private readonly resumedData?: ResumedSessionData,
   ) {
+    this.logger = options.logger ?? {
+      /* eslint-disable no-console */
+      info: console.log,
+      warn: console.warn,
+      error: console.error,
+      debug: (options.debug ?? false) ? console.debug : () => {},
+      /* eslint-enable no-console */
+    };
     this.instructions = options.instructions;
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
@@ -108,9 +118,7 @@ export class GeminiCliSession {
             return await loadSkillsFromDir(ref.path);
           }
         } catch (e) {
-          // TODO: refactor this to use a proper logger interface
-          // eslint-disable-next-line no-console
-          console.error(`Failed to load skills from ${ref.path}:`, e);
+          this.logger.error(`Failed to load skills from ${ref.path}:`, e);
         }
         return [];
       });
@@ -197,6 +205,7 @@ export class GeminiCliSession {
           shell,
           agent: this.agent,
           session: this,
+          logger: this.logger,
         };
         const newInstructions = await this.instructions(context);
         this.config.setUserMemory(newInstructions);
@@ -239,6 +248,7 @@ export class GeminiCliSession {
         shell,
         agent: this.agent,
         session: this,
+        logger: this.logger,
       };
 
       const loopContext: AgentLoopContext = this.config;

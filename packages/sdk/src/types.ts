@@ -14,6 +14,18 @@ export type SystemInstructions =
   | string
   | ((context: SessionContext) => string | Promise<string>);
 
+/**
+ * Logger interface for the Gemini CLI SDK.
+ * Follows the same dependency-injection pattern as AgentFilesystem
+ * and AgentShell, allowing SDK consumers to provide custom log handlers.
+ */
+export interface AgentLogger {
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
+}
+
 export interface GeminiCliAgentOptions {
   instructions: SystemInstructions;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +36,7 @@ export interface GeminiCliAgentOptions {
   debug?: boolean;
   recordResponses?: string;
   fakeResponses?: string;
+  logger?: AgentLogger;
 }
 
 export interface AgentFilesystem {
@@ -58,4 +71,5 @@ export interface SessionContext {
   shell: AgentShell;
   agent: GeminiCliAgent;
   session: GeminiCliSession;
+  logger: AgentLogger;
 }
