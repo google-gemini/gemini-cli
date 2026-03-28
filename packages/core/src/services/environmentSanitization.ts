@@ -173,12 +173,12 @@ function shouldRedactEnvironmentVariable(
     return true;
   }
 
-  if (ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
-    return false;
-  }
-
   if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
     return true;
+  }
+
+  if (ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
+    return false;
   }
 
   if (isStrictSanitization) {

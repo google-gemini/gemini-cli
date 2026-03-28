@@ -925,6 +925,8 @@ export async function loadCliConfig(
         ? undefined
         : settings.mcp?.excluded
       : undefined,
+    allowedEnvironmentVariables:
+      settings.security?.environmentVariableRedaction?.allowed,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,
     enableEnvironmentVariableRedaction:

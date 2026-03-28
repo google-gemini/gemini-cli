@@ -167,6 +167,31 @@ describe('Configuration Integration Tests', () => {
     });
   });
 
+  describe('Environment Variable Redaction Configuration', () => {
+    it('should forward allowedEnvironmentVariables into sanitizationConfig', () => {
+      const configParams: ConfigParameters = {
+        sessionId: 'test-session',
+        cwd: '/tmp',
+        model: 'test-model',
+        embeddingModel: 'test-embedding-model',
+        sandbox: undefined,
+        targetDir: tempDir,
+        debugMode: false,
+        allowedEnvironmentVariables: ['MY_CUSTOM_VAR', 'ANOTHER_VAR'],
+        enableEnvironmentVariableRedaction: true,
+      };
+
+      const config = new Config(configParams);
+
+      expect(config.sanitizationConfig.allowedEnvironmentVariables).toContain(
+        'MY_CUSTOM_VAR',
+      );
+      expect(config.sanitizationConfig.allowedEnvironmentVariables).toContain(
+        'ANOTHER_VAR',
+      );
+    });
+  });
+
   describe('Approval Mode Integration Tests', () => {
     let parseArguments: typeof import('./config.js').parseArguments;
 

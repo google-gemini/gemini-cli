@@ -2180,16 +2180,23 @@ from the system or loaded from `.env` files.
 
 You can customize this behavior in your `settings.json` file:
 
-- **`security.allowedEnvironmentVariables`**: A list of variable names to
-  _never_ redact, even if they match sensitive patterns.
-- **`security.blockedEnvironmentVariables`**: A list of variable names to
-  _always_ redact, even if they don't match sensitive patterns.
+- **`security.environmentVariableRedaction.allowed`**: A list of variable names
+  to _never_ redact, even if they match sensitive name patterns. Note: variables
+  whose _values_ match credential patterns (e.g. embedded passwords in a URL)
+  are still redacted regardless of this list.
+- **`security.environmentVariableRedaction.blocked`**: A list of variable names
+  to _always_ redact, even if they don't match sensitive patterns.
+- **`security.environmentVariableRedaction.enabled`**: Set to `true` to enable
+  environment variable redaction.
 
 ```json
 {
   "security": {
-    "allowedEnvironmentVariables": ["MY_PUBLIC_KEY", "NOT_A_SECRET_TOKEN"],
-    "blockedEnvironmentVariables": ["INTERNAL_IP_ADDRESS"]
+    "environmentVariableRedaction": {
+      "allowed": ["GOOGLE_CLOUD_PROJECT", "MY_PUBLIC_KEY"],
+      "blocked": ["INTERNAL_IP_ADDRESS"],
+      "enabled": true
+    }
   }
 }
 ```

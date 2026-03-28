@@ -306,6 +306,25 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
+  it('should allow user allow-list to override NEVER_ALLOWED_ENVIRONMENT_VARIABLES name list', () => {
+    // The allowlist purpose is to let users bypass overly broad security policies.
+    // NEVER_ALLOWED_ENVIRONMENT_VARIABLES contains entries like GOOGLE_CLOUD_PROJECT
+    // that are not secrets — users must be able to explicitly allow them.
+    // Value-pattern checks (NEVER_ALLOWED_VALUE_PATTERNS) still protect against
+    // actual credentials regardless of the allow-list.
+    const env = {
+      GOOGLE_CLOUD_PROJECT: 'my-project-id',
+      SAFE_VAR: 'fine',
+    };
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: ['GOOGLE_CLOUD_PROJECT'],
+      blockedEnvironmentVariables: [],
+      enableEnvironmentVariableRedaction: true,
+    });
+    expect(sanitized).toHaveProperty('GOOGLE_CLOUD_PROJECT', 'my-project-id');
+    expect(sanitized).toHaveProperty('SAFE_VAR', 'fine');
+  });
+
   it('should block variables specified in blockedEnvironmentVariables', () => {
     const env = {
       SAFE_VAR: 'safe-value',
