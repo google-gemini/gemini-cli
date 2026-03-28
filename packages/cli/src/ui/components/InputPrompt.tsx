@@ -251,6 +251,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         } else if (count === 2) {
           resetEscapeState();
           if (buffer.text.length > 0) {
+            inputHistory.saveDraft(buffer.text, buffer.getOffset());
             buffer.setText('');
             resetCompletionState();
           } else if (history.length > 0) {
@@ -1268,6 +1269,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
         return false;
+      }
+
+      if (keyMatchers[Command.CLEAR_INPUT](key) && buffer.text.trim()) {
+        inputHistory.saveDraft(buffer.text, buffer.getOffset());
       }
 
       // Fall back to the text buffer's default input handling for all other keys
