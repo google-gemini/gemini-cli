@@ -6,6 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 describe('telemetry', () => {
   let rig: TestRig;
@@ -29,5 +31,27 @@ describe('telemetry', () => {
     // Verify that a cli_command_count metric was emitted
     const cliCommandCountMetric = rig.readMetric('session.count');
     expect(cliCommandCountMetric).not.toBeNull();
+  });
+
+  it('should not write telemetry when disabled', async () => {
+    rig.setup('telemetry-disabled', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'hooks-system.session-startup.responses',
+      ),
+      settings: {
+        telemetry: { enabled: false },
+      },
+    });
+
+    // Run a simple command with telemetry disabled
+    await rig.run({
+      args: 'say hello',
+      env: { GEMINI_API_KEY: 'fake-key' },
+    });
+
+    // Verify that no telemetry log file was created
+    const telemetryLogPath = join(rig.homeDir!, 'telemetry.log');
+    expect(existsSync(telemetryLogPath)).toBe(false);
   });
 });
