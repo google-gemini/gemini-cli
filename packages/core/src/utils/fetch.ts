@@ -6,7 +6,12 @@
 
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
-import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+import {
+  Agent,
+  EnvHttpProxyAgent,
+  ProxyAgent,
+  setGlobalDispatcher,
+} from 'undici';
 import ipaddr from 'ipaddr.js';
 import { lookup } from 'node:dns/promises';
 
@@ -192,8 +197,9 @@ export async function fetchWithTimeout(
 
 export function setGlobalProxy(proxy: string) {
   setGlobalDispatcher(
-    new ProxyAgent({
-      uri: proxy,
+    new EnvHttpProxyAgent({
+      httpProxy: proxy,
+      httpsProxy: proxy,
       headersTimeout: DEFAULT_HEADERS_TIMEOUT,
       bodyTimeout: DEFAULT_BODY_TIMEOUT,
     }),
