@@ -15,7 +15,9 @@ import {
   MCPDiscoveryState,
   MCPServerStatus,
   populateMcpServerCommand,
+  type DiscoveredMCPPrompt,
 } from './mcp-client.js';
+import type { DiscoveredMCPTool } from './mcp-tool.js';
 import { getErrorMessage, isAuthenticationError } from '../utils/errors.js';
 import type { EventEmitter } from 'node:events';
 import { coreEvents } from '../utils/events.js';
@@ -24,7 +26,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { createHash } from 'node:crypto';
 import { stableStringify } from '../policy/stable-stringify.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import type { ResourceRegistry } from '../resources/resource-registry.js';
+import type {
+  ResourceRegistry,
+  MCPResource,
+} from '../resources/resource-registry.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
@@ -651,6 +656,42 @@ export class McpClientManager {
 
   getDiscoveryState(): MCPDiscoveryState {
     return this.discoveryState;
+  }
+
+  /**
+   * Retrieves all discovered MCP tools across all connected servers
+   * and their respective registries.
+   */
+  getAllDiscoveredMcpTools(): DiscoveredMCPTool[] {
+    const allTools: DiscoveredMCPTool[] = [];
+    for (const client of this.clients.values()) {
+      allTools.push(...client.getAllDiscoveredTools());
+    }
+    return allTools;
+  }
+
+  /**
+   * Retrieves all discovered MCP prompts across all connected servers
+   * and their respective registries.
+   */
+  getAllDiscoveredPrompts(): DiscoveredMCPPrompt[] {
+    const allPrompts: DiscoveredMCPPrompt[] = [];
+    for (const client of this.clients.values()) {
+      allPrompts.push(...client.getAllDiscoveredPrompts());
+    }
+    return allPrompts;
+  }
+
+  /**
+   * Retrieves all discovered MCP resources across all connected servers
+   * and their respective registries.
+   */
+  getAllDiscoveredResources(): MCPResource[] {
+    const allResources: MCPResource[] = [];
+    for (const client of this.clients.values()) {
+      allResources.push(...client.getAllDiscoveredResources());
+    }
+    return allResources;
   }
 
   /**

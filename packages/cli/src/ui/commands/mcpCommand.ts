@@ -12,7 +12,6 @@ import type {
 import { CommandKind } from './types.js';
 import type { MessageActionReturn } from '@google/gemini-cli-core';
 import {
-  DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
   MCPDiscoveryState,
@@ -212,21 +211,18 @@ const listAction = async (
     discoveryState === MCPDiscoveryState.IN_PROGRESS ||
     connectingServers.length > 0;
 
-  const allTools = toolRegistry.getAllTools();
-  const mcpTools = allTools.filter((tool) => tool instanceof DiscoveredMCPTool);
+  const mcpClientManager = config.getMcpClientManager();
+  const mcpTools = mcpClientManager
+    ? mcpClientManager.getAllDiscoveredMcpTools()
+    : [];
 
-  const promptRegistry = config.getPromptRegistry();
-  const mcpPrompts = promptRegistry
-    .getAllPrompts()
-    .filter(
-      (prompt) =>
-        'serverName' in prompt && serverNames.includes(prompt.serverName),
-    );
+  const mcpPrompts = mcpClientManager
+    ? mcpClientManager.getAllDiscoveredPrompts()
+    : [];
 
-  const resourceRegistry = config.getResourceRegistry();
-  const mcpResources = resourceRegistry
-    .getAllResources()
-    .filter((entry) => serverNames.includes(entry.serverName));
+  const mcpResources = mcpClientManager
+    ? mcpClientManager.getAllDiscoveredResources()
+    : [];
 
   const authStatus: HistoryItemMcpStatus['authStatus'] = {};
   const tokenStorage = new MCPOAuthTokenStorage();

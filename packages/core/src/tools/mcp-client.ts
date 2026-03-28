@@ -275,6 +275,56 @@ export class McpClient implements McpProgressReporter {
   }
 
   /**
+   * Gets all discovered tools registered by this client across all of its
+   * associated registry sets.
+   */
+  getAllDiscoveredTools(): DiscoveredMCPTool[] {
+    const tools = new Map<string, DiscoveredMCPTool>();
+    for (const registries of this.registeredRegistries) {
+      const serverTools =
+        registries.toolRegistry.getToolsByServer(this.serverName) || [];
+      for (const tool of serverTools) {
+        if (tool instanceof DiscoveredMCPTool) {
+          tools.set(tool.name, tool);
+        }
+      }
+    }
+    return Array.from(tools.values());
+  }
+
+  /**
+   * Gets all discovered prompts registered by this client across all of its
+   * associated registry sets.
+   */
+  getAllDiscoveredPrompts(): DiscoveredMCPPrompt[] {
+    const prompts = new Map<string, DiscoveredMCPPrompt>();
+    for (const registries of this.registeredRegistries) {
+      const serverPrompts =
+        registries.promptRegistry.getPromptsByServer(this.serverName) || [];
+      for (const prompt of serverPrompts) {
+        prompts.set(prompt.name, prompt);
+      }
+    }
+    return Array.from(prompts.values());
+  }
+
+  /**
+   * Gets all discovered resources registered by this client across all of its
+   * associated registry sets.
+   */
+  getAllDiscoveredResources(): MCPResource[] {
+    const resources = new Map<string, MCPResource>();
+    for (const registries of this.registeredRegistries) {
+      const serverResources =
+        registries.resourceRegistry.getResourcesByServer(this.serverName) || [];
+      for (const resource of serverResources) {
+        resources.set(resource.uri, resource);
+      }
+    }
+    return Array.from(resources.values());
+  }
+
+  /**
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {
