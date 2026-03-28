@@ -69,54 +69,50 @@ export const MainContent = () => {
   const topicUpdateNarrationEnabled =
     settings.merged.experimental?.topicUpdateNarration === true;
 
-  const augmentedHistory = useMemo(() => {
-    const itemsWithFlags = [];
+  const suppressNarrationFlags = useMemo(() => {
     const combinedHistory = [...uiState.history, ...pendingHistoryItems];
+    const flags = new Array<boolean>(combinedHistory.length).fill(false);
 
-    for (let i = 0; i < uiState.history.length; i++) {
-      const item = uiState.history[i];
-      let suppressNarration = false;
-
-      if (
-        topicUpdateNarrationEnabled &&
-        (item.type === 'thinking' ||
-          item.type === 'gemini' ||
-          item.type === 'gemini_content')
-      ) {
-        for (let j = i + 1; j < combinedHistory.length; j++) {
-          const nextType = combinedHistory[j].type;
-          if (nextType === 'user' || nextType === 'user_shell') {
-            break;
-          }
-          if (nextType === 'tool_group') {
-            suppressNarration = true;
-            break;
-          }
+    if (topicUpdateNarrationEnabled) {
+      let toolGroupInTurn = false;
+      for (let i = combinedHistory.length - 1; i >= 0; i--) {
+        const item = combinedHistory[i];
+        if (item.type === 'user' || item.type === 'user_shell') {
+          toolGroupInTurn = false;
+        } else if (item.type === 'tool_group') {
+          toolGroupInTurn = true;
+        } else if (
+          (item.type === 'thinking' ||
+            item.type === 'gemini' ||
+            item.type === 'gemini_content') &&
+          toolGroupInTurn
+        ) {
+          flags[i] = true;
         }
       }
-
-      const prevType = i > 0 ? uiState.history[i - 1]?.type : undefined;
-      const isFirstThinking =
-        item.type === 'thinking' && prevType !== 'thinking';
-      const isFirstAfterThinking =
-        item.type !== 'thinking' && prevType === 'thinking';
-
-      itemsWithFlags.push({
-        item,
-        isExpandable: i > lastUserPromptIndex,
-        isFirstThinking,
-        isFirstAfterThinking,
-        suppressNarration,
-      });
     }
+    return flags;
+  }, [uiState.history, pendingHistoryItems, topicUpdateNarrationEnabled]);
 
-    return itemsWithFlags;
-  }, [
-    uiState.history,
-    pendingHistoryItems,
-    lastUserPromptIndex,
-    topicUpdateNarrationEnabled,
-  ]);
+  const augmentedHistory = useMemo(
+    () =>
+      uiState.history.map((item, i) => {
+        const prevType = i > 0 ? uiState.history[i - 1]?.type : undefined;
+        const isFirstThinking =
+          item.type === 'thinking' && prevType !== 'thinking';
+        const isFirstAfterThinking =
+          item.type !== 'thinking' && prevType === 'thinking';
+
+        return {
+          item,
+          isExpandable: i > lastUserPromptIndex,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration: suppressNarrationFlags[i] ?? false,
+        };
+      }),
+    [uiState.history, lastUserPromptIndex, suppressNarrationFlags],
+  );
 
   const historyItems = useMemo(
     () =>
@@ -179,24 +175,8 @@ export const MainContent = () => {
           const isFirstAfterThinking =
             item.type !== 'thinking' && prevType === 'thinking';
 
-          let suppressNarration = false;
-          if (
-            topicUpdateNarrationEnabled &&
-            (item.type === 'thinking' ||
-              item.type === 'gemini' ||
-              item.type === 'gemini_content')
-          ) {
-            for (let j = i + 1; j < pendingHistoryItems.length; j++) {
-              const nextType = pendingHistoryItems[j].type;
-              if (nextType === 'user' || nextType === 'user_shell') {
-                break;
-              }
-              if (nextType === 'tool_group') {
-                suppressNarration = true;
-                break;
-              }
-            }
-          }
+          const suppressNarration =
+            suppressNarrationFlags[uiState.history.length + i] ?? false;
 
           return (
             <HistoryItemDisplay
@@ -230,7 +210,7 @@ export const MainContent = () => {
       showConfirmationQueue,
       confirmingTool,
       uiState.history,
-      topicUpdateNarrationEnabled,
+      suppressNarrationFlags,
     ],
   );
 
