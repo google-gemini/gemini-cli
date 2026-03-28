@@ -223,7 +223,7 @@ function toContent(content: ContentUnion): Content {
     return {
       ...content,
       parts: content.parts
-        ? toParts(content.parts.filter((p) => p != null))
+        ? toParts(content.parts.filter((p) => p != null && !p.thought))
         : [],
     };
   }
