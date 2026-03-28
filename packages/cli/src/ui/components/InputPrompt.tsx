@@ -407,7 +407,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmit = useCallback(
     (submittedValue: string) => {
-      const trimmedMessage = submittedValue.trim();
+      const trimmedMessage = String(submittedValue ?? '').trim();
       const isSlash = isSlashCommand(trimmedMessage);
 
       const isShell = shellModeActive;

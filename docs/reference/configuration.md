@@ -2433,6 +2433,10 @@ sandbox image:
 BUILD_SANDBOX=1 gemini -s
 ```
 
+Building a custom sandbox with `BUILD_SANDBOX` is only supported when running
+Gemini CLI from source. If you installed the CLI with npm, build the Docker
+image separately and reference that image in your sandbox configuration.
+
 ## Usage statistics
 
 To help us improve the Gemini CLI, we collect anonymized usage statistics. This

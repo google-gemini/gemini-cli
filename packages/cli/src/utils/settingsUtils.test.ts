@@ -783,6 +783,33 @@ describe('SettingsUtils', () => {
         expect(result).toBe('{"enabled":true,"host":"localhost"}*');
         expect(result).not.toContain('[object Object]');
       });
+
+      it('should display arrays as JSON strings', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          ui: {
+            properties: {
+              favoriteModels: {
+                type: 'array',
+                label: 'Favorite Models',
+                category: 'UI',
+                requiresRestart: false,
+                default: [],
+                description: 'Favorite models.',
+                showInDialog: true,
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({
+          ui: {
+            favoriteModels: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+          },
+        });
+        const result = getDisplayValue('ui.favoriteModels', settings, settings);
+
+        expect(result).toBe('["gemini-2.5-pro","gemini-2.5-flash"]*');
+      });
     });
 
     describe('getDisplayValue with units', () => {
