@@ -8,10 +8,15 @@ import path from 'node:path';
 import os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
+
+// In-memory cache for path resolutions to minimize HDD hits
+const realPathCache = new Map<string, string>();
+const nativeRealPathCache = new Map<string, string>();
 
 /**
  * Returns the home directory.
@@ -327,6 +332,10 @@ export function getProjectHash(projectRoot: string): string {
  */
 export function normalizePath(p: string): string {
   const resolved = path.resolve(p);
+  const cacheKey = resolved;
+  const cached = nativeRealPathCache.get(cacheKey);
+  if (cached) return cached;
+
   let normalized = resolved.replace(/\\/g, '/');
 
   if (process.platform === 'win32') {
@@ -334,8 +343,33 @@ export function normalizePath(p: string): string {
       // Try to get the actual casing from the file system
       const real = fs.realpathSync.native(resolved);
       normalized = real.replace(/\\/g, '/');
+      nativeRealPathCache.set(cacheKey, normalized);
     } catch {
       // If the path doesn't exist, fall back to lowercase for consistent comparisons
+      normalized = normalized.toLowerCase();
+    }
+  }
+
+  return normalized;
+}
+
+/**
+ * Async version of normalizePath to prevent blocking the event loop.
+ */
+export async function normalizePathAsync(p: string): Promise<string> {
+  const resolved = path.resolve(p);
+  const cacheKey = resolved;
+  const cached = nativeRealPathCache.get(cacheKey);
+  if (cached) return cached;
+
+  let normalized = resolved.replace(/\\/g, '/');
+
+  if (process.platform === 'win32') {
+    try {
+      const real = await fsPromises.realpath(resolved);
+      normalized = real.replace(/\\/g, '/');
+      nativeRealPathCache.set(cacheKey, normalized);
+    } catch {
       normalized = normalized.toLowerCase();
     }
   }
@@ -388,14 +422,38 @@ export function resolveToRealPath(pathStr: string): string {
   return robustRealpath(path.resolve(resolvedPath));
 }
 
+/**
+ * Async version of resolveToRealPath.
+ */
+export async function resolveToRealPathAsync(pathStr: string): Promise<string> {
+  let resolvedPath = pathStr;
+
+  try {
+    if (resolvedPath.startsWith('file://')) {
+      resolvedPath = fileURLToPath(resolvedPath);
+    }
+
+    resolvedPath = decodeURIComponent(resolvedPath);
+  } catch (_e) {
+    // Ignore error
+  }
+
+  return robustRealpathAsync(path.resolve(resolvedPath));
+}
+
 function robustRealpath(p: string, visited = new Set<string>()): string {
   const key = process.platform === 'win32' ? p.toLowerCase() : p;
   if (visited.has(key)) {
     throw new Error(`Infinite recursion detected in robustRealpath: ${p}`);
   }
+  const cached = realPathCache.get(key);
+  if (cached) return cached;
+
   visited.add(key);
   try {
-    return fs.realpathSync(p);
+    const real = fs.realpathSync(p);
+    realPathCache.set(key, real);
+    return real;
   } catch (e: unknown) {
     if (
       e &&
@@ -426,7 +484,63 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
       }
       const parent = path.dirname(p);
       if (parent === p) return p;
-      return path.join(robustRealpath(parent, visited), path.basename(p));
+      const realParent = robustRealpath(parent, visited);
+      const result = path.join(realParent, path.basename(p));
+      realPathCache.set(key, result);
+      return result;
+    }
+    throw e;
+  }
+}
+
+async function robustRealpathAsync(
+  p: string,
+  visited = new Set<string>(),
+): Promise<string> {
+  const key = process.platform === 'win32' ? p.toLowerCase() : p;
+  if (visited.has(key)) {
+    throw new Error(`Infinite recursion detected in robustRealpath: ${p}`);
+  }
+  const cached = realPathCache.get(key);
+  if (cached) return cached;
+
+  visited.add(key);
+  try {
+    const real = await fsPromises.realpath(p);
+    realPathCache.set(key, real);
+    return real;
+  } catch (e: unknown) {
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      (e.code === 'ENOENT' || e.code === 'EISDIR')
+    ) {
+      try {
+        const stat = await fsPromises.lstat(p);
+        if (stat.isSymbolicLink()) {
+          const target = await fsPromises.readlink(p);
+          const resolvedTarget = path.resolve(path.dirname(p), target);
+          return await robustRealpathAsync(resolvedTarget, visited);
+        }
+      } catch (lstatError: unknown) {
+        if (
+          !(
+            lstatError &&
+            typeof lstatError === 'object' &&
+            'code' in lstatError &&
+            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
+          )
+        ) {
+          throw lstatError;
+        }
+      }
+      const parent = path.dirname(p);
+      if (parent === p) return p;
+      const realParent = await robustRealpathAsync(parent, visited);
+      const result = path.join(realParent, path.basename(p));
+      realPathCache.set(key, result);
+      return result;
     }
     throw e;
   }

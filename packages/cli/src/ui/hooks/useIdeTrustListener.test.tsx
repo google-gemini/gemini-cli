@@ -124,7 +124,7 @@ describe('useIdeTrustListener', () => {
   };
 
   it('should initialize correctly with no trust information', async () => {
-    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
       isTrusted: undefined,
       source: undefined,
     });
@@ -141,7 +141,7 @@ describe('useIdeTrustListener', () => {
     vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
       status: IDEConnectionStatus.Disconnected,
     });
-    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'ide',
     });
@@ -175,7 +175,7 @@ describe('useIdeTrustListener', () => {
     vi.mocked(ideContextStore.get).mockReturnValue({
       workspaceState: { isTrusted: true },
     });
-    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'ide',
     });
@@ -191,7 +191,7 @@ describe('useIdeTrustListener', () => {
     expect(result.current.needsRestart).toBe(false);
 
     await act(async () => {
-      vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
         isTrusted: false,
         source: 'ide',
       });
@@ -214,7 +214,7 @@ describe('useIdeTrustListener', () => {
     vi.mocked(ideContextStore.get).mockReturnValue({
       workspaceState: { isTrusted: true },
     });
-    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'ide',
     });
@@ -230,7 +230,7 @@ describe('useIdeTrustListener', () => {
     expect(result.current.needsRestart).toBe(false);
 
     await act(async () => {
-      vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
         isTrusted: undefined,
         source: undefined,
       });
@@ -251,7 +251,7 @@ describe('useIdeTrustListener', () => {
     vi.mocked(ideContextStore.get).mockReturnValue({
       workspaceState: { isTrusted: true },
     });
-    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'ide',
     });

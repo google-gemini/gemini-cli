@@ -71,7 +71,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should pass workspacePoliciesDir to createPolicyEngineConfig when folder is trusted', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });
@@ -94,7 +94,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should NOT pass workspacePoliciesDir to createPolicyEngineConfig when folder is NOT trusted', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: false,
       source: 'file',
     });
@@ -115,7 +115,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should NOT pass workspacePoliciesDir if integrity is NEW but fileCount is 0', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });
@@ -141,7 +141,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should automatically accept and load workspacePoliciesDir if integrity MISMATCH in non-interactive mode', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });
@@ -175,7 +175,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should automatically accept and load workspacePoliciesDir if integrity MISMATCH in interactive mode when AUTO_ACCEPT is true', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });
@@ -215,7 +215,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should automatically accept and load workspacePoliciesDir if integrity is NEW in interactive mode when AUTO_ACCEPT is true', async () => {
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });
@@ -258,7 +258,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
     Policy.setAutoAcceptWorkspacePolicies(false);
 
     try {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(isWorkspaceTrusted).mockResolvedValue({
         isTrusted: true,
         source: 'file',
       });

@@ -38,7 +38,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-describe('Trusted Folders', () => {
+describe('Trusted Folders', async () => {
   let tempDir: string;
   let trustedFoldersPath: string;
 
@@ -61,12 +61,12 @@ describe('Trusted Folders', () => {
     vi.unstubAllEnvs();
   });
 
-  describe('Locking & Concurrency', () => {
+  describe('Locking & Concurrency', async () => {
     it('setValue should handle concurrent calls correctly using real lockfile', async () => {
       // Initialize the file
       fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
 
-      const loadedFolders = loadTrustedFolders();
+      const loadedFolders = await loadTrustedFolders();
 
       // Start two concurrent calls
       // These will race to acquire the lock on the real file system
@@ -86,52 +86,52 @@ describe('Trusted Folders', () => {
     });
   });
 
-  describe('Loading & Parsing', () => {
-    it('should load empty rules if no files exist', () => {
-      const { rules, errors } = loadTrustedFolders();
+  describe('Loading & Parsing', async () => {
+    it('should load empty rules if no files exist', async () => {
+      const { rules, errors } = await loadTrustedFolders();
       expect(rules).toEqual([]);
       expect(errors).toEqual([]);
     });
 
-    it('should load rules from the configuration file', () => {
+    it('should load rules from the configuration file', async () => {
       const config = {
         '/user/folder': TrustLevel.TRUST_FOLDER,
       };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      const { rules, errors } = loadTrustedFolders();
+      const { rules, errors } = await loadTrustedFolders();
       expect(rules).toEqual([
         { path: '/user/folder', trustLevel: TrustLevel.TRUST_FOLDER },
       ]);
       expect(errors).toEqual([]);
     });
 
-    it('should handle JSON parsing errors gracefully', () => {
+    it('should handle JSON parsing errors gracefully', async () => {
       fs.writeFileSync(trustedFoldersPath, 'invalid json', 'utf-8');
 
-      const { rules, errors } = loadTrustedFolders();
+      const { rules, errors } = await loadTrustedFolders();
       expect(rules).toEqual([]);
       expect(errors.length).toBe(1);
       expect(errors[0].path).toBe(trustedFoldersPath);
       expect(errors[0].message).toContain('Unexpected token');
     });
 
-    it('should handle non-object JSON gracefully', () => {
+    it('should handle non-object JSON gracefully', async () => {
       fs.writeFileSync(trustedFoldersPath, 'null', 'utf-8');
 
-      const { rules, errors } = loadTrustedFolders();
+      const { rules, errors } = await loadTrustedFolders();
       expect(rules).toEqual([]);
       expect(errors.length).toBe(1);
       expect(errors[0].message).toContain('not a valid JSON object');
     });
 
-    it('should handle invalid trust levels gracefully', () => {
+    it('should handle invalid trust levels gracefully', async () => {
       const config = {
         '/path': 'INVALID_LEVEL',
       };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      const { rules, errors } = loadTrustedFolders();
+      const { rules, errors } = await loadTrustedFolders();
       expect(rules).toEqual([]);
       expect(errors.length).toBe(1);
       expect(errors[0].message).toContain(
@@ -139,7 +139,7 @@ describe('Trusted Folders', () => {
       );
     });
 
-    it('should support JSON with comments', () => {
+    it('should support JSON with comments', async () => {
       const content = `
         {
           // This is a comment
@@ -148,7 +148,7 @@ describe('Trusted Folders', () => {
       `;
       fs.writeFileSync(trustedFoldersPath, content, 'utf-8');
 
-      const { rules, errors } = loadTrustedFolders();
+      const { rules, errors } = await loadTrustedFolders();
       expect(rules).toEqual([
         { path: '/path', trustLevel: TrustLevel.TRUST_FOLDER },
       ]);
@@ -156,14 +156,14 @@ describe('Trusted Folders', () => {
     });
   });
 
-  describe('isPathTrusted', () => {
+  describe('isPathTrusted', async () => {
     function setup(config: Record<string, TrustLevel>) {
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
       return loadTrustedFolders();
     }
 
-    it('provides a method to determine if a path is trusted', () => {
-      const folders = setup({
+    it('provides a method to determine if a path is trusted', async () => {
+      const folders = await setup({
         './myfolder': TrustLevel.TRUST_FOLDER,
         '/trustedparent/trustme': TrustLevel.TRUST_PARENT,
         '/user/folder': TrustLevel.TRUST_FOLDER,
@@ -174,26 +174,36 @@ describe('Trusted Folders', () => {
       // We need to resolve relative paths for comparison since the implementation uses realpath
       const resolvedMyFolder = path.resolve('./myfolder');
 
-      expect(folders.isPathTrusted('/secret')).toBe(false);
-      expect(folders.isPathTrusted('/user/folder')).toBe(true);
-      expect(folders.isPathTrusted('/secret/publickeys/public.pem')).toBe(true);
-      expect(folders.isPathTrusted('/user/folder/harhar')).toBe(true);
-      expect(
-        folders.isPathTrusted(path.join(resolvedMyFolder, 'somefile.jpg')),
-      ).toBe(true);
-      expect(folders.isPathTrusted('/trustedparent/someotherfolder')).toBe(
+      expect(await folders.isPathTrusted('/secret')).toBe(false);
+      expect(await folders.isPathTrusted('/user/folder')).toBe(true);
+      expect(await folders.isPathTrusted('/secret/publickeys/public.pem')).toBe(
         true,
       );
-      expect(folders.isPathTrusted('/trustedparent/trustme')).toBe(true);
+      expect(await folders.isPathTrusted('/user/folder/harhar')).toBe(true);
+      expect(
+        await folders.isPathTrusted(
+          path.join(resolvedMyFolder, 'somefile.jpg'),
+        ),
+      ).toBe(true);
+      expect(
+        await folders.isPathTrusted('/trustedparent/someotherfolder'),
+      ).toBe(true);
+      expect(await folders.isPathTrusted('/trustedparent/trustme')).toBe(true);
 
       // No explicit rule covers this file
-      expect(folders.isPathTrusted('/secret/bankaccounts.json')).toBe(false);
-      expect(folders.isPathTrusted('/secret/mine/privatekey.pem')).toBe(false);
-      expect(folders.isPathTrusted('/user/someotherfolder')).toBe(undefined);
+      expect(await folders.isPathTrusted('/secret/bankaccounts.json')).toBe(
+        false,
+      );
+      expect(await folders.isPathTrusted('/secret/mine/privatekey.pem')).toBe(
+        false,
+      );
+      expect(await folders.isPathTrusted('/user/someotherfolder')).toBe(
+        undefined,
+      );
     });
 
-    it('prioritizes the longest matching path (precedence)', () => {
-      const folders = setup({
+    it('prioritizes the longest matching path (precedence)', async () => {
+      const folders = await setup({
         '/a': TrustLevel.TRUST_FOLDER,
         '/a/b': TrustLevel.DO_NOT_TRUST,
         '/a/b/c': TrustLevel.TRUST_FOLDER,
@@ -201,20 +211,20 @@ describe('Trusted Folders', () => {
         '/parent/trustme/butnotthis': TrustLevel.DO_NOT_TRUST,
       });
 
-      expect(folders.isPathTrusted('/a/b/c/d')).toBe(true);
-      expect(folders.isPathTrusted('/a/b/x')).toBe(false);
-      expect(folders.isPathTrusted('/a/x')).toBe(true);
-      expect(folders.isPathTrusted('/parent/trustme/butnotthis/file')).toBe(
-        false,
-      );
-      expect(folders.isPathTrusted('/parent/other')).toBe(true);
+      expect(await folders.isPathTrusted('/a/b/c/d')).toBe(true);
+      expect(await folders.isPathTrusted('/a/b/x')).toBe(false);
+      expect(await folders.isPathTrusted('/a/x')).toBe(true);
+      expect(
+        await folders.isPathTrusted('/parent/trustme/butnotthis/file'),
+      ).toBe(false);
+      expect(await folders.isPathTrusted('/parent/other')).toBe(true);
     });
   });
 
-  describe('setValue', () => {
+  describe('setValue', async () => {
     it('should update the user config and save it atomically', async () => {
       fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
-      const loadedFolders = loadTrustedFolders();
+      const loadedFolders = await loadTrustedFolders();
 
       await loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
 
@@ -230,7 +240,7 @@ describe('Trusted Folders', () => {
     it('should throw FatalConfigError if there were load errors', async () => {
       fs.writeFileSync(trustedFoldersPath, 'invalid json', 'utf-8');
 
-      const loadedFolders = loadTrustedFolders();
+      const loadedFolders = await loadTrustedFolders();
       expect(loadedFolders.errors.length).toBe(1);
 
       await expect(
@@ -241,7 +251,7 @@ describe('Trusted Folders', () => {
     it('should report corrupted config via coreEvents.emitFeedback and still succeed', async () => {
       // Initialize with valid JSON
       fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
-      const loadedFolders = loadTrustedFolders();
+      const loadedFolders = await loadTrustedFolders();
 
       // Corrupt the file after initial load
       fs.writeFileSync(trustedFoldersPath, 'invalid json', 'utf-8');
@@ -261,7 +271,7 @@ describe('Trusted Folders', () => {
     });
   });
 
-  describe('isWorkspaceTrusted Integration', () => {
+  describe('isWorkspaceTrusted Integration', async () => {
     const mockSettings: Settings = {
       security: {
         folderTrust: {
@@ -270,17 +280,17 @@ describe('Trusted Folders', () => {
       },
     };
 
-    it('should return true for a directly trusted folder', () => {
+    it('should return true for a directly trusted folder', async () => {
       const config = { '/projectA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectA')).toEqual({
+      expect(await isWorkspaceTrusted(mockSettings, '/projectA')).toEqual({
         isTrusted: true,
         source: 'file',
       });
     });
 
-    it('should return true for a child of a trusted folder', () => {
+    it('should return true for a child of a trusted folder', async () => {
       const config = { '/projectA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
@@ -290,7 +300,7 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should return true for a child of a trusted parent folder', () => {
+    it('should return true for a child of a trusted parent folder', async () => {
       const config = { '/projectB/somefile.txt': TrustLevel.TRUST_PARENT };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
@@ -300,7 +310,7 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should return false for a directly untrusted folder', () => {
+    it('should return false for a directly untrusted folder', async () => {
       const config = { '/untrusted': TrustLevel.DO_NOT_TRUST };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
@@ -310,23 +320,23 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should return false for a child of an untrusted folder', () => {
+    it('should return false for a child of an untrusted folder', async () => {
       const config = { '/untrusted': TrustLevel.DO_NOT_TRUST };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/untrusted/src').isTrusted).toBe(
-        false,
-      );
+      expect(
+        (await isWorkspaceTrusted(mockSettings, '/untrusted/src')).isTrusted,
+      ).toBe(false);
     });
 
-    it('should return undefined when no rules match', () => {
+    it('should return undefined when no rules match', async () => {
       fs.writeFileSync(trustedFoldersPath, '{}', 'utf-8');
       expect(
-        isWorkspaceTrusted(mockSettings, '/other').isTrusted,
+        (await isWorkspaceTrusted(mockSettings, '/other')).isTrusted,
       ).toBeUndefined();
     });
 
-    it('should prioritize specific distrust over parent trust', () => {
+    it('should prioritize specific distrust over parent trust', async () => {
       const config = {
         '/projectA': TrustLevel.TRUST_FOLDER,
         '/projectA/untrusted': TrustLevel.DO_NOT_TRUST,
@@ -339,7 +349,7 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should use workspaceDir instead of process.cwd() when provided', () => {
+    it('should use workspaceDir instead of process.cwd() when provided', async () => {
       const config = {
         '/projectA': TrustLevel.TRUST_FOLDER,
         '/untrusted': TrustLevel.DO_NOT_TRUST,
@@ -355,7 +365,7 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should handle path normalization', () => {
+    it('should handle path normalization', async () => {
       const config = { '/home/user/projectA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
@@ -367,7 +377,7 @@ describe('Trusted Folders', () => {
       });
     });
 
-    it('should prioritize IDE override over file config', () => {
+    it('should prioritize IDE override over file config', async () => {
       const config = { '/projectA': TrustLevel.DO_NOT_TRUST };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
@@ -383,7 +393,7 @@ describe('Trusted Folders', () => {
       }
     });
 
-    it('should return false when IDE override is false', () => {
+    it('should return false when IDE override is false', async () => {
       const config = { '/projectA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
@@ -399,7 +409,7 @@ describe('Trusted Folders', () => {
       }
     });
 
-    it('should throw FatalConfigError when the config file is invalid', () => {
+    it('should throw FatalConfigError when the config file is invalid', async () => {
       fs.writeFileSync(trustedFoldersPath, 'invalid json', 'utf-8');
 
       expect(() => isWorkspaceTrusted(mockSettings, '/any')).toThrow(
@@ -407,7 +417,7 @@ describe('Trusted Folders', () => {
       );
     });
 
-    it('should always return true if folderTrust setting is disabled', () => {
+    it('should always return true if folderTrust setting is disabled', async () => {
       const disabledSettings: Settings = {
         security: { folderTrust: { enabled: false } },
       };
@@ -418,7 +428,7 @@ describe('Trusted Folders', () => {
     });
   });
 
-  describe('isWorkspaceTrusted headless mode', () => {
+  describe('isWorkspaceTrusted headless mode', async () => {
     const mockSettings: Settings = {
       security: {
         folderTrust: {
@@ -444,44 +454,44 @@ describe('Trusted Folders', () => {
       const config = { '/projectA': TrustLevel.DO_NOT_TRUST };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectA').isTrusted).toBe(
-        false,
-      );
+      expect(
+        (await isWorkspaceTrusted(mockSettings, '/projectA')).isTrusted,
+      ).toBe(false);
     });
 
     it('should return true for isPathTrusted when isHeadlessMode is true', async () => {
       const geminiCore = await import('@google/gemini-cli-core');
       vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(true);
 
-      const folders = loadTrustedFolders();
-      expect(folders.isPathTrusted('/any-untrusted-path')).toBe(true);
+      const folders = await loadTrustedFolders();
+      expect(await folders.isPathTrusted('/any-untrusted-path')).toBe(true);
     });
   });
 
-  describe('Trusted Folders Caching', () => {
-    it('should cache the loaded folders object', () => {
+  describe('Trusted Folders Caching', async () => {
+    it('should cache the loaded folders object', async () => {
       // First call should load and cache
-      const folders1 = loadTrustedFolders();
+      const folders1 = await loadTrustedFolders();
 
       // Second call should return the same instance from cache
-      const folders2 = loadTrustedFolders();
+      const folders2 = await loadTrustedFolders();
       expect(folders1).toBe(folders2);
 
       // Resetting should clear the cache
       resetTrustedFoldersForTesting();
 
       // Third call should return a new instance
-      const folders3 = loadTrustedFolders();
+      const folders3 = await loadTrustedFolders();
       expect(folders3).not.toBe(folders1);
     });
   });
 
-  describe('invalid trust levels', () => {
-    it('should create a comprehensive error message for invalid trust level', () => {
+  describe('invalid trust levels', async () => {
+    it('should create a comprehensive error message for invalid trust level', async () => {
       const config = { '/user/folder': 'INVALID_TRUST_LEVEL' };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      const { errors } = loadTrustedFolders();
+      const { errors } = await loadTrustedFolders();
       const possibleValues = Object.values(TrustLevel).join(', ');
       expect(errors.length).toBe(1);
       expect(errors[0].message).toBe(
@@ -492,7 +502,7 @@ describe('Trusted Folders', () => {
 
   const itif = (condition: boolean) => (condition ? it : it.skip);
 
-  describe('Symlinks Support', () => {
+  describe('Symlinks Support', async () => {
     const mockSettings: Settings = {
       security: { folderTrust: { enabled: true } },
     };
@@ -500,7 +510,7 @@ describe('Trusted Folders', () => {
     // TODO: issue 19387 - Enable symlink tests on Windows
     itif(process.platform !== 'win32')(
       'should trust a folder if the rule matches the realpath',
-      () => {
+      async () => {
         // Create a real directory and a symlink
         const realDir = path.join(tempDir, 'real');
         const symlinkDir = path.join(tempDir, 'symlink');
@@ -512,15 +522,15 @@ describe('Trusted Folders', () => {
         fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
         // Check against symlink path
-        expect(isWorkspaceTrusted(mockSettings, symlinkDir).isTrusted).toBe(
-          true,
-        );
+        expect(
+          (await isWorkspaceTrusted(mockSettings, symlinkDir)).isTrusted,
+        ).toBe(true);
       },
     );
   });
 
-  describe('Verification: Auth and Trust Interaction', () => {
-    it('should verify loadEnvironment returns early when untrusted', () => {
+  describe('Verification: Auth and Trust Interaction', async () => {
+    it('should verify loadEnvironment returns early when untrusted', async () => {
       const untrustedDir = path.join(tempDir, 'untrusted');
       fs.mkdirSync(untrustedDir);
 
@@ -536,7 +546,7 @@ describe('Trusted Folders', () => {
         security: { folderTrust: { enabled: true } },
       });
 
-      loadEnvironment(settings.merged, untrustedDir);
+      await loadEnvironment(settings.merged, untrustedDir);
 
       expect(process.env['GEMINI_API_KEY']).toBe('');
 

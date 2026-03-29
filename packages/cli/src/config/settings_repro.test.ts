@@ -107,7 +107,7 @@ describe('Settings Repro', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}');
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });

@@ -112,7 +112,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     }
 
     const workspaceContext = config.getWorkspaceContext();
-    const trustedFolders = loadTrustedFolders();
+    const trustedFolders = await loadTrustedFolders();
     const errors = [...initialErrors];
     const added = [...trustedDirs];
 

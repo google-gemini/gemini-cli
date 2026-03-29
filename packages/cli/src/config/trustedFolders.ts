@@ -90,14 +90,18 @@ export function clearRealPathCacheForTesting(): void {
   realPathCache.clear();
 }
 
-function getRealPath(location: string): string {
+async function getRealPath(location: string): Promise<string> {
   let realPath = realPathCache.get(location);
   if (realPath !== undefined) {
     return realPath;
   }
 
   try {
-    realPath = fs.existsSync(location) ? fs.realpathSync(location) : location;
+    const exists = await fsPromises
+      .stat(location)
+      .then(() => true)
+      .catch(() => false);
+    realPath = exists ? await fsPromises.realpath(location) : location;
   } catch {
     realPath = location;
   }
@@ -126,18 +130,18 @@ export class LoadedTrustedFolders {
    * @param location path
    * @returns
    */
-  isPathTrusted(
+  async isPathTrusted(
     location: string,
     config?: Record<string, TrustLevel>,
     headlessOptions?: HeadlessModeOptions,
-  ): boolean | undefined {
+  ): Promise<boolean | undefined> {
     if (isHeadlessMode(headlessOptions)) {
       return true;
     }
     const configToUse = config ?? this.user.config;
 
     // Resolve location to its realpath for canonical comparison
-    const realLocation = getRealPath(location);
+    const realLocation = await getRealPath(location);
 
     let longestMatchLen = -1;
     let longestMatchTrust: TrustLevel | undefined = undefined;
@@ -149,7 +153,7 @@ export class LoadedTrustedFolders {
           : rulePath;
 
       // Resolve effectivePath to its realpath for canonical comparison
-      const realEffectivePath = getRealPath(effectivePath);
+      const realEffectivePath = await getRealPath(effectivePath);
 
       if (isWithinRoot(realLocation, realEffectivePath)) {
         if (rulePath.length > longestMatchLen) {
@@ -180,12 +184,20 @@ export class LoadedTrustedFolders {
     }
 
     const dirPath = path.dirname(this.user.path);
-    if (!fs.existsSync(dirPath)) {
+    const dirExists = await fsPromises
+      .stat(dirPath)
+      .then(() => true)
+      .catch(() => false);
+    if (!dirExists) {
       await fsPromises.mkdir(dirPath, { recursive: true });
     }
 
     // lockfile requires the file to exist
-    if (!fs.existsSync(this.user.path)) {
+    const fileExists = await fsPromises
+      .stat(this.user.path)
+      .then(() => true)
+      .catch(() => false);
+    if (!fileExists) {
       await fsPromises.writeFile(this.user.path, JSON.stringify({}, null, 2), {
         mode: 0o600,
       });
@@ -219,7 +231,7 @@ export class LoadedTrustedFolders {
       this.user.config[folderPath] = trustLevel;
 
       try {
-        saveTrustedFolders({ ...this.user, config });
+        await saveTrustedFolders({ ...this.user, config });
       } catch (e) {
         // Revert the in-memory change if the save failed.
         if (originalTrustLevel === undefined) {
@@ -246,7 +258,7 @@ export function resetTrustedFoldersForTesting(): void {
   clearRealPathCacheForTesting();
 }
 
-export function loadTrustedFolders(): LoadedTrustedFolders {
+export async function loadTrustedFolders(): Promise<LoadedTrustedFolders> {
   if (loadedTrustedFolders) {
     return loadedTrustedFolders;
   }
@@ -256,8 +268,12 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
 
   const userPath = getTrustedFoldersPath();
   try {
-    if (fs.existsSync(userPath)) {
-      const content = fs.readFileSync(userPath, 'utf-8');
+    const fileExists = await fsPromises
+      .stat(userPath)
+      .then(() => true)
+      .catch(() => false);
+    if (fileExists) {
+      const content = await fsPromises.readFile(userPath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const parsed = parseTrustedFoldersJson(content) as Record<string, string>;
 
@@ -298,29 +314,37 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   return loadedTrustedFolders;
 }
 
-export function saveTrustedFolders(
+export async function saveTrustedFolders(
   trustedFoldersFile: TrustedFoldersFile,
-): void {
+): Promise<void> {
   // Ensure the directory exists
   const dirPath = path.dirname(trustedFoldersFile.path);
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+  const dirExists = await fsPromises
+    .stat(dirPath)
+    .then(() => true)
+    .catch(() => false);
+  if (!dirExists) {
+    await fsPromises.mkdir(dirPath, { recursive: true });
   }
 
   const content = JSON.stringify(trustedFoldersFile.config, null, 2);
   const tempPath = `${trustedFoldersFile.path}.tmp.${crypto.randomUUID()}`;
 
   try {
-    fs.writeFileSync(tempPath, content, {
+    await fsPromises.writeFile(tempPath, content, {
       encoding: 'utf-8',
       mode: 0o600,
     });
-    fs.renameSync(tempPath, trustedFoldersFile.path);
+    await fsPromises.rename(tempPath, trustedFoldersFile.path);
   } catch (error) {
     // Clean up temp file if it was created but rename failed
-    if (fs.existsSync(tempPath)) {
+    const tempExists = await fsPromises
+      .stat(tempPath)
+      .then(() => true)
+      .catch(() => false);
+    if (tempExists) {
       try {
-        fs.unlinkSync(tempPath);
+        await fsPromises.unlink(tempPath);
       } catch {
         // Ignore cleanup errors
       }
@@ -335,12 +359,12 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
   return folderTrustSetting;
 }
 
-function getWorkspaceTrustFromLocalConfig(
+async function getWorkspaceTrustFromLocalConfig(
   workspaceDir: string,
   trustConfig?: Record<string, TrustLevel>,
   headlessOptions?: HeadlessModeOptions,
-): TrustResult {
-  const folders = loadTrustedFolders();
+): Promise<TrustResult> {
+  const folders = await loadTrustedFolders();
   const configToUse = trustConfig ?? folders.user.config;
 
   if (folders.errors.length > 0) {
@@ -352,7 +376,7 @@ function getWorkspaceTrustFromLocalConfig(
     );
   }
 
-  const isTrusted = folders.isPathTrusted(
+  const isTrusted = await folders.isPathTrusted(
     workspaceDir,
     configToUse,
     headlessOptions,
@@ -363,12 +387,12 @@ function getWorkspaceTrustFromLocalConfig(
   };
 }
 
-export function isWorkspaceTrusted(
+export async function isWorkspaceTrusted(
   settings: Settings,
   workspaceDir: string = process.cwd(),
   trustConfig?: Record<string, TrustLevel>,
   headlessOptions?: HeadlessModeOptions,
-): TrustResult {
+): Promise<TrustResult> {
   if (isHeadlessMode(headlessOptions)) {
     return { isTrusted: true, source: undefined };
   }

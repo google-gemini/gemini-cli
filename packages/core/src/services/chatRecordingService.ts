@@ -139,6 +139,7 @@ export class ChatRecordingService {
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private context: AgentLoopContext;
+  private writePromise: Promise<void> = Promise.resolve();
 
   constructor(context: AgentLoopContext) {
     this.context = context;
@@ -176,12 +177,13 @@ export class ChatRecordingService {
       } else {
         // Create new session
         this.sessionId = this.context.promptId;
-        let chatsDir = path.join(
+        const chatsDir = path.join(
           this.context.config.storage.getProjectTempDir(),
           'chats',
         );
 
-        // subagents are nested under the complete parent session id
+        // Subagents are nested under the complete parent session id
+        let chatsTargetDir = chatsDir;
         if (this.kind === 'subagent' && this.context.parentSessionId) {
           const safeParentId = sanitizeFilenamePart(
             this.context.parentSessionId,
@@ -191,10 +193,14 @@ export class ChatRecordingService {
               `Invalid parentSessionId after sanitization: ${this.context.parentSessionId}`,
             );
           }
-          chatsDir = path.join(chatsDir, safeParentId);
+          chatsTargetDir = path.join(chatsDir, safeParentId);
         }
 
-        fs.mkdirSync(chatsDir, { recursive: true });
+        // We use Sync here ONLY for the initial directory creation during bootstrap.
+        // Subsequent writes are all async via the queue.
+        if (!fs.existsSync(chatsTargetDir)) {
+          fs.mkdirSync(chatsTargetDir, { recursive: true });
+        }
 
         const timestamp = new Date()
           .toISOString()
@@ -216,7 +222,7 @@ export class ChatRecordingService {
             8,
           )}.json`;
         }
-        this.conversationFile = path.join(chatsDir, filename);
+        this.conversationFile = path.join(chatsTargetDir, filename);
 
         this.writeConversation({
           sessionId: this.sessionId,
@@ -474,6 +480,7 @@ export class ChatRecordingService {
       return this.cachedConversation;
     }
     try {
+      // For initial read during bootstrap, sync is acceptable.
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.cachedConversation = JSON.parse(this.cachedLastConvData);
@@ -511,45 +518,56 @@ export class ChatRecordingService {
 
   /**
    * Saves the conversation record; overwrites the file.
+   * Now uses a background write queue to prevent blocking.
    */
   private writeConversation(
     conversation: ConversationRecord,
     { allowEmpty = false }: { allowEmpty?: boolean } = {},
   ): void {
-    try {
-      if (!this.conversationFile) return;
-      // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0 && !allowEmpty) return;
+    if (!this.conversationFile) return;
+    // Don't write the file yet until there's at least one message.
+    if (conversation.messages.length === 0 && !allowEmpty) return;
 
-      const newContent = JSON.stringify(conversation, null, 2);
-      // Skip the disk write if nothing actually changed (e.g.
-      // updateMessagesFromHistory found no matching tool calls to update).
-      // Compare before updating lastUpdated so the timestamp doesn't
-      // cause a false diff.
-      if (this.cachedLastConvData === newContent) return;
-      this.cachedConversation = conversation;
-      conversation.lastUpdated = new Date().toISOString();
-      const contentToWrite = JSON.stringify(conversation, null, 2);
-      this.cachedLastConvData = contentToWrite;
-      // Ensure directory exists before writing (handles cases where temp dir was cleaned)
-      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-      fs.writeFileSync(this.conversationFile, contentToWrite);
-    } catch (error) {
-      // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (error as NodeJS.ErrnoException).code === 'ENOSPC'
-      ) {
-        this.conversationFile = null;
-        this.cachedConversation = null;
-        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
-        return; // Don't throw - allow the conversation to continue
+    const newContent = JSON.stringify(conversation, null, 2);
+    // Skip the disk write if nothing actually changed
+    if (this.cachedLastConvData === newContent) return;
+
+    this.cachedConversation = conversation;
+    conversation.lastUpdated = new Date().toISOString();
+    const contentToWrite = JSON.stringify(conversation, null, 2);
+    this.cachedLastConvData = contentToWrite;
+
+    // Chain the write to the promise queue
+    this.writePromise = this.writePromise.then(async () => {
+      try {
+        const chatsDir = path.dirname(this.conversationFile!);
+        const dirExists = await fs.promises
+          .stat(chatsDir)
+          .then(() => true)
+          .catch(() => false);
+        if (!dirExists) {
+          await fs.promises.mkdir(chatsDir, { recursive: true });
+        }
+        await fs.promises.writeFile(this.conversationFile!, contentToWrite);
+      } catch (error) {
+        // Handle disk full (ENOSPC) gracefully
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (error as NodeJS.ErrnoException).code === 'ENOSPC'
+        ) {
+          this.conversationFile = null;
+          this.cachedConversation = null;
+          debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+          return;
+        }
+        debugLogger.error(
+          'Error writing conversation file in background.',
+          error,
+        );
       }
-      debugLogger.error('Error writing conversation file.', error);
-      throw error;
-    }
+    });
   }
 
   /**

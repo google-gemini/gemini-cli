@@ -219,13 +219,13 @@ export const directoryCommand: SlashCommand = {
         }
 
         if (isFolderTrustEnabled(settings.merged)) {
-          const trustedFolders = loadTrustedFolders();
+          const trustedFolders = await loadTrustedFolders();
           const dirsToConfirm: string[] = [];
           const trustedDirs: string[] = [];
 
           for (const pathToAdd of pathsToProcess) {
             const expandedPath = path.resolve(expandHomeDir(pathToAdd.trim()));
-            const isTrusted = trustedFolders.isPathTrusted(expandedPath);
+            const isTrusted = await trustedFolders.isPathTrusted(expandedPath);
             // If explicitly trusted, add immediately.
             // If undefined or explicitly untrusted (DO_NOT_TRUST), prompt for confirmation.
             // This allows users to "upgrade" a DO_NOT_TRUST folder to trusted via the dialog.

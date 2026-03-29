@@ -150,7 +150,7 @@ describe('extensionUpdates', () => {
       mode: 0o755,
     } as unknown as fs.Stats);
     vi.mocked(fs.promises.chmod).mockResolvedValue(undefined);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });

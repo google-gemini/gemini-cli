@@ -214,13 +214,13 @@ export class ExtensionManager extends ExtensionLoader {
     let localSourcePath: string | undefined;
     let extension: GeminiCLIExtension | null;
     try {
-      if (!isWorkspaceTrusted(this.settings).isTrusted) {
+      if (!(await isWorkspaceTrusted(this.settings)).isTrusted) {
         if (
           await this.requestConsent(
             `The current workspace at "${this.workspaceDir}" is not trusted. Do you want to trust this workspace to install extensions?`,
           )
         ) {
-          const trustedFolders = loadTrustedFolders();
+          const trustedFolders = await loadTrustedFolders();
           await trustedFolders.setValue(
             this.workspaceDir,
             TrustLevel.TRUST_FOLDER,
@@ -771,7 +771,7 @@ Would you like to attempt to install via "git clone" instead?`,
           extensionId,
           ExtensionSettingScope.USER,
         );
-        if (isWorkspaceTrusted(this.settings).isTrusted) {
+        if ((await isWorkspaceTrusted(this.settings)).isTrusted) {
           workspaceSettings = await getScopedEnvContents(
             config,
             extensionId,

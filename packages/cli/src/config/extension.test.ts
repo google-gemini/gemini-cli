@@ -209,7 +209,7 @@ describe('extension tests', () => {
     mockPromptForSettings.mockResolvedValue('');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: undefined,
     });
@@ -1361,7 +1361,7 @@ name = "yolo-checker"
     });
 
     it('should prompt for trust if workspace is not trusted', async () => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(isWorkspaceTrusted).mockResolvedValue({
         isTrusted: false,
         source: undefined,
       });
@@ -1383,7 +1383,7 @@ name = "yolo-checker"
     });
 
     it('should not install if user denies trust', async () => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(isWorkspaceTrusted).mockResolvedValue({
         isTrusted: false,
         source: undefined,
       });
@@ -1420,7 +1420,7 @@ name = "yolo-checker"
         '.gemini',
         'trustedFolders.json',
       );
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(isWorkspaceTrusted).mockResolvedValue({
         isTrusted: false,
         source: undefined,
       });

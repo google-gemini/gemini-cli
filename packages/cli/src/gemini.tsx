@@ -45,10 +45,10 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import {
-  loadSettings,
   SettingScope,
   type DnsResolutionOrder,
   type LoadedSettings,
+  loadSettingsAsync,
 } from './config/settings.js';
 import {
   loadTrustedFolders,
@@ -215,7 +215,7 @@ export async function main() {
   });
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
-  const settings = loadSettings();
+  const settings = await loadSettingsAsync();
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
@@ -235,7 +235,7 @@ export async function main() {
     cleanupToolOutputFiles(settings.merged),
     cleanupBackgroundLogs(),
   ])
-    .catch((e) => {
+    .catch((e: unknown) => {
       debugLogger.error('Early cleanup failed:', e);
     })
     .finally(() => {
@@ -254,7 +254,7 @@ export async function main() {
     coreEvents.emitFeedback('warning', error.message);
   });
 
-  const trustedFolders = loadTrustedFolders();
+  const trustedFolders = await loadTrustedFolders();
   trustedFolders.errors.forEach((error: TrustedFoldersError) => {
     coreEvents.emitFeedback(
       'warning',

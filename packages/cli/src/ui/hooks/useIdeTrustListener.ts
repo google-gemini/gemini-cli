@@ -76,16 +76,20 @@ export function useIdeTrustListener() {
   const isIdeTrusted = useSyncExternalStore(subscribe, getSnapshot);
 
   useEffect(() => {
-    const currentTrust = isWorkspaceTrusted(settings.merged).isTrusted;
-    // Trigger a restart if the overall trust status for the CLI has changed,
-    // but not on the initial trust value.
-    if (
-      previousTrust.current !== undefined &&
-      previousTrust.current !== currentTrust
-    ) {
-      setNeedsRestart(true);
-    }
-    previousTrust.current = currentTrust;
+    // isWorkspaceTrusted is async, so we wrap the logic in an async IIFE
+    void (async () => {
+      const currentTrust = (await isWorkspaceTrusted(settings.merged))
+        .isTrusted;
+      // Trigger a restart if the overall trust status for the CLI has changed,
+      // but not on the initial trust value.
+      if (
+        previousTrust.current !== undefined &&
+        previousTrust.current !== currentTrust
+      ) {
+        setNeedsRestart(true);
+      }
+      previousTrust.current = currentTrust;
+    })();
   }, [isIdeTrusted, settings.merged]);
 
   return { isIdeTrusted, needsRestart, restartReason };

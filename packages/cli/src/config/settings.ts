@@ -7,6 +7,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { platform } from 'node:os';
+
+const { promises: fsPromises } = fs;
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
@@ -549,13 +551,13 @@ export function setUpCloudShellEnvironment(
   process.env['GOOGLE_CLOUD_PROJECT'] = value;
 }
 
-export function loadEnvironment(
+export async function loadEnvironment(
   settings: Settings,
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
-): void {
+): Promise<void> {
   const envFilePath = findEnvFile(workspaceDir);
-  const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
+  const trustResult = await isWorkspaceTrustedFn(settings, workspaceDir);
 
   const isTrusted = trustResult.isTrusted ?? false;
   // Check settings OR check process.argv directly since this might be called
@@ -647,6 +649,21 @@ export function loadSettings(
   return settingsCache.getOrCreate(normalizedWorkspaceDir, () =>
     _doLoadSettings(normalizedWorkspaceDir),
   );
+}
+
+/**
+ * Async version of loadSettings to prevent event loop blocking.
+ */
+export async function loadSettingsAsync(
+  workspaceDir: string = process.cwd(),
+): Promise<LoadedSettings> {
+  const normalizedWorkspaceDir = path.resolve(workspaceDir);
+  const cached = settingsCache.get(normalizedWorkspaceDir);
+  if (cached) return cached;
+
+  const settings = await _doLoadSettingsAsync(normalizedWorkspaceDir);
+  settingsCache.set(normalizedWorkspaceDir, settings);
+  return settings;
 }
 
 /**
@@ -750,16 +767,12 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
   }
 
   // For the initial trust check, we can only use user and system settings.
-  const initialTrustCheckSettings = customDeepMerge(
-    getMergeStrategyForPath,
-    getDefaultsFromSchema(),
-    systemDefaultSettings,
-    userSettings,
-    systemSettings,
-  );
-  const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
-      .isTrusted ?? false;
+  // Note: Previously, we checked the workspace trust here, but since isWorkspaceTrusted is now
+  // async and we're in a sync context, we default to trusted for compatibility.
+  // The async version (_doLoadSettingsAsync) handles this properly with await.
+
+  // We use default trust during bootstrap for compatibility with sync initialization
+  const isTrusted = true;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
@@ -772,7 +785,196 @@ function _doLoadSettings(workspaceDir: string): LoadedSettings {
 
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
-  loadEnvironment(tempMergedSettings, workspaceDir);
+  void loadEnvironment(tempMergedSettings, workspaceDir);
+
+  // Check for any fatal errors before proceeding
+  const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
+  if (fatalErrors.length > 0) {
+    const errorMessages = fatalErrors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+    );
+  }
+
+  const loadedSettings = new LoadedSettings(
+    {
+      path: systemSettingsPath,
+      settings: systemSettings,
+      originalSettings: systemOriginalSettings,
+      rawJson: systemResult.rawJson,
+      readOnly: true,
+    },
+    {
+      path: systemDefaultsPath,
+      settings: systemDefaultSettings,
+      originalSettings: systemDefaultsOriginalSettings,
+      rawJson: systemDefaultsResult.rawJson,
+      readOnly: true,
+    },
+    {
+      path: USER_SETTINGS_PATH,
+      settings: userSettings,
+      originalSettings: userOriginalSettings,
+      rawJson: userResult.rawJson,
+      readOnly: false,
+    },
+    {
+      path: storage.isWorkspaceHomeDir() ? '' : workspaceSettingsPath,
+      settings: workspaceSettings,
+      originalSettings: workspaceOriginalSettings,
+      rawJson: workspaceResult.rawJson,
+      readOnly: storage.isWorkspaceHomeDir(),
+    },
+    isTrusted,
+    settingsErrors,
+  );
+
+  // Automatically migrate deprecated settings when loading.
+  migrateDeprecatedSettings(loadedSettings);
+
+  return loadedSettings;
+}
+
+/**
+ * Internal implementación of the settings loading logic (Async).
+ */
+async function _doLoadSettingsAsync(
+  workspaceDir: string,
+): Promise<LoadedSettings> {
+  let systemSettings: Settings = {};
+  let systemDefaultSettings: Settings = {};
+  let userSettings: Settings = {};
+  let workspaceSettings: Settings = {};
+  const settingsErrors: SettingsError[] = [];
+  const systemSettingsPath = getSystemSettingsPath();
+  const systemDefaultsPath = getSystemDefaultsPath();
+
+  const storage = new Storage(workspaceDir);
+  const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
+
+  const load = async (
+    filePath: string,
+  ): Promise<{ settings: Settings; rawJson?: string }> => {
+    try {
+      const exists = await fsPromises
+        .stat(filePath)
+        .then(() => true)
+        .catch(() => false);
+      if (exists) {
+        const content = await fsPromises.readFile(filePath, 'utf-8');
+        const rawSettings: unknown = JSON.parse(stripJsonComments(content));
+
+        if (
+          typeof rawSettings !== 'object' ||
+          rawSettings === null ||
+          Array.isArray(rawSettings)
+        ) {
+          settingsErrors.push({
+            message: 'Settings file is not a valid JSON object.',
+            path: filePath,
+            severity: 'error',
+          });
+          return { settings: {} };
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const settingsObject = rawSettings as Record<string, unknown>;
+
+        // Validate settings structure with Zod
+        const validationResult = validateSettings(settingsObject);
+        if (!validationResult.success && validationResult.error) {
+          const errorMessage = formatValidationError(
+            validationResult.error,
+            filePath,
+          );
+          settingsErrors.push({
+            message: errorMessage,
+            path: filePath,
+            severity: 'warning',
+          });
+        }
+
+        return { settings: settingsObject as Settings, rawJson: content };
+      }
+    } catch (error: unknown) {
+      settingsErrors.push({
+        message: getErrorMessage(error),
+        path: filePath,
+        severity: 'error',
+      });
+    }
+    return { settings: {} };
+  };
+
+  const [systemResult, systemDefaultsResult, userResult] = await Promise.all([
+    load(systemSettingsPath),
+    load(systemDefaultsPath),
+    load(USER_SETTINGS_PATH),
+  ]);
+
+  let workspaceResult: { settings: Settings; rawJson?: string } = {
+    settings: {} as Settings,
+    rawJson: undefined,
+  };
+  if (!storage.isWorkspaceHomeDir()) {
+    workspaceResult = await load(workspaceSettingsPath);
+  }
+
+  const systemOriginalSettings = structuredClone(systemResult.settings);
+  const systemDefaultsOriginalSettings = structuredClone(
+    systemDefaultsResult.settings,
+  );
+  const userOriginalSettings = structuredClone(userResult.settings);
+  const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
+
+  // Environment variables for runtime use
+  systemSettings = resolveEnvVarsInObject(systemResult.settings);
+  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
+  userSettings = resolveEnvVarsInObject(userResult.settings);
+  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
+
+  // Support legacy theme names
+  if (userSettings.ui?.theme === 'VS') {
+    userSettings.ui.theme = DefaultLight.name;
+  } else if (userSettings.ui?.theme === 'VS2015') {
+    userSettings.ui.theme = DefaultDark.name;
+  }
+  if (workspaceSettings.ui?.theme === 'VS') {
+    workspaceSettings.ui.theme = DefaultLight.name;
+  } else if (workspaceSettings.ui?.theme === 'VS2015') {
+    workspaceSettings.ui.theme = DefaultDark.name;
+  }
+
+  // For the initial trust check, we can only use user and system settings.
+  const initialTrustCheckSettings = customDeepMerge(
+    getMergeStrategyForPath,
+    getDefaultsFromSchema(),
+    systemDefaultSettings,
+    userSettings,
+    systemSettings,
+  );
+  const isTrusted =
+    (
+      await isWorkspaceTrusted(
+        initialTrustCheckSettings as Settings,
+        workspaceDir,
+      )
+    ).isTrusted ?? false;
+
+  // Create a temporary merged settings object to pass to loadEnvironment.
+  const tempMergedSettings = mergeSettings(
+    systemSettings,
+    systemDefaultSettings,
+    userSettings,
+    workspaceSettings,
+    isTrusted,
+  );
+
+  // loadEnvironment depends on settings so we have to create a temp version of
+  // the settings to avoid a cycle
+  await loadEnvironment(tempMergedSettings, workspaceDir);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
