@@ -1,9 +1,0 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
-
-exports[`<SubagentGroupDisplay /> > renders collapsed view by default with correct agent counts and states 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ≡ 2 Agents (1 running, 1 completed)... (ctrl+o to expand)                    │
-│ ! api-monitor · Action Required Verify server is running                     │
-│ ✓ db-manager · 💭 Completed successfully                                     │
-"
-`;
