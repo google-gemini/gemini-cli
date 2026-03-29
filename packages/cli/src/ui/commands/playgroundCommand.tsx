@@ -140,7 +140,27 @@ export const PlaygroundApp = () => {
   );
 };
 
+import { SettingsContext } from '../contexts/SettingsContext.js';
+import { KeypressProvider } from '../contexts/KeypressContext.js';
+import { loadSettings } from '../../config/settings.js';
+import { loadCliConfig } from '../../config/config.js';
+
 export async function startPlayground() {
-  const { waitUntilExit } = render(<PlaygroundApp />);
+  const workspaceDir = process.cwd();
+  const settings = loadSettings(workspaceDir);
+  const config = await loadCliConfig(
+    settings.merged,
+    'playground-session',
+    {} as any,
+    { cwd: workspaceDir }
+  );
+
+  const { waitUntilExit } = render(
+    <SettingsContext.Provider value={settings}>
+      <KeypressProvider config={config}>
+        <PlaygroundApp />
+      </KeypressProvider>
+    </SettingsContext.Provider>
+  );
   await waitUntilExit();
 }
