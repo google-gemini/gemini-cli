@@ -35,13 +35,13 @@ describe('telemetry_gcp.js', () => {
   beforeEach(() => {
     vi.resetModules(); // This is key to re-run the script
     vi.clearAllMocks();
-    process.env.OTLP_GOOGLE_CLOUD_PROJECT = 'test-project';
+    vi.stubEnv('OTLP_GOOGLE_CLOUD_PROJECT', 'test-project');
     // Clear the env var before each test
-    delete process.env.GEMINI_CLI_CREDENTIALS_PATH;
+    vi.stubEnv('GEMINI_CLI_CREDENTIALS_PATH', '');
   });
 
   afterEach(() => {
-    delete process.env.OTLP_GOOGLE_CLOUD_PROJECT;
+    vi.unstubAllEnvs();
   });
 
   it('should not set GOOGLE_APPLICATION_CREDENTIALS when env var is not set', async () => {
