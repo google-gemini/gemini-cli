@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, getWorkspaceDirs } from './config.js';
+import { CoderAgentEvent, type AgentSettings } from '../types.js';
 import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
@@ -613,5 +614,95 @@ describe('loadConfig', () => {
         );
       });
     });
+  });
+});
+
+describe('getWorkspaceDirs', () => {
+  const originalCwd = process.cwd();
+
+  beforeEach(() => {
+    delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+    delete process.env['CODER_AGENT_WORKSPACE_PATHS'];
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns cwd when no paths are set', () => {
+    const dirs = getWorkspaceDirs(undefined);
+    expect(dirs).toEqual([originalCwd]);
+  });
+
+  it('returns single path from CODER_AGENT_WORKSPACE_PATH', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/single-path';
+    const dirs = getWorkspaceDirs(undefined);
+    expect(dirs).toEqual([path.resolve('/tmp/single-path')]);
+  });
+
+  it('returns multiple paths from CODER_AGENT_WORKSPACE_PATHS', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATHS'] =
+      `/tmp/path1${path.delimiter}/tmp/path2`;
+    const dirs = getWorkspaceDirs(undefined);
+    expect(dirs).toEqual([
+      path.resolve('/tmp/path1'),
+      path.resolve('/tmp/path2'),
+    ]);
+  });
+
+  it('returns paths from AgentSettings if within Trusted Roots (Env)', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/root';
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: '/tmp/root/sub/path',
+      workspacePaths: ['/tmp/root/another'],
+    };
+    const dirs = getWorkspaceDirs(settings);
+    // order: Valid AgentSettings (workspacePaths, then workspacePath), then Trusted Roots (Env)
+    expect(dirs).toEqual([
+      path.resolve('/tmp/root/another'),
+      path.resolve('/tmp/root/sub/path'),
+      path.resolve('/tmp/root'),
+    ]);
+  });
+
+  it('discards AgentSettings paths outside Trusted Roots', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/allowed';
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: '/etc/passwd', // Unauthorized
+      workspacePaths: ['/tmp/allowed/ok', '/tmp/forbidden'], // One ok, one forbidden
+    };
+    const dirs = getWorkspaceDirs(settings);
+    expect(dirs).toEqual([
+      path.resolve('/tmp/allowed/ok'),
+      path.resolve('/tmp/allowed'),
+    ]);
+    expect(dirs).not.toContain(path.resolve('/etc/passwd'));
+    expect(dirs).not.toContain(path.resolve('/tmp/forbidden'));
+  });
+
+  it('allows AgentSettings paths under process.cwd() if no env roots are set', () => {
+    const subDir = path.join(originalCwd, 'subdir');
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: subDir,
+    };
+    const dirs = getWorkspaceDirs(settings);
+    expect(dirs).toEqual([path.resolve(subDir), path.resolve(originalCwd)]);
+  });
+
+  it('deduplicates paths across AgentSettings and Env', () => {
+    process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/root';
+    const settings: AgentSettings = {
+      kind: CoderAgentEvent.StateAgentSettingsEvent,
+      workspacePath: '/tmp/root', // Duplicate of env
+      workspacePaths: ['/tmp/root/sub'],
+    };
+    const dirs = getWorkspaceDirs(settings);
+    expect(dirs).toEqual([
+      path.resolve('/tmp/root/sub'),
+      path.resolve('/tmp/root'),
+    ]);
   });
 });

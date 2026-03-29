@@ -144,9 +144,12 @@ async function handleExecuteCommand(
     const commandToExecute = commandRegistry.get(command);
 
     if (commandToExecute?.requiresWorkspace) {
-      if (!process.env['CODER_AGENT_WORKSPACE_PATH']) {
+      if (
+        !process.env['CODER_AGENT_WORKSPACE_PATH'] &&
+        !process.env['CODER_AGENT_WORKSPACE_PATHS']
+      ) {
         return res.status(400).json({
-          error: `Command "${command}" requires a workspace, but CODER_AGENT_WORKSPACE_PATH is not set.`,
+          error: `Command "${command}" requires a workspace, but neither CODER_AGENT_WORKSPACE_PATH nor CODER_AGENT_WORKSPACE_PATHS is set.`,
         });
       }
     }
@@ -195,7 +198,8 @@ async function handleExecuteCommand(
 export async function createApp() {
   try {
     // Load the server configuration once on startup.
-    const workspaceRoot = setTargetDir(undefined);
+    const workspaceRoots = setTargetDir(undefined);
+    const workspaceRoot = workspaceRoots[0] ?? process.cwd();
     loadEnvironment();
     const settings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
@@ -203,6 +207,7 @@ export async function createApp() {
       settings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
+      undefined,
     );
 
     let git: GitService | undefined;
