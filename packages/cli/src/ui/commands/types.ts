@@ -126,6 +126,7 @@ export interface OpenDialogActionReturn {
     | 'settings'
     | 'sessionBrowser'
     | 'model'
+    | 'voice-model'
     | 'agentConfig'
     | 'permissions';
 }
