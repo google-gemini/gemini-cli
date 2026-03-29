@@ -15,7 +15,11 @@ import {
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  SHELL_PARAM_IS_BACKGROUND,
   SHELL_TOOL_NAME,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -30,8 +34,9 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
-  sandbox?: SandboxMode;
+  sandbox?: SandboxOptions;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
@@ -54,6 +59,7 @@ export interface PrimaryWorkflowsOptions {
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
+  taskTracker?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -61,9 +67,15 @@ export interface OperationalGuidelinesOptions {
   isGemini3: boolean;
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
+  memoryManagerEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
+
+export interface SandboxOptions {
+  mode: SandboxMode;
+  toolSandboxingEnabled: boolean;
+}
 
 export interface GitRepoOptions {
   interactive: boolean;
@@ -77,6 +89,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
+  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -112,6 +125,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -280,8 +295,9 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 `.trim();
 }
 
-export function renderSandbox(mode?: SandboxMode): string {
-  if (!mode) return '';
+export function renderSandbox(options?: SandboxOptions): string {
+  if (!options || !options.mode) return '';
+  const mode = options.mode;
   if (mode === 'macos-seatbelt') {
     return `
 # macOS Seatbelt
@@ -290,11 +306,12 @@ You are running under macos seatbelt with limited access to files outside the pr
     return `
 # Sandbox
 You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
-  } else {
+  } else if (mode === 'outside') {
     return `
 # Outside of Sandbox
 You are running outside of a sandbox container, directly on the user's system. For critical commands that are particularly likely to modify the user's system outside of the project directory or system temp directory, as you explain the command to the user (per the Explain Critical Commands rule above), also remind the user to consider enabling sandboxing.`.trim();
   }
+  return '';
 }
 
 export function renderInteractiveYoloMode(enabled?: boolean): string {
@@ -454,6 +471,20 @@ An approved plan is available for this task.
 `;
 }
 
+export function renderTaskTracker(): string {
+  return `
+# TASK MANAGEMENT PROTOCOL
+You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\`${TRACKER_CREATE_TASK_TOOL_NAME}\`, \`${TRACKER_LIST_TASKS_TOOL_NAME}\`, \`${TRACKER_UPDATE_TASK_TOOL_NAME}\`) for all state management.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \`${TRACKER_CREATE_TASK_TOOL_NAME}\`.
+3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
+4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the \`${TRACKER_CREATE_TASK_TOOL_NAME}\` tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
+5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
+6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+}
+
 // --- Leaf Helpers (Strictly strings or simple calls) ---
 
 function mandateConfirm(interactive: boolean): string {
@@ -494,14 +525,24 @@ Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions 
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
+  if (options.approvedPlan && options.taskTracker) {
+    return `2. **Plan:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan.`;
+  }
   if (options.approvedPlan) {
     return `2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+  }
+
+  if (options.enableCodebaseInvestigator && options.taskTracker) {
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableCodebaseInvestigator && options.enableWriteTodosTool) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableCodebaseInvestigator) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
+  }
+  if (options.taskTracker) {
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableWriteTodosTool) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
@@ -599,12 +640,12 @@ function toolUsageInteractive(
   interactiveShellEnabled: boolean,
 ): string {
   if (interactive) {
-    const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+    const focusHint = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `tab` to focus into the shell to provide input.'
       : '';
     return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
+    - **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true.
+    - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${focusHint}`;
   }
   return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
@@ -614,8 +655,12 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
+  if (options.memoryManagerEnabled) {
+    return `
+- **Memory Tool:** You MUST use the '${MEMORY_TOOL_NAME}' tool to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
+  }
   const base = `
-- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
+- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases, or a workflow like "always lint after editing"). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
   const suffix = options.interactive
     ? ' If unsure whether to save something, you can ask the user, "Should I remember that for you?"'
     : '';

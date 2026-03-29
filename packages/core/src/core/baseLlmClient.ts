@@ -18,9 +18,18 @@ import { handleFallback } from '../fallback/handler.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { logMalformedJsonResponse } from '../telemetry/loggers.js';
-import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import {
+  logMalformedJsonResponse,
+  logNetworkRetryAttempt,
+} from '../telemetry/loggers.js';
+import {
+  MalformedJsonResponseEvent,
+  LlmRole,
+  NetworkRetryAttemptEvent,
+} from '../telemetry/types.js';
+import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
+import { coreEvents } from '../utils/events.js';
+import { getDisplayString } from '../config/models.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   applyModelSelection,
@@ -327,6 +336,32 @@ export class BaseLlmClient {
           : undefined,
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
+        retryFetchErrors: this.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) => {
+          const actualMaxAttempts =
+            availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+          const modelName = getDisplayString(currentModel);
+          const errorType = getRetryErrorType(error);
+
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts: actualMaxAttempts,
+            delayMs,
+            error: errorType,
+            model: modelName,
+          });
+
+          logNetworkRetryAttempt(
+            this.config,
+            new NetworkRetryAttemptEvent(
+              attempt,
+              actualMaxAttempts,
+              errorType,
+              delayMs,
+              modelName,
+            ),
+          );
+        },
       });
     } catch (error) {
       if (abortSignal?.aborted) {

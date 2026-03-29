@@ -13,8 +13,12 @@ import {
   afterAll,
   vi,
 } from 'vitest';
-import type { RipGrepToolParams } from './ripGrep.js';
-import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
+import {
+  canUseRipgrep,
+  RipGrepTool,
+  ensureRgPath,
+  type RipGrepToolParams,
+} from './ripGrep.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -23,8 +27,7 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
@@ -350,7 +353,7 @@ describe('RipGrepTool', () => {
       },
       {
         name: 'pattern, path, and include',
-        params: { pattern: 'hello', dir_path: '.', include: '*.txt' },
+        params: { pattern: 'hello', dir_path: '.', include_pattern: '*.txt' },
         expected: null,
       },
     ])(
@@ -526,7 +529,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: 'hello', include: '*.js' };
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        include_pattern: '*.js',
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -564,7 +570,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
         dir_path: 'sub',
-        include: '*.js',
+        include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1314,7 +1320,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = {
         pattern: 'content',
-        include: '*.{ts,tsx}',
+        include_pattern: '*.{ts,tsx}',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1350,7 +1356,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = {
         pattern: 'code',
-        include: 'src/**',
+        include_pattern: 'src/**',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1774,7 +1780,7 @@ describe('RipGrepTool', () => {
       },
       {
         name: 'pattern and include',
-        params: { pattern: 'testPattern', include: '*.ts' },
+        params: { pattern: 'testPattern', include_pattern: '*.ts' },
         expected: "'testPattern' in *.ts within ./",
       },
       {
@@ -1849,7 +1855,7 @@ describe('RipGrepTool', () => {
       await fs.mkdir(dirPath, { recursive: true });
       const params: RipGrepToolParams = {
         pattern: 'testPattern',
-        include: '*.ts',
+        include_pattern: '*.ts',
         dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);
@@ -2021,6 +2027,32 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('fileA.txt');
       expect(result.llmContent).not.toContain('fileB.txt');
       expect(result.llmContent).toContain('Copyright 2025 Google LLC');
+    });
+
+    it('should truncate excessively long lines', async () => {
+      const longString = 'a'.repeat(3000);
+      mockSpawn.mockImplementation(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'longline.txt' },
+                line_number: 1,
+                lines: { text: `Target match ${longString}\n` },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'Target match', context: 0 };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // MAX_LINE_LENGTH_TEXT_FILE is 2000. It should be truncated.
+      expect(result.llmContent).toContain('... [truncated]');
+      expect(result.llmContent).not.toContain(longString);
     });
   });
 });

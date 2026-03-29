@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
 
@@ -18,14 +18,13 @@ const GeneralistAgentSchema = z.object({
  * It uses the same core system prompt as the main agent but in a non-interactive mode.
  */
 export const GeneralistAgent = (
-  config: Config,
+  context: AgentLoopContext,
 ): LocalAgentDefinition<typeof GeneralistAgentSchema> => ({
   kind: 'local',
   name: 'generalist',
   displayName: 'Generalist Agent',
   description:
-    "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
-  experimental: true,
+    'A general-purpose AI agent with access to all tools. Highly recommended for tasks that are turn-intensive or involve processing large amounts of data. Use this to keep the main session history lean and efficient. Excellent for: batch refactoring/error fixing across multiple files, running commands with high-volume output, and speculative investigations.',
   inputConfig: {
     inputSchema: {
       type: 'object',
@@ -47,7 +46,7 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    const tools = config.getToolRegistry().getAllToolNames();
+    const tools = context.toolRegistry.getAllToolNames();
     return {
       tools,
     };
@@ -55,7 +54,7 @@ export const GeneralistAgent = (
   get promptConfig() {
     return {
       systemPrompt: getCoreSystemPrompt(
-        config,
+        context.config,
         /*useMemory=*/ undefined,
         /*interactiveOverride=*/ false,
       ),

@@ -6,8 +6,7 @@
 
 import { GoogleAuth } from 'google-auth-library';
 import { GoogleCredentialProvider } from './google-auth-provider.js';
-import type { Mock } from 'vitest';
-import { vi, describe, beforeEach, it, expect } from 'vitest';
+import { vi, describe, beforeEach, it, expect, type Mock } from 'vitest';
 import type { MCPServerConfig } from '../config/config.js';
 
 vi.mock('google-auth-library');
@@ -178,6 +177,7 @@ describe('GoogleCredentialProvider', () => {
     it('should prioritize config headers over quota project ID', async () => {
       mockClient['quotaProjectId'] = 'quota-project-id';
       const configWithHeaders = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...validConfig,
         headers: {
           'X-Goog-User-Project': 'config-project-id',
@@ -194,6 +194,7 @@ describe('GoogleCredentialProvider', () => {
     it('should prioritize config headers over quota project ID (case-insensitive)', async () => {
       mockClient['quotaProjectId'] = 'quota-project-id';
       const configWithHeaders = {
+        // eslint-disable-next-line @typescript-eslint/no-misused-spread
         ...validConfig,
         headers: {
           'x-goog-user-project': 'config-project-id',

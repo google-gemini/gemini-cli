@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 167
+  // Next ID: 195
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -53,6 +53,22 @@ export enum EventMetadataKey {
 
   // Logs the output format of the session.
   GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
+  // ==========================================================================
+  // Startup Stats Event Keys
+  // ==========================================================================
+
+  // Logs the array of startup phases.
+  GEMINI_CLI_STARTUP_PHASES = 172,
+
+  // Logs the OS platform for startup stats.
+  GEMINI_CLI_STARTUP_OS_PLATFORM = 173,
+
+  // Logs the OS release for startup stats.
+  GEMINI_CLI_STARTUP_OS_RELEASE = 174,
+
+  // Logs whether the CLI is running in docker for startup stats.
+  GEMINI_CLI_STARTUP_IS_DOCKER = 175,
 
   // ==========================================================================
   // User Prompt Event Keys
@@ -137,6 +153,21 @@ export enum EventMetadataKey {
   // Logs the tool use token count of the API call.
   GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT = 29,
 
+  // Logs the token count for system instructions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS = 167,
+
+  // Logs the token count for tool definitions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS = 168,
+
+  // Logs the token count for conversation history.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY = 169,
+
+  // Logs the token count for tool calls (JSON map of tool name to tokens).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS = 170,
+
+  // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
+
   // ==========================================================================
   // GenAI API Error Event Keys
   // ===========================================================================
@@ -199,6 +230,18 @@ export enum EventMetadataKey {
 
   // Logs the repository name of the GitHub Action that triggered the session.
   GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
+
+  // Logs the event name of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_EVENT_NAME = 176,
+
+  // Logs the Pull Request number if the workflow is operating on a PR.
+  GEMINI_CLI_GH_PR_NUMBER = 177,
+
+  // Logs the Issue number if the workflow is operating on an Issue.
+  GEMINI_CLI_GH_ISSUE_NUMBER = 178,
+
+  // Logs a custom tracking string (e.g. a comma-separated list of issue IDs for scheduled batches).
+  GEMINI_CLI_GH_CUSTOM_TRACKING_ID = 179,
 
   // ==========================================================================
   // Loop Detected Event Keys
@@ -408,6 +451,9 @@ export enum EventMetadataKey {
 
   // Logs the name of extensions as a comma-separated string
   GEMINI_CLI_START_SESSION_EXTENSION_IDS = 120,
+
+  // Logs whether the session is running in a Git worktree.
+  GEMINI_CLI_START_SESSION_WORKTREE_ACTIVE = 191,
 
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
@@ -631,4 +677,52 @@ export enum EventMetadataKey {
 
   // Logs the error message for Conseca events.
   CONSECA_ERROR = 166,
+
+  // ==========================================================================
+  // Network Retry Event Keys
+  // ==========================================================================
+
+  // Logs the attempt number for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ATTEMPT_NUMBER = 180,
+
+  // Logs the delay in milliseconds for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_DELAY_MS = 181,
+
+  // Logs the error type for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE = 182,
+
+  // ==========================================================================
+  // Billing / AI Credits Event Keys
+  // ==========================================================================
+
+  // Logs the model associated with a billing event.
+  GEMINI_CLI_BILLING_MODEL = 185,
+
+  // Logs the number of AI credits consumed in a request.
+  GEMINI_CLI_BILLING_CREDITS_CONSUMED = 186,
+
+  // Logs the remaining AI credits after a request.
+  GEMINI_CLI_BILLING_CREDITS_REMAINING = 187,
+
+  // Logs the overage option selected by the user (e.g. use_credits, use_fallback, manage, stop).
+  GEMINI_CLI_BILLING_SELECTED_OPTION = 188,
+
+  // Logs the user's credit balance when the overage menu was shown.
+  GEMINI_CLI_BILLING_CREDIT_BALANCE = 189,
+
+  // Logs the source of a credit purchase click (e.g. overage_menu, empty_wallet_menu, manage).
+  GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
+
+  // ==========================================================================
+  // Gemini Enterprise (GE) Event Keys
+  // ==========================================================================
+
+  // Logs the start of the onboarding process.
+  GEMINI_CLI_ONBOARDING_START = 192,
+
+  // Logs the user tier for onboarding success events.
+  GEMINI_CLI_ONBOARDING_USER_TIER = 193,
+
+  // Logs the duration of the onboarding process in milliseconds.
+  GEMINI_CLI_ONBOARDING_DURATION_MS = 194,
 }

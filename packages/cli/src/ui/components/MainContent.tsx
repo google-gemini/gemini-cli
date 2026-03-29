@@ -7,8 +7,10 @@
 import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
+
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import {
   SCROLL_TO_ITEM_END,
@@ -19,6 +21,7 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
+import { isTopicTool } from './messages/TopicMessage.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -34,6 +37,7 @@ export const MainContent = () => {
 
   const confirmingTool = useConfirmingTool();
   const showConfirmationQueue = confirmingTool !== null;
+  const confirmingToolCallId = confirmingTool?.tool.callId;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
@@ -41,12 +45,13 @@ export const MainContent = () => {
     if (showConfirmationQueue) {
       scrollableListRef.current?.scrollToEnd();
     }
-  }, [showConfirmationQueue, confirmingTool]);
+  }, [showConfirmationQueue, confirmingToolCallId]);
 
   const {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
+    availableTerminalHeight,
     cleanUiDetailsVisible,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
@@ -61,11 +66,65 @@ export const MainContent = () => {
     return -1;
   }, [uiState.history]);
 
+  const settings = useSettings();
+  const topicUpdateNarrationEnabled =
+    settings.merged.experimental?.topicUpdateNarration === true;
+
+  const suppressNarrationFlags = useMemo(() => {
+    const combinedHistory = [...uiState.history, ...pendingHistoryItems];
+    const flags = new Array<boolean>(combinedHistory.length).fill(false);
+
+    if (topicUpdateNarrationEnabled) {
+      let toolGroupInTurn = false;
+      for (let i = combinedHistory.length - 1; i >= 0; i--) {
+        const item = combinedHistory[i];
+        if (item.type === 'user' || item.type === 'user_shell') {
+          toolGroupInTurn = false;
+        } else if (item.type === 'tool_group') {
+          toolGroupInTurn = item.tools.some((t) => isTopicTool(t.name));
+        } else if (
+          (item.type === 'thinking' ||
+            item.type === 'gemini' ||
+            item.type === 'gemini_content') &&
+          toolGroupInTurn
+        ) {
+          flags[i] = true;
+        }
+      }
+    }
+    return flags;
+  }, [uiState.history, pendingHistoryItems, topicUpdateNarrationEnabled]);
+
+  const augmentedHistory = useMemo(
+    () =>
+      uiState.history.map((item, i) => {
+        const prevType = i > 0 ? uiState.history[i - 1]?.type : undefined;
+        const isFirstThinking =
+          item.type === 'thinking' && prevType !== 'thinking';
+        const isFirstAfterThinking =
+          item.type !== 'thinking' && prevType === 'thinking';
+
+        return {
+          item,
+          isExpandable: i > lastUserPromptIndex,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration: suppressNarrationFlags[i] ?? false,
+        };
+      }),
+    [uiState.history, lastUserPromptIndex, suppressNarrationFlags],
+  );
+
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h, index) => {
-        const isExpandable = index > lastUserPromptIndex;
-        return (
+      augmentedHistory.map(
+        ({
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }) => (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
@@ -74,21 +133,23 @@ export const MainContent = () => {
                 : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={h.id}
-            item={h}
+            key={item.id}
+            item={item}
             isPending={false}
             commands={uiState.slashCommands}
             isExpandable={isExpandable}
+            isFirstThinking={isFirstThinking}
+            isFirstAfterThinking={isFirstAfterThinking}
+            suppressNarration={suppressNarration}
           />
-        );
-      }),
+        ),
+      ),
     [
-      uiState.history,
+      augmentedHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
-      lastUserPromptIndex,
     ],
   );
 
@@ -104,45 +165,78 @@ export const MainContent = () => {
 
   const pendingItems = useMemo(
     () => (
-      <Box flexDirection="column">
-        {pendingHistoryItems.map((item, i) => (
-          <HistoryItemDisplay
-            key={i}
-            availableTerminalHeight={
-              uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
-            }
-            terminalWidth={mainAreaWidth}
-            item={{ ...item, id: 0 }}
-            isPending={true}
-            isExpandable={true}
-          />
-        ))}
+      <Box flexDirection="column" key="pending-items-group">
+        {pendingHistoryItems.map((item, i) => {
+          const prevType =
+            i === 0
+              ? uiState.history.at(-1)?.type
+              : pendingHistoryItems[i - 1]?.type;
+          const isFirstThinking =
+            item.type === 'thinking' && prevType !== 'thinking';
+          const isFirstAfterThinking =
+            item.type !== 'thinking' && prevType === 'thinking';
+
+          const suppressNarration =
+            suppressNarrationFlags[uiState.history.length + i] ?? false;
+
+          return (
+            <HistoryItemDisplay
+              key={`pending-${i}`}
+              availableTerminalHeight={
+                uiState.constrainHeight ? availableTerminalHeight : undefined
+              }
+              terminalWidth={mainAreaWidth}
+              item={{ ...item, id: -(i + 1) }}
+              isPending={true}
+              isExpandable={true}
+              isFirstThinking={isFirstThinking}
+              isFirstAfterThinking={isFirstAfterThinking}
+              suppressNarration={suppressNarration}
+            />
+          );
+        })}
         {showConfirmationQueue && confirmingTool && (
-          <ToolConfirmationQueue confirmingTool={confirmingTool} />
+          <ToolConfirmationQueue
+            key="confirmation-queue"
+            confirmingTool={confirmingTool}
+          />
         )}
       </Box>
     ),
     [
       pendingHistoryItems,
       uiState.constrainHeight,
-      staticAreaMaxItemHeight,
+      availableTerminalHeight,
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
+      uiState.history,
+      suppressNarrationFlags,
     ],
   );
 
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item, index) => ({
-        type: 'history' as const,
-        item,
-        isExpandable: index > lastUserPromptIndex,
-      })),
+      ...augmentedHistory.map(
+        ({
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }) => ({
+          type: 'history' as const,
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressNarration,
+        }),
+      ),
       { type: 'pending' as const },
     ],
-    [uiState.history, lastUserPromptIndex],
+    [augmentedHistory],
   );
 
   const renderItem = useCallback(
@@ -170,6 +264,9 @@ export const MainContent = () => {
             isPending={false}
             commands={uiState.slashCommands}
             isExpandable={item.isExpandable}
+            isFirstThinking={item.isFirstThinking}
+            isFirstAfterThinking={item.isFirstAfterThinking}
+            suppressNarration={item.suppressNarration}
           />
         );
       } else {

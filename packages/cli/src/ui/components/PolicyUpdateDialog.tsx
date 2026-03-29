@@ -5,18 +5,21 @@
  */
 
 import { Box, Text } from 'ink';
-import { useCallback, useRef } from 'react';
 import type React from 'react';
+import { useCallback, useRef } from 'react';
 import {
+  PolicyIntegrityManager,
   type Config,
   type PolicyUpdateConfirmationRequest,
-  PolicyIntegrityManager,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 export enum PolicyUpdateChoice {
   ACCEPT = 'accept',
@@ -34,6 +37,7 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
   request,
   onClose,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const isProcessing = useRef(false);
 
   const handleSelect = useCallback(

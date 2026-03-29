@@ -97,7 +97,7 @@ export function useToolScheduler(
   const scheduler = useMemo(
     () =>
       new Scheduler({
-        config,
+        context: config,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
         schedulerId: ROOT_SCHEDULER_ID,
@@ -115,6 +115,8 @@ export function useToolScheduler(
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
+      const isRoot = event.schedulerId === ROOT_SCHEDULER_ID;
+
       // Update output timer for UI spinners (Side Effect)
       const hasExecuting = event.toolCalls.some(
         (tc) =>
@@ -130,10 +132,33 @@ export function useToolScheduler(
       }
 
       setToolCallsMap((prev) => {
-        const adapted = internalAdaptToolCalls(
-          event.toolCalls,
-          prev[event.schedulerId] ?? [],
-        );
+        const prevCalls = prev[event.schedulerId] ?? [];
+        const prevCallIds = new Set(prevCalls.map((tc) => tc.request.callId));
+
+        // For non-root schedulers, we only show tool calls that:
+        // 1. Are currently awaiting approval.
+        // 2. Were previously shown (e.g., they are now executing or completed).
+        // This prevents "thinking" tools (reads/searches) from flickering in the UI
+        // unless they specifically required user interaction.
+        const filteredToolCalls = isRoot
+          ? event.toolCalls
+          : event.toolCalls.filter(
+              (tc) =>
+                tc.status === CoreToolCallStatus.AwaitingApproval ||
+                prevCallIds.has(tc.request.callId),
+            );
+
+        // If this is a subagent and we have no tools to show and weren't showing any,
+        // we can skip the update entirely to avoid unnecessary re-renders.
+        if (
+          !isRoot &&
+          filteredToolCalls.length === 0 &&
+          prevCalls.length === 0
+        ) {
+          return prev;
+        }
+
+        const adapted = internalAdaptToolCalls(filteredToolCalls, prevCalls);
 
         return {
           ...prev,

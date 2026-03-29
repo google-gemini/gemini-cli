@@ -19,9 +19,8 @@ import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
 } from './trustedFolders.js';
-import { loadEnvironment } from './settings.js';
+import { loadEnvironment, type Settings } from './settings.js';
 import { createMockSettings } from '../test-utils/settings.js';
-import type { Settings } from './settings.js';
 
 // We explicitly do NOT mock 'fs' or 'proper-lockfile' here to ensure
 // we are testing the actual behavior on the real file system.
@@ -506,7 +505,7 @@ describe('Trusted Folders', () => {
         const realDir = path.join(tempDir, 'real');
         const symlinkDir = path.join(tempDir, 'symlink');
         fs.mkdirSync(realDir);
-        fs.symlinkSync(realDir, symlinkDir);
+        fs.symlinkSync(realDir, symlinkDir, 'dir');
 
         // Rule uses realpath
         const config = { [realDir]: TrustLevel.TRUST_FOLDER };

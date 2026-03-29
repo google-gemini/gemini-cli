@@ -14,7 +14,7 @@ import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
   history?: HistoryType;
-  clientHistory?: Content[];
+  clientHistory?: readonly Content[];
   commitHash?: string;
   toolCall: {
     name: string;

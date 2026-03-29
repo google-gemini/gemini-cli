@@ -5,25 +5,26 @@
  */
 
 import type { Config } from '../config/config.js';
-import { HookRegistry } from './hookRegistry.js';
+import { HookRegistry, type HookRegistryEntry } from './hookRegistry.js';
 import { HookRunner } from './hookRunner.js';
-import { HookAggregator } from './hookAggregator.js';
+import { HookAggregator, type AggregatedHookResult } from './hookAggregator.js';
 import { HookPlanner } from './hookPlanner.js';
 import { HookEventHandler } from './hookEventHandler.js';
-import type { HookRegistryEntry } from './hookRegistry.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type {
-  SessionStartSource,
-  SessionEndReason,
-  PreCompressTrigger,
-  DefaultHookOutput,
-  BeforeModelHookOutput,
-  AfterModelHookOutput,
-  BeforeToolSelectionHookOutput,
-  McpToolContext,
+import {
+  NotificationType,
+  type SessionStartSource,
+  type SessionEndReason,
+  type PreCompressTrigger,
+  type DefaultHookOutput,
+  type BeforeModelHookOutput,
+  type AfterModelHookOutput,
+  type BeforeToolSelectionHookOutput,
+  type McpToolContext,
+  type HookConfig,
+  type HookEventName,
+  type ConfigSource,
 } from './types.js';
-import { NotificationType } from './types.js';
-import type { AggregatedHookResult } from './hookAggregator.js';
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
@@ -200,6 +201,17 @@ export class HookSystem {
    */
   getAllHooks(): HookRegistryEntry[] {
     return this.hookRegistry.getAllHooks();
+  }
+
+  /**
+   * Register a new hook programmatically
+   */
+  registerHook(
+    config: HookConfig,
+    eventName: HookEventName,
+    options?: { matcher?: string; sequential?: boolean; source?: ConfigSource },
+  ): void {
+    this.hookRegistry.registerHook(config, eventName, options);
   }
 
   /**

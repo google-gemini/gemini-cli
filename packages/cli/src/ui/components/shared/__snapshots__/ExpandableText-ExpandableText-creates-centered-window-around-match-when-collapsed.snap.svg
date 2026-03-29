@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="54" viewBox="0 0 920 54">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="54" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#e5e5e5" textLength="621" lengthAdjust="spacingAndGlyphs">...ry/long/path/that/keeps/going/cd_/very/long/path/that/keeps/going/</text>
+    <rect x="621" y="0" width="99" height="17" fill="#e5e5e5" />
+    <text x="621" y="2" fill="#000000" textLength="99" lengthAdjust="spacingAndGlyphs">search-here</text>
+    <text x="720" y="2" fill="#e5e5e5" textLength="180" lengthAdjust="spacingAndGlyphs">/and/then/some/more/</text>
+    <text x="0" y="19" fill="#e5e5e5" textLength="450" lengthAdjust="spacingAndGlyphs">components//and/then/some/more/components//and/...</text>
+  </g>
+</svg>

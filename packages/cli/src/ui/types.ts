@@ -15,13 +15,21 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type Kind,
+  type AnsiOutput,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export { CoreToolCallStatus };
+export type {
+  ThoughtSummary,
+  SkillDefinition,
+  SerializableConfirmationDetails,
+  ToolResultDisplay,
+};
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -85,6 +93,16 @@ export function mapCoreStatusToDisplayStatus(
   }
 }
 
+/**
+ * --- TYPE GUARDS ---
+ */
+
+export const isTodoList = (res: unknown): res is { todos: unknown[] } =>
+  typeof res === 'object' && res !== null && 'todos' in res;
+
+export const isAnsiOutput = (res: unknown): res is AnsiOutput =>
+  Array.isArray(res) && (res.length === 0 || Array.isArray(res[0]));
+
 export interface ToolCallEvent {
   type: 'tool_call';
   status: CoreToolCallStatus;
@@ -98,10 +116,15 @@ export interface ToolCallEvent {
 
 export interface IndividualToolCallDisplay {
   callId: string;
+  parentCallId?: string;
   name: string;
+  args?: Record<string, unknown>;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
+  // True when the tool was initiated directly by the user (slash/@/shell flows).
+  isClientInitiated?: boolean;
+  kind?: Kind;
   confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
@@ -109,8 +132,9 @@ export interface IndividualToolCallDisplay {
   correlationId?: string;
   approvalMode?: ApprovalMode;
   progressMessage?: string;
-  progressPercent?: number;
   originalRequestName?: string;
+  progress?: number;
+  progressTotal?: number;
 }
 
 export interface CompressionProps {
@@ -147,6 +171,7 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  secondaryText?: string;
   icon?: string;
   color?: string;
   marginBottom?: number;
@@ -200,6 +225,7 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {
@@ -336,6 +362,7 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
       isPersistentDisabled: boolean;
     }
   >;
+  errors: Record<string, string>;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
@@ -343,22 +370,6 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
-export type HistoryItemHooksList = HistoryItemBase & {
-  type: 'hooks_list';
-  hooks: Array<{
-    config: { command?: string; type: string; timeout?: number };
-    source: string;
-    eventName: string;
-    matcher?: string;
-    sequential?: boolean;
-    enabled: boolean;
-  }>;
-};
-
-// Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
-// type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
-// 'tools' in historyItem.
-// Individually exported types extending HistoryItemBase
 export type HistoryItemWithoutId =
   | HistoryItemUser
   | HistoryItemUserShell
@@ -383,8 +394,7 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint
-  | HistoryItemHooksList;
+  | HistoryItemHint;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -408,7 +418,6 @@ export enum MessageType {
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
-  HOOKS_LIST = 'hooks_list',
   HINT = 'hint',
 }
 
@@ -488,6 +497,7 @@ export type SlashCommandProcessorResult =
       type: 'schedule_tool';
       toolName: string;
       toolArgs: Record<string, unknown>;
+      postSubmitPrompt?: PartListUnion;
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
@@ -511,6 +521,7 @@ export interface PermissionConfirmationRequest {
 export interface ActiveHook {
   name: string;
   eventName: string;
+  source?: string;
   index?: number;
   total?: number;
 }

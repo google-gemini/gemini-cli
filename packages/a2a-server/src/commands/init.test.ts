@@ -6,7 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InitCommand } from './init.js';
-import { performInit } from '@google/gemini-cli-core';
+import {
+  performInit,
+  type CommandActionReturn,
+  type Config,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CoderAgentExecutor } from '../agent/executor.js';
@@ -14,7 +18,6 @@ import { CoderAgentEvent } from '../types.js';
 import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { CommandContext } from './types.js';
-import type { CommandActionReturn, Config } from '@google/gemini-cli-core';
 import { logger } from '../utils/logger.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

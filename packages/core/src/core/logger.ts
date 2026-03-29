@@ -27,7 +27,7 @@ export interface LogEntry {
 }
 
 export interface Checkpoint {
-  history: Content[];
+  history: readonly Content[];
   authType?: AuthType;
 }
 

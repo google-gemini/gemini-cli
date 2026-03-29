@@ -4,10 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { WebSearchToolParams } from './web-search.js';
-import { WebSearchTool } from './web-search.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import { WebSearchTool, type WebSearchToolParams } from './web-search.js';
 import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
@@ -25,6 +31,9 @@ describe('WebSearchTool', () => {
   beforeEach(() => {
     const mockConfigInstance = {
       getGeminiClient: () => mockGeminiClient,
+      get geminiClient() {
+        return mockGeminiClient;
+      },
       getProxy: () => undefined,
       generationConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({
@@ -33,6 +42,12 @@ describe('WebSearchTool', () => {
         })),
       },
     } as unknown as Config;
+    (
+      mockConfigInstance as unknown as { config: Config; promptId: string }
+    ).config = mockConfigInstance;
+    (
+      mockConfigInstance as unknown as { config: Config; promptId: string }
+    ).promptId = 'test-prompt-id';
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     tool = new WebSearchTool(mockConfigInstance, createMockMessageBus());
   });

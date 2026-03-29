@@ -45,13 +45,13 @@ import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   type ShellExecutionResult,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { EOL } from 'node:os';
 import * as path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
@@ -95,6 +95,13 @@ describe('ShellTool', () => {
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      geminiClient: {
+        stripThoughtsFromHistory: vi.fn(),
+      },
+
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
@@ -129,8 +136,11 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      getShellBackgroundCompletionBehavior: vi.fn().mockReturnValue('silent'),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      getSandboxEnabled: vi.fn().mockReturnValue(false),
       sanitizationConfig: {},
+      sandboxManager: new NoopSandboxManager(),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -264,22 +274,62 @@ describe('ShellTool', () => {
 
       // Simulate pgrep output file creation by the shell command
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${EOL}54322${EOL}`);
+      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\n${'my-command &'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
       expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
+    it('should add a space when command ends with a backslash to prevent escaping newline', async () => {
+      const invocation = shellTool.build({ command: 'ls\\' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `(\nls\\ \n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
+    });
+
+    it('should handle trailing comments correctly by placing them on their own line', async () => {
+      const invocation = shellTool.build({ command: 'ls # comment' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `(\nls # comment\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.any(Object),
+      );
     });
 
     it('should use the provided absolute directory as cwd', async () => {
@@ -293,14 +343,18 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -314,14 +368,18 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `(\n${'ls'}\n); __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -367,7 +425,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat', sanitizationConfig: {} },
+          {
+            pager: 'cat',
+            sanitizationConfig: {},
+            sandboxManager: new NoopSandboxManager(),
+          },
         );
       },
       20000,
@@ -442,7 +504,7 @@ describe('ShellTool', () => {
         mockConfig,
         { model: 'summarizer-shell' },
         expect.any(String),
-        mockConfig.getGeminiClient(),
+        mockConfig.geminiClient,
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');
@@ -641,6 +703,39 @@ describe('ShellTool', () => {
       );
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).not.toContain('Efficiency Guidelines:');
+    });
+  });
+
+  describe('getDisplayTitle and getExplanation', () => {
+    it('should return only the command for getDisplayTitle', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+        dir_path: 'foo/bar',
+        is_background: true,
+      });
+      expect(invocation.getDisplayTitle?.()).toBe('echo hello');
+    });
+
+    it('should return the context for getExplanation', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+        description: 'prints hello',
+        dir_path: 'foo/bar',
+        is_background: true,
+      });
+      expect(invocation.getExplanation?.()).toBe(
+        '[in foo/bar] (prints hello) [background]',
+      );
+    });
+
+    it('should construct explanation without optional parameters', () => {
+      const invocation = shellTool.build({
+        command: 'echo hello',
+      });
+      expect(invocation.getExplanation?.()).toBe(
+        `[current working directory ${process.cwd()}]`,
+      );
     });
   });
 

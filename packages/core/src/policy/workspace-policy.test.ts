@@ -34,7 +34,7 @@ describe('Workspace-Level Policies', () => {
     vi.doUnmock('node:fs/promises');
   });
 
-  it('should load workspace policies with correct priority (Tier 2)', async () => {
+  it('should load workspace policies with correct priority (Tier 3)', async () => {
     const workspacePoliciesDir = '/mock/workspace/policies';
     const defaultPoliciesDir = '/mock/default/policies';
 
@@ -98,21 +98,21 @@ priority = 10
 toolName = "test_tool"
 decision = "deny"
 priority = 10
-`; // Tier 3 -> 3.010
+`; // Tier 4 -> 4.010
       }
       if (path.includes('workspace.toml')) {
         return `[[rule]]
 toolName = "test_tool"
 decision = "allow"
 priority = 10
-`; // Tier 2 -> 2.010
+`; // Tier 3 -> 3.010
       }
       if (path.includes('admin.toml')) {
         return `[[rule]]
 toolName = "test_tool"
 decision = "deny"
 priority = 10
-`; // Tier 4 -> 4.010
+`; // Tier 5 -> 5.010
       }
       return '';
     });
@@ -144,9 +144,9 @@ priority = 10
 
     // Check for all 4 rules
     const defaultRule = rules?.find((r) => r.priority === 1.01);
-    const workspaceRule = rules?.find((r) => r.priority === 2.01);
-    const userRule = rules?.find((r) => r.priority === 3.01);
-    const adminRule = rules?.find((r) => r.priority === 4.01);
+    const workspaceRule = rules?.find((r) => r.priority === 3.01);
+    const userRule = rules?.find((r) => r.priority === 4.01);
+    const adminRule = rules?.find((r) => r.priority === 5.01);
 
     expect(defaultRule).toBeDefined();
     expect(userRule).toBeDefined();
@@ -224,7 +224,7 @@ priority=10`,
     expect(rules![0].priority).toBe(1.01);
   });
 
-  it('should load workspace policies and correctly transform to Tier 2', async () => {
+  it('should load workspace policies and correctly transform to Tier 3', async () => {
     const workspacePoliciesDir = '/mock/workspace/policies';
 
     // Mock FS
@@ -284,7 +284,7 @@ priority=500`,
 
     const rule = config.rules?.find((r) => r.toolName === 'p_tool');
     expect(rule).toBeDefined();
-    // Workspace Tier (2) + 500/1000 = 2.5
-    expect(rule?.priority).toBe(2.5);
+    // Workspace Tier (3) + 500/1000 = 3.5
+    expect(rule?.priority).toBe(3.5);
   });
 });

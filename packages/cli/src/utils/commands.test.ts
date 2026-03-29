@@ -20,7 +20,7 @@ const mockCommands: readonly SlashCommand[] = [
     name: 'commit',
     description: 'Commit changes',
     action: async () => {},
-    kind: CommandKind.FILE,
+    kind: CommandKind.USER_FILE,
   },
   {
     name: 'memory',
