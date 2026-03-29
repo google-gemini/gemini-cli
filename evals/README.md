@@ -184,6 +184,29 @@ merges.
 6. Include a reviewer-ready PR summary with the problem statement, fix approach,
    exact commands run, and residual risks.
 
+## Quality PR Evidence Template
+
+When opening a quality-focused PR related to behavioral evals, include a concise
+evidence section in your PR description so reviewers can validate quickly and
+consistently.
+
+```md
+## Eval Evidence
+
+- Related issue: #<issue-number>
+- Target behavior gap: <one sentence>
+- Commands run:
+  - <command 1>
+  - <command 2>
+- Local rerun results: <for example, 3/3 passes>
+- Nightly evidence (if available): <workflow/run link>
+- Policy impact: <USUALLY_PASSES or ALWAYS_PASSES, and why>
+- Residual risk: <one sentence>
+```
+
+Keep this section factual and brief. Link to logs/runs instead of pasting long
+output blocks.
+
 ## Ensuring Eval is Stable Prior to Check-in
 
 The
