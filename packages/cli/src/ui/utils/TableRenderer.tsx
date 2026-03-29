@@ -5,20 +5,19 @@
  */
 
 import React, { useMemo } from 'react';
-import { styledCharsToString } from '@alcalzone/ansi-tokenize';
-import {
-  Text,
-  Box,
-  type StyledChar,
-  toStyledCharacters,
-  styledCharsWidth,
-  wordBreakStyledChars,
-  wrapStyledChars,
-  widestLineFromStyledChars,
-} from 'ink';
+import { Text, Box } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { parseMarkdownToANSI } from './markdownParsingUtils.js';
 import { stripUnsafeCharacters } from './textUtils.js';
+import {
+  type StyleSpan,
+  parseToStyleSpans,
+  styleSpansWidth,
+  styleSpansToString,
+  wordBreakStyleSpans,
+  wrapStyleSpans,
+  widestLineFromStyleSpans,
+} from './styleSpans.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -31,23 +30,21 @@ const COLUMN_PADDING = 2;
 const TABLE_MARGIN = 2;
 
 /**
- * Parses markdown to StyledChar array by first converting to ANSI.
- * This ensures character counts are accurate (markdown markers are removed
- * and styles are applied to the character's internal style object).
+ * Parses markdown to StyleSpan array by first converting to ANSI.
  */
-const parseMarkdownToStyledChars = (
+const parseMarkdownToStyleSpans = (
   text: string,
   defaultColor?: string,
-): StyledChar[] => {
+): StyleSpan[] => {
   const ansi = parseMarkdownToANSI(text, defaultColor);
-  return toStyledCharacters(ansi);
+  return parseToStyleSpans(ansi);
 };
 
-const calculateWidths = (styledChars: StyledChar[]) => {
-  const contentWidth = styledCharsWidth(styledChars);
+const calculateWidths = (styleSpans: StyleSpan[]) => {
+  const contentWidth = styleSpansWidth(styleSpans);
 
-  const words: StyledChar[][] = wordBreakStyledChars(styledChars);
-  const maxWordWidth = widestLineFromStyledChars(words);
+  const words: StyleSpan[][] = wordBreakStyleSpans(styleSpans);
+  const maxWordWidth = widestLineFromStyleSpans(words);
 
   return { contentWidth, maxWordWidth };
 };
@@ -70,7 +67,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const styledHeaders = useMemo(
     () =>
       headers.map((header) =>
-        parseMarkdownToStyledChars(
+        parseMarkdownToStyleSpans(
           stripUnsafeCharacters(header),
           theme.text.link,
         ),
@@ -82,7 +79,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     () =>
       rows.map((row) =>
         row.map((cell) =>
-          parseMarkdownToStyledChars(
+          parseMarkdownToStyleSpans(
             stripUnsafeCharacters(cell),
             theme.text.primary,
           ),
@@ -100,14 +97,14 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // --- Define Constraints per Column ---
     const constraints = Array.from({ length: numColumns }).map(
       (_, colIndex) => {
-        const headerStyledChars = styledHeaders[colIndex] || [];
+        const headerStyleSpans = styledHeaders[colIndex] || [];
         let { contentWidth: maxContentWidth, maxWordWidth } =
-          calculateWidths(headerStyledChars);
+          calculateWidths(headerStyleSpans);
 
         styledRows.forEach((row) => {
-          const cellStyledChars = row[colIndex] || [];
+          const cellStyleSpans = row[colIndex] || [];
           const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
-            calculateWidths(cellStyledChars);
+            calculateWidths(cellStyleSpans);
 
           maxContentWidth = Math.max(maxContentWidth, cellWidth);
           maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
@@ -174,30 +171,27 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     }
 
     // --- Pre-wrap and Optimize Widths ---
-    const actualColumnWidths = new Array(numColumns).fill(0);
+    const actualColumnWidths: number[] = new Array<number>(numColumns).fill(0);
 
-    const wrapAndProcessRow = (row: StyledChar[][]) => {
+    const wrapAndProcessRow = (row: StyleSpan[][]) => {
       const rowResult: ProcessedLine[][] = [];
       // Ensure we iterate up to numColumns, filling with empty cells if needed
       for (let colIndex = 0; colIndex < numColumns; colIndex++) {
-        const cellStyledChars = row[colIndex] || [];
+        const cellStyleSpans = row[colIndex] || [];
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 
-        const wrappedStyledLines = wrapStyledChars(
-          cellStyledChars,
-          contentWidth,
-        );
+        const wrappedStyledLines = wrapStyleSpans(cellStyleSpans, contentWidth);
 
-        const maxLineWidth = widestLineFromStyledChars(wrappedStyledLines);
+        const maxLineWidth = widestLineFromStyleSpans(wrappedStyledLines);
         actualColumnWidths[colIndex] = Math.max(
           actualColumnWidths[colIndex],
           maxLineWidth,
         );
 
         const lines = wrappedStyledLines.map((line) => ({
-          text: styledCharsToString(line),
-          width: styledCharsWidth(line),
+          text: styleSpansToString(line),
+          width: styleSpansWidth(line),
         }));
         rowResult.push(lines);
       }
@@ -208,11 +202,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const wrappedRows = styledRows.map((row) => wrapAndProcessRow(row));
 
     // Use the TIGHTEST widths that fit the wrapped content + padding
-    const adjustedWidths = actualColumnWidths.map(
-      (w) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        w + COLUMN_PADDING,
-    );
+    const adjustedWidths = actualColumnWidths.map((w) => w + COLUMN_PADDING);
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
@@ -263,7 +253,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const width = adjustedWidths[index] || 0;
       return renderCell(cell, width, isHeader);
     });
