@@ -28,9 +28,11 @@ export class AskUserTool extends BaseDeclarativeTool<
   AskUserParams,
   ToolResult
 > {
+  static readonly Name = ASK_USER_TOOL_NAME;
+
   constructor(messageBus: MessageBus) {
     super(
-      ASK_USER_TOOL_NAME,
+      AskUserTool.Name,
       ASK_USER_DISPLAY_NAME,
       ASK_USER_DEFINITION.base.description!,
       Kind.Communicate,

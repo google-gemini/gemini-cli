@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --no-warnings=DEP0040
 
 /**
  * @license
@@ -36,7 +36,21 @@ process.on('uncaughtException', (error) => {
 });
 
 main().catch(async (error) => {
-  await runExitCleanup();
+  // Set a timeout to force exit if cleanup hangs
+  const cleanupTimeout = setTimeout(() => {
+    writeToStderr('Cleanup timed out, forcing exit...\n');
+    process.exit(1);
+  }, 5000);
+
+  try {
+    await runExitCleanup();
+  } catch (cleanupError) {
+    writeToStderr(
+      `Error during final cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
+    );
+  } finally {
+    clearTimeout(cleanupTimeout);
+  }
 
   if (error instanceof FatalError) {
     let errorMessage = error.message;
@@ -46,6 +60,7 @@ main().catch(async (error) => {
     writeToStderr(errorMessage + '\n');
     process.exit(error.exitCode);
   }
+
   writeToStderr('An unexpected critical error occurred:');
   if (error instanceof Error) {
     writeToStderr(error.stack + '\n');

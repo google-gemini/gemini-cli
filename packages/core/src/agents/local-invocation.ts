@@ -4,20 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
-import { ToolErrorType } from '../tools/tool-error.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  SubagentActivityEvent,
+import {
+  BaseToolInvocation,
+  type ToolResult,
+  type ToolLiveOutput,
+} from '../tools/tools.js';
+import {
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type SubagentActivityEvent,
+  type SubagentProgress,
+  type SubagentActivityItem,
+  AgentTerminateMode,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
+  SUBAGENT_CANCELLED_ERROR_MESSAGE,
+  isToolActivityError,
 } from './types.js';
+import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import {
+  sanitizeThoughtContent,
+  sanitizeToolArgs,
+  sanitizeErrorMessage,
+} from '../utils/agent-sanitization-utils.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
+const MAX_RECENT_ACTIVITY = 3;
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -35,13 +51,13 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 > {
   /**
    * @param definition The definition object that configures the agent.
-   * @param config The global runtime configuration.
+   * @param context The agent loop context.
    * @param params The validated input parameters for the agent.
    * @param messageBus Message bus for policy enforcement.
    */
   constructor(
     private readonly definition: LocalAgentDefinition,
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -81,11 +97,20 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    */
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    let recentActivity: SubagentActivityItem[] = [];
+
     try {
       if (updateOutput) {
-        updateOutput('Subagent starting...\n');
+        // Send initial state
+        const initialProgress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [],
+          state: 'running',
+        };
+        updateOutput(initialProgress);
       }
 
       // Create an activity callback to bridge the executor's events to the
@@ -93,51 +118,246 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
 
-        if (
-          activity.type === 'THOUGHT_CHUNK' &&
-          typeof activity.data['text'] === 'string'
-        ) {
-          updateOutput(`🤖💭 ${activity.data['text']}`);
+        let updated = false;
+
+        switch (activity.type) {
+          case 'THOUGHT_CHUNK': {
+            const text = String(activity.data['text']);
+            const lastItem = recentActivity[recentActivity.length - 1];
+
+            if (
+              lastItem &&
+              lastItem.type === 'thought' &&
+              lastItem.status === 'running'
+            ) {
+              lastItem.content = sanitizeThoughtContent(text);
+            } else {
+              recentActivity.push({
+                id: randomUUID(),
+                type: 'thought',
+                content: sanitizeThoughtContent(text),
+                status: 'running',
+              });
+            }
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_START': {
+            const name = String(activity.data['name']);
+            const displayName = activity.data['displayName']
+              ? sanitizeErrorMessage(String(activity.data['displayName']))
+              : undefined;
+            const description = activity.data['description']
+              ? sanitizeErrorMessage(String(activity.data['description']))
+              : undefined;
+            const args = JSON.stringify(
+              sanitizeToolArgs(activity.data['args']),
+            );
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'tool_call',
+              content: name,
+              displayName,
+              description,
+              args,
+              status: 'running',
+            });
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_END': {
+            const name = String(activity.data['name']);
+            const data = activity.data['data'];
+            const isError = isToolActivityError(data);
+
+            for (let i = recentActivity.length - 1; i >= 0; i--) {
+              if (
+                recentActivity[i].type === 'tool_call' &&
+                recentActivity[i].content === name &&
+                recentActivity[i].status === 'running'
+              ) {
+                recentActivity[i].status = isError ? 'error' : 'completed';
+                updated = true;
+                break;
+              }
+            }
+            break;
+          }
+          case 'ERROR': {
+            const error = String(activity.data['error']);
+            const errorType = activity.data['errorType'];
+            const sanitizedError = sanitizeErrorMessage(error);
+            const isCancellation =
+              errorType === SubagentActivityErrorType.CANCELLED ||
+              error === SUBAGENT_CANCELLED_ERROR_MESSAGE;
+            const isRejection =
+              errorType === SubagentActivityErrorType.REJECTED ||
+              error.startsWith(SUBAGENT_REJECTED_ERROR_PREFIX);
+
+            const toolName = activity.data['name']
+              ? String(activity.data['name'])
+              : undefined;
+
+            if (toolName && (isCancellation || isRejection)) {
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].content === toolName &&
+                  recentActivity[i].status === 'running'
+                ) {
+                  recentActivity[i].status = 'cancelled';
+                  updated = true;
+                  break;
+                }
+              }
+            } else if (toolName) {
+              // Mark non-rejection/non-cancellation errors as 'error'
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].content === toolName &&
+                  recentActivity[i].status === 'running'
+                ) {
+                  recentActivity[i].status = 'error';
+                  updated = true;
+                  break;
+                }
+              }
+            }
+
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'thought',
+              content:
+                isCancellation || isRejection
+                  ? sanitizedError
+                  : `Error: ${sanitizedError}`,
+              status: isCancellation || isRejection ? 'cancelled' : 'error',
+            });
+            updated = true;
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (updated) {
+          // Keep only the last N items
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
+
+          const progress: SubagentProgress = {
+            isSubagentProgress: true,
+            agentName: this.definition.name,
+            recentActivity: [...recentActivity], // Copy to avoid mutation issues
+            state: 'running',
+          };
+
+          updateOutput(progress);
         }
       };
 
       const executor = await LocalAgentExecutor.create(
         this.definition,
-        this.config,
+        this.context,
         onActivity,
       );
 
       const output = await executor.run(this.params, signal);
+
+      if (output.terminate_reason === AgentTerminateMode.ABORTED) {
+        const progress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [...recentActivity],
+          state: 'cancelled',
+        };
+
+        if (updateOutput) {
+          updateOutput(progress);
+        }
+
+        const cancelError = new Error('Operation cancelled by user');
+        cancelError.name = 'AbortError';
+        throw cancelError;
+      }
+
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.definition.name,
+        recentActivity: [...recentActivity],
+        state: 'completed',
+        result: output.result,
+        terminateReason: output.terminate_reason,
+      };
+
+      if (updateOutput) {
+        updateOutput(progress);
+      }
 
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent = `
-Subagent ${this.definition.name} Finished
-
-Termination Reason:\n ${output.terminate_reason}
-
-Result:
-${output.result}
-`;
-
       return {
         llmContent: [{ text: resultContent }],
-        returnDisplay: displayContent,
+        returnDisplay: progress,
       };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
+      const isAbort =
+        (error instanceof Error && error.name === 'AbortError') ||
+        errorMessage.includes('Aborted');
+
+      // Mark any running items as error/cancelled
+      for (const item of recentActivity) {
+        if (item.status === 'running') {
+          item.status = isAbort ? 'cancelled' : 'error';
+        }
+      }
+
+      // Ensure the error is reflected in the recent activity for display
+      // But only if it's NOT an abort, or if we want to show "Cancelled" as a thought
+      if (!isAbort) {
+        const lastActivity = recentActivity[recentActivity.length - 1];
+        if (!lastActivity || lastActivity.status !== 'error') {
+          recentActivity.push({
+            id: randomUUID(),
+            type: 'thought',
+            content: `Error: ${errorMessage}`,
+            status: 'error',
+          });
+          // Maintain size limit
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
+        }
+      }
+
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.definition.name,
+        recentActivity: [...recentActivity],
+        state: isAbort ? 'cancelled' : 'error',
+      };
+
+      if (updateOutput) {
+        updateOutput(progress);
+      }
+
+      if (isAbort) {
+        throw error;
+      }
+
       return {
         llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
-        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
-        error: {
-          message: errorMessage,
-          type: ToolErrorType.EXECUTION_FAILED,
-        },
+        returnDisplay: progress,
+        // We omit the 'error' property so that the UI renders our rich returnDisplay
+        // instead of the raw error message. The llmContent still informs the agent of the failure.
       };
     }
   }

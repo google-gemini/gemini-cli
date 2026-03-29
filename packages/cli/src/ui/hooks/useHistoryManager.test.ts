@@ -11,13 +11,13 @@ import { useHistory } from './useHistoryManager.js';
 import type { HistoryItem } from '../types.js';
 
 describe('useHistoryManager', () => {
-  it('should initialize with an empty history', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should initialize with an empty history', async () => {
+    const { result } = await renderHook(() => useHistory());
     expect(result.current.history).toEqual([]);
   });
 
-  it('should add an item to history with a unique ID', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should add an item to history with a unique ID', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -39,8 +39,58 @@ describe('useHistoryManager', () => {
     expect(result.current.history[0].id).toBeGreaterThanOrEqual(timestamp);
   });
 
-  it('should generate unique IDs for items added with the same base timestamp', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should generate strictly increasing IDs even if baseTimestamp goes backwards', async () => {
+    const { result } = await renderHook(() => useHistory());
+    const timestamp = 1000000;
+    const itemData: Omit<HistoryItem, 'id'> = { type: 'info', text: 'First' };
+
+    let id1!: number;
+    let id2!: number;
+
+    act(() => {
+      id1 = result.current.addItem(itemData, timestamp);
+      // Try to add with a smaller timestamp
+      id2 = result.current.addItem(itemData, timestamp - 500);
+    });
+
+    expect(id1).toBe(timestamp);
+    expect(id2).toBe(id1 + 1);
+    expect(result.current.history[1].id).toBe(id2);
+  });
+
+  it('should ensure new IDs start after existing IDs when resuming a session', async () => {
+    const initialItems: HistoryItem[] = [
+      { id: 5000, type: 'info', text: 'Existing' },
+    ];
+    const { result } = await renderHook(() => useHistory({ initialItems }));
+
+    let newId!: number;
+    act(() => {
+      // Try to add with a timestamp smaller than the highest existing ID
+      newId = result.current.addItem({ type: 'info', text: 'New' }, 2000);
+    });
+
+    expect(newId).toBe(5001);
+    expect(result.current.history[1].id).toBe(5001);
+  });
+
+  it('should update lastIdRef when loading new history', async () => {
+    const { result } = await renderHook(() => useHistory());
+
+    act(() => {
+      result.current.loadHistory([{ id: 8000, type: 'info', text: 'Loaded' }]);
+    });
+
+    let newId!: number;
+    act(() => {
+      newId = result.current.addItem({ type: 'info', text: 'New' }, 1000);
+    });
+
+    expect(newId).toBe(8001);
+  });
+
+  it('should generate unique IDs for items added with the same base timestamp', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -67,8 +117,8 @@ describe('useHistoryManager', () => {
     expect(id2).toBeGreaterThan(id1);
   });
 
-  it('should update an existing history item', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should update an existing history item', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const initialItem: Omit<HistoryItem, 'id'> = {
       type: 'gemini', // Replaced HistoryItemType.Gemini
@@ -93,8 +143,8 @@ describe('useHistoryManager', () => {
     });
   });
 
-  it('should not change history if updateHistoryItem is called with a nonexistent ID', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should not change history if updateHistoryItem is called with a nonexistent ID', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -114,8 +164,8 @@ describe('useHistoryManager', () => {
     expect(result.current.history).toEqual(originalHistory);
   });
 
-  it('should clear the history', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should clear the history', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -140,8 +190,8 @@ describe('useHistoryManager', () => {
     expect(result.current.history).toEqual([]);
   });
 
-  it('should not add consecutive duplicate user messages', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should not add consecutive duplicate user messages', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -173,8 +223,8 @@ describe('useHistoryManager', () => {
     expect(result.current.history[2].text).toBe('Another user message');
   });
 
-  it('should add duplicate user messages if they are not consecutive', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should add duplicate user messages if they are not consecutive', async () => {
+    const { result } = await renderHook(() => useHistory());
     const timestamp = Date.now();
     const itemData1: Omit<HistoryItem, 'id'> = {
       type: 'user', // Replaced HistoryItemType.User
@@ -201,8 +251,8 @@ describe('useHistoryManager', () => {
     expect(result.current.history[2].text).toBe('Message 1');
   });
 
-  it('should use Date.now() as default baseTimestamp if not provided', () => {
-    const { result } = renderHook(() => useHistory());
+  it('should use Date.now() as default baseTimestamp if not provided', async () => {
+    const { result } = await renderHook(() => useHistory());
     const before = Date.now();
     const itemData: Omit<HistoryItem, 'id'> = {
       type: 'user',
@@ -215,13 +265,13 @@ describe('useHistoryManager', () => {
     const after = Date.now();
 
     expect(result.current.history).toHaveLength(1);
-    // ID should be >= before + 1 (since counter starts at 0 and increments to 1)
-    expect(result.current.history[0].id).toBeGreaterThanOrEqual(before + 1);
+    // ID should be >= before (since baseTimestamp defaults to Date.now())
+    expect(result.current.history[0].id).toBeGreaterThanOrEqual(before);
     expect(result.current.history[0].id).toBeLessThanOrEqual(after + 1);
   });
 
   describe('initialItems with auth information', () => {
-    it('should initialize with auth information', () => {
+    it('should initialize with auth information', async () => {
       const email = 'user@example.com';
       const tier = 'Pro';
       const authMessage = `Authenticated as: ${email} (Plan: ${tier})`;
@@ -232,13 +282,13 @@ describe('useHistoryManager', () => {
           text: authMessage,
         },
       ];
-      const { result } = renderHook(() => useHistory({ initialItems }));
+      const { result } = await renderHook(() => useHistory({ initialItems }));
       expect(result.current.history).toHaveLength(1);
       expect(result.current.history[0].text).toBe(authMessage);
     });
 
-    it('should add items with auth information via addItem', () => {
-      const { result } = renderHook(() => useHistory());
+    it('should add items with auth information via addItem', async () => {
+      const { result } = await renderHook(() => useHistory());
       const email = 'user@example.com';
       const tier = 'Pro';
       const authMessage = `Authenticated as: ${email} (Plan: ${tier})`;

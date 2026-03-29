@@ -69,4 +69,17 @@ export class ResourceRegistry {
   clear(): void {
     this.resources.clear();
   }
+
+  /**
+   * Returns an array of resources registered from a specific MCP server.
+   */
+  getResourcesByServer(serverName: string): MCPResource[] {
+    const serverResources: MCPResource[] = [];
+    for (const resource of this.resources.values()) {
+      if (resource.serverName === serverName) {
+        serverResources.push(resource);
+      }
+    }
+    return serverResources.sort((a, b) => a.uri.localeCompare(b.uri));
+  }
 }

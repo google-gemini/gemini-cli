@@ -125,6 +125,7 @@ export class OAuthCredentialStorage {
       throw error;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const credentials: Credentials = JSON.parse(credsJson);
 
     // Save to new storage

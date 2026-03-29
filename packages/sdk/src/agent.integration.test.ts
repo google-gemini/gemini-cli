@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiCliAgent } from './agent.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 // Set this to true locally when you need to update snapshots
 const RECORD_MODE = process.env['RECORD_NEW_RESPONSES'] === 'true';
@@ -20,6 +19,13 @@ const getGoldenPath = (name: string) =>
   path.resolve(__dirname, '../test-data', `${name}.json`);
 
 describe('GeminiCliAgent Integration', () => {
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
   it('handles static instructions', async () => {
     const goldenFile = getGoldenPath('agent-static-instructions');
 
@@ -144,11 +150,14 @@ describe('GeminiCliAgent Integration', () => {
   });
 
   it('propagates errors from dynamic instructions', async () => {
+    const goldenFile = getGoldenPath('agent-static-instructions');
     const agent = new GeminiCliAgent({
       instructions: () => {
         throw new Error('Dynamic instruction failure');
       },
       model: 'gemini-2.0-flash',
+      recordResponses: RECORD_MODE ? goldenFile : undefined,
+      fakeResponses: RECORD_MODE ? undefined : goldenFile,
     });
 
     const session = agent.session();
@@ -159,5 +168,5 @@ describe('GeminiCliAgent Integration', () => {
         // Just consume the stream
       }
     }).rejects.toThrow('Dynamic instruction failure');
-  });
+  }, 30000);
 });

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
-import { createPolicyUpdater } from './config.js';
+import { createPolicyUpdater, ALWAYS_ALLOW_PRIORITY } from './config.js';
 import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -19,16 +19,20 @@ import {
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import * as shellUtils from '../utils/shell-utils.js';
+import { escapeRegex } from './utils.js';
 
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
 vi.mock('../utils/shell-utils.js', () => ({
   getCommandRoots: vi.fn(),
   stripShellWrapper: vi.fn(),
+  hasRedirection: vi.fn(),
 }));
 interface ParsedPolicy {
   rule?: Array<{
     commandPrefix?: string | string[];
+    mcpName?: string;
+    toolName?: string;
   }>;
 }
 
@@ -41,6 +45,7 @@ interface TestableShellToolInvocation {
 describe('createPolicyUpdater', () => {
   let policyEngine: PolicyEngine;
   let messageBus: MessageBus;
+  let mockStorage: Storage;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -48,8 +53,9 @@ describe('createPolicyUpdater', () => {
     vi.spyOn(policyEngine, 'addRule');
 
     messageBus = new MessageBus(policyEngine);
-    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
-      '/mock/user/policies',
+    mockStorage = new Storage('/mock/project');
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(
+      '/mock/user/.gemini/policies/auto-saved.toml',
     );
   });
 
@@ -58,12 +64,13 @@ describe('createPolicyUpdater', () => {
   });
 
   it('should add multiple rules when commandPrefix is an array', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: 'run_shell_command',
       commandPrefix: ['echo', 'ls'],
+      mcpName: 'test-mcp',
       persist: false,
     });
 
@@ -72,20 +79,85 @@ describe('createPolicyUpdater', () => {
       1,
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"echo(?:[\\s"]|\\\\")'),
+        priority: ALWAYS_ALLOW_PRIORITY,
+        mcpName: 'test-mcp',
+        argsPattern: new RegExp(
+          escapeRegex('"command":"echo') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
     expect(policyEngine.addRule).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"ls(?:[\\s"]|\\\\")'),
+        priority: ALWAYS_ALLOW_PRIORITY,
+        mcpName: 'test-mcp',
+        argsPattern: new RegExp(
+          escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
   });
 
+  it('should pass mcpName to policyEngine.addRule for argsPattern updates', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      argsPattern: '"foo":"bar"',
+      mcpName: 'test-mcp',
+      persist: false,
+    });
+
+    expect(policyEngine.addRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'test_tool',
+        mcpName: 'test-mcp',
+        argsPattern: /"foo":"bar"/,
+      }),
+    );
+  });
+
+  it('should persist mcpName to TOML', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+    vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(fs.open).mockResolvedValue(
+      mockFileHandle as unknown as fs.FileHandle,
+    );
+    vi.mocked(fs.rename).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'mcp_test-mcp_tool',
+      mcpName: 'test-mcp',
+      commandPrefix: 'ls',
+      persist: true,
+    });
+
+    // Wait for the async listener to complete
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fs.open).toHaveBeenCalled();
+    const [content] = mockFileHandle.writeFile.mock.calls[0] as [
+      string,
+      string,
+    ];
+    const parsed = toml.parse(content) as unknown as ParsedPolicy;
+
+    expect(parsed.rule).toHaveLength(1);
+    expect(parsed.rule![0].mcpName).toBe('test-mcp');
+    expect(parsed.rule![0].toolName).toBe('tool'); // toolName should be stripped of MCP prefix
+  });
+
   it('should add a single rule when commandPrefix is a string', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -98,13 +170,35 @@ describe('createPolicyUpdater', () => {
     expect(policyEngine.addRule).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"git(?:[\\s"]|\\\\")'),
+        priority: ALWAYS_ALLOW_PRIORITY,
+        argsPattern: new RegExp(
+          escapeRegex('"command":"git') + '(?:[\\s"]|\\\\")',
+        ),
+      }),
+    );
+  });
+
+  it('should pass allowRedirection to policyEngine.addRule', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'run_shell_command',
+      commandPrefix: 'ls',
+      persist: false,
+      allowRedirection: true,
+    });
+
+    expect(policyEngine.addRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'run_shell_command',
+        allowRedirection: true,
       }),
     );
   });
 
   it('should persist multiple rules correctly to TOML', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
     vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
@@ -139,7 +233,7 @@ describe('createPolicyUpdater', () => {
   });
 
   it('should reject unsafe regex patterns', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -164,6 +258,7 @@ describe('ShellToolInvocation Policy Update', () => {
     vi.mocked(shellUtils.stripShellWrapper).mockImplementation(
       (c: string) => c,
     );
+    vi.mocked(shellUtils.hasRedirection).mockReturnValue(false);
   });
 
   it('should extract multiple root commands for chained commands', () => {
@@ -204,5 +299,27 @@ describe('ShellToolInvocation Policy Update', () => {
     ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
     expect(options!.commandPrefix).toEqual(['ls']);
     expect(shellUtils.getCommandRoots).toHaveBeenCalledWith('ls -la /tmp');
+  });
+
+  it('should include allowRedirection if command has redirection', () => {
+    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['echo']);
+    vi.mocked(shellUtils.hasRedirection).mockReturnValue(true);
+
+    const invocation = new ShellToolInvocation(
+      mockConfig,
+      { command: 'echo "hello" > file.txt' },
+      mockMessageBus,
+      'run_shell_command',
+      'Shell',
+    );
+
+    const options = (
+      invocation as unknown as TestableShellToolInvocation
+    ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
+    expect(options!.commandPrefix).toEqual(['echo']);
+    expect(options!.allowRedirection).toBe(true);
+    expect(shellUtils.hasRedirection).toHaveBeenCalledWith(
+      'echo "hello" > file.txt',
+    );
   });
 });

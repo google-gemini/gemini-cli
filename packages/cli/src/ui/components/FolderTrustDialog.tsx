@@ -9,8 +9,10 @@ import type React from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import stripAnsi from 'strip-ansi';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './shared/RadioButtonSelect.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { Scrollable } from './shared/Scrollable.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -54,9 +56,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isRestarting) {
-      timer = setTimeout(async () => {
-        await relaunchApp();
-      }, 250);
+      timer = setTimeout(relaunchApp, 250);
     }
     return () => {
       if (timer) clearTimeout(timer);
@@ -135,6 +135,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     { label: 'MCP Servers', items: discoveryResults?.mcps ?? [] },
     { label: 'Hooks', items: discoveryResults?.hooks ?? [] },
     { label: 'Skills', items: discoveryResults?.skills ?? [] },
+    { label: 'Agents', items: discoveryResults?.agents ?? [] },
     { label: 'Setting overrides', items: discoveryResults?.settings ?? [] },
   ].filter((g) => g.items.length > 0);
 
@@ -285,33 +286,33 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     );
   };
 
-  return (
-    <OverflowProvider>
-      <Box flexDirection="column" width="100%">
-        <Box flexDirection="column" marginLeft={1} marginRight={1}>
-          {renderContent()}
-        </Box>
-
-        <Box paddingX={2} marginBottom={1}>
-          <ShowMoreLines constrainHeight={constrainHeight} />
-        </Box>
-
-        {isRestarting && (
-          <Box marginLeft={1} marginTop={1}>
-            <Text color={theme.status.warning}>
-              Gemini CLI is restarting to apply the trust changes...
-            </Text>
-          </Box>
-        )}
-        {exiting && (
-          <Box marginLeft={1} marginTop={1}>
-            <Text color={theme.status.warning}>
-              A folder trust level must be selected to continue. Exiting since
-              escape was pressed.
-            </Text>
-          </Box>
-        )}
+  const content = (
+    <Box flexDirection="column" width="100%">
+      <Box flexDirection="column" marginLeft={1} marginRight={1}>
+        {renderContent()}
       </Box>
-    </OverflowProvider>
+
+      <Box paddingX={2} marginBottom={1}>
+        <ShowMoreLines constrainHeight={constrainHeight} />
+      </Box>
+
+      {isRestarting && (
+        <Box marginLeft={1} marginTop={1}>
+          <Text color={theme.status.warning}>
+            Gemini CLI is restarting to apply the trust changes...
+          </Text>
+        </Box>
+      )}
+      {exiting && (
+        <Box marginLeft={1} marginTop={1}>
+          <Text color={theme.status.warning}>
+            A folder trust level must be selected to continue. Exiting since
+            escape was pressed.
+          </Text>
+        </Box>
+      )}
+    </Box>
   );
+
+  return <OverflowProvider>{content}</OverflowProvider>;
 };

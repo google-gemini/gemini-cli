@@ -5,6 +5,19 @@ problems encountered while using Gemini CLI.
 
 ## General issues
 
+This section addresses common questions about Gemini CLI usage, security, and
+troubleshooting general errors.
+
+### Why can't I use third-party software (e.g. Claude Code, OpenClaw, OpenCode) with Gemini CLI?
+
+Using third-party software, tools, or services to harvest or piggyback on Gemini
+CLI's OAuth authentication to access our backend services is a direct violation
+of our [applicable terms and policies](tos-privacy.md). Doing so bypasses our
+intended authentication and security structures, and such actions may be grounds
+for immediate suspension or termination of your account. If you would like to
+use a third-party coding agent with Gemini, the supported and secure method is
+to use a Vertex AI or Google AI Studio API key.
+
 ### Why am I getting an `API error: 429 - Resource exhausted`?
 
 This error indicates that you have exceeded your API request limit. The Gemini
@@ -45,6 +58,19 @@ your total token usage using the `/stats` command in Gemini CLI.
 
 ## Installation and updates
 
+### How do I check which version of Gemini CLI I'm currently running?
+
+You can check your current Gemini CLI version using one of these methods:
+
+- Run `gemini --version` or `gemini -v` from your terminal
+- Check the globally installed version using your package manager:
+  - npm: `npm list -g @google/gemini-cli`
+  - pnpm: `pnpm list -g @google/gemini-cli`
+  - yarn: `yarn global list @google/gemini-cli`
+  - bun: `bun pm ls -g @google/gemini-cli`
+  - homebrew: `brew list --versions gemini-cli`
+- Inside an active Gemini CLI session, use the `/about` command
+
 ### How do I update Gemini CLI to the latest version?
 
 If you installed it globally via `npm`, update it using the command
@@ -75,8 +101,16 @@ You can configure your Google Cloud Project ID using an environment variable.
 
 Set the `GOOGLE_CLOUD_PROJECT` environment variable in your shell:
 
+**macOS/Linux**
+
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
 To make this setting permanent, add this line to your shell's startup file

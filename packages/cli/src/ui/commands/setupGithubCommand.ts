@@ -17,14 +17,18 @@ import {
   getGitHubRepoInfo,
 } from '../../utils/gitUtils.js';
 
-import type { SlashCommand, SlashCommandActionReturn } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  CommandKind,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+} from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
 export const GITHUB_WORKFLOW_PATHS = [
   'gemini-dispatch/gemini-dispatch.yml',
   'gemini-assistant/gemini-invoke.yml',
+  'gemini-assistant/gemini-plan-execute.yml',
   'issue-triage/gemini-triage.yml',
   'issue-triage/gemini-scheduled-triage.yml',
   'pr-review/gemini-review.yml',
@@ -32,6 +36,7 @@ export const GITHUB_WORKFLOW_PATHS = [
 
 export const GITHUB_COMMANDS_PATHS = [
   'gemini-assistant/gemini-invoke.toml',
+  'gemini-assistant/gemini-plan-execute.toml',
   'issue-triage/gemini-scheduled-triage.toml',
   'issue-triage/gemini-triage.toml',
   'pr-review/gemini-review.toml',
@@ -225,7 +230,7 @@ export const setupGithubCommand: SlashCommand = {
     }
 
     // Get the latest release tag from GitHub
-    const proxy = context?.services?.config?.getProxy();
+    const proxy = context?.services?.agentContext?.config.getProxy();
     const releaseTag = await getLatestGitHubRelease(proxy);
     const readmeUrl = `https://github.com/google-github-actions/run-gemini-cli/blob/${releaseTag}/README.md#quick-start`;
 

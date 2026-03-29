@@ -64,9 +64,9 @@ export async function refreshMemory(
   let content: string;
 
   if (memoryContent.length > 0) {
-    content = `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`;
+    content = `Memory reloaded successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s)`;
   } else {
-    content = 'Memory refreshed successfully. No memory content found.';
+    content = 'Memory reloaded successfully. No memory content found';
   }
 
   return {
