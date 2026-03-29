@@ -162,8 +162,13 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         try {
           const content = await fs.readFile(planPath);
           return crypto.createHash('sha256').update(content).digest('hex');
-        } catch {
-          return null;
+        } catch (err) {
+          // If the file doesn't exist, it's not an error, just means there's no hash.
+          if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+            return null;
+          }
+          // For other errors (e.g., permissions), re-throw to be caught by the outer handler.
+          throw err;
         }
       };
 
