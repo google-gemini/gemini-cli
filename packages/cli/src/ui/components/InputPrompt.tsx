@@ -269,6 +269,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           resetEscapeState();
           if (buffer.text.length > 0) {
             buffer.setText('');
+            turnBaselineRef.current = null;
             resetCompletionState();
           } else if (history.length > 0) {
             onSubmit('/rewind');
@@ -297,11 +298,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const transcriptionServiceRef = useRef<LiveTranscriptionService | null>(null);
+  const turnBaselineRef = useRef<string | null>(null);
 
-  const currentBufferTextRef = useRef(buffer.text);
-  useEffect(() => {
-    currentBufferTextRef.current = buffer.text;
-  }, [buffer.text]);
+  const bufferRef = useRef(buffer);
+  bufferRef.current = buffer;
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -420,6 +420,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
+      turnBaselineRef.current = null;
       onSubmit(processedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
@@ -785,37 +786,34 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 apiKey,
               );
 
-              let turnBaseline: string | null = null;
               transcriptionServiceRef.current.on('transcription', (text) => {
                 // If user toggled off while transcription was in flight
                 if (!recordingInProgressRef.current) return;
 
                 if (text) {
                   // Capture the baseline at the EXACT moment the FIRST transcription part arrives
-                  if (turnBaseline === null) {
-                    turnBaseline = currentBufferTextRef.current;
-                    debugLogger.log(
-                      `[Voice] Turn baseline locked from actual buffer: "${turnBaseline}"`,
-                    );
+                  // using the live Ref to avoid stale closures.
+                  if (turnBaselineRef.current === null) {
+                    turnBaselineRef.current = bufferRef.current.text;
                   }
 
+                  const baseline = turnBaselineRef.current;
                   const separator =
-                    turnBaseline &&
-                    !turnBaseline.endsWith(' ') &&
-                    !turnBaseline.endsWith('\n')
+                    baseline &&
+                    !baseline.endsWith(' ') &&
+                    !baseline.endsWith('\n')
                       ? ' '
                       : '';
-                  const newTotalText = turnBaseline + separator + text;
+                  const newTotalText = baseline + separator + text;
 
-                  buffer.setText(newTotalText);
-                  buffer.moveToOffset(newTotalText.length);
+                  bufferRef.current.setText(newTotalText, 'end');
                 }
 
                 liveTranscriptionRef.current = text;
               });
 
               transcriptionServiceRef.current.on('turnComplete', () => {
-                turnBaseline = null;
+                turnBaselineRef.current = null;
                 liveTranscriptionRef.current = '';
               });
               transcriptionServiceRef.current.on('error', (err) => {
@@ -1112,6 +1110,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
+        turnBaselineRef.current = null;
         return true;
       }
 
