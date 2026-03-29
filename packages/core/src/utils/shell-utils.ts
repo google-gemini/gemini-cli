@@ -726,6 +726,53 @@ export function stripShellWrapper(command: string): string {
  * @param command The shell command string to check
  * @returns true if command substitution would be executed by bash
  */
+export function detectCommandSubstitution(command: string): boolean {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let i = 0;
+
+  while (i < command.length) {
+    const char = command[i];
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      i++;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      i++;
+      continue;
+    }
+
+    if (inSingleQuote) {
+      i++;
+      continue;
+    }
+
+    if (char === '\\' && inDoubleQuote) {
+      i += 2;
+      continue;
+    }
+
+    if (char === '$' && command[i + 1] === '(') {
+      return true;
+    }
+
+    if (char === '<' && command[i + 1] === '(') {
+      return true;
+    }
+
+    if (char === '`') {
+      return true;
+    }
+
+    i++;
+  }
+
+  return false;
+}
 /**
  * Determines whether a given shell command is allowed to execute based on
  * the tool's configuration including allowlists and blocklists.
