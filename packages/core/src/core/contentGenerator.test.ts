@@ -27,6 +27,11 @@ vi.mock('./apiKeyCredentialStorage.js', () => ({
 }));
 
 vi.mock('./fakeContentGenerator.js');
+vi.mock('../utils/installationManager.js', () => ({
+  InstallationManager: vi.fn().mockImplementation(() => ({
+    getInstallationId: () => 'test-install-id',
+  })),
+}));
 
 const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
@@ -39,6 +44,7 @@ describe('createContentGenerator', () => {
   beforeEach(() => {
     resetVersionCache();
     vi.clearAllMocks();
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
   });
 
   afterEach(() => {
@@ -152,8 +158,9 @@ describe('createContentGenerator', () => {
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.stringMatching(
-            /GeminiCLI\/1\.2\.3\/gemini-pro \(.*; .*; terminal\)/,
+            /GeminiCLI\/1\.2\.3\/gemini-pro \(.*; .*; (terminal|antigravity)\)/,
           ),
+          'x-gemini-api-privileged-user-id': 'test-install-id',
         }),
       }),
     });
@@ -192,8 +199,9 @@ describe('createContentGenerator', () => {
         httpOptions: expect.objectContaining({
           headers: expect.objectContaining({
             'User-Agent': expect.stringMatching(
-              /GeminiCLI-a2a-server\/1\.2\.3\/gemini-pro \(.*; .*; terminal\)/,
+              /GeminiCLI-a2a-server\/1\.2\.3\/gemini-pro \(.*; .*; (terminal|antigravity)\)/,
             ),
+            'x-gemini-api-privileged-user-id': 'test-install-id',
           }),
         }),
       }),
@@ -232,6 +240,7 @@ describe('createContentGenerator', () => {
             'User-Agent': expect.stringMatching(
               /CloudCodeVSCode\/1\.2\.3 \(aidev_client; os_type=.*; os_version=.*; arch=.*; host_path=VSCode\/1\.85\.0; proxy_client=geminicli\)/,
             ),
+            'x-gemini-api-privileged-user-id': 'test-install-id',
           }),
         }),
       }),
@@ -268,8 +277,9 @@ describe('createContentGenerator', () => {
         httpOptions: expect.objectContaining({
           headers: expect.objectContaining({
             'User-Agent': expect.stringMatching(
-              /GeminiCLI-my-client\/1\.2\.3\/gemini-pro \(.*; .*; terminal\)/,
+              /GeminiCLI-my-client\/1\.2\.3\/gemini-pro \(.*; .*; (terminal|antigravity)\)/,
             ),
+            'x-gemini-api-privileged-user-id': 'test-install-id',
           }),
         }),
       }),
