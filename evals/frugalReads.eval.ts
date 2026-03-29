@@ -45,9 +45,9 @@ describe('Frugal reads eval', () => {
     prompt:
       'Fix all linter errors in linter_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const logs = rig.readToolLogs();
 
-      // Check if the agent read the whole file
       const readCalls = logs.filter(
         (log) => log.toolRequest?.name === READ_FILE_TOOL_NAME,
       );
@@ -165,6 +165,7 @@ describe('Frugal reads eval', () => {
     prompt:
       'Fix all linter errors in far_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const logs = rig.readToolLogs();
 
       const readCalls = logs.filter(
@@ -234,6 +235,7 @@ describe('Frugal reads eval', () => {
     prompt:
       'Fix all linter errors in many_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const logs = rig.readToolLogs();
 
       const readCalls = logs.filter(

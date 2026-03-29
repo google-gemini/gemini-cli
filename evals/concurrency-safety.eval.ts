@@ -34,6 +34,7 @@ describe('concurrency safety eval test cases', () => {
       '.gemini/agents/mutation-agent.md': MUTATION_AGENT_DEFINITION,
     },
     assert: async (rig) => {
+      await rig.waitForTelemetryReady();
       const logs = rig.readToolLogs();
       const mutationCalls = logs.filter(
         (log) => log.toolRequest?.name === 'mutation-agent',
