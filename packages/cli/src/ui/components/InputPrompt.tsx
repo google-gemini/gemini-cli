@@ -2068,7 +2068,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             {buffer.text.length === 0 && !isRecording ? (
               isVoiceModeEnabled ? (
                 <Text color={theme.text.secondary}>
-                  &gt; Voice mode enabled - hold Space to speak (Esc to exit)
+                  &gt; Voice mode: Space to start/stop recording (Esc to exit)
                 </Text>
               ) : placeholder ? (
                 showCursor ? (
