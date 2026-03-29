@@ -1366,6 +1366,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`tools.shell.backgroundCompletionBehavior`** (enum):
+  - **Description:** Controls what happens when a background shell command
+    finishes. 'silent' (default): quietly exits in background. 'inject':
+    automatically returns output to agent. 'notify': shows brief message in
+    chat.
+  - **Default:** `"silent"`
+  - **Values:** `"silent"`, `"inject"`, `"notify"`
+
 - **`tools.shell.pager`** (string):
   - **Description:** The pager command to use for shell output. Defaults to
     `cat`.
