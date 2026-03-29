@@ -123,6 +123,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isVoiceModelDialogOpen: boolean;
   isAgentConfigDialogOpen: boolean;
   selectedAgentName?: string;
   selectedAgentDisplayName?: string;

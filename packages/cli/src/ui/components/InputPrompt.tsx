@@ -45,7 +45,8 @@ import {
   debugLogger,
   type Config,
   AudioRecorder,
-  LiveTranscriptionService,
+  TranscriptionFactory,
+  type TranscriptionProvider,
 } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
@@ -283,7 +284,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const recordingInProgressRef = useRef(false); // Lock for toggle
   const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
-  const transcriptionServiceRef = useRef<LiveTranscriptionService | null>(null);
+  const transcriptionServiceRef = useRef<TranscriptionProvider | null>(null);
   const turnBaselineRef = useRef<string | null>(null);
 
   const bufferRef = useRef(buffer);
@@ -758,9 +759,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               }
 
               recorderRef.current = new AudioRecorder();
-              transcriptionServiceRef.current = new LiveTranscriptionService(
-                apiKey,
-              );
+              transcriptionServiceRef.current =
+                TranscriptionFactory.createProvider(settings.voice, apiKey);
 
               transcriptionServiceRef.current.on('transcription', (text) => {
                 // If user toggled off while transcription was in flight
@@ -819,8 +819,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 isConnectingRef.current = false; // Successfully connected
 
+                const voiceBackend = settings.voice?.backend ?? 'gemini-live';
+
                 recorderRef.current?.on('data', (chunk) => {
-                  transcriptionServiceRef.current?.sendAudioChunk(chunk);
+                  if (voiceBackend === 'gemini-live') {
+                    transcriptionServiceRef.current?.sendAudioChunk(chunk);
+                  }
                 });
                 recorderRef.current?.on('error', (err) => {
                   debugLogger.error('[Voice] Recorder error:', err);
