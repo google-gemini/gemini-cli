@@ -5,9 +5,11 @@ and managing Gemini CLI in an enterprise environment. By leveraging system-level
 settings, administrators can enforce security policies, manage tool access, and
 ensure a consistent experience for all users.
 
-> **A note on security:** The patterns described in this document are intended
-> to help administrators create a more controlled and secure environment for
-> using Gemini CLI. However, they should not be considered a foolproof security
+<!-- prettier-ignore -->
+> [!WARNING]
+> The patterns described in this document are intended to help
+> administrators create a more controlled and secure environment for using
+> Gemini CLI. However, they should not be considered a foolproof security
 > boundary. A determined user with sufficient privileges on their local machine
 > may still be able to circumvent these configurations. These measures are
 > designed to prevent accidental misuse and enforce corporate policy in a
@@ -280,10 +282,12 @@ environment to a blocklist.
 }
 ```
 
-**Security note:** Blocklisting with `excludeTools` is less secure than
-allowlisting with `coreTools`, as it relies on blocking known-bad commands, and
-clever users may find ways to bypass simple string-based blocks. **Allowlisting
-is the recommended approach.**
+<!-- prettier-ignore -->
+> [!WARNING]
+> Blocklisting with `excludeTools` is less secure than
+> allowlisting with `coreTools`, as it relies on blocking known-bad commands,
+> and clever users may find ways to bypass simple string-based blocks.
+> **Allowlisting is the recommended approach.**
 
 ### Disabling YOLO mode
 
@@ -494,8 +498,10 @@ other events. For more information, see the
 }
 ```
 
-**Note:** Ensure that `logPrompts` is set to `false` in an enterprise setting to
-avoid collecting potentially sensitive information from user prompts.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Ensure that `logPrompts` is set to `false` in an enterprise setting to
+> avoid collecting potentially sensitive information from user prompts.
 
 ## Authentication
 

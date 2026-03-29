@@ -22,7 +22,7 @@ import * as path from 'node:path';
 import { copyToClipboard } from '../utils/commandUtils.js';
 
 async function copyAction(context: CommandContext) {
-  const config = context.services.config;
+  const config = context.services.agentContext?.config;
   if (!config) {
     debugLogger.debug('Plan copy command: config is not available in context');
     return;
@@ -53,7 +53,7 @@ export const planCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context) => {
-    const config = context.services.config;
+    const config = context.services.agentContext?.config;
     if (!config) {
       debugLogger.debug('Plan command: config is not available in context');
       return;

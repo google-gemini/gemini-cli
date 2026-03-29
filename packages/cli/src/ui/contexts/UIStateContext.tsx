@@ -8,7 +8,6 @@ import { createContext, useContext } from 'react';
 import type {
   HistoryItem,
   ThoughtSummary,
-  ConsoleMessageItem,
   ConfirmationRequest,
   QuotaStats,
   LoopDetectionConfirmationRequest,
@@ -85,7 +84,7 @@ export interface EmptyWalletDialogRequest {
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
-import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
+import type { BackgroundTask } from '../hooks/useExecutionLifecycle.js';
 
 export interface QuotaState {
   userTier: UserTierId | undefined;
@@ -158,7 +157,6 @@ export interface UIState {
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
-  filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
@@ -168,6 +166,8 @@ export interface UIState {
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
+  currentTip: string | undefined;
+  currentWittyPhrase: string | undefined;
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];
@@ -180,6 +180,7 @@ export interface UIState {
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;
+  stableControlsHeight: number;
   mainAreaWidth: number;
   staticAreaMaxItemHeight: number;
   staticExtraHeight: number;
@@ -190,7 +191,7 @@ export interface UIState {
   sessionStats: SessionStatsState;
   terminalWidth: number;
   terminalHeight: number;
-  mainControlsRef: React.MutableRefObject<DOMElement | null>;
+  mainControlsRef: React.RefCallback<DOMElement | null>;
   // NOTE: This is for performance profiling only.
   rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
@@ -200,8 +201,8 @@ export interface UIState {
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
-  backgroundShellCount: number;
-  isBackgroundShellVisible: boolean;
+  backgroundTaskCount: number;
+  isBackgroundTaskVisible: boolean;
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
@@ -214,10 +215,10 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
-  backgroundShells: Map<number, BackgroundShell>;
-  activeBackgroundShellPid: number | null;
-  backgroundShellHeight: number;
-  isBackgroundShellListOpen: boolean;
+  backgroundTasks: Map<number, BackgroundTask>;
+  activeBackgroundTaskPid: number | null;
+  backgroundTaskHeight: number;
+  isBackgroundTaskListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
   showIsExpandableHint: boolean;

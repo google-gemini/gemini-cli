@@ -13,7 +13,7 @@ import type {
 import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../policy/types.js';
 
-import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { AuthType } from '../core/contentGenerator.js';
@@ -77,6 +77,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   extensions: string;
   extension_ids: string;
   auth_type?: string;
+  worktree_active: boolean;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -114,6 +115,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.extensions = extensions.map((e) => e.name).join(',');
     this.extension_ids = extensions.map((e) => e.id).join(',');
     this.auth_type = generatorConfig?.authType;
+    this.worktree_active = !!config.getWorktreeSettings();
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -147,6 +149,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       extensions_count: this.extensions_count,
       extension_ids: this.extension_ids,
       auth_type: this.auth_type,
+      worktree_active: this.worktree_active,
     };
   }
 
@@ -2180,7 +2183,8 @@ export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: EVENT_APPROVAL_MODE_SWITCH,
+      'event.name': EVENT_APPROVAL_MODE_SWITCH,
+      'event.timestamp': this['event.timestamp'],
       from_mode: this.from_mode,
       to_mode: this.to_mode,
     };
@@ -2210,7 +2214,8 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: EVENT_APPROVAL_MODE_DURATION,
+      'event.name': EVENT_APPROVAL_MODE_DURATION,
+      'event.timestamp': this['event.timestamp'],
       mode: this.mode,
       duration_ms: this.duration_ms,
     };
@@ -2354,6 +2359,58 @@ export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Keychain availability: ${this.available}`;
+  }
+}
+
+export const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+export class OnboardingStartEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_start';
+  'event.timestamp': string;
+
+  constructor() {
+    this['event.name'] = 'onboarding_start';
+    this['event.timestamp'] = new Date().toISOString();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ONBOARDING_START,
+      'event.timestamp': this['event.timestamp'],
+    };
+  }
+
+  toLogBody(): string {
+    return 'Onboarding started.';
+  }
+}
+
+export const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+export class OnboardingSuccessEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_success';
+  'event.timestamp': string;
+  userTier?: string;
+  duration_ms?: number;
+
+  constructor(userTier?: string, duration_ms?: number) {
+    this['event.name'] = 'onboarding_success';
+    this['event.timestamp'] = new Date().toISOString();
+    this.userTier = userTier;
+    this.duration_ms = duration_ms;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_ONBOARDING_SUCCESS,
+      'event.timestamp': this['event.timestamp'],
+      user_tier: this.userTier ?? '',
+      duration_ms: this.duration_ms ?? 0,
+    };
+  }
+
+  toLogBody(): string {
+    return `Onboarding succeeded.${this.userTier ? ` Tier: ${this.userTier}` : ''}${this.duration_ms !== undefined ? `. Duration: ${this.duration_ms}ms` : ''}`;
   }
 }
 

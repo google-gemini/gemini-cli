@@ -32,7 +32,7 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from './coreToolScheduler.js';
+import type { CompletedToolCall } from '../scheduler/types.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -524,8 +524,20 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
+      const useGemini3_1FlashLite =
+        (await this.context.config.getGemini31FlashLiteLaunched?.()) ?? false;
+      const hasAccessToPreview =
+        this.context.config.getHasAccessToPreviewModel?.() ?? true;
+
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        useGemini3_1,
+        useGemini3_1FlashLite,
+        false,
+        hasAccessToPreview,
+        this.context.config,
+      );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
@@ -533,6 +545,10 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
+          useGemini3_1FlashLite,
+          false,
+          hasAccessToPreview,
+          this.context.config,
         );
       }
 
@@ -1016,8 +1032,8 @@ export class GeminiChat {
 
       return {
         id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
+        name: call.request.originalRequestName ?? call.request.name,
+        args: call.request.originalRequestArgs ?? call.request.args,
         result: call.response?.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),
