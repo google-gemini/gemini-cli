@@ -45,9 +45,7 @@ describe('skill install command', () => {
 
   describe('installCommand', () => {
     it('should have correct command and describe', () => {
-      expect(installCommand.command).toBe(
-        'install <source> [--scope] [--path]',
-      );
+      expect(installCommand.command).toBe('install <source>');
       expect(installCommand.describe).toBe(
         'Installs an agent skill from a git repository URL or a local path.',
       );
