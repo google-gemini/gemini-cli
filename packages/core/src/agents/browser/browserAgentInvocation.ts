@@ -33,10 +33,7 @@ import {
   isToolActivityError,
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import {
-  createBrowserAgentDefinition,
-  cleanupBrowserAgent,
-} from './browserAgentFactory.js';
+import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import {
   sanitizeThoughtContent,
@@ -368,10 +365,9 @@ ${displayResult}
         },
       };
     } finally {
-      // Always cleanup browser resources
+      // Clean up input blocker, but keep browserManager alive for persistent sessions
       if (browserManager) {
         await removeInputBlocker(browserManager);
-        await cleanupBrowserAgent(browserManager);
       }
     }
   }
