@@ -116,6 +116,7 @@ The user has the ability to modify \`content\`. If modified, this will be stated
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
           type: 'integer',
           minimum: 1,
+          maximum: 500,
         },
         total_max_matches: {
           description:
@@ -197,6 +198,7 @@ The user has the ability to modify \`content\`. If modified, this will be stated
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
           type: 'integer',
           minimum: 1,
+          maximum: 500,
         },
         total_max_matches: {
           description:
@@ -458,7 +460,7 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
     description: `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
 
 Depending on the task complexity, you should first divide a given task into subtasks and then use this tool to list out the subtasks that are required to be completed for a given user request.
-Each of the subtasks should be clear and distinct. 
+Each of the subtasks should be clear and distinct.
 
 Use this tool for complex queries that require multiple steps. If you find that the request is actually complex after you have started executing the user task, create a todo list and use it. If execution of the user task requires multiple steps, planning and generally is higher complexity than a simple Q&A, use this tool.
 

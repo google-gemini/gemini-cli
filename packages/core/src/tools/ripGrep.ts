@@ -34,6 +34,8 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
+const MAX_MAX_MATCHES_PER_FILE = 500;
+
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
 }
@@ -184,8 +186,6 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      // Default to '.' if path is explicitly undefined/null.
-      // This forces CWD search instead of 'all workspaces' search by default.
       const pathParam = this.params.dir_path || '.';
 
       const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
@@ -204,7 +204,6 @@ class GrepToolInvocation extends BaseToolInvocation<
         };
       }
 
-      // Check existence and type asynchronously
       try {
         const stats = await fsPromises.stat(searchDirAbs);
         if (!stats.isDirectory() && !stats.isFile()) {
@@ -240,13 +239,11 @@ class GrepToolInvocation extends BaseToolInvocation<
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
-      // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
       const timeoutId = setTimeout(() => {
         timeoutController.abort();
       }, DEFAULT_SEARCH_TIMEOUT_MS);
 
-      // Link the passed signal to our timeout controller
       const onAbort = () => timeoutController.abort();
       if (signal.aborted) {
         onAbort();
@@ -435,8 +432,6 @@ class GrepToolInvocation extends BaseToolInvocation<
         rgArgs.push('--glob', `!${exclude}`);
       });
 
-      // Add .geminiignore and custom ignore files support (if provided/mandated)
-      // (ripgrep natively handles .gitignore)
       const geminiIgnorePaths = this.fileDiscoveryService.getIgnoreFilePaths();
       for (const ignorePath of geminiIgnorePaths) {
         rgArgs.push('--ignore-file', ignorePath);
@@ -492,7 +487,6 @@ class GrepToolInvocation extends BaseToolInvocation<
       const json = JSON.parse(line);
       if (json.type === 'match' || json.type === 'context') {
         const data = json.data;
-        // Defensive check: ensure text properties exist (skips binary/invalid encoding)
         if (data.path?.text && data.lines?.text) {
           const absoluteFilePath = path.resolve(basePath, data.path.text);
           const relativeCheck = path.relative(basePath, absoluteFilePath);
@@ -515,7 +509,6 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
     } catch (error) {
-      // Only log if it's not a simple empty line or widely invalid
       if (line.trim().length > 0) {
         debugLogger.warn(
           `Failed to parse ripgrep JSON line: ${line.substring(0, 100)}...`,
@@ -526,11 +519,6 @@ class GrepToolInvocation extends BaseToolInvocation<
     return null;
   }
 
-  /**
-   * Gets a description of the grep operation
-   * @param params Parameters for the grep operation
-   * @returns A string describing the grep
-   */
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
     if (this.params.include) {
@@ -572,8 +560,8 @@ export class RipGrepTool extends BaseDeclarativeTool<
       Kind.Search,
       RIP_GREP_DEFINITION.base.parametersJsonSchema,
       messageBus,
-      true, // isOutputMarkdown
-      false, // canUpdateOutput
+      true,
+      false,
     );
     this.fileDiscoveryService = new FileDiscoveryService(
       config.getTargetDir(),
@@ -581,11 +569,6 @@ export class RipGrepTool extends BaseDeclarativeTool<
     );
   }
 
-  /**
-   * Validates the parameters for the tool
-   * @param params Parameters to validate
-   * @returns An error message string if invalid, null otherwise
-   */
   protected override validateToolParamValues(
     params: RipGrepToolParams,
   ): string | null {
@@ -613,13 +596,19 @@ export class RipGrepTool extends BaseDeclarativeTool<
     }
 
     if (
+      params.max_matches_per_file !== undefined &&
+      params.max_matches_per_file > MAX_MAX_MATCHES_PER_FILE
+    ) {
+      return `max_matches_per_file must be at most ${MAX_MAX_MATCHES_PER_FILE}.`;
+    }
+
+    if (
       params.total_max_matches !== undefined &&
       params.total_max_matches < 1
     ) {
       return 'total_max_matches must be at least 1.';
     }
 
-    // Only validate path if one is provided
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
@@ -633,7 +622,6 @@ export class RipGrepTool extends BaseDeclarativeTool<
         return validationError;
       }
 
-      // Check existence and type
       try {
         const stats = fs.statSync(resolvedPath);
         if (!stats.isDirectory() && !stats.isFile()) {
@@ -647,7 +635,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
       }
     }
 
-    return null; // Parameters are valid
+    return null;
   }
 
   protected createInvocation(

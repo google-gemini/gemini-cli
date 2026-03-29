@@ -114,6 +114,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
           type: 'integer',
           minimum: 1,
+          maximum: 500,
         },
         total_max_matches: {
           description:
@@ -195,6 +196,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
           type: 'integer',
           minimum: 1,
+          maximum: 500,
         },
         total_max_matches: {
           description:
@@ -291,13 +293,13 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
   replace: {
     name: EDIT_TOOL_NAME,
     description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
-      
+
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
+
       Expectation for required parameters:
       1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
+      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary.
       4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
       5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
@@ -480,7 +482,7 @@ NEVER save workspace-specific context, local paths, or commands (e.g. "The entry
     description: `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
 
 Depending on the task complexity, you should first divide a given task into subtasks and then use this tool to list out the subtasks that are required to be completed for a given user request.
-Each of the subtasks should be clear and distinct. 
+Each of the subtasks should be clear and distinct.
 
 Use this tool for complex queries that require multiple steps. If you find that the request is actually complex after you have started executing the user task, create a todo list and use it. If execution of the user task requires multiple steps, planning and generally is higher complexity than a simple Q&A, use this tool.
 
