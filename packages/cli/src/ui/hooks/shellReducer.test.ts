@@ -302,8 +302,8 @@ describe('shellReducer', () => {
   it('should handle chunks larger than MAX_SHELL_OUTPUT_SIZE', () => {
     // Setup: existing output that when combined with large chunk exceeds threshold
     const existingOutput = 'a'.repeat(1_500_000); // 1.5 MB
-    const largeChunk = 'b'.repeat(9_600_000); // 9.6 MB
-    // Combined: 11.1 MB, which exceeds MAX (10MB) + BUFFER (1MB) = 11MB threshold
+    const largeChunk = 'b'.repeat(MAX_SHELL_OUTPUT_SIZE + 10_000); // 10.01 MB
+    // Combined exceeds MAX (10MB) + BUFFER (1MB) = 11MB threshold
     const shellState: ShellState = {
       ...initialState,
       backgroundShells: new Map([
@@ -333,7 +333,7 @@ describe('shellReducer', () => {
     expect(typeof output).toBe('string');
     // After truncation, output should be exactly MAX_SHELL_OUTPUT_SIZE
     expect(output.length).toBe(MAX_SHELL_OUTPUT_SIZE);
-    // The new chunk (largeChunk) should be fully preserved at the end
-    expect(output.endsWith(largeChunk)).toBe(true);
+    // Because largeChunk > MAX_SHELL_OUTPUT_SIZE, we only preserve its tail
+    expect(output).toBe('b'.repeat(MAX_SHELL_OUTPUT_SIZE));
   });
 });

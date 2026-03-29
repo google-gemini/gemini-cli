@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnsiOutput, CompletionBehavior } from '@google/gemini-cli-core';
+import type { AnsiOutput } from '@google/gemini-cli-core';
 import {
   MAX_SHELL_OUTPUT_SIZE,
   SHELL_OUTPUT_TRUNCATION_BUFFER,
@@ -109,15 +109,19 @@ export function shellReducer(
           combinedLength >
           MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
         ) {
-          // Truncate currentOutput so that after appending the chunk the
-          // result is exactly MAX_SHELL_OUTPUT_SIZE characters.
-          const keepCurrentLength = Math.max(
-            0,
-            MAX_SHELL_OUTPUT_SIZE - action.chunk.length,
-          );
-          newOutput =
-            currentOutput.slice(currentOutput.length - keepCurrentLength) +
-            action.chunk;
+          // Truncate the output to MAX_SHELL_OUTPUT_SIZE using Array.from
+          // to avoid splitting multi-byte Unicode characters (e.g., emojis).
+          const chunkArr = Array.from(action.chunk);
+          if (chunkArr.length >= MAX_SHELL_OUTPUT_SIZE) {
+            // If the new chunk is larger than the max size, use its tail.
+            newOutput = chunkArr.slice(-MAX_SHELL_OUTPUT_SIZE).join('');
+          } else {
+            // Otherwise, combine the tail of the old output with the new chunk.
+            const keepFromCurrent = MAX_SHELL_OUTPUT_SIZE - chunkArr.length;
+            const currentArr = Array.from(currentOutput);
+            newOutput =
+              currentArr.slice(-keepFromCurrent).join('') + action.chunk;
+          }
         } else {
           newOutput = currentOutput + action.chunk;
         }
