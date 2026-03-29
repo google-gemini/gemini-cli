@@ -3349,6 +3349,8 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     // helper to create & register core tools that are enabled
+    let hasWarnedAboutCoreToolsAllowlist = false;
+
     const maybeRegister = (
       toolClass: { name: string; Name?: string },
       registerFn: () => void,
@@ -3356,6 +3358,18 @@ export class Config implements McpContext, AgentLoopContext {
       const className = toolClass.name;
       const toolName = toolClass.Name || className;
       const coreTools = this.getCoreTools();
+
+      if (
+        coreTools &&
+        coreTools.length > 0 &&
+        !hasWarnedAboutCoreToolsAllowlist
+      ) {
+        hasWarnedAboutCoreToolsAllowlist = true;
+        console.warn(
+          `[Gemini CLI] tools.core is configured as an allowlist. Only the specified tools will be enabled: ${coreTools.join(', ')}. Other built-in tools are disabled.`,
+        );
+      }
+
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
 
