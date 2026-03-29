@@ -400,23 +400,33 @@ export function profileToPerfetto(profile: CPUProfile): string {
   const trackUuid = builder.createTrack('CPU Profile');
   const nodeMap = buildNodeMap(profile.nodes);
 
-  // Convert samples to track events
-  let _currentTime = profile.startTime;
+  // Model each sample as a complete event spanning its sampling interval.
+  let currentTimeUs = profile.startTime;
 
   for (let i = 0; i < profile.samples.length; i++) {
     const nodeId = profile.samples[i];
-    const delta = profile.timeDeltas[i] || 0;
-    _currentTime += delta;
+    const durationUs = Math.max(profile.timeDeltas[i] || 0, 1);
+    const sampleStartUs = currentTimeUs;
+    currentTimeUs += durationUs;
 
     const node = nodeMap.get(nodeId);
     if (node) {
-      // Add as memory snapshot event repurposed for CPU
-      const metaData: Record<string, number> = {
+      const functionName = node.callFrame.functionName || '(anonymous)';
+      const metaData = {
         sampleIndex: i,
-        nodeIdNum: nodeId,
+        nodeId,
+        scriptId: node.callFrame.scriptId,
+        url: node.callFrame.url,
+        lineNumber: node.callFrame.lineNumber,
+        columnNumber: node.callFrame.columnNumber,
       };
-      builder.addMemorySnapshot(trackUuid, 0, 0, delta, 0, metaData);
-      void (node.callFrame.functionName || '(anonymous)'); // referenced to avoid unused warning
+      builder.addCompleteEvent(
+        trackUuid,
+        functionName,
+        sampleStartUs,
+        durationUs,
+        metaData,
+      );
     }
   }
 
