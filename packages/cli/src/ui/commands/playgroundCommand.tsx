@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render, Box, Text, useInput } from 'ink';
-import { useState, useEffect } from 'react';
+import { render, Box, Text } from 'ink';
+import { useState, useEffect, useReducer } from 'react';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 const EVAL_CASES = [
   "Missing dependency lodash",
@@ -15,24 +16,30 @@ const EVAL_CASES = [
   "Refactor utils.ts to remove circular dependency"
 ];
 
+function selectedIndexReducer(state: number, action: 'UP' | 'DOWN'): number {
+  if (action === 'UP') return Math.max(0, state - 1);
+  if (action === 'DOWN') return Math.min(EVAL_CASES.length - 1, state + 1);
+  return state;
+}
+
 export const PlaygroundApp = () => {
   const [promptContent, setPromptContent] = useState<string>('Loading prompt...');
   const [executionStream, setExecutionStream] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, dispatchIndex] = useReducer(selectedIndexReducer, 0);
   const [activeCase, setActiveCase] = useState<string | null>(null);
 
-  useInput((input, key) => {
-    if (key.upArrow) {
-      setSelectedIndex((prev) => Math.max(0, prev - 1));
+  useKeypress((key) => {
+    if (key.name === 'up') {
+      dispatchIndex('UP');
     }
-    if (key.downArrow) {
-      setSelectedIndex((prev) => Math.min(EVAL_CASES.length - 1, prev + 1));
+    if (key.name === 'down') {
+      dispatchIndex('DOWN');
     }
-    if (key.return) {
+    if (key.name === 'enter') {
       setActiveCase(EVAL_CASES[selectedIndex]);
       setExecutionStream([`> Initializing Eval Case: '${EVAL_CASES[selectedIndex]}'`]);
     }
-  });
+  }, { isActive: true });
 
   useEffect(() => {
     const fileToWatch = path.resolve(process.cwd(), 'packages/core/src/prompts/snippets.ts');
