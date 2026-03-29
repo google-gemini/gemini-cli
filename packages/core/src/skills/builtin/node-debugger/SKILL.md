@@ -145,14 +145,14 @@ Uses Chrome Remote Interface (`chrome-remote-interface`):
 
 ## When to Use
 
-✅ **Use this skill for:**
+**Use this skill for:**
 - Capturing heap snapshots
 - CPU profiling
 - Coverage analysis
 - Batch breakpoint debugging
 - Automated diagnostics
 
-❌ **Use DAP for:**
+**Use DAP for:**
 - Interactive step-through debugging
 - Complex conditional breakpoints
 - Watch expressions requiring UI

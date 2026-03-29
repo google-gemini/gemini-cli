@@ -63,11 +63,11 @@ Comparing profiles:
 ```
 Function               Baseline    Current    Change
 --------------------- ---------- ---------- --------
-database.query        200ms      850ms      +325% ⚠️
+database.query        200ms      850ms      +325% 
 JSON.parse            50ms       52ms       +4%
 renderTemplate        120ms      125ms      +4%
 
-⚠️  database.query shows significant regression
+database.query shows significant regression
 ```
 
 ## Output Formats
