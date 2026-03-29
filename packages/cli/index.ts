@@ -38,13 +38,23 @@ process.on('uncaughtException', (error) => {
 
 // Start the application.
 // We use a supervised child process to enable self-healing and automatic session recovery.
-relaunchAppInChildProcess([], []).catch((error) => {
-  // If the supervisor itself fails to launch, fall back to a direct execution
-  writeToStderr(
-    `[Supervisor] Initial launch failed: ${error.message}. Falling back to direct mode.\n`,
-  );
-  main().catch((fatal) => {
-    writeToStderr(`[Fatal] Direct execution failed: ${fatal.message}\n`);
-    process.exit(1);
+relaunchAppInChildProcess([], [])
+  .then(async () => {
+    // relaunchAppInChildProcess either spawns a child and waits for it (supervisor mode)
+    // or returns immediately if GEMINI_CLI_NO_RELAUNCH is set (supervised child mode).
+    // In supervised child mode, we need to run main() here.
+    if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+      await main();
+    }
+    // In supervisor mode, the child process has already run and exited normally.
+  })
+  .catch((error) => {
+    // If the supervisor itself fails to launch, fall back to a direct execution
+    writeToStderr(
+      `[Supervisor] Initial launch failed: ${error.message}. Falling back to direct mode.\n`,
+    );
+    main().catch((fatal) => {
+      writeToStderr(`[Fatal] Direct execution failed: ${fatal.message}\n`);
+      process.exit(1);
+    });
   });
-});
