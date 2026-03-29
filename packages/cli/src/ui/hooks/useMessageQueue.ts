@@ -12,6 +12,7 @@ export interface UseMessageQueueOptions {
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
   isMcpReady: boolean;
+  canSubmitMessages?: boolean;
 }
 
 export interface UseMessageQueueReturn {
@@ -32,6 +33,7 @@ export function useMessageQueue({
   streamingState,
   submitQuery,
   isMcpReady,
+  canSubmitMessages = true,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
 
@@ -70,6 +72,7 @@ export function useMessageQueue({
       isConfigInitialized &&
       streamingState === StreamingState.Idle &&
       isMcpReady &&
+      canSubmitMessages &&
       messageQueue.length > 0
     ) {
       // Combine all messages with double newlines for clarity
@@ -82,6 +85,7 @@ export function useMessageQueue({
     isConfigInitialized,
     streamingState,
     isMcpReady,
+    canSubmitMessages,
     messageQueue,
     submitQuery,
   ]);

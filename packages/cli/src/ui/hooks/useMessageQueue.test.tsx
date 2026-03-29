@@ -29,6 +29,7 @@ describe('useMessageQueue', () => {
     streamingState: StreamingState;
     submitQuery: (query: string) => void;
     isMcpReady: boolean;
+    canSubmitMessages?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useMessageQueue>;
     function TestComponent(props: typeof initialProps) {
@@ -185,6 +186,30 @@ describe('useMessageQueue', () => {
 
     await waitFor(() => {
       expect(mockSubmitQuery).toHaveBeenCalledWith('Delayed message');
+      expect(result.current.messageQueue).toEqual([]);
+    });
+  });
+
+  it('should hold queued messages until submission is re-enabled', async () => {
+    const { result, rerender } = await renderMessageQueueHook({
+      isConfigInitialized: true,
+      streamingState: StreamingState.Idle,
+      submitQuery: mockSubmitQuery,
+      isMcpReady: true,
+      canSubmitMessages: false,
+    });
+
+    act(() => {
+      result.current.addMessage('Queued during compression');
+    });
+
+    expect(mockSubmitQuery).not.toHaveBeenCalled();
+    expect(result.current.messageQueue).toEqual(['Queued during compression']);
+
+    rerender({ canSubmitMessages: true });
+
+    await waitFor(() => {
+      expect(mockSubmitQuery).toHaveBeenCalledWith('Queued during compression');
       expect(result.current.messageQueue).toEqual([]);
     });
   });
