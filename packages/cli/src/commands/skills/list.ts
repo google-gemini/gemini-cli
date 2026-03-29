@@ -64,7 +64,7 @@ export async function handleList(args: { all?: boolean }) {
 }
 
 export const listCommand: CommandModule = {
-  command: 'list [--all]',
+  command: 'list',
   describe: 'Lists discovered agent skills.',
   builder: (yargs) =>
     yargs.option('all', {
