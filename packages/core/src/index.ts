@@ -169,6 +169,7 @@ export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/tool-names.js';
+export * from './tools/definitions/base-declarations.js';
 export * from './resources/resource-registry.js';
 
 // Export prompt logic

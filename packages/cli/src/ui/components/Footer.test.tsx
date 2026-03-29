@@ -76,6 +76,7 @@ const mockConfig = {
   getIdeMode: () => false,
   isTrustedFolder: () => true,
   getExtensionRegistryURI: () => undefined,
+  getSandboxConfig: () => undefined,
 } as unknown as Config;
 
 const mockSessionStats = {

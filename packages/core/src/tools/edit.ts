@@ -289,6 +289,56 @@ async function calculateRegexReplacement(
   };
 }
 
+async function calculateLineRangeReplacement(
+  context: ReplacementContext,
+): Promise<ReplacementResult | null> {
+  const { currentContent, params } = context;
+  const { start_line, end_line, old_string, new_string } = params;
+
+  if (start_line === undefined || end_line === undefined) {
+    return null;
+  }
+
+  const lines = currentContent.split(/\r?\n/);
+  if (start_line < 1 || end_line > lines.length || start_line > end_line) {
+    return null;
+  }
+
+  const targetLines = lines.slice(start_line - 1, end_line);
+  const targetContent = targetLines.join('\n');
+
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  // Check if the target lines match the old_string (either exactly or with flexible whitespace)
+  const isExactMatch = targetContent === normalizedSearch;
+  const isFlexibleMatch =
+    !isExactMatch &&
+    targetContent.replace(/\s+/g, ' ').trim() ===
+      normalizedSearch.replace(/\s+/g, ' ').trim();
+
+  if (isExactMatch || isFlexibleMatch) {
+    const newLines = [...lines];
+    const replacementLines = normalizedReplace.split('\n');
+    newLines.splice(
+      start_line - 1,
+      end_line - start_line + 1,
+      ...replacementLines,
+    );
+
+    return {
+      newContent: restoreTrailingNewline(currentContent, newLines.join('\n')),
+      occurrences: 1,
+      finalOldString: targetContent,
+      finalNewString: normalizedReplace,
+      strategy: isExactMatch ? 'exact' : 'flexible',
+      matchRanges: [{ start: start_line, end: end_line }],
+    };
+  }
+
+  return null;
+}
+
 export async function calculateReplacement(
   config: Config,
   context: ReplacementContext,
@@ -305,6 +355,16 @@ export async function calculateReplacement(
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
     };
+  }
+
+  // 1. Try line-range replacement first if lines are provided
+  if (params.start_line !== undefined && params.end_line !== undefined) {
+    const rangeResult = await calculateLineRangeReplacement(context);
+    if (rangeResult) {
+      const event = new EditStrategyEvent(rangeResult.strategy || 'exact');
+      logEditStrategy(config, event);
+      return rangeResult;
+    }
   }
 
   const exactResult = await calculateExactReplacement(context);
@@ -398,6 +458,16 @@ export interface EditToolParams {
    * If false (default), the tool will only succeed if exactly one occurrence is found.
    */
   allow_multiple?: boolean;
+
+  /**
+   * Optional: The 1-based line number to start the replacement at.
+   */
+  start_line?: number;
+
+  /**
+   * Optional: The 1-based line number to end the replacement at (inclusive).
+   */
+  end_line?: number;
 
   /**
    * The instruction for what needs to be done.

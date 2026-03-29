@@ -507,7 +507,9 @@ export interface SandboxConfig {
     | 'sandbox-exec'
     | 'runsc'
     | 'lxc'
-    | 'windows-native';
+    | 'windows-native'
+    | 'bwrap'
+    | 'native';
   image?: string;
 }
 
@@ -525,6 +527,8 @@ export const ConfigSchema = z.object({
           'runsc',
           'lxc',
           'windows-native',
+          'bwrap',
+          'native',
         ])
         .optional(),
       image: z.string().optional(),

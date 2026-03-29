@@ -36,7 +36,15 @@ const VALID_SANDBOX_COMMANDS = [
 
 function isSandboxCommand(
   value: string,
-): value is Exclude<SandboxConfig['command'], undefined> {
+): value is
+  | 'docker'
+  | 'podman'
+  | 'sandbox-exec'
+  | 'runsc'
+  | 'lxc'
+  | 'windows-native'
+  | 'bwrap'
+  | 'native' {
   return (VALID_SANDBOX_COMMANDS as ReadonlyArray<string | undefined>).includes(
     value,
   );
@@ -44,7 +52,16 @@ function isSandboxCommand(
 
 function getSandboxCommand(
   sandbox?: boolean | string | null,
-): SandboxConfig['command'] | '' {
+):
+  | 'docker'
+  | 'podman'
+  | 'sandbox-exec'
+  | 'runsc'
+  | 'lxc'
+  | 'windows-native'
+  | 'bwrap'
+  | 'native'
+  | '' {
   // If the SANDBOX env var is set, we're already inside the sandbox.
   if (process.env['SANDBOX']) {
     return '';
@@ -184,9 +201,17 @@ export async function loadSandboxConfig(
   const isNative =
     command === 'windows-native' ||
     command === 'sandbox-exec' ||
-    command === 'lxc';
+    command === 'lxc' ||
+    command === 'bwrap' ||
+    command === 'native';
 
   return command && (image || isNative)
-    ? { enabled: true, allowedPaths, networkAccess, command, image }
+    ? {
+        enabled: true,
+        allowedPaths,
+        networkAccess,
+        command: command as SandboxConfig['command'],
+        image,
+      }
     : undefined;
 }

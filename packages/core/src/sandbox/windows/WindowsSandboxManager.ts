@@ -51,7 +51,18 @@ export class WindowsSandboxManager implements SandboxManager {
   private readonly deniedCache = new Set<string>();
 
   constructor(private readonly options: GlobalSandboxOptions) {
-    this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+    // Determine the helper path based on the execution environment.
+    // In SEA (Single Executable), the files are extracted to a known structure.
+    const seaExtractionDir = process.env['GEMINI_RUNTIME_DIR'];
+    if (seaExtractionDir) {
+      this.helperPath = path.resolve(
+        seaExtractionDir,
+        'sandbox/windows/GeminiSandbox.exe',
+      );
+    } else {
+      // Development mode / source execution
+      this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+    }
   }
 
   isKnownSafeCommand(args: string[]): boolean {

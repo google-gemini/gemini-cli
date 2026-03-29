@@ -96,7 +96,7 @@ const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
         ? 'native'
         : sandboxConfig.command === 'bwrap'
           ? 'bwrap'
-          : sandboxConfig.command || 'active';
+          : sandboxConfig.command || 'tool-sandbox';
     return <Text color="green">{label}</Text>;
   }
 
@@ -320,7 +320,7 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
           str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
         else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
         else if (sandboxConfig?.enabled)
-          str = sandboxConfig.command || 'active';
+          str = sandboxConfig.command || 'tool-sandbox';
 
         addCol(
           id,

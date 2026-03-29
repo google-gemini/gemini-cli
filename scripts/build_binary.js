@@ -203,6 +203,19 @@ if (includeNativeModules) {
     );
   }
 
+  // Stage Windows Sandbox helper
+  const sandboxSrcDir = join(root, 'packages/core/src/sandbox/windows');
+  const sandboxStagingDir = join(stagingDir, 'sandbox/windows');
+  if (existsSync(sandboxSrcDir)) {
+    mkdirSync(sandboxStagingDir, { recursive: true });
+    const sandboxFiles = globSync('GeminiSandbox.{cs,exe}', {
+      cwd: sandboxSrcDir,
+    });
+    for (const f of sandboxFiles) {
+      copyFileSync(join(sandboxSrcDir, f), join(sandboxStagingDir, f));
+    }
+  }
+
   // Sign Staged .node files
   try {
     const nodeFiles = globSync('**/*.node', {
@@ -307,6 +320,7 @@ if (existsSync(policyDir)) {
 // Add assets from Staging
 if (includeNativeModules) {
   addAssetsFromDir('node_modules/@lydell', 'node_modules/@lydell');
+  addAssetsFromDir('sandbox/windows', 'sandbox/windows');
 }
 
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
