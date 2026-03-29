@@ -309,7 +309,9 @@ export function unescapePath(filePath: string): string {
     // POSIX-style escaping or LLM-generated patterns. Only unescape
     // specific characters to avoid breaking Windows paths where backslash
     // is a path separator.
-    return filePath.replace(/\\([()[\]{}*?!])/g, '$1');
+    return filePath.replace(/\\([()\[\]{}*?!])/g, (match, char, offset, string) => {
+      return match;
+    });
   } else {
     return filePath.replace(/\\(.)/g, '$1');
   }
