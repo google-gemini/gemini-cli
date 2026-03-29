@@ -408,7 +408,9 @@ function hasPromptCommandTransform(root: Node): boolean {
   return false;
 }
 
-function parseBashCommandDetails(command: string): CommandParseResult | null {
+export function parseBashCommandDetails(
+  command: string,
+): CommandParseResult | null {
   if (treeSitterInitializationError) {
     debugLogger.debug(
       'Bash parser not initialized:',
@@ -557,7 +559,19 @@ export function parseCommandDetails(
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
-    return parsePowerShellCommandDetails(command, configuration.executable);
+    const result = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    if (!result || result.hasError) {
+      // Fallback to bash parser which is usually good enough for simple commands
+      // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
+      const bashResult = parseBashCommandDetails(command);
+      if (bashResult && !bashResult.hasError) {
+        return bashResult;
+      }
+    }
+    return result;
   }
 
   if (configuration.shell === 'bash') {
