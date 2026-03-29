@@ -102,17 +102,18 @@ function buildHandshake(host, port, path) {
   return { handshake, expectedAccept };
 }
 
-// ---------- Step 3: WebSocket frame parser (text frames only) ---------------
+// ---------- Step 3: WebSocket frame parser (text + control frames) ----------
 
 function parseFrames(buffer) {
   const messages = [];
+  const controlFrames = [];
   let offset = 0;
   while (offset < buffer.length) {
     if (buffer.length - offset < 2) break;
     const fin = (buffer[offset] & 0x80) !== 0;
     const opcode = buffer[offset] & 0x0f;
     offset++;
-    // Server frames from V8 inspector are always unmasked (mask bit at 0x80 is 0)
+    const masked = (buffer[offset] & 0x80) !== 0;
     let payloadLen = buffer[offset] & 0x7f;
     offset++;
     if (payloadLen === 126) {
@@ -124,43 +125,85 @@ function parseFrames(buffer) {
       payloadLen = Number(buffer.readBigUInt64BE(offset));
       offset += 8;
     }
+    let maskKey = null;
+    if (masked) {
+      if (buffer.length - offset < 4) break;
+      maskKey = buffer.slice(offset, offset + 4);
+      offset += 4;
+    }
     if (buffer.length - offset < payloadLen) break;
-    const payload = buffer.slice(offset, offset + payloadLen);
+    let payload = buffer.slice(offset, offset + payloadLen);
     offset += payloadLen;
-    if (fin && opcode === 1) messages.push(payload.toString('utf8'));
+    if (masked && maskKey) {
+      const unmasked = Buffer.alloc(payload.length);
+      for (let i = 0; i < payload.length; i++) {
+        unmasked[i] = payload[i] ^ maskKey[i & 3];
+      }
+      payload = unmasked;
+    }
+    if (fin && opcode === 1) {
+      messages.push(payload.toString('utf8'));
+    } else if (fin && (opcode === 0x8 || opcode === 0x9 || opcode === 0xA)) {
+      controlFrames.push({ opcode, payload });
+    }
   }
-  return { messages, remaining: buffer.slice(offset) };
+  return { messages, controlFrames, remaining: buffer.slice(offset) };
 }
 
-// ---------- Step 4: Send MASKED WS text frame (RFC 6455 Section 5.1) --------
+// ---------- Step 4: Send MASKED WS frames (RFC 6455 Section 5.1) ------------
 // Per RFC 6455: "A client MUST mask all frames that it sends to the server."
 
-function buildTextFrame(text) {
-  const payload = Buffer.from(text, 'utf8');
-  const len = payload.length;
+function buildFrame(opcode, payload = Buffer.alloc(0)) {
+  const body = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8');
+  const len = body.length;
   const maskKey = randomBytes(4);
   let header;
   if (len < 126) {
     header = Buffer.alloc(2);
-    header[0] = 0x81; // FIN + opcode=text
+    header[0] = 0x80 | opcode;
     header[1] = 0x80 | len; // MASK bit set + payload length
   } else if (len < 65536) {
     header = Buffer.alloc(4);
-    header[0] = 0x81;
+    header[0] = 0x80 | opcode;
     header[1] = 0x80 | 126;
     header.writeUInt16BE(len, 2);
   } else {
     header = Buffer.alloc(10);
-    header[0] = 0x81;
+    header[0] = 0x80 | opcode;
     header[1] = 0x80 | 127;
     header.writeBigUInt64BE(BigInt(len), 2);
   }
   // XOR payload with 4-byte mask key (RFC 6455 Section 5.3)
   const maskedPayload = Buffer.alloc(len);
   for (let i = 0; i < len; i++) {
-    maskedPayload[i] = payload[i] ^ maskKey[i & 3];
+    maskedPayload[i] = body[i] ^ maskKey[i & 3];
   }
   return Buffer.concat([header, maskKey, maskedPayload]);
+}
+
+function buildTextFrame(text) {
+  return buildFrame(0x1, text);
+}
+
+function buildPongFrame(payload) {
+  return buildFrame(0xA, payload);
+}
+
+function buildCloseFrame(payload = Buffer.alloc(0)) {
+  return buildFrame(0x8, payload);
+}
+
+function decodeCloseReason(payload) {
+  if (!payload || payload.length < 2) return 'no close reason provided';
+  const code = payload.readUInt16BE(0);
+  const reason = payload.length > 2 ? payload.slice(2).toString('utf8') : 'no reason';
+  return `code ${code}${reason ? ` (${reason})` : ''}`;
+}
+
+function isMainModule() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1') === entry;
 }
 
 // ---------- Main capture flow -----------------------------------------------
@@ -182,10 +225,51 @@ async function captureCdpSnapshot() {
     let handshakeDone = false;
     let residual = Buffer.alloc(0);
     let snapshotDone = false;
+    let settled = false;
+    let closeSent = false;
+    let completionPoll = null;
 
     function send(method, params = {}) {
       const msg = JSON.stringify({ id: msgId++, method, params });
       sock.write(buildTextFrame(msg));
+    }
+
+    function sendClose(payload = Buffer.alloc(0)) {
+      if (closeSent || sock.destroyed) return;
+      closeSent = true;
+      sock.write(buildCloseFrame(payload));
+    }
+
+    function cleanup() {
+      if (completionPoll) {
+        clearInterval(completionPoll);
+        completionPoll = null;
+      }
+      sock.setTimeout(0);
+    }
+
+    function finishSuccess() {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      process.stdout.write('\n');
+      writer.end(() => {
+        console.log(`[cdp] Snapshot written to ${OUTPUT}`);
+        sock.destroy();
+        resolve();
+      });
+    }
+
+    function fail(error, options = {}) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (options.sendClose) {
+        sendClose(options.closePayload);
+      }
+      writer.destroy();
+      sock.destroy();
+      reject(error);
     }
 
     sock.on('connect', () => sock.write(handshake));
@@ -193,8 +277,8 @@ async function captureCdpSnapshot() {
     sock.on('data', (chunk) => {
       if (!handshakeDone) {
         const text = chunk.toString();
-        if (!text.includes('101')) { reject(new Error('WS upgrade failed')); return; }
-        if (!text.includes(expectedAccept)) { reject(new Error('WS accept key mismatch')); return; }
+        if (!text.includes('101')) { fail(new Error('WS upgrade failed')); return; }
+        if (!text.includes(expectedAccept)) { fail(new Error('WS accept key mismatch')); return; }
         handshakeDone = true;
         console.log('[cdp] WebSocket connected. Enabling HeapProfiler...');
         send('HeapProfiler.enable');
@@ -204,8 +288,25 @@ async function captureCdpSnapshot() {
       }
 
       residual = Buffer.concat([residual, chunk]);
-      const { messages, remaining } = parseFrames(residual);
+      const { messages, controlFrames, remaining } = parseFrames(residual);
       residual = remaining;
+
+      for (const frame of controlFrames) {
+        if (frame.opcode === 0x9) {
+          sock.write(buildPongFrame(frame.payload));
+          continue;
+        }
+        if (frame.opcode === 0xA) {
+          continue;
+        }
+        if (frame.opcode === 0x8) {
+          fail(
+            new Error(`[cdp] Inspector closed the WebSocket connection: ${decodeCloseReason(frame.payload)}`),
+            { sendClose: !closeSent, closePayload: frame.payload }
+          );
+          return;
+        }
+      }
 
       for (const raw of messages) {
         let msg;
@@ -231,25 +332,14 @@ async function captureCdpSnapshot() {
 
         // takeHeapSnapshot response (id=2)
         if (msg.id === 2) {
-          if (msg.error) { reject(new Error('CDP error: ' + msg.error.message)); return; }
+          if (msg.error) { fail(new Error('CDP error: ' + msg.error.message)); return; }
           if (snapshotDone) {
-            process.stdout.write('\n');
-            writer.end(() => {
-              console.log(`[cdp] Snapshot written to ${OUTPUT}`);
-              sock.destroy();
-              resolve();
-            });
+            finishSuccess();
           } else {
             // Wait for progress finished event
-            const check = setInterval(() => {
+            completionPoll = setInterval(() => {
               if (snapshotDone) {
-                clearInterval(check);
-                process.stdout.write('\n');
-                writer.end(() => {
-                  console.log(`[cdp] Snapshot written to ${OUTPUT}`);
-                  sock.destroy();
-                  resolve();
-                });
+                finishSuccess();
               }
             }, 100);
           }
@@ -257,12 +347,19 @@ async function captureCdpSnapshot() {
       }
     });
 
-    sock.on('error', (e) => reject(new Error('[cdp] Socket error: ' + e.message)));
-    sock.setTimeout(30000, () => reject(new Error('[cdp] Connection timed out after 30s')));
+    sock.on('error', (e) => fail(new Error('[cdp] Socket error: ' + e.message)));
+    sock.setTimeout(30000, () => fail(new Error('[cdp] Connection timed out after 30s')));
+    sock.on('close', () => {
+      if (!settled) {
+        fail(new Error('[cdp] Inspector closed the socket before snapshot capture completed.'));
+      }
+    });
   });
 }
 
-captureCdpSnapshot().catch((e) => {
-  console.error('[cdp] FATAL:', e.message);
-  process.exit(1);
-});
+if (isMainModule()) {
+  captureCdpSnapshot().catch((e) => {
+    console.error('[cdp] FATAL:', e.message);
+    process.exit(1);
+  });
+}
