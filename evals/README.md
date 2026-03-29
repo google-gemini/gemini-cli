@@ -207,6 +207,33 @@ consistently.
 Keep this section factual and brief. Link to logs/runs instead of pasting long
 output blocks.
 
+## Quick Eval Gap Triage (Contributor Starter)
+
+If you are looking for a high-impact eval contribution, use this lightweight
+triage flow before writing code.
+
+1. Pick one behavior area (for example: tool selection, approvals, context
+   continuity, instruction following, or sub-agent delegation).
+2. Check current coverage quickly:
+
+- `rg "describe\\(|evalTest\\(" evals/*.eval.ts`
+- `rg "<keyword-for-behavior>" evals/*.eval.ts`
+
+3. Review recent nightly trends for candidate flaky tests and note any repeated
+   regressions for the same behavior area.
+4. Open or link one issue that states:
+
+- expected behavior,
+- current observed gap,
+- why it matters for users,
+- and the first eval(s) you plan to add or stabilize.
+
+5. Start with one narrow eval change and keep it in `USUALLY_PASSES` incubation
+   until promotion criteria are met.
+
+This keeps contribution scope small, reviewable, and aligned with the deflaking
+process.
+
 ## Ensuring Eval is Stable Prior to Check-in
 
 The
