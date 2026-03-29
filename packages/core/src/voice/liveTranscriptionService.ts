@@ -36,7 +36,7 @@ export class LiveTranscriptionService extends EventEmitter<LiveTranscriptionEven
     }
 
     const url = `${baseUrl}?key=${this.apiKey}`;
-    debugLogger.log(
+    debugLogger.debug(
       `[LiveTranscription] Connecting to model ${modelName} via raw WebSocket with API Key...`,
     );
 
@@ -45,8 +45,6 @@ export class LiveTranscriptionService extends EventEmitter<LiveTranscriptionEven
         this.ws = new WebSocket(url);
 
         this.ws.on('open', () => {
-          debugLogger.log('[LiveTranscription] WebSocket Connected');
-
           const setupMessage = {
             setup: {
               model: `models/${modelName}`,
@@ -132,7 +130,7 @@ export class LiveTranscriptionService extends EventEmitter<LiveTranscriptionEven
         });
 
         this.ws.on('close', (code, reason) => {
-          debugLogger.log(
+          debugLogger.debug(
             `[LiveTranscription] Connection Closed. Code: ${code}, Reason: ${reason}`,
           );
           this.emit('close');
@@ -174,7 +172,6 @@ export class LiveTranscriptionService extends EventEmitter<LiveTranscriptionEven
 
   disconnect(): void {
     if (this.ws) {
-      debugLogger.log('[LiveTranscription] Disconnecting...');
       this.ws.close();
       this.ws = null;
     }
