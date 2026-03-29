@@ -297,3 +297,7 @@ export * from './context/profiles.js';
 
 // Export trust utility
 export * from './utils/trust.js';
+
+// Export voice utilities
+export * from './voice/audioRecorder.js';
+export * from './voice/liveTranscriptionService.js';
