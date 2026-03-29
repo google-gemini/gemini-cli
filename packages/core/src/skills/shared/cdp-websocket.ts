@@ -527,7 +527,7 @@ export class WebSocketCDPClient {
     await fs.writeFile(outputPath, fullSnapshot, 'utf8');
   }
 
-  async forcGC(): Promise<void> {
+  async forceGC(): Promise<void> {
     await this.sendCommand('HeapProfiler.collectGarbage');
   }
 
