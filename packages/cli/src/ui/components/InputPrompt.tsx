@@ -689,7 +689,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           keyMatchers[Command.ESCAPE](key) ||
           keyMatchers[Command.VOICE_MODE_PTT](key)
         ) {
-          debugLogger.log(`[Voice] Stop requested via ${key.name}`);
+          debugLogger.debug(`[Voice] Stop requested via ${key.name}`);
           recordingInProgressRef.current = false;
           stopRequestedRef.current = true;
           setIsRecording(false);
