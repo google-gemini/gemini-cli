@@ -1,4 +1,4 @@
-/* global console, process, Buffer, URL, setInterval, clearInterval */
+/* global console, process, Buffer, URL, setTimeout, clearTimeout */
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -12,6 +12,7 @@
  *
  * Usage:
  *   node cdp.mjs --port 9229 --output ./snapshot_cdp.heapsnapshot
+ *   node cdp.mjs --port 9229 --output ./snapshot_cdp.heapsnapshot --timeout 300
  *
  * Target process must be launched with:
  *   node --inspect=127.0.0.1:9229 your-script.js
@@ -22,8 +23,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import { request } from 'node:http';
 import { createWriteStream } from 'node:fs';
 import { parseArgs } from 'node:util';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 // ---------- Argument parsing ------------------------------------------------
 
@@ -32,7 +31,7 @@ const { values: args } = parseArgs({
     port: { type: 'string', default: '9229' },
     host: { type: 'string', default: '127.0.0.1' },
     output: { type: 'string', default: './snapshot_cdp.heapsnapshot' },
-    'timeout-ms': { type: 'string', default: '30000' },
+    timeout: { type: 'string', default: '300' },
   },
   strict: true,
 });
@@ -40,7 +39,7 @@ const { values: args } = parseArgs({
 const PORT = parseInt(args.port, 10);
 const HOST = args.host;
 const OUTPUT = args.output;
-const TIMEOUT_MS = parseInt(args['timeout-ms'], 10);
+const TIMEOUT_S = parseInt(args.timeout, 10);
 
 // ---------- Security: Loopback-only enforcement ----------------------------
 
@@ -58,10 +57,6 @@ if (PORT < 1024) {
     `[cdp] SECURITY: Refused connection to privileged port ${PORT}.\n` +
     `     Use a port >= 1024 (default: 9229).`
   );
-  process.exit(1);
-}
-if (!Number.isFinite(TIMEOUT_MS) || TIMEOUT_MS <= 0) {
-  console.error('[cdp] Invalid --timeout-ms value. Use a positive integer.');
   process.exit(1);
 }
 
@@ -110,114 +105,180 @@ function buildHandshake(host, port, path) {
   return { handshake, expectedAccept };
 }
 
-// ---------- Step 3: WebSocket frame parser (text + control frames) ----------
+// ---------- Step 3: Robust WebSocket frame parser ---------------------------
+// Handles: text frames (opcode 1), continuation frames (opcode 0),
+// close frames (opcode 8), ping frames (opcode 9).
+// V8 inspector sends large payloads that may be fragmented across
+// multiple WebSocket frames AND multiple TCP packets.
 
+/**
+ * Parse one or more complete WebSocket frames from a buffer.
+ *
+ * Returns an object with:
+ * - frames: array of { opcode, fin, payload } for each complete frame
+ * - remaining: leftover bytes not yet forming a complete frame
+ *
+ * This is the low-level parser. Message assembly (handling fragmentation)
+ * is done by the caller.
+ */
 function parseFrames(buffer) {
-  const messages = [];
-  const controlFrames = [];
+  const frames = [];
   let offset = 0;
+
   while (offset < buffer.length) {
+    // Need at least 2 bytes for the frame header
     if (buffer.length - offset < 2) break;
-    const fin = (buffer[offset] & 0x80) !== 0;
-    const opcode = buffer[offset] & 0x0f;
-    offset++;
-    const masked = (buffer[offset] & 0x80) !== 0;
-    let payloadLen = buffer[offset] & 0x7f;
-    offset++;
+
+    const byte0 = buffer[offset];
+    const byte1 = buffer[offset + 1];
+    const fin = (byte0 & 0x80) !== 0;
+    const opcode = byte0 & 0x0f;
+    const masked = (byte1 & 0x80) !== 0;
+    let payloadLen = byte1 & 0x7f;
+    let headerLen = 2;
+
     if (payloadLen === 126) {
-      if (buffer.length - offset < 2) break;
-      payloadLen = buffer.readUInt16BE(offset);
-      offset += 2;
+      headerLen += 2;
+      if (buffer.length - offset < headerLen) break;
+      payloadLen = buffer.readUInt16BE(offset + 2);
     } else if (payloadLen === 127) {
-      if (buffer.length - offset < 8) break;
-      payloadLen = Number(buffer.readBigUInt64BE(offset));
-      offset += 8;
-    }
-    let maskKey = null;
-    if (masked) {
-      if (buffer.length - offset < 4) break;
-      maskKey = buffer.slice(offset, offset + 4);
-      offset += 4;
-    }
-    if (buffer.length - offset < payloadLen) break;
-    let payload = buffer.slice(offset, offset + payloadLen);
-    offset += payloadLen;
-    if (masked && maskKey) {
-      const unmasked = Buffer.alloc(payload.length);
-      for (let i = 0; i < payload.length; i++) {
-        unmasked[i] = payload[i] ^ maskKey[i & 3];
+      headerLen += 8;
+      if (buffer.length - offset < headerLen) break;
+      // For safety, read as BigInt then convert
+      const bigLen = buffer.readBigUInt64BE(offset + 2);
+      if (bigLen > BigInt(Number.MAX_SAFE_INTEGER)) {
+        // Frame too large to handle - skip it
+        break;
       }
-      payload = unmasked;
+      payloadLen = Number(bigLen);
     }
-    if (fin && opcode === 1) {
-      messages.push(payload.toString('utf8'));
-    } else if (fin && (opcode === 0x8 || opcode === 0x9 || opcode === 0xA)) {
-      controlFrames.push({ opcode, payload });
+
+    // If server sent a masked frame, account for the 4-byte mask key
+    if (masked) {
+      headerLen += 4;
     }
+
+    const totalFrameLen = headerLen + payloadLen;
+    if (buffer.length - offset < totalFrameLen) break;
+
+    let payload;
+    if (masked) {
+      const maskKey = buffer.slice(offset + headerLen - 4, offset + headerLen);
+      payload = Buffer.alloc(payloadLen);
+      for (let i = 0; i < payloadLen; i++) {
+        payload[i] = buffer[offset + headerLen + i] ^ maskKey[i & 3];
+      }
+    } else {
+      payload = buffer.slice(offset + headerLen, offset + headerLen + payloadLen);
+    }
+
+    frames.push({ opcode, fin, payload });
+    offset += totalFrameLen;
   }
-  return { messages, controlFrames, remaining: buffer.slice(offset) };
+
+  return { frames, remaining: buffer.slice(offset) };
 }
 
-// ---------- Step 4: Send MASKED WS frames (RFC 6455 Section 5.1) ------------
-// Per RFC 6455: "A client MUST mask all frames that it sends to the server."
+/**
+ * Assembles complete WebSocket messages from a stream of frames.
+ * Handles continuation frames (opcode 0) for fragmented messages.
+ */
+class MessageAssembler {
+  constructor() {
+    this._fragments = [];
+    this._currentOpcode = -1;
+  }
 
-function buildFrame(opcode, payload = Buffer.alloc(0)) {
-  const body = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8');
-  const len = body.length;
+  /**
+   * Feed a parsed frame. Returns an array of complete text messages (strings).
+   */
+  feed(frame) {
+    const messages = [];
+
+    if (frame.opcode >= 0x8) {
+      // Control frame (close=8, ping=9, pong=10) — handle inline
+      if (frame.opcode === 8) {
+        messages.push({ _type: 'close' });
+      } else if (frame.opcode === 9) {
+        messages.push({ _type: 'ping', payload: frame.payload });
+      }
+      // Control frames don't affect fragmentation state
+      return messages;
+    }
+
+    if (frame.opcode !== 0) {
+      // New data frame (text=1, binary=2)
+      this._currentOpcode = frame.opcode;
+      this._fragments = [frame.payload];
+    } else {
+      // Continuation frame
+      this._fragments.push(frame.payload);
+    }
+
+    if (frame.fin) {
+      // Message complete — assemble
+      if (this._currentOpcode === 1) {
+        const fullPayload = Buffer.concat(this._fragments);
+        messages.push({ _type: 'text', data: fullPayload.toString('utf8') });
+      }
+      this._fragments = [];
+      this._currentOpcode = -1;
+    }
+
+    return messages;
+  }
+}
+
+// ---------- Step 4: Send MASKED WS text frame (RFC 6455 Section 5.1) --------
+
+function buildTextFrame(text) {
+  const payload = Buffer.from(text, 'utf8');
+  const len = payload.length;
   const maskKey = randomBytes(4);
   let header;
   if (len < 126) {
     header = Buffer.alloc(2);
-    header[0] = 0x80 | opcode;
+    header[0] = 0x81; // FIN + opcode=text
     header[1] = 0x80 | len; // MASK bit set + payload length
   } else if (len < 65536) {
     header = Buffer.alloc(4);
-    header[0] = 0x80 | opcode;
+    header[0] = 0x81;
     header[1] = 0x80 | 126;
     header.writeUInt16BE(len, 2);
   } else {
     header = Buffer.alloc(10);
-    header[0] = 0x80 | opcode;
+    header[0] = 0x81;
     header[1] = 0x80 | 127;
     header.writeBigUInt64BE(BigInt(len), 2);
   }
-  // XOR payload with 4-byte mask key (RFC 6455 Section 5.3)
   const maskedPayload = Buffer.alloc(len);
   for (let i = 0; i < len; i++) {
-    maskedPayload[i] = body[i] ^ maskKey[i & 3];
+    maskedPayload[i] = payload[i] ^ maskKey[i & 3];
   }
   return Buffer.concat([header, maskKey, maskedPayload]);
 }
 
-function buildTextFrame(text) {
-  return buildFrame(0x1, text);
-}
+// ---------- Step 5: Build Pong frame for keep-alive -------------------------
 
 function buildPongFrame(payload) {
-  return buildFrame(0xA, payload);
-}
-
-function buildCloseFrame(payload = Buffer.alloc(0)) {
-  return buildFrame(0x8, payload);
-}
-
-function decodeCloseReason(payload) {
-  if (!payload || payload.length < 2) return 'no close reason provided';
-  const code = payload.readUInt16BE(0);
-  const reason = payload.length > 2 ? payload.slice(2).toString('utf8') : 'no reason';
-  return `code ${code}${reason ? ` (${reason})` : ''}`;
-}
-
-function isMainModule() {
-  const entry = process.argv[1];
-  if (!entry) return false;
-  return path.resolve(fileURLToPath(import.meta.url)) === path.resolve(entry);
+  const len = payload ? payload.length : 0;
+  const maskKey = randomBytes(4);
+  const header = Buffer.alloc(2);
+  header[0] = 0x8A; // FIN + opcode=pong
+  header[1] = 0x80 | len;
+  if (len === 0) return Buffer.concat([header, maskKey]);
+  const masked = Buffer.alloc(len);
+  for (let i = 0; i < len; i++) {
+    masked[i] = payload[i] ^ maskKey[i & 3];
+  }
+  return Buffer.concat([header, maskKey, masked]);
 }
 
 // ---------- Main capture flow -----------------------------------------------
 
 async function captureCdpSnapshot() {
   console.log(`[cdp] Connecting to ${HOST}:${PORT}...`);
+  console.log(`[cdp] Timeout: ${TIMEOUT_S}s`);
 
   const wsUrl = await resolveWsUrl(HOST, PORT);
   const urlObj = new URL(wsUrl);
@@ -232,142 +293,131 @@ async function captureCdpSnapshot() {
     let msgId = 1;
     let handshakeDone = false;
     let residual = Buffer.alloc(0);
-    let snapshotDone = false;
-    let settled = false;
-    let closeSent = false;
-    let completionPoll = null;
+    const assembler = new MessageAssembler();
+    let chunkCount = 0;
+    let totalBytes = 0;
 
     function send(method, params = {}) {
       const msg = JSON.stringify({ id: msgId++, method, params });
       sock.write(buildTextFrame(msg));
     }
 
-    function sendClose(payload = Buffer.alloc(0)) {
-      if (closeSent || sock.destroyed) return;
-      closeSent = true;
-      sock.write(buildCloseFrame(payload));
-    }
-
     function cleanup() {
-      if (completionPoll) {
-        clearInterval(completionPoll);
-        completionPoll = null;
-      }
-      sock.setTimeout(0);
-    }
-
-    function finishSuccess() {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      process.stdout.write('\n');
-      writer.end(() => {
-        console.log(`[cdp] Snapshot written to ${OUTPUT}`);
-        sock.destroy();
-        resolve();
-      });
-    }
-
-    function fail(error, options = {}) {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (options.sendClose) {
-        sendClose(options.closePayload);
-      }
-      writer.destroy();
+      clearTimeout(timeoutHandle);
       sock.destroy();
-      reject(error);
     }
+
+    const timeoutHandle = setTimeout(() => {
+      console.error(`\n[cdp] Timed out after ${TIMEOUT_S}s (chunks received: ${chunkCount}, bytes: ${totalBytes})`);
+      writer.end(() => {
+        cleanup();
+        reject(new Error(`Timed out after ${TIMEOUT_S}s`));
+      });
+    }, TIMEOUT_S * 1000);
 
     sock.on('connect', () => sock.write(handshake));
 
     sock.on('data', (chunk) => {
       if (!handshakeDone) {
         const text = chunk.toString();
-        if (!text.includes('101')) { fail(new Error('WS upgrade failed')); return; }
-        if (!text.includes(expectedAccept)) { fail(new Error('WS accept key mismatch')); return; }
+        if (!text.includes('101')) { cleanup(); reject(new Error('WS upgrade failed')); return; }
+        if (!text.includes(expectedAccept)) { cleanup(); reject(new Error('WS accept key mismatch')); return; }
         handshakeDone = true;
         console.log('[cdp] WebSocket connected. Enabling HeapProfiler...');
         send('HeapProfiler.enable');
-        const rest = chunk.slice(chunk.indexOf('\r\n\r\n') + 4);
-        if (rest.length > 0) residual = Buffer.concat([residual, rest]);
+        const headerEnd = chunk.indexOf('\r\n\r\n');
+        if (headerEnd !== -1) {
+          const rest = chunk.slice(headerEnd + 4);
+          if (rest.length > 0) residual = Buffer.concat([residual, rest]);
+        }
         return;
       }
 
       residual = Buffer.concat([residual, chunk]);
-      const { messages, controlFrames, remaining } = parseFrames(residual);
+      const { frames, remaining } = parseFrames(residual);
       residual = remaining;
 
-      for (const frame of controlFrames) {
-        if (frame.opcode === 0x9) {
-          sock.write(buildPongFrame(frame.payload));
-          continue;
-        }
-        if (frame.opcode === 0xA) {
-          continue;
-        }
-        if (frame.opcode === 0x8) {
-          fail(
-            new Error(`[cdp] Inspector closed the WebSocket connection: ${decodeCloseReason(frame.payload)}`),
-            { sendClose: !closeSent, closePayload: frame.payload }
-          );
-          return;
-        }
-      }
+      for (const frame of frames) {
+        const msgs = assembler.feed(frame);
+        for (const m of msgs) {
+          if (m._type === 'close') {
+            console.log('[cdp] Server sent Close frame');
+            continue;
+          }
+          if (m._type === 'ping') {
+            sock.write(buildPongFrame(m.payload));
+            continue;
+          }
+          if (m._type !== 'text') continue;
 
-      for (const raw of messages) {
-        let msg;
-        try { msg = JSON.parse(raw); } catch { continue; }
+          let msg;
+          try { msg = JSON.parse(m.data); } catch { continue; }
 
-        // HeapProfiler.enable ack → take snapshot
-        if (msg.id === 1 && !msg.error) {
-          console.log('[cdp] HeapProfiler enabled. Taking snapshot...');
-          send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
-        }
+          // HeapProfiler.enable ack → take snapshot
+          if (msg.id === 1 && !msg.error) {
+            console.log('[cdp] HeapProfiler enabled. Taking snapshot (this may take a while)...');
+            send('HeapProfiler.takeHeapSnapshot', { reportProgress: true });
+          }
 
-        // Snapshot chunk events
-        if (msg.method === 'HeapProfiler.addHeapSnapshotChunk') {
-          process.stdout.write('.');
-          writer.write(msg.params.chunk);
-        }
+          // HeapProfiler.enable error
+          if (msg.id === 1 && msg.error) {
+            cleanup();
+            reject(new Error('HeapProfiler.enable failed: ' + msg.error.message));
+            return;
+          }
 
-        // Snapshot complete
-        if (msg.method === 'HeapProfiler.reportHeapSnapshotProgress' &&
-            msg.params.finished === true) {
-          snapshotDone = true;
-        }
+          // Snapshot chunk events
+          if (msg.method === 'HeapProfiler.addHeapSnapshotChunk') {
+            chunkCount++;
+            const chunkData = msg.params.chunk;
+            totalBytes += chunkData.length;
+            writer.write(chunkData);
+            if (chunkCount % 200 === 0) {
+              process.stdout.write(`\r[cdp] ${chunkCount} chunks, ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
+            }
+          }
 
-        // takeHeapSnapshot response (id=2)
-        if (msg.id === 2) {
-          if (msg.error) { fail(new Error('CDP error: ' + msg.error.message)); return; }
-          if (snapshotDone) {
-            finishSuccess();
-          } else {
-            // Wait for progress finished event
-            completionPoll = setInterval(() => {
-              if (snapshotDone) {
-                finishSuccess();
-              }
-            }, 100);
+          // Progress events (informational)
+          if (msg.method === 'HeapProfiler.reportHeapSnapshotProgress') {
+            if (msg.params?.finished) {
+              process.stdout.write(`\r[cdp] Snapshot generation complete.                    \n`);
+            }
+          }
+
+          // takeHeapSnapshot response (id=2) — this is the authoritative completion signal
+          if (msg.id === 2) {
+            if (msg.error) {
+              cleanup();
+              reject(new Error('CDP error: ' + msg.error.message));
+              return;
+            }
+            // The response with id=2 means V8 has finished sending all chunks.
+            // No need to wait for a progress event.
+            process.stdout.write(`\r[cdp] Total: ${chunkCount} chunks, ${(totalBytes / 1024 / 1024).toFixed(1)} MB\n`);
+            writer.end(() => {
+              console.log(`[cdp] Snapshot written to ${OUTPUT}`);
+              cleanup();
+              resolve();
+            });
+            return;
           }
         }
       }
     });
 
-    sock.on('error', (e) => fail(new Error('[cdp] Socket error: ' + e.message)));
-    sock.setTimeout(TIMEOUT_MS, () => fail(new Error(`[cdp] Connection timed out after ${TIMEOUT_MS}ms`)));
+    sock.on('error', (e) => {
+      cleanup();
+      reject(new Error('[cdp] Socket error: ' + e.message));
+    });
+
     sock.on('close', () => {
-      if (!settled) {
-        fail(new Error('[cdp] Inspector closed the socket before snapshot capture completed.'));
-      }
+      // If we get here without resolving, the server closed unexpectedly
+      clearTimeout(timeoutHandle);
     });
   });
 }
 
-if (isMainModule()) {
-  captureCdpSnapshot().catch((e) => {
-    console.error('[cdp] FATAL:', e.message);
-    process.exit(1);
-  });
-}
+captureCdpSnapshot().catch((e) => {
+  console.error('[cdp] FATAL:', e.message);
+  process.exit(1);
+});
