@@ -164,6 +164,26 @@ npm run test:all_evals
 This command sets the `RUN_EVALS` environment variable to `1`, which enables the
 `USUALLY_PASSES` tests.
 
+## Community Contribution Workflow
+
+Use this checklist when preparing a quality-related eval contribution. The goal
+is to make it easy for reviewers to validate the behavior change and avoid flaky
+merges.
+
+1. Confirm the behavior gap and collect evidence by linking the relevant issue,
+   nightly report, or failing test output, and explain why the behavior change
+   matters.
+2. Reproduce with a focused run by executing only the target eval(s) first, then
+   run the full eval target once.
+3. Apply the smallest fix that addresses the gap, preferring prompt/tool
+   guidance updates and minimizing test-only changes.
+4. Validate stability before opening a PR by running multiple local attempts and
+   including pass-rate notes in the PR.
+5. Keep new evals in incubation: new evals must start as `USUALLY_PASSES` until
+   they satisfy promotion criteria.
+6. Include a reviewer-ready PR summary with the problem statement, fix approach,
+   exact commands run, and residual risks.
+
 ## Ensuring Eval is Stable Prior to Check-in
 
 The
