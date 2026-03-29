@@ -1,0 +1,13 @@
+I will read the `policies_list.txt` file to provide you with the list of policies.
+I will list the files in the root directory to verify the existence and size of `policies_list.txt`.
+I will read `policies_list.txt` to retrieve the list of policies.
+I will run `cat policies_list.txt` to see the actual content of the file.
+I will search for the word "policy" in the codebase to find where policies are defined or listed.
+I will list the contents of the `.gemini/policies` directory to find any policy-related files.
+I will read the contents of `/Users/mattkorwel/.gemini/policies/policy.toml` to understand the current policies.
+I will read the contents of `/Users/mattkorwel/.gemini/policies/auto-saved.toml` to see if there are any additional policies.
+I will explore the `packages/core/src/policy/` directory to see if there are any other files relevant to policies.
+I will list the contents of `packages/core/src/policy/policies` to see if there are any built-in or default policies.
+Error: read EIO
+    at TTY.onStreamRead (node:internal/stream_base_commons:218:20)
+    at TTY.callbackTrampoline (node:internal/async_hooks:130:17)
