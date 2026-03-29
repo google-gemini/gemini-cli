@@ -8,11 +8,6 @@ import { render, cleanup } from '../../../test-utils/render.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 import type { SubagentProgress } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { Text } from 'ink';
-
-vi.mock('ink-spinner', () => ({
-  default: () => <Text>⠋</Text>,
-}));
 
 describe('<SubagentProgressDisplay />', () => {
   afterEach(() => {
@@ -172,6 +167,27 @@ describe('<SubagentProgressDisplay />', () => {
           id: '6',
           type: 'thought',
           content: 'Request cancelled.',
+          status: 'error',
+        },
+      ],
+    };
+
+    const { lastFrame } = await render(
+      <SubagentProgressDisplay progress={progress} terminalWidth={80} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders error tool status correctly', async () => {
+    const progress: SubagentProgress = {
+      isSubagentProgress: true,
+      agentName: 'TestAgent',
+      recentActivity: [
+        {
+          id: '7',
+          type: 'tool_call',
+          content: 'run_shell_command',
+          args: '{"command": "echo hello"}',
           status: 'error',
         },
       ],

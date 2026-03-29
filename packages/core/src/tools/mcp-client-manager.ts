@@ -554,8 +554,10 @@ export class McpClientManager {
     );
 
     if (Object.keys(servers).length === 0) {
-      this.discoveryState = MCPDiscoveryState.COMPLETED;
-      this.eventEmitter?.emit('mcp-client-update', this.clients);
+      if (!this.discoveryPromise) {
+        this.discoveryState = MCPDiscoveryState.COMPLETED;
+        this.eventEmitter?.emit('mcp-client-update', this.clients);
+      }
       return;
     }
 
@@ -574,7 +576,10 @@ export class McpClientManager {
     // If every configured server was skipped (for example because all are
     // disabled by user settings), no discovery promise is created. In that
     // case we must still mark discovery complete or the UI will wait forever.
-    if (this.discoveryState === MCPDiscoveryState.IN_PROGRESS) {
+    if (
+      this.discoveryState === MCPDiscoveryState.IN_PROGRESS &&
+      !this.discoveryPromise
+    ) {
       this.discoveryState = MCPDiscoveryState.COMPLETED;
       this.eventEmitter?.emit('mcp-client-update', this.clients);
     }

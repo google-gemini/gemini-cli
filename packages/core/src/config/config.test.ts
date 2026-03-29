@@ -92,6 +92,7 @@ vi.mock('../tools/tool-registry', () => {
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
+  ToolRegistryMock.prototype.getAllToolNames = vi.fn(() => []);
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
   return { ToolRegistry: ToolRegistryMock };
 });
@@ -1474,6 +1475,22 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(100); // default
+    });
+
+    it('should return custom maxActionsPerTask', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          browser: {
+            maxActionsPerTask: 50,
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.customConfig.maxActionsPerTask).toBe(50);
     });
 
     it('should apply defaults for partial custom config', () => {
@@ -1546,6 +1563,17 @@ describe('Server Config (config.ts)', () => {
       expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
       expect(config.getSandboxNetworkAccess()).toBe(false);
     });
+  });
+
+  it('should have independent TopicState across instances', () => {
+    const config1 = new Config(baseParams);
+    const config2 = new Config(baseParams);
+
+    config1.topicState.setTopic('Topic 1');
+    config2.topicState.setTopic('Topic 2');
+
+    expect(config1.topicState.getTopic()).toBe('Topic 1');
+    expect(config2.topicState.getTopic()).toBe('Topic 2');
   });
 });
 
