@@ -46,12 +46,10 @@ type RequireExactlyOne<T> = {
 }[keyof T];
 
 interface AgentSendPayloads {
-  message:
-    | ContentPart[]
-    | {
-        content: ContentPart[];
-        displayContent?: string;
-      };
+  message: {
+    content: ContentPart[];
+    displayContent?: string;
+  };
   elicitations: ElicitationResponse[];
   update: { title?: string; model?: string; config?: Record<string, unknown> };
   action: { type: string; data: unknown };

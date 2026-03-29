@@ -200,40 +200,6 @@ describe('LegacyAgentSession', () => {
       await collectEvents(session, { streamId: streamId ?? undefined });
     });
 
-    it('accepts legacy message-array sends without displayContent', async () => {
-      const sendMock = deps.client.sendMessageStream as ReturnType<
-        typeof vi.fn
-      >;
-      sendMock.mockReturnValue(
-        makeStream([
-          {
-            type: GeminiEventType.Finished,
-            value: { reason: FinishReason.STOP, usageMetadata: undefined },
-          },
-        ]),
-      );
-
-      const session = new LegacyAgentSession(deps);
-      const { streamId } = await session.send({
-        message: [{ type: 'text', text: 'hi' }],
-      });
-
-      const userMessage = session.events.find(
-        (e): e is AgentEvent<'message'> =>
-          e.type === 'message' && e.role === 'user' && e.streamId === streamId,
-      );
-      expect(userMessage?.content).toEqual([{ type: 'text', text: 'hi' }]);
-      await vi.advanceTimersByTimeAsync(0);
-      expect(sendMock).toHaveBeenCalledWith(
-        [{ text: 'hi' }],
-        expect.any(AbortSignal),
-        'test-prompt',
-        undefined,
-        false,
-        undefined,
-      );
-    });
-
     it('returns streamId before emitting agent_start', async () => {
       const sendMock = deps.client.sendMessageStream as ReturnType<
         typeof vi.fn

@@ -15,7 +15,14 @@ import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
   convertSessionToClientHistory,
+  FatalError,
+  FatalAuthenticationError,
   FatalInputError,
+  FatalSandboxError,
+  FatalConfigError,
+  FatalTurnLimitedError,
+  FatalToolExecutionError,
+  FatalCancellationError,
   promptIdContext,
   OutputFormat,
   JsonFormatter,
@@ -341,17 +348,57 @@ export async function runNonInteractive({
       };
 
       const reconstructFatalError = (event: AgentEvent<'error'>): Error => {
-        const errToThrow = new Error(event.message);
         const errorMeta = event._meta;
+        const name =
+          typeof errorMeta?.['errorName'] === 'string'
+            ? errorMeta['errorName']
+            : undefined;
+
+        let errToThrow: Error;
+        switch (name) {
+          case 'FatalAuthenticationError':
+            errToThrow = new FatalAuthenticationError(event.message);
+            break;
+          case 'FatalInputError':
+            errToThrow = new FatalInputError(event.message);
+            break;
+          case 'FatalSandboxError':
+            errToThrow = new FatalSandboxError(event.message);
+            break;
+          case 'FatalConfigError':
+            errToThrow = new FatalConfigError(event.message);
+            break;
+          case 'FatalTurnLimitedError':
+            errToThrow = new FatalTurnLimitedError(event.message);
+            break;
+          case 'FatalToolExecutionError':
+            errToThrow = new FatalToolExecutionError(event.message);
+            break;
+          case 'FatalCancellationError':
+            errToThrow = new FatalCancellationError(event.message);
+            break;
+          case 'FatalError':
+            errToThrow = new FatalError(
+              event.message,
+              typeof errorMeta?.['exitCode'] === 'number'
+                ? errorMeta['exitCode']
+                : 1,
+            );
+            break;
+          default:
+            errToThrow = new Error(event.message);
+            if (name) {
+              Object.defineProperty(errToThrow, 'name', {
+                value: name,
+                enumerable: true,
+              });
+            }
+            break;
+        }
+
         if (errorMeta?.['exitCode'] !== undefined) {
           Object.defineProperty(errToThrow, 'exitCode', {
             value: errorMeta['exitCode'],
-            enumerable: true,
-          });
-        }
-        if (errorMeta?.['errorName'] !== undefined) {
-          Object.defineProperty(errToThrow, 'name', {
-            value: errorMeta['errorName'],
             enumerable: true,
           });
         }
@@ -555,7 +602,18 @@ export async function runNonInteractive({
             streamEnded = true;
             break;
           }
+          case 'initialize':
+          case 'session_update':
+          case 'agent_start':
+          case 'tool_update':
+          case 'elicitation_request':
+          case 'elicitation_response':
+          case 'usage':
+          case 'custom':
+            // Explicitly ignore these non-interactive events
+            break;
           default:
+            event satisfies never;
             break;
         }
       }
