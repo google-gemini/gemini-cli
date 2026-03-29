@@ -110,6 +110,17 @@ function estimateFunctionResponseTokens(part: Part, depth: number): number {
   } else if (response !== undefined && response !== null) {
     if (Array.isArray(response)) {
       totalTokens += estimateToolResponseArrayTokens(response);
+    } else if (
+      typeof response === 'object' &&
+      'type' in response &&
+      (response as { type?: unknown }).type === 'array' &&
+      'items' in response &&
+      Array.isArray((response as { items?: unknown }).items)
+    ) {
+      // Handle MCP response format: { type: 'array', items: [...] }
+      totalTokens += estimateToolResponseArrayTokens(
+        (response as { items: unknown[] }).items,
+      );
     } else {
       // For other objects, stringify only the payload, not the whole Part object.
       totalTokens += JSON.stringify(response).length / 4;
