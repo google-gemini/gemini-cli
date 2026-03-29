@@ -132,6 +132,7 @@ export interface UIState {
   pendingGeminiHistoryItems: HistoryItemWithoutId[];
   thought: ThoughtSummary | null;
   isInputActive: boolean;
+  isVoiceModeEnabled: boolean;
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
