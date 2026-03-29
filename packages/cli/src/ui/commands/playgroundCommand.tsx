@@ -47,6 +47,8 @@ export const PlaygroundApp = () => {
       if (fs.existsSync(fileToWatch)) {
         const content = fs.readFileSync(fileToWatch, 'utf8');
         setPromptContent(content.substring(0, 1500) + '\\n\\n(Truncated for display)');
+      } else {
+        setPromptContent(`File not found: ${fileToWatch}`);
       }
     } catch (e) {
       setPromptContent(`Error reading file: ${e}`);
