@@ -2250,6 +2250,7 @@ export class Config implements McpContext, AgentLoopContext {
         global: this.contextManager.getGlobalMemory(),
         extension: this.contextManager.getExtensionMemory(),
         project: this.contextManager.getEnvironmentMemory(),
+        userProjectMemory: this.contextManager.getUserProjectMemory(),
       };
     }
     return this.userMemory;
@@ -2279,13 +2280,20 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Returns memory for the system instruction.
-   * When JIT is enabled, only global memory (Tier 1) goes in the system
-   * instruction. Extension and project memory (Tier 2) are placed in the
-   * first user message instead, per the tiered context model.
+   * When JIT is enabled, global memory and user project memory (Tier 1) go
+   * in the system instruction. Extension and project memory (Tier 2) are
+   * placed in the first user message instead, per the tiered context model.
+   * User project memory is in Tier 1 so mid-session saves are reflected
+   * via system instruction updates.
    */
   getSystemInstructionMemory(): string | HierarchicalMemory {
     if (this.experimentalJitContext && this.contextManager) {
-      return this.contextManager.getGlobalMemory();
+      const global = this.contextManager.getGlobalMemory();
+      const userProjectMemory = this.contextManager.getUserProjectMemory();
+      if (userProjectMemory?.trim()) {
+        return { global, userProjectMemory };
+      }
+      return global;
     }
     return this.userMemory;
   }
@@ -3430,7 +3438,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     if (!this.isMemoryManagerEnabled()) {
       maybeRegister(MemoryTool, () =>
-        registry.registerTool(new MemoryTool(this.messageBus)),
+        registry.registerTool(new MemoryTool(this.messageBus, this.storage)),
       );
     }
     maybeRegister(WebSearchTool, () =>
