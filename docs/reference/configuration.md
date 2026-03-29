@@ -1702,25 +1702,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.agentHistoryTruncation`** (boolean):
-  - **Description:** Enable truncation window logic for the Agent History
-    Provider.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistoryTruncationThreshold`** (number):
-  - **Description:** The maximum number of messages before history is truncated.
-  - **Default:** `30`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistoryRetainedMessages`** (number):
-  - **Description:** The number of recent messages to retain after truncation.
-  - **Default:** `15`
-  - **Requires restart:** Yes
-
-- **`experimental.agentHistorySummarization`** (boolean):
-  - **Description:** Enable summarization of truncated content via a small model
-    for the Agent History Provider.
+- **`experimental.contextManagement`** (boolean):
+  - **Description:** Enable logic for context management.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1814,6 +1797,54 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hooks that execute before tool selection. Can filter or
     prioritize available tools dynamically.
   - **Default:** `[]`
+
+#### `contextManagement`
+
+- **`contextManagement.historyWindow.truncationThreshold`** (number):
+  - **Description:** The maximum number of messages before history is truncated.
+  - **Default:** `25`
+  - **Requires restart:** Yes
+
+- **`contextManagement.historyWindow.retainedMessages`** (number):
+  - **Description:** The number of recent messages to retain after truncation.
+  - **Default:** `20`
+  - **Requires restart:** Yes
+
+- **`contextManagement.historyWindow.targetRetainedTokens`** (number):
+  - **Description:** The target number of tokens to retain in the session
+    history.
+  - **Default:** `40000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalTokenLimit`** (number):
+  - **Description:** The target number of tokens to budget for a normal
+    conversation turn.
+  - **Default:** `2500`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.maximumTokenLimit`** (number):
+  - **Description:** The maximum number of tokens a single conversation turn can
+    consume before truncation.
+  - **Default:** `12000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.messageLimits.normalizationHeadRatio`** (number):
+  - **Description:** The ratio of tokens to retain from the beginning of a
+    truncated message (0.0 to 1.0).
+  - **Default:** `0.25`
+  - **Requires restart:** Yes
+
+- **`contextManagement.toolDistillation.truncationThreshold`** (number):
+  - **Description:** Maximum characters to show when truncating large tool
+    outputs. Set to 0 or negative to disable truncation.
+  - **Default:** `40000`
+  - **Requires restart:** Yes
+
+- **`contextManagement.toolDistillation.summarizationThreshold`** (number):
+  - **Description:** Threshold above which truncated tool outputs will be
+    summarized by an LLM.
+  - **Default:** `80000`
+  - **Requires restart:** Yes
 
 #### `admin`
 

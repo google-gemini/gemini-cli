@@ -2925,31 +2925,10 @@
           "default": false,
           "type": "boolean"
         },
-        "agentHistoryTruncation": {
-          "title": "Agent History Truncation",
-          "description": "Enable truncation window logic for the Agent History Provider.",
-          "markdownDescription": "Enable truncation window logic for the Agent History Provider.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "agentHistoryTruncationThreshold": {
-          "title": "Agent History Truncation Threshold",
-          "description": "The maximum number of messages before history is truncated.",
-          "markdownDescription": "The maximum number of messages before history is truncated.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30`",
-          "default": 30,
-          "type": "number"
-        },
-        "agentHistoryRetainedMessages": {
-          "title": "Agent History Retained Messages",
-          "description": "The number of recent messages to retain after truncation.",
-          "markdownDescription": "The number of recent messages to retain after truncation.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `15`",
-          "default": 15,
-          "type": "number"
-        },
-        "agentHistorySummarization": {
-          "title": "Agent History Summarization",
-          "description": "Enable summarization of truncated content via a small model for the Agent History Provider.",
-          "markdownDescription": "Enable summarization of truncated content via a small model for the Agent History Provider.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+        "contextManagement": {
+          "title": "Enable Context Management",
+          "description": "Enable logic for context management.",
+          "markdownDescription": "Enable logic for context management.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -3143,6 +3122,99 @@
         "type": "array",
         "items": {}
       }
+    },
+    "contextManagement": {
+      "title": "Context Management",
+      "description": "Settings for agent history and tool distillation context management.",
+      "markdownDescription": "Settings for agent history and tool distillation context management.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "historyWindow": {
+          "title": "History Window Settings",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "truncationThreshold": {
+              "title": "Truncation Threshold",
+              "description": "The maximum number of messages before history is truncated.",
+              "markdownDescription": "The maximum number of messages before history is truncated.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `25`",
+              "default": 25,
+              "type": "number"
+            },
+            "retainedMessages": {
+              "title": "Retained Messages",
+              "description": "The number of recent messages to retain after truncation.",
+              "markdownDescription": "The number of recent messages to retain after truncation.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `20`",
+              "default": 20,
+              "type": "number"
+            },
+            "targetRetainedTokens": {
+              "title": "Target Retained Tokens",
+              "description": "The target number of tokens to retain in the session history.",
+              "markdownDescription": "The target number of tokens to retain in the session history.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `40000`",
+              "default": 40000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "messageLimits": {
+          "title": "Message Limits",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "normalTokenLimit": {
+              "title": "Normal Token Limit",
+              "description": "The target number of tokens to budget for a normal conversation turn.",
+              "markdownDescription": "The target number of tokens to budget for a normal conversation turn.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `2500`",
+              "default": 2500,
+              "type": "number"
+            },
+            "maximumTokenLimit": {
+              "title": "Maximum Token Limit",
+              "description": "The maximum number of tokens a single conversation turn can consume before truncation.",
+              "markdownDescription": "The maximum number of tokens a single conversation turn can consume before truncation.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `12000`",
+              "default": 12000,
+              "type": "number"
+            },
+            "normalizationHeadRatio": {
+              "title": "Normalization Head Ratio",
+              "description": "The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).",
+              "markdownDescription": "The ratio of tokens to retain from the beginning of a truncated message (0.0 to 1.0).\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `0.25`",
+              "default": 0.25,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "toolDistillation": {
+          "title": "Tool Distillation",
+          "markdownDescription": "Description not provided.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "truncationThreshold": {
+              "title": "Tool Truncation Threshold",
+              "description": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.",
+              "markdownDescription": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `40000`",
+              "default": 40000,
+              "type": "number"
+            },
+            "summarizationThreshold": {
+              "title": "Tool Summarization Threshold",
+              "description": "Threshold above which truncated tool outputs will be summarized by an LLM.",
+              "markdownDescription": "Threshold above which truncated tool outputs will be summarized by an LLM.\n\n- Category: `Context Management`\n- Requires restart: `yes`\n- Default: `80000`",
+              "default": 80000,
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "admin": {
       "title": "Admin",
