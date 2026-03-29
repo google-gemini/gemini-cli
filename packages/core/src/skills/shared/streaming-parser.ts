@@ -22,6 +22,14 @@ export type HeapNodeCallback = (
   fields: Record<string, number | string>,
 ) => void;
 
+interface HeapSnapshotParserOptions {
+  collectNodes?: boolean;
+  collectEdges?: boolean;
+  collectStrings?: boolean;
+  nodeSize?: number;
+  onNodeValues?: (values: number[]) => void;
+}
+
 /** Parse state machine states */
 type ParseState =
   | 'init'
@@ -41,25 +49,29 @@ type ParseState =
 class HeapSnapshotStreamParser {
   private state: ParseState = 'init';
   private buffer = '';
-  private snapshot: Partial<HeapSnapshot> = {};
-  private currentKey = '';
-  private nodesArr: number[] = [];
-  private edgesArr: number[] = [];
-  private stringsArr: string[] = [];
-  // snapshot.meta sub-state
-  private metaKey = '';
-  private inMetaObj = false;
+  private readonly nodesArr: number[] = [];
+  private readonly edgesArr: number[] = [];
+  private readonly stringsArr: string[] = [];
   private snapshotMeta: Partial<HeapSnapshot['snapshot']['meta']> = {};
   private snapshotNodeCount = 0;
   private snapshotEdgeCount = 0;
-  // depth tracking for skipping nested objects we don't care about
-  private skipDepth = 0;
-  private inSkip = false;
 
   // Pending raw token buffer for the tokenizer
   private pos = 0;
+  private readonly collectNodes: boolean;
+  private readonly collectEdges: boolean;
+  private readonly collectStrings: boolean;
+  private readonly nodeSize: number;
+  private readonly onNodeValues?: (values: number[]) => void;
+  private pendingNodeValues: number[] = [];
 
-  onNode?: HeapNodeCallback;
+  constructor(options: HeapSnapshotParserOptions = {}) {
+    this.collectNodes = options.collectNodes ?? true;
+    this.collectEdges = options.collectEdges ?? true;
+    this.collectStrings = options.collectStrings ?? true;
+    this.nodeSize = options.nodeSize ?? 0;
+    this.onNodeValues = options.onNodeValues;
+  }
 
   feed(chunk: string): void {
     this.buffer += chunk;
@@ -307,7 +319,6 @@ class HeapSnapshotStreamParser {
           const key = this.readString();
           if (key === undefined) break;
           if (!this.consume(':')) break;
-          this.currentKey = key;
           if (key === 'snapshot') {
             if (!this.consume('{')) break;
             this.state = 'snapshot_obj';
@@ -404,7 +415,16 @@ class HeapSnapshotStreamParser {
           }
           const n = this.readNumberValue();
           if (n === undefined) break;
-          this.nodesArr.push(n);
+          if (this.collectNodes) {
+            this.nodesArr.push(n);
+          }
+          if (this.onNodeValues && this.nodeSize > 0) {
+            this.pendingNodeValues.push(n);
+            if (this.pendingNodeValues.length === this.nodeSize) {
+              this.onNodeValues(this.pendingNodeValues);
+              this.pendingNodeValues = [];
+            }
+          }
           break;
         }
         case 'edges_array': {
@@ -420,7 +440,9 @@ class HeapSnapshotStreamParser {
           }
           const n = this.readNumberValue();
           if (n === undefined) break;
-          this.edgesArr.push(n);
+          if (this.collectEdges) {
+            this.edgesArr.push(n);
+          }
           break;
         }
         case 'strings_array': {
@@ -437,7 +459,9 @@ class HeapSnapshotStreamParser {
           if (ch === '"') {
             const s = this.readString();
             if (s === undefined) break;
-            this.stringsArr.push(s);
+            if (this.collectStrings) {
+              this.stringsArr.push(s);
+            }
           } else {
             // skip non-string value (shouldn't happen in valid heapsnapshot)
             this.skipValue();
@@ -515,7 +539,14 @@ export async function parseHeapSnapshotStream(
   }
 
   const parser = new HeapSnapshotStreamParser();
+  await streamHeapSnapshotFile(filePath, parser);
+  return parser.finalize();
+}
 
+async function streamHeapSnapshotFile(
+  filePath: string,
+  parser: HeapSnapshotStreamParser,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const stream = fs.createReadStream(filePath, {
       encoding: 'utf8',
@@ -533,16 +564,14 @@ export async function parseHeapSnapshotStream(
       }
     };
 
-    stream.on('data', (chunk: string) => {
-      parser.feed(chunk);
+    stream.on('data', (chunk: string | Buffer<ArrayBufferLike>) => {
+      parser.feed(typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
       checkMemoryPressure();
     });
 
     stream.on('end', () => resolve());
     stream.on('error', (err) => reject(err));
   });
-
-  return parser.finalize();
 }
 
 /**
@@ -553,10 +582,14 @@ export async function streamHeapSnapshotNodes(
   filePath: string,
   onNode: (nodeId: number, fields: Record<string, number | string>) => void,
 ): Promise<void> {
-  // First pass: collect metadata (snapshot.meta) then stream nodes
-  // We do a two-pass approach: first read up to the first 4MB to get meta,
-  // then stream nodes from the nodes array.
-  const snapshot = await parseHeapSnapshotStream(filePath);
+  // First pass: collect metadata and strings needed to resolve node fields.
+  const firstPassParser = new HeapSnapshotStreamParser({
+    collectNodes: false,
+    collectEdges: false,
+    collectStrings: true,
+  });
+  await streamHeapSnapshotFile(filePath, firstPassParser);
+  const snapshot = firstPassParser.finalize();
   const nodeFields = snapshot.snapshot.meta.node_fields;
   const nodeSize = nodeFields.length;
   const idIndex = nodeFields.indexOf('id');
@@ -565,25 +598,30 @@ export async function streamHeapSnapshotNodes(
   const typeEnum: string[] = Array.isArray(rawTypeEnum)
     ? rawTypeEnum.filter((x): x is string => typeof x === 'string')
     : [];
-
-  for (let i = 0; i < snapshot.nodes.length; i += nodeSize) {
-    const fields: Record<string, number | string> = {};
-    for (let f = 0; f < nodeSize; f++) {
-      const val = snapshot.nodes[i + f];
-      const fieldName = nodeFields[f];
-      if (fieldName === 'type' && typeEnum) {
-        fields[fieldName] = typeEnum[val] ?? val;
-      } else if (fieldName === 'name' || fieldName === 'detachedness') {
-        if (fieldName === 'name') {
+  let streamedNodeIndex = 0;
+  const secondPassParser = new HeapSnapshotStreamParser({
+    collectNodes: false,
+    collectEdges: false,
+    collectStrings: false,
+    nodeSize,
+    onNodeValues: (nodeValues) => {
+      const fields: Record<string, number | string> = {};
+      for (let f = 0; f < nodeSize; f++) {
+        const val = nodeValues[f];
+        const fieldName = nodeFields[f];
+        if (fieldName === 'type' && typeEnum.length > 0) {
+          fields[fieldName] = typeEnum[val] ?? val;
+        } else if (fieldName === 'name') {
           fields[fieldName] = snapshot.strings[val] ?? '';
         } else {
           fields[fieldName] = val;
         }
-      } else {
-        fields[fieldName] = val;
       }
-    }
-    const nodeId = idIndex >= 0 ? snapshot.nodes[i + idIndex] : i / nodeSize;
-    onNode(nodeId, fields);
-  }
+      const nodeId =
+        idIndex >= 0 ? nodeValues[idIndex] : streamedNodeIndex / nodeSize;
+      streamedNodeIndex += nodeSize;
+      onNode(nodeId, fields);
+    },
+  });
+  await streamHeapSnapshotFile(filePath, secondPassParser);
 }
