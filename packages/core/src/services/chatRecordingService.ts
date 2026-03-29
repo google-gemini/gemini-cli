@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Status } from '../core/coreToolScheduler.js';
+import { type Status } from '../scheduler/types.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
-import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import path from 'node:path';
 import fs from 'node:fs';
+import { sanitizeFilenamePart } from '../utils/fileUtils.js';
+import {
+  deleteSessionArtifactsAsync,
+  deleteSubagentSessionDirAndArtifactsAsync,
+} from '../utils/sessionOperations.js';
 import { randomUUID } from 'node:crypto';
 import type {
   Content,
@@ -172,20 +176,46 @@ export class ChatRecordingService {
       } else {
         // Create new session
         this.sessionId = this.context.promptId;
-        const chatsDir = path.join(
+        let chatsDir = path.join(
           this.context.config.storage.getProjectTempDir(),
           'chats',
         );
+
+        // subagents are nested under the complete parent session id
+        if (this.kind === 'subagent' && this.context.parentSessionId) {
+          const safeParentId = sanitizeFilenamePart(
+            this.context.parentSessionId,
+          );
+          if (!safeParentId) {
+            throw new Error(
+              `Invalid parentSessionId after sanitization: ${this.context.parentSessionId}`,
+            );
+          }
+          chatsDir = path.join(chatsDir, safeParentId);
+        }
+
         fs.mkdirSync(chatsDir, { recursive: true });
 
         const timestamp = new Date()
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
-        const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
-          0,
-          8,
-        )}.json`;
+        const safeSessionId = sanitizeFilenamePart(this.sessionId);
+        if (!safeSessionId) {
+          throw new Error(
+            `Invalid sessionId after sanitization: ${this.sessionId}`,
+          );
+        }
+
+        let filename: string;
+        if (this.kind === 'subagent') {
+          filename = `${safeSessionId}.json`;
+        } else {
+          filename = `${SESSION_FILE_PREFIX}${timestamp}-${safeSessionId.slice(
+            0,
+            8,
+          )}.json`;
+        }
         this.conversationFile = path.join(chatsDir, filename);
 
         this.writeConversation({
@@ -596,21 +626,22 @@ export class ChatRecordingService {
    *
    * @throws {Error} If shortId validation fails.
    */
-  deleteSession(sessionIdOrBasename: string): void {
+  async deleteSession(sessionIdOrBasename: string): Promise<void> {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
 
       const shortId = this.deriveShortId(sessionIdOrBasename);
 
-      if (!fs.existsSync(chatsDir)) {
+      // Using stat instead of existsSync for async sanity
+      if (!(await fs.promises.stat(chatsDir).catch(() => null))) {
         return; // Nothing to delete
       }
 
       const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
 
       for (const file of matchingFiles) {
-        this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
+        await this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
@@ -654,14 +685,14 @@ export class ChatRecordingService {
   /**
    * Deletes a single session file and its associated logs, tool-outputs, and directory.
    */
-  private deleteSessionAndArtifacts(
+  private async deleteSessionAndArtifacts(
     chatsDir: string,
     file: string,
     tempDir: string,
-  ): void {
+  ): Promise<void> {
     const filePath = path.join(chatsDir, file);
     try {
-      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const fileContent = await fs.promises.readFile(filePath, 'utf8');
       const content = JSON.parse(fileContent) as unknown;
 
       let fullSessionId: string | undefined;
@@ -673,57 +704,19 @@ export class ChatRecordingService {
       }
 
       // Delete the session file
-      fs.unlinkSync(filePath);
+      await fs.promises.unlink(filePath);
 
       if (fullSessionId) {
-        this.deleteSessionLogs(fullSessionId, tempDir);
-        this.deleteSessionToolOutputs(fullSessionId, tempDir);
-        this.deleteSessionDirectory(fullSessionId, tempDir);
+        // Delegate to shared utility!
+        await deleteSessionArtifactsAsync(fullSessionId, tempDir);
+        await deleteSubagentSessionDirAndArtifactsAsync(
+          fullSessionId,
+          chatsDir,
+          tempDir,
+        );
       }
     } catch (error) {
       debugLogger.error(`Error deleting associated file ${file}:`, error);
-    }
-  }
-
-  /**
-   * Cleans up activity logs for a session.
-   */
-  private deleteSessionLogs(sessionId: string, tempDir: string): void {
-    const logsDir = path.join(tempDir, 'logs');
-    const safeSessionId = sanitizeFilenamePart(sessionId);
-    const logPath = path.join(logsDir, `session-${safeSessionId}.jsonl`);
-    if (fs.existsSync(logPath) && logPath.startsWith(logsDir)) {
-      fs.unlinkSync(logPath);
-    }
-  }
-
-  /**
-   * Cleans up tool outputs for a session.
-   */
-  private deleteSessionToolOutputs(sessionId: string, tempDir: string): void {
-    const safeSessionId = sanitizeFilenamePart(sessionId);
-    const toolOutputDir = path.join(
-      tempDir,
-      'tool-outputs',
-      `session-${safeSessionId}`,
-    );
-    const toolOutputsBase = path.join(tempDir, 'tool-outputs');
-    if (
-      fs.existsSync(toolOutputDir) &&
-      toolOutputDir.startsWith(toolOutputsBase)
-    ) {
-      fs.rmSync(toolOutputDir, { recursive: true, force: true });
-    }
-  }
-
-  /**
-   * Cleans up the session-specific directory.
-   */
-  private deleteSessionDirectory(sessionId: string, tempDir: string): void {
-    const safeSessionId = sanitizeFilenamePart(sessionId);
-    const sessionDir = path.join(tempDir, safeSessionId);
-    if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
-      fs.rmSync(sessionDir, { recursive: true, force: true });
     }
   }
 

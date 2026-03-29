@@ -19,6 +19,8 @@ import {
   AuthType,
   isHeadlessMode,
   FatalAuthenticationError,
+  PolicyDecision,
+  PRIORITY_YOLO_ALLOW_ALL,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -27,6 +29,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    PRIORITY_YOLO_ALLOW_ALL: 998,
     Config: vi.fn().mockImplementation((params) => {
       const mockConfig = {
         ...params,
@@ -325,25 +328,97 @@ describe('loadConfig', () => {
       );
     });
 
+    it('should pass enableAgents to Config constructor', async () => {
+      const settings: Settings = {
+        experimental: {
+          enableAgents: false,
+        },
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: false,
+        }),
+      );
+    });
+
+    it('should default enableAgents to true when not provided', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: true,
+        }),
+      );
+    });
+
     describe('interactivity', () => {
-      it('should set interactive true when not headless', async () => {
+      it('should always set interactive true', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(true);
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interactive: true,
+          }),
+        );
+
         vi.mocked(isHeadlessMode).mockReturnValue(false);
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
             interactive: true,
-            enableInteractiveShell: true,
           }),
         );
       });
 
-      it('should set interactive false when headless', async () => {
+      it('should set enableInteractiveShell based on headless mode', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            enableInteractiveShell: true,
+          }),
+        );
+
         vi.mocked(isHeadlessMode).mockReturnValue(true);
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            interactive: false,
             enableInteractiveShell: false,
+          }),
+        );
+      });
+    });
+
+    describe('YOLO mode', () => {
+      it('should enable YOLO mode and add policy rule when GEMINI_YOLO_MODE is true', async () => {
+        vi.stubEnv('GEMINI_YOLO_MODE', 'true');
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            approvalMode: 'yolo',
+            policyEngineConfig: expect.objectContaining({
+              rules: expect.arrayContaining([
+                expect.objectContaining({
+                  decision: PolicyDecision.ALLOW,
+                  priority: PRIORITY_YOLO_ALLOW_ALL,
+                  modes: ['yolo'],
+                  allowRedirection: true,
+                }),
+              ]),
+            }),
+          }),
+        );
+      });
+
+      it('should use default approval mode and empty rules when GEMINI_YOLO_MODE is not true', async () => {
+        vi.stubEnv('GEMINI_YOLO_MODE', 'false');
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            approvalMode: 'default',
+            policyEngineConfig: expect.objectContaining({
+              rules: [],
+            }),
           }),
         );
       });

@@ -23,6 +23,7 @@ import {
   type Storage,
   NoopSandboxManager,
   type ToolRegistry,
+  type SandboxManager,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { expect, vi } from 'vitest';
@@ -96,16 +97,24 @@ export function createMockConfig(
     getMcpClientManager: vi.fn().mockReturnValue({
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
+    getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(false),
     getGitService: vi.fn(),
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
-      sandboxManager: new NoopSandboxManager(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      sandboxManager: new NoopSandboxManager() as unknown as SandboxManager,
       sanitizationConfig: {
         allowedEnvironmentVariables: [],
         blockedEnvironmentVariables: [],
         enableEnvironmentVariableRedaction: false,
       },
     }),
+    isExperimentalAgentHistoryTruncationEnabled: vi.fn().mockReturnValue(false),
+    getExperimentalAgentHistoryTruncationThreshold: vi.fn().mockReturnValue(50),
+    getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(30),
+    isExperimentalAgentHistorySummarizationEnabled: vi
+      .fn()
+      .mockReturnValue(false),
     ...overrides,
   } as unknown as Config;
 

@@ -89,6 +89,9 @@ describe('ShellProcessor', () => {
       getPolicyEngine: vi.fn().mockReturnValue({
         check: mockPolicyEngineCheck,
       }),
+      get config() {
+        return this as unknown as Config;
+      },
     };
 
     context = createMockCommandContext({
@@ -98,7 +101,7 @@ describe('ShellProcessor', () => {
         args: 'default args',
       },
       services: {
-        config: mockConfig as Config,
+        agentContext: mockConfig as Config,
       },
       session: {
         sessionShellAllowlist: new Set(),
@@ -120,7 +123,7 @@ describe('ShellProcessor', () => {
     const prompt: PromptPipelineContent = createPromptPipelineContent('!{ls}');
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        config: null,
+        agentContext: null,
       },
     });
 

@@ -26,6 +26,7 @@ import * as grpc from '@grpc/grpc-js';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent, ProxyAgent } from 'undici';
 import { normalizeAgentCard } from './a2aUtils.js';
+import type { AgentCardLoadOptions } from './types.js';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { classifyAgentError } from './a2a-errors.js';
@@ -49,8 +50,6 @@ const A2A_TIMEOUT = 1800000; // 30 minutes
  * Manages protocol negotiation, authentication, and transport selection.
  */
 export class A2AClientManager {
-  private static instance: A2AClientManager;
-
   // Each agent should manage their own context/taskIds/card/etc
   private clients = new Map<string, Client>();
   private agentCards = new Map<string, AgentCard>();
@@ -58,8 +57,8 @@ export class A2AClientManager {
   private a2aDispatcher: UndiciAgent | ProxyAgent;
   private a2aFetch: typeof fetch;
 
-  private constructor(config?: Config) {
-    const proxyUrl = config?.getProxy();
+  constructor(private readonly config: Config) {
+    const proxyUrl = this.config.getProxy();
     const agentOptions = {
       headersTimeout: A2A_TIMEOUT,
       bodyTimeout: A2A_TIMEOUT,
@@ -79,25 +78,6 @@ export class A2AClientManager {
   }
 
   /**
-   * Gets the singleton instance of the A2AClientManager.
-   */
-  static getInstance(config?: Config): A2AClientManager {
-    if (!A2AClientManager.instance) {
-      A2AClientManager.instance = new A2AClientManager(config);
-    }
-    return A2AClientManager.instance;
-  }
-
-  /**
-   * Resets the singleton instance. Only for testing purposes.
-   * @internal
-   */
-  static resetInstanceForTesting() {
-    // @ts-expect-error - Resetting singleton for testing
-    A2AClientManager.instance = undefined;
-  }
-
-  /**
    * Loads an agent by fetching its AgentCard and caches the client.
    * @param name The name to assign to the agent.
    * @param agentCardUrl The full URL to the agent's card.
@@ -106,7 +86,7 @@ export class A2AClientManager {
    */
   async loadAgent(
     name: string,
-    agentCardUrl: string,
+    options: AgentCardLoadOptions,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
     if (this.clients.has(name) && this.agentCards.has(name)) {
@@ -140,7 +120,24 @@ export class A2AClientManager {
     };
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
-    const rawCard = await resolver.resolve(agentCardUrl, '');
+
+    let rawCard: unknown;
+    let urlIdentifier = 'inline JSON';
+
+    if (options.type === 'json') {
+      try {
+        rawCard = JSON.parse(options.json);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to parse inline agent card JSON for agent '${name}': ${msg}`,
+        );
+      }
+    } else {
+      urlIdentifier = options.url;
+      rawCard = await resolver.resolve(options.url, '');
+    }
+
     // TODO: Remove normalizeAgentCard once @a2a-js/sdk handles
     // proto field name aliases (supportedInterfaces → additionalInterfaces,
     // protocolBinding → transport).
@@ -174,12 +171,12 @@ export class A2AClientManager {
       this.agentCards.set(name, agentCard);
 
       debugLogger.debug(
-        `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+        `[A2AClientManager] Loaded agent '${name}' from ${urlIdentifier}`,
       );
 
       return agentCard;
     } catch (error: unknown) {
-      throw classifyAgentError(name, agentCardUrl, error);
+      throw classifyAgentError(name, urlIdentifier, error);
     }
   }
 

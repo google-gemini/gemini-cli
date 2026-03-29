@@ -30,6 +30,7 @@ import {
   getToolAliases,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
 } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
@@ -223,14 +224,29 @@ export class ToolRegistry {
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
   readonly messageBus: MessageBus;
+  private isMainRegistry: boolean;
 
-  constructor(config: Config, messageBus: MessageBus) {
+  constructor(
+    config: Config,
+    messageBus: MessageBus,
+    isMainRegistry: boolean = false,
+  ) {
     this.config = config;
     this.messageBus = messageBus;
+    this.isMainRegistry = isMainRegistry;
   }
 
   getMessageBus(): MessageBus {
     return this.messageBus;
+  }
+
+  /**
+   * Creates a shallow clone of the registry and its current known tools.
+   */
+  clone(): ToolRegistry {
+    const clone = new ToolRegistry(this.config, this.messageBus);
+    clone.allKnownTools = new Map(this.allKnownTools);
+    return clone;
   }
 
   /**
@@ -561,6 +577,12 @@ export class ToolRegistry {
         ),
       ) ?? new Set([]);
 
+    if (tool.name === UPDATE_TOPIC_TOOL_NAME) {
+      if (!this.config.isTopicUpdateNarrationEnabled()) {
+        return false;
+      }
+    }
+
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
     if (tool instanceof DiscoveredMCPTool) {
@@ -590,6 +612,10 @@ export class ToolRegistry {
     const declarations: FunctionDeclaration[] = [];
     const seenNames = new Set<string>();
 
+    const mainAgentTools = this.isMainRegistry
+      ? this.config.getMainAgentTools()
+      : undefined;
+
     this.getActiveTools().forEach((tool) => {
       const toolName =
         tool instanceof DiscoveredMCPTool
@@ -599,6 +625,16 @@ export class ToolRegistry {
       if (seenNames.has(toolName)) {
         return;
       }
+
+      if (
+        mainAgentTools &&
+        !mainAgentTools.includes(toolName) &&
+        !mainAgentTools.includes(tool.constructor.name) &&
+        !mainAgentTools.some((t) => t.startsWith(`${tool.constructor.name}(`))
+      ) {
+        return;
+      }
+
       seenNames.add(toolName);
 
       let schema = tool.getSchema(modelId);
