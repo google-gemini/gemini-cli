@@ -809,7 +809,10 @@ export function stripShellWrapper(command: string): string {
 export const spawnAsync = async (
   command: string,
   args: string[],
-  options?: SpawnOptionsWithoutStdio & { sandboxManager?: SandboxManager },
+  options?: SpawnOptionsWithoutStdio & {
+    sandboxManager?: SandboxManager;
+    timeout?: number;
+  },
 ): Promise<{ stdout: string; stderr: string }> => {
   const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
   const prepared = await sandboxManager.prepareCommand({
@@ -820,14 +823,23 @@ export const spawnAsync = async (
   });
 
   const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
+  const timeoutMs = options?.timeout ?? 60000; // Default 60s timeout
 
   return new Promise((resolve, reject) => {
     const child = spawn(finalCommand, finalArgs, {
       ...options,
       env: finalEnv,
     });
+
     let stdout = '';
     let stderr = '';
+
+    const timer = setTimeout(() => {
+      if (!child.killed) {
+        child.kill('SIGKILL');
+        reject(new Error(`Command timed out after ${timeoutMs}ms: ${command}`));
+      }
+    }, timeoutMs);
 
     child.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -838,6 +850,7 @@ export const spawnAsync = async (
     });
 
     child.on('close', (code) => {
+      clearTimeout(timer);
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -846,6 +859,7 @@ export const spawnAsync = async (
     });
 
     child.on('error', (err) => {
+      clearTimeout(timer);
       reject(err);
     });
   });
