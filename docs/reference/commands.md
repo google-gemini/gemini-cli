@@ -442,6 +442,18 @@ Slash commands provide meta-level control over the CLI itself.
   - **`tools`**:
     - **Description:** Show tool-specific usage statistics.
 
+### `/teleport`
+
+- **Description:** Export or import sessions to make them portable across
+  machines.
+- **Sub-commands:**
+  - **`export [session-id] [output-path] [--secret] [--key-file <path>] [--blob <uri>]`**:
+    - **Description:** Packages the session state into a compressed archive.
+    - **Note:** Use `--secret` for AES-256 encryption or `--blob` to upload
+      directly to GCS/S3.
+  - **`import <path-or-uri> [--secret] [--key-file <path>]`**:
+    - **Description:** Restores a session from a local file or cloud URI.
+
 ### `/terminal-setup`
 
 - **Description:** Configure terminal keybindings for multiline input (VS Code,
