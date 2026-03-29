@@ -71,7 +71,9 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const [isTruncated, setIsTruncated] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(
+    confirmationDetails.type === 'exec',
+  );
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
