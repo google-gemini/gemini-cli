@@ -20,7 +20,6 @@ import {
   coreEvents,
   getErrorType,
   getErrorMessage,
-  getErrorType,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
 

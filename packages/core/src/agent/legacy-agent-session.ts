@@ -93,9 +93,6 @@ class LegacyAgentProtocol implements AgentProtocol {
         'LegacyAgentSession.send() only supports message sends for the moment.',
       );
     }
-    const normalizedMessage = Array.isArray(message)
-      ? { content: message, displayContent: undefined }
-      : message;
 
     if (this._activeStreamId) {
       // TODO: Interactive may eventually allow selected in-stream sends such as
@@ -108,16 +105,16 @@ class LegacyAgentProtocol implements AgentProtocol {
 
     this._beginNewStream();
     const streamId = this._translationState.streamId;
-    const parts = contentPartsToGeminiParts(normalizedMessage.content);
+    const parts = contentPartsToGeminiParts(message.content);
     const userMessage = this._makeUserMessageEvent(
-      normalizedMessage.content,
-      normalizedMessage.displayContent,
+      message.content,
+      message.displayContent,
       payload._meta,
     );
 
     this._emit([userMessage]);
 
-    this._scheduleRunLoop(parts, normalizedMessage.displayContent);
+    this._scheduleRunLoop(parts, message.displayContent);
 
     return { streamId };
   }
