@@ -61,17 +61,25 @@ export class LinuxSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
-  private getMaskFilePath(): { maskPath: string; cleanup: () => void } {
+  private async getMaskFilePath(): Promise<{
+    maskPath: string;
+    cleanup: () => void;
+  }> {
     if (
       LinuxSandboxManager.maskFilePath &&
-      fs.existsSync(LinuxSandboxManager.maskFilePath)
+      (await fs.promises
+        .stat(LinuxSandboxManager.maskFilePath)
+        .then(() => true)
+        .catch(() => false))
     ) {
       return { maskPath: LinuxSandboxManager.maskFilePath, cleanup: () => {} };
     }
-    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
+    const tempDir = await fs.promises.mkdtemp(
+      join(os.tmpdir(), 'gemini-cli-mask-file-'),
+    );
     const maskPath = join(tempDir, 'mask');
-    fs.writeFileSync(maskPath, '');
-    fs.chmodSync(maskPath, 0);
+    await fs.promises.writeFile(maskPath, '');
+    await fs.promises.chmod(maskPath, 0);
     LinuxSandboxManager.maskFilePath = maskPath;
 
     const cleanup = () => {
@@ -85,7 +93,10 @@ export class LinuxSandboxManager implements SandboxManager {
     return { maskPath, cleanup };
   }
 
-  private getSeccompBpfPath(): { bpfPath: string; cleanup: () => void } {
+  private async getSeccompBpfPath(): Promise<{
+    bpfPath: string;
+    cleanup: () => void;
+  }> {
     const arch = os.arch();
     let AUDIT_ARCH: number;
     let SYS_ptrace: number;
@@ -133,9 +144,11 @@ export class LinuxSandboxManager implements SandboxManager {
       buf.writeUInt32LE(inst.k, offset + 4);
     }
 
-    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
+    const tempDir = await fs.promises.mkdtemp(
+      join(os.tmpdir(), 'gemini-cli-seccomp-'),
+    );
     const bpfPath = join(tempDir, 'seccomp.bpf');
-    fs.writeFileSync(bpfPath, buf);
+    await fs.promises.writeFile(bpfPath, buf);
 
     const cleanup = () => {
       try {
@@ -151,19 +164,21 @@ export class LinuxSandboxManager implements SandboxManager {
   /**
    * Ensures a file or directory exists.
    */
-  private touch(filePath: string, isDirectory: boolean) {
+  private async touch(filePath: string, isDirectory: boolean) {
     try {
       // If it exists (even as a broken symlink), do nothing
-      if (fs.lstatSync(filePath)) return;
+      await fs.promises.lstat(filePath);
+      return;
     } catch {
       // Ignore ENOENT
     }
 
     if (isDirectory) {
-      fs.mkdirSync(filePath, { recursive: true });
+      await fs.promises.mkdir(filePath, { recursive: true });
     } else {
-      fs.mkdirSync(dirname(filePath), { recursive: true });
-      fs.closeSync(fs.openSync(filePath, 'a'));
+      await fs.promises.mkdir(dirname(filePath), { recursive: true });
+      const handle = await fs.promises.open(filePath, 'a');
+      await handle.close();
     }
   }
 
@@ -315,7 +330,7 @@ export class LinuxSandboxManager implements SandboxManager {
 
     for (const file of GOVERNANCE_FILES) {
       const filePath = join(this.options.workspace, file.path);
-      this.touch(filePath, file.isDirectory);
+      await this.touch(filePath, file.isDirectory);
       const realPath = tryRealpath(filePath);
       bwrapArgs.push('--ro-bind', filePath, filePath);
       if (realPath !== filePath) {
@@ -328,7 +343,11 @@ export class LinuxSandboxManager implements SandboxManager {
       let resolved: string;
       try {
         resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
-        if (!fs.existsSync(resolved)) continue;
+        const exists = await fs.promises
+          .stat(resolved)
+          .then(() => true)
+          .catch(() => false);
+        if (!exists) continue;
       } catch (e: unknown) {
         debugLogger.warn(
           `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
@@ -337,7 +356,7 @@ export class LinuxSandboxManager implements SandboxManager {
         continue;
       }
       try {
-        const stat = fs.statSync(resolved);
+        const stat = await fs.promises.stat(resolved);
         if (stat.isDirectory()) {
           bwrapArgs.push('--tmpfs', resolved, '--remount-ro', resolved);
         } else {
@@ -360,7 +379,7 @@ export class LinuxSandboxManager implements SandboxManager {
       await this.getSecretFilesArgs(req.policy?.allowedPaths);
     bwrapArgs.push(...secretArgs);
 
-    const { bpfPath, cleanup: bpfCleanup } = this.getSeccompBpfPath();
+    const { bpfPath, cleanup: bpfCleanup } = await this.getSeccompBpfPath();
 
     bwrapArgs.push('--seccomp', '9');
     bwrapArgs.push('--', req.command, ...req.args);
@@ -395,7 +414,7 @@ export class LinuxSandboxManager implements SandboxManager {
     cleanup: () => void;
   }> {
     const args: string[] = [];
-    const { maskPath, cleanup } = this.getMaskFilePath();
+    const { maskPath, cleanup } = await this.getMaskFilePath();
     const paths = sanitizePaths(allowedPaths) || [];
     const searchDirs = new Set([this.options.workspace, ...paths]);
     const findPatterns = getSecretFileFindArgs();
@@ -438,16 +457,16 @@ export class LinuxSandboxManager implements SandboxManager {
           '-print0',
         ]);
 
-        const files = findResult.stdout.toString().split('\0');
+        const files: string[] = findResult.stdout.toString().split('\0');
         for (const file of files) {
           if (file.trim()) {
             args.push('--bind', maskPath, file.trim());
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         debugLogger.log(
           `LinuxSandboxManager: Failed to find or mask secret files in ${dir}`,
-          e,
+          e instanceof Error ? e : String(e),
         );
       }
     }

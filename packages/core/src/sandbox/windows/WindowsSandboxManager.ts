@@ -85,22 +85,28 @@ export class WindowsSandboxManager implements SandboxManager {
   /**
    * Ensures a file or directory exists.
    */
-  private touch(filePath: string, isDirectory: boolean): void {
+  private async touch(filePath: string, isDirectory: boolean): Promise<void> {
     try {
       // If it exists (even as a broken symlink), do nothing
-      if (fs.lstatSync(filePath)) return;
+      await fs.promises.lstat(filePath);
+      return;
     } catch {
       // Ignore ENOENT
     }
 
     if (isDirectory) {
-      fs.mkdirSync(filePath, { recursive: true });
+      await fs.promises.mkdir(filePath, { recursive: true });
     } else {
       const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+      const dirExists = await fs.promises
+        .stat(dir)
+        .then(() => true)
+        .catch(() => false);
+      if (!dirExists) {
+        await fs.promises.mkdir(dir, { recursive: true });
       }
-      fs.closeSync(fs.openSync(filePath, 'a'));
+      const handle = await fs.promises.open(filePath, 'a');
+      await handle.close();
     }
   }
 
@@ -112,13 +118,23 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      if (!fs.existsSync(this.helperPath)) {
+      const helperExists = await fs.promises
+        .stat(this.helperPath)
+        .then(() => true)
+        .catch(() => false);
+
+      if (!helperExists) {
         debugLogger.log(
           `WindowsSandboxManager: Helper not found at ${this.helperPath}. Attempting to compile...`,
         );
         // If the exe doesn't exist, we try to compile it from the .cs file
         const sourcePath = this.helperPath.replace(/\.exe$/, '.cs');
-        if (fs.existsSync(sourcePath)) {
+        const sourceExists = await fs.promises
+          .stat(sourcePath)
+          .then(() => true)
+          .catch(() => false);
+
+        if (sourceExists) {
           const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
           const cscPaths = [
             'csc.exe', // Try in PATH first
@@ -330,12 +346,12 @@ export class WindowsSandboxManager implements SandboxManager {
     // By being created as Medium integrity, they are write-protected from Low processes.
     for (const file of GOVERNANCE_FILES) {
       const filePath = path.join(this.options.workspace, file.path);
-      this.touch(filePath, file.isDirectory);
+      await this.touch(filePath, file.isDirectory);
     }
 
     // 4. Forbidden paths manifest
     const { manifestPath, cleanup } =
-      this.generateForbiddenManifest(secretsToBlock);
+      await this.generateForbiddenManifest(secretsToBlock);
 
     // GeminiSandbox.exe <network:0|1> <cwd> --forbidden-manifest <path> <command> [args...]
     const program = this.helperPath;
@@ -361,19 +377,19 @@ export class WindowsSandboxManager implements SandboxManager {
   /**
    * Generates a manifest file of forbidden paths for the native helper.
    */
-  private generateForbiddenManifest(secretsToBlock: string[]): {
+  private async generateForbiddenManifest(secretsToBlock: string[]): Promise<{
     manifestPath: string;
     cleanup: () => void;
-  } {
+  }> {
     const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
     const allForbidden = Array.from(
       new Set([...secretsToBlock, ...forbiddenPaths]),
     );
-    const tempDir = fs.mkdtempSync(
+    const tempDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'gemini-cli-forbidden-'),
     );
     const manifestPath = path.join(tempDir, 'manifest.txt');
-    fs.writeFileSync(manifestPath, allForbidden.join('\n'));
+    await fs.promises.writeFile(manifestPath, allForbidden.join('\n'));
 
     const cleanup = () => {
       try {
