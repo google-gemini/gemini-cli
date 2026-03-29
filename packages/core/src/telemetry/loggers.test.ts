@@ -1151,8 +1151,11 @@ describe('loggers', () => {
       getQuestion: () => 'test-question',
       getToolRegistry: () =>
         new ToolRegistry(cfg1, {} as unknown as MessageBus),
-
       getUserMemory: () => 'user-memory',
+      isExperimentalAgentHistoryTruncationEnabled: () => false,
+      getExperimentalAgentHistoryTruncationThreshold: () => 30,
+      getExperimentalAgentHistoryRetainedMessages: () => 15,
+      isExperimentalAgentHistorySummarizationEnabled: () => false,
     } as unknown as Config;
 
     (cfg2 as unknown as { config: Config; promptId: string }).config = cfg2;
@@ -2566,7 +2569,7 @@ describe('loggers', () => {
     });
 
     it('should log onboarding success event to Clearcut and OTEL, and record metrics', () => {
-      const event = new OnboardingSuccessEvent('standard-tier');
+      const event = new OnboardingSuccessEvent('standard-tier', 100);
 
       logOnboardingSuccess(mockConfig, event);
 
@@ -2575,7 +2578,7 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Onboarding succeeded. Tier: standard-tier',
+        body: 'Onboarding succeeded. Tier: standard-tier. Duration: 100ms',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
@@ -2584,12 +2587,14 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           interactive: false,
           user_tier: 'standard-tier',
+          duration_ms: 100,
         },
       });
 
       expect(metrics.recordOnboardingSuccess).toHaveBeenCalledWith(
         mockConfig,
         'standard-tier',
+        100,
       );
     });
   });

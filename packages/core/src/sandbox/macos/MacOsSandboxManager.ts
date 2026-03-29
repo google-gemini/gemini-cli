@@ -8,46 +8,110 @@ import {
   type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
+  type SandboxPermissions,
+  type GlobalSandboxOptions,
+  type ParsedSandboxDenial,
 } from '../../services/sandboxManager.js';
+import type { ShellExecutionResult } from '../../services/shellExecutionService.js';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
-  type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
-
-/**
- * Options for configuring the MacOsSandboxManager.
- */
-export interface MacOsSandboxOptions {
-  /** The primary workspace path to allow access to within the sandbox. */
-  workspace: string;
-  /** Additional paths to allow access to within the sandbox. */
-  allowedPaths?: string[];
-  /** Whether network access is allowed. */
-  networkAccess?: boolean;
-  /** Optional base sanitization config. */
-  sanitizationConfig?: EnvironmentSanitizationConfig;
-}
+import {
+  initializeShellParsers,
+  getCommandName,
+} from '../../utils/shell-utils.js';
+import {
+  isKnownSafeCommand,
+  isDangerousCommand,
+  isStrictlyApproved,
+} from '../utils/commandSafety.js';
+import { verifySandboxOverrides } from '../utils/commandUtils.js';
+import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
 /**
  * A SandboxManager implementation for macOS that uses Seatbelt.
  */
 export class MacOsSandboxManager implements SandboxManager {
-  constructor(private readonly options: MacOsSandboxOptions) {}
+  constructor(private readonly options: GlobalSandboxOptions) {}
+
+  isKnownSafeCommand(args: string[]): boolean {
+    const toolName = args[0];
+    const approvedTools = this.options.modeConfig?.approvedTools ?? [];
+    if (toolName && approvedTools.includes(toolName)) {
+      return true;
+    }
+    return isKnownSafeCommand(args);
+  }
+
+  isDangerousCommand(args: string[]): boolean {
+    return isDangerousCommand(args);
+  }
+
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined {
+    return parsePosixSandboxDenials(result);
+  }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
+    await initializeShellParsers();
     const sanitizationConfig = getSecureSanitizationConfig(
-      req.config?.sanitizationConfig,
-      this.options.sanitizationConfig,
+      req.policy?.sanitizationConfig,
     );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
+    const isReadonlyMode = this.options.modeConfig?.readonly ?? true;
+    const allowOverrides = this.options.modeConfig?.allowOverrides ?? true;
+
+    // Reject override attempts in plan mode
+    verifySandboxOverrides(allowOverrides, req.policy);
+
+    // If not in readonly mode OR it's a strictly approved pipeline, allow workspace writes
+    const isApproved = allowOverrides
+      ? await isStrictlyApproved(
+          req.command,
+          req.args,
+          this.options.modeConfig?.approvedTools,
+        )
+      : false;
+
+    const workspaceWrite = !isReadonlyMode || isApproved;
+    const defaultNetwork =
+      this.options.modeConfig?.network || req.policy?.networkAccess || false;
+
+    // Fetch persistent approvals for this command
+    const commandName = await getCommandName(req.command, req.args);
+    const persistentPermissions = allowOverrides
+      ? this.options.policyManager?.getCommandPermissions(commandName)
+      : undefined;
+
+    // Merge all permissions
+    const mergedAdditional: SandboxPermissions = {
+      fileSystem: {
+        read: [
+          ...(persistentPermissions?.fileSystem?.read ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.read ?? []),
+        ],
+        write: [
+          ...(persistentPermissions?.fileSystem?.write ?? []),
+          ...(req.policy?.additionalPermissions?.fileSystem?.write ?? []),
+        ],
+      },
+      network:
+        defaultNetwork ||
+        persistentPermissions?.network ||
+        req.policy?.additionalPermissions?.network ||
+        false,
+    };
+
     const sandboxArgs = buildSeatbeltArgs({
       workspace: this.options.workspace,
-      allowedPaths: this.options.allowedPaths,
-      networkAccess: this.options.networkAccess,
+      allowedPaths: [...(req.policy?.allowedPaths || [])],
+      forbiddenPaths: this.options.forbiddenPaths,
+      networkAccess: mergedAdditional.network,
+      workspaceWrite,
+      additionalPermissions: mergedAdditional,
     });
 
     return {

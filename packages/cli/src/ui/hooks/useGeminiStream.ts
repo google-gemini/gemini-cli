@@ -26,7 +26,6 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
-  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -39,6 +38,10 @@ import {
   getPlanModeExitMessage,
   isBackgroundExecutionData,
   Kind,
+  ACTIVATE_SKILL_TOOL_NAME,
+  shouldHideToolCall,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -65,9 +68,14 @@ import type {
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType } from '../types.js';
+import {
+  StreamingState,
+  MessageType,
+  mapCoreStatusToDisplayStatus,
+  ToolCallStatus,
+} from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
-import { useShellCommandProcessor } from './shellCommandProcessor.js';
+import { useExecutionLifecycle } from './useExecutionLifecycle.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
@@ -101,6 +109,9 @@ interface BackgroundedToolInfo {
   command: string;
   initialOutput: string;
 }
+
+const isTopicTool = (name: string): boolean =>
+  name === UPDATE_TOPIC_TOOL_NAME || name === UPDATE_TOPIC_DISPLAY_NAME;
 
 enum StreamProcessingStatus {
   Completed,
@@ -358,14 +369,14 @@ export const useGeminiStream = (
     handleShellCommand,
     activeShellPtyId,
     lastShellOutputTime,
-    backgroundShellCount,
-    isBackgroundShellVisible,
-    toggleBackgroundShell,
-    backgroundCurrentShell,
-    registerBackgroundShell,
-    dismissBackgroundShell,
-    backgroundShells,
-  } = useShellCommandProcessor(
+    backgroundTaskCount,
+    isBackgroundTaskVisible,
+    toggleBackgroundTasks,
+    backgroundCurrentExecution,
+    registerBackgroundTask,
+    dismissBackgroundTask,
+    backgroundTasks,
+  } = useExecutionLifecycle(
     addItem,
     setPendingHistoryItem,
     onExec,
@@ -477,13 +488,23 @@ export const useGeminiStream = (
           activeShellPtyId,
           !!isShellFocused,
           [],
-          backgroundShells,
+          backgroundTasks,
         ),
       });
       addItem(historyItem);
 
       setPushedToolCallIds(newPushed);
-      setIsFirstToolInGroup(false);
+
+      // If this batch ONLY contains topics, and we were the first in the group,
+      // the NEXT batch is still effectively the first VISIBLE bordered tool in the group.
+      if (
+        isFirstToolInGroupRef.current &&
+        toolsToPush.every((tc) => isTopicTool(tc.request.name))
+      ) {
+        // Keep it true!
+      } else {
+        setIsFirstToolInGroup(false);
+      }
     }
   }, [
     toolCalls,
@@ -494,9 +515,8 @@ export const useGeminiStream = (
     addItem,
     activeShellPtyId,
     isShellFocused,
-    backgroundShells,
+    backgroundTasks,
   ]);
-
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
       (tc) => !pushedToolCallIds.has(tc.request.callId),
@@ -509,19 +529,30 @@ export const useGeminiStream = (
       activeShellPtyId,
       !!isShellFocused,
       [],
-      backgroundShells,
+      backgroundTasks,
     );
 
     if (remainingTools.length > 0) {
+      // Should we draw a top border? Yes if NO previous tools were drawn,
+      // OR if ALL previously drawn tools were topics (which don't draw top borders).
+      let needsTopBorder = pushedToolCallIds.size === 0;
+      if (!needsTopBorder) {
+        const allPushedWereTopics = toolCalls
+          .filter((tc) => pushedToolCallIds.has(tc.request.callId))
+          .every((tc) => isTopicTool(tc.request.name));
+        if (allPushedWereTopics) {
+          needsTopBorder = true;
+        }
+      }
+
       items.push(
         mapTrackedToolCallsToDisplay(remainingTools, {
-          borderTop: pushedToolCallIds.size === 0,
+          borderTop: needsTopBorder,
           borderBottom: false, // Stay open to connect with the slice below
           ...appearance,
         }),
       );
     }
-
     // Always show a bottom border slice if we have ANY tools in the batch
     // and we haven't finished pushing the whole batch to history yet.
     // Once all tools are terminal and pushed, the last history item handles the closing border.
@@ -540,14 +571,39 @@ export const useGeminiStream = (
 
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
-      // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
-      const isInProgress =
-        tc.status !== 'success' &&
-        tc.status !== 'error' &&
-        tc.status !== 'cancelled';
-      if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
+      const displayName = tc.tool?.displayName ?? tc.request.name;
+
+      let hasResultDisplay = false;
+      if (
+        tc.status === CoreToolCallStatus.Success ||
+        tc.status === CoreToolCallStatus.Error ||
+        tc.status === CoreToolCallStatus.Cancelled
+      ) {
+        hasResultDisplay = !!tc.response?.resultDisplay;
+      } else if (tc.status === CoreToolCallStatus.Executing) {
+        hasResultDisplay = !!tc.liveOutput;
+      }
+
+      // AskUser tools and Plan Mode write/edit are handled by this logic
+      if (
+        shouldHideToolCall({
+          displayName,
+          status: tc.status,
+          approvalMode: tc.approvalMode,
+          hasResultDisplay,
+          parentCallId: tc.request.parentCallId,
+        })
+      ) {
         return false;
       }
+
+      // ToolGroupMessage explicitly hides Confirming tools because they are
+      // rendered in the interactive ToolConfirmationQueue instead.
+      const displayStatus = mapCoreStatusToDisplayStatus(tc.status);
+      if (displayStatus === ToolCallStatus.Confirming) {
+        return false;
+      }
+
       // ToolGroupMessage now shows all non-canceled tools, so they are visible
       // in pending and we need to draw the closing border for them.
       return true;
@@ -573,7 +629,7 @@ export const useGeminiStream = (
     pushedToolCallIds,
     activeShellPtyId,
     isShellFocused,
-    backgroundShells,
+    backgroundTasks,
   ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -1720,6 +1776,36 @@ export const useGeminiStream = (
       );
       if (clientTools.length > 0) {
         markToolsAsSubmitted(clientTools.map((t) => t.request.callId));
+
+        if (geminiClient) {
+          for (const tool of clientTools) {
+            // Only manually record skill activations in the chat history.
+            // Other client-initiated tools (like save_memory) update the system
+            // prompt/context and don't strictly need to be in the history.
+            if (tool.request.name !== ACTIVATE_SKILL_TOOL_NAME) {
+              continue;
+            }
+
+            // Add both the call (model turn) and the result (user turn) to history.
+            // Client-initiated calls are essentially "synthetic" turns that let
+            // subsequent model calls understand what just happened in the UI.
+            await geminiClient.addHistory({
+              role: 'model',
+              parts: [
+                {
+                  functionCall: {
+                    name: tool.request.name,
+                    args: tool.request.args,
+                  },
+                },
+              ],
+            });
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: tool.response.responseParts,
+            });
+          }
+        }
       }
 
       // Identify new, successful save_memory calls that we haven't processed yet.
@@ -1733,7 +1819,7 @@ export const useGeminiStream = (
       for (const toolCall of completedAndReadyToSubmitTools) {
         const backgroundedTool = getBackgroundedToolInfo(toolCall);
         if (backgroundedTool) {
-          registerBackgroundShell(
+          registerBackgroundTask(
             backgroundedTool.pid,
             backgroundedTool.command,
             backgroundedTool.initialOutput,
@@ -1867,7 +1953,7 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
-      registerBackgroundShell,
+      registerBackgroundTask,
       consumeUserHint,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,
@@ -1962,12 +2048,12 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
-    backgroundShellCount,
-    isBackgroundShellVisible,
-    toggleBackgroundShell,
-    backgroundCurrentShell,
-    backgroundShells,
-    dismissBackgroundShell,
+    backgroundTaskCount,
+    isBackgroundTaskVisible,
+    toggleBackgroundTasks,
+    backgroundCurrentExecution,
+    backgroundTasks,
+    dismissBackgroundTask,
     retryStatus,
   };
 };

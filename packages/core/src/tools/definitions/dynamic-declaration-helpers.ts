@@ -21,8 +21,13 @@ import {
   PARAM_DESCRIPTION,
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  PARAM_ADDITIONAL_PERMISSIONS,
+  UPDATE_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 /**
@@ -80,6 +85,7 @@ export function getCommandDescription(): string {
 export function getShellDeclaration(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  enableToolSandboxing: boolean = false,
 ): FunctionDeclaration {
   return {
     name: SHELL_TOOL_NAME,
@@ -109,6 +115,39 @@ export function getShellDeclaration(
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
         },
+        ...(enableToolSandboxing
+          ? {
+              [PARAM_ADDITIONAL_PERMISSIONS]: {
+                type: 'object',
+                description:
+                  'Sandbox permissions for the command. Use this to request additional sandboxed filesystem or network permissions if a previous command failed with "Operation not permitted".',
+                properties: {
+                  network: {
+                    type: 'boolean',
+                    description:
+                      'Set to true to enable network access for this command.',
+                  },
+                  fileSystem: {
+                    type: 'object',
+                    properties: {
+                      read: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description:
+                          'List of additional absolute paths to allow reading.',
+                      },
+                      write: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description:
+                          'List of additional absolute paths to allow writing.',
+                      },
+                    },
+                  },
+                },
+              },
+            }
+          : {}),
       },
       required: [SHELL_PARAM_COMMAND],
     },
@@ -118,20 +157,18 @@ export function getShellDeclaration(
 /**
  * Returns the FunctionDeclaration for exiting plan mode.
  */
-export function getExitPlanModeDeclaration(
-  plansDir: string,
-): FunctionDeclaration {
+export function getExitPlanModeDeclaration(): FunctionDeclaration {
   return {
     name: EXIT_PLAN_MODE_TOOL_NAME,
     description:
       'Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.',
     parametersJsonSchema: {
       type: 'object',
-      required: [EXIT_PLAN_PARAM_PLAN_PATH],
+      required: [EXIT_PLAN_PARAM_PLAN_FILENAME],
       properties: {
-        [EXIT_PLAN_PARAM_PLAN_PATH]: {
+        [EXIT_PLAN_PARAM_PLAN_FILENAME]: {
           type: 'string',
-          description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
+          description: `The filename of the finalized plan (e.g., "feature-x.md"). Do not provide an absolute path.`,
         },
       },
     },
@@ -169,5 +206,36 @@ export function getActivateSkillDeclaration(
     name: ACTIVATE_SKILL_TOOL_NAME,
     description: `Activates a specialized agent skill by name${availableSkillsHint}. Returns the skill's instructions wrapped in \`<activated_skill>\` tags. These provide specialized guidance for the current task. Use this when you identify a task that matches a skill's description. ONLY use names exactly as they appear in the \`<available_skills>\` section.`,
     parametersJsonSchema: zodToJsonSchema(schema),
+  };
+}
+
+/**
+ * Returns the FunctionDeclaration for updating the topic context.
+ */
+export function getUpdateTopicDeclaration(): FunctionDeclaration {
+  return {
+    name: UPDATE_TOPIC_TOOL_NAME,
+    description:
+      'Manages your narrative flow. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [TOPIC_PARAM_TITLE]: {
+          type: 'string',
+          description: 'The title of the new topic or chapter.',
+        },
+        [TOPIC_PARAM_SUMMARY]: {
+          type: 'string',
+          description:
+            '(OPTIONAL) A detailed summary (5-10 sentences) covering both the work completed in the previous topic and the strategic intent of the new topic. This is required when transitioning between topics to maintain continuity.',
+        },
+        [TOPIC_PARAM_STRATEGIC_INTENT]: {
+          type: 'string',
+          description:
+            'A mandatory one-sentence statement of your immediate intent.',
+        },
+      },
+      required: [TOPIC_PARAM_STRATEGIC_INTENT],
+    },
   };
 }
