@@ -98,36 +98,34 @@ export function shellReducer(
       // to avoid re-rendering if the drawer is not visible.
       // This is an intentional performance optimization for the CLI.
       let newOutput = shell.output;
-      if (action.chunk) {
-        if (typeof action.chunk === 'string') {
-          // Check combined length BEFORE concatenation — the + operator itself
-          // can throw if the resulting string would exceed ~1 GB.
-          const currentOutput =
-            typeof shell.output === 'string' ? shell.output : '';
-          const combinedLength = currentOutput.length + action.chunk.length;
+      if (typeof action.chunk === 'string') {
+        // Check combined length BEFORE concatenation — the + operator itself
+        // can throw if the resulting string would exceed ~1 GB.
+        const currentOutput =
+          typeof shell.output === 'string' ? shell.output : '';
+        const combinedLength = currentOutput.length + action.chunk.length;
 
-          if (
-            combinedLength >
-            MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
-          ) {
-            // Truncate currentOutput so that after appending the chunk the
-            // result is exactly MAX_SHELL_OUTPUT_SIZE characters.
-            const keepCurrentLength = Math.max(
-              0,
-              MAX_SHELL_OUTPUT_SIZE - action.chunk.length,
-            );
-            newOutput =
-              currentOutput.slice(currentOutput.length - keepCurrentLength) +
-              action.chunk;
-          } else {
-            newOutput = currentOutput + action.chunk;
-          }
+        if (
+          combinedLength >
+          MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+        ) {
+          // Truncate currentOutput so that after appending the chunk the
+          // result is exactly MAX_SHELL_OUTPUT_SIZE characters.
+          const keepCurrentLength = Math.max(
+            0,
+            MAX_SHELL_OUTPUT_SIZE - action.chunk.length,
+          );
+          newOutput =
+            currentOutput.slice(currentOutput.length - keepCurrentLength) +
+            action.chunk;
         } else {
-          newOutput = action.chunk;
+          newOutput = currentOutput + action.chunk;
         }
-      } else {
+      } else if (action.chunk) {
+        // This handles AnsiOutput, which replaces the whole buffer.
         newOutput = action.chunk;
       }
+      // If action.chunk is falsy, newOutput remains unchanged (preserves current output)
       shell.output = newOutput;
 
       const nextState = { ...state, lastShellOutputTime: Date.now() };

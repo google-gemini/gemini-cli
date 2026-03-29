@@ -265,4 +265,75 @@ describe('shellReducer', () => {
     // The newest chunk should be preserved at the end
     expect((output as string).endsWith(chunk)).toBe(true);
   });
+
+  it('should preserve output when appending empty string', () => {
+    const originalOutput = 'important data' + 'x'.repeat(5000);
+    const shellState: ShellState = {
+      ...initialState,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'tail -f log',
+            output: originalOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk: '', // Empty string should not modify output
+    };
+
+    const state = shellReducer(shellState, action);
+    const output = state.backgroundShells.get(1001)?.output;
+
+    // Empty string should leave output unchanged
+    expect(output).toBe(originalOutput);
+    expect(output).not.toBe('');
+  });
+
+  it('should handle chunks larger than MAX_SHELL_OUTPUT_SIZE', () => {
+    // Setup: existing output that when combined with large chunk exceeds threshold
+    const existingOutput = 'a'.repeat(1_500_000); // 1.5 MB
+    const largeChunk = 'b'.repeat(9_600_000); // 9.6 MB
+    // Combined: 11.1 MB, which exceeds MAX (10MB) + BUFFER (1MB) = 11MB threshold
+    const shellState: ShellState = {
+      ...initialState,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'test',
+            output: existingOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const action: ShellAction = {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk: largeChunk,
+    };
+
+    const state = shellReducer(shellState, action);
+    const output = state.backgroundShells.get(1001)?.output as string;
+
+    expect(typeof output).toBe('string');
+    // After truncation, output should be exactly MAX_SHELL_OUTPUT_SIZE
+    expect(output.length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    // The new chunk (largeChunk) should be fully preserved at the end
+    expect(output.endsWith(largeChunk)).toBe(true);
+  });
 });

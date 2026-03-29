@@ -64,3 +64,19 @@ gemini-debug.log
 evals/logs/
 
 temp_agents/
+
+# Analysis and review files (temporary documentation)
+ISSUE_ANALYSIS.md
+BUG_DEMONSTRATION.md
+FINAL_PR_REVIEW.md
+PR_ANALYSIS_GUIDE.md
+FIX_APPLIED.md
+
+# Test output artifacts
+*_out.txt
+*_test*.txt
+*_run.txt
+*_verbose.txt
+cli_out*.txt
+build_out.txt
+core_test_run.txt
