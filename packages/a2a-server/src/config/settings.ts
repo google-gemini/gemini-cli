@@ -48,6 +48,9 @@ export interface Settings {
     enableRecursiveFileSearch?: boolean;
     customIgnoreFilePaths?: string[];
   };
+  experimental?: {
+    enableAgents?: boolean;
+  };
 }
 
 export interface SettingsError {

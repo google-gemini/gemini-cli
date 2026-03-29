@@ -51,7 +51,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
-import { coreEvents } from '../utils/events.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock fs module to prevent actual file system operations during tests
@@ -216,6 +216,8 @@ describe('Gemini Client (client.ts)', () => {
       getUserMemory: vi.fn().mockReturnValue(''),
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
+      getSystemInstructionMemory: vi.fn().mockReturnValue(''),
+      getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
       getContextManager: vi.fn().mockReturnValue(undefined),
       getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
@@ -282,6 +284,16 @@ describe('Gemini Client (client.ts)', () => {
         isSkillActive: vi.fn().mockReturnValue(false),
         activateSkill: vi.fn(),
       }),
+      isExperimentalAgentHistoryTruncationEnabled: vi
+        .fn()
+        .mockReturnValue(false),
+      getExperimentalAgentHistoryTruncationThreshold: vi
+        .fn()
+        .mockReturnValue(30),
+      getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(15),
+      isExperimentalAgentHistorySummarizationEnabled: vi
+        .fn()
+        .mockReturnValue(false),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -707,6 +719,43 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('calls AgentHistoryProvider.manageHistory when history truncation is enabled', async () => {
+      // Arrange
+      mockConfig.isExperimentalAgentHistoryTruncationEnabled = vi
+        .fn()
+        .mockReturnValue(true);
+      const manageHistorySpy = vi
+        .spyOn(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (client as any).agentHistoryProvider,
+          'manageHistory',
+        )
+        .mockResolvedValue([
+          { role: 'user', parts: [{ text: 'preserved message' }] },
+        ]);
+
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      await fromAsync(stream);
+
+      // Assert
+      expect(manageHistorySpy).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(AbortSignal),
+      );
+    });
+
     it('emits a compression event when the context was automatically compressed', async () => {
       // Arrange
       mockTurnRunFn.mockReturnValue(
@@ -1966,12 +2015,11 @@ ${JSON.stringify(
       });
     });
 
-    it('should use getGlobalMemory for system instruction when JIT is enabled', async () => {
+    it('should use getSystemInstructionMemory for system instruction when JIT is enabled', async () => {
       vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockConfig.getGlobalMemory).mockReturnValue(
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
         'Global JIT Memory',
       );
-      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Full JIT Memory');
 
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
@@ -1980,13 +2028,15 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
-        'Full JIT Memory',
+        'Global JIT Memory',
       );
     });
 
-    it('should use getUserMemory for system instruction when JIT is disabled', async () => {
+    it('should use getSystemInstructionMemory for system instruction when JIT is disabled', async () => {
       vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
-      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Legacy Memory');
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Legacy Memory',
+      );
 
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
@@ -1996,6 +2046,23 @@ ${JSON.stringify(
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
         'Legacy Memory',
+      );
+    });
+
+    it('should update system instruction when MemoryChanged event is emitted', async () => {
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Updated Memory',
+      );
+
+      const { getCoreSystemPrompt } = await import('./prompts.js');
+      const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
+      mockGetCoreSystemPrompt.mockClear();
+
+      coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: 2 });
+
+      expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
+        mockConfig,
+        'Updated Memory',
       );
     });
 
