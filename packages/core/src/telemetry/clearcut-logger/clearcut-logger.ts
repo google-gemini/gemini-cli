@@ -1821,6 +1821,12 @@ export class ClearcutLogger {
         value: event.userTier,
       });
     }
+    if (event.duration_ms !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ONBOARDING_DURATION_MS,
+        value: event.duration_ms.toString(),
+      });
+    }
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.ONBOARDING_SUCCESS, data),
     );

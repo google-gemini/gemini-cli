@@ -301,7 +301,7 @@ priority = 10
 # (Optional) A custom message to display when a tool call is denied by this
 # rule. This message is returned to the model and user,
 # useful for explaining *why* it was denied.
-deny_message = "Deletion is permanent"
+denyMessage = "Deletion is permanent"
 
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
@@ -310,6 +310,14 @@ modes = ["autoEdit"]
 # non-interactive (false) environments.
 # If omitted, the rule applies to both.
 interactive = true
+
+# (Optional) If true, lets shell commands use redirection operators
+# (>, >>, <, <<, <<<). By default, the policy engine asks for confirmation
+# when redirection is detected, even if a rule matches the command.
+# This permission is granular; it only applies to the specific rule it's
+# defined in. In chained commands (e.g., cmd1 > file && cmd2), each
+# individual command rule must permit redirection if it's used.
+allowRedirection = true
 ```
 
 ### Using arrays (lists)
@@ -394,7 +402,7 @@ server.
 mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
-deny_message = "This server is not trusted by the admin."
+denyMessage = "This server is not trusted by the admin."
 ```
 
 **3. Targeting all MCP servers**
@@ -405,6 +413,7 @@ registered MCP server. This is useful for setting category-wide defaults.
 ```toml
 # Ask user for any tool call from any MCP server
 [[rule]]
+toolName = "*"
 mcpName = "*"
 decision = "ask_user"
 priority = 10

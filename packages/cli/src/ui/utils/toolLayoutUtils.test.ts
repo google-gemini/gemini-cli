@@ -9,6 +9,10 @@ import {
   calculateToolContentMaxLines,
   calculateShellMaxLines,
   SHELL_CONTENT_OVERHEAD,
+  TOOL_RESULT_STATIC_HEIGHT,
+  TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
+  TOOL_RESULT_ASB_RESERVED_LINE_COUNT,
+  TOOL_RESULT_MIN_LINES_SHOWN,
 } from './toolLayoutUtils.js';
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import {
@@ -48,7 +52,7 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 2,
           isAlternateBuffer: false,
         },
-        expected: 3,
+        expected: TOOL_RESULT_MIN_LINES_SHOWN + 1,
       },
       {
         desc: 'returns available space directly in constrained terminal (ASB mode)',
@@ -56,7 +60,7 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 4,
           isAlternateBuffer: true,
         },
-        expected: 3,
+        expected: TOOL_RESULT_MIN_LINES_SHOWN + 1,
       },
       {
         desc: 'returns remaining space if sufficient space exists (Standard mode)',
@@ -64,7 +68,10 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 20,
           isAlternateBuffer: false,
         },
-        expected: 17,
+        expected:
+          20 -
+          TOOL_RESULT_STATIC_HEIGHT -
+          TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
       },
       {
         desc: 'returns remaining space if sufficient space exists (ASB mode)',
@@ -72,7 +79,8 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 20,
           isAlternateBuffer: true,
         },
-        expected: 13,
+        expected:
+          20 - TOOL_RESULT_STATIC_HEIGHT - TOOL_RESULT_ASB_RESERVED_LINE_COUNT,
       },
     ];
 
@@ -148,7 +156,7 @@ describe('toolLayoutUtils', () => {
           constrainHeight: true,
           isExpandable: false,
         },
-        expected: 4,
+        expected: 6 - TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
       },
       {
         desc: 'handles negative availableTerminalHeight gracefully',
@@ -172,7 +180,7 @@ describe('toolLayoutUtils', () => {
           constrainHeight: false,
           isExpandable: false,
         },
-        expected: 28,
+        expected: 30 - TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
       },
       {
         desc: 'falls back to COMPLETED_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD for completed shells if space allows',
