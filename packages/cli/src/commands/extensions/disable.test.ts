@@ -151,7 +151,7 @@ describe('extensions disable command', () => {
     const command = disableCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('disable [--scope] <name>');
+      expect(command.command).toBe('disable <name>');
       expect(command.describe).toBe('Disables an extension.');
     });
 

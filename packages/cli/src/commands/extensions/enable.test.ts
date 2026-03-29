@@ -202,7 +202,7 @@ describe('extensions enable command', () => {
     const command = enableCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('enable [--scope] <name>');
+      expect(command.command).toBe('enable <name>');
       expect(command.describe).toBe('Enables an extension.');
     });
 

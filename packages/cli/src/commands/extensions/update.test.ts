@@ -196,7 +196,7 @@ describe('extensions update command', () => {
     const command = updateCommand;
 
     it('should have correct command and describe', () => {
-      expect(command.command).toBe('update [<name>] [--all]');
+      expect(command.command).toBe('update [<name>]');
       expect(command.describe).toBe(
         'Updates all extensions or a named extension to the latest version.',
       );

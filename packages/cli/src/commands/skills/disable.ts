@@ -31,7 +31,7 @@ export async function handleDisable(args: DisableArgs) {
 }
 
 export const disableCommand: CommandModule = {
-  command: 'disable <name> [--scope]',
+  command: 'disable <name>',
   describe: 'Disables an agent skill.',
   builder: (yargs) =>
     yargs
