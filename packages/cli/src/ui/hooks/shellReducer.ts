@@ -5,6 +5,10 @@
  */
 
 import type { AnsiOutput, CompletionBehavior } from '@google/gemini-cli-core';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 export interface BackgroundTask {
   pid: number;
@@ -98,13 +102,38 @@ export function shellReducer(
       // This is an intentional performance optimization for the CLI.
       let newOutput = task.output;
       if (typeof action.chunk === 'string') {
-        newOutput =
-          typeof task.output === 'string'
-            ? task.output + action.chunk
-            : action.chunk;
-      } else {
+        // Check combined length BEFORE concatenation — the + operator itself
+        // can throw if the resulting string would exceed ~1 GB.
+        const currentOutput =
+          typeof task.output === 'string' ? task.output : '';
+        const combinedLength = currentOutput.length + action.chunk.length;
+
+        if (
+          combinedLength >
+          MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+        ) {
+          // Truncate using Array.from to avoid splitting multi-byte Unicode
+          // characters (e.g. emojis) at a code-unit boundary.
+          const chunkArr = Array.from(action.chunk);
+          if (chunkArr.length >= MAX_SHELL_OUTPUT_SIZE) {
+            // Incoming chunk alone exceeds the cap — keep its tail.
+            newOutput = chunkArr.slice(-MAX_SHELL_OUTPUT_SIZE).join('');
+          } else {
+            // Keep as much of the existing output as possible, then append.
+            const keepFromCurrent = MAX_SHELL_OUTPUT_SIZE - chunkArr.length;
+            const currentArr = Array.from(currentOutput);
+            newOutput =
+              currentArr.slice(-keepFromCurrent).join('') + action.chunk;
+          }
+        } else {
+          newOutput = currentOutput + action.chunk;
+        }
+      } else if (action.chunk) {
+        // AnsiOutput replaces the whole buffer.
         newOutput = action.chunk;
       }
+      // If action.chunk is falsy (e.g. empty string already handled above via
+      // typeof gate), newOutput remains unchanged — no data loss.
       task.output = newOutput;
 
       const nextState = { ...state, lastShellOutputTime: Date.now() };
