@@ -86,10 +86,10 @@ vi.mock('./shared/ScrollableList.js', () => ({
 }));
 
 import { theme } from '../semantic-colors.js';
-import { type BackgroundShell } from '../hooks/shellReducer.js';
+import { type BackgroundTask } from '../hooks/shellReducer.js';
 
 describe('getToolGroupBorderAppearance', () => {
-  const mockBackgroundShells = new Map<number, BackgroundShell>();
+  const mockBackgroundTasks = new Map<number, BackgroundTask>();
   const activeShellPtyId = 123;
 
   it('returns default empty values for non-tool_group items', () => {
@@ -99,7 +99,7 @@ describe('getToolGroupBorderAppearance', () => {
       null,
       false,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({ borderColor: '', borderDimColor: false });
   });
@@ -144,7 +144,7 @@ describe('getToolGroupBorderAppearance', () => {
       null,
       false,
       pendingItems,
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({
       borderColor: theme.border.default,
@@ -173,7 +173,7 @@ describe('getToolGroupBorderAppearance', () => {
       null,
       false,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({
       borderColor: theme.border.default,
@@ -202,7 +202,7 @@ describe('getToolGroupBorderAppearance', () => {
       null,
       false,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({
       borderColor: theme.status.warning,
@@ -232,7 +232,7 @@ describe('getToolGroupBorderAppearance', () => {
       activeShellPtyId,
       false,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({
       borderColor: theme.ui.active,
@@ -262,7 +262,7 @@ describe('getToolGroupBorderAppearance', () => {
       activeShellPtyId,
       true,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({
       borderColor: theme.ui.focus,
@@ -291,7 +291,7 @@ describe('getToolGroupBorderAppearance', () => {
       activeShellPtyId,
       false,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     expect(result).toEqual({
       borderColor: theme.ui.active,
@@ -308,7 +308,7 @@ describe('getToolGroupBorderAppearance', () => {
       activeShellPtyId,
       true,
       [],
-      mockBackgroundShells,
+      mockBackgroundTasks,
     );
     // Since there are no tools to inspect, it falls back to empty pending, but isCurrentlyInShellTurn=true
     // so it counts as pending shell.
