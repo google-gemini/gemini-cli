@@ -22,6 +22,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { request } from 'node:http';
 import { createWriteStream } from 'node:fs';
 import { parseArgs } from 'node:util';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ---------- Argument parsing ------------------------------------------------
 
@@ -30,6 +32,7 @@ const { values: args } = parseArgs({
     port: { type: 'string', default: '9229' },
     host: { type: 'string', default: '127.0.0.1' },
     output: { type: 'string', default: './snapshot_cdp.heapsnapshot' },
+    'timeout-ms': { type: 'string', default: '30000' },
   },
   strict: true,
 });
@@ -37,6 +40,7 @@ const { values: args } = parseArgs({
 const PORT = parseInt(args.port, 10);
 const HOST = args.host;
 const OUTPUT = args.output;
+const TIMEOUT_MS = parseInt(args['timeout-ms'], 10);
 
 // ---------- Security: Loopback-only enforcement ----------------------------
 
@@ -54,6 +58,10 @@ if (PORT < 1024) {
     `[cdp] SECURITY: Refused connection to privileged port ${PORT}.\n` +
     `     Use a port >= 1024 (default: 9229).`
   );
+  process.exit(1);
+}
+if (!Number.isFinite(TIMEOUT_MS) || TIMEOUT_MS <= 0) {
+  console.error('[cdp] Invalid --timeout-ms value. Use a positive integer.');
   process.exit(1);
 }
 
@@ -203,7 +211,7 @@ function decodeCloseReason(payload) {
 function isMainModule() {
   const entry = process.argv[1];
   if (!entry) return false;
-  return new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1') === entry;
+  return path.resolve(fileURLToPath(import.meta.url)) === path.resolve(entry);
 }
 
 // ---------- Main capture flow -----------------------------------------------
@@ -348,7 +356,7 @@ async function captureCdpSnapshot() {
     });
 
     sock.on('error', (e) => fail(new Error('[cdp] Socket error: ' + e.message)));
-    sock.setTimeout(30000, () => fail(new Error('[cdp] Connection timed out after 30s')));
+    sock.setTimeout(TIMEOUT_MS, () => fail(new Error(`[cdp] Connection timed out after ${TIMEOUT_MS}ms`)));
     sock.on('close', () => {
       if (!settled) {
         fail(new Error('[cdp] Inspector closed the socket before snapshot capture completed.'));
