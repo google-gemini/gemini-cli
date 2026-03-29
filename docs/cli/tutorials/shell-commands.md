@@ -17,9 +17,10 @@ prefix.
 
 **Example:** `!ls -la`
 
-This executes `ls -la` immediately and prints the output to your terminal. The
-AI doesn't "see" this output unless you paste it back into the chat or use it in
-a prompt.
+This executes `ls -la` immediately and prints the output to your terminal.
+Gemini CLI also records the command and its output in the current session
+context, so the model can reference it in follow-up prompts. Very large outputs
+may be truncated.
 
 ### Scenario: Entering Shell mode
 

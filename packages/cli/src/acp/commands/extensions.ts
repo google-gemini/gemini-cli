@@ -319,26 +319,43 @@ export class UninstallExtensionCommand implements Command {
       };
     }
 
-    const name = args.join(' ').trim();
-    if (!name) {
+    const all = args.includes('--all');
+    const names = args.filter((a) => !a.startsWith('--')).map((a) => a.trim());
+
+    if (!all && names.length === 0) {
       return {
         name: this.name,
-        data: `Usage: /extensions uninstall <extension-name>`,
+        data: `Usage: /extensions uninstall <extension-names...>|--all`,
       };
     }
 
-    try {
-      await extensionLoader.uninstallExtension(name, false);
+    let namesToUninstall: string[] = [];
+    if (all) {
+      namesToUninstall = extensionLoader.getExtensions().map((ext) => ext.name);
+    } else {
+      namesToUninstall = names;
+    }
+
+    if (namesToUninstall.length === 0) {
       return {
         name: this.name,
-        data: `Extension "${name}" uninstalled successfully.`,
-      };
-    } catch (error) {
-      return {
-        name: this.name,
-        data: `Failed to uninstall extension "${name}": ${getErrorMessage(error)}`,
+        data: all ? 'No extensions installed.' : 'No extension name provided.',
       };
     }
+
+    const output: string[] = [];
+    for (const extensionName of namesToUninstall) {
+      try {
+        await extensionLoader.uninstallExtension(extensionName, false);
+        output.push(`Extension "${extensionName}" uninstalled successfully.`);
+      } catch (error) {
+        output.push(
+          `Failed to uninstall extension "${extensionName}": ${getErrorMessage(error)}`,
+        );
+      }
+    }
+
+    return { name: this.name, data: output.join('\n') };
   }
 }
 

@@ -280,8 +280,8 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
-    // In Zed integration, we skip the interactive consent and directly open the browser
-    if (!config.getExperimentalZedIntegration()) {
+    // In ACP mode, we skip the interactive consent and directly open the browser
+    if (!config.getAcpMode()) {
       const userConsent = await getConsentForOauth('');
       if (!userConsent) {
         throw new FatalCancellationError('Authentication cancelled by user.');

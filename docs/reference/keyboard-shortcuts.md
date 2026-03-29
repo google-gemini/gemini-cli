@@ -19,12 +19,12 @@ available combinations.
 
 | Action                                      | Keys                                                         |
 | ------------------------------------------- | ------------------------------------------------------------ |
-| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home (no Shift, Ctrl)`                      |
-| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Shift, Ctrl)`                       |
-| Move the cursor up one line.                | `Up Arrow (no Shift, Alt, Ctrl, Cmd)`                        |
-| Move the cursor down one line.              | `Down Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
-| Move the cursor one character to the left.  | `Left Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
-| Move the cursor one character to the right. | `Right Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + F`     |
+| Move the cursor to the start of the line.   | `Ctrl + A`<br />`Home`                                       |
+| Move the cursor to the end of the line.     | `Ctrl + E`<br />`End`                                        |
+| Move the cursor up one line.                | `Up Arrow`                                                   |
+| Move the cursor down one line.              | `Down Arrow`                                                 |
+| Move the cursor one character to the left.  | `Left Arrow`                                                 |
+| Move the cursor one character to the right. | `Right Arrow`<br />`Ctrl + F`                                |
 | Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Alt + Left Arrow`<br />`Alt + B`   |
 | Move the cursor one word to the right.      | `Ctrl + Right Arrow`<br />`Alt + Right Arrow`<br />`Alt + F` |
 
@@ -39,7 +39,7 @@ available combinations.
 | Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`<br />`Alt + D`               |
 | Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                                      |
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                         |
-| Undo the most recent text edit.                  | `Cmd + Z (no Shift)`<br />`Alt + Z (no Shift)`                   |
+| Undo the most recent text edit.                  | `Cmd + Z`<br />`Alt + Z`                                         |
 | Redo the most recent undone text edit.           | `Shift + Ctrl + Z`<br />`Shift + Cmd + Z`<br />`Shift + Alt + Z` |
 
 #### Scrolling
@@ -55,72 +55,72 @@ available combinations.
 
 #### History & Search
 
-| Action                                       | Keys                  |
-| -------------------------------------------- | --------------------- |
-| Show the previous entry in history.          | `Ctrl + P (no Shift)` |
-| Show the next entry in history.              | `Ctrl + N (no Shift)` |
-| Start reverse search through history.        | `Ctrl + R`            |
-| Submit the selected reverse-search match.    | `Enter (no Ctrl)`     |
-| Accept a suggestion while reverse searching. | `Tab (no Shift)`      |
-| Browse and rewind previous interactions.     | `Double Esc`          |
+| Action                                       | Keys         |
+| -------------------------------------------- | ------------ |
+| Show the previous entry in history.          | `Ctrl + P`   |
+| Show the next entry in history.              | `Ctrl + N`   |
+| Start reverse search through history.        | `Ctrl + R`   |
+| Submit the selected reverse-search match.    | `Enter`      |
+| Accept a suggestion while reverse searching. | `Tab`        |
+| Browse and rewind previous interactions.     | `Double Esc` |
 
 #### Navigation
 
-| Action                                             | Keys                                        |
-| -------------------------------------------------- | ------------------------------------------- |
-| Move selection up in lists.                        | `Up Arrow (no Shift)`                       |
-| Move selection down in lists.                      | `Down Arrow (no Shift)`                     |
-| Move up within dialog options.                     | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
-| Move down within dialog options.                   | `Down Arrow (no Shift)`<br />`J (no Shift)` |
-| Move to the next item or question in a dialog.     | `Tab (no Shift)`                            |
-| Move to the previous item or question in a dialog. | `Shift + Tab`                               |
+| Action                                             | Keys                  |
+| -------------------------------------------------- | --------------------- |
+| Move selection up in lists.                        | `Up Arrow`            |
+| Move selection down in lists.                      | `Down Arrow`          |
+| Move up within dialog options.                     | `Up Arrow`<br />`K`   |
+| Move down within dialog options.                   | `Down Arrow`<br />`J` |
+| Move to the next item or question in a dialog.     | `Tab`                 |
+| Move to the previous item or question in a dialog. | `Shift + Tab`         |
 
 #### Suggestions & Completions
 
-| Action                                  | Keys                                               |
-| --------------------------------------- | -------------------------------------------------- |
-| Accept the inline suggestion.           | `Tab (no Shift)`<br />`Enter (no Ctrl)`            |
-| Move to the previous completion option. | `Up Arrow (no Shift)`<br />`Ctrl + P (no Shift)`   |
-| Move to the next completion option.     | `Down Arrow (no Shift)`<br />`Ctrl + N (no Shift)` |
-| Expand an inline suggestion.            | `Right Arrow`                                      |
-| Collapse an inline suggestion.          | `Left Arrow`                                       |
+| Action                                  | Keys                         |
+| --------------------------------------- | ---------------------------- |
+| Accept the inline suggestion.           | `Tab`<br />`Enter`           |
+| Move to the previous completion option. | `Up Arrow`<br />`Ctrl + P`   |
+| Move to the next completion option.     | `Down Arrow`<br />`Ctrl + N` |
+| Expand an inline suggestion.            | `Right Arrow`                |
+| Collapse an inline suggestion.          | `Left Arrow`                 |
 
 #### Text Input
 
 | Action                                                     | Keys                                                                                      |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Submit the current prompt.                                 | `Enter (no Shift, Alt, Ctrl, Cmd)`                                                        |
+| Submit the current prompt.                                 | `Enter`                                                                                   |
 | Insert a newline without submitting.                       | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Alt + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
 | Open the current prompt or the plan in an external editor. | `Ctrl + X`                                                                                |
 | Paste from the clipboard.                                  | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
 
 #### App Controls
 
-| Action                                                                                                                                             | Keys             |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Toggle detailed error information.                                                                                                                 | `F12`            |
-| Toggle the full TODO list.                                                                                                                         | `Ctrl + T`       |
-| Show IDE context details.                                                                                                                          | `Ctrl + G`       |
-| Toggle Markdown rendering.                                                                                                                         | `Alt + M`        |
-| Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl + S`       |
-| Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl + Y`       |
-| Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift + Tab`    |
-| Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl + O`       |
-| Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl + O`       |
-| Toggle current background shell visibility.                                                                                                        | `Ctrl + B`       |
-| Toggle background shell list.                                                                                                                      | `Ctrl + L`       |
-| Kill the active background shell.                                                                                                                  | `Ctrl + K`       |
-| Confirm selection in background shell list.                                                                                                        | `Enter`          |
-| Dismiss background shell list.                                                                                                                     | `Esc`            |
-| Move focus from background shell to Gemini.                                                                                                        | `Shift + Tab`    |
-| Move focus from background shell list to Gemini.                                                                                                   | `Tab (no Shift)` |
-| Show warning when trying to move focus away from background shell.                                                                                 | `Tab (no Shift)` |
-| Show warning when trying to move focus away from shell input.                                                                                      | `Tab (no Shift)` |
-| Move focus from Gemini to the active shell.                                                                                                        | `Tab (no Shift)` |
-| Move focus from the shell back to Gemini.                                                                                                          | `Shift + Tab`    |
-| Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl + L`       |
-| Restart the application.                                                                                                                           | `R`              |
-| Suspend the CLI and move it to the background.                                                                                                     | `Ctrl + Z`       |
+| Action                                                                                                                                             | Keys                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Toggle detailed error information.                                                                                                                 | `F12`                |
+| Toggle the full TODO list.                                                                                                                         | `Ctrl + T`           |
+| Show IDE context details.                                                                                                                          | `Ctrl + G`           |
+| Toggle Markdown rendering.                                                                                                                         | `Alt + M`            |
+| Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl + S`           |
+| Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl + Y`           |
+| Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift + Tab`        |
+| Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl + O`           |
+| Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl + O`           |
+| Toggle current background shell visibility.                                                                                                        | `Ctrl + B`           |
+| Toggle background shell list.                                                                                                                      | `Ctrl + L`           |
+| Kill the active background shell.                                                                                                                  | `Ctrl + K`           |
+| Confirm selection in background shell list.                                                                                                        | `Enter`              |
+| Dismiss background shell list.                                                                                                                     | `Esc`                |
+| Move focus from background shell to Gemini.                                                                                                        | `Shift + Tab`        |
+| Move focus from background shell list to Gemini.                                                                                                   | `Tab`                |
+| Show warning when trying to move focus away from background shell.                                                                                 | `Tab`                |
+| Show warning when trying to move focus away from shell input.                                                                                      | `Tab`                |
+| Move focus from Gemini to the active shell.                                                                                                        | `Tab`                |
+| Move focus from the shell back to Gemini.                                                                                                          | `Shift + Tab`        |
+| Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl + L`           |
+| Restart the application.                                                                                                                           | `R`<br />`Shift + R` |
+| Suspend the CLI and move it to the background.                                                                                                     | `Ctrl + Z`           |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
@@ -156,7 +156,7 @@ available combinations.
 ## Limitations
 
 - On [Windows Terminal](https://en.wikipedia.org/wiki/Windows_Terminal):
-  - `shift+enter` is not supported.
+  - `shift+enter` is only supported in version 1.25 and higher.
   - `shift+tab`
     [is not supported](https://github.com/google-gemini/gemini-cli/issues/20314)
     on Node 20 and earlier versions of Node 22.
