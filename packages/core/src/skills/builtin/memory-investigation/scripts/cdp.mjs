@@ -1,0 +1,268 @@
+/* global console, process, Buffer, URL, setInterval, clearInterval */
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * cdp.mjs — Minimal CDP WebSocket client for heap snapshot capture.
+ *
+ * Zero external dependencies. Uses node:net + node:http + node:crypto.
+ * Connects to a running Node.js process via --inspect, sends HeapProfiler
+ * commands, streams snapshot chunks to a file.
+ *
+ * Usage:
+ *   node cdp.mjs --port 9229 --output ./snapshot_cdp.heapsnapshot
+ *
+ * Target process must be launched with:
+ *   node --inspect=127.0.0.1:9229 your-script.js
+ */
+
+import { createConnection } from 'node:net';
+import { createHash, randomBytes } from 'node:crypto';
+import { request } from 'node:http';
+import { createWriteStream } from 'node:fs';
+import { parseArgs } from 'node:util';
+
+// ---------- Argument parsing ------------------------------------------------
+
+const { values: args } = parseArgs({
+  options: {
+    port: { type: 'string', default: '9229' },
+    host: { type: 'string', default: '127.0.0.1' },
+    output: { type: 'string', default: './snapshot_cdp.heapsnapshot' },
+  },
+  strict: true,
+});
+
+const PORT = parseInt(args.port, 10);
+const HOST = args.host;
+const OUTPUT = args.output;
+
+// ---------- Security: Loopback-only enforcement ----------------------------
+
+const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+if (!ALLOWED_HOSTS.has(HOST)) {
+  console.error(
+    `[cdp] SECURITY: Refused connection to non-loopback host "${HOST}".\n` +
+    `     Inspector ports must bind to 127.0.0.1 or localhost only.\n` +
+    `     Connecting to remote/0.0.0.0 hosts exposes the debugger to the network.`
+  );
+  process.exit(1);
+}
+if (PORT < 1024) {
+  console.error(
+    `[cdp] SECURITY: Refused connection to privileged port ${PORT}.\n` +
+    `     Use a port >= 1024 (default: 9229).`
+  );
+  process.exit(1);
+}
+
+// ---------- Step 1: Resolve WebSocket URL from /json/list -------------------
+
+function resolveWsUrl(host, port) {
+  return new Promise((resolve, reject) => {
+    const req = request(`http://${host}:${port}/json/list`, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          const targets = JSON.parse(data);
+          const target = targets.find((t) => t.type === 'node') ?? targets[0];
+          if (!target?.webSocketDebuggerUrl) {
+            reject(new Error('No debuggable Node.js target found on port ' + port));
+            return;
+          }
+          resolve(target.webSocketDebuggerUrl);
+        } catch (e) {
+          reject(new Error('Failed to parse /json/list: ' + e.message));
+        }
+      });
+    });
+    req.on('error', (e) => reject(new Error(`Inspector not reachable at ${host}:${port} — ${e.message}`)));
+    req.end();
+  });
+}
+
+// ---------- Step 2: Minimal WebSocket handshake (RFC 6455) ------------------
+
+function buildHandshake(host, port, path) {
+  const key = randomBytes(16).toString('base64');
+  const handshake = [
+    `GET ${path} HTTP/1.1`,
+    `Host: ${host}:${port}`,
+    'Upgrade: websocket',
+    'Connection: Upgrade',
+    `Sec-WebSocket-Key: ${key}`,
+    'Sec-WebSocket-Version: 13',
+    '\r\n',
+  ].join('\r\n');
+  const expectedAccept = createHash('sha1')
+    .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+    .digest('base64');
+  return { handshake, expectedAccept };
+}
+
+// ---------- Step 3: WebSocket frame parser (text frames only) ---------------
+
+function parseFrames(buffer) {
+  const messages = [];
+  let offset = 0;
+  while (offset < buffer.length) {
+    if (buffer.length - offset < 2) break;
+    const fin = (buffer[offset] & 0x80) !== 0;
+    const opcode = buffer[offset] & 0x0f;
+    offset++;
+    // Server frames from V8 inspector are always unmasked (mask bit at 0x80 is 0)
+    let payloadLen = buffer[offset] & 0x7f;
+    offset++;
+    if (payloadLen === 126) {
+      if (buffer.length - offset < 2) break;
+      payloadLen = buffer.readUInt16BE(offset);
+      offset += 2;
+    } else if (payloadLen === 127) {
+      if (buffer.length - offset < 8) break;
+      payloadLen = Number(buffer.readBigUInt64BE(offset));
+      offset += 8;
+    }
+    if (buffer.length - offset < payloadLen) break;
+    const payload = buffer.slice(offset, offset + payloadLen);
+    offset += payloadLen;
+    if (fin && opcode === 1) messages.push(payload.toString('utf8'));
+  }
+  return { messages, remaining: buffer.slice(offset) };
+}
+
+// ---------- Step 4: Send MASKED WS text frame (RFC 6455 Section 5.1) --------
+// Per RFC 6455: "A client MUST mask all frames that it sends to the server."
+
+function buildTextFrame(text) {
+  const payload = Buffer.from(text, 'utf8');
+  const len = payload.length;
+  const maskKey = randomBytes(4);
+  let header;
+  if (len < 126) {
+    header = Buffer.alloc(2);
+    header[0] = 0x81; // FIN + opcode=text
+    header[1] = 0x80 | len; // MASK bit set + payload length
+  } else if (len < 65536) {
+    header = Buffer.alloc(4);
+    header[0] = 0x81;
+    header[1] = 0x80 | 126;
+    header.writeUInt16BE(len, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x81;
+    header[1] = 0x80 | 127;
+    header.writeBigUInt64BE(BigInt(len), 2);
+  }
+  // XOR payload with 4-byte mask key (RFC 6455 Section 5.3)
+  const maskedPayload = Buffer.alloc(len);
+  for (let i = 0; i < len; i++) {
+    maskedPayload[i] = payload[i] ^ maskKey[i & 3];
+  }
+  return Buffer.concat([header, maskKey, maskedPayload]);
+}
+
+// ---------- Main capture flow -----------------------------------------------
+
+async function captureCdpSnapshot() {
+  console.log(`[cdp] Connecting to ${HOST}:${PORT}...`);
+
+  const wsUrl = await resolveWsUrl(HOST, PORT);
+  const urlObj = new URL(wsUrl);
+
+  console.log(`[cdp] Target: ${urlObj.pathname}`);
+
+  await new Promise((resolve, reject) => {
+    const sock = createConnection({ host: urlObj.hostname, port: parseInt(urlObj.port, 10) });
+    const { handshake, expectedAccept } = buildHandshake(urlObj.hostname, urlObj.port, urlObj.pathname);
+
+    const writer = createWriteStream(OUTPUT);
+    let msgId = 1;
+    let handshakeDone = false;
+    let residual = Buffer.alloc(0);
+    let snapshotDone = false;
+
+    function send(method, params = {}) {
+      const msg = JSON.stringify({ id: msgId++, method, params });
+      sock.write(buildTextFrame(msg));
+    }
+
+    sock.on('connect', () => sock.write(handshake));
+
+    sock.on('data', (chunk) => {
+      if (!handshakeDone) {
+        const text = chunk.toString();
+        if (!text.includes('101')) { reject(new Error('WS upgrade failed')); return; }
+        if (!text.includes(expectedAccept)) { reject(new Error('WS accept key mismatch')); return; }
+        handshakeDone = true;
+        console.log('[cdp] WebSocket connected. Enabling HeapProfiler...');
+        send('HeapProfiler.enable');
+        const rest = chunk.slice(chunk.indexOf('\r\n\r\n') + 4);
+        if (rest.length > 0) residual = Buffer.concat([residual, rest]);
+        return;
+      }
+
+      residual = Buffer.concat([residual, chunk]);
+      const { messages, remaining } = parseFrames(residual);
+      residual = remaining;
+
+      for (const raw of messages) {
+        let msg;
+        try { msg = JSON.parse(raw); } catch { continue; }
+
+        // HeapProfiler.enable ack → take snapshot
+        if (msg.id === 1 && !msg.error) {
+          console.log('[cdp] HeapProfiler enabled. Taking snapshot...');
+          send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
+        }
+
+        // Snapshot chunk events
+        if (msg.method === 'HeapProfiler.addHeapSnapshotChunk') {
+          process.stdout.write('.');
+          writer.write(msg.params.chunk);
+        }
+
+        // Snapshot complete
+        if (msg.method === 'HeapProfiler.reportHeapSnapshotProgress' &&
+            msg.params.finished === true) {
+          snapshotDone = true;
+        }
+
+        // takeHeapSnapshot response (id=2)
+        if (msg.id === 2) {
+          if (msg.error) { reject(new Error('CDP error: ' + msg.error.message)); return; }
+          if (snapshotDone) {
+            process.stdout.write('\n');
+            writer.end(() => {
+              console.log(`[cdp] Snapshot written to ${OUTPUT}`);
+              sock.destroy();
+              resolve();
+            });
+          } else {
+            // Wait for progress finished event
+            const check = setInterval(() => {
+              if (snapshotDone) {
+                clearInterval(check);
+                process.stdout.write('\n');
+                writer.end(() => {
+                  console.log(`[cdp] Snapshot written to ${OUTPUT}`);
+                  sock.destroy();
+                  resolve();
+                });
+              }
+            }, 100);
+          }
+        }
+      }
+    });
+
+    sock.on('error', (e) => reject(new Error('[cdp] Socket error: ' + e.message)));
+    sock.setTimeout(30000, () => reject(new Error('[cdp] Connection timed out after 30s')));
+  });
+}
+
+captureCdpSnapshot().catch((e) => {
+  console.error('[cdp] FATAL:', e.message);
+  process.exit(1);
+});
