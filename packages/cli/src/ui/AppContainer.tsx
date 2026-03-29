@@ -1136,6 +1136,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
+  const isCompressionPending = useMemo(
+    () =>
+      pendingHistoryItems.some(
+        (item) => item.type === 'compression' && item.compression.isPending,
+      ),
+    [pendingHistoryItems],
+  );
 
   const hasPendingToolConfirmation = useMemo(
     () => isToolAwaitingConfirmation(pendingHistoryItems),
@@ -1209,6 +1216,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     streamingState,
     submitQuery,
     isMcpReady,
+    canSubmitMessages: !isCompressionPending,
   });
 
   cancelHandlerRef.current = useCallback(
@@ -1279,10 +1287,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       const isSlash = isSlashCommand(submittedValue.trim());
+      const isShell = shellModeActive;
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
         isToolExecuting(pendingHistoryItems);
+
+      if (isCompressionPending) {
+        if (isSlash || isShell) {
+          setQueueErrorMessage(
+            `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
+          );
+          return;
+        }
+
+        addMessage(submittedValue);
+        addInput(submittedValue);
+        return;
+      }
 
       if (isSlash && isAgentRunning) {
         const { commandToExecute } = parseSlashCommand(
@@ -1344,10 +1366,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       submitQuery,
       handleSlashCommand,
       slashCommands,
+      shellModeActive,
       isMcpReady,
       streamingState,
       messageQueue.length,
       pendingHistoryItems,
+      isCompressionPending,
       config,
       constrainHeight,
       setConstrainHeight,
@@ -1356,6 +1380,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       reset,
       handleHintSubmit,
       isConfigInitialized,
+      setQueueErrorMessage,
       triggerExpandHint,
     ],
   );
@@ -1387,7 +1412,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
    */
   const isInputActive =
     !initError &&
-    !isProcessing &&
+    (!isProcessing || isCompressionPending) &&
     !isResuming &&
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding ||
