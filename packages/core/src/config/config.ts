@@ -36,6 +36,8 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { UpdateTopicTool } from '../tools/topicTool.js';
+import { TopicState } from './topicState.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -641,6 +643,7 @@ export interface ConfigParameters {
   useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
+  shellBackgroundCompletionBehavior?: string;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -728,6 +731,7 @@ export class Config implements McpContext, AgentLoopContext {
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
+  readonly topicState = new TopicState();
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -844,6 +848,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
+  private readonly shellBackgroundCompletionBehavior:
+    | 'inject'
+    | 'notify'
+    | 'silent';
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
@@ -1181,6 +1189,14 @@ export class Config implements McpContext, AgentLoopContext {
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
+
+    const requestedBehavior = params.shellBackgroundCompletionBehavior;
+    if (requestedBehavior === 'inject' || requestedBehavior === 'notify') {
+      this.shellBackgroundCompletionBehavior = requestedBehavior;
+    } else {
+      this.shellBackgroundCompletionBehavior = 'silent';
+    }
+
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -1190,6 +1206,7 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig: this.sanitizationConfig,
       sandboxManager: this._sandboxManager,
       sandboxConfig: this.sandbox,
+      backgroundCompletionBehavior: this.shellBackgroundCompletionBehavior,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -3164,6 +3181,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.enableInteractiveShell;
   }
 
+  getShellBackgroundCompletionBehavior(): 'inject' | 'notify' | 'silent' {
+    return this.shellBackgroundCompletionBehavior;
+  }
+
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
   }
@@ -3353,6 +3374,10 @@ export class Config implements McpContext, AgentLoopContext {
         registerFn();
       }
     };
+
+    maybeRegister(UpdateTopicTool, () =>
+      registry.registerTool(new UpdateTopicTool(this, this.messageBus)),
+    );
 
     maybeRegister(LSTool, () =>
       registry.registerTool(new LSTool(this, this.messageBus)),

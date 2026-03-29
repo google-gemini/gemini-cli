@@ -110,6 +110,7 @@ export interface ResultEvent extends BaseJsonStreamEvent {
 
 export interface ThoughtEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.THOUGHT;
+  subject: string;
   content: string;
 }
 
