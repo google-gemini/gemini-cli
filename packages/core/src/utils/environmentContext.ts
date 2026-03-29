@@ -59,6 +59,14 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   const tempDir = config.storage.getProjectTempDir();
   const environmentMemory = config.getEnvironmentMemory();
 
+  // Keep fact-freshness behavior deterministic when timeline-sensitive claims appear.
+  const factFreshnessGuidance = `
+Fact Freshness Guidance:
+- For time-sensitive or current facts, verify uncertain claims with retrieval/search tools before asserting that something exists or does not exist.
+- Do not label unfamiliar current terms as hallucinations without verification first.
+- For first-party product names or aliases, prefer first-party documentation retrieval (e.g., get_internal_docs when available) before broader web search.
+- For stable, non-time-sensitive facts, normal reasoning from established knowledge remains acceptable.`;
+
   const context = `
 <session_context>
 This is the Gemini CLI. We are setting up the context for our chat.
@@ -66,6 +74,8 @@ Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 The project's temporary directory is: ${tempDir}
 ${directoryContext}
+
+${factFreshnessGuidance}
 
 ${environmentMemory}
 </session_context>`.trim();

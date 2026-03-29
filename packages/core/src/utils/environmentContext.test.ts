@@ -185,4 +185,30 @@ describe('getEnvironmentContext', () => {
 
     expect(parts.length).toBe(1); // No extra part added
   });
+
+  it('should include future-date verification guardrails for time-sensitive claims', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-26T12:00:00.000Z'));
+
+    try {
+      const parts = await getEnvironmentContext(mockConfig as Config);
+      const context = parts[0].text;
+
+      expect(context).toContain('2026');
+      expect(context).toContain(
+        'For time-sensitive or current facts, verify uncertain claims with retrieval/search tools before asserting that something exists or does not exist.',
+      );
+      expect(context).toContain(
+        'Do not label unfamiliar current terms as hallucinations without verification first.',
+      );
+      expect(context).toContain(
+        'For first-party product names or aliases, prefer first-party documentation retrieval (e.g., get_internal_docs when available) before broader web search.',
+      );
+      expect(context).toContain(
+        'For stable, non-time-sensitive facts, normal reasoning from established knowledge remains acceptable.',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
