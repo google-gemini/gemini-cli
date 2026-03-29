@@ -5,7 +5,7 @@
  */
 
 import { render, Box, Text } from 'ink';
-import { useState, useEffect, useReducer } from 'react';
+import { useState, useEffect, useReducer, useRef, useCallback } from 'react';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -28,25 +28,38 @@ export const PlaygroundApp = () => {
   const [selectedIndex, dispatchIndex] = useReducer(selectedIndexReducer, 0);
   const [activeCase, setActiveCase] = useState<string | null>(null);
 
-  useKeypress((key) => {
+  const selectedIndexRef = useRef(selectedIndex);
+  useEffect(() => {
+    selectedIndexRef.current = selectedIndex;
+  }, [selectedIndex]);
+
+  const handleKeypress = useCallback((key: any) => {
     if (key.name === 'up') {
       dispatchIndex('UP');
+      return true;
     }
     if (key.name === 'down') {
       dispatchIndex('DOWN');
+      return true;
     }
     if (key.name === 'enter') {
-      setActiveCase(EVAL_CASES[selectedIndex]);
-      setExecutionStream([`> Initializing Eval Case: '${EVAL_CASES[selectedIndex]}'`]);
+      const active = EVAL_CASES[selectedIndexRef.current];
+      setActiveCase(active);
+      setExecutionStream([`> Initializing Eval Case: '${active}'`]);
+      return true;
     }
-  }, { isActive: true });
+    return false;
+  }, []);
+
+  useKeypress(handleKeypress, { isActive: true });
 
   useEffect(() => {
     const fileToWatch = path.resolve(process.cwd(), 'packages/core/src/prompts/snippets.ts');
     try {
       if (fs.existsSync(fileToWatch)) {
         const content = fs.readFileSync(fileToWatch, 'utf8');
-        setPromptContent(content.substring(0, 1500) + '\\n\\n(Truncated for display)');
+        const lines = content.split('\n');
+        setPromptContent(lines.slice(0, 13).join('\n') + (lines.length > 13 ? '\\n\\n(Truncated for display)' : ''));
       } else {
         setPromptContent(`File not found: ${fileToWatch}`);
       }
@@ -59,7 +72,8 @@ export const PlaygroundApp = () => {
       watcher = fs.watch(fileToWatch, (eventType) => {
         if (eventType === 'change') {
           const content = fs.readFileSync(fileToWatch, 'utf8');
-          setPromptContent(content.substring(0, 1500) + '\\n\\n(Truncated for display)');
+          const lines = content.split('\n');
+          setPromptContent(lines.slice(0, 13).join('\n') + (lines.length > 13 ? '\\n\\n(Truncated for display)' : ''));
         }
       });
     } catch (e) {}
