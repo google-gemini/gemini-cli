@@ -751,7 +751,7 @@ export function detectCommandSubstitution(command: string): boolean {
       continue;
     }
 
-    if (char === '\\' && inDoubleQuote) {
+    if (char === '\\' && !inSingleQuote) {
       i += 2;
       continue;
     }
@@ -760,7 +760,7 @@ export function detectCommandSubstitution(command: string): boolean {
       return true;
     }
 
-    if (char === '<' && command[i + 1] === '(') {
+    if ((char === '<' || char === '>') && command[i + 1] === '(') {
       return true;
     }
 

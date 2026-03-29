@@ -165,7 +165,7 @@ describe('ShellTool', () => {
 
     // Capture the output callback to simulate streaming events from the service
     mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => {
-      mockShellOutputCallback = callback;
+      mockShellOutputCallback = _callback;
       return {
         pid: 12345,
         result: new Promise((resolve) => {
@@ -760,7 +760,6 @@ describe('ShellTool', () => {
       const result = await promise;
       expect(result.llmContent).not.toContain('Process Group PGID:');
     });
-
     it('should have minimal output for successful command', async () => {
       const invocation = shellTool.build({ command: 'echo hello' });
       const promise = invocation.execute(mockAbortSignal);
@@ -856,6 +855,50 @@ describe('ShellTool', () => {
 
     it('should allow normal commands without substitution', async () => {
       mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: 'hello',
+          rawOutput: Buffer.from('hello'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo hello' });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow single quoted strings with special chars', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+        pid: 12345,
+        result: Promise.resolve({
+          output: '$(not substituted)',
+          rawOutput: Buffer.from('$(not substituted)'),
+          exitCode: 0,
+          signal: null,
+          error: null,
+          aborted: false,
+          pid: 12345,
+          executionMethod: 'child_process',
+          backgrounded: false,
+        }),
+      }));
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({
+        command: "echo '$(not substituted)'",
+      });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).not.toContain('Blocked');
+    });
+
+    it('should allow escaped backtick outside double quotes', async () => {
+      mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
           pid: 12345,
           result: Promise.resolve({
             output: 'hello',
@@ -870,17 +913,31 @@ describe('ShellTool', () => {
           }),
         }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
-      const invocation = tool.build({ command: 'echo hello' });
+      const invocation = tool.build({ command: 'echo \\`hello\\`' });
       const result = await invocation.execute(new AbortController().signal);
       expect(result.returnDisplay).not.toContain('Blocked');
     });
 
-    it('should allow single quoted strings with special chars', async () => {
+    it('should block $() inside double quotes', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo "$(whoami)"' });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should block >() process substitution', async () => {
+      const tool = new ShellTool(mockConfig, createMockMessageBus());
+      const invocation = tool.build({ command: 'echo >(whoami)' });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toContain('Blocked');
+    });
+
+    it('should allow $() inside single quotes', async () => {
       mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
           pid: 12345,
           result: Promise.resolve({
-            output: '$(not substituted)',
-            rawOutput: Buffer.from('$(not substituted)'),
+            output: '$(whoami)',
+            rawOutput: Buffer.from('$(whoami)'),
             exitCode: 0,
             signal: null,
             error: null,
@@ -892,7 +949,7 @@ describe('ShellTool', () => {
         }));
       const tool = new ShellTool(mockConfig, createMockMessageBus());
       const invocation = tool.build({
-        command: "echo '$(not substituted)'",
+        command: "echo '$(whoami)'",
       });
       const result = await invocation.execute(new AbortController().signal);
       expect(result.returnDisplay).not.toContain('Blocked');
