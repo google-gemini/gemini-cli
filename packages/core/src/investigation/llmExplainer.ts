@@ -1,25 +1,7 @@
 /**
- * LLMExplainer — LLM-powered retainer path explanation and fix suggestion engine.
- *
- * This is the "third layer" of the investigation pipeline: after data collection
- * (heap snapshots) and signal extraction (root cause analysis), this module
- * generates natural language explanations and code fix suggestions using Gemini.
- *
- * Key capabilities:
- *   - Explain retainer chains in plain English ("why is this object retained?")
- *   - Generate code fix suggestions based on leak patterns
- *   - Summarize investigation results for non-expert developers
- *   - Provide interactive follow-up questions for deeper investigation
- *   - Format explanations for terminal display (ANSI-styled)
- *
- * This module is designed to work with the Gemini CLI's existing tool infrastructure.
- * It generates structured prompts that can be sent to the Gemini model, and parses
- * the responses into actionable investigation steps.
- *
- * Architecture:
- *   HeapSnapshotAnalyzer → RootCauseAnalyzer → LLMExplainer → Gemini Model
- *                                                ↓
- *                                    User-facing explanations + fix suggestions
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/llmExplainer
  */
@@ -27,17 +9,11 @@
 import type {
   ClassSummary,
   RetainerChain,
-  RetainerStep,
   LeakReport,
   LeakCandidate,
-  HeapNodeType,
 } from './heapSnapshotAnalyzer.js';
 
-import type {
-  RootCauseReport,
-  RootCauseFinding,
-  Confidence,
-} from './rootCauseAnalyzer.js';
+import type { RootCauseReport, Confidence } from './rootCauseAnalyzer.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -195,10 +171,15 @@ Provide a JSON response with this structure:
   /**
    * Generate an investigation narrative from root cause analysis results.
    */
-  generateNarrative: (report: RootCauseReport, classSummaries: ClassSummary[]): string => {
+  generateNarrative: (
+    report: RootCauseReport,
+    classSummaries: ClassSummary[],
+  ): string => {
     const topClasses = classSummaries.slice(0, 15);
-    const highFindings = report.findings.filter(f => f.confidence === 'high');
-    const medFindings = report.findings.filter(f => f.confidence === 'medium');
+    const highFindings = report.findings.filter((f) => f.confidence === 'high');
+    const medFindings = report.findings.filter(
+      (f) => f.confidence === 'medium',
+    );
 
     return `
 You are a senior Node.js performance engineer writing a memory investigation report for a team.
@@ -209,13 +190,13 @@ Total Estimated Impact: ${report.totalEstimatedImpact} bytes
 Findings: ${report.findings.length} total (${highFindings.length} high, ${medFindings.length} medium confidence)
 
 ### High-Confidence Findings
-${highFindings.map(f => `- **${f.title}** (${f.category}): ${f.description.slice(0, 200)}`).join('\n')}
+${highFindings.map((f) => `- **${f.title}** (${f.category}): ${f.description.slice(0, 200)}`).join('\n')}
 
 ### Top Classes by Retained Size
-${topClasses.map(c => `- ${c.className}: ${c.count} instances, ${c.retainedSize} bytes retained`).join('\n')}
+${topClasses.map((c) => `- ${c.className}: ${c.count} instances, ${c.retainedSize} bytes retained`).join('\n')}
 
 ### All Recommendations
-${report.recommendations.map(r => `- ${r}`).join('\n')}
+${report.recommendations.map((r) => `- ${r}`).join('\n')}
 
 ## Instructions
 Write a clear, actionable investigation summary in JSON format:
@@ -240,7 +221,9 @@ Write a clear, actionable investigation summary in JSON format:
    * Generate a multi-turn investigation question based on current context.
    */
   suggestNextQuestion: (context: InvestigationContext): string => {
-    const parts: string[] = ['You are an expert memory debugger guiding a developer through an investigation.'];
+    const parts: string[] = [
+      'You are an expert memory debugger guiding a developer through an investigation.',
+    ];
 
     if (context.rootCauseReport) {
       parts.push(`\nCurrent findings: ${context.rootCauseReport.summary}`);
@@ -248,7 +231,9 @@ Write a clear, actionable investigation summary in JSON format:
     }
 
     if (context.focusedClasses && context.focusedClasses.length > 0) {
-      parts.push(`\nCurrently investigating: ${context.focusedClasses.join(', ')}`);
+      parts.push(
+        `\nCurrently investigating: ${context.focusedClasses.join(', ')}`,
+      );
     }
 
     if (context.hypotheses && context.hypotheses.length > 0) {
@@ -285,10 +270,17 @@ Growth rate: ${candidate.growthRate} new instances per interval
 Total leaked memory: ${candidate.totalLeakedSize} bytes
 Confidence: ${candidate.confidence}
 
-${candidate.retainerChains.length > 0 ? `## Retainer Chains
-${candidate.retainerChains.map((chain, i) =>
-  `Chain ${i + 1}: ${chain.chain.map(s => `${s.edgeName}→${s.nodeName}`).join(' → ')}`
-).join('\n')}` : 'No retainer chains available.'}
+${
+  candidate.retainerChains.length > 0
+    ? `## Retainer Chains
+${candidate.retainerChains
+  .map(
+    (chain, i) =>
+      `Chain ${i + 1}: ${chain.chain.map((s) => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
+  )
+  .join('\n')}`
+    : 'No retainer chains available.'
+}
 
 ## Instructions
 Explain this leak in plain English and suggest fixes. Return JSON:
@@ -323,31 +315,54 @@ export class LLMExplainer {
    * Generate a prompt to explain a retainer chain.
    * Returns the prompt string — caller sends to Gemini and passes response to parseRetainerExplanation().
    */
-  generateRetainerExplanationPrompt(chain: RetainerChain, additionalContext?: string): string {
+  generateRetainerExplanationPrompt(
+    chain: RetainerChain,
+    additionalContext?: string,
+  ): string {
     return PROMPTS.explainRetainerChain(chain, additionalContext);
   }
 
   /**
    * Parse Gemini's response to a retainer chain explanation prompt.
    */
-  parseRetainerExplanation(chain: RetainerChain, llmResponse: string): RetainerExplanation {
+  parseRetainerExplanation(
+    chain: RetainerChain,
+    llmResponse: string,
+  ): RetainerExplanation {
     try {
       // Try to parse as JSON first
       const parsed = extractJSON(llmResponse);
 
+      const suggestedFixesArray: unknown[] = Array.isArray(
+        parsed['suggestedFixes'],
+      )
+        ? (parsed['suggestedFixes'] as unknown[])
+        : [];
+      const followUpArray: unknown[] = Array.isArray(
+        parsed['followUpQuestions'],
+      )
+        ? (parsed['followUpQuestions'] as unknown[])
+        : [];
+
       return {
         chain,
-        whyRetained: parsed.whyRetained || 'Unable to determine retention reason.',
-        likelyCause: parsed.likelyCause || 'Unknown code pattern.',
-        suggestedFixes: (parsed.suggestedFixes || []).map((fix: Record<string, unknown>) => ({
-          description: String(fix.description || ''),
-          findPattern: String(fix.findPattern || ''),
-          replaceWith: String(fix.replaceWith || ''),
-          searchHint: String(fix.searchHint || ''),
-          confidence: validateConfidence(fix.confidence),
-        })),
-        followUpQuestions: parsed.followUpQuestions || [],
-        severity: validateSeverity(parsed.severity),
+        whyRetained: String(
+          parsed['whyRetained'] || 'Unable to determine retention reason.',
+        ),
+        likelyCause: String(parsed['likelyCause'] || 'Unknown code pattern.'),
+        suggestedFixes: suggestedFixesArray.map((fix: unknown) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const fixRec = fix as Record<string, unknown>;
+          return {
+            description: String(fixRec['description'] || ''),
+            findPattern: String(fixRec['findPattern'] || ''),
+            replaceWith: String(fixRec['replaceWith'] || ''),
+            searchHint: String(fixRec['searchHint'] || ''),
+            confidence: validateConfidence(fixRec['confidence']),
+          };
+        }),
+        followUpQuestions: followUpArray.map((q) => String(q)),
+        severity: validateSeverity(parsed['severity']),
         estimatedSavings: chain.retainedSize,
       };
     } catch {
@@ -367,7 +382,10 @@ export class LLMExplainer {
   /**
    * Generate a prompt for a full investigation narrative.
    */
-  generateNarrativePrompt(report: RootCauseReport, classSummaries: ClassSummary[]): string {
+  generateNarrativePrompt(
+    report: RootCauseReport,
+    classSummaries: ClassSummary[],
+  ): string {
     return PROMPTS.generateNarrative(report, classSummaries);
   }
 
@@ -378,17 +396,30 @@ export class LLMExplainer {
     try {
       const parsed = extractJSON(llmResponse);
 
+      const actionItemsArray: unknown[] = Array.isArray(parsed['actionItems'])
+        ? (parsed['actionItems'] as unknown[])
+        : [];
+      const nextStepsArray: unknown[] = Array.isArray(parsed['nextSteps'])
+        ? (parsed['nextSteps'] as unknown[])
+        : [];
+
       return {
-        executiveSummary: parsed.executiveSummary || 'Investigation complete.',
-        narrative: parsed.narrative || llmResponse,
-        actionItems: (parsed.actionItems || []).map((item: Record<string, unknown>) => ({
-          priority: validatePriority(item.priority),
-          title: String(item.title || ''),
-          description: String(item.description || ''),
-          effort: validateEffort(item.effort),
-          estimatedSavings: Number(item.estimatedSavings) || 0,
-        })),
-        nextSteps: parsed.nextSteps || [],
+        executiveSummary: String(
+          parsed['executiveSummary'] || 'Investigation complete.',
+        ),
+        narrative: String(parsed['narrative'] || llmResponse),
+        actionItems: actionItemsArray.map((item: unknown) => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const itemRec = item as Record<string, unknown>;
+          return {
+            priority: validatePriority(itemRec['priority']),
+            title: String(itemRec['title'] || ''),
+            description: String(itemRec['description'] || ''),
+            effort: validateEffort(itemRec['effort']),
+            estimatedSavings: Number(itemRec['estimatedSavings']) || 0,
+          };
+        }),
+        nextSteps: nextStepsArray.map((step) => String(step)),
         generationPrompt: prompt,
       };
     } catch {
@@ -434,9 +465,15 @@ export class LLMExplainer {
   /**
    * Add a turn to the conversation.
    */
-  addTurn(role: 'user' | 'assistant', content: string, toolCalls?: ToolCallRecord[]): void {
+  addTurn(
+    role: 'user' | 'assistant',
+    content: string,
+    toolCalls?: ToolCallRecord[],
+  ): void {
     if (!this.conversationState) {
-      throw new Error('No active conversation. Call startConversation() first.');
+      throw new Error(
+        'No active conversation. Call startConversation() first.',
+      );
     }
 
     this.conversationState.turns.push({
@@ -464,10 +501,15 @@ export class LLMExplainer {
 
     const history = this.conversationState.turns
       .slice(-6) // Last 6 turns for context
-      .map(t => `${t.role === 'user' ? 'Developer' : 'Investigator'}: ${t.content}`)
+      .map(
+        (t) =>
+          `${t.role === 'user' ? 'Developer' : 'Investigator'}: ${t.content}`,
+      )
       .join('\n\n');
 
-    const contextSummary = this.summarizeContext(this.conversationState.context);
+    const contextSummary = this.summarizeContext(
+      this.conversationState.context,
+    );
 
     return `
 You are an expert memory debugging assistant conducting an interactive investigation.
@@ -508,9 +550,9 @@ Respond in JSON format:
    */
   explainRetainerChainLocally(chain: RetainerChain): RetainerExplanation {
     const steps = chain.chain ?? [];
-    const edgeNames = steps.map(s => String(s.edgeName).toLowerCase());
-    const nodeNames = steps.map(s => s.nodeName.toLowerCase());
-    const nodeTypes = steps.map(s => s.nodeType);
+    const edgeNames = steps.map((s) => String(s.edgeName).toLowerCase());
+    const nodeNames = steps.map((s) => s.nodeName.toLowerCase());
+    const nodeTypes = steps.map((s) => s.nodeType);
 
     // Detect common patterns
     let whyRetained = '';
@@ -519,82 +561,104 @@ Respond in JSON format:
     let severity: 'critical' | 'warning' | 'info' = 'info';
 
     // Pattern: Event listener chain
-    if (edgeNames.some(e => /listener|handler|_events|on[A-Z]/.test(e))) {
-      whyRetained = `This ${chain.nodeType} "${chain.nodeName}" is being kept alive by an event listener chain. ` +
+    if (edgeNames.some((e) => /listener|handler|_events|on[A-Z]/.test(e))) {
+      whyRetained =
+        `This ${chain.nodeType} "${chain.nodeName}" is being kept alive by an event listener chain. ` +
         `An event handler or callback holds a reference to this object, preventing garbage collection.`;
-      likelyCause = 'Event listener registered without a corresponding removal (missing .off(), removeEventListener(), or AbortController).';
+      likelyCause =
+        'Event listener registered without a corresponding removal (missing .off(), removeEventListener(), or AbortController).';
       severity = chain.retainedSize > 1_000_000 ? 'critical' : 'warning';
       fixes.push({
         description: 'Add cleanup for the event listener',
         findPattern: `\\.on\\(.*${chain.nodeName}|addEventListener.*${chain.nodeName}`,
-        replaceWith: 'Add a corresponding .off() or removeEventListener() in your cleanup/dispose method',
+        replaceWith:
+          'Add a corresponding .off() or removeEventListener() in your cleanup/dispose method',
         searchHint: `Look in files that create ${chain.nodeName} instances`,
         confidence: 'medium',
       });
     }
     // Pattern: Cache/Map retention
-    else if (edgeNames.some(e => /cache|store|map|registry|pool/i.test(e)) ||
-             nodeNames.some(n => /map|set|cache|store|registry/i.test(n))) {
-      whyRetained = `This ${chain.nodeType} "${chain.nodeName}" is stored in a cache or collection. ` +
+    else if (
+      edgeNames.some((e) => /cache|store|map|registry|pool/i.test(e)) ||
+      nodeNames.some((n) => /map|set|cache|store|registry/i.test(n))
+    ) {
+      whyRetained =
+        `This ${chain.nodeType} "${chain.nodeName}" is stored in a cache or collection. ` +
         `It will remain in memory as long as the cache/collection holds a reference to it.`;
-      likelyCause = 'Object stored in a cache/Map/Set without an eviction policy (no TTL, no max size limit).';
+      likelyCause =
+        'Object stored in a cache/Map/Set without an eviction policy (no TTL, no max size limit).';
       severity = chain.retainedSize >= 5_000_000 ? 'critical' : 'warning';
       fixes.push({
         description: 'Add cache eviction policy',
         findPattern: `new Map\\(|new Set\\(|cache\\[|cache\\.set`,
-        replaceWith: 'Use an LRU cache (e.g., lru-cache package) with maxSize and TTL',
+        replaceWith:
+          'Use an LRU cache (e.g., lru-cache package) with maxSize and TTL',
         searchHint: 'Look in caching/storage modules',
+        confidence: 'high',
+      });
+    }
+    // Pattern: Timer retention (check before closure — timer closures are a specific sub-pattern)
+    else if (
+      edgeNames.some((e) => /timer|interval|timeout|_timer/i.test(e)) ||
+      nodeNames.some((n) => /timeout|interval|timer/i.test(n))
+    ) {
+      whyRetained =
+        `This object is retained by a timer (setInterval/setTimeout). ` +
+        `The timer's callback closure keeps a reference to this object until the timer is cleared.`;
+      likelyCause =
+        'A setInterval() or setTimeout() was created without a corresponding clearInterval()/clearTimeout().';
+      severity = 'warning';
+      fixes.push({
+        description: 'Clear the timer when no longer needed',
+        findPattern: `setInterval|setTimeout`,
+        replaceWith:
+          'Store the timer ID and call clearInterval(id)/clearTimeout(id) in cleanup',
+        searchHint: 'Look for timer setup code without corresponding cleanup',
         confidence: 'high',
       });
     }
     // Pattern: Closure capture
     else if (nodeTypes.includes('closure')) {
-      whyRetained = `This object is captured by a closure (an inner function that references variables from its outer scope). ` +
+      whyRetained =
+        `This object is captured by a closure (an inner function that references variables from its outer scope). ` +
         `The closure keeps everything it references alive, even if only part of the captured data is needed.`;
-      likelyCause = 'A closure captures a reference to a large object or data structure that outlives its usefulness.';
+      likelyCause =
+        'A closure captures a reference to a large object or data structure that outlives its usefulness.';
       severity = chain.retainedSize > 2_000_000 ? 'critical' : 'warning';
       fixes.push({
         description: 'Extract only the needed values from the closure scope',
         findPattern: 'function|=>|callback|handler',
-        replaceWith: 'Destructure or copy only the needed values before the closure, set the rest to null',
+        replaceWith:
+          'Destructure or copy only the needed values before the closure, set the rest to null',
         searchHint: `Look for closures that reference ${chain.nodeName}`,
         confidence: 'medium',
       });
     }
-    // Pattern: Timer retention
-    else if (edgeNames.some(e => /timer|interval|timeout|_timer/i.test(e)) ||
-             nodeNames.some(n => /timeout|interval|timer/i.test(n))) {
-      whyRetained = `This object is retained by a timer (setInterval/setTimeout). ` +
-        `The timer's callback closure keeps a reference to this object until the timer is cleared.`;
-      likelyCause = 'A setInterval() or setTimeout() was created without a corresponding clearInterval()/clearTimeout().';
-      severity = 'warning';
-      fixes.push({
-        description: 'Clear the timer when no longer needed',
-        findPattern: `setInterval|setTimeout`,
-        replaceWith: 'Store the timer ID and call clearInterval(id)/clearTimeout(id) in cleanup',
-        searchHint: 'Look for timer setup code without corresponding cleanup',
-        confidence: 'high',
-      });
-    }
     // Pattern: Global/root retention
     else if (steps.length <= 2 && steps[0]?.nodeType === 'synthetic') {
-      whyRetained = `This object is directly or nearly-directly reachable from a GC root (global scope). ` +
+      whyRetained =
+        `This object is directly or nearly-directly reachable from a GC root (global scope). ` +
         `It's likely stored in a global variable, module-level variable, or static field.`;
-      likelyCause = 'Object stored in module scope or global variable — it will never be GC\'d unless explicitly nullified.';
+      likelyCause =
+        "Object stored in module scope or global variable — it will never be GC'd unless explicitly nullified.";
       severity = chain.retainedSize > 10_000_000 ? 'critical' : 'info';
       fixes.push({
-        description: 'Move from module scope to function scope or use lazy initialization',
+        description:
+          'Move from module scope to function scope or use lazy initialization',
         findPattern: `(const|let|var)\\s+\\w+.*=.*${chain.nodeName}`,
-        replaceWith: 'Move the declaration inside a function, or set to null when no longer needed',
+        replaceWith:
+          'Move the declaration inside a function, or set to null when no longer needed',
         searchHint: 'Look at top-level module declarations',
         confidence: 'low',
       });
     }
     // Generic explanation
     else {
-      whyRetained = `This ${chain.nodeType} "${chain.nodeName}" is retained through a reference chain ` +
+      whyRetained =
+        `This ${chain.nodeType} "${chain.nodeName}" is retained through a reference chain ` +
         `of ${steps.length} steps from a GC root. Each link in this chain prevents garbage collection.`;
-      likelyCause = 'An object reference chain is preventing garbage collection.';
+      likelyCause =
+        'An object reference chain is preventing garbage collection.';
       severity = chain.retainedSize > 5_000_000 ? 'warning' : 'info';
     }
 
@@ -605,7 +669,9 @@ Respond in JSON format:
     ];
 
     if (chain.retainedSize > 1_000_000) {
-      followUpQuestions.push(`What objects does ${chain.nodeName} itself retain?`);
+      followUpQuestions.push(
+        `What objects does ${chain.nodeName} itself retain?`,
+      );
     }
 
     return {
@@ -624,23 +690,34 @@ Respond in JSON format:
    * This produces an instant narrative without API calls — useful for offline mode
    * and as a baseline that can be enhanced by LLM.
    */
-  generateLocalNarrative(report: RootCauseReport, classSummaries: ClassSummary[]): InvestigationNarrative {
-    const highFindings = report.findings.filter(f => f.confidence === 'high');
-    const medFindings = report.findings.filter(f => f.confidence === 'medium');
-    const totalSize = classSummaries.reduce((sum, c) => sum + c.retainedSize, 0);
+  generateLocalNarrative(
+    report: RootCauseReport,
+    classSummaries: ClassSummary[],
+  ): InvestigationNarrative {
+    const highFindings = report.findings.filter((f) => f.confidence === 'high');
+    const medFindings = report.findings.filter(
+      (f) => f.confidence === 'medium',
+    );
+    const totalSize = classSummaries.reduce(
+      (sum, c) => sum + c.retainedSize,
+      0,
+    );
 
     // Executive summary
     let executiveSummary: string;
     if (report.healthScore >= 80) {
-      executiveSummary = `Memory health is good (${report.healthScore}/100). ` +
+      executiveSummary =
+        `Memory health is good (${report.healthScore}/100). ` +
         (report.findings.length > 0
           ? `${report.findings.length} minor issue${report.findings.length > 1 ? 's' : ''} detected.`
           : 'No significant issues detected.');
     } else if (report.healthScore >= 50) {
-      executiveSummary = `Memory health is moderate (${report.healthScore}/100) with ${highFindings.length} high-priority issue${highFindings.length !== 1 ? 's' : ''}. ` +
+      executiveSummary =
+        `Memory health is moderate (${report.healthScore}/100) with ${highFindings.length} high-priority issue${highFindings.length !== 1 ? 's' : ''}. ` +
         `Estimated ${formatBytes(report.totalEstimatedImpact)} of memory could be reclaimed.`;
     } else {
-      executiveSummary = `Memory health is poor (${report.healthScore}/100). ` +
+      executiveSummary =
+        `Memory health is poor (${report.healthScore}/100). ` +
         `${highFindings.length} critical issue${highFindings.length !== 1 ? 's' : ''} found, ` +
         `with an estimated impact of ${formatBytes(report.totalEstimatedImpact)}.`;
     }
@@ -650,21 +727,26 @@ Respond in JSON format:
 
     narrativeParts.push(
       `The heap contains ${classSummaries.length} distinct classes using a total of ${formatBytes(totalSize)}. ` +
-      `The top memory consumers are ${classSummaries.slice(0, 3).map(c => `${c.className} (${formatBytes(c.retainedSize)})`).join(', ')}.`
+        `The top memory consumers are ${classSummaries
+          .slice(0, 3)
+          .map((c) => `${c.className} (${formatBytes(c.retainedSize)})`)
+          .join(', ')}.`,
     );
 
     if (highFindings.length > 0) {
       narrativeParts.push(
         `\n\nThe most critical issues are: ` +
-        highFindings.map(f => f.title).join('; ') + '. ' +
-        `These should be addressed first as they account for the majority of the memory impact.`
+          highFindings.map((f) => f.title).join('; ') +
+          '. ' +
+          `These should be addressed first as they account for the majority of the memory impact.`,
       );
     }
 
     if (medFindings.length > 0) {
       narrativeParts.push(
         `\n\nAdditionally, ${medFindings.length} medium-confidence finding${medFindings.length > 1 ? 's were' : ' was'} identified: ` +
-        medFindings.map(f => f.title).join('; ') + '.'
+          medFindings.map((f) => f.title).join('; ') +
+          '.',
       );
     }
 
@@ -672,14 +754,25 @@ Respond in JSON format:
     const actionItems: ActionItem[] = [];
 
     for (const finding of report.findings) {
-      const priority = finding.confidence === 'high' ? 'P0' : finding.confidence === 'medium' ? 'P1' : 'P2';
-      const effort = (finding.estimatedImpact ?? 0) > 10_000_000 ? 'medium' : 'small';
+      const priority =
+        finding.confidence === 'high'
+          ? 'P0'
+          : finding.confidence === 'medium'
+            ? 'P1'
+            : 'P2';
+      const effort =
+        (finding.estimatedImpact ?? 0) > 10_000_000 ? 'medium' : 'small';
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const pri = priority as unknown as 'P0' | 'P1' | 'P2';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const eff = effort as unknown as 'trivial' | 'small' | 'medium' | 'large';
       actionItems.push({
-        priority: priority as 'P0' | 'P1' | 'P2',
+        priority: pri,
         title: finding.title,
-        description: finding.recommendations[0] || finding.description.slice(0, 200),
-        effort: effort as 'trivial' | 'small' | 'medium' | 'large',
+        description:
+          finding.recommendations[0] || finding.description.slice(0, 200),
+        effort: eff,
         estimatedSavings: finding.estimatedImpact ?? 0,
       });
     }
@@ -693,11 +786,15 @@ Respond in JSON format:
       'Use the 3-snapshot technique to confirm which objects are actually leaking',
     ];
 
-    if (highFindings.some(f => f.category === 'event_listener_leak')) {
-      nextSteps.push('Run the process with --trace-events-enabled to trace event listener registrations');
+    if (highFindings.some((f) => f.category === 'event_listener_leak')) {
+      nextSteps.push(
+        'Run the process with --trace-events-enabled to trace event listener registrations',
+      );
     }
-    if (highFindings.some(f => f.category === 'unbounded_collection')) {
-      nextSteps.push('Add memory monitoring (process.memoryUsage()) to track cache size over time');
+    if (highFindings.some((f) => f.category === 'unbounded_collection')) {
+      nextSteps.push(
+        'Add memory monitoring (process.memoryUsage()) to track cache size over time',
+      );
     }
 
     return {
@@ -719,20 +816,24 @@ Respond in JSON format:
 
     const severityColor = {
       critical: '\x1b[31m', // red
-      warning: '\x1b[33m',  // yellow
-      info: '\x1b[36m',     // cyan
+      warning: '\x1b[33m', // yellow
+      info: '\x1b[36m', // cyan
     };
     const reset = '\x1b[0m';
     const bold = '\x1b[1m';
     const dim = '\x1b[2m';
 
-    lines.push(`${bold}${severityColor[explanation.severity]}━━━ ${explanation.severity.toUpperCase()}: ${explanation.chain.nodeName} ━━━${reset}`);
+    lines.push(
+      `${bold}${severityColor[explanation.severity]}━━━ ${explanation.severity.toUpperCase()}: ${explanation.chain.nodeName} ━━━${reset}`,
+    );
     lines.push('');
     lines.push(`${bold}Why retained:${reset} ${explanation.whyRetained}`);
     lines.push('');
     lines.push(`${bold}Likely cause:${reset} ${explanation.likelyCause}`);
     lines.push('');
-    lines.push(`${bold}Estimated savings:${reset} ${formatBytes(explanation.estimatedSavings)}`);
+    lines.push(
+      `${bold}Estimated savings:${reset} ${formatBytes(explanation.estimatedSavings)}`,
+    );
     lines.push('');
 
     // Retainer chain visualization
@@ -740,7 +841,9 @@ Respond in JSON format:
     for (let i = 0; i < explanation.chain.chain.length; i++) {
       const step = explanation.chain.chain[i];
       const prefix = i === explanation.chain.chain.length - 1 ? '  └─' : '  ├─';
-      lines.push(`${dim}${prefix}${reset} ${step.edgeName} ${dim}(${step.edgeType})${reset} → ${bold}${step.nodeName}${reset} ${dim}(${step.nodeType})${reset}`);
+      lines.push(
+        `${dim}${prefix}${reset} ${step.edgeName} ${dim}(${step.edgeType})${reset} → ${bold}${step.nodeName}${reset} ${dim}(${step.nodeType})${reset}`,
+      );
     }
     lines.push('');
 
@@ -748,7 +851,9 @@ Respond in JSON format:
     if (explanation.suggestedFixes.length > 0) {
       lines.push(`${bold}Suggested fixes:${reset}`);
       for (const fix of explanation.suggestedFixes) {
-        lines.push(`  ${severityColor[explanation.severity]}▸${reset} ${fix.description}`);
+        lines.push(
+          `  ${severityColor[explanation.severity]}▸${reset} ${fix.description}`,
+        );
         lines.push(`    ${dim}Search: ${fix.findPattern}${reset}`);
         lines.push(`    ${dim}Fix: ${fix.replaceWith}${reset}`);
         lines.push('');
@@ -778,9 +883,15 @@ Respond in JSON format:
     const yellow = '\x1b[33m';
     const green = '\x1b[32m';
 
-    lines.push(`${bold}╔══════════════════════════════════════════════════════════════════╗${reset}`);
-    lines.push(`${bold}║  MEMORY INVESTIGATION REPORT                                   ║${reset}`);
-    lines.push(`${bold}╚══════════════════════════════════════════════════════════════════╝${reset}`);
+    lines.push(
+      `${bold}╔══════════════════════════════════════════════════════════════════╗${reset}`,
+    );
+    lines.push(
+      `${bold}║  MEMORY INVESTIGATION REPORT                                   ║${reset}`,
+    );
+    lines.push(
+      `${bold}╚══════════════════════════════════════════════════════════════════╝${reset}`,
+    );
     lines.push('');
     lines.push(`${bold}Summary:${reset} ${narrative.executiveSummary}`);
     lines.push('');
@@ -791,10 +902,19 @@ Respond in JSON format:
       lines.push(`${bold}━━━ Action Items ━━━${reset}`);
       lines.push('');
       for (const item of narrative.actionItems) {
-        const color = item.priority === 'P0' ? red : item.priority === 'P1' ? yellow : green;
-        lines.push(`  ${color}[${item.priority}]${reset} ${bold}${item.title}${reset}`);
+        const color =
+          item.priority === 'P0'
+            ? red
+            : item.priority === 'P1'
+              ? yellow
+              : green;
+        lines.push(
+          `  ${color}[${item.priority}]${reset} ${bold}${item.title}${reset}`,
+        );
         lines.push(`       ${item.description}`);
-        lines.push(`       ${dim}Effort: ${item.effort} | Savings: ${formatBytes(item.estimatedSavings)}${reset}`);
+        lines.push(
+          `       ${dim}Effort: ${item.effort} | Savings: ${formatBytes(item.estimatedSavings)}${reset}`,
+        );
         lines.push('');
       }
     }
@@ -840,12 +960,19 @@ Respond in JSON format:
     }
 
     if (context.classSummaries) {
-      const totalSize = context.classSummaries.reduce((sum, c) => sum + c.retainedSize, 0);
-      parts.push(`Classes: ${context.classSummaries.length}, Total: ${formatBytes(totalSize)}`);
+      const totalSize = context.classSummaries.reduce(
+        (sum, c) => sum + c.retainedSize,
+        0,
+      );
+      parts.push(
+        `Classes: ${context.classSummaries.length}, Total: ${formatBytes(totalSize)}`,
+      );
     }
 
     if (context.rootCauseReport) {
-      parts.push(`Health: ${context.rootCauseReport.healthScore}/100, Findings: ${context.rootCauseReport.findings.length}`);
+      parts.push(
+        `Health: ${context.rootCauseReport.healthScore}/100, Findings: ${context.rootCauseReport.findings.length}`,
+      );
     }
 
     if (context.focusedClasses && context.focusedClasses.length > 0) {
@@ -862,17 +989,23 @@ Respond in JSON format:
 function extractJSON(text: string): Record<string, unknown> {
   // Try direct parse first
   try {
-    return JSON.parse(text);
+    const parsed: unknown = JSON.parse(text);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return parsed as Record<string, unknown>;
   } catch {
     // Try extracting from code fences
     const match = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
     if (match) {
-      return JSON.parse(match[1]);
+      const parsed: unknown = JSON.parse(match[1]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return parsed as Record<string, unknown>;
     }
     // Try finding JSON object in text
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const parsed: unknown = JSON.parse(jsonMatch[0]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return parsed as Record<string, unknown>;
     }
     throw new Error('No valid JSON found in response');
   }
@@ -884,7 +1017,8 @@ function validateConfidence(value: unknown): Confidence {
 }
 
 function validateSeverity(value: unknown): 'critical' | 'warning' | 'info' {
-  if (value === 'critical' || value === 'warning' || value === 'info') return value;
+  if (value === 'critical' || value === 'warning' || value === 'info')
+    return value;
   return 'info';
 }
 
@@ -893,8 +1027,16 @@ function validatePriority(value: unknown): 'P0' | 'P1' | 'P2' {
   return 'P2';
 }
 
-function validateEffort(value: unknown): 'trivial' | 'small' | 'medium' | 'large' {
-  if (value === 'trivial' || value === 'small' || value === 'medium' || value === 'large') return value;
+function validateEffort(
+  value: unknown,
+): 'trivial' | 'small' | 'medium' | 'large' {
+  if (
+    value === 'trivial' ||
+    value === 'small' ||
+    value === 'medium' ||
+    value === 'large'
+  )
+    return value;
   return 'medium';
 }
 
@@ -904,7 +1046,10 @@ function formatBytes(bytes: number): string {
   // BUG FIX #15: Clamp index and handle negative bytes properly
   const sign = bytes < 0 ? '-' : '';
   const abs = Math.abs(bytes);
-  const i = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }

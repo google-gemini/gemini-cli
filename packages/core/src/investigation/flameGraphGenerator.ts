@@ -1,28 +1,17 @@
 /**
- * FlameGraphGenerator — Memory allocation flame graph for heap snapshots.
- *
- * Instead of the traditional CPU flame graph where width = time spent,
- * this generates a MEMORY flame graph where width = bytes retained.
- * Each frame represents a retainer path from root to leaf objects.
- *
- * Output formats:
- *   - Self-contained HTML with interactive SVG (opens in browser)
- *   - Perfetto-compatible trace events (for ui.perfetto.dev)
- *   - ASCII art for terminal display
- *   - Folded stacks format (compatible with Brendan Gregg's flamegraph.pl)
- *
- * Architecture:
- *   HeapSnapshotAnalyzer → FlameGraphGenerator → HTML / SVG / ASCII / Folded
- *
- * Innovation: This applies the flame graph metaphor to MEMORY instead of CPU,
- * showing WHERE memory is retained and WHY. Each horizontal bar is a reference
- * chain link; width = bytes that flow through this reference.
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/flameGraphGenerator
  */
 
-import type { ClassSummary, RetainerChain, RetainerStep, HeapNodeType } from './heapSnapshotAnalyzer.js';
-import type { RootCauseReport, RootCauseFinding } from './rootCauseAnalyzer.js';
+import type {
+  ClassSummary,
+  RetainerChain,
+  HeapNodeType,
+} from './heapSnapshotAnalyzer.js';
+import type { RootCauseFinding } from './rootCauseAnalyzer.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -73,26 +62,26 @@ export interface FlameGraphOptions {
 
 /** Folded stack line (compatible with flamegraph.pl) */
 export interface FoldedStack {
-  stack: string;  // semicolon-separated stack
-  value: number;  // bytes
+  stack: string; // semicolon-separated stack
+  value: number; // bytes
 }
 
 // ─── Color Schemes ──────────────────────────────────────────────────────────
 
 const MEMORY_COLORS: Record<string, string> = {
-  'object': '#e74c3c',      // red — objects
-  'string': '#3498db',      // blue — strings
-  'closure': '#9b59b6',     // purple — closures
-  'array': '#e67e22',       // orange — arrays
-  'code': '#2ecc71',        // green — code
-  'hidden': '#95a5a6',      // gray — hidden/internal
-  'native': '#1abc9c',      // teal — native
-  'number': '#f1c40f',      // yellow — numbers
-  'regexp': '#e91e63',      // pink — regexp
-  'synthetic': '#607d8b',   // blue-gray — synthetic
-  'root': '#34495e',        // dark — root
-  'category': '#2c3e50',    // darker — categories
-  'default': '#bdc3c7',     // light gray — default
+  object: '#e74c3c', // red — objects
+  string: '#3498db', // blue — strings
+  closure: '#9b59b6', // purple — closures
+  array: '#e67e22', // orange — arrays
+  code: '#2ecc71', // green — code
+  hidden: '#95a5a6', // gray — hidden/internal
+  native: '#1abc9c', // teal — native
+  number: '#f1c40f', // yellow — numbers
+  regexp: '#e91e63', // pink — regexp
+  synthetic: '#607d8b', // blue-gray — synthetic
+  root: '#34495e', // dark — root
+  category: '#2c3e50', // darker — categories
+  default: '#bdc3c7', // light gray — default
 };
 
 // ─── Generator ──────────────────────────────────────────────────────────────
@@ -122,8 +111,11 @@ export class FlameGraphGenerator {
     for (const cls of summaries) {
       if (cls.retainedSize < this.options.minBytes) continue;
 
-      const typeNode = this.getOrCreateChild(this.root, cls.className,
-        classNameToType(cls.className));
+      const typeNode = this.getOrCreateChild(
+        this.root,
+        cls.className,
+        classNameToType(cls.className),
+      );
       typeNode.totalBytes += cls.retainedSize;
       typeNode.selfBytes += cls.shallowSize;
       typeNode.objectCount += cls.count;
@@ -144,7 +136,11 @@ export class FlameGraphGenerator {
       let current = this.root;
 
       // Walk the chain from root to leaf
-      for (let i = 0; i < Math.min(chain.chain.length, this.options.maxDepth); i++) {
+      for (
+        let i = 0;
+        i < Math.min(chain.chain.length, this.options.maxDepth);
+        i++
+      ) {
         const step = chain.chain[i];
         const name = `${step.edgeName}→${step.nodeName}`;
         current = this.getOrCreateChild(current, name, step.nodeType);
@@ -166,14 +162,25 @@ export class FlameGraphGenerator {
    */
   addRootCauseFindings(findings: RootCauseFinding[]): void {
     for (const finding of findings) {
-      if (!finding.estimatedImpact || finding.estimatedImpact < this.options.minBytes) continue;
+      if (
+        !finding.estimatedImpact ||
+        finding.estimatedImpact < this.options.minBytes
+      )
+        continue;
 
       // Category level
-      const categoryNode = this.getOrCreateChild(this.root, finding.category, 'category');
+      const categoryNode = this.getOrCreateChild(
+        this.root,
+        finding.category,
+        'category',
+      );
 
       // Finding level
-      const findingNode = this.getOrCreateChild(categoryNode,
-        finding.title.slice(0, 60), 'category');
+      const findingNode = this.getOrCreateChild(
+        categoryNode,
+        finding.title.slice(0, 60),
+        'category',
+      );
       findingNode.totalBytes += finding.estimatedImpact;
       findingNode.selfBytes += finding.estimatedImpact;
 
@@ -197,15 +204,21 @@ export class FlameGraphGenerator {
     const totalHeight = (this.getMaxDepth() + 2) * frameHeight + 60;
 
     const svgFrames = frames
-      .filter(f => f.totalBytes >= this.options.minBytes)
-      .map(f => {
+      .filter((f) => f.totalBytes >= this.options.minBytes)
+      .map((f) => {
         const x = (f.x / this.root.totalBytes) * totalWidth;
-        const w = Math.max(1, (f.totalBytes / this.root.totalBytes) * totalWidth);
+        const w = Math.max(
+          1,
+          (f.totalBytes / this.root.totalBytes) * totalWidth,
+        );
         // Inverted: deepest at top (icicle graph for memory)
         const y = f.depth * frameHeight + 40;
         const color = MEMORY_COLORS[f.type] || MEMORY_COLORS['default'];
 
-        const label = f.name.length > Math.floor(w / 7) ? f.name.slice(0, Math.floor(w / 7)) + '…' : f.name;
+        const label =
+          f.name.length > Math.floor(w / 7)
+            ? f.name.slice(0, Math.floor(w / 7)) + '…'
+            : f.name;
 
         return `<g class="frame" data-name="${escapeHtml(f.name)}" data-bytes="${f.totalBytes}" data-self="${f.selfBytes}" data-count="${f.objectCount}" data-type="${f.type}">
   <rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="${frameHeight - 1}" fill="${color}" rx="2" ry="2" />
@@ -239,9 +252,13 @@ svg { display: block; margin: 0 auto; }
 <h1>${escapeHtml(this.options.title)}</h1>
 <div class="subtitle">Width = retained bytes | Click to zoom | Generated by Gemini CLI Investigation Module</div>
 <div id="legend">
-${Object.entries(MEMORY_COLORS).filter(([k]) => !['root', 'category', 'default'].includes(k)).map(([type, color]) =>
-  `<div class="item"><span class="swatch" style="background:${color}"></span>${type}</div>`
-).join('\n')}
+${Object.entries(MEMORY_COLORS)
+  .filter(([k]) => !['root', 'category', 'default'].includes(k))
+  .map(
+    ([type, color]) =>
+      `<div class="item"><span class="swatch" style="background:${color}"></span>${type}</div>`,
+  )
+  .join('\n')}
 </div>
 <svg width="${totalWidth}" height="${totalHeight}">
 ${svgFrames}
@@ -298,14 +315,19 @@ frames.forEach(f => {
 
     for (let depth = 0; depth <= maxDepth; depth++) {
       const depthFrames = frames
-        .filter(f => f.depth === depth && f.totalBytes >= this.options.minBytes)
+        .filter(
+          (f) => f.depth === depth && f.totalBytes >= this.options.minBytes,
+        )
         .sort((a, b) => b.totalBytes - a.totalBytes);
 
       if (depthFrames.length === 0) continue;
 
       let line = '';
       for (const frame of depthFrames) {
-        const w = Math.max(1, Math.round((frame.totalBytes / this.root.totalBytes) * width));
+        const w = Math.max(
+          1,
+          Math.round((frame.totalBytes / this.root.totalBytes) * width),
+        );
         const label = frame.name.slice(0, w - 1);
         const bar = `[${label}${'═'.repeat(Math.max(0, w - label.length - 2))}]`;
         line += bar.slice(0, w);
@@ -317,7 +339,9 @@ frames.forEach(f => {
     }
 
     lines.push(`${'─'.repeat(width)}`);
-    lines.push(`${dim}Total: ${formatBytes(this.root.totalBytes)} | Frames: ${frames.length}${reset}`);
+    lines.push(
+      `${dim}Total: ${formatBytes(this.root.totalBytes)} | Frames: ${frames.length}${reset}`,
+    );
 
     return lines.join('\n');
   }
@@ -329,7 +353,7 @@ frames.forEach(f => {
   toFoldedStacks(): string {
     const stacks: FoldedStack[] = [];
     this.collectFoldedStacks(this.root, [], stacks);
-    return stacks.map(s => `${s.stack} ${s.value}`).join('\n');
+    return stacks.map((s) => `${s.stack} ${s.value}`).join('\n');
   }
 
   /**
@@ -350,7 +374,7 @@ frames.forEach(f => {
         cat: frame.type,
         pid: 1,
         tid: frame.depth + 1,
-        ts: ts,
+        ts,
         dur: frame.totalBytes / 1000, // Scale to reasonable time
         args: {
           totalBytes: frame.totalBytes,
@@ -382,7 +406,11 @@ frames.forEach(f => {
 
   // ─── Private Methods ──────────────────────────────────────────────────
 
-  private createNode(name: string, type: HeapNodeType | 'root' | 'category', depth: number): FlameNode {
+  private createNode(
+    name: string,
+    type: HeapNodeType | 'root' | 'category',
+    depth: number,
+  ): FlameNode {
     return {
       name,
       type,
@@ -394,7 +422,11 @@ frames.forEach(f => {
     };
   }
 
-  private getOrCreateChild(parent: FlameNode, name: string, type: HeapNodeType | 'root' | 'category'): FlameNode {
+  private getOrCreateChild(
+    parent: FlameNode,
+    name: string,
+    type: HeapNodeType | 'root' | 'category',
+  ): FlameNode {
     let child = parent.children.get(name);
     if (!child) {
       child = this.createNode(name, type, parent.depth + 1);
@@ -442,12 +474,14 @@ frames.forEach(f => {
   private flattenNode(
     node: FlameNode,
     x: number,
-    result: Array<FlameNode & { x: number }>
+    result: Array<FlameNode & { x: number }>,
   ): void {
     result.push({ ...node, x });
 
     let childX = x;
-    const sortedChildren = [...node.children.values()].sort((a, b) => b.totalBytes - a.totalBytes);
+    const sortedChildren = [...node.children.values()].sort(
+      (a, b) => b.totalBytes - a.totalBytes,
+    );
 
     for (const child of sortedChildren) {
       this.flattenNode(child, childX, result);
@@ -458,7 +492,7 @@ frames.forEach(f => {
   private collectFoldedStacks(
     node: FlameNode,
     path: string[],
-    stacks: FoldedStack[]
+    stacks: FoldedStack[],
   ): void {
     const currentPath = node.name === 'all' ? path : [...path, node.name];
 
@@ -505,7 +539,10 @@ function formatBytes(bytes: number): string {
   // BUG FIX #15: Clamp index and handle negative bytes properly
   const sign = bytes < 0 ? '-' : '';
   const abs = Math.abs(bytes);
-  const i = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }

@@ -1,10 +1,20 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TrendForecaster, type HeapDataPoint, type TrendReport } from './trendForecaster.js';
+import { TrendForecaster, type HeapDataPoint } from './trendForecaster.js';
 import type { ClassSummary } from './heapSnapshotAnalyzer.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
-function createLinearGrowthPoints(count: number, startSize: number, growthPerPoint: number, intervalMs: number): HeapDataPoint[] {
+function createLinearGrowthPoints(
+  count: number,
+  startSize: number,
+  growthPerPoint: number,
+  intervalMs: number,
+): HeapDataPoint[] {
   const points: HeapDataPoint[] = [];
   for (let i = 0; i < count; i++) {
     points.push({
@@ -18,11 +28,15 @@ function createLinearGrowthPoints(count: number, startSize: number, growthPerPoi
   return points;
 }
 
-function createStablePoints(count: number, size: number, intervalMs: number): HeapDataPoint[] {
+function createStablePoints(
+  count: number,
+  size: number,
+  intervalMs: number,
+): HeapDataPoint[] {
   const points: HeapDataPoint[] = [];
   for (let i = 0; i < count; i++) {
     // Add small random noise
-    const noise = (i % 3 - 1) * 100;
+    const noise = ((i % 3) - 1) * 100;
     points.push({
       timestamp: 1000000 + i * intervalMs,
       totalHeapSize: size + noise,
@@ -34,20 +48,59 @@ function createStablePoints(count: number, size: number, intervalMs: number): He
   return points;
 }
 
-function createClassSummariesSeries(): { summaries: ClassSummary[][]; timestamps: number[] } {
+function createClassSummariesSeries(): {
+  summaries: ClassSummary[][];
+  timestamps: number[];
+} {
   const timestamps = [1000, 2000, 3000];
   const summaries: ClassSummary[][] = [
     [
-      { className: 'Map', count: 5, shallowSize: 500, retainedSize: 1_000_000, instances: [] },
-      { className: 'string', count: 100, shallowSize: 10000, retainedSize: 500_000, instances: [] },
+      {
+        className: 'Map',
+        count: 5,
+        shallowSize: 500,
+        retainedSize: 1_000_000,
+        instances: [],
+      },
+      {
+        className: 'string',
+        count: 100,
+        shallowSize: 10000,
+        retainedSize: 500_000,
+        instances: [],
+      },
     ],
     [
-      { className: 'Map', count: 10, shallowSize: 1000, retainedSize: 2_000_000, instances: [] },
-      { className: 'string', count: 150, shallowSize: 15000, retainedSize: 750_000, instances: [] },
+      {
+        className: 'Map',
+        count: 10,
+        shallowSize: 1000,
+        retainedSize: 2_000_000,
+        instances: [],
+      },
+      {
+        className: 'string',
+        count: 150,
+        shallowSize: 15000,
+        retainedSize: 750_000,
+        instances: [],
+      },
     ],
     [
-      { className: 'Map', count: 15, shallowSize: 1500, retainedSize: 3_000_000, instances: [] },
-      { className: 'string', count: 200, shallowSize: 20000, retainedSize: 1_000_000, instances: [] },
+      {
+        className: 'Map',
+        count: 15,
+        shallowSize: 1500,
+        retainedSize: 3_000_000,
+        instances: [],
+      },
+      {
+        className: 'string',
+        count: 200,
+        shallowSize: 20000,
+        retainedSize: 1_000_000,
+        instances: [],
+      },
     ],
   ];
   return { summaries, timestamps };
@@ -64,9 +117,24 @@ describe('TrendForecaster', () => {
 
   describe('addDataPoint', () => {
     it('should add data points and maintain sorted order', () => {
-      forecaster.addDataPoint({ timestamp: 3000, totalHeapSize: 300, usedHeapSize: 300, objectCount: 30 });
-      forecaster.addDataPoint({ timestamp: 1000, totalHeapSize: 100, usedHeapSize: 100, objectCount: 10 });
-      forecaster.addDataPoint({ timestamp: 2000, totalHeapSize: 200, usedHeapSize: 200, objectCount: 20 });
+      forecaster.addDataPoint({
+        timestamp: 3000,
+        totalHeapSize: 300,
+        usedHeapSize: 300,
+        objectCount: 30,
+      });
+      forecaster.addDataPoint({
+        timestamp: 1000,
+        totalHeapSize: 100,
+        usedHeapSize: 100,
+        objectCount: 10,
+      });
+      forecaster.addDataPoint({
+        timestamp: 2000,
+        totalHeapSize: 200,
+        usedHeapSize: 200,
+        objectCount: 20,
+      });
 
       expect(forecaster.getDataPointCount()).toBe(3);
     });
@@ -81,13 +149,20 @@ describe('TrendForecaster', () => {
     });
 
     it('should throw if arrays have different lengths', () => {
-      expect(() => forecaster.addFromClassSummaries([[]], [1000, 2000])).toThrow('same length');
+      expect(() =>
+        forecaster.addFromClassSummaries([[]], [1000, 2000]),
+      ).toThrow('same length');
     });
   });
 
   describe('analyze — linear growth', () => {
     it('should detect growing trend', () => {
-      const points = createLinearGrowthPoints(5, 100_000_000, 10_000_000, 60_000);
+      const points = createLinearGrowthPoints(
+        5,
+        100_000_000,
+        10_000_000,
+        60_000,
+      );
       forecaster.addDataPoints(points);
 
       const report = forecaster.analyze();
@@ -98,7 +173,12 @@ describe('TrendForecaster', () => {
     });
 
     it('should have high R² for perfectly linear data', () => {
-      const points = createLinearGrowthPoints(10, 100_000_000, 10_000_000, 1000);
+      const points = createLinearGrowthPoints(
+        10,
+        100_000_000,
+        10_000_000,
+        1000,
+      );
       forecaster.addDataPoints(points);
 
       const report = forecaster.analyze();
@@ -109,7 +189,12 @@ describe('TrendForecaster', () => {
 
     it('should predict OOM time for growing heap', () => {
       // Start at 500MB, grow 100MB per point (every 60s)
-      const points = createLinearGrowthPoints(5, 500_000_000, 100_000_000, 60_000);
+      const points = createLinearGrowthPoints(
+        5,
+        500_000_000,
+        100_000_000,
+        60_000,
+      );
       forecaster.addDataPoints(points);
 
       const report = forecaster.analyze();
@@ -153,7 +238,12 @@ describe('TrendForecaster', () => {
 
   describe('analyze — shrinking', () => {
     it('should detect shrinking trend', () => {
-      const points = createLinearGrowthPoints(5, 500_000_000, -50_000_000, 60_000);
+      const points = createLinearGrowthPoints(
+        5,
+        500_000_000,
+        -50_000_000,
+        60_000,
+      );
       forecaster.addDataPoints(points);
 
       const report = forecaster.analyze();
@@ -165,7 +255,12 @@ describe('TrendForecaster', () => {
 
   describe('analyze — errors', () => {
     it('should throw with fewer than 2 data points', () => {
-      forecaster.addDataPoint({ timestamp: 1000, totalHeapSize: 100, usedHeapSize: 100, objectCount: 10 });
+      forecaster.addDataPoint({
+        timestamp: 1000,
+        totalHeapSize: 100,
+        usedHeapSize: 100,
+        objectCount: 10,
+      });
 
       expect(() => forecaster.analyze()).toThrow('at least 2 data points');
     });
@@ -200,7 +295,7 @@ describe('TrendForecaster', () => {
 
       expect(report.classGrowth.length).toBeGreaterThan(0);
       // Map should be the top grower
-      const mapGrowth = report.classGrowth.find(c => c.className === 'Map');
+      const mapGrowth = report.classGrowth.find((c) => c.className === 'Map');
       expect(mapGrowth).toBeDefined();
       expect(mapGrowth!.isGrowing).toBe(true);
       expect(mapGrowth!.sizeGrowthRate).toBeGreaterThan(0);
@@ -227,7 +322,12 @@ describe('TrendForecaster', () => {
 
   describe('formatForTerminal', () => {
     it('should format growing report', () => {
-      const points = createLinearGrowthPoints(5, 100_000_000, 10_000_000, 60_000);
+      const points = createLinearGrowthPoints(
+        5,
+        100_000_000,
+        10_000_000,
+        60_000,
+      );
       forecaster.addDataPoints(points);
       const report = forecaster.analyze();
 
@@ -269,7 +369,12 @@ describe('TrendForecaster', () => {
 
   describe('summary generation', () => {
     it('should include growth rate in summary', () => {
-      const points = createLinearGrowthPoints(5, 100_000_000, 10_000_000, 60_000);
+      const points = createLinearGrowthPoints(
+        5,
+        100_000_000,
+        10_000_000,
+        60_000,
+      );
       forecaster.addDataPoints(points);
 
       const report = forecaster.analyze();
@@ -284,7 +389,7 @@ describe('TrendForecaster', () => {
 
       const report = forecaster.analyze();
 
-      if (report.classGrowth.filter(c => c.isGrowing).length > 0) {
+      if (report.classGrowth.filter((c) => c.isGrowing).length > 0) {
         expect(report.summary).toContain('Top growing');
       }
     });

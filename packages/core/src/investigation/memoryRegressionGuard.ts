@@ -1,20 +1,7 @@
 /**
- * Memory Regression Guard — CI/CD Memory Baseline & Regression Detection
- *
- * ORIGINAL MODULE — No existing tool provides automated memory regression
- * detection with git-awareness and trend-based analysis.
- *
- * Creates "memory fingerprints" from heap snapshots, stores baselines,
- * and detects regressions across runs. Designed for CI/CD integration.
- *
- * Features:
- * - Memory fingerprinting: captures heap signature (class distribution, retained sizes)
- * - Baseline storage & comparison (JSON format)
- * - Trend-based regression detection (not just threshold)
- * - Git-aware: associates baselines with commits/branches
- * - Budget enforcement: per-class and total memory budgets
- * - CI-friendly output: exit codes, JSON reports, GitHub Actions annotations
- * - Historical tracking with rolling window analysis
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/memoryRegressionGuard
  */
@@ -101,7 +88,12 @@ export interface RegressionResult {
 
 /** A single regression violation */
 export interface RegressionViolation {
-  type: 'heap_growth' | 'class_growth' | 'new_retention' | 'budget_exceeded' | 'trend_regression';
+  type:
+    | 'heap_growth'
+    | 'class_growth'
+    | 'new_retention'
+    | 'budget_exceeded'
+    | 'trend_regression';
   severity: 'warning' | 'failure';
   description: string;
   /** What changed */
@@ -158,11 +150,11 @@ export interface TrendAnalysis {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEFAULT_GROWTH_WARNING_PERCENT = 5;   // 5% growth = warning
-const DEFAULT_GROWTH_FAILURE_PERCENT = 15;  // 15% growth = failure
-const DEFAULT_CLASS_GROWTH_THRESHOLD = 20;  // 20% class growth = flag
-const DEFAULT_HISTORY_WINDOW = 20;          // Keep last 20 runs
-const TREND_MIN_POINTS = 3;                 // Need 3+ points for trend
+const DEFAULT_GROWTH_WARNING_PERCENT = 5; // 5% growth = warning
+const DEFAULT_GROWTH_FAILURE_PERCENT = 15; // 15% growth = failure
+const DEFAULT_CLASS_GROWTH_THRESHOLD = 20; // 20% class growth = flag
+const DEFAULT_HISTORY_WINDOW = 20; // Keep last 20 runs
+const TREND_MIN_POINTS = 3; // Need 3+ points for trend
 
 // ─── Memory Regression Guard ─────────────────────────────────────────────────
 
@@ -184,14 +176,18 @@ export class MemoryRegressionGuard {
       branch?: string;
       label?: string;
       snapshotFile?: string;
-      retainerChains?: Array<{ targetClass: string; retainedSize: number; chain: string[] }>;
+      retainerChains?: Array<{
+        targetClass: string;
+        retainedSize: number;
+        chain: string[];
+      }>;
     },
   ): MemoryFingerprint {
     const totalHeap = classSummaries.reduce((s, c) => s + c.retainedSize, 0);
     const objectCount = classSummaries.reduce((s, c) => s + c.count, 0);
 
     const classDistribution: ClassFingerprint[] = classSummaries
-      .map(c => ({
+      .map((c) => ({
         className: c.className,
         instanceCount: c.count,
         shallowSize: c.shallowSize,
@@ -202,7 +198,7 @@ export class MemoryRegressionGuard {
 
     const topRetainers: RetainerFingerprint[] = (options?.retainerChains || [])
       .slice(0, 20)
-      .map(rc => ({
+      .map((rc) => ({
         targetClass: rc.targetClass,
         retainedSize: rc.retainedSize,
         chainLength: rc.chain.length,
@@ -221,7 +217,8 @@ export class MemoryRegressionGuard {
       meta: {
         snapshotFile: options?.snapshotFile,
         label: options?.label,
-        nodeVersion: typeof process !== 'undefined' ? process.version : undefined,
+        nodeVersion:
+          typeof process !== 'undefined' ? process.version : undefined,
         platform: typeof process !== 'undefined' ? process.platform : undefined,
       },
     };
@@ -230,9 +227,15 @@ export class MemoryRegressionGuard {
   /**
    * Set or update the baseline for a given key (e.g., branch name)
    */
-  setBaseline(key: string, fingerprint: MemoryFingerprint, budget?: MemoryBudget): void {
+  setBaseline(
+    key: string,
+    fingerprint: MemoryFingerprint,
+    budget?: MemoryBudget,
+  ): void {
     const existing = this.baselines.get(key);
-    const history = existing ? [...existing.history, fingerprint].slice(-DEFAULT_HISTORY_WINDOW) : [fingerprint];
+    const history = existing
+      ? [...existing.history, fingerprint].slice(-DEFAULT_HISTORY_WINDOW)
+      : [fingerprint];
 
     this.baselines.set(key, {
       fingerprint,
@@ -297,7 +300,10 @@ export class MemoryRegressionGuard {
 
     // Check 2: Per-class growth
     for (const grower of comparison.topGrowers) {
-      if (grower.deltaPercent > DEFAULT_CLASS_GROWTH_THRESHOLD && grower.delta > 10_000) {
+      if (
+        grower.deltaPercent > DEFAULT_CLASS_GROWTH_THRESHOLD &&
+        grower.delta > 10_000
+      ) {
         violations.push({
           type: 'class_growth',
           severity: grower.deltaPercent > 50 ? 'failure' : 'warning',
@@ -313,7 +319,8 @@ export class MemoryRegressionGuard {
 
     // Check 3: New retention patterns (classes that appeared)
     for (const newClass of comparison.newClasses) {
-      if (newClass.retainedSize > 50_000) { // >50KB new class
+      if (newClass.retainedSize > 50_000) {
+        // >50KB new class
         violations.push({
           type: 'new_retention',
           severity: newClass.retainedSize > 500_000 ? 'failure' : 'warning',
@@ -335,7 +342,11 @@ export class MemoryRegressionGuard {
     // Check 5: Trend-based regression (needs history)
     if (baseline.history.length >= TREND_MIN_POINTS) {
       const trend = this.analyzeTrend([...baseline.history, current]);
-      if (trend.isGrowing && trend.confidence > 0.7 && trend.growthPerRun > 50_000) {
+      if (
+        trend.isGrowing &&
+        trend.confidence > 0.7 &&
+        trend.growthPerRun > 50_000
+      ) {
         violations.push({
           type: 'trend_regression',
           severity: trend.growthPerRun > 500_000 ? 'failure' : 'warning',
@@ -348,20 +359,25 @@ export class MemoryRegressionGuard {
       }
     }
 
-    const failures = violations.filter(v => v.severity === 'failure');
-    const warnings = violations.filter(v => v.severity === 'warning');
+    const failures = violations.filter((v) => v.severity === 'failure');
+    const warnings = violations.filter((v) => v.severity === 'warning');
 
     const severity: RegressionResult['severity'] =
-      failures.length > 0 ? 'failure' :
-      warnings.length > 0 ? 'warning' : 'pass';
+      failures.length > 0
+        ? 'failure'
+        : warnings.length > 0
+          ? 'warning'
+          : 'pass';
 
-    const exitCode = severity === 'failure' ? 1 : severity === 'warning' ? 2 : 0;
+    const exitCode =
+      severity === 'failure' ? 1 : severity === 'warning' ? 2 : 0;
 
     let summary: string;
     if (severity === 'pass') {
       summary = `Memory check PASSED. Heap: ${this.formatBytes(current.totalHeapSize)} (${comparison.heapDeltaPercent >= 0 ? '+' : ''}${comparison.heapDeltaPercent.toFixed(1)}% vs baseline).`;
     } else {
-      summary = `Memory check ${severity.toUpperCase()}: ${failures.length} failure(s), ${warnings.length} warning(s). ` +
+      summary =
+        `Memory check ${severity.toUpperCase()}: ${failures.length} failure(s), ${warnings.length} warning(s). ` +
         `Heap: ${this.formatBytes(current.totalHeapSize)} (${comparison.heapDeltaPercent >= 0 ? '+' : ''}${comparison.heapDeltaPercent.toFixed(1)}%).`;
     }
 
@@ -390,7 +406,7 @@ export class MemoryRegressionGuard {
     }
 
     // Linear regression on total heap over runs
-    const heapValues = fingerprints.map(fp => fp.totalHeapSize);
+    const heapValues = fingerprints.map((fp) => fp.totalHeapSize);
     const { slope, r2 } = this.linearRegression(heapValues);
 
     // Per-class trends
@@ -407,7 +423,8 @@ export class MemoryRegressionGuard {
     for (const [className, values] of classMap) {
       if (values.length >= TREND_MIN_POINTS) {
         const classReg = this.linearRegression(values);
-        if (classReg.slope > 1000) { // >1KB/run growth
+        if (classReg.slope > 1000) {
+          // >1KB/run growth
           classTrends.push({
             className,
             growthPerRun: classReg.slope,
@@ -430,14 +447,21 @@ export class MemoryRegressionGuard {
 
   // ─── Comparison Logic ───────────────────────────────────────────────────
 
-  private compareFingerprints(baseline: MemoryFingerprint, current: MemoryFingerprint): FingerprintComparison {
+  private compareFingerprints(
+    baseline: MemoryFingerprint,
+    current: MemoryFingerprint,
+  ): FingerprintComparison {
     const heapDelta = current.totalHeapSize - baseline.totalHeapSize;
-    const heapDeltaPercent = baseline.totalHeapSize > 0
-      ? (heapDelta / baseline.totalHeapSize) * 100 : 0;
+    const heapDeltaPercent =
+      baseline.totalHeapSize > 0
+        ? (heapDelta / baseline.totalHeapSize) * 100
+        : 0;
 
     const objectCountDelta = current.objectCount - baseline.objectCount;
-    const objectCountDeltaPercent = baseline.objectCount > 0
-      ? (objectCountDelta / baseline.objectCount) * 100 : 0;
+    const objectCountDeltaPercent =
+      baseline.objectCount > 0
+        ? (objectCountDelta / baseline.objectCount) * 100
+        : 0;
 
     // Build baseline class map
     const baselineClasses = new Map<string, ClassFingerprint>();
@@ -455,8 +479,8 @@ export class MemoryRegressionGuard {
         newClasses.push(cls);
       } else {
         const delta = cls.retainedSize - baseCls.retainedSize;
-        const deltaPercent = baseCls.retainedSize > 0
-          ? (delta / baseCls.retainedSize) * 100 : 0;
+        const deltaPercent =
+          baseCls.retainedSize > 0 ? (delta / baseCls.retainedSize) * 100 : 0;
         if (delta > 0) {
           topGrowers.push({ ...cls, delta, deltaPercent });
         }
@@ -466,10 +490,12 @@ export class MemoryRegressionGuard {
     topGrowers.sort((a, b) => b.delta - a.delta);
 
     // Find removed classes
-    const currentClassNames = new Set(current.classDistribution.map(c => c.className));
+    const currentClassNames = new Set(
+      current.classDistribution.map((c) => c.className),
+    );
     const removedClasses = baseline.classDistribution
-      .filter(c => !currentClassNames.has(c.className))
-      .map(c => c.className);
+      .filter((c) => !currentClassNames.has(c.className))
+      .map((c) => c.className);
 
     return {
       heapDelta,
@@ -482,7 +508,11 @@ export class MemoryRegressionGuard {
     };
   }
 
-  private checkBudget(fp: MemoryFingerprint, budget: MemoryBudget, violations: RegressionViolation[]): void {
+  private checkBudget(
+    fp: MemoryFingerprint,
+    budget: MemoryBudget,
+    violations: RegressionViolation[],
+  ): void {
     if (budget.totalHeapMax && fp.totalHeapSize > budget.totalHeapMax) {
       violations.push({
         type: 'budget_exceeded',
@@ -491,7 +521,9 @@ export class MemoryRegressionGuard {
         metric: 'totalHeapBudget',
         baseline: budget.totalHeapMax,
         current: fp.totalHeapSize,
-        changePercent: ((fp.totalHeapSize - budget.totalHeapMax) / budget.totalHeapMax) * 100,
+        changePercent:
+          ((fp.totalHeapSize - budget.totalHeapMax) / budget.totalHeapMax) *
+          100,
       });
     }
 
@@ -503,12 +535,16 @@ export class MemoryRegressionGuard {
         metric: 'objectCountBudget',
         baseline: budget.objectCountMax,
         current: fp.objectCount,
-        changePercent: ((fp.objectCount - budget.objectCountMax) / budget.objectCountMax) * 100,
+        changePercent:
+          ((fp.objectCount - budget.objectCountMax) / budget.objectCountMax) *
+          100,
       });
     }
 
     if (budget.classBudgets) {
-      const classMap = new Map(fp.classDistribution.map(c => [c.className, c]));
+      const classMap = new Map(
+        fp.classDistribution.map((c) => [c.className, c]),
+      );
       for (const cb of budget.classBudgets) {
         const cls = classMap.get(cb.className);
         if (!cls) continue;
@@ -521,7 +557,9 @@ export class MemoryRegressionGuard {
             metric: 'classBudget',
             baseline: cb.maxRetainedSize,
             current: cls.retainedSize,
-            changePercent: ((cls.retainedSize - cb.maxRetainedSize) / cb.maxRetainedSize) * 100,
+            changePercent:
+              ((cls.retainedSize - cb.maxRetainedSize) / cb.maxRetainedSize) *
+              100,
             className: cb.className,
           });
         }
@@ -534,7 +572,8 @@ export class MemoryRegressionGuard {
             metric: 'classInstanceBudget',
             baseline: cb.maxInstances,
             current: cls.instanceCount,
-            changePercent: ((cls.instanceCount - cb.maxInstances) / cb.maxInstances) * 100,
+            changePercent:
+              ((cls.instanceCount - cb.maxInstances) / cb.maxInstances) * 100,
             className: cb.className,
           });
         }
@@ -559,6 +598,7 @@ export class MemoryRegressionGuard {
    * Import baselines from JSON
    */
   importBaselines(json: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const data = JSON.parse(json) as Record<string, BaselineEntry>;
     for (const [key, entry] of Object.entries(data)) {
       this.baselines.set(key, entry);
@@ -580,7 +620,10 @@ export class MemoryRegressionGuard {
   /**
    * Generate CI-friendly JSON report
    */
-  static toCIReport(result: RegressionResult, fingerprint: MemoryFingerprint): Record<string, unknown> {
+  static toCIReport(
+    result: RegressionResult,
+    fingerprint: MemoryFingerprint,
+  ): Record<string, unknown> {
     return {
       passed: !result.isRegression,
       severity: result.severity,
@@ -590,14 +633,14 @@ export class MemoryRegressionGuard {
         total: fingerprint.totalHeapSize,
         totalFormatted: formatBytesStatic(fingerprint.totalHeapSize),
         objectCount: fingerprint.objectCount,
-        topClasses: fingerprint.classDistribution.slice(0, 10).map(c => ({
+        topClasses: fingerprint.classDistribution.slice(0, 10).map((c) => ({
           name: c.className,
           retained: c.retainedSize,
           retainedFormatted: formatBytesStatic(c.retainedSize),
           share: `${c.heapShare.toFixed(1)}%`,
         })),
       },
-      violations: result.violations.map(v => ({
+      violations: result.violations.map((v) => ({
         type: v.type,
         severity: v.severity,
         description: v.description,
@@ -629,14 +672,26 @@ export class MemoryRegressionGuard {
     const CYAN = '\x1b[36m';
     const DIM = '\x1b[2m';
 
-    const statusColor = result.severity === 'pass' ? GREEN : result.severity === 'warning' ? YELLOW : RED;
-    const statusIcon = result.severity === 'pass' ? '✓' : result.severity === 'warning' ? '⚠' : '✗';
+    const statusColor =
+      result.severity === 'pass'
+        ? GREEN
+        : result.severity === 'warning'
+          ? YELLOW
+          : RED;
+    const statusIcon =
+      result.severity === 'pass'
+        ? '✓'
+        : result.severity === 'warning'
+          ? '⚠'
+          : '✗';
 
     lines.push(`${BOLD}┌─────────────────────────────────────────┐${RESET}`);
     lines.push(`${BOLD}│  MEMORY REGRESSION GUARD                │${RESET}`);
     lines.push(`${BOLD}└─────────────────────────────────────────┘${RESET}`);
     lines.push('');
-    lines.push(`  Status: ${statusColor}${BOLD}${statusIcon} ${result.severity.toUpperCase()}${RESET}`);
+    lines.push(
+      `  Status: ${statusColor}${BOLD}${statusIcon} ${result.severity.toUpperCase()}${RESET}`,
+    );
     lines.push(`  ${result.summary}`);
 
     if (result.violations.length > 0) {
@@ -644,8 +699,11 @@ export class MemoryRegressionGuard {
       lines.push(`${BOLD}  Violations:${RESET}`);
       for (const v of result.violations) {
         const sevColor = v.severity === 'failure' ? RED : YELLOW;
-        lines.push(`    ${sevColor}[${v.severity.toUpperCase()}]${RESET} ${v.description}`);
-        if (v.className) lines.push(`      ${DIM}Class: ${v.className}${RESET}`);
+        lines.push(
+          `    ${sevColor}[${v.severity.toUpperCase()}]${RESET} ${v.description}`,
+        );
+        if (v.className)
+          lines.push(`      ${DIM}Class: ${v.className}${RESET}`);
       }
     }
 
@@ -654,7 +712,9 @@ export class MemoryRegressionGuard {
       lines.push('');
       lines.push(`${BOLD}  Top Growers:${RESET}`);
       for (const g of comp.topGrowers.slice(0, 5)) {
-        lines.push(`    ${CYAN}${g.className}${RESET}: +${formatBytesStatic(g.delta)} (+${g.deltaPercent.toFixed(1)}%)`);
+        lines.push(
+          `    ${CYAN}${g.className}${RESET}: +${formatBytesStatic(g.delta)} (+${g.deltaPercent.toFixed(1)}%)`,
+        );
       }
     }
 
@@ -662,7 +722,9 @@ export class MemoryRegressionGuard {
       lines.push('');
       lines.push(`${BOLD}  New Classes:${RESET}`);
       for (const c of comp.newClasses.slice(0, 5)) {
-        lines.push(`    ${YELLOW}+ ${c.className}${RESET}: ${formatBytesStatic(c.retainedSize)} (${c.instanceCount} instances)`);
+        lines.push(
+          `    ${YELLOW}+ ${c.className}${RESET}: ${formatBytesStatic(c.retainedSize)} (${c.instanceCount} instances)`,
+        );
       }
     }
 
@@ -671,11 +733,18 @@ export class MemoryRegressionGuard {
 
   // ─── Helpers ────────────────────────────────────────────────────────────
 
-  private linearRegression(values: number[]): { slope: number; intercept: number; r2: number } {
+  private linearRegression(values: number[]): {
+    slope: number;
+    intercept: number;
+    r2: number;
+  } {
     const n = values.length;
     if (n < 2) return { slope: 0, intercept: values[0] || 0, r2: 0 };
 
-    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    let sumX = 0;
+    let sumY = 0;
+    let sumXY = 0;
+    let sumXX = 0;
     for (let i = 0; i < n; i++) {
       sumX += i;
       sumY += values[i];
@@ -691,7 +760,8 @@ export class MemoryRegressionGuard {
 
     // R²
     const meanY = sumY / n;
-    let ssTot = 0, ssRes = 0;
+    let ssTot = 0;
+    let ssRes = 0;
     for (let i = 0; i < n; i++) {
       const predicted = intercept + slope * i;
       ssTot += (values[i] - meanY) ** 2;

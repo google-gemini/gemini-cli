@@ -1,26 +1,16 @@
 /**
- * RootCauseAnalyzer — Automated pattern-matching root-cause analysis for memory issues.
- *
- * Analyzes heap snapshot data (class summaries, retainer chains, leak reports)
- * to identify common memory leak patterns and generate LLM-friendly diagnostics.
- *
- * Patterns detected:
- *   - Event listener accumulation (EventEmitter, addEventListener)
- *   - Closure capture leaks (closures holding references to large objects)
- *   - Unbounded cache/Map/Set growth
- *   - Detached DOM nodes (browser environments)
- *   - Timer leaks (setInterval/setTimeout without cleanup)
- *   - Circular reference chains
- *   - String concatenation memory pressure
- *   - Buffer/ArrayBuffer accumulation
- *
- * Designed for LLM consumption: output is structured for Gemini to reason about
- * and present to users with actionable recommendations.
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/rootCauseAnalyzer
  */
 
-import type { ClassSummary, LeakReport, LeakCandidate, RetainerChain } from './heapSnapshotAnalyzer.js';
+import type {
+  ClassSummary,
+  LeakReport,
+  LeakCandidate,
+} from './heapSnapshotAnalyzer.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -119,7 +109,10 @@ export class RootCauseAnalyzer {
   /**
    * Analyze a snapshot's class summaries for memory issues.
    */
-  analyzeSnapshot(summaries: ClassSummary[], totalNodes: number): RootCauseReport {
+  analyzeSnapshot(
+    summaries: ClassSummary[],
+    totalNodes: number,
+  ): RootCauseReport {
     const findings: RootCauseFinding[] = [];
 
     for (const matcher of this.matchers) {
@@ -129,26 +122,35 @@ export class RootCauseAnalyzer {
 
     // Sort by confidence (high first) then by estimated impact
     findings.sort((a, b) => {
-      const confidenceOrder: Record<Confidence, number> = { high: 0, medium: 1, low: 2 };
-      const confDiff = confidenceOrder[a.confidence] - confidenceOrder[b.confidence];
+      const confidenceOrder: Record<Confidence, number> = {
+        high: 0,
+        medium: 1,
+        low: 2,
+      };
+      const confDiff =
+        confidenceOrder[a.confidence] - confidenceOrder[b.confidence];
       if (confDiff !== 0) return confDiff;
       return (b.estimatedImpact ?? 0) - (a.estimatedImpact ?? 0);
     });
 
     // Deduplicate recommendations
-    const allRecs = findings.flatMap(f => f.recommendations);
+    const allRecs = findings.flatMap((f) => f.recommendations);
     const uniqueRecs = [...new Set(allRecs)];
 
-    const totalImpact = findings.reduce((sum, f) => sum + (f.estimatedImpact ?? 0), 0);
+    const totalImpact = findings.reduce(
+      (sum, f) => sum + (f.estimatedImpact ?? 0),
+      0,
+    );
     const healthScore = this.computeHealthScore(findings, summaries);
 
-    const summary = findings.length === 0
-      ? 'No significant memory issues detected.'
-      : `Found ${findings.length} potential issue${findings.length > 1 ? 's' : ''}: ` +
-        `${findings.filter(f => f.confidence === 'high').length} high, ` +
-        `${findings.filter(f => f.confidence === 'medium').length} medium, ` +
-        `${findings.filter(f => f.confidence === 'low').length} low confidence. ` +
-        `Estimated impact: ${formatBytes(totalImpact)}.`;
+    const summary =
+      findings.length === 0
+        ? 'No significant memory issues detected.'
+        : `Found ${findings.length} potential issue${findings.length > 1 ? 's' : ''}: ` +
+          `${findings.filter((f) => f.confidence === 'high').length} high, ` +
+          `${findings.filter((f) => f.confidence === 'medium').length} medium, ` +
+          `${findings.filter((f) => f.confidence === 'low').length} low confidence. ` +
+          `Estimated impact: ${formatBytes(totalImpact)}.`;
 
     return {
       timestamp: new Date().toISOString(),
@@ -174,18 +176,26 @@ export class RootCauseAnalyzer {
 
     // Sort findings
     findings.sort((a, b) => {
-      const confidenceOrder: Record<Confidence, number> = { high: 0, medium: 1, low: 2 };
+      const confidenceOrder: Record<Confidence, number> = {
+        high: 0,
+        medium: 1,
+        low: 2,
+      };
       return confidenceOrder[a.confidence] - confidenceOrder[b.confidence];
     });
 
-    const uniqueRecs = [...new Set(findings.flatMap(f => f.recommendations))];
-    const totalImpact = findings.reduce((sum, f) => sum + (f.estimatedImpact ?? 0), 0);
+    const uniqueRecs = [...new Set(findings.flatMap((f) => f.recommendations))];
+    const totalImpact = findings.reduce(
+      (sum, f) => sum + (f.estimatedImpact ?? 0),
+      0,
+    );
 
     return {
       timestamp: new Date().toISOString(),
-      summary: findings.length === 0
-        ? 'No root causes identified from leak report.'
-        : `Identified ${findings.length} potential root cause${findings.length > 1 ? 's' : ''} for memory leaks.`,
+      summary:
+        findings.length === 0
+          ? 'No root causes identified from leak report.'
+          : `Identified ${findings.length} potential root cause${findings.length > 1 ? 's' : ''} for memory leaks.`,
       findings,
       recommendations: uniqueRecs,
       healthScore: Math.max(0, 100 - findings.length * 15),
@@ -209,7 +219,9 @@ export class RootCauseAnalyzer {
     ];
 
     if (report.findings.length === 0) {
-      lines.push('No significant memory issues detected. The heap appears healthy.');
+      lines.push(
+        'No significant memory issues detected. The heap appears healthy.',
+      );
       return lines.join('\n');
     }
 
@@ -217,11 +229,18 @@ export class RootCauseAnalyzer {
 
     for (let i = 0; i < report.findings.length; i++) {
       const f = report.findings[i];
-      const badge = f.confidence === 'high' ? '🔴' : f.confidence === 'medium' ? '🟡' : '🟢';
+      const badge =
+        f.confidence === 'high'
+          ? '🔴'
+          : f.confidence === 'medium'
+            ? '🟡'
+            : '🟢';
 
       lines.push(`### ${i + 1}. ${badge} ${f.title}`);
       lines.push('');
-      lines.push(`**Category:** ${f.category} | **Confidence:** ${f.confidence}`);
+      lines.push(
+        `**Category:** ${f.category} | **Confidence:** ${f.confidence}`,
+      );
       if (f.estimatedImpact !== undefined) {
         lines.push(`**Estimated Impact:** ${formatBytes(f.estimatedImpact)}`);
       }
@@ -263,10 +282,13 @@ export class RootCauseAnalyzer {
 
   // ─── Pattern Matchers ──────────────────────────────────────────────────
 
-  private detectEventListenerLeaks(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectEventListenerLeaks(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const listenerClasses = summaries.filter(c =>
-      /listener|handler|observer|emitter|callback/i.test(c.className)
+    const listenerClasses = summaries.filter((c) =>
+      /listener|handler|observer|emitter|callback/i.test(c.className),
     );
 
     for (const cls of listenerClasses) {
@@ -298,15 +320,19 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectUnboundedCollections(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectUnboundedCollections(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const collectionClasses = summaries.filter(c =>
-      /^(Map|Set|WeakMap|WeakSet|Array)$/.test(c.className)
+    const collectionClasses = summaries.filter((c) =>
+      /^(Map|Set|WeakMap|WeakSet|Array)$/.test(c.className),
     );
 
     for (const cls of collectionClasses) {
       // Flag Maps and Sets with disproportionately high retained size
-      const retainedPerInstance = cls.count > 0 ? cls.retainedSize / cls.count : 0;
+      const retainedPerInstance =
+        cls.count > 0 ? cls.retainedSize / cls.count : 0;
 
       if (cls.className === 'Map' || cls.className === 'Set') {
         if (cls.retainedSize > 1_000_000 && retainedPerInstance > 100_000) {
@@ -360,9 +386,14 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectClosureCaptures(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectClosureCaptures(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const closureClass = summaries.find(c => c.className === '(closure)' || c.className === 'system / Closure');
+    const closureClass = summaries.find(
+      (c) => c.className === '(closure)' || c.className === 'system / Closure',
+    );
 
     if (closureClass && closureClass.count > 1000) {
       const avgSize = closureClass.retainedSize / closureClass.count;
@@ -395,13 +426,19 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectStringAccumulation(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectStringAccumulation(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const stringClasses = summaries.filter(c =>
-      /^(string|concatenated string|sliced string)$/i.test(c.className)
+    const stringClasses = summaries.filter((c) =>
+      /^(string|concatenated string|sliced string)$/i.test(c.className),
     );
 
-    const totalStringSize = stringClasses.reduce((sum, c) => sum + c.retainedSize, 0);
+    const totalStringSize = stringClasses.reduce(
+      (sum, c) => sum + c.retainedSize,
+      0,
+    );
     const totalStringCount = stringClasses.reduce((sum, c) => sum + c.count, 0);
 
     if (totalStringSize > 10_000_000) {
@@ -413,13 +450,16 @@ export class RootCauseAnalyzer {
           `This could indicate log accumulation, template string buildup, or JSON stringification ` +
           `of large objects being held in memory.`,
         confidence: totalStringSize > 50_000_000 ? 'high' : 'medium',
-        evidence: stringClasses.map(c => `${c.className}: ${c.count} instances, ${formatBytes(c.retainedSize)}`),
+        evidence: stringClasses.map(
+          (c) =>
+            `${c.className}: ${c.count} instances, ${formatBytes(c.retainedSize)}`,
+        ),
         recommendations: [
           'Check for accumulated log strings — consider streaming logs to disk instead of holding in memory',
           'Avoid JSON.stringify() on large objects for logging — use structured logging',
           'For string concatenation in loops, use Array.join() instead of += for better memory behavior',
         ],
-        involvedClasses: stringClasses.map(c => c.className),
+        involvedClasses: stringClasses.map((c) => c.className),
         estimatedImpact: totalStringSize,
       });
     }
@@ -427,13 +467,19 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectBufferAccumulation(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectBufferAccumulation(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const bufferClasses = summaries.filter(c =>
-      /buffer|arraybuffer|uint8array|typedarray|dataview/i.test(c.className)
+    const bufferClasses = summaries.filter((c) =>
+      /buffer|arraybuffer|uint8array|typedarray|dataview/i.test(c.className),
     );
 
-    const totalBufferSize = bufferClasses.reduce((sum, c) => sum + c.retainedSize, 0);
+    const totalBufferSize = bufferClasses.reduce(
+      (sum, c) => sum + c.retainedSize,
+      0,
+    );
 
     if (totalBufferSize > 5_000_000) {
       findings.push({
@@ -444,13 +490,16 @@ export class RootCauseAnalyzer {
           `This could indicate accumulated network response bodies, file read buffers, or crypto operations ` +
           `that haven't been released.`,
         confidence: totalBufferSize > 20_000_000 ? 'high' : 'medium',
-        evidence: bufferClasses.map(c => `${c.className}: ${c.count} instances, ${formatBytes(c.retainedSize)}`),
+        evidence: bufferClasses.map(
+          (c) =>
+            `${c.className}: ${c.count} instances, ${formatBytes(c.retainedSize)}`,
+        ),
         recommendations: [
           'Ensure Buffers from file reads and network responses are dereferenced after processing',
           'Use streaming (stream.pipeline) instead of buffering entire files/responses in memory',
           'Check for accumulated response bodies from HTTP clients (axios, fetch, etc.)',
         ],
-        involvedClasses: bufferClasses.map(c => c.className),
+        involvedClasses: bufferClasses.map((c) => c.className),
         estimatedImpact: totalBufferSize,
       });
     }
@@ -458,7 +507,10 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectLargeRetainedTrees(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectLargeRetainedTrees(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
 
     // Look for classes where retained size >> shallow size (indicating large retained trees)
@@ -495,19 +547,25 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectExcessiveAllocations(summaries: ClassSummary[], totalNodes: number): RootCauseFinding[] {
+  private detectExcessiveAllocations(
+    summaries: ClassSummary[],
+    totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
 
     // V8 internal types are enclosed in parentheses — (string), (code), (hidden), (array), etc.
     // These are EXPECTED to be high-count in normal heaps, so we use a much higher threshold.
     const V8_INTERNAL_THRESHOLD = 50; // 50% for V8 internals
-    const USER_CLASS_THRESHOLD = 20;  // 20% for user-defined classes
+    const USER_CLASS_THRESHOLD = 20; // 20% for user-defined classes
 
     // Flag any single class that represents an excessive share of all nodes
     for (const cls of summaries) {
       const percentage = (cls.count / totalNodes) * 100;
-      const isV8Internal = cls.className.startsWith('(') && cls.className.endsWith(')');
-      const threshold = isV8Internal ? V8_INTERNAL_THRESHOLD : USER_CLASS_THRESHOLD;
+      const isV8Internal =
+        cls.className.startsWith('(') && cls.className.endsWith(')');
+      const threshold = isV8Internal
+        ? V8_INTERNAL_THRESHOLD
+        : USER_CLASS_THRESHOLD;
       if (percentage > threshold && cls.count > 1000) {
         findings.push({
           category: 'excessive_allocation',
@@ -534,29 +592,44 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectDetachedDOM(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectDetachedDOM(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const detachedClasses = summaries.filter(c =>
-      /detached/i.test(c.className) || /^(HTMLDivElement|HTMLSpanElement|HTMLElement|Node|Element)$/.test(c.className)
+    const detachedClasses = summaries.filter(
+      (c) =>
+        /detached/i.test(c.className) ||
+        /^(HTMLDivElement|HTMLSpanElement|HTMLElement|Node|Element)$/.test(
+          c.className,
+        ),
     );
 
-    const detached = detachedClasses.filter(c => /detached/i.test(c.className));
+    const detached = detachedClasses.filter((c) =>
+      /detached/i.test(c.className),
+    );
     if (detached.length > 0) {
-      const totalRetained = detached.reduce((sum, c) => sum + c.retainedSize, 0);
+      const totalRetained = detached.reduce(
+        (sum, c) => sum + c.retainedSize,
+        0,
+      );
       findings.push({
         category: 'detached_dom',
-        title: `Detached DOM nodes found (${detached.map(c => `${c.count} ${c.className}`).join(', ')})`,
+        title: `Detached DOM nodes found (${detached.map((c) => `${c.count} ${c.className}`).join(', ')})`,
         description:
           `Detached DOM nodes are elements that have been removed from the document tree but are still ` +
           `referenced by JavaScript. They cannot be garbage collected until all references are released.`,
         confidence: 'high',
-        evidence: detached.map(c => `${c.className}: ${c.count} instances, ${formatBytes(c.retainedSize)}`),
+        evidence: detached.map(
+          (c) =>
+            `${c.className}: ${c.count} instances, ${formatBytes(c.retainedSize)}`,
+        ),
         recommendations: [
           'Nullify references to removed DOM elements (set variables/properties to null after removeChild)',
           'Remove event listeners before removing DOM elements from the tree',
           'Use MutationObserver cleanup patterns for dynamically created elements',
         ],
-        involvedClasses: detached.map(c => c.className),
+        involvedClasses: detached.map((c) => c.className),
         estimatedImpact: totalRetained,
       });
     }
@@ -564,10 +637,13 @@ export class RootCauseAnalyzer {
     return findings;
   }
 
-  private detectTimerLeaks(summaries: ClassSummary[], _totalNodes: number): RootCauseFinding[] {
+  private detectTimerLeaks(
+    summaries: ClassSummary[],
+    _totalNodes: number,
+  ): RootCauseFinding[] {
     const findings: RootCauseFinding[] = [];
-    const timerClasses = summaries.filter(c =>
-      /timer|interval|timeout|Timeout/i.test(c.className)
+    const timerClasses = summaries.filter((c) =>
+      /timer|interval|timeout|Timeout/i.test(c.className),
     );
 
     for (const cls of timerClasses) {
@@ -604,23 +680,23 @@ export class RootCauseAnalyzer {
 
     // Analyze retainer chains for patterns
     for (const chain of candidate.retainerChains) {
-      const edgeNames = chain.chain.map(step => step.edgeName);
-      const nodeNames = chain.chain.map(step => step.nodeName);
+      const edgeNames = chain.chain.map((step) => step.edgeName);
+      const nodeNames = chain.chain.map((step) => step.nodeName);
 
       // Check for event listener pattern
-      if (edgeNames.some(e => /listener|handler|_events/i.test(e))) {
+      if (edgeNames.some((e) => /listener|handler|_events/i.test(String(e)))) {
         findings.push({
           category: 'event_listener_leak',
           title: `${candidate.className} leaked via event listener chain`,
           description:
             `${candidate.className} instances are growing (${candidate.countInSnapshot1} → ${candidate.countInSnapshot2} → ${candidate.countInSnapshot3}) ` +
-            `and are retained through an event listener chain: ${chain.chain.map(s => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
+            `and are retained through an event listener chain: ${chain.chain.map((s) => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
           confidence: candidate.confidence as Confidence,
           evidence: [
             `Growth: ${candidate.countInSnapshot1} → ${candidate.countInSnapshot2} → ${candidate.countInSnapshot3}`,
             `Growth rate: ${candidate.growthRate} per snapshot`,
             `Total leaked: ${formatBytes(candidate.totalLeakedSize)}`,
-            `Retainer chain: ${chain.chain.map(s => s.edgeName).join(' → ')}`,
+            `Retainer chain: ${chain.chain.map((s) => s.edgeName).join(' → ')}`,
           ],
           recommendations: [
             `Remove event listeners that reference ${candidate.className} instances when they're no longer needed`,
@@ -631,13 +707,16 @@ export class RootCauseAnalyzer {
         });
       }
       // Check for cache/map pattern
-      else if (edgeNames.some(e => /cache|store|map|registry/i.test(e)) || nodeNames.some(n => /Map|Cache|Store/i.test(n))) {
+      else if (
+        edgeNames.some((e) => /cache|store|map|registry/i.test(String(e))) ||
+        nodeNames.some((n) => /Map|Cache|Store/i.test(String(n)))
+      ) {
         findings.push({
           category: 'unbounded_collection',
           title: `${candidate.className} accumulating in cache/collection`,
           description:
             `${candidate.className} instances are consistently growing and retained via a cache or collection: ` +
-            `${chain.chain.map(s => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
+            `${chain.chain.map((s) => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
           confidence: candidate.confidence as Confidence,
           evidence: [
             `Growth: ${candidate.countInSnapshot1} → ${candidate.countInSnapshot2} → ${candidate.countInSnapshot3}`,
@@ -659,7 +738,7 @@ export class RootCauseAnalyzer {
           description:
             `${candidate.className} count increased from ${candidate.countInSnapshot1} to ${candidate.countInSnapshot3} ` +
             `across 3 snapshots with a growth rate of ${candidate.growthRate} per interval. ` +
-            `Retainer: ${chain.chain.map(s => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
+            `Retainer: ${chain.chain.map((s) => `${s.edgeName}→${s.nodeName}`).join(' → ')}`,
           confidence: candidate.confidence as Confidence,
           evidence: [
             `Growth: ${candidate.countInSnapshot1} → ${candidate.countInSnapshot2} → ${candidate.countInSnapshot3}`,
@@ -700,7 +779,10 @@ export class RootCauseAnalyzer {
 
   // ─── Health Score ──────────────────────────────────────────────────────
 
-  private computeHealthScore(findings: RootCauseFinding[], summaries: ClassSummary[]): number {
+  private computeHealthScore(
+    findings: RootCauseFinding[],
+    _summaries: ClassSummary[],
+  ): number {
     let score = 100;
 
     for (const f of findings) {
@@ -713,6 +795,8 @@ export class RootCauseAnalyzer {
           break;
         case 'low':
           score -= 5;
+          break;
+        default:
           break;
       }
     }
@@ -729,7 +813,10 @@ function formatBytes(bytes: number): string {
   // BUG FIX #15: Clamp index and handle negative bytes properly
   const sign = bytes < 0 ? '-' : '';
   const abs = Math.abs(bytes);
-  const i = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }

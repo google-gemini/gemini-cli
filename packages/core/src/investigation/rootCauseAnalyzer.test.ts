@@ -1,10 +1,24 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { RootCauseAnalyzer, type RootCauseReport } from './rootCauseAnalyzer.js';
-import type { ClassSummary, LeakReport, LeakCandidate } from './heapSnapshotAnalyzer.js';
+import {
+  RootCauseAnalyzer,
+  type RootCauseReport,
+} from './rootCauseAnalyzer.js';
+import type {
+  ClassSummary,
+  LeakReport,
+  LeakCandidate,
+} from './heapSnapshotAnalyzer.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
-function makeClassSummary(overrides: Partial<ClassSummary> & { className: string }): ClassSummary {
+function makeClassSummary(
+  overrides: Partial<ClassSummary> & { className: string },
+): ClassSummary {
   return {
     count: 10,
     shallowSize: 1000,
@@ -14,7 +28,9 @@ function makeClassSummary(overrides: Partial<ClassSummary> & { className: string
   };
 }
 
-function makeLeakCandidate(overrides: Partial<LeakCandidate> & { className: string }): LeakCandidate {
+function makeLeakCandidate(
+  overrides: Partial<LeakCandidate> & { className: string },
+): LeakCandidate {
   return {
     countInSnapshot1: 5,
     countInSnapshot2: 15,
@@ -39,8 +55,18 @@ describe('RootCauseAnalyzer', () => {
   describe('analyzeSnapshot()', () => {
     it('should return healthy report when no issues found', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'Object', count: 100, shallowSize: 5000, retainedSize: 10000 }),
-        makeClassSummary({ className: 'String', count: 50, shallowSize: 2000, retainedSize: 3000 }),
+        makeClassSummary({
+          className: 'Object',
+          count: 100,
+          shallowSize: 5000,
+          retainedSize: 10000,
+        }),
+        makeClassSummary({
+          className: 'String',
+          count: 50,
+          shallowSize: 2000,
+          retainedSize: 3000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 1000);
@@ -51,12 +77,19 @@ describe('RootCauseAnalyzer', () => {
 
     it('should detect event listener leaks', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'EventListener', count: 500, shallowSize: 50000, retainedSize: 200000 }),
+        makeClassSummary({
+          className: 'EventListener',
+          count: 500,
+          shallowSize: 50000,
+          retainedSize: 200000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
       expect(report.findings.length).toBeGreaterThan(0);
-      const listenerFinding = report.findings.find(f => f.category === 'event_listener_leak');
+      const listenerFinding = report.findings.find(
+        (f) => f.category === 'event_listener_leak',
+      );
       expect(listenerFinding).toBeDefined();
       expect(listenerFinding!.confidence).toBe('high');
       expect(listenerFinding!.involvedClasses).toContain('EventListener');
@@ -64,11 +97,18 @@ describe('RootCauseAnalyzer', () => {
 
     it('should detect moderate event listener counts as medium confidence', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'ClickHandler', count: 75, shallowSize: 7500, retainedSize: 15000 }),
+        makeClassSummary({
+          className: 'ClickHandler',
+          count: 75,
+          shallowSize: 7500,
+          retainedSize: 15000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 5000);
-      const finding = report.findings.find(f => f.category === 'event_listener_leak');
+      const finding = report.findings.find(
+        (f) => f.category === 'event_listener_leak',
+      );
       expect(finding).toBeDefined();
       expect(finding!.confidence).toBe('medium');
     });
@@ -84,7 +124,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f => f.category === 'unbounded_collection');
+      const finding = report.findings.find(
+        (f) => f.category === 'unbounded_collection',
+      );
       expect(finding).toBeDefined();
       expect(finding!.title).toContain('Map');
       expect(finding!.recommendations.length).toBeGreaterThan(0);
@@ -101,7 +143,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f => f.category === 'unbounded_collection');
+      const finding = report.findings.find(
+        (f) => f.category === 'unbounded_collection',
+      );
       expect(finding).toBeDefined();
     });
 
@@ -116,8 +160,10 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f =>
-        f.category === 'unbounded_collection' && f.involvedClasses.includes('Array')
+      const finding = report.findings.find(
+        (f) =>
+          f.category === 'unbounded_collection' &&
+          f.involvedClasses.includes('Array'),
       );
       expect(finding).toBeDefined();
     });
@@ -133,7 +179,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 20000);
-      const finding = report.findings.find(f => f.category === 'closure_capture');
+      const finding = report.findings.find(
+        (f) => f.category === 'closure_capture',
+      );
       expect(finding).toBeDefined();
       expect(finding!.confidence).toBe('high');
     });
@@ -155,7 +203,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 200000);
-      const finding = report.findings.find(f => f.category === 'string_accumulation');
+      const finding = report.findings.find(
+        (f) => f.category === 'string_accumulation',
+      );
       expect(finding).toBeDefined();
       expect(finding!.involvedClasses).toContain('string');
     });
@@ -171,7 +221,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f => f.category === 'buffer_accumulation');
+      const finding = report.findings.find(
+        (f) => f.category === 'buffer_accumulation',
+      );
       expect(finding).toBeDefined();
     });
 
@@ -186,7 +238,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f => f.category === 'large_retained_tree');
+      const finding = report.findings.find(
+        (f) => f.category === 'large_retained_tree',
+      );
       expect(finding).toBeDefined();
       expect(finding!.title).toContain('AppController');
     });
@@ -202,7 +256,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 100000);
-      const finding = report.findings.find(f => f.category === 'excessive_allocation');
+      const finding = report.findings.find(
+        (f) => f.category === 'excessive_allocation',
+      );
       expect(finding).toBeDefined();
       expect(finding!.title).toContain('50');
     });
@@ -218,7 +274,9 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f => f.category === 'detached_dom');
+      const finding = report.findings.find(
+        (f) => f.category === 'detached_dom',
+      );
       expect(finding).toBeDefined();
       expect(finding!.confidence).toBe('high');
     });
@@ -234,16 +292,29 @@ describe('RootCauseAnalyzer', () => {
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
-      const finding = report.findings.find(f => f.category === 'timer_leak');
+      const finding = report.findings.find((f) => f.category === 'timer_leak');
       expect(finding).toBeDefined();
       expect(finding!.confidence).toBe('high');
     });
 
     it('should sort findings by confidence then impact', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'Timeout', count: 30, retainedSize: 50000 }),
-        makeClassSummary({ className: 'EventListener', count: 300, retainedSize: 200000 }),
-        makeClassSummary({ className: 'Map', count: 3, shallowSize: 300, retainedSize: 3_000_000 }),
+        makeClassSummary({
+          className: 'Timeout',
+          count: 30,
+          retainedSize: 50000,
+        }),
+        makeClassSummary({
+          className: 'EventListener',
+          count: 300,
+          retainedSize: 200000,
+        }),
+        makeClassSummary({
+          className: 'Map',
+          count: 3,
+          shallowSize: 300,
+          retainedSize: 3_000_000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
@@ -260,8 +331,16 @@ describe('RootCauseAnalyzer', () => {
     it('should deduplicate recommendations', () => {
       // Create scenario where multiple findings generate the same recommendation
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'EventListener', count: 100, retainedSize: 100000 }),
-        makeClassSummary({ className: 'ClickHandler', count: 80, retainedSize: 80000 }),
+        makeClassSummary({
+          className: 'EventListener',
+          count: 100,
+          retainedSize: 100000,
+        }),
+        makeClassSummary({
+          className: 'ClickHandler',
+          count: 80,
+          retainedSize: 80000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
@@ -271,8 +350,17 @@ describe('RootCauseAnalyzer', () => {
 
     it('should compute health score based on findings', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'EventListener', count: 500, retainedSize: 200000 }),
-        makeClassSummary({ className: 'Map', count: 3, shallowSize: 300, retainedSize: 3_000_000 }),
+        makeClassSummary({
+          className: 'EventListener',
+          count: 500,
+          retainedSize: 200000,
+        }),
+        makeClassSummary({
+          className: 'Map',
+          count: 3,
+          shallowSize: 300,
+          retainedSize: 3_000_000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
@@ -289,17 +377,31 @@ describe('RootCauseAnalyzer', () => {
         leakCandidates: [
           makeLeakCandidate({
             className: 'RequestHandler',
-            retainerChains: [{
-              nodeId: 100,
-              nodeName: 'RequestHandler',
-              nodeType: 'object',
-              selfSize: 500,
-              retainedSize: 5000,
-              chain: [
-                { edgeName: '_events', edgeType: 'property', nodeName: 'EventEmitter', nodeType: 'object', nodeId: 50 },
-                { edgeName: 'server', edgeType: 'property', nodeName: 'Server', nodeType: 'object', nodeId: 1 },
-              ],
-            }],
+            retainerChains: [
+              {
+                nodeId: 100,
+                nodeName: 'RequestHandler',
+                nodeType: 'object',
+                selfSize: 500,
+                retainedSize: 5000,
+                chain: [
+                  {
+                    edgeName: '_events',
+                    edgeType: 'property',
+                    nodeName: 'EventEmitter',
+                    nodeType: 'object',
+                    nodeId: 50,
+                  },
+                  {
+                    edgeName: 'server',
+                    edgeType: 'property',
+                    nodeName: 'Server',
+                    nodeType: 'object',
+                    nodeId: 1,
+                  },
+                ],
+              },
+            ],
           }),
         ],
         summary: 'test',
@@ -308,7 +410,9 @@ describe('RootCauseAnalyzer', () => {
 
       const result = analyzer.analyzeLeakReport(report);
       expect(result.findings.length).toBeGreaterThan(0);
-      const finding = result.findings.find(f => f.category === 'event_listener_leak');
+      const finding = result.findings.find(
+        (f) => f.category === 'event_listener_leak',
+      );
       expect(finding).toBeDefined();
     });
 
@@ -319,17 +423,31 @@ describe('RootCauseAnalyzer', () => {
         leakCandidates: [
           makeLeakCandidate({
             className: 'UserSession',
-            retainerChains: [{
-              nodeId: 100,
-              nodeName: 'UserSession',
-              nodeType: 'object',
-              selfSize: 1000,
-              retainedSize: 10000,
-              chain: [
-                { edgeName: 'cache', edgeType: 'property', nodeName: 'Map', nodeType: 'object', nodeId: 50 },
-                { edgeName: 'sessionStore', edgeType: 'property', nodeName: 'App', nodeType: 'object', nodeId: 1 },
-              ],
-            }],
+            retainerChains: [
+              {
+                nodeId: 100,
+                nodeName: 'UserSession',
+                nodeType: 'object',
+                selfSize: 1000,
+                retainedSize: 10000,
+                chain: [
+                  {
+                    edgeName: 'cache',
+                    edgeType: 'property',
+                    nodeName: 'Map',
+                    nodeType: 'object',
+                    nodeId: 50,
+                  },
+                  {
+                    edgeName: 'sessionStore',
+                    edgeType: 'property',
+                    nodeName: 'App',
+                    nodeType: 'object',
+                    nodeId: 1,
+                  },
+                ],
+              },
+            ],
           }),
         ],
         summary: 'test',
@@ -337,7 +455,9 @@ describe('RootCauseAnalyzer', () => {
       };
 
       const result = analyzer.analyzeLeakReport(report);
-      const finding = result.findings.find(f => f.category === 'unbounded_collection');
+      const finding = result.findings.find(
+        (f) => f.category === 'unbounded_collection',
+      );
       expect(finding).toBeDefined();
       expect(finding!.involvedClasses).toContain('UserSession');
     });
@@ -375,7 +495,11 @@ describe('RootCauseAnalyzer', () => {
   describe('toMarkdown()', () => {
     it('should generate markdown for a report with findings', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'EventListener', count: 500, retainedSize: 200000 }),
+        makeClassSummary({
+          className: 'EventListener',
+          count: 500,
+          retainedSize: 200000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);
@@ -404,7 +528,11 @@ describe('RootCauseAnalyzer', () => {
 
     it('should include confidence badges in markdown', () => {
       const summaries: ClassSummary[] = [
-        makeClassSummary({ className: 'Timeout', count: 200, retainedSize: 400000 }),
+        makeClassSummary({
+          className: 'Timeout',
+          count: 200,
+          retainedSize: 400000,
+        }),
       ];
 
       const report = analyzer.analyzeSnapshot(summaries, 10000);

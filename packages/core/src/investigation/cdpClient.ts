@@ -1,27 +1,25 @@
 /**
- * CDPClient — Chrome DevTools Protocol client for Node.js --inspect.
- *
- * Wraps the CDP WebSocket protocol to enable programmatic debugging
- * with minimal agent turns (as specified by Issue #23365):
- *   - HeapProfiler: take/get heap snapshots, track allocations
- *   - Profiler: CPU profiling start/stop/get
- *   - Runtime: evaluate expressions, get heap usage
- *   - NodeTracing: V8 trace events
- *
- * Unlike DAP (which requires step-by-step interaction), CDP supports
- * batch operations: "take 3 snapshots, diff them, report leaks" in a
- * single skill invocation — dramatically reducing agent turns.
- *
- * Connection: ws://127.0.0.1:{port}/json → get debugger WebSocket URL →
- *   connect → send JSON-RPC → receive responses/events
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/cdpClient
  */
 
-import { EventEmitter } from 'events';
-import * as http from 'http';
+import { EventEmitter } from 'node:events';
+import * as http from 'node:http';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+/** Type guard: check if a value is a CDPResponse */
+function isCDPResponse(msg: unknown): msg is CDPResponse {
+  return msg !== null && typeof msg === 'object' && 'id' in msg;
+}
+
+/** Type guard: check if a value is a CDPEvent */
+function isCDPEvent(msg: unknown): msg is CDPEvent {
+  return msg !== null && typeof msg === 'object' && 'method' in msg;
+}
 
 /** CDP JSON-RPC request message */
 interface CDPRequest {
@@ -122,7 +120,11 @@ export interface SamplingHeapProfileNode {
 }
 
 /** Client state */
-export type CDPClientState = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type CDPClientState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error';
 
 // ─── Client ──────────────────────────────────────────────────────────────────
 
@@ -149,22 +151,36 @@ export class CDPClient extends EventEmitter {
    * Discover available debug targets on a Node.js --inspect port.
    * Uses the HTTP /json endpoint to list debuggable targets.
    */
-  static async discoverTargets(port: number = 9229, host: string = '127.0.0.1'): Promise<CDPTarget[]> {
+  static async discoverTargets(
+    port: number = 9229,
+    host: string = '127.0.0.1',
+  ): Promise<CDPTarget[]> {
     return new Promise((resolve, reject) => {
       const req = http.get(`http://${host}:${port}/json`, (res) => {
         let data = '';
-        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+        res.on('data', (chunk) => {
+          if (Buffer.isBuffer(chunk)) {
+            data += chunk.toString();
+          }
+        });
         res.on('end', () => {
           try {
-            resolve(JSON.parse(data) as CDPTarget[]);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            const parsed = JSON.parse(data);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            resolve(parsed as CDPTarget[]);
           } catch (e) {
-            reject(new Error(`Failed to parse CDP targets: ${e}`));
+            const errMsg = e instanceof Error ? e.message : String(e);
+            reject(new Error(`Failed to parse CDP targets: ${errMsg}`));
           }
         });
       });
 
       req.on('error', (e) => {
-        reject(new Error(`Cannot reach debug target at ${host}:${port}: ${e.message}`));
+        const errMsg = e instanceof Error ? e.message : String(e);
+        reject(
+          new Error(`Cannot reach debug target at ${host}:${port}: ${errMsg}`),
+        );
       });
 
       req.setTimeout(5000, () => {
@@ -261,15 +277,19 @@ export class CDPClient extends EventEmitter {
 
     // Listen for chunk events
     const chunkHandler = (params: Record<string, unknown>) => {
-      this.snapshotChunks.push(params.chunk as string);
+      const chunk = params['chunk'];
+      this.snapshotChunks.push(String(chunk));
     };
 
     const progressHandler = (params: Record<string, unknown>) => {
-      this.emit('heapSnapshotProgress', {
-        done: params.done,
-        total: params.total,
-        finished: params.finished,
-      } as HeapSnapshotProgress);
+      const doneVal = params['done'];
+      const totalVal = params['total'];
+      const finishedVal = params['finished'];
+      const done = typeof doneVal === 'number' ? doneVal : 0;
+      const total = typeof totalVal === 'number' ? totalVal : 0;
+      const finished =
+        typeof finishedVal === 'boolean' ? finishedVal : undefined;
+      this.emit('heapSnapshotProgress', { done, total, finished });
     };
 
     this.on('HeapProfiler.addHeapSnapshotChunk', chunkHandler);
@@ -287,7 +307,10 @@ export class CDPClient extends EventEmitter {
       return this.snapshotChunks.join('');
     } finally {
       this.removeListener('HeapProfiler.addHeapSnapshotChunk', chunkHandler);
-      this.removeListener('HeapProfiler.reportHeapSnapshotProgress', progressHandler);
+      this.removeListener(
+        'HeapProfiler.reportHeapSnapshotProgress',
+        progressHandler,
+      );
       this.snapshotChunks = [];
     }
   }
@@ -315,6 +338,13 @@ export class CDPClient extends EventEmitter {
   /** Stop sampling and get allocation profile */
   async stopSampling(): Promise<SamplingHeapProfile> {
     const result = await this.send('HeapProfiler.stopSampling');
+    // Runtime assertion: profile field exists
+    if (!('profile' in result)) {
+      throw new Error(
+        'Invalid HeapProfiler.stopSampling response: missing profile',
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as unknown as SamplingHeapProfile;
   }
 
@@ -338,6 +368,11 @@ export class CDPClient extends EventEmitter {
   /** Stop CPU profiling and get the profile */
   async stopCpuProfile(): Promise<CPUProfileResult> {
     const result = await this.send('Profiler.stop');
+    // Runtime assertion: profile field exists
+    if (!('profile' in result)) {
+      throw new Error('Invalid Profiler.stop response: missing profile');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as unknown as CPUProfileResult;
   }
 
@@ -354,22 +389,27 @@ export class CDPClient extends EventEmitter {
   }
 
   /** Evaluate an expression in the global context */
-  async evaluate(expression: string, returnByValue: boolean = true): Promise<unknown> {
+  async evaluate(
+    expression: string,
+    returnByValue: boolean = true,
+  ): Promise<unknown> {
     const result = await this.send('Runtime.evaluate', {
       expression,
       returnByValue,
       generatePreview: true,
     });
-    return result.result;
+    const evalResult = result['result'];
+    return evalResult;
   }
 
   /** Get current heap usage statistics */
   async getHeapUsage(): Promise<HeapUsage> {
     const result = await this.send('Runtime.getHeapUsage');
-    return {
-      usedSize: result.usedSize as number,
-      totalSize: result.totalSize as number,
-    };
+    const usedSizeVal = result['usedSize'];
+    const totalSizeVal = result['totalSize'];
+    const usedSize = typeof usedSizeVal === 'number' ? usedSizeVal : 0;
+    const totalSize = typeof totalSizeVal === 'number' ? totalSizeVal : 0;
+    return { usedSize, totalSize };
   }
 
   // ─── Composite Operations ───────────────────────────────────────────────
@@ -420,7 +460,9 @@ export class CDPClient extends EventEmitter {
    * Capture a CPU profile over a duration.
    * Single operation: start → wait → stop → return profile.
    */
-  async captureCpuProfile(durationMs: number = 5000): Promise<CPUProfileResult> {
+  async captureCpuProfile(
+    durationMs: number = 5000,
+  ): Promise<CPUProfileResult> {
     await this.profilerEnable();
     await this.startCpuProfile();
     await this.delay(durationMs);
@@ -453,7 +495,10 @@ export class CDPClient extends EventEmitter {
 
   // ─── Internal Protocol Handling ─────────────────────────────────────────
 
-  private async send(method: string, params?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async send(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     if (!this.ws || this.state !== 'connected') {
       throw new Error(`Cannot send: client is ${this.state}`);
     }
@@ -465,7 +510,11 @@ export class CDPClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`CDP request timeout: ${method} (${this.requestTimeout}ms)`));
+        reject(
+          new Error(
+            `CDP request timeout: ${method} (${this.requestTimeout}ms)`,
+          ),
+        );
       }, this.requestTimeout);
 
       this.pending.set(id, { resolve, reject, timer, method });
@@ -474,45 +523,52 @@ export class CDPClient extends EventEmitter {
   }
 
   private handleMessage(data: string): void {
-    let message: CDPResponse | CDPEvent;
+    let parsed: unknown;
     try {
-      message = JSON.parse(data);
+      parsed = JSON.parse(data);
     } catch (err) {
       // BUG FIX #13: Previously silently swallowed malformed JSON with no
       // diagnostics. Now emits a warning so callers can debug protocol issues.
       // The pending request will still timeout, but the developer can now see WHY.
       if (this.listenerCount('error') > 0) {
-        this.emit('error', new Error(`Malformed CDP JSON: ${(err as Error).message}`));
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.emit('error', new Error(`Malformed CDP JSON: ${errMsg}`));
       }
       return;
     }
 
-    // Response to a request
-    if ('id' in message && typeof message.id === 'number') {
+    // Check if this is a response (type guard)
+    if (isCDPResponse(parsed)) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const message = parsed as CDPResponse;
       const pending = this.pending.get(message.id);
       if (pending) {
         clearTimeout(pending.timer);
         this.pending.delete(message.id);
 
-        const response = message as CDPResponse;
-        if (response.error) {
-          pending.reject(new Error(`CDP error (${response.error.code}): ${response.error.message}`));
+        if (message.error) {
+          pending.reject(
+            new Error(
+              `CDP error (${message.error.code}): ${message.error.message}`,
+            ),
+          );
         } else {
-          pending.resolve(response.result ?? {});
+          pending.resolve(message.result ?? {});
         }
       }
       return;
     }
 
-    // Event notification
-    if ('method' in message) {
-      const event = message as CDPEvent;
+    // Event notification (type guard)
+    if (isCDPEvent(parsed)) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const event = parsed as CDPEvent;
       this.emit(event.method, event.params ?? {});
     }
   }
 
   private cleanup(): void {
-    for (const [id, pending] of this.pending) {
+    for (const [, pending] of this.pending) {
       clearTimeout(pending.timer);
       pending.reject(new Error('CDP connection closed'));
     }
@@ -520,6 +576,6 @@ export class CDPClient extends EventEmitter {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

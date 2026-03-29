@@ -1,23 +1,14 @@
 /**
- * InvestigationTool — Gemini CLI skill for memory investigation and performance profiling.
- *
- * Registers as a tool that the Gemini agent can invoke to:
- *   - Analyze .heapsnapshot files for memory leaks
- *   - Capture heap snapshots via CDP (3-snapshot technique)
- *   - Profile CPU usage via CDP
- *   - Export results in Perfetto-compatible format
- *   - Generate root-cause analysis with LLM-friendly summaries
- *
- * Design: Single tool with an `action` parameter that routes to the appropriate
- * investigation capability. This follows the pattern of other multi-action tools
- * in Gemini CLI and minimizes the number of tools the agent needs to discover.
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/investigationTool
  */
 
-import { EventEmitter } from 'events';
-import * as fs from 'fs';
-import * as path from 'path';
+import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 import {
   HeapSnapshotAnalyzer,
@@ -26,21 +17,11 @@ import {
   type ClassSummary,
 } from './heapSnapshotAnalyzer.js';
 
-import {
-  PerfettoExporter,
-  type V8CpuProfile,
-} from './perfettoExporter.js';
+import { PerfettoExporter, type V8CpuProfile } from './perfettoExporter.js';
 
-import {
-  CDPClient,
-  type CPUProfileResult,
-  type HeapUsage,
-} from './cdpClient.js';
+import { CDPClient, type CPUProfileResult } from './cdpClient.js';
 
-import {
-  RootCauseAnalyzer,
-  type RootCauseReport,
-} from './rootCauseAnalyzer.js';
+import { RootCauseAnalyzer } from './rootCauseAnalyzer.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -119,11 +100,13 @@ export const INVESTIGATION_PARAMETER_SCHEMA = {
     },
     file_path: {
       type: 'string',
-      description: 'Path to a .heapsnapshot file (for analyze_heap_snapshot and diagnose_memory actions)',
+      description:
+        'Path to a .heapsnapshot file (for analyze_heap_snapshot and diagnose_memory actions)',
     },
     port: {
       type: 'number',
-      description: 'CDP debug port of the target Node.js process (default: 9229). Used by take_heap_snapshots, capture_cpu_profile, capture_memory_report',
+      description:
+        'CDP debug port of the target Node.js process (default: 9229). Used by take_heap_snapshots, capture_cpu_profile, capture_memory_report',
     },
     duration_ms: {
       type: 'number',
@@ -131,19 +114,23 @@ export const INVESTIGATION_PARAMETER_SCHEMA = {
     },
     interval_ms: {
       type: 'number',
-      description: 'Interval in milliseconds between heap snapshots in the 3-snapshot technique (default: 0 = immediate)',
+      description:
+        'Interval in milliseconds between heap snapshots in the 3-snapshot technique (default: 0 = immediate)',
     },
     output_path: {
       type: 'string',
-      description: 'Output file path for Perfetto JSON export (for export_perfetto action)',
+      description:
+        'Output file path for Perfetto JSON export (for export_perfetto action)',
     },
     include_memory_counters: {
       type: 'boolean',
-      description: 'Include memory counter tracks in Perfetto export (default: true)',
+      description:
+        'Include memory counter tracks in Perfetto export (default: true)',
     },
     include_leak_annotations: {
       type: 'boolean',
-      description: 'Include leak annotation events in Perfetto export (default: true)',
+      description:
+        'Include leak annotation events in Perfetto export (default: true)',
     },
   },
   required: ['action'],
@@ -171,8 +158,6 @@ export class InvestigationExecutor extends EventEmitter {
   private lastLeakReport: LeakReport | null = null;
   private lastClassSummaries: ClassSummary[] | null = null;
   private lastCpuProfile: V8CpuProfile | null = null;
-  private lastHeapUsage: HeapUsage | null = null;
-  private lastRootCause: RootCauseReport | null = null;
   private cdpClient: CDPClient | null = null;
 
   constructor() {
@@ -233,7 +218,9 @@ export class InvestigationExecutor extends EventEmitter {
    * Parses the V8 heap snapshot, computes dominator tree, extracts class summaries,
    * and returns an LLM-friendly summary.
    */
-  private async analyzeHeapSnapshot(params: InvestigationToolParams): Promise<InvestigationResult> {
+  private async analyzeHeapSnapshot(
+    params: InvestigationToolParams,
+  ): Promise<InvestigationResult> {
     if (!params.file_path) {
       return {
         success: false,
@@ -253,7 +240,10 @@ export class InvestigationExecutor extends EventEmitter {
       };
     }
 
-    const raw = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8')) as RawHeapSnapshot;
+    const fileContent1 = fs.readFileSync(resolvedPath, 'utf-8');
+    const parsed1: unknown = JSON.parse(fileContent1);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const raw = parsed1 as RawHeapSnapshot;
     const analyzer = new HeapSnapshotAnalyzer(raw);
     const summaries = analyzer.getClassSummaries();
     this.lastClassSummaries = summaries;
@@ -271,8 +261,9 @@ export class InvestigationExecutor extends EventEmitter {
       '',
       '| Class | Count | Shallow Size | Retained Size |',
       '|-------|-------|-------------|---------------|',
-      ...topClasses.map(c =>
-        `| ${c.className} | ${c.count} | ${formatBytes(c.shallowSize)} | ${formatBytes(c.retainedSize)} |`
+      ...topClasses.map(
+        (c) =>
+          `| ${c.className} | ${c.count} | ${formatBytes(c.shallowSize)} | ${formatBytes(c.retainedSize)} |`,
       ),
     ].join('\n');
 
@@ -284,7 +275,7 @@ export class InvestigationExecutor extends EventEmitter {
         nodeCount: analyzer.nodeCount,
         edgeCount: analyzer.edgeCount,
         totalRetainedSize: totalSize,
-        topClasses: topClasses.map(c => ({
+        topClasses: topClasses.map((c) => ({
           className: c.className,
           count: c.count,
           shallowSize: c.shallowSize,
@@ -297,7 +288,9 @@ export class InvestigationExecutor extends EventEmitter {
   /**
    * Connect to a running Node.js process via CDP and perform the 3-snapshot technique.
    */
-  private async takeHeapSnapshots(params: InvestigationToolParams): Promise<InvestigationResult> {
+  private async takeHeapSnapshots(
+    params: InvestigationToolParams,
+  ): Promise<InvestigationResult> {
     const port = params.port ?? 9229;
     const intervalMs = params.interval_ms ?? 0;
 
@@ -306,11 +299,21 @@ export class InvestigationExecutor extends EventEmitter {
     this.emit('progress', 'Taking 3 heap snapshots for leak detection...');
     const [snap1, snap2, snap3] = await client.threeSnapshotCapture(intervalMs);
 
-    const analyzer1 = new HeapSnapshotAnalyzer(JSON.parse(snap1) as RawHeapSnapshot);
-    const analyzer2 = new HeapSnapshotAnalyzer(JSON.parse(snap2) as RawHeapSnapshot);
-    const analyzer3 = new HeapSnapshotAnalyzer(JSON.parse(snap3) as RawHeapSnapshot);
+    const parsed2: unknown = JSON.parse(snap1);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const analyzer1 = new HeapSnapshotAnalyzer(parsed2 as RawHeapSnapshot);
+    const parsed3: unknown = JSON.parse(snap2);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const analyzer2 = new HeapSnapshotAnalyzer(parsed3 as RawHeapSnapshot);
+    const parsed4: unknown = JSON.parse(snap3);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const analyzer3 = new HeapSnapshotAnalyzer(parsed4 as RawHeapSnapshot);
 
-    const report = HeapSnapshotAnalyzer.detectLeaks(analyzer1, analyzer2, analyzer3);
+    const report = HeapSnapshotAnalyzer.detectLeaks(
+      analyzer1,
+      analyzer2,
+      analyzer3,
+    );
     this.lastLeakReport = report;
     this.lastClassSummaries = analyzer3.getClassSummaries();
 
@@ -332,7 +335,9 @@ export class InvestigationExecutor extends EventEmitter {
   /**
    * Capture a CPU profile from a running Node.js process.
    */
-  private async captureCpuProfile(params: InvestigationToolParams): Promise<InvestigationResult> {
+  private async captureCpuProfile(
+    params: InvestigationToolParams,
+  ): Promise<InvestigationResult> {
     const port = params.port ?? 9229;
     const durationMs = params.duration_ms ?? 5000;
 
@@ -341,7 +346,11 @@ export class InvestigationExecutor extends EventEmitter {
     this.emit('progress', `Capturing CPU profile for ${durationMs}ms...`);
     const result: CPUProfileResult = await client.captureCpuProfile(durationMs);
 
-    this.lastCpuProfile = result.profile as unknown as V8CpuProfile;
+    // Store CPU profile for later export
+    const profileData: unknown = result.profile;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const profile = profileData as V8CpuProfile;
+    this.lastCpuProfile = profile;
 
     const hotFunctions = result.profile.nodes
       .sort((a, b) => b.hitCount - a.hitCount)
@@ -357,8 +366,9 @@ export class InvestigationExecutor extends EventEmitter {
       '',
       '| Function | Script | Line | Hits |',
       '|----------|--------|------|------|',
-      ...hotFunctions.map(n =>
-        `| ${n.callFrame.functionName || '(anonymous)'} | ${path.basename(n.callFrame.url) || '(native)'} | ${n.callFrame.lineNumber} | ${n.hitCount} |`
+      ...hotFunctions.map(
+        (n) =>
+          `| ${n.callFrame.functionName || '(anonymous)'} | ${path.basename(n.callFrame.url) || '(native)'} | ${n.callFrame.lineNumber} | ${n.hitCount} |`,
       ),
     ].join('\n');
 
@@ -370,7 +380,7 @@ export class InvestigationExecutor extends EventEmitter {
         sampleCount: result.profile.samples.length,
         nodeCount: result.profile.nodes.length,
         duration: result.profile.endTime - result.profile.startTime,
-        hotFunctions: hotFunctions.map(n => ({
+        hotFunctions: hotFunctions.map((n) => ({
           name: n.callFrame.functionName,
           url: n.callFrame.url,
           line: n.callFrame.lineNumber,
@@ -383,7 +393,9 @@ export class InvestigationExecutor extends EventEmitter {
   /**
    * Capture a comprehensive memory report: heap usage + sampling profile + snapshot.
    */
-  private async captureMemoryReport(params: InvestigationToolParams): Promise<InvestigationResult> {
+  private async captureMemoryReport(
+    params: InvestigationToolParams,
+  ): Promise<InvestigationResult> {
     const port = params.port ?? 9229;
 
     const client = await this.getOrCreateClient(port);
@@ -391,9 +403,9 @@ export class InvestigationExecutor extends EventEmitter {
     this.emit('progress', 'Capturing comprehensive memory report...');
     const report = await client.captureMemoryReport();
 
-    this.lastHeapUsage = report.heapUsage;
-
-    const raw = JSON.parse(report.snapshot) as RawHeapSnapshot;
+    const parsed5: unknown = JSON.parse(report.snapshot);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const raw = parsed5 as RawHeapSnapshot;
     const analyzer = new HeapSnapshotAnalyzer(raw);
     this.lastClassSummaries = analyzer.getClassSummaries();
 
@@ -409,8 +421,9 @@ export class InvestigationExecutor extends EventEmitter {
       '',
       '| Class | Count | Retained Size |',
       '|-------|-------|---------------|',
-      ...topClasses.map(c =>
-        `| ${c.className} | ${c.count} | ${formatBytes(c.retainedSize)} |`
+      ...topClasses.map(
+        (c) =>
+          `| ${c.className} | ${c.count} | ${formatBytes(c.retainedSize)} |`,
       ),
     ].join('\n');
 
@@ -422,7 +435,7 @@ export class InvestigationExecutor extends EventEmitter {
         heapUsed: report.heapUsage.usedSize,
         heapTotal: report.heapUsage.totalSize,
         nodeCount: analyzer.nodeCount,
-        topClasses: topClasses.map(c => ({
+        topClasses: topClasses.map((c) => ({
           className: c.className,
           count: c.count,
           retainedSize: c.retainedSize,
@@ -434,7 +447,9 @@ export class InvestigationExecutor extends EventEmitter {
   /**
    * Export investigation results as Perfetto-compatible JSON.
    */
-  private async exportPerfetto(params: InvestigationToolParams): Promise<InvestigationResult> {
+  private async exportPerfetto(
+    params: InvestigationToolParams,
+  ): Promise<InvestigationResult> {
     const exporter = new PerfettoExporter({
       processName: 'Gemini CLI Investigation',
       threadName: 'Analysis',
@@ -451,8 +466,14 @@ export class InvestigationExecutor extends EventEmitter {
     }
 
     if (this.lastClassSummaries && this.lastClassSummaries.length > 0) {
-      const totalSize = this.lastClassSummaries.reduce((sum, c) => sum + c.retainedSize, 0);
-      exporter.exportClassSummaries(this.lastClassSummaries.slice(0, 30), totalSize);
+      const totalSize = this.lastClassSummaries.reduce(
+        (sum, c) => sum + c.retainedSize,
+        0,
+      );
+      exporter.exportClassSummaries(
+        this.lastClassSummaries.slice(0, 30),
+        totalSize,
+      );
       hasData = true;
     }
 
@@ -465,7 +486,8 @@ export class InvestigationExecutor extends EventEmitter {
       return {
         success: false,
         action: 'export_perfetto',
-        summary: 'No investigation data to export. Run analyze_heap_snapshot, take_heap_snapshots, or capture_cpu_profile first.',
+        summary:
+          'No investigation data to export. Run analyze_heap_snapshot, take_heap_snapshots, or capture_cpu_profile first.',
         error: 'No data available for export',
       };
     }
@@ -503,7 +525,9 @@ export class InvestigationExecutor extends EventEmitter {
   /**
    * Run automated root-cause analysis on a heap snapshot.
    */
-  private async diagnoseMemory(params: InvestigationToolParams): Promise<InvestigationResult> {
+  private async diagnoseMemory(
+    params: InvestigationToolParams,
+  ): Promise<InvestigationResult> {
     if (!params.file_path) {
       return {
         success: false,
@@ -523,14 +547,19 @@ export class InvestigationExecutor extends EventEmitter {
       };
     }
 
-    const raw = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8')) as RawHeapSnapshot;
+    const fileContent1 = fs.readFileSync(resolvedPath, 'utf-8');
+    const parsed1: unknown = JSON.parse(fileContent1);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const raw = parsed1 as RawHeapSnapshot;
     const analyzer = new HeapSnapshotAnalyzer(raw);
     const summaries = analyzer.getClassSummaries();
     this.lastClassSummaries = summaries;
 
     const rootCauseAnalyzer = new RootCauseAnalyzer();
-    const report = rootCauseAnalyzer.analyzeSnapshot(summaries, analyzer.nodeCount);
-    this.lastRootCause = report;
+    const report = rootCauseAnalyzer.analyzeSnapshot(
+      summaries,
+      analyzer.nodeCount,
+    );
 
     const markdown = RootCauseAnalyzer.toMarkdown(report);
 
@@ -541,8 +570,11 @@ export class InvestigationExecutor extends EventEmitter {
       markdownReport: markdown,
       data: {
         findingCount: report.findings.length,
-        highConfidence: report.findings.filter(f => f.confidence === 'high').length,
-        mediumConfidence: report.findings.filter(f => f.confidence === 'medium').length,
+        highConfidence: report.findings.filter((f) => f.confidence === 'high')
+          .length,
+        mediumConfidence: report.findings.filter(
+          (f) => f.confidence === 'medium',
+        ).length,
         recommendations: report.recommendations,
       },
     };
@@ -568,7 +600,10 @@ function formatBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB'];
   const sign = bytes < 0 ? '-' : '';
   const abs = Math.abs(bytes);
-  const i = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }

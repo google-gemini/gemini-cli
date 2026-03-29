@@ -1,28 +1,12 @@
 /**
- * SmartDiff — Intelligent heap snapshot comparison with retainer chain analysis.
- *
- * Goes beyond simple "added/removed/grown" diffs by:
- *   - Comparing retainer chains between snapshots to show WHY retention changed
- *   - Grouping related changes into "change stories" (e.g., "cache grew because...")
- *   - Identifying new retention paths (object now retained by something it wasn't before)
- *   - Detecting freed retention paths (object released from a retainer)
- *   - Computing change attribution (which class is responsible for growth)
- *   - Generating LLM-friendly diff narratives
- *
- * Architecture:
- *   HeapSnapshotAnalyzer(snap1) + HeapSnapshotAnalyzer(snap2) → SmartDiff → SmartDiffReport
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/smartDiff
  */
 
-import type {
-  ClassSummary,
-  RetainerChain,
-  HeapNodeType,
-  HeapEdgeType,
-  SnapshotDiff,
-  GrowthEntry,
-} from './heapSnapshotAnalyzer.js';
+import type { ClassSummary } from './heapSnapshotAnalyzer.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -150,17 +134,16 @@ export interface GrowthAttribution {
 // ─── Smart Diff Engine ──────────────────────────────────────────────────────
 
 export class SmartDiffEngine {
-
   /**
    * Compute a smart diff between two sets of class summaries.
    */
   diff(
     snap1Summaries: ClassSummary[],
     snap2Summaries: ClassSummary[],
-    options?: { timeDeltaMs?: number }
+    options?: { timeDeltaMs?: number },
   ): SmartDiffReport {
-    const map1 = new Map(snap1Summaries.map(c => [c.className, c]));
-    const map2 = new Map(snap2Summaries.map(c => [c.className, c]));
+    const map1 = new Map(snap1Summaries.map((c) => [c.className, c]));
+    const map2 = new Map(snap2Summaries.map((c) => [c.className, c]));
 
     const total1 = snap1Summaries.reduce((s, c) => s + c.retainedSize, 0);
     const total2 = snap2Summaries.reduce((s, c) => s + c.retainedSize, 0);
@@ -216,20 +199,41 @@ export class SmartDiffEngine {
     // Compute growth share
     const totalGrowth = growers.reduce((s, g) => s + g.retainedDelta, 0);
     for (const g of growers) {
-      g.growthShare = totalGrowth > 0 ? (g.retainedDelta / totalGrowth) * 100 : 0;
+      g.growthShare =
+        totalGrowth > 0 ? (g.retainedDelta / totalGrowth) * 100 : 0;
     }
 
     // Generate change stories
-    const stories = this.generateStories(growers, shrinkers, newClasses, disappearedClasses);
+    const stories = this.generateStories(
+      growers,
+      shrinkers,
+      newClasses,
+      disappearedClasses,
+    );
 
     // Attribution
-    const attribution = this.computeAttribution(growers, shrinkers, newClasses, netChange);
+    const attribution = this.computeAttribution(
+      growers,
+      shrinkers,
+      newClasses,
+      netChange,
+    );
 
     // Health delta (simplified)
-    const healthDelta = netChange > 0 ? -Math.min(20, Math.floor(netChange / 1_000_000)) : Math.min(10, Math.floor(Math.abs(netChange) / 1_000_000));
+    const healthDelta =
+      netChange > 0
+        ? -Math.min(20, Math.floor(netChange / 1_000_000))
+        : Math.min(10, Math.floor(Math.abs(netChange) / 1_000_000));
 
     // Summary
-    const summary = this.generateSummary(netChange, percentChange, growers, shrinkers, newClasses, disappearedClasses);
+    const summary = this.generateSummary(
+      netChange,
+      percentChange,
+      growers,
+      shrinkers,
+      newClasses,
+      disappearedClasses,
+    );
 
     return {
       timestamp: new Date().toISOString(),
@@ -260,14 +264,28 @@ export class SmartDiffEngine {
     const yellow = '\x1b[33m';
     const cyan = '\x1b[36m';
 
-    const changeColor = report.netMemoryChange > 0 ? red : report.netMemoryChange < 0 ? green : cyan;
-    const arrow = report.netMemoryChange > 0 ? '↑' : report.netMemoryChange < 0 ? '↓' : '→';
+    const changeColor =
+      report.netMemoryChange > 0
+        ? red
+        : report.netMemoryChange < 0
+          ? green
+          : cyan;
+    const arrow =
+      report.netMemoryChange > 0 ? '↑' : report.netMemoryChange < 0 ? '↓' : '→';
 
-    lines.push(`${bold}╔══════════════════════════════════════════════════════════════════╗${reset}`);
-    lines.push(`${bold}║  SMART HEAP DIFF                                               ║${reset}`);
-    lines.push(`${bold}╚══════════════════════════════════════════════════════════════════╝${reset}`);
+    lines.push(
+      `${bold}╔══════════════════════════════════════════════════════════════════╗${reset}`,
+    );
+    lines.push(
+      `${bold}║  SMART HEAP DIFF                                               ║${reset}`,
+    );
+    lines.push(
+      `${bold}╚══════════════════════════════════════════════════════════════════╝${reset}`,
+    );
     lines.push('');
-    lines.push(`${bold}Net change:${reset} ${changeColor}${arrow} ${formatBytes(Math.abs(report.netMemoryChange))} (${report.percentChange > 0 ? '+' : ''}${report.percentChange.toFixed(1)}%)${reset}`);
+    lines.push(
+      `${bold}Net change:${reset} ${changeColor}${arrow} ${formatBytes(Math.abs(report.netMemoryChange))} (${report.percentChange > 0 ? '+' : ''}${report.percentChange.toFixed(1)}%)${reset}`,
+    );
     lines.push('');
 
     // Change stories
@@ -275,14 +293,21 @@ export class SmartDiffEngine {
       lines.push(`${bold}━━━ What Changed ━━━${reset}`);
       lines.push('');
       for (const story of report.stories) {
-        const icon = story.changeType === 'growth' ? `${red}▲${reset}` :
-                     story.changeType === 'shrinkage' ? `${green}▼${reset}` :
-                     story.changeType === 'new_retention' ? `${yellow}★${reset}` :
-                     story.changeType === 'freed' ? `${green}✓${reset}` :
-                     `${cyan}◆${reset}`;
+        const icon =
+          story.changeType === 'growth'
+            ? `${red}▲${reset}`
+            : story.changeType === 'shrinkage'
+              ? `${green}▼${reset}`
+              : story.changeType === 'new_retention'
+                ? `${yellow}★${reset}`
+                : story.changeType === 'freed'
+                  ? `${green}✓${reset}`
+                  : `${cyan}◆${reset}`;
         lines.push(`  ${icon} ${bold}${story.title}${reset}`);
         lines.push(`    ${story.description}`);
-        lines.push(`    ${dim}Impact: ${formatBytes(Math.abs(story.memoryImpact))} | Classes: ${story.involvedClasses.join(', ')}${reset}`);
+        lines.push(
+          `    ${dim}Impact: ${formatBytes(Math.abs(story.memoryImpact))} | Classes: ${story.involvedClasses.join(', ')}${reset}`,
+        );
         lines.push('');
       }
     }
@@ -291,14 +316,20 @@ export class SmartDiffEngine {
     if (report.topGrowers.length > 0) {
       lines.push(`${bold}━━━ Top Growers ━━━${reset}`);
       lines.push('');
-      lines.push(`  ${'Class'.padEnd(25)} ${'Count Δ'.padStart(10)} ${'Retained Δ'.padStart(12)} ${'Share'.padStart(7)}`);
-      lines.push(`  ${'─'.repeat(25)} ${'─'.repeat(10)} ${'─'.repeat(12)} ${'─'.repeat(7)}`);
+      lines.push(
+        `  ${'Class'.padEnd(25)} ${'Count Δ'.padStart(10)} ${'Retained Δ'.padStart(12)} ${'Share'.padStart(7)}`,
+      );
+      lines.push(
+        `  ${'─'.repeat(25)} ${'─'.repeat(10)} ${'─'.repeat(12)} ${'─'.repeat(7)}`,
+      );
       for (const g of report.topGrowers.slice(0, 8)) {
         const name = g.className.slice(0, 24).padEnd(25);
         const countDelta = `+${g.countDelta}`.padStart(10);
         const retDelta = `+${formatBytes(g.retainedDelta)}`.padStart(12);
         const share = `${g.growthShare.toFixed(1)}%`.padStart(7);
-        lines.push(`  ${red}${name}${reset} ${countDelta} ${retDelta} ${share}`);
+        lines.push(
+          `  ${red}${name}${reset} ${countDelta} ${retDelta} ${share}`,
+        );
       }
       lines.push('');
     }
@@ -308,7 +339,9 @@ export class SmartDiffEngine {
       lines.push(`${bold}━━━ Memory Freed ━━━${reset}`);
       lines.push('');
       for (const s of report.topShrinkers.slice(0, 5)) {
-        lines.push(`  ${green}▼${reset} ${s.className}: ${formatBytes(Math.abs(s.retainedDelta))} freed (${s.countDelta} instances removed)`);
+        lines.push(
+          `  ${green}▼${reset} ${s.className}: ${formatBytes(Math.abs(s.retainedDelta))} freed (${s.countDelta} instances removed)`,
+        );
       }
       lines.push('');
     }
@@ -318,7 +351,9 @@ export class SmartDiffEngine {
       lines.push(`${bold}━━━ New Classes ━━━${reset}`);
       lines.push('');
       for (const cls of report.newClasses.slice(0, 5)) {
-        lines.push(`  ${yellow}★${reset} ${cls.className}: ${cls.count} instances, ${formatBytes(cls.retainedSize)} retained`);
+        lines.push(
+          `  ${yellow}★${reset} ${cls.className}: ${cls.count} instances, ${formatBytes(cls.retainedSize)} retained`,
+        );
       }
       lines.push('');
     }
@@ -329,7 +364,9 @@ export class SmartDiffEngine {
       lines.push('');
       for (const attr of report.attribution.slice(0, 5)) {
         const bar = '█'.repeat(Math.max(1, Math.round(attr.percentage / 5)));
-        lines.push(`  ${attr.source.padEnd(25)} ${bar} ${attr.percentage.toFixed(1)}% (${formatBytes(attr.bytes)})`);
+        lines.push(
+          `  ${attr.source.padEnd(25)} ${bar} ${attr.percentage.toFixed(1)}% (${formatBytes(attr.bytes)})`,
+        );
         lines.push(`  ${dim}${attr.explanation}${reset}`);
       }
     }
@@ -345,7 +382,9 @@ export class SmartDiffEngine {
       '# Heap Snapshot Diff Report',
       '',
       `**Generated:** ${report.timestamp}`,
-      report.timeDeltaMs ? `**Time between snapshots:** ${formatDuration(report.timeDeltaMs)}` : '',
+      report.timeDeltaMs
+        ? `**Time between snapshots:** ${formatDuration(report.timeDeltaMs)}`
+        : '',
       `**Net memory change:** ${formatBytes(report.netMemoryChange)} (${report.percentChange > 0 ? '+' : ''}${report.percentChange.toFixed(1)}%)`,
       '',
       `> ${report.summary}`,
@@ -355,12 +394,20 @@ export class SmartDiffEngine {
     if (report.stories.length > 0) {
       lines.push('## Change Stories', '');
       for (const story of report.stories) {
-        const icon = story.changeType === 'growth' ? '🔴' :
-                     story.changeType === 'shrinkage' ? '🟢' :
-                     story.changeType === 'new_retention' ? '🟡' : '🔵';
+        const icon =
+          story.changeType === 'growth'
+            ? '🔴'
+            : story.changeType === 'shrinkage'
+              ? '🟢'
+              : story.changeType === 'new_retention'
+                ? '🟡'
+                : '🔵';
         lines.push(`### ${icon} ${story.title}`, '');
         lines.push(story.description, '');
-        lines.push(`**Impact:** ${formatBytes(Math.abs(story.memoryImpact))} | **Classes:** ${story.involvedClasses.join(', ')}`, '');
+        lines.push(
+          `**Impact:** ${formatBytes(Math.abs(story.memoryImpact))} | **Classes:** ${story.involvedClasses.join(', ')}`,
+          '',
+        );
 
         if (story.suggestions.length > 0) {
           lines.push('**Suggestions:**');
@@ -377,7 +424,9 @@ export class SmartDiffEngine {
       lines.push('| Class | Count Δ | Retained Δ | Share |');
       lines.push('|-------|---------|------------|-------|');
       for (const g of report.topGrowers.slice(0, 10)) {
-        lines.push(`| ${g.className} | +${g.countDelta} | +${formatBytes(g.retainedDelta)} | ${g.growthShare.toFixed(1)}% |`);
+        lines.push(
+          `| ${g.className} | +${g.countDelta} | +${formatBytes(g.retainedDelta)} | ${g.growthShare.toFixed(1)}% |`,
+        );
       }
       lines.push('');
     }
@@ -385,7 +434,9 @@ export class SmartDiffEngine {
     if (report.attribution.length > 0) {
       lines.push('## Growth Attribution', '');
       for (const attr of report.attribution) {
-        lines.push(`- **${attr.source}** (${attr.percentage.toFixed(1)}%, ${formatBytes(attr.bytes)}): ${attr.explanation}`);
+        lines.push(
+          `- **${attr.source}** (${attr.percentage.toFixed(1)}%, ${formatBytes(attr.bytes)}): ${attr.explanation}`,
+        );
       }
     }
 
@@ -398,31 +449,44 @@ export class SmartDiffEngine {
     growers: ClassGrowthSummary[],
     shrinkers: ClassGrowthSummary[],
     newClasses: ClassSummary[],
-    disappearedClasses: ClassSummary[]
+    _disappearedClasses: ClassSummary[],
   ): ChangeStory[] {
     const stories: ChangeStory[] = [];
 
     // Story: Major growth cluster
-    const majorGrowers = growers.filter(g => g.retainedDelta > 100_000);
+    const majorGrowers = growers.filter((g) => g.retainedDelta > 100_000);
     if (majorGrowers.length > 0) {
       // Group by probable cause
-      const stringGrowers = majorGrowers.filter(g => /string|concat/i.test(g.className));
-      const collectionGrowers = majorGrowers.filter(g => /map|set|array|cache/i.test(g.className));
-      const closureGrowers = majorGrowers.filter(g => /closure|function/i.test(g.className));
-      const objectGrowers = majorGrowers.filter(g =>
-        !stringGrowers.includes(g) && !collectionGrowers.includes(g) && !closureGrowers.includes(g)
+      const stringGrowers = majorGrowers.filter((g) =>
+        /string|concat/i.test(g.className),
+      );
+      const collectionGrowers = majorGrowers.filter((g) =>
+        /map|set|array|cache/i.test(g.className),
+      );
+      const closureGrowers = majorGrowers.filter((g) =>
+        /closure|function/i.test(g.className),
+      );
+      const objectGrowers = majorGrowers.filter(
+        (g) =>
+          !stringGrowers.includes(g) &&
+          !collectionGrowers.includes(g) &&
+          !closureGrowers.includes(g),
       );
 
       if (stringGrowers.length > 0) {
-        const totalImpact = stringGrowers.reduce((s, g) => s + g.retainedDelta, 0);
+        const totalImpact = stringGrowers.reduce(
+          (s, g) => s + g.retainedDelta,
+          0,
+        );
         stories.push({
           title: `String accumulation (+${formatBytes(totalImpact)})`,
-          description: `${stringGrowers.length} string-related class${stringGrowers.length > 1 ? 'es' : ''} grew. ` +
+          description:
+            `${stringGrowers.length} string-related class${stringGrowers.length > 1 ? 'es' : ''} grew. ` +
             `This typically indicates log accumulation, JSON serialization artifacts, or template caching.`,
           changeType: 'growth',
-          involvedClasses: stringGrowers.map(g => g.className),
+          involvedClasses: stringGrowers.map((g) => g.className),
           memoryImpact: totalImpact,
-          changes: stringGrowers.map(g => ({
+          changes: stringGrowers.map((g) => ({
             what: `${g.className} grew by ${formatBytes(g.retainedDelta)}`,
             direction: 'grew' as const,
             className: g.className,
@@ -439,15 +503,19 @@ export class SmartDiffEngine {
       }
 
       if (collectionGrowers.length > 0) {
-        const totalImpact = collectionGrowers.reduce((s, g) => s + g.retainedDelta, 0);
+        const totalImpact = collectionGrowers.reduce(
+          (s, g) => s + g.retainedDelta,
+          0,
+        );
         stories.push({
           title: `Collection growth (+${formatBytes(totalImpact)})`,
-          description: `${collectionGrowers.length} collection${collectionGrowers.length > 1 ? 's' : ''} (Map/Set/Array) grew. ` +
+          description:
+            `${collectionGrowers.length} collection${collectionGrowers.length > 1 ? 's' : ''} (Map/Set/Array) grew. ` +
             `This suggests unbounded caching or accumulation without eviction.`,
           changeType: 'growth',
-          involvedClasses: collectionGrowers.map(g => g.className),
+          involvedClasses: collectionGrowers.map((g) => g.className),
           memoryImpact: totalImpact,
-          changes: collectionGrowers.map(g => ({
+          changes: collectionGrowers.map((g) => ({
             what: `${g.className} grew by ${formatBytes(g.retainedDelta)}`,
             direction: 'grew' as const,
             className: g.className,
@@ -464,15 +532,19 @@ export class SmartDiffEngine {
       }
 
       if (closureGrowers.length > 0) {
-        const totalImpact = closureGrowers.reduce((s, g) => s + g.retainedDelta, 0);
+        const totalImpact = closureGrowers.reduce(
+          (s, g) => s + g.retainedDelta,
+          0,
+        );
         stories.push({
           title: `Closure accumulation (+${formatBytes(totalImpact)})`,
-          description: `${closureGrowers.length} closure-related class${closureGrowers.length > 1 ? 'es' : ''} grew. ` +
+          description:
+            `${closureGrowers.length} closure-related class${closureGrowers.length > 1 ? 'es' : ''} grew. ` +
             `Closures capturing large objects from their scope prevent garbage collection.`,
           changeType: 'growth',
-          involvedClasses: closureGrowers.map(g => g.className),
+          involvedClasses: closureGrowers.map((g) => g.className),
           memoryImpact: totalImpact,
-          changes: closureGrowers.map(g => ({
+          changes: closureGrowers.map((g) => ({
             what: `${g.className} grew by ${formatBytes(g.retainedDelta)}`,
             direction: 'grew' as const,
             className: g.className,
@@ -493,14 +565,15 @@ export class SmartDiffEngine {
         const top3 = objectGrowers.slice(0, 3);
         const totalImpact = top3.reduce((s, g) => s + g.retainedDelta, 0);
         stories.push({
-          title: `Object growth in ${top3.map(g => g.className).join(', ')}`,
-          description: `${top3.length} class${top3.length > 1 ? 'es' : ''} showed significant growth. ` +
+          title: `Object growth in ${top3.map((g) => g.className).join(', ')}`,
+          description:
+            `${top3.length} class${top3.length > 1 ? 'es' : ''} showed significant growth. ` +
             `The largest contributor is ${top3[0].className} (+${formatBytes(top3[0].retainedDelta)}, ` +
             `${top3[0].countDelta > 0 ? '+' : ''}${top3[0].countDelta} instances).`,
           changeType: 'growth',
-          involvedClasses: top3.map(g => g.className),
+          involvedClasses: top3.map((g) => g.className),
           memoryImpact: totalImpact,
-          changes: top3.map(g => ({
+          changes: top3.map((g) => ({
             what: `${g.className}: ${g.countDelta > 0 ? '+' : ''}${g.countDelta} instances, +${formatBytes(g.retainedDelta)} retained`,
             direction: 'grew' as const,
             className: g.className,
@@ -517,17 +590,21 @@ export class SmartDiffEngine {
     }
 
     // Story: Memory freed
-    const majorShrinkers = shrinkers.filter(s => s.retainedDelta < -100_000);
+    const majorShrinkers = shrinkers.filter((s) => s.retainedDelta < -100_000);
     if (majorShrinkers.length > 0) {
-      const totalFreed = majorShrinkers.reduce((s, g) => s + Math.abs(g.retainedDelta), 0);
+      const totalFreed = majorShrinkers.reduce(
+        (s, g) => s + Math.abs(g.retainedDelta),
+        0,
+      );
       stories.push({
         title: `Memory freed: ${formatBytes(totalFreed)}`,
-        description: `${majorShrinkers.length} class${majorShrinkers.length > 1 ? 'es' : ''} released memory. ` +
+        description:
+          `${majorShrinkers.length} class${majorShrinkers.length > 1 ? 'es' : ''} released memory. ` +
           `This could indicate GC cycles, cache evictions, or intentional cleanup.`,
         changeType: 'shrinkage',
-        involvedClasses: majorShrinkers.map(g => g.className),
+        involvedClasses: majorShrinkers.map((g) => g.className),
         memoryImpact: -totalFreed,
-        changes: majorShrinkers.map(g => ({
+        changes: majorShrinkers.map((g) => ({
           what: `${g.className}: ${formatBytes(Math.abs(g.retainedDelta))} freed`,
           direction: 'shrunk' as const,
           className: g.className,
@@ -545,13 +622,18 @@ export class SmartDiffEngine {
       const totalNew = newClasses.reduce((s, c) => s + c.retainedSize, 0);
       stories.push({
         title: `${newClasses.length} new class${newClasses.length > 1 ? 'es' : ''} appeared`,
-        description: `New classes in the heap that weren't present before: ${newClasses.slice(0, 5).map(c => c.className).join(', ')}` +
-          (newClasses.length > 5 ? ` and ${newClasses.length - 5} more` : '') + '. ' +
+        description:
+          `New classes in the heap that weren't present before: ${newClasses
+            .slice(0, 5)
+            .map((c) => c.className)
+            .join(', ')}` +
+          (newClasses.length > 5 ? ` and ${newClasses.length - 5} more` : '') +
+          '. ' +
           `Total: ${formatBytes(totalNew)}.`,
         changeType: 'new_retention',
-        involvedClasses: newClasses.map(c => c.className),
+        involvedClasses: newClasses.map((c) => c.className),
         memoryImpact: totalNew,
-        changes: newClasses.slice(0, 5).map(c => ({
+        changes: newClasses.slice(0, 5).map((c) => ({
           what: `New: ${c.className} (${c.count} instances, ${formatBytes(c.retainedSize)})`,
           direction: 'added' as const,
           className: c.className,
@@ -576,7 +658,7 @@ export class SmartDiffEngine {
     growers: ClassGrowthSummary[],
     shrinkers: ClassGrowthSummary[],
     newClasses: ClassSummary[],
-    netChange: number
+    netChange: number,
   ): GrowthAttribution[] {
     const attrs: GrowthAttribution[] = [];
 
@@ -585,7 +667,8 @@ export class SmartDiffEngine {
       attrs.push({
         source: g.className,
         bytes: g.retainedDelta,
-        percentage: netChange !== 0 ? (g.retainedDelta / Math.abs(netChange)) * 100 : 0,
+        percentage:
+          netChange !== 0 ? (g.retainedDelta / Math.abs(netChange)) * 100 : 0,
         explanation: `+${g.countDelta} instances, +${formatBytes(g.retainedDelta)} retained`,
       });
     }
@@ -595,7 +678,8 @@ export class SmartDiffEngine {
       attrs.push({
         source: `${cls.className} (new)`,
         bytes: cls.retainedSize,
-        percentage: netChange !== 0 ? (cls.retainedSize / Math.abs(netChange)) * 100 : 0,
+        percentage:
+          netChange !== 0 ? (cls.retainedSize / Math.abs(netChange)) * 100 : 0,
         explanation: `New class with ${cls.count} instances`,
       });
     }
@@ -612,29 +696,42 @@ export class SmartDiffEngine {
     growers: ClassGrowthSummary[],
     shrinkers: ClassGrowthSummary[],
     newClasses: ClassSummary[],
-    disappearedClasses: ClassSummary[]
+    _disappearedClasses: ClassSummary[],
   ): string {
     const parts: string[] = [];
 
     if (netChange > 0) {
-      parts.push(`Memory grew by ${formatBytes(netChange)} (+${percentChange.toFixed(1)}%).`);
+      parts.push(
+        `Memory grew by ${formatBytes(netChange)} (+${percentChange.toFixed(1)}%).`,
+      );
     } else if (netChange < 0) {
-      parts.push(`Memory decreased by ${formatBytes(Math.abs(netChange))} (${percentChange.toFixed(1)}%).`);
+      parts.push(
+        `Memory decreased by ${formatBytes(Math.abs(netChange))} (${percentChange.toFixed(1)}%).`,
+      );
     } else {
       parts.push('Memory is stable between snapshots.');
     }
 
     if (growers.length > 0) {
-      parts.push(`${growers.length} class${growers.length > 1 ? 'es' : ''} grew (top: ${growers[0].className} +${formatBytes(growers[0].retainedDelta)}).`);
+      parts.push(
+        `${growers.length} class${growers.length > 1 ? 'es' : ''} grew (top: ${growers[0].className} +${formatBytes(growers[0].retainedDelta)}).`,
+      );
     }
 
     if (newClasses.length > 0) {
-      parts.push(`${newClasses.length} new class${newClasses.length > 1 ? 'es' : ''} appeared.`);
+      parts.push(
+        `${newClasses.length} new class${newClasses.length > 1 ? 'es' : ''} appeared.`,
+      );
     }
 
     if (shrinkers.length > 0) {
-      const totalFreed = shrinkers.reduce((s, g) => s + Math.abs(g.retainedDelta), 0);
-      parts.push(`${formatBytes(totalFreed)} was freed across ${shrinkers.length} class${shrinkers.length > 1 ? 'es' : ''}.`);
+      const totalFreed = shrinkers.reduce(
+        (s, g) => s + Math.abs(g.retainedDelta),
+        0,
+      );
+      parts.push(
+        `${formatBytes(totalFreed)} was freed across ${shrinkers.length} class${shrinkers.length > 1 ? 'es' : ''}.`,
+      );
     }
 
     return parts.join(' ');
@@ -649,7 +746,10 @@ function formatBytes(bytes: number): string {
   // BUG FIX #15: Clamp index and handle negative bytes properly
   const sign = bytes < 0 ? '-' : '';
   const abs = Math.abs(bytes);
-  const i = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }

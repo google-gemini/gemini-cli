@@ -1,17 +1,7 @@
 /**
- * HeapSnapshotAnalyzer — V8 .heapsnapshot parser, differ, and leak detector.
- *
- * Implements the automated 3-snapshot technique for memory leak investigation:
- *   1. Parse V8 heap snapshot JSON into an in-memory graph
- *   2. Compute retained sizes via dominator-tree construction
- *   3. Diff two snapshots to find grown/leaked objects
- *   4. Run the 3-snapshot workflow to isolate true leaks
- *   5. Generate LLM-friendly summaries with retainer chains
- *
- * References:
- *   - V8 heap snapshot format: nodes/edges as flat arrays indexed by meta fields
- *   - 3-Snapshot Technique: https://nicwn.me/v8-heapsnapshot-format/
- *   - Chrome DevTools heap analysis internals
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/heapSnapshotAnalyzer
  */
@@ -58,9 +48,21 @@ export type HeapNodeType =
   | 'object shape';
 
 const NODE_TYPES: HeapNodeType[] = [
-  'hidden', 'array', 'string', 'object', 'code', 'closure', 'regexp',
-  'number', 'native', 'synthetic', 'concatenated string', 'sliced string',
-  'symbol', 'bigint', 'object shape',
+  'hidden',
+  'array',
+  'string',
+  'object',
+  'code',
+  'closure',
+  'regexp',
+  'number',
+  'native',
+  'synthetic',
+  'concatenated string',
+  'sliced string',
+  'symbol',
+  'bigint',
+  'object shape',
 ];
 
 /** Edge types defined by V8 */
@@ -74,21 +76,27 @@ export type HeapEdgeType =
   | 'weak';
 
 const EDGE_TYPES: HeapEdgeType[] = [
-  'context', 'element', 'property', 'internal', 'hidden', 'shortcut', 'weak',
+  'context',
+  'element',
+  'property',
+  'internal',
+  'hidden',
+  'shortcut',
+  'weak',
 ];
 
 /** Parsed node with resolved references */
 export interface HeapNode {
-  index: number;          // ordinal index (0, 1, 2, ...)
+  index: number; // ordinal index (0, 1, 2, ...)
   type: HeapNodeType;
   name: string;
-  id: number;             // V8 unique node id (stable across snapshots)
+  id: number; // V8 unique node id (stable across snapshots)
   selfSize: number;
   edgeCount: number;
-  retainedSize: number;   // computed via dominator tree
-  edges: HeapEdge[];      // outgoing edges
-  retainers: HeapEdge[];  // incoming edges (reverse graph)
-  dominatorId: number;    // dominator node index (-1 if root)
+  retainedSize: number; // computed via dominator tree
+  edges: HeapEdge[]; // outgoing edges
+  retainers: HeapEdge[]; // incoming edges (reverse graph)
+  dominatorId: number; // dominator node index (-1 if root)
   detachedness: number;
 }
 
@@ -96,8 +104,8 @@ export interface HeapNode {
 export interface HeapEdge {
   type: HeapEdgeType;
   nameOrIndex: string | number;
-  fromNode: number;       // node index
-  toNode: number;         // node index
+  fromNode: number; // node index
+  toNode: number; // node index
 }
 
 /** Summary of a class (constructor) in the heap */
@@ -106,14 +114,14 @@ export interface ClassSummary {
   count: number;
   shallowSize: number;
   retainedSize: number;
-  instances: number[];    // node indices
+  instances: number[]; // node indices
 }
 
 /** Result of diffing two snapshots */
 export interface SnapshotDiff {
-  added: DiffEntry[];       // objects in snapshot2 not in snapshot1
-  removed: DiffEntry[];     // objects in snapshot1 not in snapshot2
-  grown: GrowthEntry[];     // classes that grew between snapshots
+  added: DiffEntry[]; // objects in snapshot2 not in snapshot1
+  removed: DiffEntry[]; // objects in snapshot1 not in snapshot2
+  grown: GrowthEntry[]; // classes that grew between snapshots
   totalAdded: number;
   totalRemoved: number;
   netGrowth: number;
@@ -132,7 +140,7 @@ export interface GrowthEntry {
   countDelta: number;
   sizeDelta: number;
   retainedDelta: number;
-  newInstances: number[];   // node IDs of new objects
+  newInstances: number[]; // node IDs of new objects
 }
 
 /** Retainer chain — path from GC root to a leaked object */
@@ -158,7 +166,7 @@ export interface LeakReport {
   timestamp: string;
   snapshotSizes: [number, number, number];
   leakCandidates: LeakCandidate[];
-  summary: string;         // LLM-friendly natural language summary
+  summary: string; // LLM-friendly natural language summary
   recommendations: string[];
 }
 
@@ -167,7 +175,7 @@ export interface LeakCandidate {
   countInSnapshot1: number;
   countInSnapshot2: number;
   countInSnapshot3: number;
-  growthRate: number;       // objects per snapshot interval
+  growthRate: number; // objects per snapshot interval
   totalLeakedSize: number;
   retainerChains: RetainerChain[];
   confidence: 'high' | 'medium' | 'low';
@@ -177,11 +185,10 @@ export interface LeakCandidate {
 
 export class HeapSnapshotAnalyzer {
   private nodes: HeapNode[] = [];
-  private nodeById: Map<number, number> = new Map();  // V8 id → node index
+  private nodeById: Map<number, number> = new Map(); // V8 id → node index
   private nodeFieldCount = 7;
   private edgeFieldCount = 3;
   private strings: string[] = [];
-  private rawSnapshot: RawHeapSnapshot | null = null;
 
   /**
    * Create a HeapSnapshotAnalyzer.
@@ -195,8 +202,8 @@ export class HeapSnapshotAnalyzer {
     if (arguments.length > 0 && (raw === null || raw === undefined)) {
       throw new Error(
         'Invalid heap snapshot: expected an object, got ' +
-        (raw === null ? 'null' : 'undefined') +
-        '. If the snapshot came from JSON.parse(), ensure the parse succeeded.'
+          (raw === null ? 'null' : 'undefined') +
+          '. If the snapshot came from JSON.parse(), ensure the parse succeeded.',
       );
     }
     if (raw) {
@@ -230,19 +237,34 @@ export class HeapSnapshotAnalyzer {
   parse(raw: RawHeapSnapshot): void {
     // Validate input structure
     if (!raw || typeof raw !== 'object') {
-      throw new Error('Invalid heap snapshot: expected an object, got ' + (raw === null ? 'null' : typeof raw));
+      throw new Error(
+        'Invalid heap snapshot: expected an object, got ' +
+          (raw === null ? 'null' : typeof raw),
+      );
     }
     if (!raw.snapshot || typeof raw.snapshot !== 'object') {
-      throw new Error('Invalid heap snapshot: missing "snapshot" field. This does not appear to be a V8 .heapsnapshot file.');
+      throw new Error(
+        'Invalid heap snapshot: missing "snapshot" field. This does not appear to be a V8 .heapsnapshot file.',
+      );
     }
     if (!raw.snapshot.meta || typeof raw.snapshot.meta !== 'object') {
       throw new Error('Invalid heap snapshot: missing "snapshot.meta" field.');
     }
-    if (!Array.isArray(raw.snapshot.meta.node_fields) || raw.snapshot.meta.node_fields.length === 0) {
-      throw new Error('Invalid heap snapshot: missing or empty "snapshot.meta.node_fields".');
+    if (
+      !Array.isArray(raw.snapshot.meta.node_fields) ||
+      raw.snapshot.meta.node_fields.length === 0
+    ) {
+      throw new Error(
+        'Invalid heap snapshot: missing or empty "snapshot.meta.node_fields".',
+      );
     }
-    if (!Array.isArray(raw.snapshot.meta.edge_fields) || raw.snapshot.meta.edge_fields.length === 0) {
-      throw new Error('Invalid heap snapshot: missing or empty "snapshot.meta.edge_fields".');
+    if (
+      !Array.isArray(raw.snapshot.meta.edge_fields) ||
+      raw.snapshot.meta.edge_fields.length === 0
+    ) {
+      throw new Error(
+        'Invalid heap snapshot: missing or empty "snapshot.meta.edge_fields".',
+      );
     }
     if (!Array.isArray(raw.nodes)) {
       throw new Error('Invalid heap snapshot: missing "nodes" array.');
@@ -254,18 +276,19 @@ export class HeapSnapshotAnalyzer {
       throw new Error('Invalid heap snapshot: missing "strings" array.');
     }
 
-    this.rawSnapshot = raw;
     this.strings = raw.strings;
     this.nodeFieldCount = raw.snapshot.meta.node_fields.length;
     this.edgeFieldCount = raw.snapshot.meta.edge_fields.length;
 
     const nf = this.nodeFieldCount;
     // node_count might be missing; compute from array length
-    const nodeCount = raw.snapshot.node_count ?? Math.floor(raw.nodes.length / nf);
+    const nodeCount =
+      raw.snapshot.node_count ?? Math.floor(raw.nodes.length / nf);
     const ef = this.edgeFieldCount;
 
     // ── Pass 1: Create all nodes ──
-    this.nodes = new Array(nodeCount);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    this.nodes = Array.from({ length: nodeCount }, () => ({}) as HeapNode);
     this.nodeById.clear();
 
     for (let i = 0; i < nodeCount; i++) {
@@ -312,7 +335,8 @@ export class HeapSnapshotAnalyzer {
         if (edgeType === 'element' || edgeType === 'hidden') {
           nameOrIndex = nameOrIndexRaw;
         } else {
-          nameOrIndex = this.strings[nameOrIndexRaw] ?? `<edge:${nameOrIndexRaw}>`;
+          nameOrIndex =
+            this.strings[nameOrIndexRaw] ?? `<edge:${nameOrIndexRaw}>`;
         }
 
         const edge: HeapEdge = {
@@ -328,7 +352,11 @@ export class HeapSnapshotAnalyzer {
         // BUG FIX #14: Also guard against negative and non-integer indices
         // which can occur with corrupt/truncated snapshots where the raw
         // edge offset doesn't align with node field count.
-        if (toNodeIdx >= 0 && toNodeIdx < nodeCount && Number.isInteger(toNodeIdx)) {
+        if (
+          toNodeIdx >= 0 &&
+          toNodeIdx < nodeCount &&
+          Number.isInteger(toNodeIdx)
+        ) {
           this.nodes[toNodeIdx].retainers.push(edge);
         }
 
@@ -357,12 +385,15 @@ export class HeapSnapshotAnalyzer {
     doms[0] = 0;
 
     // Build predecessors list (non-weak, non-shortcut edges only)
-    const preds: number[][] = new Array(n);
-    for (let i = 0; i < n; i++) preds[i] = [];
+    const preds: number[][] = Array.from({ length: n }, () => []);
 
     for (const node of this.nodes) {
       for (const edge of node.edges) {
-        if (edge.type !== 'weak' && edge.type !== 'shortcut' && edge.toNode < n) {
+        if (
+          edge.type !== 'weak' &&
+          edge.type !== 'shortcut' &&
+          edge.toNode < n
+        ) {
           preds[edge.toNode].push(node.index);
         }
       }
@@ -413,8 +444,7 @@ export class HeapSnapshotAnalyzer {
 
     // Compute retained sizes (post-order: children before parents)
     // Build dominator tree children list
-    const domChildren: number[][] = new Array(n);
-    for (let i = 0; i < n; i++) domChildren[i] = [];
+    const domChildren: number[][] = Array.from({ length: n }, () => []);
     for (let i = 1; i < n; i++) {
       if (doms[i] >= 0 && doms[i] !== i) {
         domChildren[doms[i]].push(i);
@@ -423,7 +453,9 @@ export class HeapSnapshotAnalyzer {
 
     // Post-order traversal using iterative DFS
     const visited = new Uint8Array(n);
-    const stack: Array<{ node: number; phase: 'enter' | 'exit' }> = [{ node: 0, phase: 'enter' }];
+    const stack: Array<{ node: number; phase: 'enter' | 'exit' }> = [
+      { node: 0, phase: 'enter' },
+    ];
 
     while (stack.length > 0) {
       const item = stack.pop()!;
@@ -465,7 +497,12 @@ export class HeapSnapshotAnalyzer {
       order.push(current);
 
       for (const edge of this.nodes[current].edges) {
-        if (edge.type !== 'weak' && edge.type !== 'shortcut' && !visited[edge.toNode] && edge.toNode < n) {
+        if (
+          edge.type !== 'weak' &&
+          edge.type !== 'shortcut' &&
+          !visited[edge.toNode] &&
+          edge.toNode < n
+        ) {
           visited[edge.toNode] = 1;
           queue[tail++] = edge.toNode;
         }
@@ -478,7 +515,12 @@ export class HeapSnapshotAnalyzer {
    * Fast intersect helper for dominator computation.
    * Uses pre-computed orderIndex array instead of creating a Map per call.
    */
-  private intersectFast(doms: Int32Array, a: number, b: number, orderIndex: Int32Array): number {
+  private intersectFast(
+    doms: Int32Array,
+    a: number,
+    b: number,
+    orderIndex: Int32Array,
+  ): number {
     let finger1 = a;
     let finger2 = b;
 
@@ -498,7 +540,7 @@ export class HeapSnapshotAnalyzer {
   // ─── Query API ──────────────────────────────────────────────────────────
 
   /** Get all parsed nodes */
-  getNodes(): ReadonlyArray<HeapNode> {
+  getNodes(): readonly HeapNode[] {
     return this.nodes;
   }
 
@@ -528,7 +570,13 @@ export class HeapSnapshotAnalyzer {
 
       let entry = classes.get(className);
       if (!entry) {
-        entry = { className, count: 0, shallowSize: 0, retainedSize: 0, instances: [] };
+        entry = {
+          className,
+          count: 0,
+          shallowSize: 0,
+          retainedSize: 0,
+          instances: [],
+        };
         classes.set(className, entry);
       }
       entry.count++;
@@ -537,7 +585,9 @@ export class HeapSnapshotAnalyzer {
       entry.instances.push(node.index);
     }
 
-    return Array.from(classes.values()).sort((a, b) => b.retainedSize - a.retainedSize);
+    return Array.from(classes.values()).sort(
+      (a, b) => b.retainedSize - a.retainedSize,
+    );
   }
 
   /** Find top N objects by retained size */
@@ -548,7 +598,10 @@ export class HeapSnapshotAnalyzer {
   }
 
   /** Build a retainer chain from a node back to the GC root */
-  getRetainerChain(nodeIndex: number, maxDepth: number = 10): RetainerChain | undefined {
+  getRetainerChain(
+    nodeIndex: number,
+    maxDepth: number = 10,
+  ): RetainerChain | undefined {
     const node = this.nodes[nodeIndex];
     if (!node) return undefined;
 
@@ -565,9 +618,12 @@ export class HeapSnapshotAnalyzer {
 
       // Pick the strongest retainer (largest retained size, non-weak)
       const retainer = currentNode.retainers
-        .filter(e => e.type !== 'weak' && e.type !== 'shortcut')
-        .sort((a, b) => (this.nodes[b.fromNode]?.retainedSize ?? 0) - (this.nodes[a.fromNode]?.retainedSize ?? 0))
-        [0];
+        .filter((e) => e.type !== 'weak' && e.type !== 'shortcut')
+        .sort(
+          (a, b) =>
+            (this.nodes[b.fromNode]?.retainedSize ?? 0) -
+            (this.nodes[a.fromNode]?.retainedSize ?? 0),
+        )[0];
 
       if (!retainer) break;
 
@@ -595,7 +651,7 @@ export class HeapSnapshotAnalyzer {
 
   /** Find detached DOM nodes (detachedness > 0) */
   getDetachedNodes(): HeapNode[] {
-    return this.nodes.filter(n => n.detachedness > 0 && n.selfSize > 0);
+    return this.nodes.filter((n) => n.detachedness > 0 && n.selfSize > 0);
   }
 
   // ─── Diffing ────────────────────────────────────────────────────────────
@@ -604,7 +660,10 @@ export class HeapSnapshotAnalyzer {
    * Diff two parsed snapshots. Compares by V8 node id (stable across snapshots).
    * Returns added objects, removed objects, and classes that grew.
    */
-  static diff(snapshot1: HeapSnapshotAnalyzer, snapshot2: HeapSnapshotAnalyzer): SnapshotDiff {
+  static diff(
+    snapshot1: HeapSnapshotAnalyzer,
+    snapshot2: HeapSnapshotAnalyzer,
+  ): SnapshotDiff {
     const ids1 = new Map<number, HeapNode>();
     const ids2 = new Map<number, HeapNode>();
 
@@ -643,7 +702,7 @@ export class HeapSnapshotAnalyzer {
     // Class-level growth analysis
     const classes1 = snapshot1.getClassSummaries();
     const classes2 = snapshot2.getClassSummaries();
-    const classMap1 = new Map(classes1.map(c => [c.className, c]));
+    const classMap1 = new Map(classes1.map((c) => [c.className, c]));
 
     const grown: GrowthEntry[] = [];
     for (const cls2 of classes2) {
@@ -655,14 +714,22 @@ export class HeapSnapshotAnalyzer {
       if (countDelta > 0 && sizeDelta > 0) {
         // Find which specific instances are new
         const oldIds = new Set(
-          (cls1?.instances ?? []).map(idx => snapshot1.getNodeByIndex(idx)?.id).filter(Boolean)
+          (cls1?.instances ?? [])
+            .map((idx) => snapshot1.getNodeByIndex(idx)?.id)
+            .filter(Boolean),
         );
         const newInstances = cls2.instances
-          .map(idx => snapshot2.getNodeByIndex(idx)!)
-          .filter(node => node && !oldIds.has(node.id))
-          .map(node => node.id);
+          .map((idx) => snapshot2.getNodeByIndex(idx)!)
+          .filter((node) => node && !oldIds.has(node.id))
+          .map((node) => node.id);
 
-        grown.push({ className: cls2.className, countDelta, sizeDelta, retainedDelta, newInstances });
+        grown.push({
+          className: cls2.className,
+          countDelta,
+          sizeDelta,
+          retainedDelta,
+          newInstances,
+        });
       }
     }
 
@@ -704,7 +771,7 @@ export class HeapSnapshotAnalyzer {
     const leakCandidates: LeakCandidate[] = [];
 
     // Find classes that grew in BOTH diffs (consistent growth = leak signal)
-    const growthMap12 = new Map(diff12.grown.map(g => [g.className, g]));
+    const growthMap12 = new Map(diff12.grown.map((g) => [g.className, g]));
 
     for (const growth23 of diff23.grown) {
       const growth12 = growthMap12.get(growth23.className);
@@ -714,9 +781,15 @@ export class HeapSnapshotAnalyzer {
       const growthRate = (growth12.countDelta + growth23.countDelta) / 2;
 
       // Get class summaries for each snapshot
-      const classes1 = snapshot1.getClassSummaries().find(c => c.className === growth23.className);
-      const classes2 = snapshot2.getClassSummaries().find(c => c.className === growth23.className);
-      const classes3 = snapshot3.getClassSummaries().find(c => c.className === growth23.className);
+      const classes1 = snapshot1
+        .getClassSummaries()
+        .find((c) => c.className === growth23.className);
+      const classes2 = snapshot2
+        .getClassSummaries()
+        .find((c) => c.className === growth23.className);
+      const classes3 = snapshot3
+        .getClassSummaries()
+        .find((c) => c.className === growth23.className);
 
       // Build retainer chains for new instances in snapshot 3
       const retainerChains: RetainerChain[] = [];
@@ -729,8 +802,9 @@ export class HeapSnapshotAnalyzer {
       }
 
       // Confidence: high if both intervals show similar growth
-      const ratio = Math.min(growth12.countDelta, growth23.countDelta) /
-                    Math.max(growth12.countDelta, growth23.countDelta);
+      const ratio =
+        Math.min(growth12.countDelta, growth23.countDelta) /
+        Math.max(growth12.countDelta, growth23.countDelta);
       const confidence = ratio > 0.5 ? 'high' : ratio > 0.2 ? 'medium' : 'low';
 
       leakCandidates.push({
@@ -747,8 +821,10 @@ export class HeapSnapshotAnalyzer {
 
     leakCandidates.sort((a, b) => {
       const confOrder = { high: 3, medium: 2, low: 1 };
-      return (confOrder[b.confidence] - confOrder[a.confidence]) ||
-             (b.totalLeakedSize - a.totalLeakedSize);
+      return (
+        confOrder[b.confidence] - confOrder[a.confidence] ||
+        b.totalLeakedSize - a.totalLeakedSize
+      );
     });
 
     const size1 = snapshot1.getTotalSize();
@@ -759,8 +835,13 @@ export class HeapSnapshotAnalyzer {
       timestamp: new Date().toISOString(),
       snapshotSizes: [size1, size2, size3],
       leakCandidates,
-      summary: HeapSnapshotAnalyzer.generateLeakSummary(leakCandidates, [size1, size2, size3]),
-      recommendations: HeapSnapshotAnalyzer.generateRecommendations(leakCandidates),
+      summary: HeapSnapshotAnalyzer.generateLeakSummary(leakCandidates, [
+        size1,
+        size2,
+        size3,
+      ]),
+      recommendations:
+        HeapSnapshotAnalyzer.generateRecommendations(leakCandidates),
     };
   }
 
@@ -779,20 +860,28 @@ export class HeapSnapshotAnalyzer {
       `Heap growth: ${formatBytes(sizes[0])} → ${formatBytes(sizes[1])} → ${formatBytes(sizes[2])} (${formatBytes(sizes[2] - sizes[0])} net increase)`,
     ];
 
-    const highConf = candidates.filter(c => c.confidence === 'high');
-    const medConf = candidates.filter(c => c.confidence === 'medium');
+    const highConf = candidates.filter((c) => c.confidence === 'high');
+    const medConf = candidates.filter((c) => c.confidence === 'medium');
 
     if (highConf.length === 0 && medConf.length === 0) {
-      lines.push('No consistent leak patterns detected across the 3 snapshots.');
-      lines.push('The heap growth may be caused by legitimate caching or one-time allocations.');
+      lines.push(
+        'No consistent leak patterns detected across the 3 snapshots.',
+      );
+      lines.push(
+        'The heap growth may be caused by legitimate caching or one-time allocations.',
+      );
     } else {
       if (highConf.length > 0) {
         lines.push(`\nHigh-confidence leaks (${highConf.length}):`);
         for (const c of highConf.slice(0, 5)) {
-          lines.push(`  - ${c.className}: ${c.countInSnapshot1} → ${c.countInSnapshot2} → ${c.countInSnapshot3} instances (${formatBytes(c.totalLeakedSize)} leaked)`);
+          lines.push(
+            `  - ${c.className}: ${c.countInSnapshot1} → ${c.countInSnapshot2} → ${c.countInSnapshot3} instances (${formatBytes(c.totalLeakedSize)} leaked)`,
+          );
           if (c.retainerChains.length > 0) {
             const chain = c.retainerChains[0];
-            const path = chain.chain.map(s => `${s.nodeName}.${s.edgeName}`).join(' → ');
+            const path = chain.chain
+              .map((s) => `${s.nodeName}.${s.edgeName}`)
+              .join(' → ');
             lines.push(`    Retained by: ${path || '(root)'}`);
           }
         }
@@ -801,7 +890,9 @@ export class HeapSnapshotAnalyzer {
       if (medConf.length > 0) {
         lines.push(`\nMedium-confidence leaks (${medConf.length}):`);
         for (const c of medConf.slice(0, 3)) {
-          lines.push(`  - ${c.className}: +${c.growthRate.toFixed(0)} instances/interval (${formatBytes(c.totalLeakedSize)} total)`);
+          lines.push(
+            `  - ${c.className}: +${c.growthRate.toFixed(0)} instances/interval (${formatBytes(c.totalLeakedSize)} total)`,
+          );
         }
       }
     }
@@ -810,39 +901,73 @@ export class HeapSnapshotAnalyzer {
   }
 
   /** Generate actionable recommendations based on leak analysis */
-  private static generateRecommendations(candidates: LeakCandidate[]): string[] {
+  private static generateRecommendations(
+    candidates: LeakCandidate[],
+  ): string[] {
     const recs: string[] = [];
 
-    for (const c of candidates.filter(c => c.confidence === 'high').slice(0, 3)) {
+    for (const c of candidates
+      .filter((c) => c.confidence === 'high')
+      .slice(0, 3)) {
       if (c.retainerChains.length > 0) {
         const chain = c.retainerChains[0];
         const lastStep = chain.chain[chain.chain.length - 1];
 
         if (lastStep?.edgeType === 'property') {
-          recs.push(`Check if ${lastStep.nodeName}.${lastStep.edgeName} is being cleaned up. Consider using WeakRef or nulling the reference when the ${c.className} is no longer needed.`);
+          recs.push(
+            `Check if ${lastStep.nodeName}.${lastStep.edgeName} is being cleaned up. Consider using WeakRef or nulling the reference when the ${c.className} is no longer needed.`,
+          );
         }
 
-        if (chain.chain.some(s => s.nodeName.includes('EventEmitter') || s.edgeName.toString().includes('listener'))) {
-          recs.push(`${c.className} appears retained by an event listener. Ensure removeListener/removeAllListeners is called when the object is disposed.`);
+        if (
+          chain.chain.some(
+            (s) =>
+              s.nodeName.includes('EventEmitter') ||
+              s.edgeName.toString().includes('listener'),
+          )
+        ) {
+          recs.push(
+            `${c.className} appears retained by an event listener. Ensure removeListener/removeAllListeners is called when the object is disposed.`,
+          );
         }
 
-        if (chain.chain.some(s => s.nodeName.includes('Map') || s.nodeName.includes('Set'))) {
-          recs.push(`${c.className} instances accumulate in a Map/Set. Consider using a WeakMap, adding size limits, or implementing an eviction policy.`);
+        if (
+          chain.chain.some(
+            (s) => s.nodeName.includes('Map') || s.nodeName.includes('Set'),
+          )
+        ) {
+          recs.push(
+            `${c.className} instances accumulate in a Map/Set. Consider using a WeakMap, adding size limits, or implementing an eviction policy.`,
+          );
         }
 
-        if (chain.chain.some(s => s.nodeName.includes('Array'))) {
-          recs.push(`${c.className} instances accumulate in an Array. Check if items are being removed after use, or consider a bounded buffer.`);
+        if (chain.chain.some((s) => s.nodeName.includes('Array'))) {
+          recs.push(
+            `${c.className} instances accumulate in an Array. Check if items are being removed after use, or consider a bounded buffer.`,
+          );
         }
       }
     }
 
-    if (candidates.some(c => c.retainerChains.some(r => r.chain.some(s => s.nodeType === 'closure')))) {
-      recs.push('Closures are retaining leaked objects. Check for anonymous functions capturing variables that should be released.');
+    if (
+      candidates.some((c) =>
+        c.retainerChains.some((r) =>
+          r.chain.some((s) => s.nodeType === 'closure'),
+        ),
+      )
+    ) {
+      recs.push(
+        'Closures are retaining leaked objects. Check for anonymous functions capturing variables that should be released.',
+      );
     }
 
     if (recs.length === 0) {
-      recs.push('Review the retainer chains above to identify which data structures are accumulating objects.');
-      recs.push('Consider running the analysis with a longer interval between snapshots for more conclusive results.');
+      recs.push(
+        'Review the retainer chains above to identify which data structures are accumulating objects.',
+      );
+      recs.push(
+        'Consider running the analysis with a longer interval between snapshots for more conclusive results.',
+      );
     }
 
     return recs;
@@ -856,7 +981,7 @@ export class HeapSnapshotAnalyzer {
       '# Memory Leak Investigation Report',
       '',
       `**Timestamp:** ${report.timestamp}`,
-      `**Snapshot Sizes:** ${report.snapshotSizes.map(s => `${(s / (1024 * 1024)).toFixed(1)} MB`).join(' → ')}`,
+      `**Snapshot Sizes:** ${report.snapshotSizes.map((s) => `${(s / (1024 * 1024)).toFixed(1)} MB`).join(' → ')}`,
       '',
       '## Summary',
       '',
@@ -867,25 +992,38 @@ export class HeapSnapshotAnalyzer {
     if (report.leakCandidates.length > 0) {
       lines.push('## Leak Candidates');
       lines.push('');
-      lines.push('| Class | Count (S1→S2→S3) | Growth Rate | Leaked Size | Confidence |');
-      lines.push('|-------|------------------|-------------|-------------|------------|');
+      lines.push(
+        '| Class | Count (S1→S2→S3) | Growth Rate | Leaked Size | Confidence |',
+      );
+      lines.push(
+        '|-------|------------------|-------------|-------------|------------|',
+      );
 
       for (const c of report.leakCandidates) {
         const counts = `${c.countInSnapshot1} → ${c.countInSnapshot2} → ${c.countInSnapshot3}`;
-        const size = c.totalLeakedSize < 1024 ? `${c.totalLeakedSize} B` :
-                     c.totalLeakedSize < 1024 * 1024 ? `${(c.totalLeakedSize / 1024).toFixed(1)} KB` :
-                     `${(c.totalLeakedSize / (1024 * 1024)).toFixed(1)} MB`;
-        lines.push(`| ${c.className} | ${counts} | +${c.growthRate.toFixed(0)}/interval | ${size} | ${c.confidence} |`);
+        const size =
+          c.totalLeakedSize < 1024
+            ? `${c.totalLeakedSize} B`
+            : c.totalLeakedSize < 1024 * 1024
+              ? `${(c.totalLeakedSize / 1024).toFixed(1)} KB`
+              : `${(c.totalLeakedSize / (1024 * 1024)).toFixed(1)} MB`;
+        lines.push(
+          `| ${c.className} | ${counts} | +${c.growthRate.toFixed(0)}/interval | ${size} | ${c.confidence} |`,
+        );
       }
 
       lines.push('');
       lines.push('## Retainer Chains');
       lines.push('');
 
-      for (const c of report.leakCandidates.filter(c => c.retainerChains.length > 0)) {
+      for (const c of report.leakCandidates.filter(
+        (c) => c.retainerChains.length > 0,
+      )) {
         lines.push(`### ${c.className}`);
         for (const chain of c.retainerChains.slice(0, 3)) {
-          const path = chain.chain.map(s => `\`${s.nodeName}\` --[${s.edgeName}]-->`).join(' ');
+          const path = chain.chain
+            .map((s) => `\`${s.nodeName}\` --[${s.edgeName}]-->`)
+            .join(' ');
           lines.push(`- \`${chain.nodeName}\` ← ${path} (root)`);
         }
         lines.push('');

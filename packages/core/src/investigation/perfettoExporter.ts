@@ -1,24 +1,12 @@
 /**
- * PerfettoExporter — Converts investigation results into Perfetto-compatible
- * JSON trace format for visualization in ui.perfetto.dev.
- *
- * Supports:
- *   - Chrome JSON trace event format (legacy but widely supported)
- *   - Duration events (B/E pairs), complete events (X), counter events (C)
- *   - Memory counter tracks for heap size over time
- *   - Allocation flamecharts from heap snapshots
- *   - CPU profiling data from V8 profiles
- *   - Custom metadata and process/thread naming
- *
- * Output can be opened directly in:
- *   - ui.perfetto.dev (drag & drop)
- *   - chrome://tracing
- *   - Android Studio profiler
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/perfettoExporter
  */
 
-import type { LeakReport, ClassSummary, HeapNode, RetainerChain } from './heapSnapshotAnalyzer.js';
+import type { LeakReport, ClassSummary } from './heapSnapshotAnalyzer.js';
 
 // ─── Perfetto Trace Event Types ──────────────────────────────────────────────
 
@@ -85,11 +73,11 @@ export interface PerfettoExportOptions {
 // ─── Colors for Perfetto UI ──────────────────────────────────────────────────
 
 const COLORS = {
-  leak: 'terrible',        // Red
-  growth: 'bad',           // Orange
-  allocation: 'good',      // Green
-  gc: 'olive',             // Olive
-  snapshot: 'rail_idle',   // Blue
+  leak: 'terrible', // Red
+  growth: 'bad', // Orange
+  allocation: 'good', // Green
+  gc: 'olive', // Olive
+  snapshot: 'rail_idle', // Blue
   memory: 'cq_build_running',
   analysis: 'generic_work',
 } as const;
@@ -139,7 +127,10 @@ export class PerfettoExporter {
    *   - Analysis phase duration events
    *   - Per-class allocation flamechart
    */
-  exportLeakReport(report: LeakReport, options: PerfettoExportOptions = {}): PerfettoTrace {
+  exportLeakReport(
+    report: LeakReport,
+    options: PerfettoExportOptions = {},
+  ): PerfettoTrace {
     const includeMemory = options.includeMemoryCounters !== false;
     const includeLeaks = options.includeLeakAnnotations !== false;
     const includeAllocations = options.includeAllocations !== false;
@@ -180,7 +171,9 @@ export class PerfettoExporter {
       dur: 2_000_000, // 2 seconds
       args: {
         candidates_found: report.leakCandidates.length,
-        high_confidence: report.leakCandidates.filter(c => c.confidence === 'high').length,
+        high_confidence: report.leakCandidates.filter(
+          (c) => c.confidence === 'high',
+        ).length,
         net_growth_bytes: report.snapshotSizes[2] - report.snapshotSizes[0],
       },
       cname: COLORS.analysis,
@@ -245,7 +238,10 @@ export class PerfettoExporter {
     // Top classes as nested events
     let offset = 0;
     for (const cls of summaries.slice(0, 30)) {
-      const dur = totalSize > 0 ? Math.max((cls.retainedSize / totalSize) * totalDur, 1) : 1;
+      const dur =
+        totalSize > 0
+          ? Math.max((cls.retainedSize / totalSize) * totalDur, 1)
+          : 1;
       this.events.push({
         pid: this.pid,
         tid,
@@ -260,7 +256,10 @@ export class PerfettoExporter {
           retained_size: cls.retainedSize,
           avg_size: cls.count > 0 ? Math.round(cls.shallowSize / cls.count) : 0,
         },
-        cname: cls.retainedSize > totalSize * 0.1 ? COLORS.growth : COLORS.allocation,
+        cname:
+          cls.retainedSize > totalSize * 0.1
+            ? COLORS.growth
+            : COLORS.allocation,
       });
       offset += dur;
     }
@@ -289,7 +288,7 @@ export class PerfettoExporter {
       for (let i = 0; i < profile.samples.length; i++) {
         const nodeId = profile.samples[i];
         const delta = profile.timeDeltas[i] ?? 0;
-        const node = profile.nodes.find(n => n.id === nodeId);
+        const node = profile.nodes.find((n) => n.id === nodeId);
 
         if (node && node.callFrame) {
           this.events.push({
@@ -327,8 +326,8 @@ export class PerfettoExporter {
         ph: 'C',
         name: 'Heap Size',
         args: {
-          'heap_size_mb': Number((sizes[i] / (1024 * 1024)).toFixed(2)),
-          'heap_size_bytes': sizes[i],
+          heap_size_mb: Number((sizes[i] / (1024 * 1024)).toFixed(2)),
+          heap_size_bytes: sizes[i],
         },
       });
 
@@ -342,8 +341,8 @@ export class PerfettoExporter {
           ph: 'C',
           name: 'Heap Growth',
           args: {
-            'growth_bytes': growth,
-            'growth_kb': Number((growth / 1024).toFixed(1)),
+            growth_bytes: growth,
+            growth_kb: Number((growth / 1024).toFixed(1)),
           },
         });
       }
@@ -364,9 +363,12 @@ export class PerfettoExporter {
     });
 
     for (const candidate of report.leakCandidates.slice(0, 10)) {
-      const color = candidate.confidence === 'high' ? COLORS.leak :
-                    candidate.confidence === 'medium' ? COLORS.growth :
-                    COLORS.allocation;
+      const color =
+        candidate.confidence === 'high'
+          ? COLORS.leak
+          : candidate.confidence === 'medium'
+            ? COLORS.growth
+            : COLORS.allocation;
 
       // Duration event for each candidate (proportional to leaked size)
       const dur = Math.max(candidate.totalLeakedSize / 10, 100_000);
@@ -383,8 +385,8 @@ export class PerfettoExporter {
           count_progression: `${candidate.countInSnapshot1} → ${candidate.countInSnapshot2} → ${candidate.countInSnapshot3}`,
           growth_rate: candidate.growthRate,
           total_leaked_bytes: candidate.totalLeakedSize,
-          retainer_chains: candidate.retainerChains.map(c =>
-            c.chain.map(s => `${s.nodeName}.${s.edgeName}`).join(' → ')
+          retainer_chains: candidate.retainerChains.map((c) =>
+            c.chain.map((s) => `${s.nodeName}.${s.edgeName}`).join(' → '),
           ),
         },
         cname: color,

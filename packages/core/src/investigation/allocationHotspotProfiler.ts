@@ -1,20 +1,7 @@
 /**
- * Allocation Hotspot Profiler — Where Is Memory Being Allocated Fastest?
- *
- * ORIGINAL MODULE — Complementary to heap snapshots (which show what's retained,
- * not what's being allocated). This shows allocation RATE by call site.
- *
- * Uses V8's AllocationProfile sampling data or heap snapshot allocation
- * tracking to identify the hottest allocation sites in code.
- *
- * Features:
- * - Parses V8 allocation profiles (sampling allocations)
- * - Identifies top allocation sites by rate (bytes/sec) and count
- * - Builds allocation call trees (like CPU flame graphs but for allocations)
- * - Detects "allocation storms" (sudden spikes in allocation rate)
- * - Identifies allocate-and-discard patterns (high alloc + high GC)
- * - Generates allocation flame graph (folded stacks format)
- * - Terminal-formatted hotspot reports
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/allocationHotspotProfiler
  */
@@ -129,7 +116,6 @@ export interface AllocationProfileReport {
 // ─── Allocation Hotspot Profiler ──────────────────────────────────────────────
 
 export class AllocationHotspotProfiler {
-
   /**
    * Analyze allocation samples and produce a hotspot report
    */
@@ -163,15 +149,24 @@ export class AllocationHotspotProfiler {
 
     // Churn ratio (allocation rate vs retained — high means allocate-and-discard)
     const gcFreed = options?.gcFreedBytes || 0;
-    const churnRatio = totalBytes > 0 && gcFreed > 0
-      ? Math.min(1, gcFreed / totalBytes)
-      : 0;
+    const churnRatio =
+      totalBytes > 0 && gcFreed > 0 ? Math.min(1, gcFreed / totalBytes) : 0;
 
     // Assessment
-    const assessment = this.generateAssessment(bytesPerSec, hotspots, storms, churnRatio);
+    const assessment = this.generateAssessment(
+      bytesPerSec,
+      hotspots,
+      storms,
+      churnRatio,
+    );
 
     // Recommendations
-    const recommendations = this.generateRecommendations(hotspots, storms, churnRatio, bytesPerSec);
+    const recommendations = this.generateRecommendations(
+      hotspots,
+      storms,
+      churnRatio,
+      bytesPerSec,
+    );
 
     return {
       profileDurationMs: durationMs,
@@ -196,7 +191,10 @@ export class AllocationHotspotProfiler {
     samples?: Array<{ nodeId: number; size: number; count?: number }>;
   }): AllocationSample[] {
     const samples: AllocationSample[] = [];
-    const nodeMap = new Map<number, { node: V8ProfileNode; stack: StackFrame[] }>();
+    const nodeMap = new Map<
+      number,
+      { node: V8ProfileNode; stack: StackFrame[] }
+    >();
 
     // Build node map with stack traces
     function traverse(node: V8ProfileNode, stack: StackFrame[]): void {
@@ -249,30 +247,40 @@ export class AllocationHotspotProfiler {
    * (when real allocation profiling isn't available)
    */
   static fromClassSummaries(
-    classes: Array<{ className: string; count: number; shallowSize: number; retainedSize: number }>,
-    durationMs?: number,
+    classes: Array<{
+      className: string;
+      count: number;
+      shallowSize: number;
+      retainedSize: number;
+    }>,
+    _durationMs?: number,
   ): AllocationSample[] {
     return classes.map((cls, i) => ({
       nodeId: i + 1,
       size: cls.shallowSize,
       count: cls.count,
-      stack: [{
-        functionName: `new ${cls.className}`,
-        scriptName: '(heap)',
-        lineNumber: 0,
-        columnNumber: 0,
-      }],
+      stack: [
+        {
+          functionName: `new ${cls.className}`,
+          scriptName: '(heap)',
+          lineNumber: 0,
+          columnNumber: 0,
+        },
+      ],
     }));
   }
 
   // ─── Call Tree Building ─────────────────────────────────────────────────
 
-  private buildCallTree(samples: AllocationSample[], totalBytes: number): AllocationNode {
+  private buildCallTree(
+    samples: AllocationSample[],
+    totalBytes: number,
+  ): AllocationNode {
     const root: AllocationNode = {
       functionName: '(root)',
       scriptName: '',
       lineNumber: 0,
-      totalBytes: totalBytes,
+      totalBytes,
       selfBytes: 0,
       totalCount: samples.reduce((s, a) => s + a.count, 0),
       selfCount: 0,
@@ -286,9 +294,10 @@ export class AllocationHotspotProfiler {
       let current = root;
       for (const frame of sample.stack) {
         let child = current.children.find(
-          c => c.functionName === frame.functionName &&
-               c.scriptName === frame.scriptName &&
-               c.lineNumber === frame.lineNumber
+          (c) =>
+            c.functionName === frame.functionName &&
+            c.scriptName === frame.scriptName &&
+            c.lineNumber === frame.lineNumber,
         );
 
         if (!child) {
@@ -327,7 +336,8 @@ export class AllocationHotspotProfiler {
   }
 
   private computePercents(node: AllocationNode, totalBytes: number): void {
-    node.totalPercent = totalBytes > 0 ? (node.totalBytes / totalBytes) * 100 : 0;
+    node.totalPercent =
+      totalBytes > 0 ? (node.totalBytes / totalBytes) * 100 : 0;
     node.selfPercent = totalBytes > 0 ? (node.selfBytes / totalBytes) * 100 : 0;
     for (const child of node.children) {
       this.computePercents(child, totalBytes);
@@ -349,15 +359,23 @@ export class AllocationHotspotProfiler {
     durationMs: number,
   ): AllocationHotspot[] {
     // Group by leaf function (deepest frame)
-    const hotspotMap = new Map<string, {
-      frame: StackFrame;
-      bytes: number;
-      count: number;
-      stacks: string[][];
-    }>();
+    const hotspotMap = new Map<
+      string,
+      {
+        frame: StackFrame;
+        bytes: number;
+        count: number;
+        stacks: string[][];
+      }
+    >();
 
     for (const sample of samples) {
-      if (!sample.stack || !Array.isArray(sample.stack) || sample.stack.length === 0) continue;
+      if (
+        !sample.stack ||
+        !Array.isArray(sample.stack) ||
+        sample.stack.length === 0
+      )
+        continue;
       const leaf = sample.stack[sample.stack.length - 1];
       if (!leaf) continue;
 
@@ -372,7 +390,7 @@ export class AllocationHotspotProfiler {
           frame: leaf,
           bytes: sample.size,
           count: sample.count,
-          stacks: [sample.stack.map(f => f.functionName)],
+          stacks: [sample.stack.map((f) => f.functionName)],
         });
       }
     }
@@ -397,25 +415,61 @@ export class AllocationHotspotProfiler {
     return hotspots.sort((a, b) => b.totalBytes - a.totalBytes);
   }
 
-  private categorizeAllocation(funcName: string): AllocationHotspot['category'] {
+  private categorizeAllocation(
+    funcName: string,
+  ): AllocationHotspot['category'] {
     const lower = funcName.toLowerCase();
-    if (lower.includes('buffer') || lower.includes('uint8') || lower.includes('arraybuffer')) return 'buffer';
-    if (lower.includes('string') || lower.includes('concat') || lower.includes('join') || lower.includes('replace')) return 'string';
-    if (lower.includes('array') || lower.includes('push') || lower.includes('map') || lower.includes('filter')) return 'array';
-    if (lower.includes('closure') || lower.includes('=>') || lower.includes('bind')) return 'closure';
-    if (lower.includes('object') || lower.includes('new ') || lower.includes('create')) return 'object';
+    if (
+      lower.includes('buffer') ||
+      lower.includes('uint8') ||
+      lower.includes('arraybuffer')
+    )
+      return 'buffer';
+    if (
+      lower.includes('string') ||
+      lower.includes('concat') ||
+      lower.includes('join') ||
+      lower.includes('replace')
+    )
+      return 'string';
+    if (
+      lower.includes('array') ||
+      lower.includes('push') ||
+      lower.includes('map') ||
+      lower.includes('filter')
+    )
+      return 'array';
+    if (
+      lower.includes('closure') ||
+      lower.includes('=>') ||
+      lower.includes('bind')
+    )
+      return 'closure';
+    if (
+      lower.includes('object') ||
+      lower.includes('new ') ||
+      lower.includes('create')
+    )
+      return 'object';
     return 'unknown';
   }
 
   // ─── Storm Detection ────────────────────────────────────────────────────
 
-  private detectStorms(samples: AllocationSample[], durationMs: number): AllocationStorm[] {
+  private detectStorms(
+    samples: AllocationSample[],
+    durationMs: number,
+  ): AllocationStorm[] {
     if (samples.length < 10) return [];
 
     // Partition samples into time buckets based on nodeId ordering
     const bucketCount = Math.min(20, Math.ceil(samples.length / 5));
     const bucketSize = Math.ceil(samples.length / bucketCount);
-    const buckets: { bytes: number; count: number; topAllocators: string[] }[] = [];
+    const buckets: Array<{
+      bytes: number;
+      count: number;
+      topAllocators: string[];
+    }> = [];
 
     for (let i = 0; i < bucketCount; i++) {
       const start = i * bucketSize;
@@ -426,16 +480,21 @@ export class AllocationHotspotProfiler {
       const topAlloc = bucketSamples
         .sort((a, b) => b.size - a.size)
         .slice(0, 3)
-        .map(s => s.stack[s.stack.length - 1]?.functionName || 'unknown');
+        .map((s) => s.stack[s.stack.length - 1]?.functionName || 'unknown');
 
-      buckets.push({ bytes, count: bucketSamples.length, topAllocators: topAlloc });
+      buckets.push({
+        bytes,
+        count: bucketSamples.length,
+        topAllocators: topAlloc,
+      });
     }
 
     if (buckets.length < 3) return [];
 
     // Compute baseline (median bucket)
     const sortedBuckets = [...buckets].sort((a, b) => a.bytes - b.bytes);
-    const medianBytes = sortedBuckets[Math.floor(sortedBuckets.length / 2)].bytes;
+    const medianBytes =
+      sortedBuckets[Math.floor(sortedBuckets.length / 2)].bytes;
 
     // Detect spikes (>3x median)
     const storms: AllocationStorm[] = [];
@@ -479,15 +538,21 @@ export class AllocationHotspotProfiler {
     }
 
     if (hotspots.length > 0 && hotspots[0].share > 50) {
-      parts.push(`Top hotspot "${hotspots[0].functionName}" accounts for ${hotspots[0].share.toFixed(0)}% of all allocations.`);
+      parts.push(
+        `Top hotspot "${hotspots[0].functionName}" accounts for ${hotspots[0].share.toFixed(0)}% of all allocations.`,
+      );
     }
 
     if (storms.length > 0) {
-      parts.push(`${storms.length} allocation storm(s) detected with up to ${storms[0]?.spikeMultiplier.toFixed(1)}x spike.`);
+      parts.push(
+        `${storms.length} allocation storm(s) detected with up to ${storms[0]?.spikeMultiplier.toFixed(1)}x spike.`,
+      );
     }
 
     if (churnRatio > 0.8) {
-      parts.push('High churn: >80% of allocations are immediately discarded. Consider object pooling.');
+      parts.push(
+        'High churn: >80% of allocations are immediately discarded. Consider object pooling.',
+      );
     }
 
     return parts.join(' ');
@@ -505,38 +570,56 @@ export class AllocationHotspotProfiler {
     if (hotspots.length > 0) {
       const top = hotspots[0];
       if (top.category === 'string' && top.share > 20) {
-        recs.push(`String allocation hotspot in "${top.functionName}": Consider using Buffer or string concatenation optimization (template literals, array.join).`);
+        recs.push(
+          `String allocation hotspot in "${top.functionName}": Consider using Buffer or string concatenation optimization (template literals, array.join).`,
+        );
       }
       if (top.category === 'array' && top.share > 20) {
-        recs.push(`Array allocation hotspot in "${top.functionName}": Pre-allocate arrays with known size. Avoid .map().filter() chains (use a single loop).`);
+        recs.push(
+          `Array allocation hotspot in "${top.functionName}": Pre-allocate arrays with known size. Avoid .map().filter() chains (use a single loop).`,
+        );
       }
       if (top.category === 'closure' && top.share > 15) {
-        recs.push(`Closure allocation hotspot in "${top.functionName}": Move closures outside hot loops. Use bound methods instead of arrow functions in constructors.`);
+        recs.push(
+          `Closure allocation hotspot in "${top.functionName}": Move closures outside hot loops. Use bound methods instead of arrow functions in constructors.`,
+        );
       }
       if (top.category === 'buffer' && top.share > 30) {
-        recs.push(`Buffer allocation hotspot in "${top.functionName}": Use a Buffer pool (Buffer.allocUnsafe + manual management) for high-throughput paths.`);
+        recs.push(
+          `Buffer allocation hotspot in "${top.functionName}": Use a Buffer pool (Buffer.allocUnsafe + manual management) for high-throughput paths.`,
+        );
       }
     }
 
     // Storm recommendations
     if (storms.length > 0) {
-      recs.push('Allocation storms detected: Profile the specific code path during peak activity. Consider request-scoped allocation limits.');
+      recs.push(
+        'Allocation storms detected: Profile the specific code path during peak activity. Consider request-scoped allocation limits.',
+      );
     }
 
     // Churn recommendations
     if (churnRatio > 0.8) {
-      recs.push('High allocation churn: Objects are created and immediately discarded. Implement object pooling for frequently allocated types.');
+      recs.push(
+        'High allocation churn: Objects are created and immediately discarded. Implement object pooling for frequently allocated types.',
+      );
     } else if (churnRatio > 0.5) {
-      recs.push('Moderate allocation churn: Consider caching or reusing frequently created objects.');
+      recs.push(
+        'Moderate allocation churn: Consider caching or reusing frequently created objects.',
+      );
     }
 
     // General rate recommendations
     if (bytesPerSec > 50_000_000) {
-      recs.push('Consider --max-semi-space-size=64 to give the young generation more room (reduces GC frequency at high allocation rates).');
+      recs.push(
+        'Consider --max-semi-space-size=64 to give the young generation more room (reduces GC frequency at high allocation rates).',
+      );
     }
 
     if (recs.length === 0) {
-      recs.push('Allocation patterns look healthy. No immediate optimizations needed.');
+      recs.push(
+        'Allocation patterns look healthy. No immediate optimizations needed.',
+      );
     }
 
     return recs;
@@ -552,10 +635,10 @@ export class AllocationHotspotProfiler {
 
     for (const sample of samples) {
       if (!sample.stack || !Array.isArray(sample.stack)) continue;
-      const frames = sample.stack.map(f =>
+      const frames = sample.stack.map((f) =>
         f.scriptName
           ? `${f.functionName} (${f.scriptName}:${f.lineNumber})`
-          : f.functionName
+          : f.functionName,
       );
       if (frames.length > 0) {
         stacks.push(`${frames.join(';')} ${sample.size}`);
@@ -568,13 +651,18 @@ export class AllocationHotspotProfiler {
   /**
    * Generate Perfetto-compatible trace events for allocation visualization
    */
-  toPerfettoEvents(samples: AllocationSample[], durationMs: number): Array<Record<string, unknown>> {
+  toPerfettoEvents(
+    samples: AllocationSample[],
+    durationMs: number,
+  ): Array<Record<string, unknown>> {
     const events: Array<Record<string, unknown>> = [];
     const pid = 1;
     const tid = 2; // Separate thread for allocations
 
     events.push({
-      ph: 'M', pid, tid,
+      ph: 'M',
+      pid,
+      tid,
       name: 'thread_name',
       args: { name: 'Allocation Activity' },
     });
@@ -583,11 +671,14 @@ export class AllocationHotspotProfiler {
 
     for (let i = 0; i < samples.length; i++) {
       const sample = samples[i];
-      const stack = sample.stack && Array.isArray(sample.stack) ? sample.stack : [];
+      const stack =
+        sample.stack && Array.isArray(sample.stack) ? sample.stack : [];
       const leaf = stack[stack.length - 1];
 
       events.push({
-        ph: 'X', pid, tid,
+        ph: 'X',
+        pid,
+        tid,
         name: leaf?.functionName || 'alloc',
         cat: 'allocation',
         ts: i * sampleDurationUs,
@@ -595,13 +686,15 @@ export class AllocationHotspotProfiler {
         args: {
           bytes: sample.size,
           count: sample.count,
-          stack: stack.map(f => f.functionName).join(' → '),
+          stack: stack.map((f) => f.functionName).join(' → '),
         },
       });
 
       // Counter for cumulative allocation
       events.push({
-        ph: 'C', pid, tid: 0,
+        ph: 'C',
+        pid,
+        tid: 0,
         name: 'AllocationRate',
         ts: i * sampleDurationUs,
         args: { bytes: sample.size },
@@ -620,7 +713,6 @@ export class AllocationHotspotProfiler {
     const RED = '\x1b[31m';
     const GREEN = '\x1b[32m';
     const YELLOW = '\x1b[33m';
-    const CYAN = '\x1b[36m';
     const DIM = '\x1b[2m';
 
     lines.push(`${BOLD}┌─────────────────────────────────────────┐${RESET}`);
@@ -628,7 +720,9 @@ export class AllocationHotspotProfiler {
     lines.push(`${BOLD}└─────────────────────────────────────────┘${RESET}`);
     lines.push('');
     lines.push(`  Duration:         ${report.profileDurationMs}ms`);
-    lines.push(`  Total Allocated:  ${formatBytes(report.totalAllocatedBytes)}`);
+    lines.push(
+      `  Total Allocated:  ${formatBytes(report.totalAllocatedBytes)}`,
+    );
     lines.push(`  Allocation Rate:  ${formatBytes(report.bytesPerSec)}/sec`);
     lines.push(`  Allocations/sec:  ${report.allocationsPerSec.toFixed(0)}`);
     lines.push(`  Churn Ratio:      ${(report.churnRatio * 100).toFixed(0)}%`);
@@ -641,9 +735,14 @@ export class AllocationHotspotProfiler {
       for (const h of report.hotspots.slice(0, 10)) {
         const color = h.share > 30 ? RED : h.share > 10 ? YELLOW : GREEN;
         const bar = '█'.repeat(Math.max(1, Math.round(h.share / 5)));
-        lines.push(`    ${color}${bar}${RESET} ${h.functionName} ${DIM}(${h.category})${RESET}`);
-        lines.push(`      ${formatBytes(h.totalBytes)} (${h.share.toFixed(1)}%) · ${h.count} allocs · ${formatBytes(h.bytesPerSec)}/s`);
-        if (h.scriptName) lines.push(`      ${DIM}${h.scriptName}:${h.lineNumber}${RESET}`);
+        lines.push(
+          `    ${color}${bar}${RESET} ${h.functionName} ${DIM}(${h.category})${RESET}`,
+        );
+        lines.push(
+          `      ${formatBytes(h.totalBytes)} (${h.share.toFixed(1)}%) · ${h.count} allocs · ${formatBytes(h.bytesPerSec)}/s`,
+        );
+        if (h.scriptName)
+          lines.push(`      ${DIM}${h.scriptName}:${h.lineNumber}${RESET}`);
       }
     }
 
@@ -651,8 +750,12 @@ export class AllocationHotspotProfiler {
       lines.push('');
       lines.push(`${BOLD}  Allocation Storms:${RESET}`);
       for (const s of report.storms) {
-        lines.push(`    ${RED}⚡${RESET} ${s.spikeMultiplier.toFixed(1)}x spike · Peak: ${formatBytes(s.peakBytesPerSec)}/s`);
-        lines.push(`      ${DIM}Top allocators: ${s.topAllocators.join(', ')}${RESET}`);
+        lines.push(
+          `    ${RED}⚡${RESET} ${s.spikeMultiplier.toFixed(1)}x spike · Peak: ${formatBytes(s.peakBytesPerSec)}/s`,
+        );
+        lines.push(
+          `      ${DIM}Top allocators: ${s.topAllocators.join(', ')}${RESET}`,
+        );
       }
     }
 

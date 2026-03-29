@@ -1,13 +1,18 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   InvestigationExecutor,
   INVESTIGATION_TOOL_NAME,
   INVESTIGATION_TOOL_DESCRIPTION,
   INVESTIGATION_PARAMETER_SCHEMA,
-  type InvestigationToolParams,
+  type InvestigationAction,
 } from './investigationTool.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 // ─── Test Fixtures ───────────────────────────────────────────────────────────
 
@@ -19,14 +24,44 @@ function createMinimalSnapshot(): object {
   return {
     snapshot: {
       meta: {
-        node_fields: ['type', 'name', 'id', 'self_size', 'edge_count', 'trace_node_id', 'detachedness'],
+        node_fields: [
+          'type',
+          'name',
+          'id',
+          'self_size',
+          'edge_count',
+          'trace_node_id',
+          'detachedness',
+        ],
         node_types: [
-          ['hidden', 'object', 'string', 'number', 'code', 'closure', 'regexp', 'native',
-           'synthetic', 'concatenated string', 'sliced string', 'symbol', 'bigint', 'array'],
+          [
+            'hidden',
+            'object',
+            'string',
+            'number',
+            'code',
+            'closure',
+            'regexp',
+            'native',
+            'synthetic',
+            'concatenated string',
+            'sliced string',
+            'symbol',
+            'bigint',
+            'array',
+          ],
         ],
         edge_fields: ['type', 'name_or_index', 'to_node'],
         edge_types: [
-          ['context', 'element', 'property', 'internal', 'hidden', 'shortcut', 'weak'],
+          [
+            'context',
+            'element',
+            'property',
+            'internal',
+            'hidden',
+            'shortcut',
+            'weak',
+          ],
         ],
       },
       node_count: 3,
@@ -65,7 +100,9 @@ describe('InvestigationTool', () => {
     it('should have valid parameter schema', () => {
       expect(INVESTIGATION_PARAMETER_SCHEMA.type).toBe('object');
       expect(INVESTIGATION_PARAMETER_SCHEMA.required).toContain('action');
-      expect(INVESTIGATION_PARAMETER_SCHEMA.properties.action.enum).toHaveLength(6);
+      expect(
+        INVESTIGATION_PARAMETER_SCHEMA.properties.action.enum,
+      ).toHaveLength(6);
     });
   });
 
@@ -102,12 +139,14 @@ describe('InvestigationTool', () => {
         expect(result.action).toBe('analyze_heap_snapshot');
         expect(result.summary).toContain('Heap Snapshot Analysis');
         expect(result.data).toBeDefined();
-        expect(result.data!.nodeCount).toBe(3);
-        expect(result.data!.edgeCount).toBe(2);
+        expect(result.data!['nodeCount']).toBe(3);
+        expect(result.data!['edgeCount']).toBe(2);
       });
 
       it('should return error for missing file_path', async () => {
-        const result = await executor.execute({ action: 'analyze_heap_snapshot' });
+        const result = await executor.execute({
+          action: 'analyze_heap_snapshot',
+        });
         expect(result.success).toBe(false);
         expect(result.error).toContain('file_path');
       });
@@ -130,8 +169,8 @@ describe('InvestigationTool', () => {
           file_path: snapshotPath,
         });
 
-        expect(result.data!.topClasses).toBeDefined();
-        expect(Array.isArray(result.data!.topClasses)).toBe(true);
+        expect(result.data!['topClasses']).toBeDefined();
+        expect(Array.isArray(result.data!['topClasses'])).toBe(true);
       });
     });
 
@@ -148,7 +187,7 @@ describe('InvestigationTool', () => {
         expect(result.success).toBe(true);
         expect(result.action).toBe('diagnose_memory');
         expect(result.data).toBeDefined();
-        expect(result.data!.findingCount).toBeDefined();
+        expect(result.data!['findingCount']).toBeDefined();
       });
 
       it('should return error for missing file_path', async () => {
@@ -191,7 +230,7 @@ describe('InvestigationTool', () => {
         // Then export
         const result = await executor.execute({ action: 'export_perfetto' });
         expect(result.success).toBe(true);
-        expect(result.data!.eventCount).toBeGreaterThan(0);
+        expect(result.data!['eventCount']).toBeGreaterThan(0);
       });
 
       it('should write to output_path when specified', async () => {
@@ -223,7 +262,7 @@ describe('InvestigationTool', () => {
     describe('unknown action', () => {
       it('should return error for invalid action', async () => {
         const result = await executor.execute({
-          action: 'invalid_action' as any,
+          action: 'invalid_action' as unknown as InvestigationAction,
         });
         expect(result.success).toBe(false);
         expect(result.error).toContain('Invalid action');

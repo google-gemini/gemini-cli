@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FlameGraphGenerator, type FlameNode } from './flameGraphGenerator.js';
 import type { ClassSummary, RetainerChain } from './heapSnapshotAnalyzer.js';
@@ -7,12 +12,48 @@ import type { RootCauseFinding } from './rootCauseAnalyzer.js';
 
 function createClassSummaries(): ClassSummary[] {
   return [
-    { className: 'Map', count: 5, shallowSize: 500, retainedSize: 5_000_000, instances: [] },
-    { className: 'string', count: 10000, shallowSize: 2_000_000, retainedSize: 3_000_000, instances: [] },
-    { className: 'Array', count: 200, shallowSize: 100_000, retainedSize: 2_000_000, instances: [] },
-    { className: 'Closure', count: 300, shallowSize: 14400, retainedSize: 1_000_000, instances: [] },
-    { className: 'Buffer', count: 50, shallowSize: 500_000, retainedSize: 800_000, instances: [] },
-    { className: 'TinyClass', count: 1, shallowSize: 10, retainedSize: 10, instances: [] }, // below minBytes
+    {
+      className: 'Map',
+      count: 5,
+      shallowSize: 500,
+      retainedSize: 5_000_000,
+      instances: [],
+    },
+    {
+      className: 'string',
+      count: 10000,
+      shallowSize: 2_000_000,
+      retainedSize: 3_000_000,
+      instances: [],
+    },
+    {
+      className: 'Array',
+      count: 200,
+      shallowSize: 100_000,
+      retainedSize: 2_000_000,
+      instances: [],
+    },
+    {
+      className: 'Closure',
+      count: 300,
+      shallowSize: 14400,
+      retainedSize: 1_000_000,
+      instances: [],
+    },
+    {
+      className: 'Buffer',
+      count: 50,
+      shallowSize: 500_000,
+      retainedSize: 800_000,
+      instances: [],
+    },
+    {
+      className: 'TinyClass',
+      count: 1,
+      shallowSize: 10,
+      retainedSize: 10,
+      instances: [],
+    }, // below minBytes
   ];
 }
 
@@ -25,9 +66,27 @@ function createRetainerChains(): RetainerChain[] {
       selfSize: 256,
       retainedSize: 2_000_000,
       chain: [
-        { edgeName: '_cache', edgeType: 'property', nodeName: 'Map', nodeType: 'object', nodeId: 10 },
-        { edgeName: 'entries', edgeType: 'internal', nodeName: 'Array', nodeType: 'array', nodeId: 20 },
-        { edgeName: '0', edgeType: 'element', nodeName: 'SessionData', nodeType: 'object', nodeId: 1 },
+        {
+          edgeName: '_cache',
+          edgeType: 'property',
+          nodeName: 'Map',
+          nodeType: 'object',
+          nodeId: 10,
+        },
+        {
+          edgeName: 'entries',
+          edgeType: 'internal',
+          nodeName: 'Array',
+          nodeType: 'array',
+          nodeId: 20,
+        },
+        {
+          edgeName: '0',
+          edgeType: 'element',
+          nodeName: 'SessionData',
+          nodeType: 'object',
+          nodeId: 1,
+        },
       ],
     },
     {
@@ -37,8 +96,20 @@ function createRetainerChains(): RetainerChain[] {
       selfSize: 100_000,
       retainedSize: 500_000,
       chain: [
-        { edgeName: 'logger', edgeType: 'property', nodeName: 'Logger', nodeType: 'object', nodeId: 30 },
-        { edgeName: 'buffer', edgeType: 'property', nodeName: 'LogBuffer', nodeType: 'string', nodeId: 2 },
+        {
+          edgeName: 'logger',
+          edgeType: 'property',
+          nodeName: 'Logger',
+          nodeType: 'object',
+          nodeId: 30,
+        },
+        {
+          edgeName: 'buffer',
+          edgeType: 'property',
+          nodeName: 'LogBuffer',
+          nodeType: 'string',
+          nodeId: 2,
+        },
       ],
     },
   ];
@@ -96,7 +167,9 @@ describe('FlameGraphGenerator', () => {
     });
 
     it('should track total bytes correctly', () => {
-      const summaries = createClassSummaries().filter(c => c.retainedSize >= 100);
+      const summaries = createClassSummaries().filter(
+        (c) => c.retainedSize >= 100,
+      );
       generator.addClassSummaries(summaries);
 
       const totalExpected = summaries.reduce((s, c) => s + c.retainedSize, 0);
@@ -197,7 +270,7 @@ describe('FlameGraphGenerator', () => {
 
       expect(folded.length).toBeGreaterThan(0);
       // Each line should be "stack value"
-      const lines = folded.split('\n').filter(l => l.trim());
+      const lines = folded.split('\n').filter((l) => l.trim());
       for (const line of lines) {
         const parts = line.split(' ');
         expect(parts.length).toBeGreaterThanOrEqual(2);
@@ -214,10 +287,10 @@ describe('FlameGraphGenerator', () => {
 
       expect(events.length).toBeGreaterThan(0);
       for (const event of events) {
-        expect(event.ph).toBe('X');
-        expect(event.pid).toBe(1);
-        expect(typeof event.ts).toBe('number');
-        expect(typeof event.dur).toBe('number');
+        expect(event['ph']).toBe('X');
+        expect(event['pid']).toBe(1);
+        expect(typeof event['ts']).toBe('number');
+        expect(typeof event['dur']).toBe('number');
       }
     });
 
@@ -226,7 +299,9 @@ describe('FlameGraphGenerator', () => {
       const events = generator.toPerfettoEvents();
 
       const firstEvent = events[0];
-      expect((firstEvent.args as Record<string, unknown>).totalBytes).toBeDefined();
+      expect(
+        (firstEvent['args'] as Record<string, unknown>)['totalBytes'],
+      ).toBeDefined();
     });
   });
 
@@ -244,19 +319,45 @@ describe('FlameGraphGenerator', () => {
 
     it('should respect maxDepth', () => {
       const gen = new FlameGraphGenerator({ maxDepth: 2 });
-      const chains: RetainerChain[] = [{
-        nodeId: 1,
-        nodeName: 'Leaf',
-        nodeType: 'object',
-        selfSize: 1000,
-        retainedSize: 10000,
-        chain: [
-          { edgeName: 'a', edgeType: 'property', nodeName: 'A', nodeType: 'object', nodeId: 1 },
-          { edgeName: 'b', edgeType: 'property', nodeName: 'B', nodeType: 'object', nodeId: 2 },
-          { edgeName: 'c', edgeType: 'property', nodeName: 'C', nodeType: 'object', nodeId: 3 },
-          { edgeName: 'd', edgeType: 'property', nodeName: 'D', nodeType: 'object', nodeId: 4 },
-        ],
-      }];
+      const chains: RetainerChain[] = [
+        {
+          nodeId: 1,
+          nodeName: 'Leaf',
+          nodeType: 'object',
+          selfSize: 1000,
+          retainedSize: 10000,
+          chain: [
+            {
+              edgeName: 'a',
+              edgeType: 'property',
+              nodeName: 'A',
+              nodeType: 'object',
+              nodeId: 1,
+            },
+            {
+              edgeName: 'b',
+              edgeType: 'property',
+              nodeName: 'B',
+              nodeType: 'object',
+              nodeId: 2,
+            },
+            {
+              edgeName: 'c',
+              edgeType: 'property',
+              nodeName: 'C',
+              nodeType: 'object',
+              nodeId: 3,
+            },
+            {
+              edgeName: 'd',
+              edgeType: 'property',
+              nodeName: 'D',
+              nodeType: 'object',
+              nodeId: 4,
+            },
+          ],
+        },
+      ];
 
       gen.addRetainerChains(chains);
       const root = gen.getRoot();

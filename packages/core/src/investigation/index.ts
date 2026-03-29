@@ -1,31 +1,7 @@
 /**
- * Investigation module — Memory investigation, performance profiling,
- * and diagnostic tooling for Gemini CLI.
- *
- * Core capabilities:
- *   - V8 heap snapshot parsing and 3-snapshot leak detection
- *   - Perfetto-compatible trace export for visualization
- *   - Chrome DevTools Protocol client for batch diagnostic operations
- *   - Automated root-cause analysis with pattern matching
- *   - LLM-powered retainer chain explanation and fix suggestions
- *   - Heap growth trend forecasting with OOM prediction
- *   - Memory allocation flame graph generation (HTML/SVG/ASCII)
- *   - Smart snapshot diffing with change stories and attribution
- *   - Gemini CLI skill wrapper for agent integration
- *
- * Architecture (12 modules):
- *   heapSnapshotAnalyzer      — Parse, diff, and detect leaks in V8 heap snapshots
- *   perfettoExporter          — Export to Perfetto-compatible Chrome Trace Event format
- *   cdpClient                 — Chrome DevTools Protocol client for live debugging
- *   rootCauseAnalyzer         — Pattern-matching root cause analysis (9 detectors)
- *   llmExplainer              — LLM prompt generation for Gemini-powered explanations
- *   trendForecaster           — Statistical trend analysis with OOM time prediction
- *   flameGraphGenerator       — Memory flame graph (HTML/SVG/ASCII/folded stacks)
- *   smartDiff                 — Intelligent snapshot comparison with change stories
- *   gcPressureAnalyzer        — V8 GC tuning advisor with pattern detection [ORIGINAL]
- *   memoryRegressionGuard     — CI/CD memory baseline & regression detection [ORIGINAL]
- *   allocationHotspotProfiler — Allocation rate analysis by call site [ORIGINAL]
- *   investigationTool         — Gemini CLI tool wrapper with stateful executor
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation
  */
@@ -152,3 +128,24 @@ export {
   type InvestigationToolParams,
   type InvestigationResult,
 } from './investigationTool.js';
+
+export {
+  TokenEfficiencyBenchmark,
+  type HeapScenario,
+  type TokenCost,
+  type ReductionMetrics,
+  type BenchmarkReport,
+  type PerfettoComparison,
+  type LLMPromptReductionData,
+} from './tokenEfficiencyBenchmark.js';
+
+export {
+  PerfettoSqlIntegration,
+  SqlParser,
+  QueryExecutor,
+  type QueryResult,
+  type TraceRow,
+  type SqlParseResult,
+  type WhereClause,
+  type OrderByClause,
+} from './perfettoSqlIntegration.js';

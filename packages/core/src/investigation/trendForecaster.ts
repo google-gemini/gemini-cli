@@ -1,25 +1,12 @@
 /**
- * TrendForecaster — Heap growth trend analysis and OOM time prediction.
- *
- * Implements statistical trend analysis on heap snapshot time series:
- *   - Linear regression on heap growth to detect steady leaks
- *   - Exponential fitting for accelerating leaks
- *   - OOM time prediction ("at current rate, OOM in ~X minutes")
- *   - Per-class growth rate analysis with anomaly detection
- *   - Allocation velocity tracking (bytes/sec, objects/sec)
- *   - Confidence intervals on predictions
- *
- * The forecaster works with both:
- *   - Multiple snapshots taken over time (most accurate)
- *   - Single snapshots with process.memoryUsage() data (estimation mode)
- *
- * Architecture:
- *   HeapSnapshotAnalyzer[] → TrendForecaster → GrowthReport + OOM Prediction
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/trendForecaster
  */
 
-import type { ClassSummary, LeakReport } from './heapSnapshotAnalyzer.js';
+import type { ClassSummary } from './heapSnapshotAnalyzer.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -162,11 +149,15 @@ export class TrendForecaster {
    */
   addDataPoint(point: HeapDataPoint): void {
     // Normalize common aliases from process.memoryUsage()
-    const p = point as HeapDataPoint & Record<string, unknown>;
+    const p: unknown = point;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const pRec = p as Record<string, unknown>;
+    const heapUsedVal = Number(pRec['heapUsed'] ?? 0);
+    const heapTotalVal = Number(pRec['heapTotal'] ?? 0);
     const normalized: HeapDataPoint = {
       timestamp: point.timestamp,
-      usedHeapSize: point.usedHeapSize ?? (p['heapUsed'] as number) ?? 0,
-      totalHeapSize: point.totalHeapSize ?? (p['heapTotal'] as number) ?? 0,
+      usedHeapSize: point.usedHeapSize ?? heapUsedVal,
+      totalHeapSize: point.totalHeapSize ?? heapTotalVal,
       objectCount: point.objectCount ?? 0,
       classSummaries: point.classSummaries,
       label: point.label,
@@ -188,13 +179,21 @@ export class TrendForecaster {
   /**
    * Create data points from a series of class summaries taken at known times.
    */
-  addFromClassSummaries(summaries: ClassSummary[][], timestamps: number[]): void {
+  addFromClassSummaries(
+    summaries: ClassSummary[][],
+    timestamps: number[],
+  ): void {
     if (summaries.length !== timestamps.length) {
-      throw new Error('summaries and timestamps arrays must have the same length');
+      throw new Error(
+        'summaries and timestamps arrays must have the same length',
+      );
     }
 
     for (let i = 0; i < summaries.length; i++) {
-      const totalSize = summaries[i].reduce((sum, c) => sum + c.retainedSize, 0);
+      const totalSize = summaries[i].reduce(
+        (sum, c) => sum + c.retainedSize,
+        0,
+      );
       const totalCount = summaries[i].reduce((sum, c) => sum + c.count, 0);
 
       this.addDataPoint({
@@ -221,13 +220,15 @@ export class TrendForecaster {
    */
   analyze(): TrendReport {
     if (this.dataPoints.length < 2) {
-      throw new Error('Need at least 2 data points for trend analysis. ' +
-        `Currently have ${this.dataPoints.length}.`);
+      throw new Error(
+        'Need at least 2 data points for trend analysis. ' +
+          `Currently have ${this.dataPoints.length}.`,
+      );
     }
 
-    const timestamps = this.dataPoints.map(p => p.timestamp);
-    const heapSizes = this.dataPoints.map(p => p.usedHeapSize);
-    const objectCounts = this.dataPoints.map(p => p.objectCount);
+    const timestamps = this.dataPoints.map((p) => p.timestamp);
+    const heapSizes = this.dataPoints.map((p) => p.usedHeapSize);
+    const objectCounts = this.dataPoints.map((p) => p.objectCount);
     const timeSpanMs = timestamps[timestamps.length - 1] - timestamps[0];
 
     // Linear regression on heap size over time
@@ -235,11 +236,15 @@ export class TrendForecaster {
 
     // Growth rate (bytes per millisecond → bytes per second)
     const growthRateBytesPerSec = regression.slope * 1000;
-    const growthRateObjectsPerSec = this.computeObjectGrowthRate(timestamps, objectCounts);
+    const growthRateObjectsPerSec = this.computeObjectGrowthRate(
+      timestamps,
+      objectCounts,
+    );
 
     // Determine trend
     let trend: 'growing' | 'stable' | 'shrinking';
-    if (growthRateBytesPerSec > 100) { // > 100 bytes/sec growth
+    if (growthRateBytesPerSec > 100) {
+      // > 100 bytes/sec growth
       trend = 'growing';
     } else if (growthRateBytesPerSec < -100) {
       trend = 'shrinking';
@@ -248,10 +253,18 @@ export class TrendForecaster {
     }
 
     // Determine growth model
-    const growthModel = this.classifyGrowthModel(timestamps, heapSizes, regression.rSquared);
+    const growthModel = this.classifyGrowthModel(
+      timestamps,
+      heapSizes,
+      regression.rSquared,
+    );
 
     // Predict OOM
-    const oomResult = this.predictOom(regression, timestamps[timestamps.length - 1], heapSizes[heapSizes.length - 1]);
+    const oomResult = this.predictOom(
+      regression,
+      timestamps[timestamps.length - 1],
+      heapSizes[heapSizes.length - 1],
+    );
 
     // Statistics
     const statistics = this.computeStatistics(heapSizes);
@@ -260,7 +273,13 @@ export class TrendForecaster {
     const classGrowth = this.analyzeClassGrowth();
 
     // Summary
-    const summary = this.generateSummary(trend, growthRateBytesPerSec, oomResult, statistics, classGrowth);
+    const summary = this.generateSummary(
+      trend,
+      growthRateBytesPerSec,
+      oomResult,
+      statistics,
+      classGrowth,
+    );
 
     return {
       timestamp: new Date().toISOString(),
@@ -302,23 +321,44 @@ export class TrendForecaster {
     const green = '\x1b[32m';
     const cyan = '\x1b[36m';
 
-    const trendColor = report.trend === 'growing' ? red : report.trend === 'shrinking' ? green : cyan;
+    const trendColor =
+      report.trend === 'growing'
+        ? red
+        : report.trend === 'shrinking'
+          ? green
+          : cyan;
 
-    lines.push(`${bold}╔══════════════════════════════════════════════════════════════════╗${reset}`);
-    lines.push(`${bold}║  HEAP GROWTH TREND ANALYSIS                                    ║${reset}`);
-    lines.push(`${bold}╚══════════════════════════════════════════════════════════════════╝${reset}`);
+    lines.push(
+      `${bold}╔══════════════════════════════════════════════════════════════════╗${reset}`,
+    );
+    lines.push(
+      `${bold}║  HEAP GROWTH TREND ANALYSIS                                    ║${reset}`,
+    );
+    lines.push(
+      `${bold}╚══════════════════════════════════════════════════════════════════╝${reset}`,
+    );
     lines.push('');
-    lines.push(`${bold}Trend:${reset}        ${trendColor}${report.trend.toUpperCase()}${reset} (${report.growthModel} model, R²=${report.rSquared.toFixed(3)})`);
-    lines.push(`${bold}Growth rate:${reset}  ${formatBytes(Math.abs(report.growthRateBytesPerSec))}/sec (${report.growthRateObjectsPerSec.toFixed(1)} objects/sec)`);
-    lines.push(`${bold}Time span:${reset}    ${formatDuration(report.timeSpanMs)}`);
+    lines.push(
+      `${bold}Trend:${reset}        ${trendColor}${report.trend.toUpperCase()}${reset} (${report.growthModel} model, R²=${report.rSquared.toFixed(3)})`,
+    );
+    lines.push(
+      `${bold}Growth rate:${reset}  ${formatBytes(Math.abs(report.growthRateBytesPerSec))}/sec (${report.growthRateObjectsPerSec.toFixed(1)} objects/sec)`,
+    );
+    lines.push(
+      `${bold}Time span:${reset}    ${formatDuration(report.timeSpanMs)}`,
+    );
     lines.push(`${bold}Data points:${reset}  ${report.dataPointCount}`);
     lines.push('');
 
     // OOM prediction
     if (report.predictedOomMs !== null) {
-      lines.push(`${bold}${red}⚠ OOM Prediction:${reset} ${report.oomPrediction}`);
+      lines.push(
+        `${bold}${red}⚠ OOM Prediction:${reset} ${report.oomPrediction}`,
+      );
     } else if (report.trend === 'growing') {
-      lines.push(`${bold}${yellow}OOM Prediction:${reset} ${report.oomPrediction}`);
+      lines.push(
+        `${bold}${yellow}OOM Prediction:${reset} ${report.oomPrediction}`,
+      );
     } else {
       lines.push(`${bold}${green}OOM Risk:${reset} ${report.oomPrediction}`);
     }
@@ -326,21 +366,27 @@ export class TrendForecaster {
 
     // Sparkline-style heap size visualization
     lines.push(`${bold}Heap size over time:${reset}`);
-    lines.push(generateSparkline(
-      report.statistics.minHeapSize,
-      report.statistics.maxHeapSize,
-      // Use start and end sizes for a simple 2-point visualization
-      [report.statistics.startHeapSize, report.statistics.endHeapSize]
-    ));
-    lines.push(`  ${dim}${formatBytes(report.statistics.startHeapSize)} → ${formatBytes(report.statistics.endHeapSize)} (${report.statistics.percentChange > 0 ? '+' : ''}${report.statistics.percentChange.toFixed(1)}%)${reset}`);
+    lines.push(
+      generateSparkline(
+        report.statistics.minHeapSize,
+        report.statistics.maxHeapSize,
+        // Use start and end sizes for a simple 2-point visualization
+        [report.statistics.startHeapSize, report.statistics.endHeapSize],
+      ),
+    );
+    lines.push(
+      `  ${dim}${formatBytes(report.statistics.startHeapSize)} → ${formatBytes(report.statistics.endHeapSize)} (${report.statistics.percentChange > 0 ? '+' : ''}${report.statistics.percentChange.toFixed(1)}%)${reset}`,
+    );
     lines.push('');
 
     // Top growing classes
-    const growers = report.classGrowth.filter(c => c.isGrowing).slice(0, 5);
+    const growers = report.classGrowth.filter((c) => c.isGrowing).slice(0, 5);
     if (growers.length > 0) {
       lines.push(`${bold}━━━ Top Growing Classes ━━━${reset}`);
       lines.push('');
-      lines.push(`  ${'Class'.padEnd(25)} ${'Growth Rate'.padStart(15)} ${'Share'.padStart(8)}`);
+      lines.push(
+        `  ${'Class'.padEnd(25)} ${'Growth Rate'.padStart(15)} ${'Share'.padStart(8)}`,
+      );
       lines.push(`  ${'─'.repeat(25)} ${'─'.repeat(15)} ${'─'.repeat(8)}`);
       for (const cls of growers) {
         const name = cls.className.slice(0, 24).padEnd(25);
@@ -360,7 +406,7 @@ export class TrendForecaster {
    * Export trend data for Perfetto visualization (as counter track).
    */
   toPerfettoCounters(): Array<{ name: string; ts: number; value: number }> {
-    return this.dataPoints.map(dp => ({
+    return this.dataPoints.map((dp) => ({
       name: 'Heap Size',
       ts: dp.timestamp * 1000, // Perfetto uses microseconds
       value: dp.usedHeapSize,
@@ -369,7 +415,10 @@ export class TrendForecaster {
 
   // ─── Private Methods ──────────────────────────────────────────────────
 
-  private computeObjectGrowthRate(timestamps: number[], counts: number[]): number {
+  private computeObjectGrowthRate(
+    timestamps: number[],
+    counts: number[],
+  ): number {
     if (timestamps.length < 2) return 0;
     const regression = linearRegression(timestamps, counts);
     return regression.slope * 1000; // per second
@@ -378,7 +427,7 @@ export class TrendForecaster {
   private classifyGrowthModel(
     timestamps: number[],
     values: number[],
-    linearR2: number
+    linearR2: number,
   ): 'linear' | 'exponential' | 'stable' | 'erratic' {
     // Check if stable first
     const range = Math.max(...values) - Math.min(...values);
@@ -389,7 +438,7 @@ export class TrendForecaster {
     if (linearR2 > 0.9) return 'linear';
 
     // Try exponential: fit log(values) linearly
-    const logValues = values.map(v => Math.log(Math.max(v, 1)));
+    const logValues = values.map((v) => Math.log(Math.max(v, 1)));
     const expRegression = linearRegression(timestamps, logValues);
 
     if (expRegression.rSquared > linearR2 && expRegression.rSquared > 0.9) {
@@ -403,17 +452,23 @@ export class TrendForecaster {
   private predictOom(
     regression: RegressionResult,
     lastTimestamp: number,
-    currentSize: number
+    currentSize: number,
   ): { predictedMs: number | null; description: string } {
-    // Not growing
-    if (regression.slope <= 0) {
-      return { predictedMs: null, description: 'No OOM risk — memory is stable or shrinking.' };
+    // Not growing or negligible growth (< 100 bytes/sec = 0.1 bytes/ms)
+    if (regression.slope <= 0.1) {
+      return {
+        predictedMs: null,
+        description: 'No OOM risk — memory is stable or shrinking.',
+      };
     }
 
     // Predict when we hit max heap
     const remaining = this.maxHeapBytes - currentSize;
     if (remaining <= 0) {
-      return { predictedMs: 0, description: 'CRITICAL: Current heap size exceeds max heap limit!' };
+      return {
+        predictedMs: 0,
+        description: 'CRITICAL: Current heap size exceeds max heap limit!',
+      };
     }
 
     const msToOom = remaining / regression.slope;
@@ -430,7 +485,8 @@ export class TrendForecaster {
     if (msToOom < 60_000) {
       return {
         predictedMs: msToOom,
-        description: `CRITICAL: At current growth rate, OOM in ~${Math.ceil(msToOom / 1000)} seconds! ` +
+        description:
+          `CRITICAL: At current growth rate, OOM in ~${Math.ceil(msToOom / 1000)} seconds! ` +
           `(${formatBytes(regression.slope * 1000)}/sec, ${formatBytes(remaining)} remaining)`,
       };
     }
@@ -438,7 +494,8 @@ export class TrendForecaster {
     // Normal prediction
     return {
       predictedMs: msToOom,
-      description: `At current growth rate of ${formatBytes(regression.slope * 1000)}/sec, ` +
+      description:
+        `At current growth rate of ${formatBytes(regression.slope * 1000)}/sec, ` +
         `estimated OOM in ~${formatDuration(msToOom)} ` +
         `(${formatBytes(remaining)} remaining of ${formatBytes(this.maxHeapBytes)} max).`,
     };
@@ -471,7 +528,9 @@ export class TrendForecaster {
 
   private analyzeClassGrowth(): ClassGrowthEntry[] {
     // Need at least 2 data points with class summaries
-    const withSummaries = this.dataPoints.filter(dp => dp.classSummaries && dp.classSummaries.length > 0);
+    const withSummaries = this.dataPoints.filter(
+      (dp) => dp.classSummaries && dp.classSummaries.length > 0,
+    );
     if (withSummaries.length < 2) return [];
 
     const first = withSummaries[0];
@@ -508,7 +567,7 @@ export class TrendForecaster {
       const countSeries: number[] = [];
       const sizeSeries: number[] = [];
       for (const dp of withSummaries) {
-        const cls = dp.classSummaries!.find(c => c.className === className);
+        const cls = dp.classSummaries!.find((c) => c.className === className);
         countSeries.push(cls?.count ?? 0);
         sizeSeries.push(cls?.retainedSize ?? 0);
       }
@@ -527,7 +586,8 @@ export class TrendForecaster {
     // Compute growth share
     for (const entry of entries) {
       if (totalSizeGrowth > 0 && entry.sizeGrowthRate > 0) {
-        entry.growthShare = (entry.sizeGrowthRate * timeSpanSec / totalSizeGrowth) * 100;
+        entry.growthShare =
+          ((entry.sizeGrowthRate * timeSpanSec) / totalSizeGrowth) * 100;
       }
     }
 
@@ -542,24 +602,24 @@ export class TrendForecaster {
     growthRate: number,
     oomResult: { predictedMs: number | null; description: string },
     stats: TrendStatistics,
-    classGrowth: ClassGrowthEntry[]
+    classGrowth: ClassGrowthEntry[],
   ): string {
     const parts: string[] = [];
 
     parts.push(
       `Memory is ${trend} at ${formatBytes(Math.abs(growthRate))}/sec over ${this.dataPoints.length} data points. ` +
-      `Heap went from ${formatBytes(stats.startHeapSize)} to ${formatBytes(stats.endHeapSize)} ` +
-      `(${stats.percentChange > 0 ? '+' : ''}${stats.percentChange.toFixed(1)}%).`
+        `Heap went from ${formatBytes(stats.startHeapSize)} to ${formatBytes(stats.endHeapSize)} ` +
+        `(${stats.percentChange > 0 ? '+' : ''}${stats.percentChange.toFixed(1)}%).`,
     );
 
     if (trend === 'growing' && oomResult.predictedMs !== null) {
       parts.push(oomResult.description);
     }
 
-    const topGrowers = classGrowth.filter(c => c.isGrowing).slice(0, 3);
+    const topGrowers = classGrowth.filter((c) => c.isGrowing).slice(0, 3);
     if (topGrowers.length > 0) {
       parts.push(
-        `Top growing classes: ${topGrowers.map(c => `${c.className} (+${formatBytes(c.sizeGrowthRate)}/sec)`).join(', ')}.`
+        `Top growing classes: ${topGrowers.map((c) => `${c.className} (+${formatBytes(c.sizeGrowthRate)}/sec)`).join(', ')}.`,
       );
     }
 
@@ -584,9 +644,9 @@ function linearRegression(x: number[], y: number[]): RegressionResult {
   const meanX = x.reduce((s, v) => s + v, 0) / n;
   const meanY = y.reduce((s, v) => s + v, 0) / n;
 
-  let sumXcYc = 0;  // Σ(xᵢ - x̄)(yᵢ - ȳ)
-  let sumXc2 = 0;   // Σ(xᵢ - x̄)²
-  let ssTot = 0;    // Σ(yᵢ - ȳ)²  (for R²)
+  let sumXcYc = 0; // Σ(xᵢ - x̄)(yᵢ - ȳ)
+  let sumXc2 = 0; // Σ(xᵢ - x̄)²
+  let ssTot = 0; // Σ(yᵢ - ȳ)²  (for R²)
 
   for (let i = 0; i < n; i++) {
     const xc = x[i] - meanX;
@@ -608,7 +668,7 @@ function linearRegression(x: number[], y: number[]): RegressionResult {
     ssRes += (y[i] - predicted) ** 2;
   }
 
-  const rSquared = ssTot === 0 ? 1 : 1 - (ssRes / ssTot);
+  const rSquared = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
 
   return { slope, intercept, rSquared: Math.max(0, rSquared) };
 }
@@ -619,17 +679,26 @@ function generateSparkline(min: number, max: number, values: number[]): string {
   const chars = '▁▂▃▄▅▆▇█';
   const range = max - min || 1;
 
-  return '  ' + values.map(v => {
-    const normalized = (v - min) / range;
-    const idx = Math.min(Math.floor(normalized * chars.length), chars.length - 1);
-    return chars[idx];
-  }).join('');
+  return (
+    '  ' +
+    values
+      .map((v) => {
+        const normalized = (v - min) / range;
+        const idx = Math.min(
+          Math.floor(normalized * chars.length),
+          chars.length - 1,
+        );
+        return chars[idx];
+      })
+      .join('')
+  );
 }
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
+  if (ms < 3_600_000)
+    return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
   const hours = Math.floor(ms / 3_600_000);
   const mins = Math.floor((ms % 3_600_000) / 60_000);
   return `${hours}h ${mins}m`;
@@ -642,7 +711,10 @@ function formatBytes(bytes: number): string {
   // to prevent units[negative] → undefined or units[>3] → undefined.
   const sign = bytes < 0 ? '-' : '';
   const abs = Math.abs(bytes);
-  const i = Math.min(Math.floor(Math.log(abs) / Math.log(1024)), units.length - 1);
+  const i = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = abs / Math.pow(1024, i);
   return `${sign}${value.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }

@@ -1,19 +1,7 @@
 /**
- * GC Pressure Analyzer — V8 Garbage Collection Tuning Advisor
- *
- * ORIGINAL MODULE — No existing tool does this automatically.
- *
- * Analyzes garbage collection behavior from V8 trace events, CDP metrics,
- * and heap state to recommend specific V8 tuning flags and detect GC
- * pressure patterns that cause latency spikes.
- *
- * Features:
- * - Parses V8 GC trace events (Scavenge, Mark-Compact, Incremental Marking)
- * - Detects GC pressure patterns (promotion storms, fragmentation, compaction stalls)
- * - Recommends specific V8 flags with explanations
- * - Predicts GC pause impact on request latency
- * - Generates GC timeline for Perfetto visualization
- * - Classifies apps: latency-sensitive vs throughput-optimized
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
  * @module investigation/gcPressureAnalyzer
  */
@@ -23,7 +11,12 @@
 /** A single GC event parsed from V8 trace data or CDP */
 export interface GCEvent {
   /** GC algorithm: scavenge | mark-compact | incremental-marking | minor-gc | major-gc */
-  type: 'scavenge' | 'mark-compact' | 'incremental-marking' | 'minor-gc' | 'major-gc';
+  type:
+    | 'scavenge'
+    | 'mark-compact'
+    | 'incremental-marking'
+    | 'minor-gc'
+    | 'major-gc';
   /** Start timestamp in microseconds */
   startUs: number;
   /** Duration in microseconds */
@@ -90,7 +83,11 @@ export interface GCHealthReport {
   /** Recommended V8 flags */
   recommendations: V8TuningRecommendation[];
   /** App classification */
-  appProfile: 'latency-sensitive' | 'throughput-optimized' | 'balanced' | 'unknown';
+  appProfile:
+    | 'latency-sensitive'
+    | 'throughput-optimized'
+    | 'balanced'
+    | 'unknown';
   /** Overall GC health score (0-100) */
   healthScore: number;
   /** Promotion rate: bytes/sec promoted from young to old gen */
@@ -103,15 +100,21 @@ export interface GCHealthReport {
   summary: string;
 }
 
+// ─── Type Guards ──────────────────────────────────────────────────────────────
+
+/** Type guard: check if a value is a valid args object */
+function isArgsObject(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === 'object';
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GC_TIME_CRITICAL_THRESHOLD = 10; // >10% time in GC = critical
-const GC_TIME_WARNING_THRESHOLD = 5;   // >5% = warning
-const SCAVENGE_PAUSE_CRITICAL_US = 5_000;   // 5ms scavenge = bad
-const MAJOR_GC_PAUSE_CRITICAL_US = 50_000;  // 50ms major GC = bad
-const MAJOR_GC_PAUSE_WARNING_US = 20_000;   // 20ms = warning
+const GC_TIME_WARNING_THRESHOLD = 5; // >5% = warning
+const MAJOR_GC_PAUSE_CRITICAL_US = 50_000; // 50ms major GC = bad
+const MAJOR_GC_PAUSE_WARNING_US = 20_000; // 20ms = warning
 const PROMOTION_RATE_HIGH = 10_000_000; // 10MB/s = high promotion
-const FRAGMENTATION_THRESHOLD = 0.3;    // 30% fragmentation = warning
+const FRAGMENTATION_THRESHOLD = 0.3; // 30% fragmentation = warning
 
 // ─── GC Pressure Analyzer ────────────────────────────────────────────────────
 
@@ -125,47 +128,89 @@ export class GCPressureAnalyzer {
     }
 
     // Compute wall time from events if not provided
-    const actualWallTime = wallTimeMs ??
-      (events[events.length - 1].startUs + events[events.length - 1].durationUs - events[0].startUs) / 1000;
+    const actualWallTime =
+      wallTimeMs ??
+      (events[events.length - 1].startUs +
+        events[events.length - 1].durationUs -
+        events[0].startUs) /
+        1000;
 
     // Category summaries
     const categories = this.computeCategories(events);
 
     // Total GC time
     const totalGcUs = events.reduce((s, e) => s + e.durationUs, 0);
-    const gcTimePercent = actualWallTime > 0 ? (totalGcUs / 1000 / actualWallTime) * 100 : 0;
+    const gcTimePercent =
+      actualWallTime > 0 ? (totalGcUs / 1000 / actualWallTime) * 100 : 0;
 
     // Allocation & promotion rates
-    const totalAllocated = events.reduce((s, e) => s + e.freedBytes + (e.heapAfter - e.heapBefore + e.freedBytes), 0);
-    const allocationRate = actualWallTime > 0 ? totalAllocated / (actualWallTime / 1000) : 0;
+    const totalAllocated = events.reduce(
+      (s, e) => s + e.freedBytes + (e.heapAfter - e.heapBefore + e.freedBytes),
+      0,
+    );
+    const allocationRate =
+      actualWallTime > 0 ? totalAllocated / (actualWallTime / 1000) : 0;
 
-    const promotionEvents = events.filter(e => e.generation === 'young' || e.type === 'scavenge');
+    const promotionEvents = events.filter(
+      (e) => e.generation === 'young' || e.type === 'scavenge',
+    );
     const totalPromoted = promotionEvents.reduce((s, e) => {
       // Estimate promoted bytes: if GC freed less than the net heap reduction,
       // the difference likely moved to old gen. This is a rough heuristic since
       // V8 aggregate heap stats don't separate young/old gen sizes.
       const netReduction = e.heapBefore - e.heapAfter;
-      return s + Math.max(0, netReduction > e.freedBytes ? netReduction - e.freedBytes : 0);
+      return (
+        s +
+        Math.max(
+          0,
+          netReduction > e.freedBytes ? netReduction - e.freedBytes : 0,
+        )
+      );
     }, 0);
-    const promotionRate = actualWallTime > 0 ? Math.abs(totalPromoted) / (actualWallTime / 1000) : 0;
+    const promotionRate =
+      actualWallTime > 0
+        ? Math.abs(totalPromoted) / (actualWallTime / 1000)
+        : 0;
 
     // Fragmentation estimate
     const fragmentation = this.estimateFragmentation(events);
 
     // Detect patterns
-    const patterns = this.detectPatterns(events, categories, gcTimePercent, promotionRate, fragmentation);
+    const patterns = this.detectPatterns(
+      events,
+      categories,
+      gcTimePercent,
+      promotionRate,
+      fragmentation,
+    );
 
     // Generate recommendations
-    const recommendations = this.generateRecommendations(events, categories, patterns, gcTimePercent, allocationRate);
+    const recommendations = this.generateRecommendations(
+      events,
+      categories,
+      patterns,
+      gcTimePercent,
+      allocationRate,
+    );
 
     // Classify app profile
     const appProfile = this.classifyApp(events, categories, gcTimePercent);
 
     // Health score
-    const healthScore = this.computeHealthScore(gcTimePercent, patterns, categories);
+    const healthScore = this.computeHealthScore(
+      gcTimePercent,
+      patterns,
+      categories,
+    );
 
     // Summary
-    const summary = this.generateSummary(gcTimePercent, patterns, categories, healthScore, appProfile);
+    const summary = this.generateSummary(
+      gcTimePercent,
+      patterns,
+      categories,
+      healthScore,
+      appProfile,
+    );
 
     return {
       gcTimePercent,
@@ -186,25 +231,36 @@ export class GCPressureAnalyzer {
   /**
    * Parse V8 trace events (Chrome Trace Format) into GCEvent[]
    */
-  static parseTraceEvents(traceEvents: Array<Record<string, unknown>>): GCEvent[] {
+  static parseTraceEvents(
+    traceEvents: Array<Record<string, unknown>>,
+  ): GCEvent[] {
     const gcEvents: GCEvent[] = [];
 
     for (const event of traceEvents) {
-      if (event.ph !== 'X' && event.ph !== 'B') continue;
+      if (event['ph'] !== 'X' && event['ph'] !== 'B') continue;
 
-      const name = String(event.name || '');
-      const cat = String(event.cat || '');
+      const name = String(event['name'] || '');
+      const cat = String(event['cat'] || '');
 
       // Detect GC events from various V8 trace categories
-      if (!cat.includes('v8') && !cat.includes('gc') && !name.includes('GC') &&
-          !name.includes('Scavenge') && !name.includes('Mark') && !name.includes('Sweep') &&
-          !name.includes('Compact')) {
+      if (
+        !cat.includes('v8') &&
+        !cat.includes('gc') &&
+        !name.includes('GC') &&
+        !name.includes('Scavenge') &&
+        !name.includes('Mark') &&
+        !name.includes('Sweep') &&
+        !name.includes('Compact')
+      ) {
         continue;
       }
 
-      const args = (event.args || {}) as Record<string, unknown>;
-      const dur = Number(event.dur || 0);
-      const ts = Number(event.ts || 0);
+      const args = isArgsObject(event['args'])
+        ? // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+          (event['args'] as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
+      const dur = Number(event['dur'] || 0);
+      const ts = Number(event['ts'] || 0);
 
       let type: GCEvent['type'] = 'minor-gc';
       let generation: GCEvent['generation'] = 'young';
@@ -212,10 +268,17 @@ export class GCPressureAnalyzer {
       if (name.includes('Scavenge') || name.includes('MinorGC')) {
         type = 'scavenge';
         generation = 'young';
-      } else if (name.includes('Mark-Compact') || name.includes('MarkCompact') || name.includes('MajorGC')) {
+      } else if (
+        name.includes('Mark-Compact') ||
+        name.includes('MarkCompact') ||
+        name.includes('MajorGC')
+      ) {
         type = 'mark-compact';
         generation = 'old';
-      } else if (name.includes('IncrementalMarking') || name.includes('Incremental')) {
+      } else if (
+        name.includes('IncrementalMarking') ||
+        name.includes('Incremental')
+      ) {
         type = 'incremental-marking';
         generation = 'old';
       } else if (name.includes('Major')) {
@@ -223,8 +286,12 @@ export class GCPressureAnalyzer {
         generation = 'both';
       }
 
-      const heapBefore = Number(args.usedHeapSizeBefore || args.heapBefore || 0);
-      const heapAfter = Number(args.usedHeapSizeAfter || args.heapAfter || 0);
+      const heapBefore = Number(
+        args['usedHeapSizeBefore'] || args['heapBefore'] || 0,
+      );
+      const heapAfter = Number(
+        args['usedHeapSizeAfter'] || args['heapAfter'] || 0,
+      );
 
       gcEvents.push({
         type,
@@ -233,7 +300,7 @@ export class GCPressureAnalyzer {
         heapBefore,
         heapAfter,
         freedBytes: Math.max(0, heapBefore - heapAfter),
-        forced: Boolean(args.forced || args.type === 'forced'),
+        forced: Boolean(args['forced'] || args['type'] === 'forced'),
         generation,
       });
     }
@@ -245,7 +312,9 @@ export class GCPressureAnalyzer {
    * Create synthetic GC events from heap metric time series
    * (when real trace events aren't available)
    */
-  static fromHeapMetrics(metrics: Array<{ timestamp: number; heapUsed: number; heapTotal: number }>): GCEvent[] {
+  static fromHeapMetrics(
+    metrics: Array<{ timestamp: number; heapUsed: number; heapTotal: number }>,
+  ): GCEvent[] {
     const events: GCEvent[] = [];
     for (let i = 1; i < metrics.length; i++) {
       const prev = metrics[i - 1];
@@ -288,9 +357,11 @@ export class GCPressureAnalyzer {
       patterns.push({
         pattern: 'gc_thrashing',
         severity: 'critical',
-        description: 'Application is spending excessive time in garbage collection',
+        description:
+          'Application is spending excessive time in garbage collection',
         evidence: `${gcTimePercent.toFixed(1)}% of wall time spent in GC (threshold: ${GC_TIME_CRITICAL_THRESHOLD}%)`,
-        recommendation: 'Reduce allocation rate. Profile allocations to find hotspots. Consider object pooling.',
+        recommendation:
+          'Reduce allocation rate. Profile allocations to find hotspots. Consider object pooling.',
         estimatedImpact: `Recovering ${(gcTimePercent - 2).toFixed(0)}% of execution time`,
       });
     } else if (gcTimePercent > GC_TIME_WARNING_THRESHOLD) {
@@ -299,20 +370,24 @@ export class GCPressureAnalyzer {
         severity: 'warning',
         description: 'Application has elevated GC pressure',
         evidence: `${gcTimePercent.toFixed(1)}% of wall time in GC (threshold: ${GC_TIME_WARNING_THRESHOLD}%)`,
-        recommendation: 'Monitor allocation patterns. Consider reducing short-lived object creation.',
+        recommendation:
+          'Monitor allocation patterns. Consider reducing short-lived object creation.',
         estimatedImpact: `Could recover ${(gcTimePercent - 2).toFixed(0)}% of execution time`,
       });
     }
 
     // Pattern 2: Long major GC pauses
-    const majorCat = categories.find(c => c.type === 'mark-compact' || c.type === 'major-gc');
+    const majorCat = categories.find(
+      (c) => c.type === 'mark-compact' || c.type === 'major-gc',
+    );
     if (majorCat && majorCat.maxDurationUs > MAJOR_GC_PAUSE_CRITICAL_US) {
       patterns.push({
         pattern: 'long_major_gc',
         severity: 'critical',
         description: 'Major GC pauses are causing significant latency spikes',
         evidence: `Max major GC pause: ${(majorCat.maxDurationUs / 1000).toFixed(1)}ms (p99: ${(majorCat.p99DurationUs / 1000).toFixed(1)}ms)`,
-        recommendation: 'Enable incremental marking. Reduce old-generation heap size. Consider --max-old-space-size.',
+        recommendation:
+          'Enable incremental marking. Reduce old-generation heap size. Consider --max-old-space-size.',
         v8Flag: '--max-old-space-size',
         estimatedImpact: `Reduce worst-case pause from ${(majorCat.maxDurationUs / 1000).toFixed(0)}ms`,
       });
@@ -322,25 +397,30 @@ export class GCPressureAnalyzer {
         severity: 'warning',
         description: 'Major GC pauses are above ideal thresholds',
         evidence: `Max major GC: ${(majorCat.maxDurationUs / 1000).toFixed(1)}ms`,
-        recommendation: 'Monitor old-generation growth. Consider preemptive GC scheduling.',
+        recommendation:
+          'Monitor old-generation growth. Consider preemptive GC scheduling.',
         estimatedImpact: 'Smoother latency profile',
       });
     }
 
     // Pattern 3: Frequent scavenges (high allocation rate in young gen)
-    const scavengeCat = categories.find(c => c.type === 'scavenge' || c.type === 'minor-gc');
+    const scavengeCat = categories.find(
+      (c) => c.type === 'scavenge' || c.type === 'minor-gc',
+    );
     if (scavengeCat && scavengeCat.count > 50) {
       const timeSpanUs = events[events.length - 1].startUs - events[0].startUs;
-      const scavengesPerSec = events.length > 1 && timeSpanUs > 0
-        ? scavengeCat.count / (timeSpanUs / 1_000_000)
-        : 0;
+      const scavengesPerSec =
+        events.length > 1 && timeSpanUs > 0
+          ? scavengeCat.count / (timeSpanUs / 1_000_000)
+          : 0;
       if (scavengesPerSec > 10) {
         patterns.push({
           pattern: 'frequent_scavenge',
           severity: 'warning',
           description: 'Young generation is being collected very frequently',
           evidence: `${scavengesPerSec.toFixed(1)} scavenges/sec (${scavengeCat.count} total)`,
-          recommendation: 'Increase semi-space size to reduce scavenge frequency. Use --max-semi-space-size=64.',
+          recommendation:
+            'Increase semi-space size to reduce scavenge frequency. Use --max-semi-space-size=64.',
           v8Flag: '--max-semi-space-size',
           estimatedImpact: `Reduce scavenge frequency by ~${Math.min(80, Math.round(scavengesPerSec * 5))}%`,
         });
@@ -354,7 +434,8 @@ export class GCPressureAnalyzer {
         severity: 'warning',
         description: 'High promotion rate from young to old generation',
         evidence: `${(promotionRate / 1_000_000).toFixed(1)} MB/s promoted to old generation`,
-        recommendation: 'Objects are living too long in young gen. Increase semi-space size or reduce object lifetimes.',
+        recommendation:
+          'Objects are living too long in young gen. Increase semi-space size or reduce object lifetimes.',
         v8Flag: '--max-semi-space-size',
         estimatedImpact: 'Reduce old-gen growth and major GC frequency',
       });
@@ -365,9 +446,11 @@ export class GCPressureAnalyzer {
       patterns.push({
         pattern: 'heap_fragmentation',
         severity: 'warning',
-        description: 'Heap appears fragmented — GC frees memory but heap doesn\'t shrink',
+        description:
+          "Heap appears fragmented — GC frees memory but heap doesn't shrink",
         evidence: `Estimated fragmentation: ${(fragmentation * 100).toFixed(0)}%`,
-        recommendation: 'Consider enabling compaction or using typed arrays for large data. --always-compact.',
+        recommendation:
+          'Consider enabling compaction or using typed arrays for large data. --always-compact.',
         v8Flag: '--always-compact',
         estimatedImpact: `Recover ~${(fragmentation * 30).toFixed(0)}% of wasted space`,
       });
@@ -381,7 +464,8 @@ export class GCPressureAnalyzer {
           severity: 'info',
           description: `${cat.type} GC cycles are not reclaiming much memory per pause`,
           evidence: `${cat.type}: avg ${(cat.avgDurationUs / 1000).toFixed(1)}ms but only ${(cat.avgFreed / 1024).toFixed(0)}KB freed per cycle`,
-          recommendation: 'Most objects survive GC. Consider if allocations are necessary or if objects can be reused.',
+          recommendation:
+            'Most objects survive GC. Consider if allocations are necessary or if objects can be reused.',
           estimatedImpact: 'Better memory utilization',
         });
         break; // only report once
@@ -389,14 +473,15 @@ export class GCPressureAnalyzer {
     }
 
     // Pattern 7: Forced GC detected
-    const forcedCount = events.filter(e => e.forced).length;
+    const forcedCount = events.filter((e) => e.forced).length;
     if (forcedCount > 0) {
       patterns.push({
         pattern: 'forced_gc',
         severity: 'info',
         description: 'Manual/forced garbage collection detected',
         evidence: `${forcedCount} forced GC event(s). Forced GC causes full stop-the-world pauses.`,
-        recommendation: 'Avoid global.gc() in production. Let V8 manage GC scheduling.',
+        recommendation:
+          'Avoid global.gc() in production. Let V8 manage GC scheduling.',
         estimatedImpact: 'Remove forced pauses',
       });
     }
@@ -414,30 +499,42 @@ export class GCPressureAnalyzer {
     allocationRate: number,
   ): V8TuningRecommendation[] {
     const recs: V8TuningRecommendation[] = [];
-    const patternSet = new Set(patterns.map(p => p.pattern));
+    const patternSet = new Set(patterns.map((p) => p.pattern));
 
     // Semi-space tuning
-    if (patternSet.has('frequent_scavenge') || patternSet.has('promotion_storm')) {
+    if (
+      patternSet.has('frequent_scavenge') ||
+      patternSet.has('promotion_storm')
+    ) {
       recs.push({
         flag: '--max-semi-space-size=64',
-        currentBehavior: 'Default semi-space (16MB). Young gen fills quickly, causing frequent scavenges.',
+        currentBehavior:
+          'Default semi-space (16MB). Young gen fills quickly, causing frequent scavenges.',
         recommendedValue: '64',
-        reason: 'Larger semi-space means objects have more time to die young, reducing promotion to old gen.',
-        expectedImprovement: 'Fewer scavenges, lower promotion rate, fewer major GCs.',
+        reason:
+          'Larger semi-space means objects have more time to die young, reducing promotion to old gen.',
+        expectedImprovement:
+          'Fewer scavenges, lower promotion rate, fewer major GCs.',
         priority: 'high',
-        tradeoff: 'Uses ~48MB more memory for semi-space. Worth it for high-allocation apps.',
+        tradeoff:
+          'Uses ~48MB more memory for semi-space. Worth it for high-allocation apps.',
       });
     }
 
     // Old space tuning
     if (patternSet.has('long_major_gc') || patternSet.has('gc_thrashing')) {
       const maxHeap = events.reduce((m, e) => Math.max(m, e.heapBefore), 0);
-      const recommendedSize = Math.max(256, Math.ceil(maxHeap / 1_000_000 * 2));
+      const recommendedSize = Math.max(
+        256,
+        Math.ceil((maxHeap / 1_000_000) * 2),
+      );
       recs.push({
         flag: `--max-old-space-size=${recommendedSize}`,
-        currentBehavior: 'Default old-space limit. V8 triggers aggressive GC near the limit.',
+        currentBehavior:
+          'Default old-space limit. V8 triggers aggressive GC near the limit.',
         recommendedValue: String(recommendedSize),
-        reason: 'Giving V8 more headroom reduces the frequency and urgency of major GCs.',
+        reason:
+          'Giving V8 more headroom reduces the frequency and urgency of major GCs.',
         expectedImprovement: 'Fewer and shorter major GC pauses.',
         priority: 'high',
         tradeoff: `Uses up to ${recommendedSize}MB. Ensure the host has sufficient RAM.`,
@@ -445,26 +542,34 @@ export class GCPressureAnalyzer {
     }
 
     // Concurrent marking
-    const majorCat = categories.find(c => c.type === 'mark-compact' || c.type === 'major-gc');
+    const majorCat = categories.find(
+      (c) => c.type === 'mark-compact' || c.type === 'major-gc',
+    );
     if (majorCat && majorCat.maxDurationUs > 10_000) {
       recs.push({
         flag: '--concurrent-marking',
-        currentBehavior: 'V8 already uses concurrent marking by default in modern versions.',
+        currentBehavior:
+          'V8 already uses concurrent marking by default in modern versions.',
         recommendedValue: 'enabled (verify)',
-        reason: 'Concurrent marking moves marking work off the main thread, reducing pause times.',
-        expectedImprovement: 'Shorter major GC pauses (marking happens in background).',
+        reason:
+          'Concurrent marking moves marking work off the main thread, reducing pause times.',
+        expectedImprovement:
+          'Shorter major GC pauses (marking happens in background).',
         priority: 'medium',
         tradeoff: 'Slightly higher CPU usage from background threads.',
       });
     }
 
     // Allocation rate tuning
-    if (allocationRate > 50_000_000) { // >50MB/s
+    if (allocationRate > 50_000_000) {
+      // >50MB/s
       recs.push({
         flag: '--optimize-for-size=false',
-        currentBehavior: 'High allocation rate detected. V8 may be optimizing for memory over speed.',
+        currentBehavior:
+          'High allocation rate detected. V8 may be optimizing for memory over speed.',
         recommendedValue: 'false',
-        reason: 'When allocating heavily, optimizing for speed reduces GC frequency.',
+        reason:
+          'When allocating heavily, optimizing for speed reduces GC frequency.',
         expectedImprovement: 'Faster allocation paths, fewer GC interruptions.',
         priority: 'medium',
         tradeoff: 'May use slightly more memory per object.',
@@ -477,8 +582,10 @@ export class GCPressureAnalyzer {
         flag: '--expose-gc --trace-gc',
         currentBehavior: 'GC events are not being traced.',
         recommendedValue: 'enabled for debugging',
-        reason: 'Enables programmatic GC control and detailed GC logging for analysis.',
-        expectedImprovement: 'Better visibility into GC behavior for ongoing optimization.',
+        reason:
+          'Enables programmatic GC control and detailed GC logging for analysis.',
+        expectedImprovement:
+          'Better visibility into GC behavior for ongoing optimization.',
         priority: 'low',
         tradeoff: 'Slight overhead from trace logging. Remove in production.',
       });
@@ -502,10 +609,13 @@ export class GCPressureAnalyzer {
 
     const summaries: GCCategorySummary[] = [];
     for (const [type, evts] of groups) {
-      const durations = evts.map(e => e.durationUs).sort((a, b) => a - b);
+      const durations = evts.map((e) => e.durationUs).sort((a, b) => a - b);
       const totalDur = durations.reduce((s, d) => s + d, 0);
       const totalFreed = evts.reduce((s, e) => s + e.freedBytes, 0);
-      const p99Idx = Math.min(durations.length - 1, Math.floor(durations.length * 0.99));
+      const p99Idx = Math.min(
+        durations.length - 1,
+        Math.floor(durations.length * 0.99),
+      );
 
       summaries.push({
         type,
@@ -526,7 +636,9 @@ export class GCPressureAnalyzer {
   private estimateFragmentation(events: GCEvent[]): number {
     if (events.length < 3) return 0;
     // Look at how much heap space is recovered vs total heap after GC
-    const majorEvents = events.filter(e => e.type === 'mark-compact' || e.type === 'major-gc');
+    const majorEvents = events.filter(
+      (e) => e.type === 'mark-compact' || e.type === 'major-gc',
+    );
     if (majorEvents.length < 2) return 0;
 
     let fragSum = 0;
@@ -547,8 +659,11 @@ export class GCPressureAnalyzer {
   ): GCHealthReport['appProfile'] {
     if (events.length === 0) return 'unknown';
 
-    const majorCat = categories.find(c => c.type === 'mark-compact' || c.type === 'major-gc');
-    const hasLongPauses = majorCat && majorCat.maxDurationUs > MAJOR_GC_PAUSE_WARNING_US;
+    const majorCat = categories.find(
+      (c) => c.type === 'mark-compact' || c.type === 'major-gc',
+    );
+    const hasLongPauses =
+      majorCat && majorCat.maxDurationUs > MAJOR_GC_PAUSE_WARNING_US;
     const hasFrequentGC = gcTimePercent > 3;
 
     if (hasLongPauses && !hasFrequentGC) return 'throughput-optimized';
@@ -594,16 +709,22 @@ export class GCPressureAnalyzer {
     const parts: string[] = [];
 
     parts.push(`GC health score: ${healthScore}/100 (${appProfile} profile).`);
-    parts.push(`${gcTimePercent.toFixed(1)}% of execution time spent in GC across ${categories.reduce((s, c) => s + c.count, 0)} events.`);
+    parts.push(
+      `${gcTimePercent.toFixed(1)}% of execution time spent in GC across ${categories.reduce((s, c) => s + c.count, 0)} events.`,
+    );
 
-    const criticals = patterns.filter(p => p.severity === 'critical');
-    const warnings = patterns.filter(p => p.severity === 'warning');
+    const criticals = patterns.filter((p) => p.severity === 'critical');
+    const warnings = patterns.filter((p) => p.severity === 'warning');
 
     if (criticals.length > 0) {
-      parts.push(`${criticals.length} critical issue(s): ${criticals.map(p => p.pattern.replace(/_/g, ' ')).join(', ')}.`);
+      parts.push(
+        `${criticals.length} critical issue(s): ${criticals.map((p) => p.pattern.replace(/_/g, ' ')).join(', ')}.`,
+      );
     }
     if (warnings.length > 0) {
-      parts.push(`${warnings.length} warning(s): ${warnings.map(p => p.pattern.replace(/_/g, ' ')).join(', ')}.`);
+      parts.push(
+        `${warnings.length} warning(s): ${warnings.map((p) => p.pattern.replace(/_/g, ' ')).join(', ')}.`,
+      );
     }
 
     if (patterns.length === 0) {
@@ -642,26 +763,45 @@ export class GCPressureAnalyzer {
     const CYAN = '\x1b[36m';
     const DIM = '\x1b[2m';
 
-    const scoreColor = report.healthScore >= 80 ? GREEN : report.healthScore >= 50 ? YELLOW : RED;
+    const scoreColor =
+      report.healthScore >= 80
+        ? GREEN
+        : report.healthScore >= 50
+          ? YELLOW
+          : RED;
 
     lines.push(`${BOLD}┌─────────────────────────────────────────┐${RESET}`);
     lines.push(`${BOLD}│  GC PRESSURE ANALYSIS                   │${RESET}`);
     lines.push(`${BOLD}└─────────────────────────────────────────┘${RESET}`);
     lines.push('');
-    lines.push(`  Health Score:     ${scoreColor}${BOLD}${report.healthScore}/100${RESET}`);
+    lines.push(
+      `  Health Score:     ${scoreColor}${BOLD}${report.healthScore}/100${RESET}`,
+    );
     lines.push(`  App Profile:      ${report.appProfile}`);
-    lines.push(`  GC Time:          ${report.gcTimePercent.toFixed(1)}% of wall time`);
+    lines.push(
+      `  GC Time:          ${report.gcTimePercent.toFixed(1)}% of wall time`,
+    );
     lines.push(`  Total Events:     ${report.totalEvents}`);
-    lines.push(`  Allocation Rate:  ${(report.allocationRate / 1_000_000).toFixed(1)} MB/s`);
-    lines.push(`  Promotion Rate:   ${(report.promotionRate / 1_000_000).toFixed(1)} MB/s`);
-    lines.push(`  Fragmentation:    ${(report.fragmentation * 100).toFixed(0)}%`);
+    lines.push(
+      `  Allocation Rate:  ${(report.allocationRate / 1_000_000).toFixed(1)} MB/s`,
+    );
+    lines.push(
+      `  Promotion Rate:   ${(report.promotionRate / 1_000_000).toFixed(1)} MB/s`,
+    );
+    lines.push(
+      `  Fragmentation:    ${(report.fragmentation * 100).toFixed(0)}%`,
+    );
 
     if (report.categories.length > 0) {
       lines.push('');
       lines.push(`${BOLD}  GC Categories:${RESET}`);
       for (const cat of report.categories) {
-        lines.push(`    ${CYAN}${cat.type}${RESET}: ${cat.count} events, avg ${(cat.avgDurationUs / 1000).toFixed(1)}ms, max ${(cat.maxDurationUs / 1000).toFixed(1)}ms`);
-        lines.push(`      ${DIM}Freed: ${(cat.totalFreed / 1_000_000).toFixed(1)}MB total, efficiency: ${cat.efficiency.toFixed(0)} bytes/μs${RESET}`);
+        lines.push(
+          `    ${CYAN}${cat.type}${RESET}: ${cat.count} events, avg ${(cat.avgDurationUs / 1000).toFixed(1)}ms, max ${(cat.maxDurationUs / 1000).toFixed(1)}ms`,
+        );
+        lines.push(
+          `      ${DIM}Freed: ${(cat.totalFreed / 1_000_000).toFixed(1)}MB total, efficiency: ${cat.efficiency.toFixed(0)} bytes/μs${RESET}`,
+        );
       }
     }
 
@@ -669,8 +809,15 @@ export class GCPressureAnalyzer {
       lines.push('');
       lines.push(`${BOLD}  Detected Patterns:${RESET}`);
       for (const p of report.patterns) {
-        const sevColor = p.severity === 'critical' ? RED : p.severity === 'warning' ? YELLOW : DIM;
-        lines.push(`    ${sevColor}[${p.severity.toUpperCase()}]${RESET} ${p.description}`);
+        const sevColor =
+          p.severity === 'critical'
+            ? RED
+            : p.severity === 'warning'
+              ? YELLOW
+              : DIM;
+        lines.push(
+          `    ${sevColor}[${p.severity.toUpperCase()}]${RESET} ${p.description}`,
+        );
         lines.push(`      ${DIM}${p.evidence}${RESET}`);
         lines.push(`      → ${p.recommendation}`);
         if (p.v8Flag) lines.push(`      ${CYAN}Flag: ${p.v8Flag}${RESET}`);
@@ -681,8 +828,15 @@ export class GCPressureAnalyzer {
       lines.push('');
       lines.push(`${BOLD}  V8 Tuning Recommendations:${RESET}`);
       for (const rec of report.recommendations) {
-        const priColor = rec.priority === 'high' ? RED : rec.priority === 'medium' ? YELLOW : DIM;
-        lines.push(`    ${priColor}[${rec.priority.toUpperCase()}]${RESET} ${CYAN}${rec.flag}${RESET}`);
+        const priColor =
+          rec.priority === 'high'
+            ? RED
+            : rec.priority === 'medium'
+              ? YELLOW
+              : DIM;
+        lines.push(
+          `    ${priColor}[${rec.priority.toUpperCase()}]${RESET} ${CYAN}${rec.flag}${RESET}`,
+        );
         lines.push(`      ${rec.reason}`);
         lines.push(`      ${DIM}Tradeoff: ${rec.tradeoff}${RESET}`);
       }

@@ -1,16 +1,18 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  LLMExplainer,
-  type RetainerExplanation,
-  type InvestigationNarrative,
-  type ConversationState,
-} from './llmExplainer.js';
+import { LLMExplainer } from './llmExplainer.js';
 import type { RetainerChain, ClassSummary } from './heapSnapshotAnalyzer.js';
 import type { RootCauseReport } from './rootCauseAnalyzer.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
-function createRetainerChain(overrides?: Partial<RetainerChain>): RetainerChain {
+function createRetainerChain(
+  overrides?: Partial<RetainerChain>,
+): RetainerChain {
   return {
     nodeId: 42,
     nodeName: 'UserSession',
@@ -18,9 +20,27 @@ function createRetainerChain(overrides?: Partial<RetainerChain>): RetainerChain 
     selfSize: 1024,
     retainedSize: 5_000_000,
     chain: [
-      { edgeName: '_cache', edgeType: 'property', nodeName: 'Map', nodeType: 'object', nodeId: 10 },
-      { edgeName: 'entries', edgeType: 'internal', nodeName: 'Array', nodeType: 'array', nodeId: 20 },
-      { edgeName: '0', edgeType: 'element', nodeName: 'UserSession', nodeType: 'object', nodeId: 42 },
+      {
+        edgeName: '_cache',
+        edgeType: 'property',
+        nodeName: 'Map',
+        nodeType: 'object',
+        nodeId: 10,
+      },
+      {
+        edgeName: 'entries',
+        edgeType: 'internal',
+        nodeName: 'Array',
+        nodeType: 'array',
+        nodeId: 20,
+      },
+      {
+        edgeName: '0',
+        edgeType: 'element',
+        nodeName: 'UserSession',
+        nodeType: 'object',
+        nodeId: 42,
+      },
     ],
     ...overrides,
   };
@@ -34,9 +54,27 @@ function createEventListenerChain(): RetainerChain {
     selfSize: 48,
     retainedSize: 2_000_000,
     chain: [
-      { edgeName: '_listeners', edgeType: 'property', nodeName: 'EventEmitter', nodeType: 'object', nodeId: 1 },
-      { edgeName: 'data', edgeType: 'property', nodeName: 'Array', nodeType: 'array', nodeId: 2 },
-      { edgeName: '0', edgeType: 'element', nodeName: 'Closure', nodeType: 'closure', nodeId: 99 },
+      {
+        edgeName: '_listeners',
+        edgeType: 'property',
+        nodeName: 'EventEmitter',
+        nodeType: 'object',
+        nodeId: 1,
+      },
+      {
+        edgeName: 'data',
+        edgeType: 'property',
+        nodeName: 'Array',
+        nodeType: 'array',
+        nodeId: 2,
+      },
+      {
+        edgeName: '0',
+        edgeType: 'element',
+        nodeName: 'Closure',
+        nodeType: 'closure',
+        nodeId: 99,
+      },
     ],
   };
 }
@@ -49,8 +87,20 @@ function createTimerChain(): RetainerChain {
     selfSize: 96,
     retainedSize: 500_000,
     chain: [
-      { edgeName: '_timer', edgeType: 'property', nodeName: 'Timeout', nodeType: 'object', nodeId: 55 },
-      { edgeName: 'callback', edgeType: 'property', nodeName: 'Closure', nodeType: 'closure', nodeId: 56 },
+      {
+        edgeName: '_timer',
+        edgeType: 'property',
+        nodeName: 'Timeout',
+        nodeType: 'object',
+        nodeId: 55,
+      },
+      {
+        edgeName: 'callback',
+        edgeType: 'property',
+        nodeName: 'Closure',
+        nodeType: 'closure',
+        nodeId: 56,
+      },
     ],
   };
 }
@@ -91,7 +141,11 @@ function createRootCauseReport(): RootCauseReport {
         estimatedImpact: 20_000_000,
       },
     ],
-    recommendations: ['Add LRU eviction to caches', 'Audit listener cleanup', 'Use streaming logs'],
+    recommendations: [
+      'Add LRU eviction to caches',
+      'Audit listener cleanup',
+      'Use streaming logs',
+    ],
     healthScore: 40,
     totalEstimatedImpact: 80_000_000,
   };
@@ -99,11 +153,41 @@ function createRootCauseReport(): RootCauseReport {
 
 function createClassSummaries(): ClassSummary[] {
   return [
-    { className: 'Map', count: 5, shallowSize: 500, retainedSize: 50_000_000, instances: [1, 2, 3, 4, 5] },
-    { className: 'string', count: 10000, shallowSize: 20_000_000, retainedSize: 20_000_000, instances: [] },
-    { className: 'EventListener', count: 500, shallowSize: 24000, retainedSize: 10_000_000, instances: [] },
-    { className: 'Array', count: 200, shallowSize: 100000, retainedSize: 5_000_000, instances: [] },
-    { className: 'Closure', count: 800, shallowSize: 38400, retainedSize: 3_000_000, instances: [] },
+    {
+      className: 'Map',
+      count: 5,
+      shallowSize: 500,
+      retainedSize: 50_000_000,
+      instances: [1, 2, 3, 4, 5],
+    },
+    {
+      className: 'string',
+      count: 10000,
+      shallowSize: 20_000_000,
+      retainedSize: 20_000_000,
+      instances: [],
+    },
+    {
+      className: 'EventListener',
+      count: 500,
+      shallowSize: 24000,
+      retainedSize: 10_000_000,
+      instances: [],
+    },
+    {
+      className: 'Array',
+      count: 200,
+      shallowSize: 100000,
+      retainedSize: 5_000_000,
+      instances: [],
+    },
+    {
+      className: 'Closure',
+      count: 800,
+      shallowSize: 38400,
+      retainedSize: 3_000_000,
+      instances: [],
+    },
   ];
 }
 
@@ -129,7 +213,10 @@ describe('LLMExplainer', () => {
 
     it('should include additional context when provided', () => {
       const chain = createRetainerChain();
-      const prompt = explainer.generateRetainerExplanationPrompt(chain, 'This is from a web server');
+      const prompt = explainer.generateRetainerExplanationPrompt(
+        chain,
+        'This is from a web server',
+      );
 
       expect(prompt).toContain('This is from a web server');
       expect(prompt).toContain('Additional Context');
@@ -142,13 +229,15 @@ describe('LLMExplainer', () => {
       const response = JSON.stringify({
         whyRetained: 'The UserSession is stored in a Map cache.',
         likelyCause: 'Unbounded cache without eviction.',
-        suggestedFixes: [{
-          description: 'Add LRU eviction',
-          findPattern: 'new Map\\(\\)',
-          replaceWith: 'new LRUCache({ max: 1000 })',
-          searchHint: 'session-manager.ts',
-          confidence: 'high',
-        }],
+        suggestedFixes: [
+          {
+            description: 'Add LRU eviction',
+            findPattern: 'new Map\\(\\)',
+            replaceWith: 'new LRUCache({ max: 1000 })',
+            searchHint: 'session-manager.ts',
+            confidence: 'high',
+          },
+        ],
         followUpQuestions: ['How many sessions are active?'],
         severity: 'critical',
       });
@@ -163,7 +252,10 @@ describe('LLMExplainer', () => {
 
     it('should handle malformed JSON gracefully', () => {
       const chain = createRetainerChain();
-      const result = explainer.parseRetainerExplanation(chain, 'Not valid JSON at all');
+      const result = explainer.parseRetainerExplanation(
+        chain,
+        'Not valid JSON at all',
+      );
 
       expect(result.whyRetained).toBeTruthy();
       expect(result.severity).toBe('info');
@@ -172,7 +264,8 @@ describe('LLMExplainer', () => {
 
     it('should extract JSON from markdown code fences', () => {
       const chain = createRetainerChain();
-      const response = '```json\n{"whyRetained": "Cache", "likelyCause": "No eviction", "suggestedFixes": [], "followUpQuestions": [], "severity": "warning"}\n```';
+      const response =
+        '```json\n{"whyRetained": "Cache", "likelyCause": "No eviction", "suggestedFixes": [], "followUpQuestions": [], "severity": "warning"}\n```';
 
       const result = explainer.parseRetainerExplanation(chain, response);
       expect(result.whyRetained).toBe('Cache');
@@ -217,8 +310,20 @@ describe('LLMExplainer', () => {
         selfSize: 1024,
         retainedSize: 3_000_000,
         chain: [
-          { edgeName: 'scope', edgeType: 'context', nodeName: 'function', nodeType: 'closure', nodeId: 71 },
-          { edgeName: 'data', edgeType: 'property', nodeName: 'LargeBuffer', nodeType: 'native', nodeId: 70 },
+          {
+            edgeName: 'scope',
+            edgeType: 'context',
+            nodeName: 'function',
+            nodeType: 'closure',
+            nodeId: 71,
+          },
+          {
+            edgeName: 'data',
+            edgeType: 'property',
+            nodeName: 'LargeBuffer',
+            nodeType: 'native',
+            nodeId: 70,
+          },
         ],
       };
       const explanation = explainer.explainRetainerChainLocally(chain);
@@ -232,7 +337,9 @@ describe('LLMExplainer', () => {
       const explanation = explainer.explainRetainerChainLocally(chain);
 
       expect(explanation.followUpQuestions.length).toBeGreaterThan(0);
-      expect(explanation.followUpQuestions.some(q => q.includes('UserSession'))).toBe(true);
+      expect(
+        explanation.followUpQuestions.some((q) => q.includes('UserSession')),
+      ).toBe(true);
     });
   });
 
@@ -254,16 +361,22 @@ describe('LLMExplainer', () => {
         healthScore: 90,
         findings: [],
       };
-      const narrative = explainer.generateLocalNarrative(report, createClassSummaries());
+      const narrative = explainer.generateLocalNarrative(
+        report,
+        createClassSummaries(),
+      );
 
       expect(narrative.executiveSummary).toContain('good');
     });
 
     it('should sort action items by priority', () => {
       const report = createRootCauseReport();
-      const narrative = explainer.generateLocalNarrative(report, createClassSummaries());
+      const narrative = explainer.generateLocalNarrative(
+        report,
+        createClassSummaries(),
+      );
 
-      const priorities = narrative.actionItems.map(a => a.priority);
+      const priorities = narrative.actionItems.map((a) => a.priority);
       for (let i = 1; i < priorities.length; i++) {
         expect(priorities[i] >= priorities[i - 1]).toBe(true);
       }
@@ -271,7 +384,10 @@ describe('LLMExplainer', () => {
 
     it('should include relevant next steps based on findings', () => {
       const report = createRootCauseReport();
-      const narrative = explainer.generateLocalNarrative(report, createClassSummaries());
+      const narrative = explainer.generateLocalNarrative(
+        report,
+        createClassSummaries(),
+      );
 
       expect(narrative.nextSteps.length).toBeGreaterThan(0);
     });
@@ -292,7 +408,10 @@ describe('LLMExplainer', () => {
   describe('formatNarrativeForTerminal', () => {
     it('should format narrative with headers and colors', () => {
       const report = createRootCauseReport();
-      const narrative = explainer.generateLocalNarrative(report, createClassSummaries());
+      const narrative = explainer.generateLocalNarrative(
+        report,
+        createClassSummaries(),
+      );
       const formatted = LLMExplainer.formatNarrativeForTerminal(narrative);
 
       expect(formatted).toContain('MEMORY INVESTIGATION REPORT');
@@ -314,7 +433,10 @@ describe('LLMExplainer', () => {
     it('should add turns to conversation', () => {
       explainer.startConversation({});
       explainer.addTurn('user', 'What is using the most memory?');
-      explainer.addTurn('assistant', 'Map instances are the largest consumers.');
+      explainer.addTurn(
+        'assistant',
+        'Map instances are the largest consumers.',
+      );
 
       const state = explainer.getConversation()!;
       expect(state.turns).toHaveLength(2);
@@ -323,7 +445,9 @@ describe('LLMExplainer', () => {
     });
 
     it('should throw if adding turn without starting conversation', () => {
-      expect(() => explainer.addTurn('user', 'test')).toThrow('No active conversation');
+      expect(() => explainer.addTurn('user', 'test')).toThrow(
+        'No active conversation',
+      );
     });
 
     it('should generate contextual prompt with history', () => {
@@ -333,7 +457,9 @@ describe('LLMExplainer', () => {
       });
       explainer.addTurn('user', 'What is the biggest issue?');
 
-      const prompt = explainer.generateContextualPrompt('Tell me more about the Map issue');
+      const prompt = explainer.generateContextualPrompt(
+        'Tell me more about the Map issue',
+      );
 
       expect(prompt).toContain('What is the biggest issue?');
       expect(prompt).toContain('Tell me more about the Map issue');

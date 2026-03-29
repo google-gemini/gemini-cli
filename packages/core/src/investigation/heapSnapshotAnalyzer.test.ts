@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   HeapSnapshotAnalyzer,
@@ -13,22 +18,30 @@ import {
  */
 function buildSnapshot(config: {
   nodes: Array<{
-    type: number;     // index into NODE_TYPES
-    name: number;     // index into strings[]
-    id: number;       // V8 stable id
+    type: number; // index into NODE_TYPES
+    name: number; // index into strings[]
+    id: number; // V8 stable id
     selfSize: number;
     edgeCount: number;
     traceNodeId?: number;
     detachedness?: number;
   }>;
   edges: Array<{
-    type: number;       // index into EDGE_TYPES
+    type: number; // index into EDGE_TYPES
     nameOrIndex: number;
-    toNode: number;     // index into nodes flat array (multiply by 7)
+    toNode: number; // index into nodes flat array (multiply by 7)
   }>;
   strings: string[];
 }): RawHeapSnapshot {
-  const nodeFields = ['type', 'name', 'id', 'self_size', 'edge_count', 'trace_node_id', 'detachedness'];
+  const nodeFields = [
+    'type',
+    'name',
+    'id',
+    'self_size',
+    'edge_count',
+    'trace_node_id',
+    'detachedness',
+  ];
   const edgeFields = ['type', 'name_or_index', 'to_node'];
 
   const flatNodes: number[] = [];
@@ -54,15 +67,43 @@ function buildSnapshot(config: {
       meta: {
         node_fields: nodeFields,
         node_types: [
-          ['hidden', 'array', 'string', 'object', 'code', 'closure', 'regexp',
-           'number', 'native', 'synthetic', 'concatenated string', 'sliced string',
-           'symbol', 'bigint', 'object shape'],
-          'string', 'number', 'number', 'number', 'number', 'number',
+          [
+            'hidden',
+            'array',
+            'string',
+            'object',
+            'code',
+            'closure',
+            'regexp',
+            'number',
+            'native',
+            'synthetic',
+            'concatenated string',
+            'sliced string',
+            'symbol',
+            'bigint',
+            'object shape',
+          ],
+          'string',
+          'number',
+          'number',
+          'number',
+          'number',
+          'number',
         ],
         edge_fields: edgeFields,
         edge_types: [
-          ['context', 'element', 'property', 'internal', 'hidden', 'shortcut', 'weak'],
-          'string_or_number', 'node',
+          [
+            'context',
+            'element',
+            'property',
+            'internal',
+            'hidden',
+            'shortcut',
+            'weak',
+          ],
+          'string_or_number',
+          'node',
         ],
       },
       node_count: config.nodes.length,
@@ -86,18 +127,57 @@ function buildSnapshot(config: {
  */
 function createSimpleSnapshot(idOffset: number = 0): RawHeapSnapshot {
   return buildSnapshot({
-    strings: ['', '(GC roots)', 'App', 'data', 'Cache', 'app', 'cache', '(internal)'],
+    strings: [
+      '',
+      '(GC roots)',
+      'App',
+      'data',
+      'Cache',
+      'app',
+      'cache',
+      '(internal)',
+    ],
     nodes: [
       // 0: root (synthetic)
-      { type: 9 /* synthetic */, name: 1 /* (GC roots) */, id: 1 + idOffset, selfSize: 0, edgeCount: 2 },
+      {
+        type: 9 /* synthetic */,
+        name: 1 /* (GC roots) */,
+        id: 1 + idOffset,
+        selfSize: 0,
+        edgeCount: 2,
+      },
       // 1: App object
-      { type: 3 /* object */, name: 2 /* App */, id: 100 + idOffset, selfSize: 256, edgeCount: 2 },
+      {
+        type: 3 /* object */,
+        name: 2 /* App */,
+        id: 100 + idOffset,
+        selfSize: 256,
+        edgeCount: 2,
+      },
       // 2: data array
-      { type: 1 /* array */, name: 3 /* data */, id: 200 + idOffset, selfSize: 1024, edgeCount: 0 },
+      {
+        type: 1 /* array */,
+        name: 3 /* data */,
+        id: 200 + idOffset,
+        selfSize: 1024,
+        edgeCount: 0,
+      },
       // 3: Cache object
-      { type: 3 /* object */, name: 4 /* Cache */, id: 300 + idOffset, selfSize: 512, edgeCount: 0 },
+      {
+        type: 3 /* object */,
+        name: 4 /* Cache */,
+        id: 300 + idOffset,
+        selfSize: 512,
+        edgeCount: 0,
+      },
       // 4: hidden internal
-      { type: 0 /* hidden */, name: 7 /* (internal) */, id: 400 + idOffset, selfSize: 64, edgeCount: 0 },
+      {
+        type: 0 /* hidden */,
+        name: 7 /* (internal) */,
+        id: 400 + idOffset,
+        selfSize: 64,
+        edgeCount: 0,
+      },
     ],
     edges: [
       // root → App (property "app")
@@ -188,12 +268,24 @@ describe('HeapSnapshotAnalyzer', () => {
       const raw = buildSnapshot({
         strings: ['', 'root', 'detached'],
         nodes: [
-          { type: 9, name: 1, id: 1, selfSize: 0, edgeCount: 1, detachedness: 0 },
-          { type: 3, name: 2, id: 2, selfSize: 100, edgeCount: 0, detachedness: 2 },
+          {
+            type: 9,
+            name: 1,
+            id: 1,
+            selfSize: 0,
+            edgeCount: 1,
+            detachedness: 0,
+          },
+          {
+            type: 3,
+            name: 2,
+            id: 2,
+            selfSize: 100,
+            edgeCount: 0,
+            detachedness: 2,
+          },
         ],
-        edges: [
-          { type: 2, nameOrIndex: 2, toNode: 1 },
-        ],
+        edges: [{ type: 2, nameOrIndex: 2, toNode: 1 }],
       });
       analyzer.parse(raw);
       expect(analyzer.getNodes()[0].detachedness).toBe(0);
@@ -255,7 +347,7 @@ describe('HeapSnapshotAnalyzer', () => {
       analyzer.parse(raw);
       const summaries = analyzer.getClassSummaries();
 
-      const objectClass = summaries.find(s => s.className === 'App');
+      const objectClass = summaries.find((s) => s.className === 'App');
       expect(objectClass).toBeDefined();
       expect(objectClass!.count).toBe(1);
       expect(objectClass!.shallowSize).toBe(256);
@@ -284,12 +376,24 @@ describe('HeapSnapshotAnalyzer', () => {
       const raw = buildSnapshot({
         strings: ['', 'root', 'DetachedDiv'],
         nodes: [
-          { type: 9, name: 1, id: 1, selfSize: 0, edgeCount: 1, detachedness: 0 },
-          { type: 3, name: 2, id: 2, selfSize: 100, edgeCount: 0, detachedness: 2 },
+          {
+            type: 9,
+            name: 1,
+            id: 1,
+            selfSize: 0,
+            edgeCount: 1,
+            detachedness: 0,
+          },
+          {
+            type: 3,
+            name: 2,
+            id: 2,
+            selfSize: 100,
+            edgeCount: 0,
+            detachedness: 2,
+          },
         ],
-        edges: [
-          { type: 2, nameOrIndex: 2, toNode: 1 },
-        ],
+        edges: [{ type: 2, nameOrIndex: 2, toNode: 1 }],
       });
       analyzer.parse(raw);
       const detached = analyzer.getDetachedNodes();
@@ -302,7 +406,17 @@ describe('HeapSnapshotAnalyzer', () => {
     it('should detect added objects between two snapshots', () => {
       const raw1 = createSimpleSnapshot(0);
       const raw2 = buildSnapshot({
-        strings: ['', '(GC roots)', 'App', 'data', 'Cache', 'app', 'cache', '(internal)', 'NewObj'],
+        strings: [
+          '',
+          '(GC roots)',
+          'App',
+          'data',
+          'Cache',
+          'app',
+          'cache',
+          '(internal)',
+          'NewObj',
+        ],
         nodes: [
           { type: 9, name: 1, id: 1, selfSize: 0, edgeCount: 3 },
           { type: 3, name: 2, id: 100, selfSize: 256, edgeCount: 2 },
@@ -405,7 +519,7 @@ describe('HeapSnapshotAnalyzer', () => {
 
       const diff = HeapSnapshotAnalyzer.diff(analyzer1, analyzer2);
       expect(diff.grown.length).toBeGreaterThan(0);
-      const leakyGrowth = diff.grown.find(g => g.className === 'Leaky');
+      const leakyGrowth = diff.grown.find((g) => g.className === 'Leaky');
       expect(leakyGrowth).toBeDefined();
       expect(leakyGrowth!.countDelta).toBe(2);
     });
@@ -469,7 +583,7 @@ describe('HeapSnapshotAnalyzer', () => {
       const report = HeapSnapshotAnalyzer.detectLeaks(a1, a2, a3);
 
       expect(report.leakCandidates.length).toBeGreaterThan(0);
-      const leaky = report.leakCandidates.find(c => c.className === 'Leaky');
+      const leaky = report.leakCandidates.find((c) => c.className === 'Leaky');
       expect(leaky).toBeDefined();
       expect(leaky!.confidence).toBe('high');
       expect(leaky!.countInSnapshot1).toBe(1);
@@ -482,9 +596,7 @@ describe('HeapSnapshotAnalyzer', () => {
       // Snapshot 1: 0 objects of type Alloc
       const raw1 = buildSnapshot({
         strings: ['', 'root'],
-        nodes: [
-          { type: 9, name: 1, id: 1, selfSize: 0, edgeCount: 0 },
-        ],
+        nodes: [{ type: 9, name: 1, id: 1, selfSize: 0, edgeCount: 0 }],
         edges: [],
       });
 
@@ -528,7 +640,9 @@ describe('HeapSnapshotAnalyzer', () => {
       a3.parse(raw3);
 
       const report = HeapSnapshotAnalyzer.detectLeaks(a1, a2, a3);
-      const allocLeak = report.leakCandidates.find(c => c.className === 'Alloc');
+      const allocLeak = report.leakCandidates.find(
+        (c) => c.className === 'Alloc',
+      );
       expect(allocLeak).toBeUndefined();
     });
 
@@ -625,16 +739,18 @@ describe('HeapSnapshotAnalyzer', () => {
       const report: LeakReport = {
         timestamp: '2026-03-27T00:00:00Z',
         snapshotSizes: [1_000_000, 1_500_000, 2_000_000],
-        leakCandidates: [{
-          className: 'LeakyWidget',
-          countInSnapshot1: 10,
-          countInSnapshot2: 30,
-          countInSnapshot3: 50,
-          growthRate: 20,
-          totalLeakedSize: 40_000,
-          retainerChains: [],
-          confidence: 'high',
-        }],
+        leakCandidates: [
+          {
+            className: 'LeakyWidget',
+            countInSnapshot1: 10,
+            countInSnapshot2: 30,
+            countInSnapshot3: 50,
+            growthRate: 20,
+            totalLeakedSize: 40_000,
+            retainerChains: [],
+            confidence: 'high',
+          },
+        ],
         summary: 'Heap growing consistently',
         recommendations: ['Check LeakyWidget lifecycle'],
       };
