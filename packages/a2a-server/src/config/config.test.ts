@@ -29,6 +29,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    PRIORITY_YOLO_ALLOW_ALL: 998,
     Config: vi.fn().mockImplementation((params) => {
       const mockConfig = {
         ...params,
@@ -351,23 +352,37 @@ describe('loadConfig', () => {
     });
 
     describe('interactivity', () => {
-      it('should set interactive true when not headless', async () => {
+      it('should always set interactive true', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(true);
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interactive: true,
+          }),
+        );
+
         vi.mocked(isHeadlessMode).mockReturnValue(false);
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
             interactive: true,
-            enableInteractiveShell: true,
           }),
         );
       });
 
-      it('should set interactive false when headless', async () => {
+      it('should set enableInteractiveShell based on headless mode', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            enableInteractiveShell: true,
+          }),
+        );
+
         vi.mocked(isHeadlessMode).mockReturnValue(true);
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            interactive: false,
             enableInteractiveShell: false,
           }),
         );

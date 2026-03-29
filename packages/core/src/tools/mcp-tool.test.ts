@@ -99,6 +99,10 @@ describe('formatMcpToolName', () => {
     expect(formatMcpToolName('github', '*')).toBe('mcp_github_*');
   });
 
+  it('should handle both server and tool wildcards', () => {
+    expect(formatMcpToolName('*', '*')).toBe('mcp_*');
+  });
+
   it('should handle undefined toolName as a tool-level wildcard', () => {
     expect(formatMcpToolName('github')).toBe('mcp_github_*');
   });
@@ -162,6 +166,53 @@ describe('DiscoveredMCPTool', () => {
         },
       });
       expect(tool.serverToolName).toBe(serverToolName);
+    });
+  });
+
+  describe('getDisplayTitle and getExplanation', () => {
+    const commandTool = new DiscoveredMCPTool(
+      mockCallableToolInstance,
+      serverName,
+      serverToolName,
+      baseDescription,
+      {
+        type: 'object',
+        properties: { command: { type: 'string' }, path: { type: 'string' } },
+        required: ['command'],
+      },
+      createMockMessageBus(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+
+    it('should return command as title if it exists', () => {
+      const invocation = commandTool.build({ command: 'ls -la' });
+      expect(invocation.getDisplayTitle?.()).toBe('ls -la');
+    });
+
+    it('should return displayName if command does not exist', () => {
+      const invocation = tool.build({ param: 'testValue' });
+      expect(invocation.getDisplayTitle?.()).toBe(tool.displayName);
+    });
+
+    it('should return stringified json for getExplanation', () => {
+      const params = { command: 'ls -la', path: '/' };
+      const invocation = commandTool.build(params);
+      expect(invocation.getExplanation?.()).toBe(safeJsonStringify(params));
+    });
+
+    it('should truncate and summarize long json payloads for getExplanation', () => {
+      const longString = 'a'.repeat(600);
+      const params = { command: 'echo', text: longString, other: 'value' };
+      const invocation = commandTool.build(params);
+      const explanation = invocation.getExplanation?.() ?? '';
+      expect(explanation).toMatch(
+        /^\[Payload omitted due to length with parameters: command, text, other\]$/,
+      );
     });
   });
 
