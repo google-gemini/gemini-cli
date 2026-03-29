@@ -1050,6 +1050,52 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  voice: {
+    type: 'object',
+    label: 'Voice',
+    category: 'Voice',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings for voice mode and transcription.',
+    showInDialog: true,
+    properties: {
+      backend: {
+        type: 'enum',
+        label: 'Transcription Backend',
+        category: 'Voice',
+        requiresRestart: false,
+        default: 'gemini-live',
+        description: 'The backend to use for voice transcription.',
+        showInDialog: true,
+        options: [
+          { value: 'gemini-live', label: 'Gemini Live API (Cloud)' },
+          { value: 'whisper', label: 'Whisper (Local)' },
+        ],
+      },
+      whisperModel: {
+        type: 'enum',
+        label: 'Whisper Model',
+        category: 'Voice',
+        requiresRestart: false,
+        default: 'ggml-base.en.bin',
+        description: 'The Whisper model to use for local transcription.',
+        showInDialog: true,
+        options: [
+          { value: 'ggml-tiny.en.bin', label: 'Tiny (EN) - Fast (~75MB)' },
+          { value: 'ggml-base.en.bin', label: 'Base (EN) - Balanced (~142MB)' },
+          {
+            value: 'ggml-large-v3-turbo-q5_0.bin',
+            label: 'Large v3 Turbo (Q5_0) - High Accuracy (~547MB)',
+          },
+          {
+            value: 'ggml-large-v3-turbo-q8_0.bin',
+            label: 'Large v3 Turbo (Q8_0) - Max Accuracy (~834MB)',
+          },
+        ],
+      },
+    },
+  },
+
   modelConfigs: {
     type: 'object',
     label: 'Model Configs',

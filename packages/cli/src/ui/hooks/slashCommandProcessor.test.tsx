@@ -205,6 +205,7 @@ describe('useSlashCommandProcessor', () => {
             openSettingsDialog: vi.fn(),
             openSessionBrowser: vi.fn(),
             openModelDialog: mockOpenModelDialog,
+            openVoiceModelDialog: vi.fn(),
             openAgentConfigDialog,
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,

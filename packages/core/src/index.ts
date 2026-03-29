@@ -297,4 +297,9 @@ export * from './context/profiles.js';
 
 // Export voice utilities
 export * from './voice/audioRecorder.js';
-export * from './voice/liveTranscriptionService.js';
+export * from './voice/transcriptionProvider.js';
+export * from './voice/geminiLiveTranscriptionProvider.js';
+export * from './voice/whisperTranscriptionProvider.js';
+export * from './voice/transcriptionFactory.js';
+export * from './voice/whisperModelManager.js';
+export { isBinaryAvailable } from './utils/binaryCheck.js';

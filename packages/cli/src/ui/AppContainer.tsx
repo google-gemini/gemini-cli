@@ -104,6 +104,7 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useVoiceModelCommand } from './hooks/useVoiceModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import {
@@ -948,6 +949,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
 
+  const {
+    isVoiceModelDialogOpen,
+    openVoiceModelDialog,
+    closeVoiceModelDialog,
+  } = useVoiceModelCommand();
+
   const { toggleVimEnabled } = useVimMode();
 
   const setIsBackgroundTaskListOpenRef = useRef<(open: boolean) => void>(
@@ -971,6 +978,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openVoiceModelDialog,
       openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
@@ -1007,6 +1015,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openSettingsDialog,
       openSessionBrowser,
       openModelDialog,
+      openVoiceModelDialog,
       openAgentConfigDialog,
       setQuittingMessages,
       setDebugMessage,
@@ -2192,6 +2201,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
+    isVoiceModelDialogOpen ||
     isAgentConfigDialogOpen ||
     isPermissionsDialogOpen ||
     isAuthenticating ||
@@ -2448,6 +2458,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
@@ -2560,6 +2571,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
+      isVoiceModelDialogOpen,
       isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
@@ -2673,6 +2685,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openVoiceModelDialog,
+      closeVoiceModelDialog,
       openAgentConfigDialog,
       closeAgentConfigDialog,
       openPermissionsDialog,
@@ -2769,6 +2783,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
+      openVoiceModelDialog,
+      closeVoiceModelDialog,
       openAgentConfigDialog,
       closeAgentConfigDialog,
       openPermissionsDialog,
