@@ -95,6 +95,7 @@ export enum Command {
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
   SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'app.showShellUnfocusWarning',
+  VOICE_MODE_PTT = 'app.voiceModePTT',
 
   // Background Shell Controls
   BACKGROUND_SHELL_ESCAPE = 'background.escape',
@@ -392,6 +393,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
   [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+  [Command.VOICE_MODE_PTT, [new KeyBinding('space')]],
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
@@ -623,6 +625,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from shell input.',
+  [Command.VOICE_MODE_PTT]: 'Hold to speak in Voice Mode.',
 
   // Background Shell Controls
   [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',

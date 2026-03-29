@@ -239,6 +239,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
+  const [isVoiceModeEnabled, setVoiceModeEnabled] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
   const [historyRemountKey, setHistoryRemountKey] = useState(0);
@@ -897,6 +898,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
+      toggleVoiceMode: () => setVoiceModeEnabled((prev) => !prev),
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
@@ -2252,6 +2254,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       inputWidth,
       suggestionsWidth,
       isInputActive,
+      isVoiceModeEnabled,
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
@@ -2378,6 +2381,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       inputWidth,
       suggestionsWidth,
       isInputActive,
+      isVoiceModeEnabled,
       isResuming,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
@@ -2558,6 +2562,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setAccountSuspensionInfo(null);
         setAuthState(AuthState.Updating);
       },
+      setVoiceModeEnabled: (value: boolean) => {
+        setVoiceModeEnabled(value);
+      },
     }),
     [
       handleThemeSelect,
@@ -2614,6 +2621,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       historyManager,
       getPreferredEditor,
+      setVoiceModeEnabled,
     ],
   );
 
