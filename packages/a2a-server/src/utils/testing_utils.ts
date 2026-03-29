@@ -109,6 +109,12 @@ export function createMockConfig(
         enableEnvironmentVariableRedaction: false,
       },
     }),
+    isExperimentalAgentHistoryTruncationEnabled: vi.fn().mockReturnValue(false),
+    getExperimentalAgentHistoryTruncationThreshold: vi.fn().mockReturnValue(50),
+    getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(30),
+    isExperimentalAgentHistorySummarizationEnabled: vi
+      .fn()
+      .mockReturnValue(false),
     ...overrides,
   } as unknown as Config;
 

@@ -671,11 +671,6 @@ export async function main() {
       }
     }
 
-    // Register SessionEnd hook for graceful exit
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
-
     if (!input) {
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,

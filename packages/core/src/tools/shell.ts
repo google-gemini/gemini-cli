@@ -76,6 +76,33 @@ export class ShellToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
+  /**
+   * Wraps a command in a subshell `()` to capture background process IDs (PIDs) using pgrep.
+   * Uses newlines to prevent breaking heredocs or trailing comments.
+   *
+   * @param command The raw command string to execute.
+   * @param tempFilePath Path to the temporary file where PIDs will be written.
+   * @param isWindows Whether the current platform is Windows (if true, the command is returned as-is).
+   * @returns The wrapped command string.
+   */
+  private wrapCommandForPgrep(
+    command: string,
+    tempFilePath: string,
+    isWindows: boolean,
+  ): string {
+    if (isWindows) {
+      return command;
+    }
+    let trimmed = command.trim();
+    if (!trimmed) {
+      return '';
+    }
+    if (trimmed.endsWith('\\')) {
+      trimmed += ' ';
+    }
+    return `(\n${trimmed}\n); __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+  }
+
   private getContextualDetails(): string {
     let details = '';
     // append optional [in directory]
@@ -232,14 +259,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
-      const commandToExecute = isWindows
-        ? strippedCommand
-        : (() => {
-            // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
-            if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
-          })();
+      const commandToExecute = this.wrapCommandForPgrep(
+        strippedCommand,
+        tempFilePath,
+        isWindows,
+      );
 
       const cwd = this.params.dir_path
         ? path.resolve(this.context.config.getTargetDir(), this.params.dir_path)
@@ -333,6 +357,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
               this.context.config.sanitizationConfig,
             sandboxManager: this.context.config.sandboxManager,
             additionalPermissions: this.params[PARAM_ADDITIONAL_PERMISSIONS],
+            backgroundCompletionBehavior:
+              this.context.config.getShellBackgroundCompletionBehavior(),
           },
         );
 
