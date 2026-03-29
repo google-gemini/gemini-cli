@@ -11,7 +11,6 @@
  * @param space - Optional space parameter for formatting (defaults to no formatting)
  * @returns JSON string with circular references replaced by [Circular]
  */
-import type { Config } from '../config/config.js';
 
 export function safeJsonStringify(
   obj: unknown,
@@ -20,14 +19,13 @@ export function safeJsonStringify(
   const seen = new WeakSet();
   return JSON.stringify(
     obj,
-    (key, value) => {
+    (_key: string, value: unknown) => {
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) {
           return '[Circular]';
         }
         seen.add(value);
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     },
     space,
@@ -57,16 +55,17 @@ function removeEmptyObjects(data: any): object {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
   let configSeen = false;
-  return JSON.stringify(removeEmptyObjects(obj), (key, value) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    if ((value as Config) !== null && !configSeen) {
-      configSeen = true;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return value;
-    }
-    if (typeof value === 'boolean') {
-      return value;
-    }
-    return '';
-  });
+  return JSON.stringify(
+    removeEmptyObjects(obj),
+    (_key: string, value: unknown) => {
+      if (value !== null && !configSeen) {
+        configSeen = true;
+        return value;
+      }
+      if (typeof value === 'boolean') {
+        return value;
+      }
+      return '';
+    },
+  );
 }

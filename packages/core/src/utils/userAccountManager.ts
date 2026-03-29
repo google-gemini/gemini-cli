@@ -8,10 +8,17 @@ import path from 'node:path';
 import { promises as fsp, readFileSync } from 'node:fs';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from './debugLogger.js';
+import { z } from 'zod';
 
-interface UserAccounts {
-  active: string | null;
-  old: string[];
+const userAccountsSchema = z.object({
+  active: z.string().nullable().default(null),
+  old: z.array(z.string()).default([]),
+});
+
+type UserAccounts = z.infer<typeof userAccountsSchema>;
+
+function createDefaultAccountsState(): UserAccounts {
+  return { active: null, old: [] };
 }
 
 export class UserAccountManager {
@@ -25,41 +32,22 @@ export class UserAccountManager {
    * @returns A valid UserAccounts object.
    */
   private parseAndValidateAccounts(content: string): UserAccounts {
-    const defaultState = { active: null, old: [] };
     if (!content.trim()) {
-      return defaultState;
+      return createDefaultAccountsState();
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = JSON.parse(content);
+    const parsed: unknown = JSON.parse(content);
+    const result = userAccountsSchema.safeParse(parsed);
 
-    // Inlined validation logic
-    if (typeof parsed !== 'object' || parsed === null) {
+    if (!result.success) {
       debugLogger.log('Invalid accounts file schema, starting fresh.');
-      return defaultState;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const { active, old } = parsed as Partial<UserAccounts>;
-    const isValid =
-      (active === undefined || active === null || typeof active === 'string') &&
-      (old === undefined ||
-        (Array.isArray(old) && old.every((i) => typeof i === 'string')));
-
-    if (!isValid) {
-      debugLogger.log('Invalid accounts file schema, starting fresh.');
-      return defaultState;
+      return createDefaultAccountsState();
     }
 
-    return {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      active: parsed.active ?? null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      old: parsed.old ?? [],
-    };
+    return result.data;
   }
 
   private readAccountsSync(filePath: string): UserAccounts {
-    const defaultState = { active: null, old: [] };
     try {
       const content = readFileSync(filePath, 'utf-8');
       return this.parseAndValidateAccounts(content);
@@ -69,18 +57,17 @@ export class UserAccountManager {
         'code' in error &&
         error.code === 'ENOENT'
       ) {
-        return defaultState;
+        return createDefaultAccountsState();
       }
       debugLogger.log(
         'Error during sync read of accounts, starting fresh.',
         error,
       );
-      return defaultState;
+      return createDefaultAccountsState();
     }
   }
 
   private async readAccounts(filePath: string): Promise<UserAccounts> {
-    const defaultState = { active: null, old: [] };
     try {
       const content = await fsp.readFile(filePath, 'utf-8');
       return this.parseAndValidateAccounts(content);
@@ -90,10 +77,10 @@ export class UserAccountManager {
         'code' in error &&
         error.code === 'ENOENT'
       ) {
-        return defaultState;
+        return createDefaultAccountsState();
       }
       debugLogger.log('Could not parse accounts file, starting fresh.', error);
-      return defaultState;
+      return createDefaultAccountsState();
     }
   }
 
