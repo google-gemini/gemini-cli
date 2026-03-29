@@ -41,6 +41,8 @@ export interface UIActions {
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
   closeModelDialog: () => void;
+  openVoiceModelDialog: () => void;
+  closeVoiceModelDialog: () => void;
   openAgentConfigDialog: (
     name: string,
     displayName: string,

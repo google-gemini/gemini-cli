@@ -72,6 +72,7 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openSessionBrowser: () => void;
   openModelDialog: () => void;
+  openVoiceModelDialog: () => void;
   openAgentConfigDialog: (
     name: string,
     displayName: string,
@@ -504,6 +505,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'model':
                       actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'voice-model':
+                      actions.openVoiceModelDialog();
                       return { type: 'handled' };
                     case 'agentConfig': {
                       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
