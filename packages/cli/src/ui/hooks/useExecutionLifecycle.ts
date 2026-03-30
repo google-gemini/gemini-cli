@@ -525,47 +525,81 @@ export const useExecutionLifecycle = (
             dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
           }
 
-          let mainContent: string;
+          let finalDisplayOutput: string | AnsiOutput;
+          let finalTextOutput: string;
+
           if (isBinaryStream || isBinary(result.rawOutput)) {
-            mainContent =
+            finalTextOutput =
               '[Command produced binary output, which is not shown.]';
+            finalDisplayOutput = finalTextOutput;
           } else {
-            mainContent =
+            finalTextOutput =
               result.output.trim() || '(Command produced no output)';
+            finalDisplayOutput = Array.isArray(cumulativeStdout)
+              ? cumulativeStdout
+              : finalTextOutput;
           }
 
-          let finalOutput = mainContent;
           let finalStatus = CoreToolCallStatus.Success;
+          const prefixWarnings: string[] = [];
 
           if (result.error) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `${result.error.message}\n${finalOutput}`;
+            prefixWarnings.push(result.error.message);
           } else if (result.aborted) {
             finalStatus = CoreToolCallStatus.Cancelled;
-            finalOutput = `Command was cancelled.\n${finalOutput}`;
+            prefixWarnings.push('Command was cancelled.');
           } else if (result.backgrounded) {
             finalStatus = CoreToolCallStatus.Success;
-            finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+            finalDisplayOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+            finalTextOutput = finalDisplayOutput;
+            prefixWarnings.length = 0;
           } else if (result.signal) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;
-          } else if (result.exitCode !== 0) {
+            prefixWarnings.push(
+              `Command terminated by signal: ${result.signal}.`,
+            );
+          } else if (result.exitCode !== null && result.exitCode !== 0) {
             finalStatus = CoreToolCallStatus.Error;
-            finalOutput = `Command exited with code ${result.exitCode}.\n${finalOutput}`;
+            prefixWarnings.push(`Command exited with code ${result.exitCode}.`);
           }
 
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             const finalPwd = fs.readFileSync(pwdFilePath, 'utf8').trim();
             if (finalPwd && finalPwd !== targetDir) {
-              const warning = `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.`;
-              finalOutput = `${warning}\n\n${finalOutput}`;
+              prefixWarnings.push(
+                `WARNING: shell mode is stateless; the directory change to '${finalPwd}' will not persist.\n`,
+              );
+            }
+          }
+
+          if (prefixWarnings.length > 0) {
+            const prefixString = prefixWarnings.join('\n') + '\n';
+            finalTextOutput = prefixString + finalTextOutput;
+
+            if (typeof finalDisplayOutput === 'string') {
+              finalDisplayOutput = prefixString + finalDisplayOutput;
+            } else {
+              const ansiPrefix = prefixString.split('\n').map((line) => [
+                {
+                  text: line,
+                  bold: false,
+                  italic: false,
+                  underline: false,
+                  dim: false,
+                  inverse: false,
+                  fg: '',
+                  bg: '',
+                },
+              ]);
+              finalDisplayOutput = [...ansiPrefix, ...finalDisplayOutput];
             }
           }
 
           const finalToolDisplay: IndividualToolCallDisplay = {
             ...initialToolDisplay,
             status: finalStatus,
-            resultDisplay: finalOutput,
+            resultDisplay: finalDisplayOutput,
           };
 
           if (finalStatus !== CoreToolCallStatus.Cancelled) {
@@ -578,7 +612,11 @@ export const useExecutionLifecycle = (
             );
           }
 
-          addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
+          addShellCommandToGeminiHistory(
+            geminiClient,
+            rawQuery,
+            finalTextOutput,
+          );
         } catch (err) {
           setPendingHistoryItem(null);
           const errorMessage = err instanceof Error ? err.message : String(err);
