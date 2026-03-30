@@ -10,7 +10,13 @@ import type {
   ResumedSessionData,
   MessageRecord,
 } from '@google/gemini-cli-core';
-import { partListUnionToString } from '@google/gemini-cli-core';
+import {
+  isNodeError,
+  partListUnionToString,
+  SESSION_FILE_PREFIX,
+} from '@google/gemini-cli-core';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import type { Content, Part, PartListUnion } from '@google/genai';
 import { logger } from './logger.js';
 
@@ -28,6 +34,21 @@ function ensurePartArray(content: PartListUnion): Part[] {
     return [{ text: content }];
   }
   return [content];
+}
+
+function isConversationRecord(value: unknown): value is ConversationRecord {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<ConversationRecord>;
+  return (
+    typeof candidate.sessionId === 'string' &&
+    typeof candidate.projectHash === 'string' &&
+    typeof candidate.startTime === 'string' &&
+    typeof candidate.lastUpdated === 'string' &&
+    Array.isArray(candidate.messages)
+  );
 }
 
 /**
@@ -146,17 +167,70 @@ export async function resumeSessionHistory(
     return;
   }
 
-  const conversation: ConversationRecord | null =
-    chatRecordingService.getConversation();
-  const filePath: string | null =
-    chatRecordingService.getConversationFilePath();
+  const newFilePath = chatRecordingService.getConversationFilePath();
+  if (!newFilePath) {
+    return;
+  }
+  const chatsDir = path.dirname(newFilePath);
 
-  if (
-    !conversation ||
-    !filePath ||
-    !conversation.messages ||
-    conversation.messages.length === 0
-  ) {
+  const shortId = taskId.slice(0, 8);
+  if (shortId.length !== 8) {
+    logger.warn('[sessionUtils] Invalid taskId for session lookup: ' + taskId);
+    return;
+  }
+
+  let files: string[];
+  try {
+    files = await fs.readdir(chatsDir);
+  } catch (e) {
+    if (isNodeError(e) && e.code === 'ENOENT') {
+      return;
+    }
+    logger.error(
+      '[sessionUtils] Failed to read chats directory ' + chatsDir,
+      e,
+    );
+    return;
+  }
+
+  const matchingFiles = files.filter(
+    (f) =>
+      f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('-' + shortId + '.json'),
+  );
+
+  if (matchingFiles.length === 0) {
+    return;
+  }
+
+  matchingFiles.sort().reverse();
+  const latestFilename = matchingFiles[0];
+  const filePath = path.resolve(chatsDir, latestFilename);
+
+  if (!filePath.startsWith(path.resolve(chatsDir))) {
+    logger.error('[sessionUtils] Path traversal attempt detected: ' + filePath);
+    return;
+  }
+
+  let conversation: ConversationRecord;
+  try {
+    const fileContent = await fs.readFile(filePath, 'utf8');
+    const parsedConversation: unknown = JSON.parse(fileContent);
+    if (!isConversationRecord(parsedConversation)) {
+      logger.error(
+        '[sessionUtils] Invalid session file structure: ' + filePath,
+      );
+      return;
+    }
+    conversation = parsedConversation;
+  } catch (e) {
+    logger.error(
+      '[sessionUtils] Failed to read or parse session file ' + filePath,
+      e,
+    );
+    return;
+  }
+
+  if (!conversation?.messages || conversation.messages.length === 0) {
     return;
   }
 
@@ -168,8 +242,11 @@ export async function resumeSessionHistory(
   const resumedData: ResumedSessionData = { conversation, filePath };
 
   logger.info(
-    `[sessionUtils] Task ${taskId}: Resuming from filesystem with ${clientHistory.length} history entries.`,
+    '[sessionUtils] Task ' +
+      taskId +
+      ': Resuming from filesystem with ' +
+      clientHistory.length +
+      ' history entries.',
   );
   await geminiClient.resumeChat(clientHistory, resumedData);
-  return;
 }
