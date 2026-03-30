@@ -83,11 +83,7 @@ describe('<SubagentGroupDisplay />', () => {
   });
 
   it('renders collapsed view by default with correct agent counts and states', async () => {
-    const { lastFrame, waitUntilReady } = await renderSubagentGroup(
-      mockToolCalls,
-      40,
-    );
-    await waitUntilReady();
+    const { lastFrame } = await renderSubagentGroup(mockToolCalls, 40);
     expect(lastFrame()).toMatchSnapshot();
   });
 

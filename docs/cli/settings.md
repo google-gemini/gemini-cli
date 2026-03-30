@@ -29,8 +29,8 @@ they appear in the UI.
 | Vim Mode                | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                                                                                                        | `false`     |
 | Default Approval Mode   | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can only be enabled via command line (--yolo or --approval-mode=yolo). | `"default"` |
 | Enable Auto Update      | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                                                                                                     | `true`      |
-| Enable Notifications    | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                                                                                                      | `false`     |
-| Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.                                                                                                                                              | `undefined` |
+| Enable Notifications    | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion.                                                                                                                                                                            | `false`     |
+| Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.                                                                     | `undefined` |
 | Plan Model Routing      | `general.plan.modelRouting`        | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.                                                                                                          | `true`      |
 | Retry Fetch Errors      | `general.retryFetchErrors`         | Retry on "exception TypeError: fetch failed sending request" errors.                                                                                                                                                                                          | `true`      |
 | Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                                                                                                             | `10`        |
@@ -101,6 +101,13 @@ they appear in the UI.
 | Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
 | Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
 
+### Agents
+
+| UI Label                  | Setting                                  | Description                                                                                   | Default |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- | ------- |
+| Confirm Sensitive Actions | `agents.browser.confirmSensitiveActions` | Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script). | `false` |
+| Block File Uploads        | `agents.browser.blockFileUploads`        | Hard-block file upload requests from the browser agent.                                       | `false` |
+
 ### Context
 
 | UI Label                             | Setting                                           | Description                                                                                                                                                                                                                                 | Default |
@@ -151,12 +158,14 @@ they appear in the UI.
 | UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
 | -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
+| Enable Git Worktrees       | `experimental.worktrees`                 | Enable automated Git worktree management for parallel work.                                                                                               | `false` |
 | Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Plan                       | `experimental.plan`                      | Enable Plan Mode.                                                                                                                                         | `true`  |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
 | Memory Manager Agent       | `experimental.memoryManager`             | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
+| Enable Context Management  | `experimental.contextManagement`         | Enable logic for context management.                                                                                                                      | `false` |
 | Topic & Update Narration   | `experimental.topicUpdateNarration`      | Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.                                      | `false` |
 
 ### Skills

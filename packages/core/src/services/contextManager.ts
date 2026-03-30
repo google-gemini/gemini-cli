@@ -51,9 +51,10 @@ export class ContextManager {
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
       this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths([
-            ...this.config.getWorkspaceContext().getDirectories(),
-          ])
+        ? getEnvironmentMemoryPaths(
+            [...this.config.getWorkspaceContext().getDirectories()],
+            this.config.getMemoryBoundaryMarkers(),
+          )
         : Promise.resolve([]),
     ]);
 
@@ -76,6 +77,7 @@ export class ContextManager {
     const allContents = await readGeminiMdFiles(
       allPaths,
       this.config.getImportFormat(),
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     const loadedFilePaths = allContents
@@ -98,12 +100,7 @@ export class ContextManager {
     paths: { global: string[]; extension: string[]; project: string[] },
     contentsMap: Map<string, GeminiFileContent>,
   ) {
-    const workingDir = this.config.getWorkingDir();
-    const hierarchicalMemory = categorizeAndConcatenate(
-      paths,
-      contentsMap,
-      workingDir,
-    );
+    const hierarchicalMemory = categorizeAndConcatenate(paths, contentsMap);
 
     this.globalMemory = hierarchicalMemory.global || '';
     this.extensionMemory = hierarchicalMemory.extension || '';
@@ -138,6 +135,7 @@ export class ContextManager {
       trustedRoots,
       this.loadedPaths,
       this.loadedFileIdentities,
+      this.config.getMemoryBoundaryMarkers(),
     );
 
     if (result.files.length === 0) {
@@ -155,7 +153,6 @@ export class ContextManager {
     }
     return concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
-      this.config.getWorkingDir(),
     );
   }
 
