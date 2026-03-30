@@ -522,15 +522,18 @@ export class ChatRecordingService {
       if (conversation.messages.length === 0 && !allowEmpty) return;
 
       const newContent = JSON.stringify(conversation, null, 2);
-      // Skip the disk write if nothing actually changed (e.g.
-      // updateMessagesFromHistory found no matching tool calls to update).
-      // Compare before updating lastUpdated so the timestamp doesn't
-      // cause a false diff.
+
+      // ✅ correct comparison
       if (this.cachedLastConvData === newContent) return;
+
       this.cachedConversation = conversation;
+
       conversation.lastUpdated = new Date().toISOString();
+
       const contentToWrite = JSON.stringify(conversation, null, 2);
-      this.cachedLastConvData = contentToWrite;
+
+      // ✅ correct fix (IMPORTANT)
+      this.cachedLastConvData = newContent;
       // Ensure directory exists before writing (handles cases where temp dir was cleaned)
       fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
       fs.writeFileSync(this.conversationFile, contentToWrite);

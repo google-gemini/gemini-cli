@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
-import * as fsSync from 'node:fs';
+import type * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { FileFilteringOptions } from '../config/constants.js';
@@ -39,55 +39,62 @@ export async function bfsFileSearch(
   options: BfsFileSearchOptions,
 ): Promise<string[]> {
   const { ignoreDirs = [], maxDirs = Infinity, debug = false } = options;
+
   const foundFiles: string[] = [];
   const queue: string[] = [rootDir];
   const visited = new Set<string>();
-  let scannedDirCount = 0;
-  let queueHead = 0; // Pointer-based queue head to avoid expensive splice operations
 
-  // Convert ignoreDirs array to Set for O(1) lookup performance
+  let scannedDirCount = 0;
+  let queueHead = 0;
+
   const ignoreDirsSet = new Set(ignoreDirs);
 
-  // Process directories in parallel batches for maximum performance
-  const PARALLEL_BATCH_SIZE = 15; // Parallel processing batch size for optimal performance
+  // Process directories in parallel batches
+  const PARALLEL_BATCH_SIZE = 15;
 
   while (queueHead < queue.length && scannedDirCount < maxDirs) {
-    // Fill batch with unvisited directories up to the desired size
     const batchSize = Math.min(PARALLEL_BATCH_SIZE, maxDirs - scannedDirCount);
-    const currentBatch = [];
+
+    const currentBatch: string[] = [];
+
+    // ✅ FIXED INNER LOOP
     while (currentBatch.length < batchSize && queueHead < queue.length) {
-      const currentDir = queue[queueHead];
-      queueHead++;
-      if (!visited.has(currentDir)) {
-        visited.add(currentDir);
-        currentBatch.push(currentDir);
+      const currentDir = queue[queueHead++];
+
+      if (visited.has(currentDir)) {
+        continue;
       }
+
+      visited.add(currentDir);
+      currentBatch.push(currentDir);
     }
+
     scannedDirCount += currentBatch.length;
 
-    if (currentBatch.length === 0) continue;
-
+    if (currentBatch.length === 0) break;
     if (debug) {
       logger.debug(
         `Scanning [${scannedDirCount}/${maxDirs}]: batch of ${currentBatch.length}`,
       );
     }
 
-    // Read directories in parallel instead of one by one
+    // Read directories in parallel
     const readPromises = currentBatch.map(async (currentDir) => {
       try {
         const entries = await fs.readdir(currentDir, { withFileTypes: true });
         return { currentDir, entries };
       } catch (error) {
-        // Warn user that a directory could not be read, as this affects search results.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = (error as Error)?.message ?? 'Unknown error';
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+
         debugLogger.warn(
           `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
         );
+
         if (debug) {
           logger.debug(`Full error for ${currentDir}:`, error);
         }
+
         return { currentDir, entries: [] };
       }
     });
@@ -103,63 +110,6 @@ export async function bfsFileSearch(
         queue,
         foundFiles,
       );
-    }
-  }
-
-  return foundFiles;
-}
-
-/**
- * Performs a synchronous breadth-first search for a specific file within a directory structure.
- *
- * @param rootDir The directory to start the search from.
- * @param options Configuration for the search.
- * @returns An array of paths where the file was found.
- */
-export function bfsFileSearchSync(
-  rootDir: string,
-  options: BfsFileSearchOptions,
-): string[] {
-  const { ignoreDirs = [], maxDirs = Infinity, debug = false } = options;
-  const foundFiles: string[] = [];
-  const queue: string[] = [rootDir];
-  const visited = new Set<string>();
-  let scannedDirCount = 0;
-  let queueHead = 0;
-
-  const ignoreDirsSet = new Set(ignoreDirs);
-
-  while (queueHead < queue.length && scannedDirCount < maxDirs) {
-    const currentDir = queue[queueHead];
-    queueHead++;
-
-    if (!visited.has(currentDir)) {
-      visited.add(currentDir);
-      scannedDirCount++;
-
-      if (debug) {
-        logger.debug(
-          `Scanning Sync [${scannedDirCount}/${maxDirs}]: ${currentDir}`,
-        );
-      }
-
-      try {
-        const entries = fsSync.readdirSync(currentDir, { withFileTypes: true });
-        processDirEntries(
-          currentDir,
-          entries,
-          options,
-          ignoreDirsSet,
-          queue,
-          foundFiles,
-        );
-      } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = (error as Error)?.message ?? 'Unknown error';
-        debugLogger.warn(
-          `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
-        );
-      }
     }
   }
 
