@@ -18,6 +18,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    startMemoryService: vi.fn().mockResolvedValue(undefined),
     writeToStdout: vi.fn(),
     patchStdio: vi.fn(() => () => {}),
     createWorkingStdio: vi.fn(() => ({
@@ -327,6 +328,7 @@ describe('gemini.tsx main function cleanup', () => {
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
       getUseAlternateBuffer: vi.fn(() => false),
+      isMemoryManagerEnabled: vi.fn(() => false),
       ...overrides,
     } as unknown as Config;
   }
