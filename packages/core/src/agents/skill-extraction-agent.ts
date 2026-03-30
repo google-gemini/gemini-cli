@@ -14,6 +14,7 @@ import {
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 const SkillExtractionSchema = z.object({
   response: z
@@ -134,9 +135,13 @@ function buildSystemPrompt(skillsDir: string): string {
     'SKILL FORMAT',
     '============================================================',
     '',
-    'Each skill is a directory containing a SKILL.md file with YAML frontmatter.',
+    'Each skill is a directory containing a SKILL.md file with YAML frontmatter',
+    'and optional supporting scripts.',
     '',
-    `Directory: ${skillsDir}/<skill-name>/SKILL.md`,
+    'Directory structure:',
+    `  ${skillsDir}/<skill-name>/`,
+    '    SKILL.md            # Required entrypoint',
+    '    scripts/<tool>.*    # Optional helper scripts (Python stdlib-only or shell)',
     '',
     'SKILL.md structure:',
     '',
@@ -157,8 +162,13 @@ function buildSystemPrompt(skillsDir: string): string {
     '  ## Verification',
     '  <Concrete success checks>',
     '',
+    'Supporting scripts (optional but recommended when applicable):',
+    '- Put helper scripts in scripts/ and reference them from SKILL.md',
+    '- Prefer Python (stdlib only) or small shell scripts',
+    '- Make scripts safe: no destructive actions, no secrets, deterministic output',
+    '- Include a usage example in SKILL.md',
+    '',
     'Naming: kebab-case (e.g., fix-lint-errors, run-migrations).',
-    'Max length: 300 lines.',
     '',
     '============================================================',
     'QUALITY RULES (STRICT)',
@@ -228,7 +238,7 @@ export const SkillExtractionAgent = (
     schema: SkillExtractionSchema,
   },
   modelConfig: {
-    model: 'inherit',
+    model: DEFAULT_GEMINI_FLASH_MODEL,
   },
   toolConfig: {
     tools: [

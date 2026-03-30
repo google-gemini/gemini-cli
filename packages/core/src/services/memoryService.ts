@@ -33,7 +33,8 @@ import type { AgentLoopContext } from '../config/agent-loop-context.js';
 const LOCK_FILENAME = '.extraction.lock';
 const STATE_FILENAME = '.extraction-state.json';
 const LOCK_STALE_MS = 35 * 60 * 1000; // 35 minutes (exceeds agent's 30-min time limit)
-const MIN_USER_MESSAGES = 3;
+const MIN_USER_MESSAGES = 10;
+const MIN_IDLE_MS = 3 * 60 * 60 * 1000; // 3 hours
 const MAX_SESSION_INDEX_SIZE = 50;
 
 /**
@@ -401,6 +402,10 @@ export async function buildSessionIndex(
       // Skip subagent sessions
       if (parsed.kind === 'subagent') continue;
 
+      // Skip sessions that are still active (not idle for 3+ hours)
+      const lastUpdated = new Date(parsed.lastUpdated).getTime();
+      if (Date.now() - lastUpdated < MIN_IDLE_MS) continue;
+
       // Skip sessions with too few user messages
       const userMessageCount = parsed.messages.filter(
         (m) => m.type === 'user',
@@ -685,18 +690,12 @@ export async function startMemoryService(config: Config): Promise<void> {
     restoreConfig = agentLoopResult.restoreConfig;
 
     // Register the agent's model config since it's not going through AgentRegistry.
-    // This resolves 'inherit' to the parent session's model and creates the
-    // model config alias that the executor uses for API calls.
     const modelAlias = getModelConfigAlias(agentDefinition);
-    const modelToUse = config.getModel();
     config.modelConfigService.registerRuntimeModelConfig(modelAlias, {
-      modelConfig: {
-        ...agentDefinition.modelConfig,
-        model: modelToUse,
-      },
+      modelConfig: agentDefinition.modelConfig,
     });
     debugLogger.log(
-      `[MemoryService] Starting extraction agent (model: ${modelToUse}, maxTurns: 30, maxTime: 30min)`,
+      `[MemoryService] Starting extraction agent (model: ${agentDefinition.modelConfig.model}, maxTurns: 30, maxTime: 30min)`,
     );
 
     // Create and run the extraction agent

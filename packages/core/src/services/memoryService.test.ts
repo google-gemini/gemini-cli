@@ -361,7 +361,7 @@ describe('memoryService', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('filters out sessions with fewer than 3 user messages', async () => {
+    it('filters out sessions with fewer than 10 user messages', async () => {
       const { getUnprocessedSessions } = await import('./memoryService.js');
 
       // 2 messages total: 1 user (index 0) + 1 gemini (index 1)
@@ -385,11 +385,11 @@ describe('memoryService', () => {
     it('returns sessions sorted most recent first, up to cap', async () => {
       const { getUnprocessedSessions } = await import('./memoryService.js');
 
-      // Create 7 sessions with enough user messages (6 messages = 3 user + 3 gemini)
+      // Create 7 sessions with enough user messages (20 messages = 10 user + 10 gemini)
       for (let i = 0; i < 7; i++) {
         const conversation = createConversation({
           sessionId: `session-${i}`,
-          messageCount: 6,
+          messageCount: 20,
         });
         const paddedIndex = String(i).padStart(4, '0');
         await fs.writeFile(
@@ -670,7 +670,7 @@ describe('memoryService', () => {
       // Write a valid session that will pass all filters
       const conversation = createConversation({
         sessionId: 'error-session',
-        messageCount: 6,
+        messageCount: 20,
       });
       await fs.writeFile(
         path.join(chatsDir, 'session-2025-01-01T00-00-err00001.json'),
@@ -801,7 +801,7 @@ describe('memoryService', () => {
       const conversation = createConversation({
         sessionId: 'brand-new',
         summary: 'A brand new session',
-        messageCount: 6,
+        messageCount: 20,
       });
       await fs.writeFile(
         path.join(
@@ -823,7 +823,7 @@ describe('memoryService', () => {
       const conversation = createConversation({
         sessionId: 'old-session',
         summary: 'An old session',
-        messageCount: 6,
+        messageCount: 20,
       });
       await fs.writeFile(
         path.join(
@@ -855,7 +855,7 @@ describe('memoryService', () => {
       const conversation = createConversation({
         sessionId: 'detailed-session',
         summary: 'Debugging the login flow',
-        messageCount: 6,
+        messageCount: 20,
       });
       const fileName = `${SESSION_FILE_PREFIX}2025-01-01T00-00-detail01.json`;
       await fs.writeFile(
@@ -875,7 +875,7 @@ describe('memoryService', () => {
       const conversation = createConversation({
         sessionId: 'sub-session',
         kind: 'subagent',
-        messageCount: 6,
+        messageCount: 20,
       });
       await fs.writeFile(
         path.join(
@@ -891,7 +891,7 @@ describe('memoryService', () => {
       expect(result.newSessionIds).toEqual([]);
     });
 
-    it('filters out sessions with fewer than 3 user messages', async () => {
+    it('filters out sessions with fewer than 10 user messages', async () => {
       const { buildSessionIndex } = await import('./memoryService.js');
 
       // 2 messages total: 1 user (index 0) + 1 gemini (index 1)
@@ -921,7 +921,7 @@ describe('memoryService', () => {
         const conversation = createConversation({
           sessionId: `capped-session-${i}`,
           summary: `Summary ${i}`,
-          messageCount: 6,
+          messageCount: 20,
         });
         const paddedIndex = String(i).padStart(4, '0');
         await fs.writeFile(
@@ -947,7 +947,7 @@ describe('memoryService', () => {
       const oldConv = createConversation({
         sessionId: 'processed-one',
         summary: 'Old',
-        messageCount: 6,
+        messageCount: 20,
       });
       await fs.writeFile(
         path.join(
@@ -960,7 +960,7 @@ describe('memoryService', () => {
       const newConv = createConversation({
         sessionId: 'fresh-one',
         summary: 'New',
-        messageCount: 6,
+        messageCount: 20,
       });
       await fs.writeFile(
         path.join(
