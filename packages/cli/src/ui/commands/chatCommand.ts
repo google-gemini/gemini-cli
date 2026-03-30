@@ -75,6 +75,7 @@ const listCommand: SlashCommand = {
   description: 'List saved manual conversation checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: async (context): Promise<void> => {
     const chatDetails = await getSavedChatTags(context, false);
 
@@ -406,14 +407,24 @@ export const chatResumeSubCommands: SlashCommand[] = [
   checkpointCompatibilityCommand,
 ];
 
+import { parseSlashCommand } from '../../utils/commands.js';
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Browse auto-saved conversations and manage chat checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async () => ({
-    type: 'dialog',
-    dialog: 'sessionBrowser',
-  }),
+  action: async (context, args) => {
+    if (args) {
+      const parsed = parseSlashCommand(`/${args}`, chatResumeSubCommands);
+      if (parsed.commandToExecute?.action) {
+        return parsed.commandToExecute.action(context, parsed.args);
+      }
+    }
+    return {
+      type: 'dialog',
+      dialog: 'sessionBrowser',
+    };
+  },
   subCommands: chatResumeSubCommands,
 };
