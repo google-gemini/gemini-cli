@@ -39,9 +39,6 @@ import { parseWindowsSandboxDenials } from './windowsSandboxDenialUtils.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let registeredCleanup = false;
-const filesToCleanup: string[] = [];
-
 /**
  * A SandboxManager implementation for Windows that uses Restricted Tokens,
  * Job Objects, and Low Integrity levels for process isolation.
@@ -56,9 +53,12 @@ export class WindowsSandboxManager implements SandboxManager {
    */
   private readonly allowedCache = new Set<string>();
   private readonly deniedCache = new Set<string>();
+  private manifestTempDir?: string;
+  private readonly exitCleanupHandler: () => void;
 
   constructor(private readonly options: GlobalSandboxOptions) {
     this.helperPath = path.resolve(__dirname, 'GeminiSandbox.exe');
+    this.exitCleanupHandler = () => this.cleanup();
   }
 
   isKnownSafeCommand(args: string[]): boolean {
@@ -272,28 +272,29 @@ export class WindowsSandboxManager implements SandboxManager {
     forbiddenPaths.forEach((p) => pathsToDeny.add(p));
 
     const searchDirs = new Set([this.options.workspace, ...allowedPaths]);
-    for (const dir of searchDirs) {
-      try {
-        const secrets = await findSecretFiles(dir, 3);
-        secrets.forEach((s) => pathsToDeny.add(s));
-      } catch (e) {
-        debugLogger.log(
-          `WindowsSandboxManager: Secret scan failed for ${dir}`,
-          e,
-        );
-      }
-    }
+    await Promise.all(
+      Array.from(searchDirs).map(async (dir) => {
+        try {
+          const secrets = await findSecretFiles(dir, 3);
+          secrets.forEach((s) => pathsToDeny.add(s));
+        } catch (e) {
+          debugLogger.log(
+            `WindowsSandboxManager: Secret scan failed for ${dir}`,
+            e,
+          );
+        }
+      }),
+    );
 
     // 3. Generate setup manifest operations (L = Grant, D = Deny)
-    const pendingAcls: string[] = [];
-    for (const p of pathsToGrant) {
-      const op = await this.getLowIntegrityOp(p, 'L');
-      if (op) pendingAcls.push(op);
-    }
-    for (const p of pathsToDeny) {
-      const op = await this.getLowIntegrityOp(p, 'D');
-      if (op) pendingAcls.push(op);
-    }
+    const opResults = await Promise.all([
+      ...Array.from(pathsToGrant).map((p) => this.getLowIntegrityOp(p, 'L')),
+      ...Array.from(pathsToDeny).map((p) => this.getLowIntegrityOp(p, 'D')),
+    ]);
+
+    const pendingAcls = opResults.filter(
+      (op): op is string => op !== undefined,
+    );
 
     // 4. Ensure governance files are write-protected
     for (const file of GOVERNANCE_FILES) {
@@ -306,25 +307,18 @@ export class WindowsSandboxManager implements SandboxManager {
     // 5. Create setup manifest if needed
     let manifestPath: string | undefined;
     if (pendingAcls.length > 0) {
-      const tempDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'gemini-cli-sandbox-'),
-      );
-      manifestPath = path.join(tempDir, 'acls.txt');
-      fs.writeFileSync(manifestPath, pendingAcls.join('\n'));
-      filesToCleanup.push(tempDir);
-
-      if (!registeredCleanup) {
-        process.on('exit', () => {
-          filesToCleanup.forEach((f) => {
-            try {
-              fs.rmSync(f, { recursive: true, force: true });
-            } catch {
-              /* ignore */
-            }
-          });
-        });
-        registeredCleanup = true;
+      if (!this.manifestTempDir) {
+        this.manifestTempDir = fs.mkdtempSync(
+          path.join(os.tmpdir(), 'gemini-cli-sandbox-'),
+        );
+        process.on('exit', this.exitCleanupHandler);
       }
+
+      manifestPath = path.join(
+        this.manifestTempDir,
+        `acls-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+      );
+      fs.writeFileSync(manifestPath, pendingAcls.join('\n'));
     }
 
     // 6. Final command construction
@@ -401,5 +395,17 @@ export class WindowsSandboxManager implements SandboxManager {
       resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
       resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
     );
+  }
+
+  cleanup(): void {
+    if (this.manifestTempDir) {
+      try {
+        fs.rmSync(this.manifestTempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+      this.manifestTempDir = undefined;
+    }
+    process.removeListener('exit', this.exitCleanupHandler);
   }
 }
