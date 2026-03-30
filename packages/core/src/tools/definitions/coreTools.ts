@@ -96,7 +96,6 @@ export {
   SKILL_PARAM_NAME,
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
-  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility

@@ -27,7 +27,6 @@ import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
   TOPIC_PARAM_SUMMARY,
-  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 /**
@@ -216,7 +215,7 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
   return {
     name: UPDATE_TOPIC_TOOL_NAME,
     description:
-      'Manages your narrative flow. Include `title` and `summary` only when starting a new Chapter (logical phase) or shifting strategic intent.',
+      'Manages your narrative flow. Include `title` and `summary` only when starting a new Chapter (logical phase).',
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -227,15 +226,10 @@ export function getUpdateTopicDeclaration(): FunctionDeclaration {
         [TOPIC_PARAM_SUMMARY]: {
           type: 'string',
           description:
-            '(OPTIONAL) A detailed summary (5-10 sentences) covering both the work completed in the previous topic and the strategic intent of the new topic. This is required when transitioning between topics to maintain continuity.',
-        },
-        [TOPIC_PARAM_STRATEGIC_INTENT]: {
-          type: 'string',
-          description:
-            'A mandatory one-sentence statement of your immediate intent.',
+            '(OPTIONAL) A detailed summary (5-10 sentences) covering both the work completed in the previous topic and the high-level goals of the new topic. This is required when transitioning between topics to maintain continuity.',
         },
       },
-      required: [TOPIC_PARAM_STRATEGIC_INTENT],
+      required: [],
     },
   };
 }

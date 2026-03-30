@@ -10,7 +10,7 @@ import { ToolGroupMessage } from './ToolGroupMessage.js';
 import {
   UPDATE_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
-  TOPIC_PARAM_STRATEGIC_INTENT,
+  TOPIC_PARAM_SUMMARY,
   makeFakeConfig,
   CoreToolCallStatus,
   ApprovalMode,
@@ -264,7 +264,6 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
           },
         }),
       ];
@@ -280,19 +279,18 @@ describe('<ToolGroupMessage />', () => {
 
       const output = lastFrame();
       expect(output).toContain('Testing Topic');
-      expect(output).toContain('— This is the description');
       expect(output).toMatchSnapshot('update_topic_tool');
       unmount();
     });
 
-    it('renders update_topic tool call with summary instead of strategic_intent', async () => {
+    it('renders update_topic tool call with summary', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'topic-tool-summary',
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            summary: 'This is the summary',
+            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
           },
         }),
       ];
@@ -319,7 +317,7 @@ describe('<ToolGroupMessage />', () => {
           name: UPDATE_TOPIC_TOOL_NAME,
           args: {
             [TOPIC_PARAM_TITLE]: 'Testing Topic',
-            [TOPIC_PARAM_STRATEGIC_INTENT]: 'This is the description',
+            [TOPIC_PARAM_SUMMARY]: 'This is the summary',
           },
         }),
         createToolCall({
