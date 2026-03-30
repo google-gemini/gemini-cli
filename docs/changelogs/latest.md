@@ -71,7 +71,7 @@ npm install -g @google/gemini-cli
   in [#21931](https://github.com/google-gemini/gemini-cli/pull/21931)
 - feat(cli): support removing keybindings via '-' prefix by @scidomino in
   [#22042](https://github.com/google-gemini/gemini-cli/pull/22042)
-- feat(policy): add --admin-policy flag for supplemental admin policies by
+- feat(policy): add `--admin-policy` flag for supplemental admin policies by
   @galz10 in [#20360](https://github.com/google-gemini/gemini-cli/pull/20360)
 - merge duplicate imports packages/cli/src subtask1 by @Nixxx19 in
   [#22040](https://github.com/google-gemini/gemini-cli/pull/22040)
@@ -155,7 +155,7 @@ npm install -g @google/gemini-cli
 - fix(core): resolve MCP tool FQN validation, schema export, and wildcards in
   subagents by @abhipatel12 in
   [#22069](https://github.com/google-gemini/gemini-cli/pull/22069)
-- fix(cli): validate --model argument at startup by @JaisalJain in
+- fix(cli): validate `--model` argument at startup by @JaisalJain in
   [#21393](https://github.com/google-gemini/gemini-cli/pull/21393)
 - fix(core): handle policy ALLOW for exit_plan_mode by @backnotprop in
   [#21802](https://github.com/google-gemini/gemini-cli/pull/21802)
@@ -263,7 +263,7 @@ npm install -g @google/gemini-cli
   [#22379](https://github.com/google-gemini/gemini-cli/pull/22379)
 - feat(security): add disableAlwaysAllow setting to disable auto-approvals by
   @galz10 in [#21941](https://github.com/google-gemini/gemini-cli/pull/21941)
-- Revert "fix(cli): validate --model argument at startup" by @sehoon38 in
+- Revert "fix(cli): validate `--model` argument at startup" by @sehoon38 in
   [#22378](https://github.com/google-gemini/gemini-cli/pull/22378)
 - fix(mcp): handle equivalent root resource URLs in OAuth validation by @galz10
   in [#20231](https://github.com/google-gemini/gemini-cli/pull/20231)

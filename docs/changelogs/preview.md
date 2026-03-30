@@ -196,7 +196,7 @@ npm install -g @google/gemini-cli@preview
   @jerop in [#22973](https://github.com/google-gemini/gemini-cli/pull/22973)
 - Add support for linking in the extension registry by @kevinjwang1 in
   [#23153](https://github.com/google-gemini/gemini-cli/pull/23153)
-- feat(extensions): add --skip-settings flag to install command by @Ratish1 in
+- feat(extensions): add `--skip-settings` flag to install command by @Ratish1 in
   [#17212](https://github.com/google-gemini/gemini-cli/pull/17212)
 - feat(telemetry): track if session is running in a Git worktree by @jerop in
   [#23265](https://github.com/google-gemini/gemini-cli/pull/23265)
@@ -372,7 +372,7 @@ npm install -g @google/gemini-cli@preview
   [#23645](https://github.com/google-gemini/gemini-cli/pull/23645)
 - fix(core): improve remote agent streaming UI and UX by @adamfweidman in
   [#23633](https://github.com/google-gemini/gemini-cli/pull/23633)
-- perf(cli): optimize --version startup time by @sehoon38 in
+- perf(cli): optimize `--version` startup time by @sehoon38 in
   [#23671](https://github.com/google-gemini/gemini-cli/pull/23671)
 - refactor(core): stop gemini CLI from producing unsafe casts by @gundermanc in
   [#23611](https://github.com/google-gemini/gemini-cli/pull/23611)
