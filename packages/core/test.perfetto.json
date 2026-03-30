@@ -1,0 +1,84 @@
+{
+  "traceEvents": [
+    {
+      "name": "heap_snapshot_analysis",
+      "ph": "i",
+      "ts": 0,
+      "pid": 1,
+      "tid": 1,
+      "args": {
+        "node_count": 10,
+        "edge_count": 5,
+        "strings_count": 13,
+        "total_heap_size_kb": "102300.00",
+        "file_size_kb": "0.73 KB",
+        "largest_objects": [
+          {
+            "type": "object",
+            "name": "object10",
+            "size_bytes": 52428800,
+            "size_kb": "51200.00"
+          },
+          {
+            "type": "object",
+            "name": "object9",
+            "size_bytes": 26214400,
+            "size_kb": "25600.00"
+          },
+          {
+            "type": "object",
+            "name": "object8",
+            "size_bytes": 13107200,
+            "size_kb": "12800.00"
+          },
+          {
+            "type": "object",
+            "name": "object7",
+            "size_bytes": 6553600,
+            "size_kb": "6400.00"
+          },
+          {
+            "type": "object",
+            "name": "object6",
+            "size_bytes": 3276800,
+            "size_kb": "3200.00"
+          },
+          {
+            "type": "object",
+            "name": "object5",
+            "size_bytes": 1638400,
+            "size_kb": "1600.00"
+          },
+          {
+            "type": "object",
+            "name": "object4",
+            "size_bytes": 819200,
+            "size_kb": "800.00"
+          },
+          {
+            "type": "object",
+            "name": "object3",
+            "size_bytes": 409600,
+            "size_kb": "400.00"
+          },
+          {
+            "type": "object",
+            "name": "object2",
+            "size_bytes": 204800,
+            "size_kb": "200.00"
+          },
+          {
+            "type": "object",
+            "name": "object1",
+            "size_bytes": 102400,
+            "size_kb": "100.00"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "analyzer_version": "1.0.0",
+    "snapshot_timestamp": "2026-03-30T17:53:34.115Z"
+  }
+}
