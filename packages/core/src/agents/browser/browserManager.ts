@@ -215,20 +215,21 @@ export class BrowserManager {
    * @param toolName The name of the tool to call
    * @param args Arguments to pass to the tool
    * @param signal Optional AbortSignal to cancel the call
+   * @param isInternal Determine if the tool is for internal execution
    * @returns The result from the MCP server
    */
   async callTool(
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
-    shouldCount: boolean = true,
+    isInternal: boolean = true,
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
     // Hard enforcement of per-action rate limit
-    if (shouldCount) {
+    if (isInternal) {
       if (this.actionCounter >= this.maxActionsPerTask) {
         const error = new Error(
           `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +
