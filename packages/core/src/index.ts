@@ -160,6 +160,7 @@ export * from './services/sandboxManager.js';
 
 // Export Execution Lifecycle Service
 export * from './services/executionLifecycleService.js';
+export * from './services/promptWatcherService.js';
 
 // Export Injection Service
 export * from './config/injectionService.js';
