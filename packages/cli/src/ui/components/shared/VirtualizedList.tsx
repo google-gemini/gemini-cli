@@ -432,7 +432,10 @@ function VirtualizedList<T>(
   const observedNodes = useRef<Set<DOMElement>>(new Set());
   useLayoutEffect(() => {
     const currentNodes = new Set<DOMElement>();
-    for (let i = startIndex; i <= endIndex; i++) {
+    const observeStart = renderStatic || overflowToBackbuffer ? 0 : startIndex;
+    const observeEnd = renderStatic ? data.length - 1 : endIndex;
+
+    for (let i = observeStart; i <= observeEnd; i++) {
       const node = itemRefs.current[i];
       const item = data[i];
       if (node && item) {
@@ -478,10 +481,9 @@ function VirtualizedList<T>(
       const item = data[i];
       if (item) {
         const isOutsideViewport = i < startIndex || i > endIndex;
-        const shouldBeStatic = !!(
-          (renderStatic && isOutsideViewport) ||
-          isStaticItem?.(item, i)
-        );
+        const shouldBeStatic =
+          !!((renderStatic && isOutsideViewport) || isStaticItem?.(item, i)) &&
+          false; // XXX
         if (shouldBeStatic) {
           staticCount++;
         }
@@ -498,7 +500,7 @@ function VirtualizedList<T>(
             width={width}
             containerWidth={containerWidth}
             itemRef={(el: DOMElement | null) => {
-              if (i >= startIndex && i <= endIndex) {
+              if (i >= renderRangeStart && i <= renderRangeEnd) {
                 itemRefs.current[i] = el;
               }
             }}
@@ -509,7 +511,7 @@ function VirtualizedList<T>(
   }
 
   debugLogger.log(
-    `VirtualizedList rendered items: ${renderedItems.length}, isStatic property: ${!!isStatic}, static elements: ${staticCount}`,
+    `VirtualizedList rendered items: ${renderedItems.length}, isStatic property: ${!!isStatic}, static elements: ${staticCount}, total height: ${totalHeight}, item heights: ${data.map((_, i) => offsets[i + 1] - offsets[i]).join(', ')}`,
   );
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);

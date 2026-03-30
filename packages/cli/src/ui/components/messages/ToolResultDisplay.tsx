@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, StaticRender, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
