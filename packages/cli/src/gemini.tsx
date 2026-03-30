@@ -671,7 +671,20 @@ export async function main() {
       }
     }
 
+    // Register SessionEnd hook for graceful exit
+    registerCleanup(async () => {
+      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+    });
+
     if (!input) {
+      // Exit gracefully if we've already handled a subcommand (playground, mcp, etc.)
+      if (argv.isCommand) {
+        await runExitCleanup();
+        // Restore TTY state and exit alternate buffer before shell prompt
+        process.stdout.write('\x1b[?1049l\x1b[1G\x1b[2K\x1b[?25h');
+        process.exit(ExitCodes.SUCCESS);
+      }
+
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
