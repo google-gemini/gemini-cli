@@ -50,6 +50,7 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
+import { recordBtwUsageMetrics } from '../telemetry/index.js';
 import type {
   DefaultHookOutput,
   AfterAgentHookOutput,
@@ -1246,6 +1247,8 @@ export class GeminiClient {
     };
 
     yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+
+    recordBtwUsageMetrics(this.config);
 
     // Use a custom role for BTW to avoid side-effects in telemetry if needed,
     // but for now LlmRole.MAIN is fine as it's the primary model talking.

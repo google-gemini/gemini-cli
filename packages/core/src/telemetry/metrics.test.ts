@@ -104,6 +104,7 @@ describe('Telemetry Metrics', () => {
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
   let recordPlanExecutionModule: typeof import('./metrics.js').recordPlanExecution;
+  let recordBtwUsageMetricsModule: typeof import('./metrics.js').recordBtwUsageMetrics;
   let recordKeychainAvailabilityModule: typeof import('./metrics.js').recordKeychainAvailability;
   let recordTokenStorageInitializationModule: typeof import('./metrics.js').recordTokenStorageInitialization;
   let recordInvalidChunkModule: typeof import('./metrics.js').recordInvalidChunk;
@@ -158,6 +159,7 @@ describe('Telemetry Metrics', () => {
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
     recordPlanExecutionModule = metricsJsModule.recordPlanExecution;
+    recordBtwUsageMetricsModule = metricsJsModule.recordBtwUsageMetrics;
     recordKeychainAvailabilityModule =
       metricsJsModule.recordKeychainAvailability;
     recordTokenStorageInitializationModule =
@@ -269,6 +271,28 @@ describe('Telemetry Metrics', () => {
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
         approval_mode: 'autoEdit',
+      });
+    });
+  });
+
+  describe('recordBtwUsageMetrics', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordBtwUsageMetricsModule(config);
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a btw usage event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordBtwUsageMetricsModule(config);
+
+      // Called for session, then for btw usage
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
       });
     });
   });
