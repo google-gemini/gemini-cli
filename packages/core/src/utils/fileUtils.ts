@@ -240,6 +240,17 @@ export function getRealPath(filePath: string): string {
 }
 
 /**
+ * Async version of getRealPath.
+ */
+export async function getRealPathAsync(filePath: string): Promise<string> {
+  try {
+    return await fsPromises.realpath(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
  * Checks if a file's content is empty or contains only whitespace.
  * Efficiently checks file size first, and only samples the beginning of the file.
  * Honors Unicode BOM encodings.
@@ -412,8 +423,10 @@ export async function processSingleFileContent(
   endLine?: number,
 ): Promise<ProcessedFileReadResult> {
   try {
-    if (!fs.existsSync(filePath)) {
-      // Sync check is acceptable before async read
+    let stats: fs.Stats;
+    try {
+      stats = await fsPromises.stat(filePath);
+    } catch (_e) {
       return {
         llmContent:
           'Could not read file because no file was found at the specified path.',
@@ -422,7 +435,7 @@ export async function processSingleFileContent(
         errorType: ToolErrorType.FILE_NOT_FOUND,
       };
     }
-    const stats = await fs.promises.stat(filePath);
+
     if (stats.isDirectory()) {
       return {
         llmContent:

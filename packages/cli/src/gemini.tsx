@@ -5,6 +5,7 @@
  */
 
 import {
+  type AdminControlsSettings,
   type StartupWarning,
   WarningPriority,
   type Config,
@@ -30,9 +31,9 @@ import {
   SessionEndReason,
   ValidationCancelledError,
   ValidationRequiredError,
-  type AdminControlsSettings,
   debugLogger,
   isHeadlessMode,
+  initializeGlobalDispatcher,
 } from '@google/gemini-cli-core';
 
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -44,10 +45,10 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
 import {
-  loadSettings,
   SettingScope,
   type DnsResolutionOrder,
   type LoadedSettings,
+  loadSettingsAsync,
 } from './config/settings.js';
 import {
   loadTrustedFolders,
@@ -187,19 +188,15 @@ export async function startInteractiveUI(
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
+  // Initialize network early (proxy detection, connection pooling)
+  initializeGlobalDispatcher();
+
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
   // sandbox mode, we re-fetch the admin controls from the server once we enter
   // the sandbox.
   // TODO: Cache settings in sandbox mode as well.
   const adminControlsListner = setupAdminControlsListener();
   registerCleanup(adminControlsListner.cleanup);
-
-  const cleanupStdio = patchStdio();
-  registerSyncCleanup(() => {
-    // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
-    cleanupStdio();
-  });
 
   setupUnhandledRejectionHandler();
 
@@ -209,8 +206,16 @@ export async function main() {
   slashCommandConflictHandler.start();
   registerCleanup(() => slashCommandConflictHandler.stop());
 
+  // We patch stdio late to allow early startup errors to be visible.
+  const cleanupStdio = patchStdio();
+  registerSyncCleanup(() => {
+    // This is needed to ensure we don't lose any buffered output.
+    initializeOutputListenersAndFlush();
+    cleanupStdio();
+  });
+
   const loadSettingsHandle = startupProfiler.start('load_settings');
-  const settings = loadSettings();
+  const settings = await loadSettingsAsync();
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
@@ -230,7 +235,7 @@ export async function main() {
     cleanupToolOutputFiles(settings.merged),
     cleanupBackgroundLogs(),
   ])
-    .catch((e) => {
+    .catch((e: unknown) => {
       debugLogger.error('Early cleanup failed:', e);
     })
     .finally(() => {
@@ -249,7 +254,7 @@ export async function main() {
     coreEvents.emitFeedback('warning', error.message);
   });
 
-  const trustedFolders = loadTrustedFolders();
+  const trustedFolders = await loadTrustedFolders();
   trustedFolders.errors.forEach((error: TrustedFoldersError) => {
     coreEvents.emitFeedback(
       'warning',

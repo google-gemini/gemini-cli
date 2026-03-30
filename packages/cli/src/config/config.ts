@@ -448,6 +448,7 @@ export async function parseArguments(
     .alias('v', 'version')
     .help()
     .alias('h', 'help')
+    .completion()
     .strict()
     .demandCommand(0, 0) // Allow base command to run with no subcommands
     .exitProcess(false);
@@ -543,10 +544,12 @@ export async function loadCliConfig(
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
-    isWorkspaceTrusted(settings, cwd, undefined, {
-      prompt: argv.prompt,
-      query: argv.query,
-    })?.isTrusted ?? false;
+    (
+      await isWorkspaceTrusted(settings, cwd, undefined, {
+        prompt: argv.prompt,
+        query: argv.query,
+      })
+    )?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed

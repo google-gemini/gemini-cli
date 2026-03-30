@@ -7,10 +7,11 @@
  */
 
 import { main } from './src/gemini.js';
-import { FatalError, writeToStderr } from '@google/gemini-cli-core';
-import { runExitCleanup } from './src/utils/cleanup.js';
+import { writeToStderr } from '@google/gemini-cli-core';
+import { relaunchAppInChildProcess } from './src/utils/relaunch.js';
 
 // --- Global Entry Point ---
+// ... (uncaughtException handler remains the same)
 
 // Suppress known race condition error in node-pty on Windows
 // Tracking bug: https://github.com/microsoft/node-pty/issues/827
@@ -35,37 +36,25 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-main().catch(async (error) => {
-  // Set a timeout to force exit if cleanup hangs
-  const cleanupTimeout = setTimeout(() => {
-    writeToStderr('Cleanup timed out, forcing exit...\n');
-    process.exit(1);
-  }, 5000);
-
-  try {
-    await runExitCleanup();
-  } catch (cleanupError) {
-    writeToStderr(
-      `Error during final cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
-    );
-  } finally {
-    clearTimeout(cleanupTimeout);
-  }
-
-  if (error instanceof FatalError) {
-    let errorMessage = error.message;
-    if (!process.env['NO_COLOR']) {
-      errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
+// Start the application.
+// We use a supervised child process to enable self-healing and automatic session recovery.
+relaunchAppInChildProcess([], [])
+  .then(async () => {
+    // relaunchAppInChildProcess either spawns a child and waits for it (supervisor mode)
+    // or returns immediately if GEMINI_CLI_NO_RELAUNCH is set (supervised child mode).
+    // In supervised child mode, we need to run main() here.
+    if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+      await main();
     }
-    writeToStderr(errorMessage + '\n');
-    process.exit(error.exitCode);
-  }
-
-  writeToStderr('An unexpected critical error occurred:');
-  if (error instanceof Error) {
-    writeToStderr(error.stack + '\n');
-  } else {
-    writeToStderr(String(error) + '\n');
-  }
-  process.exit(1);
-});
+    // In supervisor mode, the child process has already run and exited normally.
+  })
+  .catch((error) => {
+    // If the supervisor itself fails to launch, fall back to a direct execution
+    writeToStderr(
+      `[Supervisor] Initial launch failed: ${error.message}. Falling back to direct mode.\n`,
+    );
+    main().catch((fatal) => {
+      writeToStderr(`[Fatal] Direct execution failed: ${fatal.message}\n`);
+      process.exit(1);
+    });
+  });

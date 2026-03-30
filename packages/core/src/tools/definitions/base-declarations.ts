@@ -67,6 +67,8 @@ export const EDIT_PARAM_INSTRUCTION = 'instruction';
 export const EDIT_PARAM_OLD_STRING = 'old_string';
 export const EDIT_PARAM_NEW_STRING = 'new_string';
 export const EDIT_PARAM_ALLOW_MULTIPLE = 'allow_multiple';
+export const EDIT_PARAM_START_LINE = 'start_line';
+export const EDIT_PARAM_END_LINE = 'end_line';
 
 // -- google_web_search --
 export const WEB_SEARCH_TOOL_NAME = 'google_web_search';

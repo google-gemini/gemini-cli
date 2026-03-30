@@ -95,7 +95,7 @@ describe('useFolderTrust', () => {
       setValue: vi.fn(),
     } as unknown as LoadedTrustedFolders;
 
-    vi.spyOn(trustedFolders, 'loadTrustedFolders').mockReturnValue(
+    vi.spyOn(trustedFolders, 'loadTrustedFolders').mockResolvedValue(
       mockTrustedFolders,
     );
     isWorkspaceTrustedSpy = vi.spyOn(trustedFolders, 'isWorkspaceTrusted');

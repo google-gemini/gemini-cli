@@ -150,16 +150,15 @@ describe('WindowsSandboxManager', () => {
     const result = await managerWithPolicy.prepareCommand(req);
     expect(result.args[0]).toBe('1'); // Network allowed by persistent policy
 
-    const icaclsArgs = vi
+    const nativeCalls = vi
       .mocked(spawnAsync)
-      .mock.calls.filter((c) => c[0] === 'icacls')
-      .map((c) => c[1]);
+      .mock.calls.filter((c) => c[1] && c[1][0] === '__grant')
+      .map((c) => ({ exe: c[0], path: c[1][1] }));
 
-    expect(icaclsArgs).toContainEqual([
-      persistentPath,
-      '/setintegritylevel',
-      '(OI)(CI)Low',
-    ]);
+    expect(nativeCalls).toContainEqual({
+      exe: expect.stringContaining('GeminiSandbox.exe'),
+      path: persistentPath,
+    });
   });
 
   it('should sanitize environment variables', async () => {
@@ -219,22 +218,20 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
+      const nativeCalls = vi
         .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
+        .mock.calls.filter((c) => c[1] && c[1][0] === '__grant')
+        .map((c) => ({ exe: c[0], path: c[1][1] }));
 
-      expect(icaclsArgs).toContainEqual([
-        path.resolve(testCwd),
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      expect(nativeCalls).toContainEqual({
+        exe: expect.stringContaining('GeminiSandbox.exe'),
+        path: path.resolve(testCwd),
+      });
 
-      expect(icaclsArgs).toContainEqual([
-        path.resolve(allowedPath),
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      expect(nativeCalls).toContainEqual({
+        exe: expect.stringContaining('GeminiSandbox.exe'),
+        path: path.resolve(allowedPath),
+      });
     } finally {
       fs.rmSync(allowedPath, { recursive: true, force: true });
     }
@@ -265,16 +262,15 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
+      const nativeCalls = vi
         .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
+        .mock.calls.filter((c) => c[1] && c[1][0] === '__grant')
+        .map((c) => ({ exe: c[0], path: c[1][1] }));
 
-      expect(icaclsArgs).toContainEqual([
-        path.resolve(extraWritePath),
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      expect(nativeCalls).toContainEqual({
+        exe: expect.stringContaining('GeminiSandbox.exe'),
+        path: path.resolve(extraWritePath),
+      });
     } finally {
       fs.rmSync(extraWritePath, { recursive: true, force: true });
     }
@@ -300,16 +296,14 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
+      const nativeCalls = vi
         .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
+        .mock.calls.filter((c) => c[1] && c[1][0] === '__grant')
+        .map((c) => ({ exe: c[0], path: c[1][1] }));
 
-      expect(icaclsArgs).not.toContainEqual([
-        uncPath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      expect(nativeCalls).not.toContainEqual(
+        expect.objectContaining({ path: uncPath }),
+      );
     },
   );
 
@@ -335,21 +329,19 @@ describe('WindowsSandboxManager', () => {
 
       await manager.prepareCommand(req);
 
-      const icaclsArgs = vi
+      const nativeCalls = vi
         .mocked(spawnAsync)
-        .mock.calls.filter((c) => c[0] === 'icacls')
-        .map((c) => c[1]);
+        .mock.calls.filter((c) => c[1] && c[1][0] === '__grant')
+        .map((c) => ({ exe: c[0], path: c[1][1] }));
 
-      expect(icaclsArgs).toContainEqual([
-        longPath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
-      expect(icaclsArgs).toContainEqual([
-        devicePath,
-        '/setintegritylevel',
-        '(OI)(CI)Low',
-      ]);
+      expect(nativeCalls).toContainEqual({
+        exe: expect.stringContaining('GeminiSandbox.exe'),
+        path: longPath,
+      });
+      expect(nativeCalls).toContainEqual({
+        exe: expect.stringContaining('GeminiSandbox.exe'),
+        path: devicePath,
+      });
     },
   );
 
@@ -379,12 +371,11 @@ describe('WindowsSandboxManager', () => {
 
     await managerWithForbidden.prepareCommand(req);
 
-    // Should NOT have called icacls to deny the missing path
-    expect(spawnAsync).not.toHaveBeenCalledWith('icacls', [
-      path.resolve(missingPath),
-      '/deny',
-      '*S-1-16-4096:(OI)(CI)(F)',
-    ]);
+    // Should NOT have called native helper to deny the missing path
+    expect(spawnAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('GeminiSandbox.exe'),
+      ['__deny', path.resolve(missingPath)],
+    );
   });
 
   it('should deny Low Integrity access to forbidden paths', async () => {
@@ -407,11 +398,10 @@ describe('WindowsSandboxManager', () => {
 
       await managerWithForbidden.prepareCommand(req);
 
-      expect(spawnAsync).toHaveBeenCalledWith('icacls', [
-        path.resolve(forbiddenPath),
-        '/deny',
-        '*S-1-16-4096:(OI)(CI)(F)',
-      ]);
+      expect(spawnAsync).toHaveBeenCalledWith(
+        expect.stringContaining('GeminiSandbox.exe'),
+        ['__deny', path.resolve(forbiddenPath)],
+      );
     } finally {
       fs.rmSync(forbiddenPath, { recursive: true, force: true });
     }
@@ -443,17 +433,17 @@ describe('WindowsSandboxManager', () => {
       const spawnMock = vi.mocked(spawnAsync);
       const allowCallIndex = spawnMock.mock.calls.findIndex(
         (call) =>
+          call[0].includes('GeminiSandbox.exe') &&
           call[1] &&
-          call[1].includes('/setintegritylevel') &&
-          call[0] === 'icacls' &&
-          call[1][0] === path.resolve(conflictPath),
+          call[1][0] === '__grant' &&
+          call[1][1] === path.resolve(conflictPath),
       );
       const denyCallIndex = spawnMock.mock.calls.findIndex(
         (call) =>
+          call[0].includes('GeminiSandbox.exe') &&
           call[1] &&
-          call[1].includes('/deny') &&
-          call[0] === 'icacls' &&
-          call[1][0] === path.resolve(conflictPath),
+          call[1][0] === '__deny' &&
+          call[1][1] === path.resolve(conflictPath),
       );
 
       // Both should have been called

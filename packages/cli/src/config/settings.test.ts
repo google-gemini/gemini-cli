@@ -194,7 +194,7 @@ describe('Settings Loading and Merging', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
-    vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+    vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockResolvedValue({
       isTrusted: true,
       source: 'file',
     });
@@ -1837,7 +1837,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should NOT merge workspace settings when workspace is not trusted', () => {
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockResolvedValue({
         isTrusted: false,
         source: 'file',
       });
@@ -1870,7 +1870,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should NOT merge workspace settings when workspace trust is undefined', () => {
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockResolvedValue({
         isTrusted: undefined,
         source: undefined,
       });
@@ -1913,7 +1913,7 @@ describe('Settings Loading and Merging', () => {
         path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
       );
 
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockResolvedValue({
         isTrusted: isWorkspaceTrustedValue,
         source: 'file',
       });
@@ -1948,40 +1948,40 @@ describe('Settings Loading and Merging', () => {
       );
     }
 
-    it('sets environment variables from .env files', () => {
+    it('sets environment variables from .env files', async () => {
       setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
       const settings = {
         security: { folderTrust: { enabled: false } },
       } as Settings;
-      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+      await loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).toEqual('1234');
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
-    it('does not load env files from untrusted spaces when sandboxed', () => {
+    it('does not load env files from untrusted spaces when sandboxed', async () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = {
         security: { folderTrust: { enabled: true } },
         tools: { sandbox: true },
       } as Settings;
-      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+      await loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('does load env files from untrusted spaces when NOT sandboxed', () => {
+    it('does load env files from untrusted spaces when NOT sandboxed', async () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = {
         security: { folderTrust: { enabled: true } },
         tools: { sandbox: false },
       } as Settings;
-      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+      await loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).toEqual('1234');
     });
 
-    it('does not load env files when trust is undefined and sandboxed', () => {
+    it('does not load env files when trust is undefined and sandboxed', async () => {
       delete process.env['TESTTEST'];
       // isWorkspaceTrusted returns {isTrusted: undefined} for matched rules with no trust value, or no matching rules.
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
@@ -1990,19 +1990,19 @@ describe('Settings Loading and Merging', () => {
         tools: { sandbox: true },
       } as Settings;
 
-      const mockTrustFn = vi.fn().mockReturnValue({ isTrusted: undefined });
-      loadEnvironment(settings, MOCK_WORKSPACE_DIR, mockTrustFn);
+      const mockTrustFn = vi.fn().mockResolvedValue({ isTrusted: undefined });
+      await loadEnvironment(settings, MOCK_WORKSPACE_DIR, mockTrustFn);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
-    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
+    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', async () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = createTestMergedSettings({
         tools: { sandbox: true },
       });
-      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+      await loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       // GEMINI_API_KEY is in the whitelist, so it should be loaded.
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
@@ -2010,7 +2010,7 @@ describe('Settings Loading and Merging', () => {
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled via CLI flag', () => {
+    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled via CLI flag', async () => {
       const originalArgv = [...process.argv];
       process.argv.push('-s');
       try {
@@ -2018,7 +2018,7 @@ describe('Settings Loading and Merging', () => {
         const settings = createTestMergedSettings({
           tools: { sandbox: false },
         });
-        loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+        await loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
         expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
         expect(process.env['TESTTEST']).not.toEqual('1234');
@@ -2038,7 +2038,7 @@ describe('Settings Loading and Merging', () => {
       mockFsExistsSync.mockReturnValue(true);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockFsReadFileSync.mockReturnValue('{}');
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockResolvedValue({
         isTrusted: true,
         source: undefined,
       });
@@ -2909,9 +2909,9 @@ describe('Settings Loading and Merging', () => {
     });
 
     describe('sandbox detection', () => {
-      it('should detect sandbox when -s is a real flag', () => {
+      it('should detect sandbox when -s is a real flag', async () => {
         process.argv = ['node', 'gemini', '-s', 'some prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -2920,7 +2920,7 @@ describe('Settings Loading and Merging', () => {
           'FOO=bar\nGEMINI_API_KEY=secret',
         );
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -2930,16 +2930,16 @@ describe('Settings Loading and Merging', () => {
         expect(process.env['GEMINI_API_KEY']).toBe('secret');
       });
 
-      it('should detect sandbox when --sandbox is a real flag', () => {
+      it('should detect sandbox when --sandbox is a real flag', async () => {
         process.argv = ['node', 'gemini', '--sandbox', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=secret');
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -2947,9 +2947,9 @@ describe('Settings Loading and Merging', () => {
         expect(process.env['GEMINI_API_KEY']).toBe('secret');
       });
 
-      it('should ignore sandbox flags if they appear after --', () => {
+      it('should ignore sandbox flags if they appear after --', async () => {
         process.argv = ['node', 'gemini', '--', '-s', 'some prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -2958,7 +2958,7 @@ describe('Settings Loading and Merging', () => {
         );
         vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=secret');
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -2966,9 +2966,9 @@ describe('Settings Loading and Merging', () => {
         expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
 
-      it('should NOT be tricked by positional arguments that look like flags', () => {
+      it('should NOT be tricked by positional arguments that look like flags', async () => {
         process.argv = ['node', 'gemini', 'my -s prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -2977,7 +2977,7 @@ describe('Settings Loading and Merging', () => {
         );
         vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=secret');
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -2987,9 +2987,9 @@ describe('Settings Loading and Merging', () => {
     });
 
     describe('env var sanitization', () => {
-      it('should strictly enforce whitelist in untrusted/sandboxed mode', () => {
+      it('should strictly enforce whitelist in untrusted/sandboxed mode', async () => {
         process.argv = ['node', 'gemini', '-s', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -3002,7 +3002,7 @@ MALICIOUS_VAR=should-be-ignored
 GOOGLE_API_KEY=another-secret
     `);
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -3012,9 +3012,9 @@ GOOGLE_API_KEY=another-secret
         expect(process.env['MALICIOUS_VAR']).toBeUndefined();
       });
 
-      it('should sanitize shell injection characters in whitelisted env vars in untrusted mode', () => {
+      it('should sanitize shell injection characters in whitelisted env vars in untrusted mode', async () => {
         process.argv = ['node', 'gemini', '--sandbox', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -3027,7 +3027,7 @@ GOOGLE_API_KEY=another-secret
           `GEMINI_API_KEY=${maliciousPayload}`,
         );
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -3036,9 +3036,9 @@ GOOGLE_API_KEY=another-secret
         expect(process.env['GEMINI_API_KEY']).toBe('key-whoami-id-');
       });
 
-      it('should allow . and / in whitelisted env vars but sanitize other characters in untrusted mode', () => {
+      it('should allow . and / in whitelisted env vars but sanitize other characters in untrusted mode', async () => {
         process.argv = ['node', 'gemini', '--sandbox', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -3051,7 +3051,7 @@ GOOGLE_API_KEY=another-secret
           `GEMINI_API_KEY=${complexPayload}`,
         );
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -3061,9 +3061,9 @@ GOOGLE_API_KEY=another-secret
         );
       });
 
-      it('should NOT sanitize variables from trusted sources', () => {
+      it('should NOT sanitize variables from trusted sources', async () => {
         process.argv = ['node', 'gemini', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: true,
           source: 'file',
         });
@@ -3071,7 +3071,7 @@ GOOGLE_API_KEY=another-secret
 
         vi.mocked(fs.readFileSync).mockReturnValue('FOO=$(bar)');
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -3080,9 +3080,9 @@ GOOGLE_API_KEY=another-secret
         expect(process.env['FOO']).toBe('$(bar)');
       });
 
-      it('should load environment variables normally when workspace is TRUSTED even if "sandboxed"', () => {
+      it('should load environment variables normally when workspace is TRUSTED even if "sandboxed"', async () => {
         process.argv = ['node', 'gemini', '-s', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: true,
           source: 'file',
         });
@@ -3094,7 +3094,7 @@ GEMINI_API_KEY=un-sanitized;key!
 MALICIOUS_VAR=allowed-because-trusted
     `);
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -3112,10 +3112,10 @@ MALICIOUS_VAR=allowed-because-trusted
     });
 
     describe('Cloud Shell security', () => {
-      it('should handle Cloud Shell special defaults securely when untrusted', () => {
+      it('should handle Cloud Shell special defaults securely when untrusted', async () => {
         process.env['CLOUD_SHELL'] = 'true';
         process.argv = ['node', 'gemini', '-s', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -3123,7 +3123,7 @@ MALICIOUS_VAR=allowed-because-trusted
         // No .env file
         vi.mocked(fs.existsSync).mockReturnValue(false);
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );
@@ -3131,10 +3131,10 @@ MALICIOUS_VAR=allowed-because-trusted
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
       });
 
-      it('should sanitize GOOGLE_CLOUD_PROJECT in Cloud Shell when loaded from .env in untrusted mode', () => {
+      it('should sanitize GOOGLE_CLOUD_PROJECT in Cloud Shell when loaded from .env in untrusted mode', async () => {
         process.env['CLOUD_SHELL'] = 'true';
         process.argv = ['node', 'gemini', '-s', 'prompt'];
-        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        vi.mocked(isWorkspaceTrusted).mockResolvedValue({
           isTrusted: false,
           source: 'file',
         });
@@ -3143,7 +3143,7 @@ MALICIOUS_VAR=allowed-because-trusted
           'GOOGLE_CLOUD_PROJECT=attacker-project;inject',
         );
 
-        loadEnvironment(
+        await loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
           MOCK_WORKSPACE_DIR,
         );

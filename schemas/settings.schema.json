@@ -2359,8 +2359,8 @@
       "properties": {
         "sandbox": {
           "title": "Sandbox",
-          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").",
-          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"windows-native\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"bwrap\", \"windows-native\", \"native\").",
+          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\", \"bwrap\", \"windows-native\", \"native\").\n\n- Category: `Tools`\n- Requires restart: `yes` \n- Default: `false`",
           "$ref": "#/$defs/BooleanOrStringOrObject"
         },
         "sandboxAllowedPaths": {
@@ -3689,8 +3689,17 @@
             },
             "command": {
               "type": "string",
-              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).",
-              "enum": ["docker", "podman", "sandbox-exec", "runsc", "lxc"]
+              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc, bwrap, windows-native, native).",
+              "enum": [
+                "docker",
+                "podman",
+                "sandbox-exec",
+                "runsc",
+                "lxc",
+                "bwrap",
+                "windows-native",
+                "native"
+              ]
             },
             "image": {
               "type": "string",

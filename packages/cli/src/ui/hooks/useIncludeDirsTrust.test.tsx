@@ -169,7 +169,7 @@ describe('useIncludeDirsTrust', () => {
       const mockLoadedFolders = {
         isPathTrusted: mockIsPathTrusted,
       } as unknown as LoadedTrustedFolders;
-      vi.spyOn(trustedFolders, 'loadTrustedFolders').mockReturnValue(
+      vi.spyOn(trustedFolders, 'loadTrustedFolders').mockResolvedValue(
         mockLoadedFolders,
       );
     });

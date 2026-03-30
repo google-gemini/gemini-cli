@@ -56,7 +56,7 @@ describe('getUserStartupWarnings', () => {
     await fs.mkdir(homeDir, { recursive: true });
     vi.mocked(os.homedir).mockReturnValue(homeDir);
     vi.mocked(isFolderTrustEnabled).mockReturnValue(false);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: false,
       source: undefined,
     });
@@ -99,7 +99,7 @@ describe('getUserStartupWarnings', () => {
 
     it('should not return a warning when folder trust is enabled and workspace is trusted', async () => {
       vi.mocked(isFolderTrustEnabled).mockReturnValue(true);
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(isWorkspaceTrusted).mockResolvedValue({
         isTrusted: true,
         source: 'file',
       });

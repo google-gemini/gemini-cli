@@ -59,10 +59,14 @@ const CwdIndicator: React.FC<CwdIndicatorProps> = ({
 
 interface SandboxIndicatorProps {
   isTrustedFolder: boolean | undefined;
+  sandboxConfig:
+    | { enabled: boolean; command?: string; toolSandboxing?: boolean }
+    | undefined;
 }
 
 const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
   isTrustedFolder,
+  sandboxConfig,
 }) => {
   if (isTrustedFolder === false) {
     return <Text color={theme.status.warning}>untrusted</Text>;
@@ -84,6 +88,16 @@ const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
         </Text>
       </Text>
     );
+  }
+
+  if (sandboxConfig?.enabled) {
+    const label =
+      sandboxConfig.command === 'windows-native'
+        ? 'native'
+        : sandboxConfig.command === 'bwrap'
+          ? 'bwrap'
+          : sandboxConfig.command || 'tool-sandbox';
+    return <Text color="green">{label}</Text>;
   }
 
   return <Text color={theme.status.error}>no sandbox</Text>;
@@ -298,17 +312,25 @@ export const Footer: React.FC<{ copyModeEnabled?: boolean }> = ({
         break;
       }
       case 'sandbox': {
+        const sandboxConfig = config.getSandboxConfig();
         let str = 'no sandbox';
         const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
         else if (sandbox === 'sandbox-exec')
           str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
         else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+        else if (sandboxConfig?.enabled)
+          str = sandboxConfig.command || 'tool-sandbox';
 
         addCol(
           id,
           header,
-          () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
+          () => (
+            <SandboxIndicator
+              isTrustedFolder={isTrustedFolder}
+              sandboxConfig={sandboxConfig}
+            />
+          ),
           str.length,
         );
         break;

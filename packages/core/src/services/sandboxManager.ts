@@ -41,6 +41,8 @@ export interface SandboxPermissions {
 export interface ExecutionPolicy {
   /** Additional absolute paths to grant full read/write access to. */
   allowedPaths?: string[];
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
   /** Whether network access is allowed. */
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
@@ -96,7 +98,7 @@ export interface SandboxRequest {
  * A command that has been prepared for sandboxed execution.
  */
 export interface SandboxedCommand {
-  /** The program or wrapper to execute. */
+  /** The path to the executable to run. */
   program: string;
   /** Final arguments for the program. */
   args: string[];
@@ -104,6 +106,8 @@ export interface SandboxedCommand {
   env: NodeJS.ProcessEnv;
   /** The working directory. */
   cwd?: string;
+  /** Optional cleanup function to be called after the command finishes. */
+  cleanup?: () => void | Promise<void>;
 }
 
 /**

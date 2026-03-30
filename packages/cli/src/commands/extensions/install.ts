@@ -56,7 +56,7 @@ export async function handleInstall(args: InstallArgs) {
       const absolutePath = path.resolve(source);
       const realPath = getRealPath(absolutePath);
       installMetadata.source = absolutePath;
-      const trustResult = isWorkspaceTrusted(settings, absolutePath);
+      const trustResult = await isWorkspaceTrusted(settings, absolutePath);
       if (trustResult.isTrusted !== true) {
         const discoveryResults =
           await FolderTrustDiscoveryService.discover(realPath);
@@ -133,7 +133,7 @@ export async function handleInstall(args: InstallArgs) {
           false,
         );
         if (confirmed) {
-          const trustedFolders = loadTrustedFolders();
+          const trustedFolders = await loadTrustedFolders();
           await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
         } else {
           throw new Error(

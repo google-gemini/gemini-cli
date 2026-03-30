@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import {
@@ -25,12 +25,12 @@ interface TrustState {
   isInheritedTrustFromIde: boolean;
 }
 
-function getInitialTrustState(
+async function getInitialTrustState(
   settings: LoadedSettings,
   cwd: string,
   isCurrentWorkspace: boolean,
-): TrustState {
-  const folders = loadTrustedFolders();
+): Promise<TrustState> {
+  const folders = await loadTrustedFolders();
   const explicitTrustLevel = folders.user.config[cwd];
 
   if (!isCurrentWorkspace) {
@@ -41,7 +41,7 @@ function getInitialTrustState(
     };
   }
 
-  const { isTrusted, source } = isWorkspaceTrusted(
+  const { isTrusted, source } = await isWorkspaceTrusted(
     settings.merged,
     process.cwd(),
   );
@@ -70,21 +70,25 @@ export const usePermissionsModifyTrust = (
     path.resolve(targetDirectory).toLowerCase() ===
     path.resolve(process.cwd()).toLowerCase();
 
-  const [initialState] = useState(() =>
-    getInitialTrustState(settings, cwd, isCurrentWorkspace),
-  );
+  const [initialState, setInitialState] = useState<TrustState | null>(null);
+
+  useEffect(() => {
+    void getInitialTrustState(settings, cwd, isCurrentWorkspace).then(
+      setInitialState,
+    );
+  }, [settings, cwd, isCurrentWorkspace]);
 
   const [currentTrustLevel] = useState<TrustLevel | undefined>(
-    initialState.currentTrustLevel,
+    initialState?.currentTrustLevel,
   );
   const [pendingTrustLevel, setPendingTrustLevel] = useState<
     TrustLevel | undefined
   >();
   const [isInheritedTrustFromParent] = useState(
-    initialState.isInheritedTrustFromParent,
+    initialState?.isInheritedTrustFromParent ?? false,
   );
   const [isInheritedTrustFromIde] = useState(
-    initialState.isInheritedTrustFromIde,
+    initialState?.isInheritedTrustFromIde ?? false,
   );
   const [needsRestart, setNeedsRestart] = useState(false);
 
@@ -96,23 +100,22 @@ export const usePermissionsModifyTrust = (
       // If we are not editing the current workspace, the logic is simple:
       // just save the setting and exit. No restart or warnings are needed.
       if (!isCurrentWorkspace) {
-        const folders = loadTrustedFolders();
+        const folders = await loadTrustedFolders();
         await folders.setValue(cwd, trustLevel);
         onExit();
         return;
       }
 
       // All logic below only applies when editing the current workspace.
-      const wasTrusted = isWorkspaceTrusted(
-        settings.merged,
-        process.cwd(),
+      const wasTrusted = (
+        await isWorkspaceTrusted(settings.merged, process.cwd())
       ).isTrusted;
 
       // Create a temporary config to check the new trust status without writing
-      const currentConfig = loadTrustedFolders().user.config;
+      const currentConfig = (await loadTrustedFolders()).user.config;
       const newConfig = { ...currentConfig, [cwd]: trustLevel };
 
-      const { isTrusted, source } = isWorkspaceTrusted(
+      const { isTrusted, source } = await isWorkspaceTrusted(
         settings.merged,
         process.cwd(),
         newConfig,
@@ -138,7 +141,7 @@ export const usePermissionsModifyTrust = (
         setPendingTrustLevel(trustLevel);
         setNeedsRestart(true);
       } else {
-        const folders = loadTrustedFolders();
+        const folders = await loadTrustedFolders();
         try {
           await folders.setValue(cwd, trustLevel);
         } catch (_e) {
@@ -155,7 +158,7 @@ export const usePermissionsModifyTrust = (
 
   const commitTrustLevelChange = useCallback(async () => {
     if (pendingTrustLevel) {
-      const folders = loadTrustedFolders();
+      const folders = await loadTrustedFolders();
       try {
         await folders.setValue(cwd, pendingTrustLevel);
         return true;

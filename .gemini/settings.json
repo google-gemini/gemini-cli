@@ -6,6 +6,8 @@
     "memoryManager": true
   },
   "general": {
-    "devtools": true
+    "devtools": true,
+    "enableAutoUpdate": false,
+    "enableAutoUpdateNotification": false
   }
 }

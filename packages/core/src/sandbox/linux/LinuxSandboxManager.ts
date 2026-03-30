@@ -5,7 +5,7 @@
  */
 
 import fs from 'node:fs';
-import { join, dirname, normalize } from 'node:path';
+import { posix as path } from 'node:path';
 import os from 'node:os';
 import {
   type SandboxManager,
@@ -41,98 +41,9 @@ import {
 } from '../utils/commandSafety.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
-let cachedBpfPath: string | undefined;
-
-function getSeccompBpfPath(): string {
-  if (cachedBpfPath) return cachedBpfPath;
-
-  const arch = os.arch();
-  let AUDIT_ARCH: number;
-  let SYS_ptrace: number;
-
-  if (arch === 'x64') {
-    AUDIT_ARCH = 0xc000003e; // AUDIT_ARCH_X86_64
-    SYS_ptrace = 101;
-  } else if (arch === 'arm64') {
-    AUDIT_ARCH = 0xc00000b7; // AUDIT_ARCH_AARCH64
-    SYS_ptrace = 117;
-  } else if (arch === 'arm') {
-    AUDIT_ARCH = 0x40000028; // AUDIT_ARCH_ARM
-    SYS_ptrace = 26;
-  } else if (arch === 'ia32') {
-    AUDIT_ARCH = 0x40000003; // AUDIT_ARCH_I386
-    SYS_ptrace = 26;
-  } else {
-    throw new Error(`Unsupported architecture for seccomp filter: ${arch}`);
-  }
-
-  const EPERM = 1;
-  const SECCOMP_RET_KILL_PROCESS = 0x80000000;
-  const SECCOMP_RET_ERRNO = 0x00050000;
-  const SECCOMP_RET_ALLOW = 0x7fff0000;
-
-  const instructions = [
-    { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
-    { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_KILL_PROCESS }, // Kill
-
-    { code: 0x20, jt: 0, jf: 0, k: 0 }, // Load nr
-    { code: 0x15, jt: 0, jf: 1, k: SYS_ptrace }, // If ptrace, jump to ERRNO
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ERRNO | EPERM }, // ERRNO
-
-    { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW }, // Allow
-  ];
-
-  const buf = Buffer.alloc(8 * instructions.length);
-  for (let i = 0; i < instructions.length; i++) {
-    const inst = instructions[i];
-    const offset = i * 8;
-    buf.writeUInt16LE(inst.code, offset);
-    buf.writeUInt8(inst.jt, offset + 2);
-    buf.writeUInt8(inst.jf, offset + 3);
-    buf.writeUInt32LE(inst.k, offset + 4);
-  }
-
-  const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-seccomp-'));
-  const bpfPath = join(tempDir, 'seccomp.bpf');
-  fs.writeFileSync(bpfPath, buf);
-  cachedBpfPath = bpfPath;
-
-  // Cleanup on exit
-  process.on('exit', () => {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      // Ignore errors
-    }
-  });
-
-  return bpfPath;
-}
-
-/**
- * Ensures a file or directory exists.
- */
-function touch(filePath: string, isDirectory: boolean) {
-  try {
-    // If it exists (even as a broken symlink), do nothing
-    if (fs.lstatSync(filePath)) return;
-  } catch {
-    // Ignore ENOENT
-  }
-
-  if (isDirectory) {
-    fs.mkdirSync(filePath, { recursive: true });
-  } else {
-    fs.mkdirSync(dirname(filePath), { recursive: true });
-    fs.closeSync(fs.openSync(filePath, 'a'));
-  }
-}
-
 /**
  * A SandboxManager implementation for Linux that uses Bubblewrap (bwrap).
  */
-
 export class LinuxSandboxManager implements SandboxManager {
   private static maskFilePath: string | undefined;
 
@@ -150,29 +61,132 @@ export class LinuxSandboxManager implements SandboxManager {
     return parsePosixSandboxDenials(result);
   }
 
-  private getMaskFilePath(): string {
+  /**
+   * Converts a path to a POSIX path and strips drive letters (Windows).
+   */
+  private toPosixPath(p: string): string {
+    return p.replace(/^[a-zA-Z]:/, '').replace(/\\/g, '/');
+  }
+
+  private async getMaskFilePath(): Promise<{
+    maskPath: string;
+    cleanup: () => void;
+  }> {
     if (
       LinuxSandboxManager.maskFilePath &&
-      fs.existsSync(LinuxSandboxManager.maskFilePath)
+      (await fs.promises
+        .stat(LinuxSandboxManager.maskFilePath)
+        .then(() => true)
+        .catch(() => false))
     ) {
-      return LinuxSandboxManager.maskFilePath;
+      return { maskPath: LinuxSandboxManager.maskFilePath, cleanup: () => {} };
     }
-    const tempDir = fs.mkdtempSync(join(os.tmpdir(), 'gemini-cli-mask-file-'));
-    const maskPath = join(tempDir, 'mask');
-    fs.writeFileSync(maskPath, '');
-    fs.chmodSync(maskPath, 0);
+    const tempDir = await fs.promises.mkdtemp(
+      path.join(this.toPosixPath(os.tmpdir()), 'gemini-cli-mask-file-'),
+    );
+    const maskPath = path.join(tempDir, 'mask');
+    await fs.promises.writeFile(maskPath, '');
+    await fs.promises.chmod(maskPath, 0);
     LinuxSandboxManager.maskFilePath = maskPath;
 
-    // Cleanup on exit
-    process.on('exit', () => {
+    const cleanup = () => {
       try {
         fs.rmSync(tempDir, { recursive: true, force: true });
       } catch {
         // Ignore errors
       }
-    });
+    };
 
-    return maskPath;
+    return { maskPath, cleanup };
+  }
+
+  private async getSeccompBpfPath(): Promise<{
+    bpfPath: string;
+    cleanup: () => void;
+  }> {
+    const arch = os.arch();
+    let AUDIT_ARCH: number;
+    let SYS_ptrace: number;
+
+    if (arch === 'x64') {
+      AUDIT_ARCH = 0xc000003e; // AUDIT_ARCH_X86_64
+      SYS_ptrace = 101;
+    } else if (arch === 'arm64') {
+      AUDIT_ARCH = 0xc00000b7; // AUDIT_ARCH_AARCH64
+      SYS_ptrace = 117;
+    } else if (arch === 'arm') {
+      AUDIT_ARCH = 0x40000028; // AUDIT_ARCH_ARM
+      SYS_ptrace = 26;
+    } else if (arch === 'ia32') {
+      AUDIT_ARCH = 0x40000003; // AUDIT_ARCH_I386
+      SYS_ptrace = 26;
+    } else {
+      throw new Error(`Unsupported architecture for seccomp filter: ${arch}`);
+    }
+
+    const EPERM = 1;
+    const SECCOMP_RET_KILL_PROCESS = 0x80000000;
+    const SECCOMP_RET_ERRNO = 0x00050000;
+    const SECCOMP_RET_ALLOW = 0x7fff0000;
+
+    const instructions = [
+      { code: 0x20, jt: 0, jf: 0, k: 4 }, // Load arch
+      { code: 0x15, jt: 1, jf: 0, k: AUDIT_ARCH }, // Jump to kill if arch != native arch
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_KILL_PROCESS }, // Kill
+
+      { code: 0x20, jt: 0, jf: 0, k: 0 }, // Load nr
+      { code: 0x15, jt: 0, jf: 1, k: SYS_ptrace }, // If ptrace, jump to ERRNO
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ERRNO | EPERM }, // ERRNO
+
+      { code: 0x06, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW }, // Allow
+    ];
+
+    const buf = Buffer.allocUnsafe(8 * instructions.length);
+    for (let i = 0; i < instructions.length; i++) {
+      const inst = instructions[i];
+      const offset = i * 8;
+      buf.writeUInt16LE(inst.code, offset);
+      buf.writeUInt8(inst.jt, offset + 2);
+      buf.writeUInt8(inst.jf, offset + 3);
+      buf.writeUInt32LE(inst.k, offset + 4);
+    }
+
+    const tempDir = await fs.promises.mkdtemp(
+      path.join(this.toPosixPath(os.tmpdir()), 'gemini-cli-seccomp-'),
+    );
+    const bpfPath = path.join(tempDir, 'seccomp.bpf');
+    await fs.promises.writeFile(bpfPath, buf);
+
+    const cleanup = () => {
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    };
+
+    return { bpfPath, cleanup };
+  }
+
+  /**
+   * Ensures a file or directory exists.
+   */
+  private async touch(filePath: string, isDirectory: boolean) {
+    try {
+      // If it exists (even as a broken symlink), do nothing
+      await fs.promises.lstat(filePath);
+      return;
+    } catch {
+      // Ignore ENOENT
+    }
+
+    if (isDirectory) {
+      await fs.promises.mkdir(filePath, { recursive: true });
+    } else {
+      await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+      const handle = await fs.promises.open(filePath, 'a');
+      await handle.close();
+    }
   }
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
@@ -217,6 +231,11 @@ export class LinuxSandboxManager implements SandboxManager {
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
+    // Ensure we don't leak D-Bus or other session-sensitive variables that could facilitate sandbox escapes.
+    if (sanitizedEnv['DBUS_SESSION_BUS_ADDRESS']) {
+      sanitizedEnv['DBUS_SESSION_BUS_ADDRESS'] = '';
+    }
+
     const bwrapArgs: string[] = [
       '--unshare-all',
       '--new-session', // Isolate session
@@ -237,47 +256,47 @@ export class LinuxSandboxManager implements SandboxManager {
       '/proc',
       '--tmpfs', // Provides an isolated, writable /tmp directory
       '/tmp',
+      '--tmpfs', // Isolate /dev/shm to prevent shared memory leaks
+      '/dev/shm',
+      '--tmpfs', // Isolate /run/user/ID if it exists in the environment
+      '/run',
     );
 
-    const workspacePath = tryRealpath(this.options.workspace);
+    const workspacePath = this.toPosixPath(tryRealpath(this.options.workspace));
+    const workspaceArg = this.toPosixPath(this.options.workspace);
 
     const bindFlag = workspaceWrite ? '--bind-try' : '--ro-bind-try';
 
     if (workspaceWrite) {
-      bwrapArgs.push(
-        '--bind-try',
-        this.options.workspace,
-        this.options.workspace,
-      );
-      if (workspacePath !== this.options.workspace) {
+      bwrapArgs.push('--bind-try', workspaceArg, workspaceArg);
+      if (workspacePath !== workspaceArg) {
         bwrapArgs.push('--bind-try', workspacePath, workspacePath);
       }
     } else {
-      bwrapArgs.push(
-        '--ro-bind-try',
-        this.options.workspace,
-        this.options.workspace,
-      );
-      if (workspacePath !== this.options.workspace) {
+      bwrapArgs.push('--ro-bind-try', workspaceArg, workspaceArg);
+      if (workspacePath !== workspaceArg) {
         bwrapArgs.push('--ro-bind-try', workspacePath, workspacePath);
       }
     }
 
-    const { worktreeGitDir, mainGitDir } =
-      resolveGitWorktreePaths(workspacePath);
+    let { worktreeGitDir, mainGitDir } = resolveGitWorktreePaths(workspacePath);
     if (worktreeGitDir) {
+      worktreeGitDir = this.toPosixPath(worktreeGitDir);
       bwrapArgs.push(bindFlag, worktreeGitDir, worktreeGitDir);
     }
     if (mainGitDir) {
+      mainGitDir = this.toPosixPath(mainGitDir);
       bwrapArgs.push(bindFlag, mainGitDir, mainGitDir);
     }
 
     const allowedPaths = sanitizePaths(req.policy?.allowedPaths) || [];
-    const normalizedWorkspace = normalize(workspacePath).replace(/\/$/, '');
+    const normalizedWorkspace = path
+      .normalize(workspacePath)
+      .replace(/\/$/, '');
     for (const allowedPath of allowedPaths) {
-      const resolved = tryRealpath(allowedPath);
+      const resolved = this.toPosixPath(tryRealpath(allowedPath));
       if (!fs.existsSync(resolved)) continue;
-      const normalizedAllowedPath = normalize(resolved).replace(/\/$/, '');
+      const normalizedAllowedPath = path.normalize(resolved).replace(/\/$/, '');
       if (normalizedAllowedPath !== normalizedWorkspace) {
         if (
           !workspaceWrite &&
@@ -294,7 +313,7 @@ export class LinuxSandboxManager implements SandboxManager {
       sanitizePaths(mergedAdditional.fileSystem?.read) || [];
     for (const p of additionalReads) {
       try {
-        const safeResolvedPath = tryRealpath(p);
+        const safeResolvedPath = this.toPosixPath(tryRealpath(p));
         bwrapArgs.push('--ro-bind-try', safeResolvedPath, safeResolvedPath);
       } catch (e: unknown) {
         debugLogger.warn(e instanceof Error ? e.message : String(e));
@@ -305,7 +324,7 @@ export class LinuxSandboxManager implements SandboxManager {
       sanitizePaths(mergedAdditional.fileSystem?.write) || [];
     for (const p of additionalWrites) {
       try {
-        const safeResolvedPath = tryRealpath(p);
+        const safeResolvedPath = this.toPosixPath(tryRealpath(p));
         bwrapArgs.push('--bind-try', safeResolvedPath, safeResolvedPath);
       } catch (e: unknown) {
         debugLogger.warn(e instanceof Error ? e.message : String(e));
@@ -313,53 +332,50 @@ export class LinuxSandboxManager implements SandboxManager {
     }
 
     for (const file of GOVERNANCE_FILES) {
-      const filePath = join(this.options.workspace, file.path);
-      touch(filePath, file.isDirectory);
-      const realPath = tryRealpath(filePath);
+      const filePath = this.toPosixPath(
+        path.join(this.options.workspace, file.path),
+      );
+      await this.touch(filePath, file.isDirectory);
+      const realPath = this.toPosixPath(tryRealpath(filePath));
       bwrapArgs.push('--ro-bind', filePath, filePath);
       if (realPath !== filePath) {
         bwrapArgs.push('--ro-bind', realPath, realPath);
       }
     }
 
-    const forbiddenPaths = sanitizePaths(this.options.forbiddenPaths) || [];
+    const forbiddenPaths = new Set([
+      ...(sanitizePaths(req.policy?.forbiddenPaths) || []),
+      ...(sanitizePaths(this.options.forbiddenPaths) || []),
+    ]);
     for (const p of forbiddenPaths) {
-      let resolved: string;
       try {
-        resolved = tryRealpath(p); // Forbidden paths should still resolve to block the real path
-        if (!fs.existsSync(resolved)) continue;
-      } catch (e: unknown) {
-        debugLogger.warn(
-          `Failed to resolve forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
-        );
-        bwrapArgs.push('--ro-bind', '/dev/null', p);
-        continue;
-      }
-      try {
-        const stat = fs.statSync(resolved);
-        if (stat.isDirectory()) {
-          bwrapArgs.push('--tmpfs', resolved, '--remount-ro', resolved);
+        const resolved = tryRealpath(p);
+        const posixP = this.toPosixPath(resolved);
+        const stats = await fs.promises.stat(resolved);
+        if (stats.isDirectory()) {
+          bwrapArgs.push('--tmpfs', posixP);
         } else {
-          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
+          bwrapArgs.push('--ro-bind', '/dev/null', posixP);
         }
       } catch (e: unknown) {
+        const posixP = this.toPosixPath(p);
         if (isErrnoException(e) && e.code === 'ENOENT') {
-          bwrapArgs.push('--symlink', '/dev/null', resolved);
+          bwrapArgs.push('--symlink', '/dev/null', posixP);
         } else {
           debugLogger.warn(
-            `Failed to stat forbidden path ${resolved}: ${e instanceof Error ? e.message : String(e)}`,
+            `Failed to stat forbidden path ${p}: ${e instanceof Error ? e.message : String(e)}`,
           );
-          bwrapArgs.push('--ro-bind', '/dev/null', resolved);
+          bwrapArgs.push('--ro-bind', '/dev/null', posixP);
         }
       }
     }
 
     // Mask secret files (.env, .env.*)
-    bwrapArgs.push(
-      ...(await this.getSecretFilesArgs(req.policy?.allowedPaths)),
-    );
+    const { args: secretArgs, cleanup: secretCleanup } =
+      await this.getSecretFilesArgs(req.policy?.allowedPaths);
+    bwrapArgs.push(...secretArgs);
 
-    const bpfPath = getSeccompBpfPath();
+    const { bpfPath, cleanup: bpfCleanup } = await this.getSeccompBpfPath();
 
     bwrapArgs.push('--seccomp', '9');
     bwrapArgs.push('--', req.command, ...req.args);
@@ -372,31 +388,42 @@ export class LinuxSandboxManager implements SandboxManager {
       ...bwrapArgs,
     ];
 
+    const cleanup = () => {
+      secretCleanup();
+      bpfCleanup();
+    };
+
     return {
       program: 'sh',
       args: shArgs,
       env: sanitizedEnv,
       cwd: req.cwd,
+      cleanup,
     };
   }
 
   /**
    * Generates bubblewrap arguments to mask secret files.
    */
-  private async getSecretFilesArgs(allowedPaths?: string[]): Promise<string[]> {
+  private async getSecretFilesArgs(allowedPaths?: string[]): Promise<{
+    args: string[];
+    cleanup: () => void;
+  }> {
     const args: string[] = [];
-    const maskPath = this.getMaskFilePath();
+    const { maskPath, cleanup } = await this.getMaskFilePath();
+    const posixMaskPath = this.toPosixPath(maskPath);
     const paths = sanitizePaths(allowedPaths) || [];
     const searchDirs = new Set([this.options.workspace, ...paths]);
     const findPatterns = getSecretFileFindArgs();
 
     for (const dir of searchDirs) {
       try {
+        const posixDir = this.toPosixPath(dir);
         // Use the native 'find' command for performance and to catch nested secrets.
         // We limit depth to 3 to keep it fast while covering common nested structures.
         // We use -prune to skip heavy directories efficiently while matching dotfiles.
         const findResult = await spawnAsync('find', [
-          dir,
+          posixDir,
           '-maxdepth',
           '3',
           '-type',
@@ -428,19 +455,20 @@ export class LinuxSandboxManager implements SandboxManager {
           '-print0',
         ]);
 
-        const files = findResult.stdout.toString().split('\0');
+        const files: string[] = findResult.stdout.toString().split('\0');
         for (const file of files) {
           if (file.trim()) {
-            args.push('--bind', maskPath, file.trim());
+            const posixFile = this.toPosixPath(file.trim());
+            args.push('--bind', posixMaskPath, posixFile);
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         debugLogger.log(
           `LinuxSandboxManager: Failed to find or mask secret files in ${dir}`,
-          e,
+          e instanceof Error ? e : String(e),
         );
       }
     }
-    return args;
+    return { args, cleanup };
   }
 }

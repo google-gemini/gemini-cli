@@ -520,7 +520,9 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L1: hello world');
       // Should NOT be a match (but might be in context as L2-)
       expect(result.llmContent).not.toContain('L2: second line with world');
-      expect(result.llmContent).toContain('File: sub/fileC.txt');
+      expect(result.llmContent).toContain(
+        'File: ' + path.normalize('sub/fileC.txt'),
+      );
       expect(result.llmContent).toContain('L1: another world in sub dir');
     });
 
@@ -534,7 +536,7 @@ describe('GrepTool', () => {
 
       expect(result.llmContent).toContain('Found 2 files with matches');
       expect(result.llmContent).toContain('fileA.txt');
-      expect(result.llmContent).toContain('sub/fileC.txt');
+      expect(result.llmContent).toContain(path.normalize('sub/fileC.txt'));
       expect(result.llmContent).not.toContain('L1:');
       expect(result.llmContent).not.toContain('hello world');
     });

@@ -5,31 +5,28 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { posix as path } from 'node:path';
 import { LinuxSandboxManager } from './LinuxSandboxManager.js';
 import type { SandboxRequest } from '../../services/sandboxManager.js';
 import fs from 'node:fs';
 import * as shellUtils from '../../utils/shell-utils.js';
 
-vi.mock('node:fs', async () => {
-  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
-  return {
-    ...actual,
-    default: {
-      // @ts-expect-error - Property 'default' does not exist on type 'typeof import("node:fs")'
-      ...actual.default,
-      existsSync: vi.fn(() => true),
-      realpathSync: vi.fn((p) => p.toString()),
-      statSync: vi.fn(() => ({ isDirectory: () => true }) as fs.Stats),
-      mkdirSync: vi.fn(),
-      mkdtempSync: vi.fn((prefix: string) => prefix + 'mocked'),
-      openSync: vi.fn(),
-      closeSync: vi.fn(),
-      writeFileSync: vi.fn(),
-      readdirSync: vi.fn(() => []),
-      chmodSync: vi.fn(),
-      unlinkSync: vi.fn(),
-      rmSync: vi.fn(),
-    },
+vi.mock('node:fs', () => {
+  const mockPromises = {
+    mkdir: vi.fn(() => Promise.resolve()),
+    open: vi.fn(() =>
+      Promise.resolve({ close: vi.fn(() => Promise.resolve()) }),
+    ),
+    stat: vi.fn(() => Promise.resolve({ isDirectory: () => true } as fs.Stats)),
+    writeFile: vi.fn(() => Promise.resolve()),
+    chmod: vi.fn(() => Promise.resolve()),
+    mkdtemp: vi.fn((prefix: string) => Promise.resolve(prefix + 'mocked')),
+    lstat: vi.fn(() =>
+      Promise.resolve({ isDirectory: () => true } as fs.Stats),
+    ),
+  };
+
+  const mockFs = {
     existsSync: vi.fn(() => true),
     realpathSync: vi.fn((p) => p.toString()),
     statSync: vi.fn(() => ({ isDirectory: () => true }) as fs.Stats),
@@ -42,7 +39,12 @@ vi.mock('node:fs', async () => {
     chmodSync: vi.fn(),
     unlinkSync: vi.fn(),
     rmSync: vi.fn(),
+    promises: mockPromises,
+    // Add default export for ESM
+    default: null as unknown,
   };
+  (mockFs as Record<string, unknown>).default = mockFs;
+  return mockFs;
 });
 
 vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
@@ -111,18 +113,22 @@ describe('LinuxSandboxManager', () => {
         '/proc',
         '--tmpfs',
         '/tmp',
+        '--tmpfs',
+        '/dev/shm',
+        '--tmpfs',
+        '/run',
         '--ro-bind-try',
         workspace,
         workspace,
         '--ro-bind',
-        `${workspace}/.gitignore`,
-        `${workspace}/.gitignore`,
+        path.normalize(`${workspace}/.gitignore`),
+        path.normalize(`${workspace}/.gitignore`),
         '--ro-bind',
-        `${workspace}/.geminiignore`,
-        `${workspace}/.geminiignore`,
+        path.normalize(`${workspace}/.geminiignore`),
+        path.normalize(`${workspace}/.geminiignore`),
         '--ro-bind',
-        `${workspace}/.git`,
-        `${workspace}/.git`,
+        path.normalize(`${workspace}/.git`),
+        path.normalize(`${workspace}/.git`),
         '--seccomp',
         '9',
         '--',
@@ -250,6 +256,7 @@ describe('LinuxSandboxManager', () => {
 
     describe('governance files', () => {
       it('should ensure governance files exist', async () => {
+        vi.mocked(fs.promises.lstat).mockRejectedValue(new Error('ENOENT'));
         vi.mocked(fs.existsSync).mockReturnValue(false);
 
         await getBwrapArgs({
@@ -259,8 +266,8 @@ describe('LinuxSandboxManager', () => {
           env: {},
         });
 
-        expect(fs.mkdirSync).toHaveBeenCalled();
-        expect(fs.openSync).toHaveBeenCalled();
+        expect(fs.promises.mkdir).toHaveBeenCalled();
+        expect(fs.promises.open).toHaveBeenCalled();
       });
 
       it('should protect both the symlink and the real path if they differ', async () => {
@@ -354,7 +361,7 @@ describe('LinuxSandboxManager', () => {
 
     describe('forbiddenPaths', () => {
       it('should parameterize forbidden paths and explicitly deny them', async () => {
-        vi.mocked(fs.statSync).mockImplementation((p) => {
+        vi.mocked(fs.promises.stat).mockImplementation(async (p) => {
           if (p.toString().includes('cache')) {
             return { isDirectory: () => true } as fs.Stats;
           }
@@ -386,8 +393,8 @@ describe('LinuxSandboxManager', () => {
       });
 
       it('resolves forbidden symlink paths to their real paths', async () => {
-        vi.mocked(fs.statSync).mockImplementation(
-          () => ({ isDirectory: () => false }) as fs.Stats,
+        vi.mocked(fs.promises.stat).mockImplementation(
+          async () => ({ isDirectory: () => false }) as fs.Stats,
         );
         vi.mocked(fs.realpathSync).mockImplementation((p) => {
           if (p === '/tmp/forbidden-symlink') return '/opt/real-target.txt';
@@ -417,7 +424,7 @@ describe('LinuxSandboxManager', () => {
       it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
         const error = new Error('File not found') as NodeJS.ErrnoException;
         error.code = 'ENOENT';
-        vi.mocked(fs.statSync).mockImplementation(() => {
+        vi.mocked(fs.promises.stat).mockImplementation(async () => {
           throw error;
         });
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
@@ -443,8 +450,8 @@ describe('LinuxSandboxManager', () => {
       });
 
       it('masks directory symlinks with tmpfs for both paths', async () => {
-        vi.mocked(fs.statSync).mockImplementation(
-          () => ({ isDirectory: () => true }) as fs.Stats,
+        vi.mocked(fs.promises.stat).mockImplementation(
+          async () => ({ isDirectory: () => true }) as fs.Stats,
         );
         vi.mocked(fs.realpathSync).mockImplementation((p) => {
           if (p === '/tmp/dir-link') return '/opt/real-dir';
@@ -471,8 +478,8 @@ describe('LinuxSandboxManager', () => {
       });
 
       it('should override allowed paths if a path is also in forbidden paths', async () => {
-        vi.mocked(fs.statSync).mockImplementation(
-          () => ({ isDirectory: () => true }) as fs.Stats,
+        vi.mocked(fs.promises.stat).mockImplementation(
+          async () => ({ isDirectory: () => true }) as fs.Stats,
         );
         vi.mocked(fs.realpathSync).mockImplementation((p) => p.toString());
 

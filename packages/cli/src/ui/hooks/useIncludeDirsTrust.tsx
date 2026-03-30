@@ -68,88 +68,91 @@ export function useIncludeDirsTrust(
       return;
     }
 
-    const pendingDirs = config.getPendingIncludeDirectories();
-    if (pendingDirs.length === 0) {
-      return;
-    }
+    // Wrap async operations in an IIFE
+    void (async () => {
+      const pendingDirs = config.getPendingIncludeDirectories();
+      if (pendingDirs.length === 0) {
+        return;
+      }
 
-    // If folder trust is disabled, isTrustedFolder will be undefined.
-    // In that case, or if the user decided not to trust the main folder,
-    // we can just add the directories without checking them.
-    if (config.getFolderTrust() === false || isTrustedFolder === false) {
+      // If folder trust is disabled, isTrustedFolder will be undefined.
+      // In that case, or if the user decided not to trust the main folder,
+      // we can just add the directories without checking them.
+      if (config.getFolderTrust() === false || isTrustedFolder === false) {
+        const added: string[] = [];
+        const errors: string[] = [];
+        const workspaceContext = config.getWorkspaceContext();
+
+        const result = batchAddDirectories(workspaceContext, pendingDirs);
+        added.push(...result.added);
+        errors.push(...result.errors);
+
+        if (added.length > 0 || errors.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          finishAddingDirectories(config, addItem, added, errors);
+        }
+        config.clearPendingIncludeDirectories();
+        return;
+      }
+
+      const trustedFolders = await loadTrustedFolders();
+      const untrustedDirs: string[] = [];
+      const undefinedTrustDirs: string[] = [];
+      const trustedDirs: string[] = [];
       const added: string[] = [];
       const errors: string[] = [];
+
+      for (const pathToAdd of pendingDirs) {
+        const expandedPath = expandHomeDir(pathToAdd.trim());
+        const isTrusted = await trustedFolders.isPathTrusted(expandedPath);
+        if (isTrusted === false) {
+          untrustedDirs.push(pathToAdd.trim());
+        } else if (isTrusted === undefined) {
+          undefinedTrustDirs.push(pathToAdd.trim());
+        } else {
+          trustedDirs.push(pathToAdd.trim());
+        }
+      }
+
+      if (untrustedDirs.length > 0) {
+        errors.push(
+          `The following directories are explicitly untrusted and cannot be added to a trusted workspace:\n- ${untrustedDirs.join(
+            '\n- ',
+          )}\nPlease use the permissions command to modify their trust level.`,
+        );
+      }
+
       const workspaceContext = config.getWorkspaceContext();
+      if (trustedDirs.length > 0) {
+        const result = batchAddDirectories(workspaceContext, trustedDirs);
+        added.push(...result.added);
+        errors.push(...result.errors);
+      }
 
-      const result = batchAddDirectories(workspaceContext, pendingDirs);
-      added.push(...result.added);
-      errors.push(...result.errors);
-
-      if (added.length > 0 || errors.length > 0) {
+      if (undefinedTrustDirs.length > 0) {
+        debugLogger.log(
+          'Creating custom dialog with undecidedDirs:',
+          undefinedTrustDirs,
+        );
+        setCustomDialog(
+          <MultiFolderTrustDialog
+            folders={undefinedTrustDirs}
+            onComplete={() => {
+              setCustomDialog(null);
+              config.clearPendingIncludeDirectories();
+            }}
+            trustedDirs={added}
+            errors={errors}
+            finishAddingDirectories={finishAddingDirectories}
+            config={config}
+            addItem={addItem}
+          />,
+        );
+      } else if (added.length > 0 || errors.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         finishAddingDirectories(config, addItem, added, errors);
+        config.clearPendingIncludeDirectories();
       }
-      config.clearPendingIncludeDirectories();
-      return;
-    }
-
-    const trustedFolders = loadTrustedFolders();
-    const untrustedDirs: string[] = [];
-    const undefinedTrustDirs: string[] = [];
-    const trustedDirs: string[] = [];
-    const added: string[] = [];
-    const errors: string[] = [];
-
-    for (const pathToAdd of pendingDirs) {
-      const expandedPath = expandHomeDir(pathToAdd.trim());
-      const isTrusted = trustedFolders.isPathTrusted(expandedPath);
-      if (isTrusted === false) {
-        untrustedDirs.push(pathToAdd.trim());
-      } else if (isTrusted === undefined) {
-        undefinedTrustDirs.push(pathToAdd.trim());
-      } else {
-        trustedDirs.push(pathToAdd.trim());
-      }
-    }
-
-    if (untrustedDirs.length > 0) {
-      errors.push(
-        `The following directories are explicitly untrusted and cannot be added to a trusted workspace:\n- ${untrustedDirs.join(
-          '\n- ',
-        )}\nPlease use the permissions command to modify their trust level.`,
-      );
-    }
-
-    const workspaceContext = config.getWorkspaceContext();
-    if (trustedDirs.length > 0) {
-      const result = batchAddDirectories(workspaceContext, trustedDirs);
-      added.push(...result.added);
-      errors.push(...result.errors);
-    }
-
-    if (undefinedTrustDirs.length > 0) {
-      debugLogger.log(
-        'Creating custom dialog with undecidedDirs:',
-        undefinedTrustDirs,
-      );
-      setCustomDialog(
-        <MultiFolderTrustDialog
-          folders={undefinedTrustDirs}
-          onComplete={() => {
-            setCustomDialog(null);
-            config.clearPendingIncludeDirectories();
-          }}
-          trustedDirs={added}
-          errors={errors}
-          finishAddingDirectories={finishAddingDirectories}
-          config={config}
-          addItem={addItem}
-        />,
-      );
-    } else if (added.length > 0 || errors.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      finishAddingDirectories(config, addItem, added, errors);
-      config.clearPendingIncludeDirectories();
-    }
+    })();
   }, [isTrustedFolder, config, addItem, setCustomDialog]);
 }

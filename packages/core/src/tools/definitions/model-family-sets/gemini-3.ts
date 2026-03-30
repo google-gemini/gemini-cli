@@ -51,6 +51,8 @@ import {
   EDIT_PARAM_OLD_STRING,
   EDIT_PARAM_NEW_STRING,
   EDIT_PARAM_ALLOW_MULTIPLE,
+  EDIT_PARAM_START_LINE,
+  EDIT_PARAM_END_LINE,
   LS_PARAM_IGNORE,
   WEB_SEARCH_PARAM_QUERY,
   WEB_FETCH_PARAM_PROMPT,
@@ -379,6 +381,16 @@ The user has the ability to modify the \`new_string\` content. If modified, this
           type: 'boolean',
           description:
             'If true, the tool will replace all occurrences of `old_string`. If false (default), it will only succeed if exactly one occurrence is found.',
+        },
+        [EDIT_PARAM_START_LINE]: {
+          type: 'number',
+          description:
+            'Optional: The 1-based line number to start the replacement at.',
+        },
+        [EDIT_PARAM_END_LINE]: {
+          type: 'number',
+          description:
+            'Optional: The 1-based line number to end the replacement at (inclusive).',
         },
       },
       required: [

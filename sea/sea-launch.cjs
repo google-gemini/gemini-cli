@@ -251,6 +251,9 @@ async function main(getAssetFn = getAsset) {
     crypto,
   });
 
+  // Set the runtime directory in the environment so the app can find embedded assets
+  process.env['GEMINI_RUNTIME_DIR'] = runtimeDir;
+
   const mainPath = path.join(runtimeDir, 'gemini.mjs');
 
   await import(pathToFileURL(mainPath).href).catch((err) => {

@@ -507,7 +507,9 @@ export interface SandboxConfig {
     | 'sandbox-exec'
     | 'runsc'
     | 'lxc'
-    | 'windows-native';
+    | 'windows-native'
+    | 'bwrap'
+    | 'native';
   image?: string;
 }
 
@@ -525,6 +527,8 @@ export const ConfigSchema = z.object({
           'runsc',
           'lxc',
           'windows-native',
+          'bwrap',
+          'native',
         ])
         .optional(),
       image: z.string().optional(),
@@ -1669,6 +1673,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   get sandboxPolicyManager() {
     return this._sandboxPolicyManager;
+  }
+
+  getSandboxConfig(): SandboxConfig | undefined {
+    return this.sandbox;
   }
 
   get sandboxManager(): SandboxManager {

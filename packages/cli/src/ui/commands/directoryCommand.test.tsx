@@ -358,7 +358,7 @@ describe('directoryCommand', () => {
       const mockLoadedFolders = {
         isPathTrusted: mockIsPathTrusted,
       } as unknown as LoadedTrustedFolders;
-      vi.spyOn(trustedFolders, 'loadTrustedFolders').mockReturnValue(
+      vi.spyOn(trustedFolders, 'loadTrustedFolders').mockResolvedValue(
         mockLoadedFolders,
       );
     });
@@ -432,7 +432,7 @@ describe('directoryCommand', () => {
     it('should prompt for directory even if workspace is untrusted', async () => {
       if (!addCommand?.action) throw new Error('No action');
       // Even if workspace is untrusted, we should still check directory trust
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockResolvedValue({
         isTrusted: false,
         source: 'file',
       });

@@ -11,14 +11,40 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
-export async function relaunchOnExitCode(runner: () => Promise<number>) {
+const MAX_RECOVERY_RETRIES = 3;
+const RECOVERY_BACKOFF_MS = 1000;
+
+export async function relaunchOnExitCode(
+  runner: (isRecovery: boolean) => Promise<number>,
+) {
+  let recoveryCount = 0;
+  let isRecovery = false;
+
   while (true) {
     try {
-      const exitCode = await runner();
+      const exitCode = await runner(isRecovery);
 
-      if (exitCode !== RELAUNCH_EXIT_CODE) {
-        process.exit(exitCode);
+      if (exitCode === RELAUNCH_EXIT_CODE) {
+        // Intentional relaunch (e.g. settings change)
+        isRecovery = false;
+        recoveryCount = 0;
+        continue;
       }
+
+      if (exitCode !== 0 && recoveryCount < MAX_RECOVERY_RETRIES) {
+        // Unintentional crash - attempt self-healing
+        recoveryCount++;
+        isRecovery = true;
+        const delay = RECOVERY_BACKOFF_MS * recoveryCount;
+        writeToStderr(
+          `\n[Self-Healing] CLI crashed (exit code ${exitCode}). Attempting recovery ${recoveryCount}/${MAX_RECOVERY_RETRIES} in ${delay}ms...\n`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Successful exit or retry limit reached
+      process.exit(exitCode);
     } catch (error) {
       process.stdin.resume();
       const errorMessage =
@@ -42,11 +68,16 @@ export async function relaunchAppInChildProcess(
 
   let latestAdminSettings = remoteAdminSettings;
 
-  const runner = () => {
+  const runner = (isRecovery: boolean) => {
     // process.argv is [node, script, ...args]
     // We want to construct [ ...nodeArgs, script, ...scriptArgs]
     const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
+    let scriptArgs = process.argv.slice(2);
+
+    // If we are recovering from a crash, ensure we resume the latest session
+    if (isRecovery && !scriptArgs.includes('--resume')) {
+      scriptArgs = ['--resume', 'latest', ...scriptArgs];
+    }
 
     const nodeArgs = [
       ...process.execArgv,

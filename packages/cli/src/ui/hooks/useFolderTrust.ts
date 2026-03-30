@@ -39,47 +39,51 @@ export const useFolderTrust = (
 
   useEffect(() => {
     let isMounted = true;
-    const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
 
-    if (trusted === undefined || trusted === false) {
-      void FolderTrustDiscoveryService.discover(process.cwd())
-        .then((results) => {
-          if (isMounted) {
-            setDiscoveryResults(results);
-          }
-        })
-        .catch(() => {
-          // Silently ignore discovery errors as they are handled within the service
-          // and reported via results.discoveryErrors if successful.
-        });
-    }
+    const checkTrust = async () => {
+      const { isTrusted: trusted } = await isWorkspaceTrusted(settings.merged);
 
-    const showUntrustedMessage = () => {
-      if (trusted === false && !startupMessageSent.current) {
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
-          },
-          Date.now(),
-        );
-        startupMessageSent.current = true;
+      if (!isMounted) return;
+
+      if (trusted === undefined || trusted === false) {
+        void FolderTrustDiscoveryService.discover(process.cwd())
+          .then((results) => {
+            if (isMounted) {
+              setDiscoveryResults(results);
+            }
+          })
+          .catch(() => {
+            // Silently ignore discovery errors
+          });
       }
-    };
 
-    if (isHeadlessMode()) {
-      if (isMounted) {
+      const showUntrustedMessage = () => {
+        if (trusted === false && !startupMessageSent.current) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
+            },
+            Date.now(),
+          );
+          startupMessageSent.current = true;
+        }
+      };
+
+      if (isHeadlessMode()) {
         setIsTrusted(trusted);
         setIsFolderTrustDialogOpen(false);
         onTrustChange(true);
         showUntrustedMessage();
+      } else {
+        setIsTrusted(trusted);
+        setIsFolderTrustDialogOpen(trusted === undefined);
+        onTrustChange(trusted);
+        showUntrustedMessage();
       }
-    } else if (isMounted) {
-      setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(trusted === undefined);
-      onTrustChange(trusted);
-      showUntrustedMessage();
-    }
+    };
+
+    void checkTrust();
 
     return () => {
       isMounted = false;
@@ -98,7 +102,7 @@ export const useFolderTrust = (
       if (!trustLevel) return;
 
       const cwd = process.cwd();
-      const trustedFolders = loadTrustedFolders();
+      const trustedFolders = await loadTrustedFolders();
 
       try {
         await trustedFolders.setValue(cwd, trustLevel);

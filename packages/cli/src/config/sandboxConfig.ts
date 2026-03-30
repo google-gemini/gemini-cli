@@ -30,11 +30,21 @@ const VALID_SANDBOX_COMMANDS = [
   'runsc',
   'lxc',
   'windows-native',
+  'bwrap',
+  'native',
 ];
 
 function isSandboxCommand(
   value: string,
-): value is Exclude<SandboxConfig['command'], undefined> {
+): value is
+  | 'docker'
+  | 'podman'
+  | 'sandbox-exec'
+  | 'runsc'
+  | 'lxc'
+  | 'windows-native'
+  | 'bwrap'
+  | 'native' {
   return (VALID_SANDBOX_COMMANDS as ReadonlyArray<string | undefined>).includes(
     value,
   );
@@ -42,7 +52,16 @@ function isSandboxCommand(
 
 function getSandboxCommand(
   sandbox?: boolean | string | null,
-): SandboxConfig['command'] | '' {
+):
+  | 'docker'
+  | 'podman'
+  | 'sandbox-exec'
+  | 'runsc'
+  | 'lxc'
+  | 'windows-native'
+  | 'bwrap'
+  | 'native'
+  | '' {
   // If the SANDBOX env var is set, we're already inside the sandbox.
   if (process.env['SANDBOX']) {
     return '';
@@ -63,6 +82,16 @@ function getSandboxCommand(
   }
 
   if (typeof sandbox === 'string' && sandbox) {
+    if (sandbox === 'native') {
+      if (os.platform() === 'win32') return 'windows-native';
+      if (os.platform() === 'linux' && commandExists.sync('bwrap'))
+        return 'bwrap';
+      if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec'))
+        return 'sandbox-exec';
+      // Fallback if 'native' requested but no native support found
+      return '';
+    }
+
     if (!isSandboxCommand(sandbox)) {
       throw new FatalSandboxError(
         `Invalid sandbox command '${sandbox}'. Must be one of ${VALID_SANDBOX_COMMANDS.join(
@@ -82,9 +111,19 @@ function getSandboxCommand(
         'Windows native sandboxing is only supported on Windows',
       );
     }
+    // bwrap is only supported on Linux
+    if (sandbox === 'bwrap' && os.platform() !== 'linux') {
+      throw new FatalSandboxError(
+        'Bubblewrap (bwrap) sandboxing is only supported on Linux',
+      );
+    }
 
     // confirm that specified command exists (unless it's built-in)
-    if (sandbox !== 'windows-native' && !commandExists.sync(sandbox)) {
+    if (
+      sandbox !== 'windows-native' &&
+      sandbox !== 'native' &&
+      !commandExists.sync(sandbox)
+    ) {
       throw new FatalSandboxError(
         `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
       );
@@ -98,11 +137,13 @@ function getSandboxCommand(
     return sandbox;
   }
 
-  // look for seatbelt, docker, or podman, in that order
-  // for container-based sandboxing, require sandbox to be enabled explicitly
-  // note: runsc is NOT auto-detected, it must be explicitly specified
+  // look for native support, then docker, or podman
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
+  } else if (os.platform() === 'win32') {
+    return 'windows-native';
+  } else if (os.platform() === 'linux' && commandExists.sync('bwrap')) {
+    return 'bwrap';
   } else if (commandExists.sync('docker') && sandbox === true) {
     return 'docker';
   } else if (commandExists.sync('podman') && sandbox === true) {
@@ -160,9 +201,17 @@ export async function loadSandboxConfig(
   const isNative =
     command === 'windows-native' ||
     command === 'sandbox-exec' ||
-    command === 'lxc';
+    command === 'lxc' ||
+    command === 'bwrap' ||
+    command === 'native';
 
   return command && (image || isNative)
-    ? { enabled: true, allowedPaths, networkAccess, command, image }
+    ? {
+        enabled: true,
+        allowedPaths,
+        networkAccess,
+        command: command as SandboxConfig['command'],
+        image,
+      }
     : undefined;
 }

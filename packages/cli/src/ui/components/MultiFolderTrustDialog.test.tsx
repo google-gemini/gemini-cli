@@ -62,7 +62,7 @@ const defaultProps: MultiFolderTrustDialogProps = {
 describe('MultiFolderTrustDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(trustedFolders.loadTrustedFolders).mockReturnValue(
+    vi.mocked(trustedFolders.loadTrustedFolders).mockResolvedValue(
       mockTrustedFolders,
     );
     vi.mocked(directoryUtils.expandHomeDir).mockImplementation((p) => p);

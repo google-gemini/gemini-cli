@@ -44,7 +44,7 @@ const homeDirectoryCheck: WarningCheck = {
         // If folder trust is enabled and the user trusts the home directory, don't show the warning.
         if (
           isFolderTrustEnabled(settings) &&
-          isWorkspaceTrusted(settings).isTrusted
+          (await isWorkspaceTrusted(settings)).isTrusted
         ) {
           return null;
         }

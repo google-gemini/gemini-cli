@@ -261,7 +261,7 @@ describe('ExtensionManager', () => {
       });
 
       // Trust the workspace to allow installation
-      const trustedFolders = loadTrustedFolders();
+      const trustedFolders = await loadTrustedFolders();
       await trustedFolders.setValue(tempWorkspaceDir, TrustLevel.TRUST_FOLDER);
 
       const installMetadata = {
@@ -291,11 +291,11 @@ describe('ExtensionManager', () => {
       } as unknown as MergedSettings;
 
       // Trust the REAL path
-      const trustedFolders = loadTrustedFolders();
+      const trustedFolders = await loadTrustedFolders();
       await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
 
       // Check trust of the symlink path
-      const trustResult = isWorkspaceTrusted(settings, absolutePath);
+      const trustResult = await isWorkspaceTrusted(settings, absolutePath);
       expect(trustResult.isTrusted).toBe(true);
 
       const manager = new ExtensionManager({

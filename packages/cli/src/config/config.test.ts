@@ -1267,7 +1267,7 @@ describe('Approval mode tool exclusion logic', () => {
 
   beforeEach(() => {
     process.stdin.isTTY = false; // Ensure non-interactive mode
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: undefined,
     });
@@ -2238,7 +2238,7 @@ describe('loadCliConfig tool exclusions', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: undefined,
     });
@@ -2637,7 +2637,7 @@ describe('loadCliConfig approval mode', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: undefined,
     });
@@ -2807,7 +2807,7 @@ describe('loadCliConfig approval mode', () => {
   // --- Untrusted Folder Scenarios ---
   describe('when folder is NOT trusted', () => {
     beforeEach(() => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.mocked(isWorkspaceTrusted).mockResolvedValue({
         isTrusted: false,
         source: 'file',
       });
@@ -3523,7 +3523,7 @@ describe('loadCliConfig disableYoloMode', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: undefined,
     });
@@ -3562,7 +3562,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.mocked(isWorkspaceTrusted).mockResolvedValue({
       isTrusted: true,
       source: undefined,
     });
