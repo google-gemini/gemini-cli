@@ -45,25 +45,25 @@ memory-investigation SKILL.md ──> Built-in Skill ──> activate_skill
 
 | Module | Lines | Purpose |
 |--------|------:|---------|
+| `llmExplainer` | 1,157 | Generate structured prompts for Gemini, parse responses, local heuristic fallback, **Gemini API MVP** |
 | `heapSnapshotAnalyzer` | 1,043 | Parse V8 `.heapsnapshot`, extract class summaries, detect leaks, build dominator trees |
-| `llmExplainer` | 1,149 | Generate structured prompts for Gemini, parse responses, local heuristic fallback, **Gemini API MVP** |
 | `gcPressureAnalyzer` | 896 | Analyze GC events, detect thrashing/long pauses, V8 tuning recommendations |
 | `allocationHotspotProfiler` | 826 | Identify allocation hotspots, storm detection, flamegraph generation |
 | `rootCauseAnalyzer` | 822 | 9 pattern detectors with confidence scoring (closures, DOM detach, timers, etc.) |
 | `memoryRegressionGuard` | 809 | Fingerprint heaps, detect regressions in CI, trend analysis, budget enforcement |
 | `smartDiff` | 761 | Structural diff of heap snapshots with growth/shrink classification |
 | `trendForecaster` | 720 | Time-series forecasting for heap growth, OOM prediction |
-| `perfettoSqlIntegration` | 664 | Load Chrome traces, run SQL queries via Perfetto engine |
-| `investigationTool` | 609 | Orchestrator — wires all modules into a single `investigate` command |
+| `perfettoSqlIntegration` | 667 | Load Chrome traces, run SQL queries via Perfetto engine |
+| `investigationTool` | 621 | Orchestrator — wires all modules into a single `investigate` command |
 | `cdpClient` | 581 | Chrome DevTools Protocol client with 3-snapshot leak capture |
+| `streamingHeapParser` | 575 | Streaming JSON parser for large (>50MB) V8 heap snapshots — 10-15% peak memory |
 | `flameGraphGenerator` | 548 | Generate interactive flamegraphs from allocation profiles |
 | `tokenEfficiencyBenchmark` | 514 | Measure token compression ratios for LLM context efficiency |
 | `perfettoExporter` | 489 | Export leak reports, class summaries, CPU profiles to Perfetto format |
-| `streamingHeapParser` | 420 | Streaming JSON parser for large (>50MB) V8 heap snapshots — 10-15% peak memory |
-| `index` | 158 | Public API barrel exports |
-| **Source Total** | **11,002** | |
-| **Tests (16 files)** | **7,411** | |
-| **Grand Total** | **18,413** | |
+| `index` | 159 | Public API barrel exports |
+| **Source Total** | **11,302** | |
+| **Tests (18 files)** | **7,602** | |
+| **Grand Total** | **18,904** | |
 
 ---
 

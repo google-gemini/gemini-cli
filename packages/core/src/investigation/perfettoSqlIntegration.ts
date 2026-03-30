@@ -541,10 +541,13 @@ export class PerfettoSqlIntegration {
     before: string,
     after: string,
   ): Promise<QueryResult> {
+    // Escape single quotes to prevent SQL injection in the in-memory engine
+    const safeBefore = before.replace(/'/g, "''");
+    const safeAfter = after.replace(/'/g, "''");
     return this.query(`
       SELECT type, COUNT(*) as count_delta, SUM(retained_size) as size_delta
       FROM objects
-      WHERE snapshot >= '${after}' AND snapshot_previous < '${before}'
+      WHERE snapshot >= '${safeAfter}' AND snapshot_previous < '${safeBefore}'
       GROUP BY type
       ORDER BY size_delta DESC
     `);

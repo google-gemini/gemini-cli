@@ -305,6 +305,8 @@ export class InvestigationExecutor extends EventEmitter {
     this.emit('progress', 'Taking 3 heap snapshots for leak detection...');
     const [snap1, snap2, snap3] = await client.threeSnapshotCapture(intervalMs);
 
+    // Note: CDP returns snapshots as in-memory JSON strings (not files),
+    // so JSON.parse is correct here. The streaming parser is for large on-disk files.
     const parsed1: unknown = JSON.parse(snap1);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const analyzer1 = new HeapSnapshotAnalyzer(parsed1 as RawHeapSnapshot);

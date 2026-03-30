@@ -510,7 +510,8 @@ export class StreamingHeapParser extends EventEmitter {
         for (let i = processed; i < buffer.length; i++) {
           if (buffer[i] === '[') sectionDepth++;
           else if (buffer[i] === ']') {
-            if (sectionDepth <= 0) {
+            if (sectionDepth === 0) {
+              // Haven't entered the array yet
               endIdx = i;
               break;
             }
