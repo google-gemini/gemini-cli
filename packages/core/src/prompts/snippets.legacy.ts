@@ -54,7 +54,6 @@ export interface CoreMandatesOptions {
   isGemini3: boolean;
   hasSkills: boolean;
   hasHierarchicalMemory: boolean;
-  contextFilenames?: string[];
   topicUpdateNarration?: boolean;
 }
 
@@ -153,12 +152,11 @@ ${renderFinalReminder(options.finalReminder)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string | HierarchicalMemory,
-  _contextFilenames?: string[],
 ): string {
   return `
 ${basePrompt.trim()}
 
-${renderUserMemory(userMemory, _contextFilenames)}
+${renderUserMemory(userMemory)}
 `.trim();
 }
 
@@ -378,10 +376,7 @@ export function renderFinalReminder(options?: FinalReminderOptions): string {
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${options.readFileToolName}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`.trim();
 }
 
-export function renderUserMemory(
-  memory?: string | HierarchicalMemory,
-  _contextFilenames?: string[],
-): string {
+export function renderUserMemory(memory?: string | HierarchicalMemory): string {
   if (!memory) return '';
   if (typeof memory === 'string') {
     const trimmed = memory.trim();
@@ -714,7 +709,7 @@ function gitRepoKeepUserInformed(interactive: boolean): string {
 /**
  * Provides the system prompt for history compression.
  */
-export function getCompressionPrompt(_approvedPlanPath?: string): string {
+export function getCompressionPrompt(): string {
   return `
 You are a specialized system component responsible for distilling chat history into a structured XML <state_snapshot>.
 
