@@ -35,7 +35,10 @@ describe('MacOsSandboxManager', () => {
       networkAccess: mockNetworkAccess,
     };
 
-    manager = new MacOsSandboxManager({ workspace: mockWorkspace });
+    manager = new MacOsSandboxManager({
+      workspace: mockWorkspace,
+      forbiddenPaths: [],
+    });
 
     // Mock the seatbelt args builder to isolate manager tests
     vi.spyOn(seatbeltArgsBuilder, 'buildSeatbeltArgs').mockReturnValue([
@@ -68,7 +71,7 @@ describe('MacOsSandboxManager', () => {
         workspace: mockWorkspace,
         allowedPaths: mockAllowedPaths,
         networkAccess: mockNetworkAccess,
-        forbiddenPaths: undefined,
+        forbiddenPaths: [],
         workspaceWrite: true,
         additionalPermissions: {
           fileSystem: {
@@ -112,7 +115,10 @@ describe('MacOsSandboxManager', () => {
           SAFE_VAR: '1',
           GITHUB_TOKEN: 'sensitive',
         },
-        policy: mockPolicy,
+        policy: {
+          ...mockPolicy,
+          sanitizationConfig: { enableEnvironmentVariableRedaction: true },
+        },
       });
 
       expect(result.env['SAFE_VAR']).toBe('1');
@@ -174,15 +180,16 @@ describe('MacOsSandboxManager', () => {
 
     describe('forbiddenPaths', () => {
       it('should parameterize forbidden paths and explicitly deny them', async () => {
-        await manager.prepareCommand({
+        const managerWithForbidden = new MacOsSandboxManager({
+          workspace: mockWorkspace,
+          forbiddenPaths: ['/tmp/forbidden1'],
+        });
+        await managerWithForbidden.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
           env: {},
-          policy: {
-            ...mockPolicy,
-            forbiddenPaths: ['/tmp/forbidden1'],
-          },
+          policy: mockPolicy,
         });
 
         expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
@@ -193,15 +200,16 @@ describe('MacOsSandboxManager', () => {
       });
 
       it('explicitly denies non-existent forbidden paths to prevent creation', async () => {
-        await manager.prepareCommand({
+        const managerWithForbidden = new MacOsSandboxManager({
+          workspace: mockWorkspace,
+          forbiddenPaths: ['/tmp/does-not-exist'],
+        });
+        await managerWithForbidden.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
           env: {},
-          policy: {
-            ...mockPolicy,
-            forbiddenPaths: ['/tmp/does-not-exist'],
-          },
+          policy: mockPolicy,
         });
 
         expect(seatbeltArgsBuilder.buildSeatbeltArgs).toHaveBeenCalledWith(
@@ -212,7 +220,11 @@ describe('MacOsSandboxManager', () => {
       });
 
       it('should override allowed paths if a path is also in forbidden paths', async () => {
-        await manager.prepareCommand({
+        const managerWithForbidden = new MacOsSandboxManager({
+          workspace: mockWorkspace,
+          forbiddenPaths: ['/tmp/conflict'],
+        });
+        await managerWithForbidden.prepareCommand({
           command: 'echo',
           args: [],
           cwd: mockWorkspace,
@@ -220,7 +232,6 @@ describe('MacOsSandboxManager', () => {
           policy: {
             ...mockPolicy,
             allowedPaths: ['/tmp/conflict'],
-            forbiddenPaths: ['/tmp/conflict'],
           },
         });
 

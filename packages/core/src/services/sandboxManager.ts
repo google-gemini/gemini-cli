@@ -21,6 +21,8 @@ import {
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import type { ShellExecutionResult } from './shellExecutionService.js';
+import type { SandboxPolicyManager } from '../policy/sandboxPolicyManager.js';
 export interface SandboxPermissions {
   /** Filesystem permissions. */
   fileSystem?: {
@@ -39,14 +41,22 @@ export interface SandboxPermissions {
 export interface ExecutionPolicy {
   /** Additional absolute paths to grant full read/write access to. */
   allowedPaths?: string[];
-  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
-  forbiddenPaths?: string[];
   /** Whether network access is allowed. */
   networkAccess?: boolean;
   /** Rules for scrubbing sensitive environment variables. */
   sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
   /** Additional granular permissions to grant to this command. */
   additionalPermissions?: SandboxPermissions;
+}
+
+/**
+ * Configuration for the sandbox mode behavior.
+ */
+export interface SandboxModeConfig {
+  readonly?: boolean;
+  network?: boolean;
+  approvedTools?: string[];
+  allowOverrides?: boolean;
 }
 
 /**
@@ -58,6 +68,12 @@ export interface GlobalSandboxOptions {
    * This directory is granted full read and write access.
    */
   workspace: string;
+  /** Absolute paths to explicitly deny read/write access to (overrides allowlists). */
+  forbiddenPaths?: string[];
+  /** The current sandbox mode behavior from config. */
+  modeConfig?: SandboxModeConfig;
+  /** The policy manager for persistent approvals. */
+  policyManager?: SandboxPolicyManager;
 }
 
 /**
@@ -91,6 +107,16 @@ export interface SandboxedCommand {
 }
 
 /**
+ * A structured result from parsing sandbox denials.
+ */
+export interface ParsedSandboxDenial {
+  /** If the denial is related to file system access, these are the paths that were blocked. */
+  filePaths?: string[];
+  /** If the denial is related to network access. */
+  network?: boolean;
+}
+
+/**
  * Interface for a service that prepares commands for sandboxed execution.
  */
 export interface SandboxManager {
@@ -108,6 +134,11 @@ export interface SandboxManager {
    * Checks if a command with its arguments is explicitly known to be dangerous for this sandbox.
    */
   isDangerousCommand(args: string[]): boolean;
+
+  /**
+   * Parses the output of a command to detect sandbox denials.
+   */
+  parseDenials(result: ShellExecutionResult): ParsedSandboxDenial | undefined;
 }
 
 /**
@@ -119,6 +150,87 @@ export const GOVERNANCE_FILES = [
   { path: '.geminiignore', isDirectory: false },
   { path: '.git', isDirectory: true },
 ] as const;
+
+/**
+ * Files that contain sensitive secrets or credentials and should be
+ * completely hidden (deny read/write) in any sandbox.
+ */
+export const SECRET_FILES = [
+  { pattern: '.env' },
+  { pattern: '.env.*' },
+] as const;
+
+/**
+ * Checks if a given file name matches any of the secret file patterns.
+ */
+export function isSecretFile(fileName: string): boolean {
+  return SECRET_FILES.some((s) => {
+    if (s.pattern.endsWith('*')) {
+      const prefix = s.pattern.slice(0, -1);
+      return fileName.startsWith(prefix);
+    }
+    return fileName === s.pattern;
+  });
+}
+
+/**
+ * Returns arguments for the Linux 'find' command to locate secret files.
+ */
+export function getSecretFileFindArgs(): string[] {
+  const args: string[] = ['('];
+  SECRET_FILES.forEach((s, i) => {
+    if (i > 0) args.push('-o');
+    args.push('-name', s.pattern);
+  });
+  args.push(')');
+  return args;
+}
+
+/**
+ * Finds all secret files in a directory up to a certain depth.
+ * Default is shallow scan (depth 1) for performance.
+ */
+export async function findSecretFiles(
+  baseDir: string,
+  maxDepth = 1,
+): Promise<string[]> {
+  const secrets: string[] = [];
+  const skipDirs = new Set([
+    'node_modules',
+    '.git',
+    '.venv',
+    '__pycache__',
+    'dist',
+    'build',
+    '.next',
+    '.idea',
+    '.vscode',
+  ]);
+
+  async function walk(dir: string, depth: number) {
+    if (depth > maxDepth) return;
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!skipDirs.has(entry.name)) {
+            await walk(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          if (isSecretFile(entry.name)) {
+            secrets.push(fullPath);
+          }
+        }
+      }
+    } catch {
+      // Ignore read errors
+    }
+  }
+
+  await walk(baseDir, 1);
+  return secrets;
+}
 
 /**
  * A no-op implementation of SandboxManager that silently passes commands
@@ -154,10 +266,14 @@ export class NoopSandboxManager implements SandboxManager {
       ? isWindowsDangerousCommand(args)
       : isMacDangerousCommand(args);
   }
+
+  parseDenials(): undefined {
+    return undefined;
+  }
 }
 
 /**
- * SandboxManager that implements actual sandboxing.
+ * A SandboxManager implementation that just runs locally (no sandboxing yet).
  */
 export class LocalSandboxManager implements SandboxManager {
   async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
@@ -170,6 +286,10 @@ export class LocalSandboxManager implements SandboxManager {
 
   isDangerousCommand(_args: string[]): boolean {
     return false;
+  }
+
+  parseDenials(): undefined {
+    return undefined;
   }
 }
 
