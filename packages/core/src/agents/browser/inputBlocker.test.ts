@@ -34,6 +34,7 @@ describe('inputBlocker', () => {
           function: expect.stringContaining('__gemini_input_blocker'),
         },
         undefined,
+        true,
       );
     });
 
@@ -96,6 +97,7 @@ describe('inputBlocker', () => {
           function: expect.stringContaining('__gemini_input_blocker'),
         }),
         undefined,
+        true,
       );
       expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
         2,
