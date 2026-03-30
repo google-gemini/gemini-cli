@@ -27,6 +27,29 @@ const listeners = new Set<() => void>();
 let messageQueue: ConsoleMessageItem[] = [];
 let timeoutId: NodeJS.Timeout | null = null;
 
+/**
+ * Initializes the global console store and subscribes to coreEvents.
+ * Acts as a safe reset function, making it idempotent and useful for test isolation.
+ * Must be called during application startup.
+ */
+export function initializeConsoleStore() {
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  messageQueue = [];
+  globalConsoleMessages = [];
+  globalErrorCount = 0;
+  notifyListeners();
+
+  // Safely detach first to ensure idempotency and prevent listener leaks
+  coreEvents.off(CoreEvent.ConsoleLog, handleConsoleLog);
+  coreEvents.off(CoreEvent.Output, handleOutput);
+
+  coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
+  coreEvents.on(CoreEvent.Output, handleOutput);
+}
+
 function notifyListeners() {
   for (const listener of listeners) {
     listener();
@@ -134,11 +157,6 @@ const handleOutput = (payload: {
   handleNewMessage({ type: 'log', content, count: 1 });
 };
 
-coreEvents.on(CoreEvent.ConsoleLog, handleConsoleLog);
-coreEvents.on(CoreEvent.Output, handleOutput);
-
-// --- React Hooks ---
-
 /**
  * Hook to access the global console message history.
  * Decoupled from any component lifecycle to ensure history is preserved even
@@ -161,19 +179,4 @@ export function useErrorCount(): UseErrorCountReturn {
   }, []);
 
   return { errorCount, clearErrorCount };
-}
-
-/**
- * Internal helper to reset the global store for unit testing purposes.
- * Should NOT be used in production code.
- */
-export function _resetConsoleStoreForTesting() {
-  if (timeoutId) {
-    clearTimeout(timeoutId);
-    timeoutId = null;
-  }
-  messageQueue = [];
-  globalConsoleMessages = [];
-  globalErrorCount = 0;
-  notifyListeners();
 }

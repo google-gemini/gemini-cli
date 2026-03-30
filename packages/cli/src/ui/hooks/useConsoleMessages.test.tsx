@@ -9,7 +9,8 @@ import { vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import {
   useConsoleMessages,
-  _resetConsoleStoreForTesting,
+  useErrorCount,
+  initializeConsoleStore,
 } from './useConsoleMessages.js';
 import { coreEvents } from '@google/gemini-cli-core';
 
@@ -43,7 +44,7 @@ describe('useConsoleMessages', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    _resetConsoleStoreForTesting();
+    initializeConsoleStore();
   });
 
   afterEach(() => {
@@ -71,7 +72,7 @@ describe('useConsoleMessages', () => {
       coreEvents._trigger('console-log', { type: 'error', content });
     }, []);
     const clearConsoleMessages = useCallback(() => {
-      _resetConsoleStoreForTesting();
+      initializeConsoleStore();
     }, []);
     return {
       consoleMessages,
@@ -145,5 +146,86 @@ describe('useConsoleMessages', () => {
       { type: 'log', content: 'First message', count: 1 },
       { type: 'error', content: 'Second message', count: 1 },
     ]);
+  });
+});
+
+describe('useErrorCount', () => {
+  let unmounts: Array<() => void> = [];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    initializeConsoleStore();
+  });
+
+  afterEach(() => {
+    for (const unmount of unmounts) {
+      try {
+        unmount();
+      } catch (_e) {
+        // Ignore unmount errors
+      }
+    }
+    unmounts = [];
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const renderErrorCountHook = async () => {
+    let hookResult: ReturnType<typeof useErrorCount>;
+    function TestComponent() {
+      hookResult = useErrorCount();
+      return null;
+    }
+    const { unmount } = await render(<TestComponent />);
+    unmounts.push(unmount);
+    return {
+      result: {
+        get current() {
+          return hookResult;
+        },
+      },
+      unmount,
+    };
+  };
+
+  it('should initialize with an error count of 0', async () => {
+    const { result } = await renderErrorCountHook();
+    expect(result.current.errorCount).toBe(0);
+  });
+
+  it('should increment error count when an error is logged', async () => {
+    const { result } = await renderErrorCountHook();
+    act(() => {
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'error', content: 'error' });
+      vi.runAllTimers();
+    });
+    expect(result.current.errorCount).toBe(1);
+  });
+
+  it('should not increment error count for non-error logs', async () => {
+    const { result } = await renderErrorCountHook();
+    act(() => {
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'log', content: 'log' });
+      vi.runAllTimers();
+    });
+    expect(result.current.errorCount).toBe(0);
+  });
+
+  it('should clear the error count', async () => {
+    const { result } = await renderErrorCountHook();
+    act(() => {
+      // @ts-expect-error - internal testing helper
+      coreEvents._trigger('console-log', { type: 'error', content: 'error' });
+      vi.runAllTimers();
+    });
+    expect(result.current.errorCount).toBe(1);
+
+    act(() => {
+      result.current.clearErrorCount();
+    });
+    expect(result.current.errorCount).toBe(0);
   });
 });
