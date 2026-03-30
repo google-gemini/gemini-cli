@@ -22,3 +22,6 @@ Makefile eol=lf
 *.eot binary
 *.ttf binary
 *.otf binary
+
+# Configure GitHub to treat Markdoc files as Markdown
+*.mdoc linguist-language=Markdown
