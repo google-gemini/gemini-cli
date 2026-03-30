@@ -684,6 +684,7 @@ export interface ConfigParameters {
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   experimentalMemoryManager?: boolean;
+  useAgentProtocol?: boolean;
   experimentalAgentHistoryTruncation?: boolean;
   experimentalAgentHistoryTruncationThreshold?: number;
   experimentalAgentHistoryRetainedMessages?: number;
@@ -922,6 +923,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   private readonly experimentalJitContext: boolean;
   private readonly experimentalMemoryManager: boolean;
+  private readonly useAgentProtocol: boolean;
   private readonly experimentalAgentHistoryTruncation: boolean;
   private readonly experimentalAgentHistoryTruncationThreshold: number;
   private readonly experimentalAgentHistoryRetainedMessages: number;
@@ -1136,6 +1138,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
+    this.useAgentProtocol = params.useAgentProtocol ?? false;
     this.experimentalAgentHistoryTruncation =
       params.experimentalAgentHistoryTruncation ?? false;
     this.experimentalAgentHistoryTruncationThreshold =
@@ -2338,6 +2341,12 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalMemoryManager;
   }
 
+  getExperimentalUseAgentProtocol(): boolean {
+    return (
+      this.useAgentProtocol ||
+      process.env['GEMINI_CLI_USE_AGENT_PROTOCOL'] === 'true'
+    );
+  }
   isExperimentalAgentHistoryTruncationEnabled(): boolean {
     return this.experimentalAgentHistoryTruncation;
   }
