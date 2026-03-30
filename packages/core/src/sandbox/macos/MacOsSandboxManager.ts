@@ -114,9 +114,19 @@ export class MacOsSandboxManager implements SandboxManager {
       additionalPermissions: mergedAdditional,
     });
 
+    let finalCommand = req.command;
+    let finalArgs = req.args;
+
+    if (req.command === '__read') {
+      finalCommand = '/bin/cat';
+    } else if (req.command === '__write') {
+      finalCommand = '/bin/sh';
+      finalArgs = ['-c', 'cat > "$1"', '_', ...req.args];
+    }
+
     return {
       program: '/usr/bin/sandbox-exec',
-      args: [...sandboxArgs, '--', req.command, ...req.args],
+      args: [...sandboxArgs, '--', finalCommand, ...finalArgs],
       env: sanitizedEnv,
       cwd: req.cwd,
     };
