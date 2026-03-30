@@ -469,7 +469,7 @@ describe('WindowsSandboxManager', () => {
     }
   });
 
-  it('should translate __write to PowerShell safely using $args', async () => {
+  it('should translate __write to PowerShell safely using environment variables', async () => {
     const filePath = path.join(testCwd, 'test.txt');
     const req: SandboxRequest = {
       command: '__write',
@@ -485,12 +485,12 @@ describe('WindowsSandboxManager', () => {
     expect(result.args[7]).toBe('-Command');
     const psCommand = result.args[8];
     expect(psCommand).toBe(
-      '& { $Input | Out-File -FilePath $args[0] -Encoding utf8 }',
+      '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
     );
-    expect(result.args[9]).toBe(filePath);
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(filePath);
   });
 
-  it('should safely handle special characters in __write path', async () => {
+  it('should safely handle special characters in __write path using environment variables', async () => {
     const maliciousPath = path.join(testCwd, 'foo"; echo bar; ".txt');
     const req: SandboxRequest = {
       command: '__write',
@@ -504,13 +504,13 @@ describe('WindowsSandboxManager', () => {
     expect(result.args[4]).toBe('PowerShell.exe');
     const psCommand = result.args[8];
     expect(psCommand).toBe(
-      '& { $Input | Out-File -FilePath $args[0] -Encoding utf8 }',
+      '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
     );
-    // The malicious path should be passed as a separate argument, not interpolated
-    expect(result.args[9]).toBe(maliciousPath);
+    // The malicious path should be injected safely via environment variable, not interpolated in args
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(maliciousPath);
   });
 
-  it('should translate __read to PowerShell safely using $args', async () => {
+  it('should translate __read to PowerShell safely using environment variables', async () => {
     const filePath = path.join(testCwd, 'test.txt');
     const req: SandboxRequest = {
       command: '__read',
@@ -524,7 +524,9 @@ describe('WindowsSandboxManager', () => {
     expect(result.args[4]).toBe('PowerShell.exe');
     expect(result.args[7]).toBe('-Command');
     const psCommand = result.args[8];
-    expect(psCommand).toBe('& { Get-Content -LiteralPath $args[0] -Raw }');
-    expect(result.args[9]).toBe(filePath);
+    expect(psCommand).toBe(
+      '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
+    );
+    expect(result.env['GEMINI_TARGET_PATH']).toBe(filePath);
   });
 });

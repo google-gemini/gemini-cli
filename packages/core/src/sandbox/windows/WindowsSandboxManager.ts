@@ -214,28 +214,28 @@ export class WindowsSandboxManager implements SandboxManager {
 
     let command = req.command;
     let args = req.args;
+    let targetPathEnv: string | undefined;
 
     // Translate virtual commands for sandboxed file system access
     if (command === '__read') {
-      // Use PowerShell for safe argument passing
+      // Use PowerShell for safe argument passing via env var
+      targetPathEnv = args[0] || '';
       command = 'PowerShell.exe';
       args = [
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        '& { Get-Content -LiteralPath $args[0] -Raw }',
-        args[0] || '',
+        '& { Get-Content -LiteralPath $env:GEMINI_TARGET_PATH -Raw }',
       ];
     } else if (command === '__write') {
-      // Use PowerShell for piping stdin to a file
-      const targetPath = args[0] || '';
+      // Use PowerShell for piping stdin to a file via env var
+      targetPathEnv = args[0] || '';
       command = 'PowerShell.exe';
       args = [
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        '& { $Input | Out-File -FilePath $args[0] -Encoding utf8 }',
-        targetPath,
+        '& { $Input | Out-File -FilePath $env:GEMINI_TARGET_PATH -Encoding utf8 }',
       ];
     }
 
@@ -406,10 +406,15 @@ export class WindowsSandboxManager implements SandboxManager {
       ...args,
     ];
 
+    const finalEnv = { ...sanitizedEnv };
+    if (targetPathEnv !== undefined) {
+      finalEnv['GEMINI_TARGET_PATH'] = targetPathEnv;
+    }
+
     return {
       program,
       args: finalArgs,
-      env: sanitizedEnv,
+      env: finalEnv,
       cwd: req.cwd,
     };
   }
