@@ -465,6 +465,44 @@ describe('McpClientManager', () => {
     });
   });
 
+  describe('removeServer', () => {
+    it('should remove a server and disconnect its client', async () => {
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+      expect(manager.getMcpServers()).toHaveProperty('test-server');
+
+      await manager.removeServer('test-server');
+
+      expect(manager.getMcpServers()).not.toHaveProperty('test-server');
+      expect(mockedMcpClient.disconnect).toHaveBeenCalled();
+      expect(mockConfig.refreshMcpContext).toHaveBeenCalled();
+    });
+
+    it('should remove a server from blocked servers if it was blocked', async () => {
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': {},
+      });
+      mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      expect(manager.getBlockedMcpServers()).toContainEqual({
+        name: 'test-server',
+        extensionName: '',
+      });
+
+      await manager.removeServer('test-server');
+
+      expect(manager.getBlockedMcpServers()).not.toContainEqual({
+        name: 'test-server',
+        extensionName: '',
+      });
+    });
+  });
+
   describe('Extension handling', () => {
     it('should remove mcp servers from allServerConfigs when stopExtension is called', async () => {
       const manager = setupManager(new McpClientManager('0.0.1', mockConfig));

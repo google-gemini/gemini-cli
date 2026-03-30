@@ -356,7 +356,7 @@ describe('IDEServer', () => {
     });
 
     it('should reject request without auth token', async () => {
-      const response = await fetch(`http://localhost:${port}/mcp`, {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -370,7 +370,7 @@ describe('IDEServer', () => {
     });
 
     it('should allow request with valid auth token', async () => {
-      const response = await fetch(`http://localhost:${port}/mcp`, {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -387,7 +387,7 @@ describe('IDEServer', () => {
     });
 
     it('should reject request with invalid auth token', async () => {
-      const response = await fetch(`http://localhost:${port}/mcp`, {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -413,7 +413,7 @@ describe('IDEServer', () => {
       ];
 
       for (const header of malformedHeaders) {
-        const response = await fetch(`http://localhost:${port}/mcp`, {
+        const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
