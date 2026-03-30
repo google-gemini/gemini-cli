@@ -32,9 +32,7 @@ describe('AgentSession', () => {
     await session.abort();
     expect(
       session.events.some(
-        (e) =>
-          e.type === 'agent_end' &&
-          (e as AgentEvent<'agent_end'>).reason === 'aborted',
+        (e) => e.type === 'agent_end' && e.reason === 'aborted',
       ),
     ).toBe(true);
   });
@@ -119,6 +117,7 @@ describe('AgentSession', () => {
     expect(events).toHaveLength(0);
     expect(protocol.events).toHaveLength(1);
     expect(protocol.events[0].type).toBe('session_update');
+    expect(protocol.events[0].streamId).toEqual(expect.any(String));
   });
 
   it('should skip events that occur before agent_start', async () => {
@@ -173,6 +172,181 @@ describe('AgentSession', () => {
       expect(streamedEvents).toEqual(allEvents.slice(2));
     });
 
+    it('should complete immediately when resuming from agent_end', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([{ type: 'message' }]);
+      const { streamId } = await session.send({
+        message: [{ type: 'text', text: 'request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const endEvent = session.events.findLast(
+        (event): event is AgentEvent<'agent_end'> =>
+          event.type === 'agent_end' && event.streamId === streamId,
+      );
+      expect(endEvent).toBeDefined();
+
+      const iterator = session
+        .stream({ eventId: endEvent!.id })
+        [Symbol.asyncIterator]();
+      await expect(iterator.next()).resolves.toEqual({
+        value: undefined,
+        done: true,
+      });
+    });
+
+    it('should throw for an unknown eventId', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      const iterator = session
+        .stream({ eventId: 'missing-event' })
+        [Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toThrow(
+        'Unknown eventId: missing-event',
+      );
+    });
+
+    it('should throw when resuming from an event before agent_start on a stream with no agent activity', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      const { streamId } = await session.send({ update: { title: 'draft' } });
+      expect(streamId).toBeNull();
+
+      const updateEvent = session.events.find(
+        (event): event is AgentEvent<'session_update'> =>
+          event.type === 'session_update',
+      );
+      expect(updateEvent).toBeDefined();
+
+      const iterator = session
+        .stream({ eventId: updateEvent!.id })
+        [Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toThrow(
+        `Cannot resume from eventId ${updateEvent!.id} before agent_start for stream ${updateEvent!.streamId}`,
+      );
+    });
+
+    it('should replay from agent_start when resuming from a pre-agent_start event after activity is in history', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'hello' }],
+        },
+      ]);
+      await session.send({
+        message: [{ type: 'text', text: 'request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const userMessage = session.events.find(
+        (event): event is AgentEvent<'message'> =>
+          event.type === 'message' && event.role === 'user',
+      );
+      expect(userMessage).toBeDefined();
+
+      const streamedEvents: AgentEvent[] = [];
+      for await (const event of session.stream({ eventId: userMessage!.id })) {
+        streamedEvents.push(event);
+      }
+
+      expect(streamedEvents.map((event) => event.type)).toEqual([
+        'agent_start',
+        'message',
+        'agent_end',
+      ]);
+      expect(streamedEvents[0]?.streamId).toBe(userMessage!.streamId);
+    });
+
+    it('should throw when resuming from a pre-agent_start event before activity is in history', async () => {
+      const protocol = new MockAgentProtocol([
+        {
+          id: 'e-1',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          streamId: 'stream-1',
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'text', text: 'request' }],
+        },
+      ]);
+      const session = new AgentSession(protocol);
+
+      const iterator = session
+        .stream({ eventId: 'e-1' })
+        [Symbol.asyncIterator]();
+      await expect(iterator.next()).rejects.toThrow(
+        'Cannot resume from eventId e-1 before agent_start for stream stream-1',
+      );
+    });
+
+    it('should resume from an in-stream event within the same stream only', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'first answer 1' }],
+        },
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'first answer 2' }],
+        },
+      ]);
+      const { streamId: streamId1 } = await session.send({
+        message: [{ type: 'text', text: 'first request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      protocol.pushResponse([
+        {
+          type: 'message',
+          role: 'agent',
+          content: [{ type: 'text', text: 'second answer' }],
+        },
+      ]);
+      await session.send({
+        message: [{ type: 'text', text: 'second request' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const resumeEvent = session.events.find(
+        (event): event is AgentEvent<'message'> =>
+          event.type === 'message' &&
+          event.streamId === streamId1 &&
+          event.role === 'agent' &&
+          event.content[0]?.type === 'text' &&
+          event.content[0].text === 'first answer 1',
+      );
+      expect(resumeEvent).toBeDefined();
+
+      const streamedEvents: AgentEvent[] = [];
+      for await (const event of session.stream({ eventId: resumeEvent!.id })) {
+        streamedEvents.push(event);
+      }
+
+      expect(
+        streamedEvents.every((event) => event.streamId === streamId1),
+      ).toBe(true);
+      expect(streamedEvents.map((event) => event.type)).toEqual([
+        'message',
+        'agent_end',
+      ]);
+      const resumedMessage = streamedEvents[0] as AgentEvent<'message'>;
+      expect(resumedMessage.content).toEqual([
+        { type: 'text', text: 'first answer 2' },
+      ]);
+    });
+
     it('should replay events for streamId starting with agent_start', async () => {
       const protocol = new MockAgentProtocol();
       const session = new AgentSession(protocol);
@@ -223,6 +397,33 @@ describe('AgentSession', () => {
       );
       expect(streamedEvents).toEqual(allEvents.slice(startEventIndex));
       expect(streamedEvents.at(-1)?.type).toBe('agent_end');
+    });
+
+    it('should not drop agent_end that arrives while replay events are being yielded', async () => {
+      const protocol = new MockAgentProtocol();
+      const session = new AgentSession(protocol);
+
+      protocol.pushResponse([{ type: 'message' }], { keepOpen: true });
+      const { streamId } = await session.send({ update: { title: 't1' } });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const iterator = session
+        .stream({ streamId: streamId! })
+        [Symbol.asyncIterator]();
+
+      const first = await iterator.next();
+      expect(first.value?.type).toBe('agent_start');
+
+      protocol.pushToStream(streamId!, [], { close: true });
+
+      const second = await iterator.next();
+      expect(second.value?.type).toBe('message');
+
+      const third = await iterator.next();
+      expect(third.value?.type).toBe('agent_end');
+
+      const fourth = await iterator.next();
+      expect(fourth.done).toBe(true);
     });
 
     it('should follow an active stream if no options provided', async () => {

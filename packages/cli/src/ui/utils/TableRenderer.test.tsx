@@ -24,9 +24,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('Header 1');
     expect(output).toContain('Row 1, Col 1');
@@ -56,9 +54,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     // Since terminalWidth is 80 and headers are long, they might be truncated.
     // We just check for some of the content.
@@ -86,9 +82,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('This is a very');
     expect(output).toContain('long cell');
@@ -114,9 +108,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('wrapping in');
     await expect(renderResult).toMatchSvgSnapshot();
@@ -141,9 +133,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('Tiny');
     expect(output).toContain('definitely needs');
@@ -170,9 +160,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('Start. Stop.');
     await expect(renderResult).toMatchSvgSnapshot();
@@ -191,9 +179,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     // The output should NOT contain the literal '**'
     expect(output).not.toContain('**Bold Header**');
@@ -218,9 +204,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     // Markers should be gone
     expect(output).not.toContain('**');
@@ -263,9 +247,7 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expect(output).toContain('Comprehensive Architectural');
     expect(output).toContain('protocol buffers');
@@ -333,9 +315,7 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
@@ -367,9 +347,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady, unmount } = renderResult;
-    await waitUntilReady();
-
+    const { lastFrame, unmount } = renderResult;
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
@@ -496,8 +474,7 @@ describe('TableRenderer', () => {
         />,
         { width: terminalWidth },
       );
-      const { lastFrame, waitUntilReady, unmount } = renderResult;
-      await waitUntilReady();
+      const { lastFrame, unmount } = renderResult;
 
       const output = lastFrame();
       expect(output).toBeDefined();

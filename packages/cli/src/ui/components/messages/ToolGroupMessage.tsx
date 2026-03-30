@@ -15,6 +15,7 @@ import type {
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
+import { TopicMessage, isTopicTool } from './TopicMessage.js';
 import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
@@ -81,7 +82,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const {
     activePtyId,
     embeddedShellFocused,
-    backgroundShells,
+    backgroundTasks,
     pendingHistoryItems,
   } = useUIState();
 
@@ -92,14 +93,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         activePtyId,
         embeddedShellFocused,
         pendingHistoryItems,
-        backgroundShells,
+        backgroundTasks,
       ),
     [
       item,
       activePtyId,
       embeddedShellFocused,
       pendingHistoryItems,
-      backgroundShells,
+      backgroundTasks,
     ],
   );
 
@@ -172,12 +173,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
   // internal errors, plan-mode hidden write/edit), we should not emit standalone
   // border fragments. The only case where an empty group should render is the
-  // explicit "closing slice" (tools: []) used to bridge static/pending sections.
+  // explicit "closing slice" (tools: []) used to bridge static/pending sections,
+  // and only if it's actually continuing an open box from above.
   const isExplicitClosingSlice = allToolCalls.length === 0;
-  if (
-    visibleToolCalls.length === 0 &&
-    (!isExplicitClosingSlice || borderBottomOverride !== true)
-  ) {
+  if (visibleToolCalls.length === 0 && !isExplicitClosingSlice) {
     return null;
   }
 
@@ -194,7 +193,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
     >
       {groupedTools.map((group, index) => {
-        const isFirst = index === 0;
+        let isFirst = index === 0;
+        if (!isFirst) {
+          // Check if all previous tools were topics
+          let allPreviousWereTopics = true;
+          for (let i = 0; i < index; i++) {
+            const prevGroup = groupedTools[i];
+            if (Array.isArray(prevGroup) || !isTopicTool(prevGroup.name)) {
+              allPreviousWereTopics = false;
+              break;
+            }
+          }
+          isFirst = allPreviousWereTopics;
+        }
+
         const resolvedIsFirst =
           borderTopOverride !== undefined
             ? borderTopOverride && isFirst
@@ -217,6 +229,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         const tool = group;
         const isShellToolCall = isShellTool(tool.name);
+        const isTopicToolCall = isTopicTool(tool.name);
 
         const commonProps = {
           ...tool,
@@ -236,7 +249,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             minHeight={1}
             width={contentWidth}
           >
-            {isShellToolCall ? (
+            {isTopicToolCall ? (
+              <TopicMessage {...commonProps} />
+            ) : isShellToolCall ? (
               <ShellToolMessage {...commonProps} config={config} />
             ) : (
               <ToolMessage {...commonProps} />
@@ -264,12 +279,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           </Box>
         );
       })}
-      {
-        /*
-            We have to keep the bottom border separate so it doesn't get
-            drawn over by the sticky header directly inside it.
-           */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
+      {/*
+          We have to keep the bottom border separate so it doesn't get
+          drawn over by the sticky header directly inside it.
+         */}
+      {(visibleToolCalls.length > 0 || borderBottomOverride !== undefined) &&
+        borderBottomOverride !== false &&
+        (visibleToolCalls.length === 0 ||
+          !visibleToolCalls.every((tool) => isTopicTool(tool.name))) && (
           <Box
             height={0}
             width={contentWidth}
@@ -281,8 +298,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             borderDimColor={borderDimColor}
             borderStyle="round"
           />
-        )
-      }
+        )}
     </Box>
   );
 

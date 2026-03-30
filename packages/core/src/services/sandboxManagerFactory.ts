@@ -9,10 +9,11 @@ import {
   type SandboxManager,
   NoopSandboxManager,
   LocalSandboxManager,
+  type GlobalSandboxOptions,
 } from './sandboxManager.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
-import { WindowsSandboxManager } from './windowsSandboxManager.js';
+import { WindowsSandboxManager } from '../sandbox/windows/WindowsSandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 
 /**
@@ -20,23 +21,24 @@ import type { SandboxConfig } from '../config/config.js';
  */
 export function createSandboxManager(
   sandbox: SandboxConfig | undefined,
-  workspace: string,
+  options: GlobalSandboxOptions,
+  approvalMode?: string,
 ): SandboxManager {
-  const isWindows = os.platform() === 'win32';
+  if (approvalMode === 'yolo') {
+    return new NoopSandboxManager();
+  }
 
-  if (
-    isWindows &&
-    (sandbox?.enabled || sandbox?.command === 'windows-native')
-  ) {
-    return new WindowsSandboxManager();
+  if (!options.modeConfig && options.policyManager && approvalMode) {
+    options.modeConfig = options.policyManager.getModeConfig(approvalMode);
   }
 
   if (sandbox?.enabled) {
-    if (os.platform() === 'linux') {
-      return new LinuxSandboxManager({ workspace });
-    }
-    if (os.platform() === 'darwin') {
-      return new MacOsSandboxManager({ workspace });
+    if (os.platform() === 'win32') {
+      return new WindowsSandboxManager(options);
+    } else if (os.platform() === 'linux') {
+      return new LinuxSandboxManager(options);
+    } else if (os.platform() === 'darwin') {
+      return new MacOsSandboxManager(options);
     }
     return new LocalSandboxManager();
   }

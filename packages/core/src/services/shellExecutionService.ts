@@ -19,7 +19,7 @@ import {
   resolveExecutable,
   type ShellType,
 } from '../utils/shell-utils.js';
-import { isBinary } from '../utils/textUtils.js';
+import { isBinary, truncateString } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import { debugLogger } from '../utils/debugLogger.js';
 import { Storage } from '../config/storage.js';
@@ -31,7 +31,11 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-import { NoopSandboxManager, type SandboxManager } from './sandboxManager.js';
+import {
+  NoopSandboxManager,
+  type SandboxManager,
+  type SandboxPermissions,
+} from './sandboxManager.js';
 import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
@@ -84,6 +88,7 @@ export type ShellExecutionResult = ExecutionResult;
 export type ShellExecutionHandle = ExecutionHandle;
 
 export interface ShellExecutionConfig {
+  additionalPermissions?: SandboxPermissions;
   terminalWidth?: number;
   terminalHeight?: number;
   pager?: string;
@@ -97,6 +102,7 @@ export interface ShellExecutionConfig {
   scrollback?: number;
   maxSerializedLines?: number;
   sandboxConfig?: SandboxConfig;
+  backgroundCompletionBehavior?: 'inject' | 'notify' | 'silent';
 }
 
 /**
@@ -115,7 +121,8 @@ interface ActiveChildProcess {
   state: {
     output: string;
     truncated: boolean;
-    outputChunks: Buffer[];
+    sniffChunks: Buffer[];
+    binaryBytesReceived: number;
   };
 }
 
@@ -231,6 +238,23 @@ export class ShellExecutionService {
 
   static getLogDir(): string {
     return path.join(Storage.getGlobalTempDir(), 'background-processes');
+  }
+
+  private static formatShellBackgroundCompletion(
+    pid: number,
+    behavior: string,
+    output: string,
+    error?: Error,
+  ): string {
+    const logPath = ShellExecutionService.getLogFilePath(pid);
+    const status = error ? `with error: ${error.message}` : 'successfully';
+
+    if (behavior === 'inject') {
+      const truncated = truncateString(output, 5000);
+      return `[Background command completed ${status}. Output saved to ${logPath}]\n\n${truncated}`;
+    }
+
+    return `[Background command completed ${status}. Output saved to ${logPath}]`;
   }
 
   static getLogFilePath(pid: number): string {
@@ -437,10 +461,11 @@ export class ShellExecutionService {
       args: spawnArgs,
       env: baseEnv,
       cwd,
-      config: {
+      policy: {
         ...shellExecutionConfig,
         ...(shellExecutionConfig.sandboxConfig || {}),
         sanitizationConfig,
+        additionalPermissions: shellExecutionConfig.additionalPermissions,
       },
     });
 
@@ -487,7 +512,8 @@ export class ShellExecutionService {
       const state = {
         output: '',
         truncated: false,
-        outputChunks: [] as Buffer[],
+        sniffChunks: [] as Buffer[],
+        binaryBytesReceived: 0,
       };
 
       if (child.pid) {
@@ -524,6 +550,15 @@ export class ShellExecutionService {
                 return false;
               }
             },
+            formatInjection: (output, error) =>
+              ShellExecutionService.formatShellBackgroundCompletion(
+                child.pid!,
+                shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+                output,
+                error ?? undefined,
+              ),
+            completionBehavior:
+              shellExecutionConfig.backgroundCompletionBehavior || 'silent',
           })
         : undefined;
 
@@ -557,14 +592,19 @@ export class ShellExecutionService {
           }
         }
 
-        state.outputChunks.push(data);
+        if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+          state.sniffChunks.push(data);
+        } else if (!isStreamingRawContent) {
+          state.binaryBytesReceived += data.length;
+        }
 
         if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-          const sniffBuffer = Buffer.concat(state.outputChunks.slice(0, 20));
+          const sniffBuffer = Buffer.concat(state.sniffChunks.slice(0, 20));
           sniffedBytes = sniffBuffer.length;
 
           if (isBinary(sniffBuffer)) {
             isStreamingRawContent = false;
+            state.binaryBytesReceived = sniffBuffer.length;
             const event: ShellOutputEvent = { type: 'binary_detected' };
             onOutputEvent(event);
             if (child.pid) {
@@ -604,10 +644,7 @@ export class ShellExecutionService {
             }
           }
         } else {
-          const totalBytes = state.outputChunks.reduce(
-            (sum, chunk) => sum + chunk.length,
-            0,
-          );
+          const totalBytes = state.binaryBytesReceived;
           const event: ShellOutputEvent = {
             type: 'binary_progress',
             bytesReceived: totalBytes,
@@ -623,7 +660,7 @@ export class ShellExecutionService {
         code: number | null,
         signal: NodeJS.Signals | null,
       ) => {
-        const { finalBuffer } = cleanup();
+        cleanup();
 
         let combinedOutput = state.output;
         if (state.truncated) {
@@ -638,7 +675,7 @@ export class ShellExecutionService {
         const exitSignal = signal ? os.constants.signals[signal] : null;
 
         const resultPayload: ShellExecutionResult = {
-          rawOutput: finalBuffer,
+          rawOutput: Buffer.from(''),
           output: finalStrippedOutput,
           exitCode,
           signal: exitSignal,
@@ -727,8 +764,7 @@ export class ShellExecutionService {
           }
         }
 
-        const finalBuffer = Buffer.concat(state.outputChunks);
-        return { finalBuffer };
+        return;
       }
 
       return { pid: child.pid, result };
@@ -853,12 +889,22 @@ export class ShellExecutionService {
           );
           return bufferData.length > 0 ? bufferData : undefined;
         },
+        formatInjection: (output, error) =>
+          ShellExecutionService.formatShellBackgroundCompletion(
+            ptyPid,
+            shellExecutionConfig.backgroundCompletionBehavior || 'silent',
+            output,
+            error ?? undefined,
+          ),
+        completionBehavior:
+          shellExecutionConfig.backgroundCompletionBehavior || 'silent',
       }).result;
 
       let processingChain = Promise.resolve();
       let decoder: TextDecoder | null = null;
       let output: string | AnsiOutput | null = null;
-      const outputChunks: Buffer[] = [];
+      const sniffChunks: Buffer[] = [];
+      let binaryBytesReceived = 0;
       const error: Error | null = null;
       let exited = false;
 
@@ -989,14 +1035,19 @@ export class ShellExecutionService {
                 }
               }
 
-              outputChunks.push(data);
+              if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                sniffChunks.push(data);
+              } else if (!isStreamingRawContent) {
+                binaryBytesReceived += data.length;
+              }
 
               if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
+                const sniffBuffer = Buffer.concat(sniffChunks.slice(0, 20));
                 sniffedBytes = sniffBuffer.length;
 
                 if (isBinary(sniffBuffer)) {
                   isStreamingRawContent = false;
+                  binaryBytesReceived = sniffBuffer.length;
                   const event: ShellOutputEvent = { type: 'binary_detected' };
                   onOutputEvent(event);
                   ExecutionLifecycleService.emitEvent(ptyPid, event);
@@ -1021,10 +1072,7 @@ export class ShellExecutionService {
                   resolveChunk();
                 });
               } else {
-                const totalBytes = outputChunks.reduce(
-                  (sum, chunk) => sum + chunk.length,
-                  0,
-                );
+                const totalBytes = binaryBytesReceived;
                 const event: ShellOutputEvent = {
                   type: 'binary_progress',
                   bytesReceived: totalBytes,
@@ -1070,7 +1118,7 @@ export class ShellExecutionService {
             });
 
             ExecutionLifecycleService.completeWithResult(ptyPid, {
-              rawOutput: Buffer.concat(outputChunks),
+              rawOutput: Buffer.from(''),
               output: getFullBufferText(headlessTerminal),
               exitCode,
               signal: signal ?? null,
