@@ -17,6 +17,7 @@ import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
+  getUpdateTopicDeclaration,
 } from './dynamic-declaration-helpers.js';
 
 // Re-export names for compatibility
@@ -38,6 +39,8 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  UPDATE_TOPIC_TOOL_NAME,
+  UPDATE_TOPIC_DISPLAY_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -89,8 +92,11 @@ export {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
-  EXIT_PLAN_PARAM_PLAN_PATH,
+  EXIT_PLAN_PARAM_PLAN_FILENAME,
   SKILL_PARAM_NAME,
+  TOPIC_PARAM_TITLE,
+  TOPIC_PARAM_SUMMARY,
+  TOPIC_PARAM_STRATEGIC_INTENT,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -221,6 +227,13 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
 };
 
+export const UPDATE_TOPIC_DEFINITION: ToolDefinition = {
+  get base() {
+    return getUpdateTopicDeclaration();
+  },
+  overrides: (modelId) => getToolSet(modelId).update_topic,
+};
+
 // ============================================================================
 // DYNAMIC TOOL DEFINITIONS (LEGACY EXPORTS)
 // ============================================================================
@@ -233,21 +246,27 @@ export {
 export function getShellDefinition(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
+  enableToolSandboxing: boolean = false,
 ): ToolDefinition {
   return {
-    base: getShellDeclaration(enableInteractiveShell, enableEfficiency),
+    base: getShellDeclaration(
+      enableInteractiveShell,
+      enableEfficiency,
+      enableToolSandboxing,
+    ),
     overrides: (modelId) =>
       getToolSet(modelId).run_shell_command(
         enableInteractiveShell,
         enableEfficiency,
+        enableToolSandboxing,
       ),
   };
 }
 
-export function getExitPlanModeDefinition(plansDir: string): ToolDefinition {
+export function getExitPlanModeDefinition(): ToolDefinition {
   return {
-    base: getExitPlanModeDeclaration(plansDir),
-    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(plansDir),
+    base: getExitPlanModeDeclaration(),
+    overrides: (modelId) => getToolSet(modelId).exit_plan_mode(),
   };
 }
 

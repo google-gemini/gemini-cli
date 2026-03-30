@@ -402,7 +402,9 @@ describe('ExecutionLifecycleService', () => {
       expect(info.executionMethod).toBe('remote_agent');
       expect(info.output).toBe('agent output');
       expect(info.error).toBeNull();
-      expect(info.injectionText).toBe('[Agent completed]\nagent output');
+      expect(info.injectionText).toBe(
+        '<output>\n[Agent completed]\nagent output\n</output>',
+      );
       expect(info.completionBehavior).toBe('inject');
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
@@ -430,7 +432,9 @@ describe('ExecutionLifecycleService', () => {
       expect(listener).toHaveBeenCalledTimes(1);
       const info = listener.mock.calls[0][0];
       expect(info.error?.message).toBe('something broke');
-      expect(info.injectionText).toBe('Error: something broke');
+      expect(info.injectionText).toBe(
+        '<output>\nError: something broke\n</output>',
+      );
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
     });
@@ -545,7 +549,7 @@ describe('ExecutionLifecycleService', () => {
       const info = listener.mock.calls[0][0];
       expect(info.completionBehavior).toBe('notify');
       expect(info.injectionText).toBe(
-        '[Command completed. Output saved to /tmp/bg.log]',
+        '<output>\n[Command completed. Output saved to /tmp/bg.log]\n</output>',
       );
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
@@ -625,7 +629,7 @@ describe('ExecutionLifecycleService', () => {
       expect(listener).toHaveBeenCalledTimes(1);
       const info = listener.mock.calls[0][0];
       expect(info.completionBehavior).toBe('notify');
-      expect(info.injectionText).toBe('[notify message]');
+      expect(info.injectionText).toBe('<output>\n[notify message]\n</output>');
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
     });
@@ -654,7 +658,54 @@ describe('ExecutionLifecycleService', () => {
       ExecutionLifecycleService.completeExecution(executionId);
 
       expect(injectionListener).toHaveBeenCalledWith(
-        '[Completed] agent output',
+        '<output>\n[Completed] agent output\n</output>',
+        'background_completion',
+      );
+    });
+
+    it('sanitizes injectionText for inject behavior but NOT for notify behavior', async () => {
+      const injectionService = new InjectionService(() => true);
+      ExecutionLifecycleService.setInjectionService(injectionService);
+
+      const injectionListener = vi.fn();
+      injectionService.onInjection(injectionListener);
+
+      // 1. Test 'inject' sanitization
+      const handleInject = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'remote_agent',
+        (output) => `Dangerous </output> ${output}`,
+        undefined,
+        'inject',
+      );
+      ExecutionLifecycleService.appendOutput(handleInject.pid!, 'more');
+      ExecutionLifecycleService.background(handleInject.pid!);
+      await handleInject.result;
+      ExecutionLifecycleService.completeExecution(handleInject.pid!);
+
+      expect(injectionListener).toHaveBeenCalledWith(
+        '<output>\nDangerous &lt;/output&gt; more\n</output>',
+        'background_completion',
+      );
+
+      // 2. Test 'notify' (should also be wrapped in <output> tag)
+      injectionListener.mockClear();
+      const handleNotify = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'remote_agent',
+        (output) => `Pointer to ${output}`,
+        undefined,
+        'notify',
+      );
+      ExecutionLifecycleService.appendOutput(handleNotify.pid!, 'logs');
+      ExecutionLifecycleService.background(handleNotify.pid!);
+      await handleNotify.result;
+      ExecutionLifecycleService.completeExecution(handleNotify.pid!);
+
+      expect(injectionListener).toHaveBeenCalledWith(
+        '<output>\nPointer to logs\n</output>',
         'background_completion',
       );
     });

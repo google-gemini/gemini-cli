@@ -7,6 +7,7 @@
 import type { InjectionService } from '../config/injectionService.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeOutput } from '../utils/textUtils.js';
 
 export type ExecutionMethod =
   | 'lydell-node-pty'
@@ -16,7 +17,7 @@ export type ExecutionMethod =
   | 'none';
 
 export interface ExecutionResult {
-  rawOutput: Buffer;
+  rawOutput?: Buffer;
   output: string;
   exitCode: number | null;
   signal: number | null;
@@ -385,10 +386,12 @@ export class ExecutionLifecycleService {
       const behavior =
         execution.completionBehavior ??
         (execution.formatInjection ? 'inject' : 'silent');
-      const injectionText =
+      const rawInjection =
         behavior !== 'silent' && execution.formatInjection
           ? execution.formatInjection(result.output, result.error)
           : null;
+
+      const injectionText = rawInjection ? sanitizeOutput(rawInjection) : null;
 
       // Inject directly into the model conversation from the backend.
       if (injectionText && this.injectionService) {

@@ -4,21 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe } from 'vitest';
-import { evalTest } from './test-helper.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const AGENT_DEFINITION = `---
-name: docs-agent
-description: An agent with expertise in updating documentation.
-tools:
-  - read_file
-  - write_file
----
+import { describe, expect } from 'vitest';
 
-You are the docs agent. Update the documentation.
-`;
+import { evalTest, TEST_AGENTS } from './test-helper.js';
 
-const INDEX_TS = 'export const add = (a: number, b: number) => a + b;';
+const INDEX_TS = 'export const add = (a: number, b: number) => a + b;\n';
+
+// A minimal package.json is used to provide a realistic workspace anchor.
+// This prevents the agent from making incorrect assumptions about the environment
+// and helps it properly navigate or act as if it is in a standard Node.js project.
+const MOCK_PACKAGE_JSON = JSON.stringify(
+  {
+    name: 'subagent-eval-project',
+    version: '1.0.0',
+    type: 'module',
+  },
+  null,
+  2,
+);
+
+function readProjectFile(
+  rig: { testDir: string | null },
+  relativePath: string,
+): string {
+  return fs.readFileSync(path.join(rig.testDir!, relativePath), 'utf8');
+}
 
 describe('subagent eval test cases', () => {
   /**
@@ -42,12 +55,237 @@ describe('subagent eval test cases', () => {
     },
     prompt: 'Please update README.md with a description of this library.',
     files: {
-      '.gemini/agents/test-agent.md': AGENT_DEFINITION,
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
       'index.ts': INDEX_TS,
-      'README.md': 'TODO: update the README.',
+      'README.md': 'TODO: update the README.\n',
     },
     assert: async (rig, _result) => {
-      await rig.expectToolCallSuccess(['docs-agent']);
+      await rig.expectToolCallSuccess([TEST_AGENTS.DOCS_AGENT.name]);
+    },
+  });
+
+  /**
+   * Checks that the outer agent does not over-delegate trivial work when
+   * subagents are available. This helps catch orchestration overuse.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should avoid delegating trivial direct edit work',
+    params: {
+      settings: {
+        experimental: {
+          enableAgents: true,
+          agents: {
+            overrides: {
+              generalist: { enabled: true },
+            },
+          },
+        },
+      },
+    },
+    prompt:
+      'Rename the exported function in index.ts from add to sum and update the file directly.',
+    files: {
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
+      'index.ts': INDEX_TS,
+    },
+    assert: async (rig, _result) => {
+      const updatedIndex = readProjectFile(rig, 'index.ts');
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+
+      expect(updatedIndex).toContain('export const sum =');
+      expect(
+        toolLogs.some(
+          (l) => l.toolRequest.name === TEST_AGENTS.DOCS_AGENT.name,
+        ),
+      ).toBe(false);
+      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+        false,
+      );
+    },
+  });
+
+  /**
+   * Checks that the outer agent prefers a more relevant specialist over a
+   * broad generalist when both are available.
+   *
+   * This is meant to codify the "overusing Generalist" failure mode.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should prefer relevant specialist over generalist',
+    params: {
+      settings: {
+        experimental: {
+          enableAgents: true,
+          agents: {
+            overrides: {
+              generalist: { enabled: true },
+            },
+          },
+        },
+      },
+    },
+    prompt: 'Please add a small test file that verifies add(1, 2) returns 3.',
+    files: {
+      ...TEST_AGENTS.TESTING_AGENT.asFile(),
+      'index.ts': INDEX_TS,
+      'package.json': MOCK_PACKAGE_JSON,
+    },
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+
+      await rig.expectToolCallSuccess([TEST_AGENTS.TESTING_AGENT.name]);
+      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+        false,
+      );
+    },
+  });
+
+  /**
+   * Checks cardinality and decomposition for a multi-surface task. The task
+   * naturally spans docs and tests, so multiple specialists should be used.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should use multiple relevant specialists for multi-surface task',
+    params: {
+      settings: {
+        experimental: {
+          enableAgents: true,
+          agents: {
+            overrides: {
+              generalist: { enabled: true },
+            },
+          },
+        },
+      },
+    },
+    prompt:
+      'Add a short README description for this library and also add a test file that verifies add(1, 2) returns 3.',
+    files: {
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
+      ...TEST_AGENTS.TESTING_AGENT.asFile(),
+      'index.ts': INDEX_TS,
+      'README.md': 'TODO: update the README.\n',
+      'package.json': MOCK_PACKAGE_JSON,
+    },
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+      const readme = readProjectFile(rig, 'README.md');
+
+      await rig.expectToolCallSuccess([
+        TEST_AGENTS.DOCS_AGENT.name,
+        TEST_AGENTS.TESTING_AGENT.name,
+      ]);
+      expect(readme).not.toContain('TODO: update the README.');
+      expect(toolLogs.some((l) => l.toolRequest.name === 'generalist')).toBe(
+        false,
+      );
+    },
+  });
+
+  /**
+   * Checks that the main agent can correctly select the appropriate subagent
+   * from a large pool of available subagents (10 total).
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should select the correct subagent from a pool of 10 different agents',
+    prompt: 'Please add a new SQL table migration for a user profile.',
+    files: {
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
+      ...TEST_AGENTS.TESTING_AGENT.asFile(),
+      ...TEST_AGENTS.DATABASE_AGENT.asFile(),
+      ...TEST_AGENTS.CSS_AGENT.asFile(),
+      ...TEST_AGENTS.I18N_AGENT.asFile(),
+      ...TEST_AGENTS.SECURITY_AGENT.asFile(),
+      ...TEST_AGENTS.DEVOPS_AGENT.asFile(),
+      ...TEST_AGENTS.ANALYTICS_AGENT.asFile(),
+      ...TEST_AGENTS.ACCESSIBILITY_AGENT.asFile(),
+      ...TEST_AGENTS.MOBILE_AGENT.asFile(),
+      'package.json': MOCK_PACKAGE_JSON,
+    },
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+      await rig.expectToolCallSuccess(['database-agent']);
+
+      // Ensure the generalist and other irrelevant specialists were not invoked
+      const uncalledAgents = [
+        'generalist',
+        TEST_AGENTS.DOCS_AGENT.name,
+        TEST_AGENTS.TESTING_AGENT.name,
+        TEST_AGENTS.CSS_AGENT.name,
+        TEST_AGENTS.I18N_AGENT.name,
+        TEST_AGENTS.SECURITY_AGENT.name,
+        TEST_AGENTS.DEVOPS_AGENT.name,
+        TEST_AGENTS.ANALYTICS_AGENT.name,
+        TEST_AGENTS.ACCESSIBILITY_AGENT.name,
+        TEST_AGENTS.MOBILE_AGENT.name,
+      ];
+
+      for (const agentName of uncalledAgents) {
+        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
+          false,
+        );
+      }
+    },
+  });
+
+  /**
+   * Checks that the main agent can correctly select the appropriate subagent
+   * from a large pool of available subagents, even when many irrelevant MCP tools are present.
+   *
+   * This test includes stress tests the subagent delegation with ~80 tools.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should select the correct subagent from a pool of 10 different agents with MCP tools present',
+    prompt: 'Please add a new SQL table migration for a user profile.',
+    setup: async (rig) => {
+      rig.addTestMcpServer('workspace-server', 'google-workspace');
+    },
+    files: {
+      ...TEST_AGENTS.DOCS_AGENT.asFile(),
+      ...TEST_AGENTS.TESTING_AGENT.asFile(),
+      ...TEST_AGENTS.DATABASE_AGENT.asFile(),
+      ...TEST_AGENTS.CSS_AGENT.asFile(),
+      ...TEST_AGENTS.I18N_AGENT.asFile(),
+      ...TEST_AGENTS.SECURITY_AGENT.asFile(),
+      ...TEST_AGENTS.DEVOPS_AGENT.asFile(),
+      ...TEST_AGENTS.ANALYTICS_AGENT.asFile(),
+      ...TEST_AGENTS.ACCESSIBILITY_AGENT.asFile(),
+      ...TEST_AGENTS.MOBILE_AGENT.asFile(),
+      'package.json': MOCK_PACKAGE_JSON,
+    },
+    assert: async (rig, _result) => {
+      const toolLogs = rig.readToolLogs() as Array<{
+        toolRequest: { name: string };
+      }>;
+      await rig.expectToolCallSuccess(['database-agent']);
+
+      // Ensure the generalist and other irrelevant specialists were not invoked
+      const uncalledAgents = [
+        'generalist',
+        TEST_AGENTS.DOCS_AGENT.name,
+        TEST_AGENTS.TESTING_AGENT.name,
+        TEST_AGENTS.CSS_AGENT.name,
+        TEST_AGENTS.I18N_AGENT.name,
+        TEST_AGENTS.SECURITY_AGENT.name,
+        TEST_AGENTS.DEVOPS_AGENT.name,
+        TEST_AGENTS.ANALYTICS_AGENT.name,
+        TEST_AGENTS.ACCESSIBILITY_AGENT.name,
+        TEST_AGENTS.MOBILE_AGENT.name,
+      ];
+
+      for (const agentName of uncalledAgents) {
+        expect(toolLogs.some((l) => l.toolRequest.name === agentName)).toBe(
+          false,
+        );
+      }
     },
   });
 });
