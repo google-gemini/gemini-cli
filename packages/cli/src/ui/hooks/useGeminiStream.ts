@@ -276,7 +276,7 @@ export const useGeminiStream = (
     return () => {
       coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
     };
-  }, [isRespondingRef]);
+  }, []);
 
   const [
     toolCalls,
@@ -1642,6 +1642,7 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
+      settings.merged.billing?.overageStrategy,
       setIsResponding,
     ],
   );
