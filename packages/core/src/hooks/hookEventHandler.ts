@@ -220,10 +220,12 @@ export class HookEventHandler {
    */
   async fireBeforeModelEvent(
     llmRequest: GenerateContentParameters,
+    isBtw?: boolean,
   ): Promise<AggregatedHookResult> {
     const input: BeforeModelInput = {
       ...this.createBaseInput(HookEventName.BeforeModel),
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
+      isBtw,
     };
 
     return this.executeHooks(
@@ -241,11 +243,13 @@ export class HookEventHandler {
   async fireAfterModelEvent(
     llmRequest: GenerateContentParameters,
     llmResponse: GenerateContentResponse,
+    isBtw?: boolean,
   ): Promise<AggregatedHookResult> {
     const input: AfterModelInput = {
       ...this.createBaseInput(HookEventName.AfterModel),
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
       llm_response: defaultHookTranslator.toHookLLMResponse(llmResponse),
+      isBtw,
     };
 
     return this.executeHooks(

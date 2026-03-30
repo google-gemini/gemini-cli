@@ -494,12 +494,6 @@ export class GeminiChat {
     signal: AbortSignal,
     role: LlmRole,
   ): AsyncGenerator<StreamEvent> {
-    let streamDoneResolver: () => void;
-    // We don't await this.sendPromise because /btw is safe to run concurrently.
-    void new Promise<void>((resolve) => {
-      streamDoneResolver = resolve;
-    });
-
     const requestContents = [
       ...this.getHistory(true),
       createUserContent(message),
@@ -541,8 +535,6 @@ export class GeminiChat {
         } else {
           throw error;
         }
-      } finally {
-        streamDoneResolver!();
       }
     };
 
@@ -636,12 +628,15 @@ export class GeminiChat {
         : [...requestContents];
 
       const hookSystem = this.context.config.getHookSystem();
-      if (hookSystem && !isBtw) {
-        const beforeModelResult = await hookSystem.fireBeforeModelEvent({
-          model: modelToUse,
-          config,
-          contents: contentsToUse,
-        });
+      if (hookSystem) {
+        const beforeModelResult = await hookSystem.fireBeforeModelEvent(
+          {
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          },
+          isBtw,
+        );
 
         if (beforeModelResult.stopped) {
           throw new AgentExecutionStoppedError(
@@ -987,10 +982,11 @@ export class GeminiChat {
       }
 
       const hookSystem = this.context.config.getHookSystem();
-      if (originalRequest && chunk && hookSystem && !isBtw) {
+      if (originalRequest && chunk && hookSystem) {
         const hookResult = await hookSystem.fireAfterModelEvent(
           originalRequest,
           chunk,
+          isBtw,
         );
 
         if (hookResult.stopped) {
