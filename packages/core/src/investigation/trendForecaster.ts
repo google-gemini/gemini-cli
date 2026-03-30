@@ -432,7 +432,7 @@ export class TrendForecaster {
     // Check if stable first
     const range = Math.max(...values) - Math.min(...values);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    if (range / mean < 0.05) return 'stable'; // Less than 5% variation
+    if (mean === 0 || range / mean < 0.05) return 'stable'; // Zero or <5% variation
 
     // Check linear fit quality
     if (linearR2 > 0.9) return 'linear';
