@@ -8,5 +8,8 @@
   },
   "general": {
     "devtools": true
+  },
+  "security": {
+    "toolSandboxing": true
   }
 }
