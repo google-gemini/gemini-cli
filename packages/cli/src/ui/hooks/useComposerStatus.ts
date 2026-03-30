@@ -7,6 +7,7 @@
 import { useMemo } from 'react';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { CoreToolCallStatus, ApprovalMode } from '@google/gemini-cli-core';
 import { type HistoryItemToolGroup, StreamingState } from '../types.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from './usePhraseCycler.js';
@@ -55,6 +56,9 @@ export const useComposerStatus = () => {
 
   const showApprovalModeIndicator = uiState.showApprovalModeIndicator;
 
+  const config = useConfig();
+  const isWildcardPolicyEnabled = config.getAllowedTools()?.includes('*');
+
   const modeContentObj = useMemo(() => {
     const hideMinimalModeHintWhileBusy =
       !uiState.cleanUiDetailsVisible &&
@@ -62,9 +66,11 @@ export const useComposerStatus = () => {
 
     if (hideMinimalModeHintWhileBusy) return null;
 
+    if (isWildcardPolicyEnabled) {
+      return { text: 'WILDCARD', color: theme.status.error };
+    }
+
     switch (showApprovalModeIndicator) {
-      case ApprovalMode.YOLO:
-        return { text: 'YOLO', color: theme.status.error };
       case ApprovalMode.PLAN:
         return { text: 'plan', color: theme.status.success };
       case ApprovalMode.AUTO_EDIT:
@@ -78,6 +84,7 @@ export const useComposerStatus = () => {
     showLoadingIndicator,
     uiState.activeHooks.length,
     showApprovalModeIndicator,
+    isWildcardPolicyEnabled,
   ]);
 
   const showMinimalContext = isContextUsageHigh(

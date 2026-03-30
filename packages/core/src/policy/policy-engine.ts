@@ -287,10 +287,7 @@ export class PolicyEngine {
 
     // Do not downgrade (do not ask user) if sandboxing is enabled and in AUTO_EDIT
     const sandboxEnabled = !(this.sandboxManager instanceof NoopSandboxManager);
-    if (
-      sandboxEnabled &&
-      this.approvalMode === ApprovalMode.AUTO_EDIT
-    ) {
+    if (sandboxEnabled && this.approvalMode === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
