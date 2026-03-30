@@ -150,17 +150,18 @@ export const useBtw = (
               if (
                 typeof value === 'object' &&
                 value !== null &&
-                'error' in value &&
-                typeof value.error === 'object' &&
-                value.error !== null
+                'error' in value
               ) {
                 const errorObj = value.error;
-                errorMessage =
+                const extracted =
+                  typeof errorObj === 'object' &&
+                  errorObj !== null &&
                   'message' in errorObj
                     ? String(errorObj.message)
                     : String(errorObj);
+                errorMessage = extracted.trim() || 'Unknown error';
               } else {
-                errorMessage = String(value);
+                errorMessage = String(value).trim() || 'Unknown error';
               }
               dispatch({
                 type: 'ERROR',

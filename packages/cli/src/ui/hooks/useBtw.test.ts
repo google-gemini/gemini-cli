@@ -91,6 +91,66 @@ describe('useBtw', () => {
     expect(result.current.isStreaming).toBe(false);
   });
 
+  it('should handle string errors', async () => {
+    const mockStream = (async function* () {
+      yield {
+        type: GeminiEventType.Error,
+        value: { error: 'Direct string error' },
+      };
+    })();
+    mockGeminiClient.sendBtwStream.mockReturnValue(mockStream);
+
+    const { result } = await renderHook(() =>
+      useBtw(mockGeminiClient as unknown as GeminiClient),
+    );
+
+    await act(async () => {
+      await result.current.submitBtw('test query');
+    });
+
+    expect(result.current.error).toBe('Direct string error');
+  });
+
+  it('should handle whitespace errors by falling back to Unknown error', async () => {
+    const mockStream = (async function* () {
+      yield {
+        type: GeminiEventType.Error,
+        value: { error: { message: '   ' } },
+      };
+    })();
+    mockGeminiClient.sendBtwStream.mockReturnValue(mockStream);
+
+    const { result } = await renderHook(() =>
+      useBtw(mockGeminiClient as unknown as GeminiClient),
+    );
+
+    await act(async () => {
+      await result.current.submitBtw('test query');
+    });
+
+    expect(result.current.error).toBe('Unknown error');
+  });
+
+  it('should handle unknown error shapes', async () => {
+    const mockStream = (async function* () {
+      yield {
+        type: GeminiEventType.Error,
+        value: 'Just some raw string value',
+      };
+    })();
+    mockGeminiClient.sendBtwStream.mockReturnValue(mockStream);
+
+    const { result } = await renderHook(() =>
+      useBtw(mockGeminiClient as unknown as GeminiClient),
+    );
+
+    await act(async () => {
+      await result.current.submitBtw('test query');
+    });
+
+    expect(result.current.error).toBe('Just some raw string value');
+  });
+
   it('should reset state on dismiss', async () => {
     const mockStream = (async function* () {
       yield { type: GeminiEventType.Content, value: 'partial' };
