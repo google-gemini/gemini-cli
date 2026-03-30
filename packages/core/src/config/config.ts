@@ -979,7 +979,7 @@ export class Config implements McpContext, AgentLoopContext {
     this._sandboxManager = createSandboxManager(
       this.sandbox,
       {
-        workspace: params.targetDir,
+        workspace: this.targetDir,
         includeDirectories: this.pendingIncludeDirectories,
         policyManager: this._sandboxPolicyManager,
       },

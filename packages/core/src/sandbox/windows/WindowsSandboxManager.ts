@@ -217,9 +217,15 @@ export class WindowsSandboxManager implements SandboxManager {
 
     // Translate virtual commands for sandboxed file system access
     if (command === '__read') {
-      // Use 'type' via cmd.exe for basic file reading
-      command = 'cmd.exe';
-      args = ['/c', 'type', ...args];
+      // Use PowerShell for safe argument passing
+      command = 'PowerShell.exe';
+      args = [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '& { Get-Content -LiteralPath $args[0] -Raw }',
+        args[0] || '',
+      ];
     } else if (command === '__write') {
       // Use PowerShell for piping stdin to a file
       const targetPath = args[0] || '';
@@ -228,7 +234,7 @@ export class WindowsSandboxManager implements SandboxManager {
         '-NoProfile',
         '-NonInteractive',
         '-Command',
-        '$Input | Out-File -FilePath $args[0] -Encoding utf8',
+        '& { $Input | Out-File -FilePath $args[0] -Encoding utf8 }',
         targetPath,
       ];
     }
