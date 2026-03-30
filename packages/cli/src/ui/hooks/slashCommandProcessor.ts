@@ -37,6 +37,10 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import {
+  SessionTraceStepKey,
+  useSessionTrace,
+} from '../contexts/SessionTraceContext.js';
 import type {
   Message,
   HistoryItemWithoutId,
@@ -108,6 +112,7 @@ export const useSlashCommandProcessor = (
   setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) => {
   const session = useSessionStats();
+  const { recordStep } = useSessionTrace();
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
@@ -435,10 +440,19 @@ export const useSlashCommandProcessor = (
                 ]),
               };
             }
-            const result = await commandToExecute.action(
-              fullCommandContext,
-              args,
-            );
+            const action = commandToExecute.action;
+            const actionStartTime = Date.now();
+            const result = await (async () => {
+              try {
+                return await action(fullCommandContext, args);
+              } finally {
+                recordStep(
+                  SessionTraceStepKey.SlashCommand,
+                  'Slash command',
+                  Date.now() - actionStartTime,
+                );
+              }
+            })();
 
             if (result) {
               switch (result.type) {
@@ -729,6 +743,7 @@ export const useSlashCommandProcessor = (
       setIsProcessing,
       setConfirmationRequest,
       setCustomDialog,
+      recordStep,
     ],
   );
 

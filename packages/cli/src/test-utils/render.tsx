@@ -47,6 +47,7 @@ import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
 import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
+import { SessionTraceProvider } from '../ui/contexts/SessionTraceContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
@@ -701,47 +702,49 @@ export const renderWithProviders = async (
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
-                <SessionStatsProvider>
-                  <StreamingContext.Provider
-                    value={finalUiState.streamingState}
-                  >
-                    <UIActionsContext.Provider value={finalUIActions}>
-                      <OverflowProvider>
-                        <ToolActionsProvider
-                          config={config}
-                          toolCalls={allToolCalls}
-                        >
-                          <AskUserActionsProvider
-                            request={null}
-                            onSubmit={vi.fn()}
-                            onCancel={vi.fn()}
+                <SessionTraceProvider>
+                  <SessionStatsProvider>
+                    <StreamingContext.Provider
+                      value={finalUiState.streamingState}
+                    >
+                      <UIActionsContext.Provider value={finalUIActions}>
+                        <OverflowProvider>
+                          <ToolActionsProvider
+                            config={config}
+                            toolCalls={allToolCalls}
                           >
-                            <KeypressProvider>
-                              <MouseProvider
-                                mouseEventsEnabled={mouseEventsEnabled}
-                              >
-                                <TerminalProvider>
-                                  <ScrollProvider>
-                                    <ContextCapture>
-                                      <Box
-                                        width={terminalWidth}
-                                        flexShrink={0}
-                                        flexGrow={0}
-                                        flexDirection="column"
-                                      >
-                                        {comp}
-                                      </Box>
-                                    </ContextCapture>
-                                  </ScrollProvider>
-                                </TerminalProvider>
-                              </MouseProvider>
-                            </KeypressProvider>
-                          </AskUserActionsProvider>
-                        </ToolActionsProvider>
-                      </OverflowProvider>
-                    </UIActionsContext.Provider>
-                  </StreamingContext.Provider>
-                </SessionStatsProvider>
+                            <AskUserActionsProvider
+                              request={null}
+                              onSubmit={vi.fn()}
+                              onCancel={vi.fn()}
+                            >
+                              <KeypressProvider>
+                                <MouseProvider
+                                  mouseEventsEnabled={mouseEventsEnabled}
+                                >
+                                  <TerminalProvider>
+                                    <ScrollProvider>
+                                      <ContextCapture>
+                                        <Box
+                                          width={terminalWidth}
+                                          flexShrink={0}
+                                          flexGrow={0}
+                                          flexDirection="column"
+                                        >
+                                          {comp}
+                                        </Box>
+                                      </ContextCapture>
+                                    </ScrollProvider>
+                                  </TerminalProvider>
+                                </MouseProvider>
+                              </KeypressProvider>
+                            </AskUserActionsProvider>
+                          </ToolActionsProvider>
+                        </OverflowProvider>
+                      </UIActionsContext.Provider>
+                    </StreamingContext.Provider>
+                  </SessionStatsProvider>
+                </SessionTraceProvider>
               </ShellFocusContext.Provider>
             </VimModeProvider>
           </UIStateContext.Provider>
