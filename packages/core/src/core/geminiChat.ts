@@ -509,7 +509,7 @@ export class GeminiChat {
           prompt_id,
           signal,
           role,
-          [], // No tools for side inquiries
+          [],
           true, // isBtw flag
         );
         for await (const chunk of stream) {
