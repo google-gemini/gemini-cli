@@ -12,7 +12,6 @@
             "label": "Authentication",
             "slug": "docs/get-started/authentication"
           },
-          { "label": "Examples", "slug": "docs/get-started/examples" },
           { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
           {
             "label": "Gemini 3 on Gemini CLI",
@@ -112,7 +111,17 @@
               { "label": "Reference", "slug": "docs/hooks/reference" }
             ]
           },
-          { "label": "IDE integration", "slug": "docs/ide-integration" },
+          {
+            "label": "IDE integration",
+            "collapsed": true,
+            "items": [
+              { "label": "Overview", "slug": "docs/ide-integration" },
+              {
+                "label": "Developer guide: ACP mode",
+                "slug": "docs/cli/acp-mode"
+              }
+            ]
+          },
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
