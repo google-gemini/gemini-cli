@@ -506,8 +506,8 @@ const baseMockUiState = {
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
   activePtyId: undefined,
-  backgroundShells: new Map(),
-  backgroundShellHeight: 0,
+  backgroundTasks: new Map(),
+  backgroundTaskHeight: 0,
   quota: {
     userTier: undefined,
     stats: undefined,
@@ -524,6 +524,8 @@ const baseMockUiState = {
   nightly: false,
   updateInfo: null,
   pendingHistoryItems: [],
+  mainControlsRef: () => {},
+  rootUiRef: { current: null },
 };
 
 export const mockAppState: AppState = {
@@ -566,6 +568,7 @@ const mockUIActions: UIActions = {
   handleOverageMenuChoice: vi.fn(),
   handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
+  addMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
@@ -576,9 +579,9 @@ const mockUIActions: UIActions = {
   revealCleanUiDetailsTemporarily: vi.fn(),
   handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
-  dismissBackgroundShell: vi.fn(),
-  setActiveBackgroundShellPid: vi.fn(),
-  setIsBackgroundShellListOpen: vi.fn(),
+  dismissBackgroundTask: vi.fn(),
+  setActiveBackgroundTaskPid: vi.fn(),
+  setIsBackgroundTaskListOpen: vi.fn(),
   setAuthContext: vi.fn(),
   onHintInput: vi.fn(),
   onHintBackspace: vi.fn(),
@@ -665,7 +668,7 @@ export const renderWithProviders = async (
     );
   }
 
-  const mainAreaWidth = terminalWidth;
+  const mainAreaWidth = providedUiState?.mainAreaWidth ?? terminalWidth;
 
   const finalUiState = {
     ...baseState,

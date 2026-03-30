@@ -22,6 +22,11 @@ import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
+import {
+  NoopSandboxManager,
+  LocalSandboxManager,
+  type SandboxManager,
+} from '../services/sandboxManager.js';
 
 // Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
 // We want to test PolicyEngine logic, not the shell parser's ability to parse commands
@@ -96,7 +101,10 @@ describe('PolicyEngine', () => {
       runChecker: vi.fn(),
     } as unknown as CheckerRunner;
     engine = new PolicyEngine(
-      { approvalMode: ApprovalMode.DEFAULT },
+      {
+        approvalMode: ApprovalMode.DEFAULT,
+        sandboxManager: new NoopSandboxManager(),
+      },
       mockCheckerRunner,
     );
   });
@@ -267,7 +275,7 @@ describe('PolicyEngine', () => {
 
     it('should apply wildcard rules (no toolName)', async () => {
       const rules: PolicyRule[] = [
-        { decision: PolicyDecision.DENY }, // Applies to all tools
+        { toolName: '*', decision: PolicyDecision.DENY }, // Applies to all tools
         { toolName: 'safe-tool', decision: PolicyDecision.ALLOW, priority: 10 },
       ];
 
@@ -285,8 +293,22 @@ describe('PolicyEngine', () => {
       const config: PolicyEngineConfig = {
         nonInteractive: true,
         rules: [
-          { toolName: 'interactive-tool', decision: PolicyDecision.ASK_USER },
+          {
+            toolName: 'interactive-tool',
+            decision: PolicyDecision.ASK_USER,
+            interactive: true,
+          },
+          {
+            toolName: 'interactive-tool',
+            decision: PolicyDecision.DENY,
+            interactive: false,
+          },
           { toolName: 'allowed-tool', decision: PolicyDecision.ALLOW },
+          {
+            toolName: 'ask_user',
+            decision: PolicyDecision.DENY,
+            interactive: false,
+          },
         ],
       };
 
@@ -329,7 +351,11 @@ describe('PolicyEngine', () => {
       );
 
       // Switch to autoEdit mode
-      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+        sandboxManager: new LocalSandboxManager(),
+      });
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
       );
@@ -339,6 +365,30 @@ describe('PolicyEngine', () => {
       expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
         PolicyDecision.ASK_USER,
       );
+    });
+
+    it('should respect tools approved by the SandboxManager', async () => {
+      const mockSandboxManager = {
+        enabled: true,
+        prepareCommand: vi.fn(),
+        isDangerousCommand: vi.fn().mockReturnValue(false),
+        isKnownSafeCommand: vi
+          .fn()
+          .mockImplementation((args) => args[0] === 'npm'),
+        parseDenials: vi.fn().mockReturnValue(undefined),
+      } as unknown as SandboxManager;
+
+      engine = new PolicyEngine({
+        sandboxManager: mockSandboxManager,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'run_shell_command', args: { command: 'npm install' } },
+        undefined,
+      );
+
+      expect(decision).toBe(PolicyDecision.ALLOW);
     });
 
     it('should return ALLOW by default in YOLO mode when no rules match', async () => {
@@ -692,7 +742,7 @@ describe('PolicyEngine', () => {
   describe('complex scenarios', () => {
     it('should handle multiple matching rules with different priorities', async () => {
       const rules: PolicyRule[] = [
-        { decision: PolicyDecision.DENY, priority: 0 }, // Default deny all
+        { toolName: '*', decision: PolicyDecision.DENY, priority: 0 }, // Default deny all
         { toolName: 'shell', decision: PolicyDecision.ASK_USER, priority: 5 },
         {
           toolName: 'shell',
@@ -1223,6 +1273,51 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should NOT automatically DENY redirected shell commands in non-interactive mode if rules permit it', async () => {
+      const toolName = 'run_shell_command';
+      const command = 'ls > out.txt';
+
+      const rules: PolicyRule[] = [
+        {
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          allowRedirection: true,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      expect(
+        (await engine.check({ name: toolName, args: { command } }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should respect DENY rules for redirected shell commands in non-interactive mode', async () => {
+      const toolName = 'run_shell_command';
+      const command = 'ls > out.txt';
+
+      const rules: PolicyRule[] = [
+        {
+          toolName,
+          decision: PolicyDecision.ASK_USER,
+          interactive: true,
+        },
+        {
+          toolName,
+          decision: PolicyDecision.DENY,
+          interactive: false,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+
+      expect(
+        (await engine.check({ name: toolName, args: { command } }, undefined))
+          .decision,
+      ).toBe(PolicyDecision.DENY);
+    });
+
     it('should NOT downgrade ALLOW to ASK_USER for quoted redirection chars', async () => {
       const rules: PolicyRule[] = [
         {
@@ -1388,21 +1483,25 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.DENY);
     });
 
-    it('should DENY redirected shell commands in non-interactive mode', async () => {
+    it('should respect explicit DENY rules for redirected shell commands in non-interactive mode', async () => {
       const config: PolicyEngineConfig = {
         nonInteractive: true,
         rules: [
           {
             toolName: 'run_shell_command',
             decision: PolicyDecision.ALLOW,
+            interactive: true,
+          },
+          {
+            toolName: 'run_shell_command',
+            decision: PolicyDecision.DENY,
+            interactive: false,
           },
         ],
       };
 
       engine = new PolicyEngine(config);
 
-      // Redirected command should be DENIED in non-interactive mode
-      // (Normally ASK_USER, but ASK_USER -> DENY in non-interactive)
       expect(
         (
           await engine.check(
@@ -1427,14 +1526,14 @@ describe('PolicyEngine', () => {
 
       engine = new PolicyEngine({ rules });
 
-      // Atomic command "whoami" matches the wildcard rule (ASK_USER).
+      // Atomic command "unknown_command" matches the wildcard rule (ASK_USER).
       // It should NOT be upgraded to ALLOW.
       expect(
         (
           await engine.check(
             {
               name: 'run_shell_command',
-              args: { command: 'whoami' },
+              args: { command: 'unknown_command' },
             },
             undefined,
           )
@@ -1572,7 +1671,10 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({ rules });
+      engine = new PolicyEngine({
+        rules,
+        sandboxManager: new LocalSandboxManager(),
+      });
       engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
 
       const result = await engine.check(
@@ -1617,6 +1719,7 @@ describe('PolicyEngine', () => {
 
       const fixedRules: PolicyRule[] = [
         {
+          toolName: '*',
           decision: PolicyDecision.DENY,
           priority: 1.06,
           modes: [ApprovalMode.PLAN],
@@ -1647,6 +1750,7 @@ describe('PolicyEngine', () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
+          toolName: '*',
           decision: PolicyDecision.ALLOW,
           priority: 999,
           modes: [ApprovalMode.YOLO],
@@ -1685,6 +1789,7 @@ describe('PolicyEngine', () => {
           priority: 2000, // Very high priority DENY (e.g. Admin)
         },
         {
+          toolName: '*',
           decision: PolicyDecision.ALLOW,
           priority: 999,
           modes: [ApprovalMode.YOLO],
@@ -1978,10 +2083,12 @@ describe('PolicyEngine', () => {
   describe('addChecker', () => {
     it('should add a new checker and maintain priority order', () => {
       const checker1: SafetyCheckerRule = {
+        toolName: '*',
         checker: { type: 'external', name: 'checker1' },
         priority: 5,
       };
       const checker2: SafetyCheckerRule = {
+        toolName: '*',
         checker: { type: 'external', name: 'checker2' },
         priority: 10,
       };
@@ -2034,6 +2141,39 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match global wildcard (*) for checkers', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: '*', decision: PolicyDecision.ALLOW },
+      ];
+      const globalChecker: SafetyCheckerRule = {
+        checker: { type: 'external', name: 'global' },
+        toolName: '*',
+      };
+
+      engine = new PolicyEngine(
+        { rules, checkers: [globalChecker] },
+        mockCheckerRunner,
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
+        decision: SafetyCheckDecision.ALLOW,
+      });
+
+      await engine.check({ name: 'any_tool' }, undefined);
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'global' }),
+      );
+
+      vi.mocked(mockCheckerRunner.runChecker).mockClear();
+
+      await engine.check({ name: 'mcp_server_tool' }, 'server');
+      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: 'global' }),
+      );
+    });
+
     it('should support wildcard patterns for checkers', async () => {
       const rules: PolicyRule[] = [
         {
@@ -2070,6 +2210,7 @@ describe('PolicyEngine', () => {
       ];
       const checkers: SafetyCheckerRule[] = [
         {
+          toolName: '*',
           checker: {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
@@ -2095,6 +2236,7 @@ describe('PolicyEngine', () => {
       ];
       const checkers: SafetyCheckerRule[] = [
         {
+          toolName: '*',
           checker: {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
@@ -2119,6 +2261,7 @@ describe('PolicyEngine', () => {
       ];
       const checkers: SafetyCheckerRule[] = [
         {
+          toolName: '*',
           checker: {
             type: 'in-process',
             name: InProcessCheckerType.ALLOWED_PATH,
@@ -2135,33 +2278,6 @@ describe('PolicyEngine', () => {
 
       const result = await engine.check({ name: 'tool' }, undefined);
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
-    });
-
-    it('should DENY if checker returns ASK_USER in non-interactive mode', async () => {
-      const rules: PolicyRule[] = [
-        { toolName: 'tool', decision: PolicyDecision.ALLOW },
-      ];
-      const checkers: SafetyCheckerRule[] = [
-        {
-          checker: {
-            type: 'in-process',
-            name: InProcessCheckerType.ALLOWED_PATH,
-          },
-        },
-      ];
-
-      engine = new PolicyEngine(
-        { rules, checkers, nonInteractive: true },
-        mockCheckerRunner,
-      );
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ASK_USER,
-        reason: 'Suspicious path',
-      });
-
-      const result = await engine.check({ name: 'tool' }, undefined);
-      expect(result.decision).toBe(PolicyDecision.DENY);
     });
   });
 
@@ -2265,17 +2381,41 @@ describe('PolicyEngine', () => {
         expected: [],
       },
       {
-        name: 'should NOT include ASK_USER tools even in non-interactive mode',
+        name: 'should include tools in exclusion list only if explicitly denied in non-interactive mode',
         rules: [
           {
             toolName: 'tool1',
             decision: PolicyDecision.ASK_USER,
             modes: [ApprovalMode.DEFAULT],
+            interactive: true,
+          },
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.DENY,
+            modes: [ApprovalMode.DEFAULT],
+            interactive: false,
           },
         ],
         nonInteractive: true,
         allToolNames: ['tool1'],
         expected: ['tool1'],
+      },
+      {
+        name: 'should specifically exclude ask_user tool in non-interactive mode',
+        rules: [
+          {
+            toolName: 'ask_user',
+            decision: PolicyDecision.DENY,
+            interactive: false,
+          },
+          {
+            toolName: 'read_file',
+            decision: PolicyDecision.ALLOW,
+          },
+        ],
+        nonInteractive: true,
+        allToolNames: ['ask_user', 'read_file'],
+        expected: ['ask_user'],
       },
       {
         name: 'should ignore rules with argsPattern',
@@ -2320,6 +2460,7 @@ describe('PolicyEngine', () => {
         name: 'should respect wildcard ALLOW rules (e.g. YOLO mode)',
         rules: [
           {
+            toolName: '*',
             decision: PolicyDecision.ALLOW,
             priority: 999,
             modes: [ApprovalMode.YOLO],
@@ -2396,6 +2537,7 @@ describe('PolicyEngine', () => {
           },
           {
             // Simulates the global deny in Plan Mode
+            toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
             modes: [ApprovalMode.PLAN],
@@ -2506,6 +2648,7 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules: [
           {
+            toolName: '*',
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
@@ -2523,6 +2666,7 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules: [
           {
+            toolName: '*',
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
@@ -2544,6 +2688,7 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules: [
           {
+            toolName: '*',
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
@@ -2615,6 +2760,7 @@ describe('PolicyEngine', () => {
             priority: 70,
           },
           {
+            toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
           },
@@ -2661,6 +2807,7 @@ describe('PolicyEngine', () => {
             priority: 70,
           },
           {
+            toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
           },
@@ -2701,6 +2848,7 @@ describe('PolicyEngine', () => {
             priority: 70,
           },
           {
+            toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
           },
@@ -2782,6 +2930,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
+            toolName: '*',
             decision: PolicyDecision.DENY,
             priority: 60,
             modes: [ApprovalMode.PLAN],
@@ -2857,6 +3006,7 @@ describe('PolicyEngine', () => {
           modes: [ApprovalMode.YOLO],
         },
         {
+          toolName: '*',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_YOLO_ALLOW_ALL,
           modes: [ApprovalMode.YOLO],
@@ -2884,6 +3034,7 @@ describe('PolicyEngine', () => {
           modes: [ApprovalMode.YOLO],
         },
         {
+          toolName: '*',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_YOLO_ALLOW_ALL,
           modes: [ApprovalMode.YOLO],
@@ -2907,6 +3058,7 @@ describe('PolicyEngine', () => {
     it('should allow activate_skill but deny shell commands in Plan Mode', async () => {
       const rules: PolicyRule[] = [
         {
+          toolName: '*',
           decision: PolicyDecision.DENY,
           priority: 60,
           modes: [ApprovalMode.PLAN],
@@ -3110,14 +3262,17 @@ describe('PolicyEngine', () => {
   describe('removeCheckersByTier', () => {
     it('should remove checkers matching a specific tier', () => {
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c1' },
         priority: 1.1,
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c2' },
         priority: 1.9,
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c3' },
         priority: 2.5,
       });
@@ -3135,14 +3290,17 @@ describe('PolicyEngine', () => {
   describe('removeCheckersBySource', () => {
     it('should remove checkers matching a specific source', () => {
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c1' },
         source: 'sourceA',
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c2' },
         source: 'sourceB',
       });
       engine.addChecker({
+        toolName: '*',
         checker: { type: 'external', name: 'c3' },
         source: 'sourceA',
       });
@@ -3161,6 +3319,7 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules: [
           {
+            toolName: '*',
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ALLOW,
             priority: 10,
