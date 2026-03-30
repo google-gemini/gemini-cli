@@ -1,0 +1,6 @@
+{"type":"console","payload":{"type":"info","content":"{\"type\":\"message\",\"timestamp\":\"2026-03-28T12:00:00.000Z\",\"role\":\"assistant\",\"content\":\"FINAL_SMOKE_SUCCESS\"}"},"sessionId":"session-1","timestamp":1711620000000}
+{"type":"console","payload":{"type":"info","content":"{\"type\":\"tool_use\",\"timestamp\":\"2026-03-28T12:00:01.000Z\",\"tool_name\":\"read_file\",\"tool_id\":\"tool-1\",\"parameters\":{\"file_path\":\"original.txt\"}}"},"sessionId":"session-1","timestamp":1711620001000}
+{"type":"console","payload":{"type":"info","content":"{\"type\":\"result\",\"timestamp\":\"2026-03-28T12:00:02.000Z\",\"status\":\"success\",\"stats\":{\"total_tokens\":135,\"input_tokens\":130,\"output_tokens\":5,\"duration_ms\":900,\"tool_calls\":1,\"models\":{}}}"},"sessionId":"session-1","timestamp":1711620002000}
+{"type":"network","payload":{"id":"req-1","timestamp":1711620000500,"method":"POST","url":"https://example.com/model","headers":{},"pending":true},"sessionId":"session-1","timestamp":1711620000500}
+{"type":"network","payload":{"id":"req-1","pending":false,"response":{"status":200,"headers":{},"body":"ok","durationMs":120}},"sessionId":"session-1","timestamp":1711620000600}
+{"type":"console","payload":{"type":"debug","content":"gemini_cli.chat_compression","tokens_before":42,"tokens_after":14},"sessionId":"session-1","timestamp":1711620003000}

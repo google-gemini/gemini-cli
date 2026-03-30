@@ -1,0 +1,11 @@
+# Ephemeral output from vitest (schema.test.ts creates tmp-run/run-* per run)
+tmp-run/
+
+# Local debugging captures (not required for CI)
+debug-run/
+debug-run-*/
+
+# Runner-isolated GEMINI_CLI_HOME under the smoke workspace (recreated each run)
+smoke-workspace/.long-context-runner/
+command-workspace/.long-context-runner/
+command-workspace/output.txt

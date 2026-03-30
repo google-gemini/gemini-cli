@@ -1,0 +1,23 @@
+{
+  "id": "smoke-stream-json",
+  "repositoryId": "gemini-cli-local",
+  "title": "Smoke stream-json runner task",
+  "description": "Validates the long-context runner scaffold using a deterministic fake-response CLI run.",
+  "prompt": "Read original.txt and answer with the exact token FINAL_SMOKE_SUCCESS.",
+  "timeoutMs": 30000,
+  "runner": {
+    "mode": "local_workspace",
+    "cwd": "evals/long-context/fixtures/smoke-workspace",
+    "fakeResponsesPath": "evals/long-context/fixtures/smoke-stream-json.responses",
+    "outputFormat": "stream-json",
+    "approvalMode": "yolo",
+    "cliArgs": []
+  },
+  "validation": {
+    "type": "stream_json",
+    "requiredToolNames": ["read_file"],
+    "finalOutputIncludes": ["FINAL_SMOKE_SUCCESS"],
+    "requiredResultStatus": "success"
+  },
+  "tags": ["smoke", "runner"]
+}

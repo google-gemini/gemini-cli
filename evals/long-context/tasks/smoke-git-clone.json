@@ -1,0 +1,28 @@
+{
+  "id": "smoke-git-clone",
+  "repositoryId": "clone-fixture-repo",
+  "title": "Smoke git-clone task",
+  "description": "Validates that the runner can clone an isolated repository workspace before executing a task.",
+  "prompt": "Write the exact token CLONE_SMOKE_SUCCESS followed by a newline into clone-output.txt.",
+  "timeoutMs": 30000,
+  "runner": {
+    "mode": "git_clone",
+    "cwd": ".",
+    "fakeResponsesPath": "evals/long-context/fixtures/clone-smoke.responses",
+    "outputFormat": "stream-json",
+    "approvalMode": "yolo",
+    "cliArgs": []
+  },
+  "validation": {
+    "type": "command",
+    "command": "python3",
+    "args": [
+      "-c",
+      "from pathlib import Path; print(Path('clone-output.txt').read_text())"
+    ],
+    "expectedExitCode": 0,
+    "stdoutIncludes": ["CLONE_SMOKE_SUCCESS"],
+    "stderrIncludes": []
+  },
+  "tags": ["smoke", "git-clone"]
+}
