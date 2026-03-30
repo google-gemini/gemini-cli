@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TopicState, UpdateTopicTool } from './topicTool.js';
+import { UpdateTopicTool } from './topicTool.js';
+import { TopicState } from '../config/topicState.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
