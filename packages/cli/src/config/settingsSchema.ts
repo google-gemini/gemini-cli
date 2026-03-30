@@ -561,6 +561,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the "? for shortcuts" hint above the input.',
         showInDialog: true,
       },
+      compactToolOutput: {
+        type: 'boolean',
+        label: 'Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Display tool outputs (like directory listings and file reads) in a compact, structured format.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',

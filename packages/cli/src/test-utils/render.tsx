@@ -613,6 +613,7 @@ export const renderWithProviders = async (
     mouseEventsEnabled = false,
     config,
     uiActions,
+    toolActions,
     persistentState,
     appState = mockAppState,
   }: {
@@ -623,6 +624,11 @@ export const renderWithProviders = async (
     mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
+    toolActions?: Partial<{
+      isExpanded: (callId: string) => boolean;
+      toggleExpansion: (callId: string) => void;
+      toggleAllExpansion: (callIds: string[]) => void;
+    }>;
     persistentState?: {
       get?: typeof persistentStateMock.get;
       set?: typeof persistentStateMock.set;
@@ -710,6 +716,16 @@ export const renderWithProviders = async (
                         <ToolActionsProvider
                           config={config}
                           toolCalls={allToolCalls}
+                          isExpanded={
+                            toolActions?.isExpanded ??
+                            vi.fn().mockReturnValue(false)
+                          }
+                          toggleExpansion={
+                            toolActions?.toggleExpansion ?? vi.fn()
+                          }
+                          toggleAllExpansion={
+                            toolActions?.toggleAllExpansion ?? vi.fn()
+                          }
                         >
                           <AskUserActionsProvider
                             request={null}

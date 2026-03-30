@@ -257,6 +257,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
 
+- **`ui.compactToolOutput`** (boolean):
+  - **Description:** Display tool outputs (like directory listings and file
+    reads) in a compact, structured format.
+  - **Default:** `false`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`
