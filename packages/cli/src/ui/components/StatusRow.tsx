@@ -206,7 +206,12 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       return uiState.currentTip;
     }
 
-    // 2. Shortcut Hint (Fallback)
+    // 2. Buffer Toggle Hint
+    if (uiState.showIsAlternateBufferHint) {
+      return '[Alt+T] Switch to Full Screen';
+    }
+
+    // 3. Shortcut Hint (Fallback)
     if (
       settings.merged.ui.showShortcutsHint &&
       !hideUiDetailsForSuggestions &&

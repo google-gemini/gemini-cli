@@ -68,8 +68,10 @@ import {
   writeToStdout,
   disableMouseEvents,
   enterAlternateScreen,
+  exitAlternateScreen,
   enableMouseEvents,
   disableLineWrapping,
+  enableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   SessionStartSource,
@@ -213,7 +215,7 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = config.getUseAlternateBuffer();
+  const [isAlternateBuffer, setIsAlternateBuffer] = useState(config.getUseAlternateBuffer());
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -1550,6 +1552,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
     type: TransientMessageType;
   }>(WARNING_PROMPT_DURATION_MS);
 
+  const [shownBufferToggleHint, setShownBufferToggleHint] = useState(false);
+
+  useEffect(() => {
+    if (isAlternateBuffer) return;
+
+    const isLongHistory = historyManager.history.length > 15;
+    const isComplexPrompt = buffer.text.length > 200 || buffer.text.includes('\n');
+
+    if ((isLongHistory || isComplexPrompt) && !shownBufferToggleHint) {
+      showTransientMessage({ 
+        text: 'Tip: Press Alt+T to toggle full-screen mode for better scrolling/editing', 
+        type: TransientMessageType.Hint 
+      });
+      setShownBufferToggleHint(true);
+    }
+  }, [historyManager.history.length, buffer.text, isAlternateBuffer, shownBufferToggleHint, showTransientMessage]);
+
   const {
     isFolderTrustDialogOpen,
     discoveryResults: folderDiscoveryResults,
@@ -1697,6 +1716,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
+        return true;
+      }
+
+      if (keyMatchers[Command.TOGGLE_BUFFER_MODE](key)) {
+        toggleAlternateBuffer();
         return true;
       }
 
@@ -2204,8 +2228,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config, refreshStatic]);
 
+  const showIsAlternateBufferHint = (historyManager.history.length > 15 || buffer.text.length > 200 || buffer.text.includes('\n')) && !isAlternateBuffer;
+
   const uiState: UIState = useMemo(
     () => ({
+      isAlternateBuffer,
       history: historyManager.history,
       historyManager,
       isThemeDialogOpen,
@@ -2331,6 +2358,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      showIsAlternateBufferHint,
       hintMode:
         config.isModelSteeringEnabled() && isToolExecuting(pendingHistoryItems),
       hintBuffer: '',
@@ -2457,6 +2485,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      showIsAlternateBufferHint,
+      isAlternateBuffer,
     ],
   );
 
@@ -2464,6 +2494,31 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => setShowPrivacyNotice(false),
     [setShowPrivacyNotice],
   );
+
+  const toggleAlternateBuffer = useCallback(() => {
+    setIsAlternateBuffer(prev => {
+      const next = !prev;
+      if (next) {
+        enterAlternateScreen();
+        enableMouseEvents();
+        disableLineWrapping();
+      } else {
+        exitAlternateScreen();
+        disableMouseEvents();
+        enableLineWrapping();
+        writeToStdout('\x1b[2J\x1b[H');
+      }
+      process.stdout.emit('resize');
+
+      // Give a tick for resize to process, then trigger remount to force full redraw
+      setImmediate(() => {
+        refreshStatic();
+        setForceRerenderKey((prev) => prev + 1);
+      });
+
+      return next;
+    });
+  }, [setIsAlternateBuffer, refreshStatic, setForceRerenderKey]);
 
   const uiActions: UIActions = useMemo(
     () => ({
@@ -2476,6 +2531,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleEditorSelect,
       exitEditorDialog,
       exitPrivacyNotice,
+      toggleAlternateBuffer,
       closeSettingsDialog,
       closeModelDialog,
       openAgentConfigDialog,
@@ -2614,6 +2670,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       historyManager,
       getPreferredEditor,
+      toggleAlternateBuffer,
     ],
   );
 

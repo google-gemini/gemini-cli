@@ -142,4 +142,38 @@ describe('<StatusRow />', () => {
     await waitUntilReady();
     expect(lastFrame()).toContain('Tip: Test Tip');
   });
+
+  it('renders buffer toggle hint when showIsAlternateBufferHint is true', async () => {
+    (useComposerStatus as Mock).mockReturnValue({
+      isInteractiveShellWaiting: false,
+      showLoadingIndicator: false,
+      showTips: false,
+      showWit: false,
+      modeContentObj: null,
+      showMinimalContext: false,
+    });
+
+    const uiState: Partial<UIState> = {
+      ...defaultUiState,
+      showIsAlternateBufferHint: true,
+    };
+
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <StatusRow
+        showUiDetails={false}
+        isNarrow={false}
+        terminalWidth={100}
+        hideContextSummary={false}
+        hideUiDetailsForSuggestions={false}
+        hasPendingActionRequired={false}
+      />,
+      {
+        width: 100,
+        uiState,
+      },
+    );
+
+    await waitUntilReady();
+    expect(lastFrame()).toContain('[Alt+T] Switch to Full Screen');
+  });
 });

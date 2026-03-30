@@ -78,6 +78,7 @@ export interface UIActions {
   setShortcutsHelpVisible: (visible: boolean) => void;
   setCleanUiDetailsVisible: (visible: boolean) => void;
   toggleCleanUiDetailsVisible: () => void;
+  toggleAlternateBuffer: () => void;
   revealCleanUiDetailsTemporarily: (durationMs?: number) => void;
   handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;

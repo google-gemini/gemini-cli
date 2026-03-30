@@ -118,6 +118,8 @@ export interface UIState {
   isEditorDialogOpen: boolean;
   showPrivacyNotice: boolean;
   corgiMode: boolean;
+  isAlternateBuffer: boolean;
+  showIsAlternateBufferHint: boolean;
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
