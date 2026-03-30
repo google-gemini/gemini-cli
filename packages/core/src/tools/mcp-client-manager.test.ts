@@ -61,6 +61,7 @@ describe('McpClientManager', () => {
         isInitialized: vi.fn(),
       }),
       refreshMcpContext: vi.fn(),
+      isSandboxEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config);
     toolRegistry = vi.mockObject({
       registerTool: vi.fn(),
@@ -819,6 +820,72 @@ describe('McpClientManager', () => {
       manager.setUserInteractedWithMcp();
       manager.emitDiagnostic('error', 'Same error');
       expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(2); // Now the actual error
+    });
+  });
+
+  describe('auto-executing tools warning', () => {
+    let coreEventsMock: typeof import('../utils/events.js').coreEvents;
+
+    beforeEach(async () => {
+      const eventsModule = await import('../utils/events.js');
+      coreEventsMock = eventsModule.coreEvents;
+      vi.spyOn(coreEventsMock, 'emitFeedback').mockImplementation(() => {});
+
+      mockedMcpClient = vi.mockObject({
+        connect: vi.fn(),
+        discoverInto: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn().mockReturnValue(MCPServerStatus.DISCONNECTED),
+        getServerConfig: vi.fn(),
+        getServerName: vi.fn().mockReturnValue('test-server'),
+        getAutoExecutingTools: vi.fn().mockReturnValue([]),
+      } as unknown as McpClient);
+      vi.mocked(McpClient).mockReturnValue(mockedMcpClient);
+    });
+
+    it('should warn about auto-executing tools if sandboxing is enabled', async () => {
+      mockConfig.isSandboxEnabled.mockReturnValue(true);
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': { command: 'node' },
+      });
+      mockedMcpClient.getAutoExecutingTools.mockReturnValue([
+        '[test-server] tool1',
+        '[test-server] tool2',
+      ]);
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+      await manager.startConfiguredMcpServers();
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'With sandboxing enabled, the following MCP tools will AUTO-EXECUTE',
+        ),
+      );
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('* [test-server] tool1'),
+      );
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('* [test-server] tool2'),
+      );
+    });
+
+    it('should not warn if sandboxing is disabled', async () => {
+      mockConfig.isSandboxEnabled.mockReturnValue(false);
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': { command: 'node' },
+      });
+      mockedMcpClient.getAutoExecutingTools.mockReturnValue(['tool1']);
+
+      const manager = setupManager(new McpClientManager('0.0.1', mockConfig));
+      await manager.startConfiguredMcpServers();
+
+      expect(coreEventsMock.emitFeedback).not.toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('AUTO-EXECUTE'),
+      );
     });
   });
 });

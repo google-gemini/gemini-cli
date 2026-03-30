@@ -17,6 +17,7 @@ import {
   debugLogger,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  NoopSandboxManager,
 } from '@google/gemini-cli-core';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -115,6 +116,8 @@ async function testMCPConnection(
       }
     },
     isTrustedFolder: () => isTrusted,
+    isSandboxEnabled: () => false,
+    sandboxManager: new NoopSandboxManager(),
   };
 
   let transport;

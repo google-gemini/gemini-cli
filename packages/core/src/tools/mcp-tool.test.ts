@@ -1022,7 +1022,7 @@ describe('DiscoveredMCPTool', () => {
   });
 
   describe('shouldConfirmExecute with read-only hint', () => {
-    it('should return false if isReadOnly is true', async () => {
+    it('should return false if isReadOnly and isSandboxEnabled are true', async () => {
       const bus = createMockMessageBus();
       getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
       const readOnlyTool = new DiscoveredMCPTool(
@@ -1034,11 +1034,36 @@ describe('DiscoveredMCPTool', () => {
         bus,
         false, // trust
         true, // isReadOnly
+        undefined, // nameOverride
+        { isSandboxEnabled: () => true, isTrustedFolder: () => true } as any, // cliConfig
       );
       const invocation = readOnlyTool.build({ param: 'mock' });
       expect(
         await invocation.shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
+    });
+
+    it('should return confirmation details if isReadOnly is true but isSandboxEnabled is false', async () => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
+      const readOnlyTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        bus,
+        false, // trust
+        true, // isReadOnly
+        undefined, // nameOverride
+        { isSandboxEnabled: () => false, isTrustedFolder: () => true } as any, // cliConfig
+      );
+      const invocation = readOnlyTool.build({ param: 'mock' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toHaveProperty('type', 'mcp');
     });
 
     it('should return confirmation details if isReadOnly is false', async () => {
@@ -1053,6 +1078,8 @@ describe('DiscoveredMCPTool', () => {
         bus,
         false, // trust
         false, // isReadOnly
+        undefined, // nameOverride
+        { isSandboxEnabled: () => true, isTrustedFolder: () => true } as any, // cliConfig
       );
       const invocation = readWriteTool.build({ param: 'mock' });
       const confirmation = await invocation.shouldConfirmExecute(

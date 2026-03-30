@@ -206,8 +206,8 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       return false; // server is trusted, no confirmation needed
     }
 
-    if (this.isReadOnly) {
-      return false; // read-only tools do not require confirmation
+    if (this.isReadOnly && this.cliConfig?.isSandboxEnabled()) {
+      return false; // read-only tools do not require confirmation if sandboxing is enabled
     }
 
     if (

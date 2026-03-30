@@ -80,6 +80,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
 import { expandEnvVars } from '../utils/envExpansion.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
@@ -161,6 +162,8 @@ export class McpClient implements McpProgressReporter {
    */
   private readonly progressTokenToCallId = new Map<string | number, string>();
 
+  private autoExecutingTools: string[] = [];
+
   constructor(
     private readonly serverName: string,
     private readonly serverConfig: MCPServerConfig,
@@ -173,6 +176,10 @@ export class McpClient implements McpProgressReporter {
 
   getServerName(): string {
     return this.serverName;
+  }
+
+  getAutoExecutingTools(): string[] {
+    return this.autoExecutingTools;
   }
 
   /**
@@ -235,6 +242,10 @@ export class McpClient implements McpProgressReporter {
     );
     const resources = await this.discoverResources();
     this.updateResourceRegistry(resources, registries.resourceRegistry);
+
+    this.autoExecutingTools = tools
+      .filter((t) => t.isReadOnly)
+      .map((t) => `[${t.serverName}] ${t.serverToolName}`);
 
     if (prompts.length === 0 && tools.length === 0 && resources.length === 0) {
       throw new Error('No prompts, tools, or resources found on the server.');
@@ -1754,6 +1765,8 @@ export interface McpContext {
   ): void;
   setUserInteractedWithMcp?(): void;
   isTrustedFolder(): boolean;
+  isSandboxEnabled(): boolean;
+  sandboxManager?: SandboxManager;
   getPolicyEngine?(): {
     getRules(): ReadonlyArray<{
       toolName: string;
@@ -2275,11 +2288,29 @@ export async function createTransport(
       }
     }
 
+    let preparedProgram = mcpServerConfig.command;
+    let preparedArgs = mcpServerConfig.args || [];
+    let preparedEnv = finalEnv;
+    let preparedCwd = mcpServerConfig.cwd || process.cwd();
+
+    if (cliConfig.isSandboxEnabled() && cliConfig.sandboxManager) {
+      const prepared = await cliConfig.sandboxManager.prepareCommand({
+        command: preparedProgram,
+        args: preparedArgs,
+        cwd: preparedCwd,
+        env: preparedEnv,
+      });
+      preparedProgram = prepared.program;
+      preparedArgs = prepared.args;
+      preparedCwd = prepared.cwd || preparedCwd;
+      preparedEnv = prepared.env as Record<string, string>;
+    }
+
     let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
-      env: finalEnv,
-      cwd: mcpServerConfig.cwd,
+      command: preparedProgram,
+      args: preparedArgs,
+      env: preparedEnv,
+      cwd: preparedCwd,
       stderr: 'pipe',
     });
 
@@ -2369,3 +2400,4 @@ export function isEnabled(
     )
   );
 }
+

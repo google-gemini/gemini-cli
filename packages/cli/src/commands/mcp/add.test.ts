@@ -27,6 +27,33 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+  class MockClient {
+    async connect() {}
+    async listTools() {
+      return {
+        tools: [
+          { name: 'read_only_tool', annotations: { readOnlyHint: true } },
+          { name: 'write_tool', annotations: { readOnlyHint: false } },
+        ],
+      };
+    }
+    async close() {}
+  }
+  return {
+    Client: MockClient,
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
+  return {
+    ...actual,
+    createTransport: vi.fn().mockResolvedValue({}),
+    createSandboxManager: vi.fn().mockReturnValue({}),
+  };
+});
+
 vi.mock('os', () => {
   const homedir = vi.fn(() => '/home/user');
   return {
@@ -68,6 +95,33 @@ describe('mcp add command', () => {
       setValue: mockSetValue,
       workspace: { path: '/path/to/project' },
       user: { path: '/home/user' },
+      merged: {},
+    });
+  });
+
+  describe('sandboxing warnings', () => {
+    it('should discover tools and emit warning when sandboxing is enabled', async () => {
+      mockedLoadSettings.mockReturnValue({
+        forScope: () => ({ settings: {} }),
+        setValue: mockSetValue,
+        workspace: { path: '/path/to/project' },
+        user: { path: '/home/user' },
+        merged: {
+          tools: {
+            sandbox: { enabled: true },
+          },
+        },
+      });
+
+      const debugLoggerWarnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+
+      await parser.parseAsync('add sandbox-server /path/to/server');
+
+      expect(debugLoggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Warning: With sandboxing enabled, the following tools are marked as read-only and will AUTO-EXECUTE without confirmation:\n  * read_only_tool',
+        ),
+      );
     });
   });
 
@@ -216,6 +270,7 @@ describe('mcp add command', () => {
         setValue: mockSetValue,
         workspace: { path: workspacePath },
         user: { path: '/home/user' },
+        merged: {},
       });
     };
 
@@ -383,6 +438,7 @@ describe('mcp add command', () => {
         setValue: mockSetValue,
         workspace: { path: '/path/to/project' },
         user: { path: '/home/user' },
+        merged: {},
       });
     });
 
