@@ -10,6 +10,6 @@
     "devtools": true
   },
   "security": {
-    "toolSandboxing": true,
+    "toolSandboxing": true
   }
 }
