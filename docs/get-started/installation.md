@@ -28,7 +28,7 @@ installation methods:
 - MacPorts
 - Anaconda
 
-Note that Gemini CLI comes pre-installed on
+Note: Gemini CLI comes pre-installed on
 [**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
 [**Cloud Workstations**](https://cloud.google.com/workstations).
 
