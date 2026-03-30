@@ -192,7 +192,7 @@ async function addMcpServer(
         );
       }
       await client.close();
-    } catch (e) {
+    } catch {
       debugLogger.warn(
         'Warning: With sandboxing enabled, any read-only tools provided by this server will AUTO-EXECUTE without confirmation.',
       );

@@ -2303,7 +2303,13 @@ export async function createTransport(
       preparedProgram = prepared.program;
       preparedArgs = prepared.args;
       preparedCwd = prepared.cwd || preparedCwd;
-      preparedEnv = prepared.env as Record<string, string>;
+      const env: Record<string, string> = {};
+      for (const [key, value] of Object.entries(prepared.env)) {
+        if (value !== undefined) {
+          env[key] = value;
+        }
+      }
+      preparedEnv = env;
     }
 
     let transport: Transport = new StdioClientTransport({
