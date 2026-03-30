@@ -23,7 +23,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -69,7 +69,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -115,7 +115,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -161,7 +161,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -207,7 +207,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -253,7 +253,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -299,7 +299,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -345,7 +345,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
@@ -391,7 +391,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable run-event notifications for action-required prompts and session completion.            │
 │                                                                                                  │
 │    Enable Plan Mode                                                                        true  │
-│    Enable Plan Mode.                                                                             │
+│    Enable Plan Mode for read-only safety during planning.                                        │
 │                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │

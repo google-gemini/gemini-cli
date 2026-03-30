@@ -299,7 +299,8 @@ const SETTINGS_SCHEMA = {
             category: 'General',
             requiresRestart: true,
             default: true,
-            description: 'Enable Plan Mode.',
+            description:
+              'Enable Plan Mode for read-only safety during planning.',
             showInDialog: true,
           },
           directory: {

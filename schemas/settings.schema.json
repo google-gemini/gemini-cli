@@ -124,8 +124,8 @@
           "properties": {
             "enabled": {
               "title": "Enable Plan Mode",
-              "description": "Enable Plan Mode.",
-              "markdownDescription": "Enable Plan Mode.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "Enable Plan Mode for read-only safety during planning.",
+              "markdownDescription": "Enable Plan Mode for read-only safety during planning.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },

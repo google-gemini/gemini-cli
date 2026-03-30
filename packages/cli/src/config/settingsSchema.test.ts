@@ -426,7 +426,9 @@ describe('SettingsSchema', () => {
       expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe('Enable Plan Mode.');
+      expect(setting.description).toBe(
+        'Enable Plan Mode for read-only safety during planning.',
+      );
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {

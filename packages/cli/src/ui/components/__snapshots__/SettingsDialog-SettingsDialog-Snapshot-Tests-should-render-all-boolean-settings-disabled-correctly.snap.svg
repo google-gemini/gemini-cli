@@ -80,7 +80,7 @@
     <text x="837" y="359" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="376" fill="#afafaf" textLength="153" lengthAdjust="spacingAndGlyphs">Enable Plan Mode.</text>
+    <text x="45" y="376" fill="#afafaf" textLength="486" lengthAdjust="spacingAndGlyphs">Enable Plan Mode for read-only safety during planning.</text>
     <text x="891" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

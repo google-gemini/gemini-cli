@@ -142,7 +142,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`general.plan.enabled`** (boolean):
-  - **Description:** Enable Plan Mode.
+  - **Description:** Enable Plan Mode for read-only safety during planning.
   - **Default:** `true`
   - **Requires restart:** Yes
 
