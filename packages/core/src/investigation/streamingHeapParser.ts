@@ -542,7 +542,7 @@ export class StreamingHeapParser extends EventEmitter {
           if (ch === '[' || ch === '{') sectionDepth++;
           else if (ch === ']' || ch === '}') {
             sectionDepth--;
-            if (sectionDepth <= 0) {
+            if (sectionDepth === 0) {
               processed = i + 1;
               currentSection = null;
               break;
