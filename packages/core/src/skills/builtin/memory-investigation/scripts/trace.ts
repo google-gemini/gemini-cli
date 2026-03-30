@@ -1,47 +1,33 @@
 /**
- * trace.mjs — Chrome JSON Trace Event Converter
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * trace.ts — Chrome JSON Trace Event Converter
  *
  * Converts heap diff analysis results into Chrome JSON Trace Event format,
  * directly compatible with ui.perfetto.dev and chrome://tracing.
  *
- * This bridges the gap between offline heapsnapshot analysis and
- * visual performance investigation using industry-standard tooling.
- *
  * Zero external dependencies.
- *
- * @license Apache-2.0
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import type { DiffSummary, TraceEvent, TraceOptions, TraceOutput } from './types.js';
 
 /**
  * Convert heap diff summary to Chrome JSON Trace Event format.
- *
- * Each anomaly becomes a Complete Event (ph: "X") with:
- * - ts: microsecond timestamp of the capture window start
- * - dur: the capture interval duration in microseconds
- * - name: constructor name
- * - cat: "heap_analysis"
- * - args: sizeDelta, countDelta, currentSize, etc.
- *
- * Additionally generates:
- * - Metadata events (ph: "M") for process/thread names
- * - Instant events (ph: "i") marking snapshot capture points
- * - Counter events (ph: "C") tracking total heap growth over time
- *
- * @param {Object} diffSummary - Output from demo.mjs (the JSON summary)
- * @param {Object} [options]
- * @returns {Object} Chrome JSON trace event object
  */
-export function convertToTraceEvents(diffSummary, options = {}) {
+export function convertToTraceEvents(
+  diffSummary: DiffSummary,
+  options: TraceOptions = {},
+): TraceOutput {
   const {
     processName = 'heapsnapshot-poc',
     pid = 1,
     tid = 1,
   } = options;
 
-  const events = [];
+  const events: TraceEvent[] = [];
 
   // Extract timing info from diff summary
   const snapshotCount = diffSummary.snapshots?.count || 3;
@@ -85,13 +71,10 @@ export function convertToTraceEvents(diffSummary, options = {}) {
   }
 
   // ── Anomaly Duration Events ──
-  // Each anomaly is a "Complete" event spanning the full analysis window
   const anomalies = diffSummary.anomalies || [];
 
   for (let i = 0; i < anomalies.length; i++) {
     const anomaly = anomalies[i];
-
-    // Stack anomalies vertically using different thread IDs
     const anomalyTid = tid + i + 1;
 
     // Thread name metadata for this anomaly
@@ -125,7 +108,6 @@ export function convertToTraceEvents(diffSummary, options = {}) {
   }
 
   // ── Counter Events (heap growth over time) ──
-  // Simulate growth trajectory across snapshot intervals
   const totalGrowth = anomalies.reduce((sum, a) => sum + Math.max(0, a.sizeDelta), 0);
 
   for (let i = 0; i < snapshotCount; i++) {
@@ -163,10 +145,8 @@ export function convertToTraceEvents(diffSummary, options = {}) {
 
 /**
  * Format bytes to human-readable string.
- * @param {number} bytes
- * @returns {string}
  */
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   const abs = Math.abs(bytes);
   const sign = bytes >= 0 ? '+' : '-';
   if (abs < 1024) return `${sign}${abs} B`;
@@ -176,19 +156,17 @@ function formatBytes(bytes) {
 
 /**
  * Run as standalone CLI tool.
- *
- * Usage: node trace.mjs <diff_summary.json> [--output trace.json]
  */
-function main() {
+function main(): void {
   const args = process.argv.slice(2);
 
   if (args.length < 1) {
-    console.error('Usage: node trace.mjs <diff_summary.json> [--output trace.json]');
+    console.error('Usage: node trace.js <diff_summary.json> [--output trace.json]');
     process.exit(1);
   }
 
   const inputPath = args[0];
-  let outputPath = null;
+  let outputPath: string | null = null;
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--output' && args[i + 1]) {
@@ -208,7 +186,7 @@ function main() {
     process.exit(1);
   }
 
-  const diffSummary = JSON.parse(fs.readFileSync(inputPath, 'utf-8'));
+  const diffSummary: DiffSummary = JSON.parse(fs.readFileSync(inputPath, 'utf-8'));
 
   // Convert to trace events
   const traceData = convertToTraceEvents(diffSummary);

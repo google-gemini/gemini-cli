@@ -1,5 +1,8 @@
 /**
- * demo.mjs — Self-Contained Heapsnapshot POC Demo
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * demo.ts — Self-Contained Heapsnapshot POC Demo
  *
  * Single-command demonstration:
  * 1. Creates a realistic multi-type memory leak
@@ -9,21 +12,18 @@
  * 5. Writes a compact JSON summary for LLM consumption
  * 6. Generates a Perfetto-compatible trace file
  *
- * Usage: node demo.mjs
+ * Usage: node demo.js
  *
  * Zero external dependencies. Requires Node.js >= 20.
- *
- * @license Apache-2.0
  */
 
-/* global console, process, Buffer, setTimeout */
-
-import { parseSnapshot, diffSnapshots } from './diff.mjs';
-import { renderTable, renderRetainerPaths } from './render.mjs';
-import { convertToTraceEvents } from './trace.mjs';
-import { walkRetainers } from './retainers.mjs';
+import { parseSnapshot, diffSnapshots } from './diff.js';
+import { renderTable, renderRetainerPaths } from './render.js';
+import { convertToTraceEvents } from './trace.js';
+import { walkRetainers } from './retainers.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { HeapSnapshot, RetainerResult } from './types.js';
 
 // ANSI codes for header
 const BOLD = '\x1b[1m';
@@ -36,21 +36,22 @@ const YELLOW = '\x1b[33m';
 // PHASE 0: Intentional Memory Leak (Realistic Multi-Type Pattern)
 // ──────────────────────────────────────────────────────────────
 
-/**
- * Simulates a realistic leak pattern with multiple growing types:
- * - RequestContext objects accumulated in a Map (never cleaned up)
- * - Each context holds a 1KB Buffer payload
- * - Each context holds a metadata object with a large captured string
- * - The Map itself grows with entries
- *
- * This produces 3-4 distinct growing constructor types in the diff,
- * mimicking a real server-side leak where request contexts accumulate.
- */
-const leakedContexts = new Map();
+interface RequestContext {
+  id: number;
+  timestamp: number;
+  payload: Buffer;
+  metadata: {
+    headers: Record<string, string>;
+    traceData: string;
+  };
+  responseCache: Array<{ chunk: number; data: string }>;
+}
+
+const leakedContexts = new Map<number, RequestContext>();
 let requestId = 0;
 
-function simulateLeakyRequest() {
-  const ctx = {
+function simulateLeakyRequest(): void {
+  const ctx: RequestContext = {
     id: requestId++,
     timestamp: Date.now(),
     payload: Buffer.alloc(1024, 'x'),
@@ -69,7 +70,7 @@ function simulateLeakyRequest() {
 // Leak rate: how many requests to simulate between each snapshot
 const LEAK_BATCH_SIZE = 5000;
 
-function runLeakBatch() {
+function runLeakBatch(): void {
   for (let i = 0; i < LEAK_BATCH_SIZE; i++) {
     simulateLeakyRequest();
   }
@@ -79,7 +80,7 @@ function runLeakBatch() {
 // MAIN DEMO FLOW
 // ──────────────────────────────────────────────────────────────
 
-async function main() {
+async function main(): Promise<void> {
   const startTime = Date.now();
 
   console.log('');
@@ -114,10 +115,9 @@ async function main() {
   console.log(`${YELLOW}Step 2:${RESET} Capturing ${snapshotCount} heap snapshots...`);
   console.log('');
 
-  // We override the capture loop to inject leak batches between snapshots
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const snapshotPaths = [];
+  const snapshotPaths: string[] = [];
 
   // Capture snapshot 0 (baseline after initial leak)
   const { captureOne } = await importCaptureHelpers();
@@ -157,9 +157,9 @@ async function main() {
   console.log('');
 
   // Parse latest snapshot as raw JSON for retainer analysis
-  const latestRaw = JSON.parse(fs.readFileSync(snapshotPaths[2], 'utf-8'));
+  const latestRaw: HeapSnapshot = JSON.parse(fs.readFileSync(snapshotPaths[2], 'utf-8'));
   const topAnomalyNames = diffs.filter(d => d.sizeDelta > 0).slice(0, 5).map(d => d.name);
-  let retainerResults = [];
+  let retainerResults: RetainerResult[] = [];
   if (topAnomalyNames.length > 0) {
     retainerResults = walkRetainers(latestRaw, topAnomalyNames, { maxDepth: 5, maxChainsPerType: 2 });
     console.log(`  Analyzed ${topAnomalyNames.length} anomaly type(s) for retainer chains.`);
@@ -234,22 +234,24 @@ async function main() {
 /**
  * Import capture helpers for individual snapshot capture.
  */
-async function importCaptureHelpers() {
+async function importCaptureHelpers(): Promise<{
+  captureOne: (outputDir: string, index: number, total: number) => Promise<string>;
+}> {
   const inspector = await import('node:inspector');
 
   const session = new inspector.default.Session();
   session.connect();
   session.post('HeapProfiler.enable');
 
-  async function captureOne(outputDir, index, total) {
+  async function captureOne(outputDir: string, index: number, total: number): Promise<string> {
     const filename = path.join(outputDir, `snapshot_${index}.heapsnapshot`);
     process.stdout.write(`  Capturing snapshot ${index + 1}/${total}...`);
 
-    return new Promise((resolve, reject) => {
-      let chunks = [];
+    return new Promise<string>((resolve, reject) => {
+      let chunks: string[] | null = [];
 
-      const onChunk = (message) => {
-        chunks.push(message.params.chunk);
+      const onChunk = (message: { params: { chunk: string } }): void => {
+        chunks!.push(message.params.chunk);
       };
 
       session.on('HeapProfiler.addHeapSnapshotChunk', onChunk);
@@ -258,7 +260,7 @@ async function importCaptureHelpers() {
         reportProgress: false,
         treatGlobalObjectsAsRoots: true,
         captureNumericValue: false,
-      }, (err) => {
+      }, (err: Error | null) => {
         session.removeListener('HeapProfiler.addHeapSnapshotChunk', onChunk);
 
         if (err) {
@@ -266,7 +268,7 @@ async function importCaptureHelpers() {
           return;
         }
 
-        const snapshotData = chunks.join('');
+        const snapshotData = chunks!.join('');
         const sizeBytes = snapshotData.length;
         chunks = null;
         fs.writeFileSync(filename, snapshotData);
@@ -291,12 +293,12 @@ async function importCaptureHelpers() {
   return { captureOne };
 }
 
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── ENTRY POINT ──
-main().catch((err) => {
+main().catch((err: Error) => {
   console.error(`\nError: ${err.message}`);
   process.exit(1);
 });

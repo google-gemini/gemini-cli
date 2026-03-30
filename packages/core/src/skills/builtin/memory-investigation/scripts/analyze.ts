@@ -1,5 +1,8 @@
 /**
- * analyze.mjs — Memory Investigation Orchestrator
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * analyze.ts — Memory Investigation Orchestrator
  *
  * Runs the complete memory investigation pipeline:
  * 1. Capture 3 heap snapshots at configurable intervals
@@ -9,32 +12,31 @@
  * 5. Write compact JSON summary for LLM consumption
  * 6. Generate Perfetto-compatible trace
  *
- * Usage: node analyze.mjs [snapshot_dir] [--interval MS] [--top K]
+ * Usage: node analyze.js [snapshot_dir] [--interval MS] [--top K]
  *
  * Zero external dependencies. Requires Node.js >= 20.
- *
- * @license Apache-2.0
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseSnapshot, diffSnapshots } from './diff.mjs';
-import { walkRetainers } from './retainers.mjs';
-import { renderTable, renderRetainerPaths } from './render.mjs';
-import { convertToTraceEvents } from './trace.mjs';
-import { captureSnapshots } from './capture.mjs';
+import { parseSnapshot, diffSnapshots } from './diff.js';
+import { walkRetainers } from './retainers.js';
+import { renderTable, renderRetainerPaths } from './render.js';
+import { convertToTraceEvents } from './trace.js';
+import { captureSnapshots } from './capture.js';
+import type { HeapSnapshot, RetainerResult } from './types.js';
 
-async function main() {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  let snapshotDir = args[0] || './snapshots';
+  const snapshotDir = args[0] && !args[0].startsWith('--') ? args[0] : './snapshots';
   let intervalMs = 5000;
   let topK = 15;
 
-  for (let i = 1; i < args.length; i++) {
+  for (let i = 0; i < args.length; i++) {
     if (args[i] === '--interval' && args[i + 1]) intervalMs = parseInt(args[++i], 10);
     if (args[i] === '--top' && args[i + 1]) topK = parseInt(args[++i], 10);
     if (args[i] === '--help') {
-      console.log('Usage: node analyze.mjs [snapshot_dir] [--interval MS] [--top K]');
+      console.log('Usage: node analyze.js [snapshot_dir] [--interval MS] [--top K]');
       process.exit(0);
     }
   }
@@ -59,9 +61,9 @@ async function main() {
 
   // Step 3: Retainer chains
   console.log('Step 3: Walking retainer chains...');
-  const latestRaw = JSON.parse(fs.readFileSync(snapshotPaths[2], 'utf-8'));
+  const latestRaw: HeapSnapshot = JSON.parse(fs.readFileSync(snapshotPaths[2], 'utf-8'));
   const topNames = diffs.filter(d => d.sizeDelta > 0).slice(0, 5).map(d => d.name);
-  const retainerResults = topNames.length > 0
+  const retainerResults: RetainerResult[] = topNames.length > 0
     ? walkRetainers(latestRaw, topNames, { maxDepth: 5, maxChainsPerType: 2 })
     : [];
   console.log('');

@@ -1,17 +1,19 @@
 /**
- * diff.mjs — V8 Heapsnapshot Parser & Diff Engine
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * diff.ts — V8 Heapsnapshot Parser & Diff Engine
  *
  * Parses .heapsnapshot files (V8 format), reconstructs per-constructor
  * size aggregations, and computes retained size deltas across snapshots.
  *
  * Zero external dependencies. Uses dynamic field indexing from snapshot
  * metadata to handle any V8/Node version.
- *
- * @license Apache-2.0
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import type { ConstructorStats, DiffEntry, DiffOptions, RankedDiffEntry, RetainerResult } from './types.js';
 
 // System/internal V8 types that dominate diffs but aren't user-actionable
 const SYSTEM_TYPES = new Set([
@@ -34,7 +36,7 @@ const SYSTEM_TYPES = new Set([
 ]);
 
 // Regex patterns for V8 internal types (e.g., "(code for someFunction)")
-const SYSTEM_TYPE_PATTERNS = [
+const SYSTEM_TYPE_PATTERNS: RegExp[] = [
   /^\(code for /,
   /^system \/ /,
 ];
@@ -52,7 +54,7 @@ const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
  * Uses dynamic field indexing from snapshot metadata — never hardcodes
  * field positions.
  */
-export function parseSnapshot(filePath) {
+export function parseSnapshot(filePath: string): Map<string, ConstructorStats> {
   const absolutePath = path.resolve(filePath);
 
   if (!fs.existsSync(absolutePath)) {
@@ -69,15 +71,19 @@ export function parseSnapshot(filePath) {
   }
 
   const raw = fs.readFileSync(absolutePath, 'utf-8');
-  let data;
+  let data: Record<string, unknown>;
   try {
-    data = JSON.parse(raw);
-  } catch (e) {
+    data = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
     throw new Error(`Invalid JSON in snapshot file: ${absolutePath}`);
   }
 
   // Validate required metadata
-  if (!data.snapshot?.meta?.node_fields) {
+  const snapshot = data.snapshot as Record<string, unknown> | undefined;
+  const meta = snapshot?.meta as Record<string, unknown> | undefined;
+  const nodeFieldsRaw = meta?.node_fields as string[] | undefined;
+
+  if (!nodeFieldsRaw) {
     throw new Error(
       `Invalid heapsnapshot format: missing 'snapshot.meta.node_fields' in ${absolutePath}`
     );
@@ -88,7 +94,7 @@ export function parseSnapshot(filePath) {
     );
   }
 
-  const nodeFields = data.snapshot.meta.node_fields;
+  const nodeFields: string[] = nodeFieldsRaw;
   const nodeFieldCount = nodeFields.length;
 
   // Dynamically find required field indices
@@ -97,7 +103,7 @@ export function parseSnapshot(filePath) {
   const selfSizeIdx = nodeFields.indexOf('self_size');
 
   // Validate required fields exist
-  for (const [field, idx] of [['name', nameIdx], ['self_size', selfSizeIdx]]) {
+  for (const [field, idx] of [['name', nameIdx], ['self_size', selfSizeIdx]] as const) {
     if (idx === -1) {
       throw new Error(
         `Invalid heapsnapshot format: missing required field '${field}' in node_fields metadata`
@@ -105,15 +111,15 @@ export function parseSnapshot(filePath) {
     }
   }
 
-  const nodes = data.nodes;
-  const strings = data.strings;
+  const nodes = data.nodes as number[];
+  const strings = data.strings as string[];
 
   // Also extract node types array for type resolution
-  const nodeTypes = data.snapshot.meta.node_types;
-  const typeNames = Array.isArray(nodeTypes?.[0]) ? nodeTypes[0] : [];
+  const nodeTypes = meta?.node_types as (string[] | string)[] | undefined;
+  const typeNames: string[] = Array.isArray(nodeTypes?.[0]) ? nodeTypes![0] as string[] : [];
 
   // Build per-constructor size map
-  const typeMap = new Map();
+  const typeMap = new Map<string, ConstructorStats>();
 
   for (let i = 0; i < nodes.length; i += nodeFieldCount) {
     const nameIndex = nodes[i + nameIdx];
@@ -139,19 +145,21 @@ export function parseSnapshot(filePath) {
 /**
  * Compute diff between two parsed snapshot type maps.
  *
- * Returns an array of objects sorted by size delta (descending):
- * { name, nodeType, sizeDelta, countDelta, currentSize, currentCount }
- *
+ * Returns an array of objects sorted by size delta (descending).
  * Filters out system types and noise below NOISE_FLOOR_BYTES.
  */
-export function diffSnapshots(map1, map2, options = {}) {
+export function diffSnapshots(
+  map1: Map<string, ConstructorStats>,
+  map2: Map<string, ConstructorStats>,
+  options: DiffOptions = {},
+): DiffEntry[] {
   const {
     topK = 15,
     filterSystem = true,
     noiseFloor = NOISE_FLOOR_BYTES,
   } = options;
 
-  const diffs = [];
+  const diffs: DiffEntry[] = [];
 
   // Check all types in the newer snapshot
   for (const [name, stats2] of map2) {
@@ -209,7 +217,7 @@ const GENERIC_TYPES = new Set([
 ]);
 
 // ── User-code name patterns (high-signal) ──
-const USER_NAME_PATTERNS = [
+const USER_NAME_PATTERNS: RegExp[] = [
   /^[A-Z][a-z]/, // PascalCase user constructors
   /Handler$/, /Manager$/, /Service$/, /Context$/,
   /Controller$/, /Provider$/, /Factory$/, /Listener$/,
@@ -217,14 +225,12 @@ const USER_NAME_PATTERNS = [
 
 /**
  * Compute an actionability score for a single anomaly.
- *
  * Higher = more useful to show the developer.
- *
- * @param {Object} anomaly - A diff entry
- * @param {Object} [retainerInfo] - Optional retainer chain info
- * @returns {number}
  */
-export function computeActionabilityScore(anomaly, retainerInfo = null) {
+export function computeActionabilityScore(
+  anomaly: DiffEntry,
+  retainerInfo: RetainerResult | null = null,
+): number {
   let score = 0;
 
   // Base: raw size delta normalized (1 point per 10KB)
@@ -259,23 +265,19 @@ export function computeActionabilityScore(anomaly, retainerInfo = null) {
 
 /**
  * Re-rank anomalies by actionability rather than raw size delta.
- *
- * This is a post-processing layer: the raw diff output stays unchanged.
- * The display/LLM summary uses this ranked version.
- *
- * @param {Array} diffs - Output of diffSnapshots()
- * @param {Array} [retainerResults] - Output of walkRetainers()
- * @returns {Array} Re-ranked diffs with actionabilityScore added
  */
-export function rankAnomalies(diffs, retainerResults = []) {
-  const retainerMap = new Map();
+export function rankAnomalies(
+  diffs: DiffEntry[],
+  retainerResults: RetainerResult[] = [],
+): RankedDiffEntry[] {
+  const retainerMap = new Map<string, RetainerResult>();
   for (const r of retainerResults) {
     retainerMap.set(r.anomaly, r);
   }
 
-  const scored = diffs.map(d => ({
+  const scored: RankedDiffEntry[] = diffs.map(d => ({
     ...d,
-    actionabilityScore: computeActionabilityScore(d, retainerMap.get(d.name)),
+    actionabilityScore: computeActionabilityScore(d, retainerMap.get(d.name) ?? null),
   }));
 
   scored.sort((a, b) => b.actionabilityScore - a.actionabilityScore);
@@ -284,14 +286,12 @@ export function rankAnomalies(diffs, retainerResults = []) {
 
 /**
  * Run diff as standalone CLI tool.
- *
- * Usage: node diff.mjs <snapshot1.heapsnapshot> <snapshot2.heapsnapshot> [--json output.json] [--top K]
  */
-function main() {
+function main(): void {
   const args = process.argv.slice(2);
 
   if (args.length < 2) {
-    console.error('Usage: node diff.mjs <snapshot1> <snapshot2> [--json output.json] [--top K]');
+    console.error('Usage: node diff.js <snapshot1> <snapshot2> [--json output.json] [--top K]');
     process.exit(1);
   }
 
@@ -299,7 +299,7 @@ function main() {
   const file2 = args[1];
 
   // Parse optional flags
-  let jsonOutput = null;
+  let jsonOutput: string | null = null;
   let topK = 15;
 
   for (let i = 2; i < args.length; i++) {
@@ -340,7 +340,7 @@ function main() {
     console.log(`JSON summary written to: ${jsonOutput}`);
   }
 
-  // Print raw diff to stdout (render.mjs handles pretty formatting)
+  // Print raw diff to stdout
   console.log(JSON.stringify(diffs, null, 2));
 }
 

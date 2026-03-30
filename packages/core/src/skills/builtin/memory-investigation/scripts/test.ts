@@ -1,13 +1,14 @@
 /**
- * test.mjs — Unit Tests for Heapsnapshot Memory Leak Detection POC
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * test.ts — Unit Tests for Heapsnapshot Memory Leak Detection POC
  *
  * 45 isolated, pure-function tests using node:test + node:assert.
  * Zero file-system dependencies — all test data is constructed in-memory.
  * No silent skips — every test either passes or fails deterministically.
  *
- * Run: node --test test.mjs
- *
- * @license Apache-2.0
+ * Run: node --test dist/test.js
  */
 
 import { describe, it } from 'node:test';
@@ -17,24 +18,33 @@ import path from 'node:path';
 import os from 'node:os';
 
 // ── Import modules under test ──
-import { parseSnapshot, diffSnapshots } from './diff.mjs';
-import { convertToTraceEvents } from './trace.mjs';
-// render.mjs exports renderTable — we test it via stdout capture
-// capture.mjs requires real inspector session — tested via mock
+import { parseSnapshot, diffSnapshots, computeActionabilityScore, rankAnomalies } from './diff.js';
+import { convertToTraceEvents } from './trace.js';
+import { formatSize, formatAbsSize, formatCount, getColor } from './render.js';
+import { buildNodeIndex, buildReverseEdgeMap, findRepresentativeNodes, walkRetainers } from './retainers.js';
+import type { ConstructorStats, DiffEntry, HeapSnapshot } from './types.js';
 
 // ── Test Helpers ──
+
+interface SyntheticConstructor {
+  name: string;
+  selfSize: number;
+  type?: string;
+  count?: number;
+}
 
 /**
  * Create a minimal valid V8 heapsnapshot JSON structure.
  * This synthetic snapshot has deterministic, controllable content.
- *
- * @param {Array<{name: string, selfSize: number, type?: string}>} constructors
- * @returns {Object} V8 heapsnapshot-compatible JSON object
  */
-function createSyntheticSnapshot(constructors) {
-  const strings = [''];  // index 0 = empty string
+function createSyntheticSnapshot(constructors: SyntheticConstructor[]): {
+  snapshot: { meta: { node_fields: string[]; node_types: string[][] } };
+  nodes: number[];
+  strings: string[];
+} {
+  const strings: string[] = [''];  // index 0 = empty string
   const nodeTypes = ['hidden', 'object', 'string', 'closure', 'regexp'];
-  const nodes = [];
+  const nodes: number[] = [];
 
   for (const ctor of constructors) {
     let nameIdx = strings.indexOf(ctor.name);
@@ -75,7 +85,7 @@ function createSyntheticSnapshot(constructors) {
  * Write a synthetic snapshot to a temp file and return its path.
  * Caller is responsible for cleanup.
  */
-function writeTempSnapshot(snapshotObj) {
+function writeTempSnapshot(snapshotObj: Record<string, unknown>): string {
   const tmpDir = os.tmpdir();
   const filename = `test_snapshot_${Date.now()}_${Math.random().toString(36).slice(2)}.heapsnapshot`;
   const filepath = path.join(tmpDir, filename);
@@ -106,9 +116,9 @@ describe('parseSnapshot', () => {
       assert.ok(result instanceof Map, 'should return a Map');
       assert.ok(result.has('RequestContext'), 'should contain RequestContext');
       assert.ok(result.has('Buffer'), 'should contain Buffer');
-      assert.equal(result.get('RequestContext').count, 2, 'RequestContext count should be 2');
-      assert.equal(result.get('RequestContext').selfSize, 2048 + 1024, 'RequestContext size should aggregate');
-      assert.equal(result.get('Buffer').selfSize, 4096, 'Buffer size should be 4096');
+      assert.equal(result.get('RequestContext')!.count, 2, 'RequestContext count should be 2');
+      assert.equal(result.get('RequestContext')!.selfSize, 2048 + 1024, 'RequestContext size should aggregate');
+      assert.equal(result.get('Buffer')!.selfSize, 4096, 'Buffer size should be 4096');
     } finally {
       fs.unlinkSync(filepath);
     }
@@ -151,13 +161,9 @@ describe('parseSnapshot', () => {
   });
 
   it('5. throws on oversized file exceeding 200MB limit', () => {
-    // We mock this by creating a real file check scenario
-    // parseSnapshot checks stat.size before reading — create a small file
-    // but verify the error message format matches the code path
     const snap = createSyntheticSnapshot([{ name: 'Tiny', selfSize: 1 }]);
     const filepath = writeTempSnapshot(snap);
     try {
-      // File is small enough to parse, just verify function completes
       const result = parseSnapshot(filepath);
       assert.ok(result instanceof Map, 'small file should parse successfully');
     } finally {
@@ -172,10 +178,10 @@ describe('parseSnapshot', () => {
 
 describe('diffSnapshots', () => {
   it('6. detects growth in a single constructor', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['RequestContext', { count: 10, selfSize: 10240, nodeType: 'object' }],
     ]);
-    const map2 = new Map([
+    const map2 = new Map<string, ConstructorStats>([
       ['RequestContext', { count: 50, selfSize: 51200, nodeType: 'object' }],
     ]);
     const diffs = diffSnapshots(map1, map2);
@@ -187,12 +193,12 @@ describe('diffSnapshots', () => {
   });
 
   it('7. filters out V8 system types when filterSystem=true', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['(system)', { count: 100, selfSize: 50000, nodeType: 'hidden' }],
       ['(compiled code)', { count: 50, selfSize: 25000, nodeType: 'hidden' }],
       ['UserClass', { count: 5, selfSize: 5000, nodeType: 'object' }],
     ]);
-    const map2 = new Map([
+    const map2 = new Map<string, ConstructorStats>([
       ['(system)', { count: 200, selfSize: 100000, nodeType: 'hidden' }],
       ['(compiled code)', { count: 100, selfSize: 50000, nodeType: 'hidden' }],
       ['UserClass', { count: 15, selfSize: 15000, nodeType: 'object' }],
@@ -204,10 +210,10 @@ describe('diffSnapshots', () => {
   });
 
   it('8. includes system types when filterSystem=false', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['(system)', { count: 100, selfSize: 50000, nodeType: 'hidden' }],
     ]);
-    const map2 = new Map([
+    const map2 = new Map<string, ConstructorStats>([
       ['(system)', { count: 200, selfSize: 100000, nodeType: 'hidden' }],
     ]);
     const diffs = diffSnapshots(map1, map2, { filterSystem: false, noiseFloor: 0 });
@@ -217,11 +223,11 @@ describe('diffSnapshots', () => {
   });
 
   it('9. applies noise floor — excludes sub-1KB changes', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['SmallObj', { count: 1, selfSize: 100, nodeType: 'object' }],
       ['BigObj', { count: 1, selfSize: 10000, nodeType: 'object' }],
     ]);
-    const map2 = new Map([
+    const map2 = new Map<string, ConstructorStats>([
       ['SmallObj', { count: 2, selfSize: 600, nodeType: 'object' }],    // +500B < 1KB
       ['BigObj', { count: 10, selfSize: 50000, nodeType: 'object' }],   // +40KB > 1KB
     ]);
@@ -232,8 +238,8 @@ describe('diffSnapshots', () => {
   });
 
   it('10. respects topK limit', () => {
-    const map1 = new Map();
-    const map2 = new Map();
+    const map1 = new Map<string, ConstructorStats>();
+    const map2 = new Map<string, ConstructorStats>();
     // Create 20 types with growth > 1KB
     for (let i = 0; i < 20; i++) {
       const name = `Type_${i}`;
@@ -243,7 +249,6 @@ describe('diffSnapshots', () => {
     const diffs = diffSnapshots(map1, map2, { topK: 5 });
 
     assert.equal(diffs.length, 5, 'should limit to topK=5');
-    // Verify sorting: first result should have largest delta
     assert.ok(
       Math.abs(diffs[0].sizeDelta) >= Math.abs(diffs[4].sizeDelta),
       'should be sorted by absolute sizeDelta descending'
@@ -251,23 +256,23 @@ describe('diffSnapshots', () => {
   });
 
   it('11. detects types that disappeared between snapshots', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['OldClass', { count: 100, selfSize: 100000, nodeType: 'object' }],
     ]);
-    const map2 = new Map();
+    const map2 = new Map<string, ConstructorStats>();
 
     const diffs = diffSnapshots(map1, map2);
 
     assert.ok(diffs.length >= 1, 'should detect disappeared type');
     const oldClassDiff = diffs.find(d => d.name === 'OldClass');
     assert.ok(oldClassDiff, 'should include OldClass');
-    assert.ok(oldClassDiff.sizeDelta < 0, 'sizeDelta should be negative');
-    assert.equal(oldClassDiff.currentSize, 0, 'currentSize should be 0');
-    assert.equal(oldClassDiff.currentCount, 0, 'currentCount should be 0');
+    assert.ok(oldClassDiff!.sizeDelta < 0, 'sizeDelta should be negative');
+    assert.equal(oldClassDiff!.currentSize, 0, 'currentSize should be 0');
+    assert.equal(oldClassDiff!.currentCount, 0, 'currentCount should be 0');
   });
 
   it('12. returns empty array when snapshots are identical', () => {
-    const map = new Map([
+    const map = new Map<string, ConstructorStats>([
       ['SameObj', { count: 10, selfSize: 500, nodeType: 'object' }],
     ]);
     const diffs = diffSnapshots(map, map);
@@ -283,7 +288,7 @@ describe('diffSnapshots', () => {
 describe('convertToTraceEvents', () => {
   const baseSummary = {
     timestamp: '2026-03-24T00:00:00.000Z',
-    snapshots: { count: 3, intervalMs: 5000, paths: [] },
+    snapshots: { count: 3, intervalMs: 5000, paths: [] as string[] },
     anomalies: [
       { name: 'RequestContext', sizeDelta: 40960, countDelta: 40, currentSize: 51200, currentCount: 50, nodeType: 'object' },
       { name: 'Buffer', sizeDelta: 20480, countDelta: 10, currentSize: 30720, currentCount: 20, nodeType: 'object' },
@@ -317,19 +322,17 @@ describe('convertToTraceEvents', () => {
     assert.equal(completeEvents.length, 2, 'should have 2 anomaly events');
     assert.equal(completeEvents[0].name, 'RequestContext', 'first anomaly should be RequestContext');
     assert.equal(completeEvents[0].cat, 'heap_analysis', 'category should be heap_analysis');
-    assert.ok(completeEvents[0].ts >= 0, 'timestamp should be non-negative');
-    assert.ok(completeEvents[0].dur > 0, 'duration should be positive');
-    assert.equal(completeEvents[0].args.size_delta_bytes, 40960, 'size_delta_bytes should match');
-    assert.equal(completeEvents[0].args.count_delta, 40, 'count_delta should match');
-    assert.equal(completeEvents[0].args.rank, 1, 'first anomaly should have rank 1');
+    assert.ok(completeEvents[0].ts! >= 0, 'timestamp should be non-negative');
+    assert.ok(completeEvents[0].dur! > 0, 'duration should be positive');
+    assert.equal(completeEvents[0].args!.size_delta_bytes, 40960, 'size_delta_bytes should match');
+    assert.equal(completeEvents[0].args!.count_delta, 40, 'count_delta should match');
+    assert.equal(completeEvents[0].args!.rank, 1, 'first anomaly should have rank 1');
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════
 // SUITE 4: formatSize / formatAbsSize / formatCount — Render Helpers
 // ═══════════════════════════════════════════════════════════════════
-
-import { formatSize, formatAbsSize, formatCount, getColor } from './render.mjs';
 
 describe('render helpers (formatSize)', () => {
   it('16. formats zero bytes correctly', () => {
@@ -386,19 +389,31 @@ describe('render helpers (formatCount, getColor, pad)', () => {
 // SUITE 7: buildNodeIndex — Retainer Chain Node Index
 // ═══════════════════════════════════════════════════════════════════
 
-import { buildNodeIndex, buildReverseEdgeMap, findRepresentativeNodes, walkRetainers } from './retainers.mjs';
+interface NodeSpec {
+  name: string;
+  type?: string;
+  selfSize?: number;
+  edgeCount?: number;
+  id?: number;
+}
+
+interface EdgeSpec {
+  type: string;
+  name?: string;
+  nameOrIndex?: number;
+  toNodeOrdinal: number;
+}
 
 /**
  * Create a synthetic snapshot WITH edges for retainer chain testing.
- * Builds a simple object graph: Root -> Parent -> Child
  */
-function createSnapshotWithEdges(nodeSpecs, edgeSpecs) {
+function createSnapshotWithEdges(nodeSpecs: NodeSpec[], edgeSpecs: EdgeSpec[]): HeapSnapshot {
   const nodeTypes = ['synthetic', 'object', 'string', 'closure', 'hidden'];
   const edgeTypes = ['context', 'element', 'property', 'internal', 'hidden', 'shortcut', 'weak'];
-  const strings = [''];
-  const nodes = [];
+  const strings: string[] = [''];
+  const nodes: number[] = [];
 
-  function getStringIdx(s) {
+  function getStringIdx(s: string): number {
     let idx = strings.indexOf(s);
     if (idx === -1) { idx = strings.length; strings.push(s); }
     return idx;
@@ -422,10 +437,10 @@ function createSnapshotWithEdges(nodeSpecs, edgeSpecs) {
   }
 
   // Build edges
-  const edges = [];
+  const edges: number[] = [];
   for (const spec of edgeSpecs) {
     const typeIdx = edgeTypes.indexOf(spec.type);
-    const nameOrIndex = spec.type === 'element' ? spec.nameOrIndex : getStringIdx(spec.name || '');
+    const nameOrIndex = spec.type === 'element' ? (spec.nameOrIndex ?? 0) : getStringIdx(spec.name || '');
     edges.push(
       typeIdx >= 0 ? typeIdx : 0,
       nameOrIndex,
@@ -463,7 +478,7 @@ describe('buildNodeIndex', () => {
 
   it('25. throws on missing node_fields', () => {
     assert.throws(
-      () => buildNodeIndex({ snapshot: { meta: {} }, nodes: [], strings: [] }),
+      () => buildNodeIndex({ snapshot: { meta: { node_fields: undefined as unknown as string[], edge_fields: [] } }, nodes: [], edges: [], strings: [] } as unknown as HeapSnapshot),
       /node_fields/
     );
   });
@@ -471,9 +486,9 @@ describe('buildNodeIndex', () => {
   it('26. throws on missing edge_fields', () => {
     assert.throws(
       () => buildNodeIndex({
-        snapshot: { meta: { node_fields: ['type', 'name', 'id', 'self_size', 'edge_count'] } },
-        nodes: [], strings: []
-      }),
+        snapshot: { meta: { node_fields: ['type', 'name', 'id', 'self_size', 'edge_count'], edge_fields: undefined as unknown as string[] } },
+        nodes: [], edges: [], strings: []
+      } as unknown as HeapSnapshot),
       /edge_fields/
     );
   });
@@ -493,9 +508,9 @@ describe('buildReverseEdgeMap', () => {
     const idx = buildNodeIndex(snap);
     const rev = buildReverseEdgeMap(snap, idx);
     assert.ok(rev.has(1), 'B (ordinal 1) should have reverse edges');
-    assert.equal(rev.get(1).length, 1);
-    assert.equal(rev.get(1)[0].fromOrdinal, 0);
-    assert.equal(rev.get(1)[0].edgeType, 'property');
+    assert.equal(rev.get(1)!.length, 1);
+    assert.equal(rev.get(1)![0].fromOrdinal, 0);
+    assert.equal(rev.get(1)![0].edgeType, 'property');
   });
 });
 
@@ -514,9 +529,9 @@ describe('findRepresentativeNodes', () => {
     const idx = buildNodeIndex(snap);
     const reps = findRepresentativeNodes(snap, ['Leak'], idx, 3);
     assert.ok(reps.has('Leak'));
-    assert.equal(reps.get('Leak').length, 2);
+    assert.equal(reps.get('Leak')!.length, 2);
     // Should be sorted by selfSize desc: ordinal 1 (500) first
-    assert.equal(reps.get('Leak')[0], 1);
+    assert.equal(reps.get('Leak')![0], 1);
   });
 
   it('29. respects limitPerType', () => {
@@ -528,7 +543,7 @@ describe('findRepresentativeNodes', () => {
     );
     const idx = buildNodeIndex(snap);
     const reps = findRepresentativeNodes(snap, ['X'], idx, 1);
-    assert.equal(reps.get('X').length, 1);
+    assert.equal(reps.get('X')!.length, 1);
   });
 
   it('30. returns empty for non-existent constructors', () => {
@@ -647,19 +662,19 @@ describe('walkRetainers', () => {
 
 describe('parser/diff boundary tests', () => {
   it('38. exact 1KB threshold — 1023B excluded, 1024B included', () => {
-    const map1 = new Map([['Edge', { count: 1, selfSize: 0, nodeType: 'object' }]]);
-    const map2a = new Map([['Edge', { count: 2, selfSize: 1023, nodeType: 'object' }]]);
-    const map2b = new Map([['Edge', { count: 2, selfSize: 1024, nodeType: 'object' }]]);
+    const map1 = new Map<string, ConstructorStats>([['Edge', { count: 1, selfSize: 0, nodeType: 'object' }]]);
+    const map2a = new Map<string, ConstructorStats>([['Edge', { count: 2, selfSize: 1023, nodeType: 'object' }]]);
+    const map2b = new Map<string, ConstructorStats>([['Edge', { count: 2, selfSize: 1024, nodeType: 'object' }]]);
     assert.equal(diffSnapshots(map1, map2a).length, 0, '1023B should be excluded');
     assert.equal(diffSnapshots(map1, map2b).length, 1, '1024B should be included');
   });
 
   it('39. negative growth anomalies are stable and sorted correctly', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['Shrink', { count: 100, selfSize: 100000, nodeType: 'object' }],
       ['Grow', { count: 1, selfSize: 0, nodeType: 'object' }],
     ]);
-    const map2 = new Map([
+    const map2 = new Map<string, ConstructorStats>([
       ['Shrink', { count: 10, selfSize: 10000, nodeType: 'object' }],
       ['Grow', { count: 50, selfSize: 50000, nodeType: 'object' }],
     ]);
@@ -670,11 +685,11 @@ describe('parser/diff boundary tests', () => {
   });
 
   it('40. mixed user and system anomalies — only user types in filtered output', () => {
-    const map1 = new Map([
+    const map1 = new Map<string, ConstructorStats>([
       ['UserClass', { count: 1, selfSize: 0, nodeType: 'object' }],
       ['system / Context', { count: 1, selfSize: 0, nodeType: 'hidden' }],
     ]);
-    const map2 = new Map([
+    const map2 = new Map<string, ConstructorStats>([
       ['UserClass', { count: 10, selfSize: 50000, nodeType: 'object' }],
       ['system / Context', { count: 100, selfSize: 500000, nodeType: 'hidden' }],
     ]);
@@ -690,13 +705,11 @@ describe('parser/diff boundary tests', () => {
 // SUITE 12: rankAnomalies — Actionable Anomaly Ranking
 // ═══════════════════════════════════════════════════════════════════
 
-import { computeActionabilityScore, rankAnomalies } from './diff.mjs';
-
 describe('rankAnomalies', () => {
   it('41. user constructors outrank generic runtime types', () => {
-    const diffs = [
-      { name: 'Object', sizeDelta: 100000, countDelta: 100, nodeType: 'object' },
-      { name: 'RequestContext', sizeDelta: 50000, countDelta: 50, nodeType: 'object' },
+    const diffs: DiffEntry[] = [
+      { name: 'Object', sizeDelta: 100000, countDelta: 100, nodeType: 'object', currentSize: 100000, currentCount: 100 },
+      { name: 'RequestContext', sizeDelta: 50000, countDelta: 50, nodeType: 'object', currentSize: 50000, currentCount: 50 },
     ];
     const ranked = rankAnomalies(diffs);
     assert.equal(ranked[0].name, 'RequestContext', 'user constructor should rank first');
@@ -704,9 +717,9 @@ describe('rankAnomalies', () => {
   });
 
   it('42. anomalies with retainer chains rank higher', () => {
-    const diffs = [
-      { name: 'TypeA', sizeDelta: 50000, countDelta: 50, nodeType: 'object' },
-      { name: 'TypeB', sizeDelta: 50000, countDelta: 50, nodeType: 'object' },
+    const diffs: DiffEntry[] = [
+      { name: 'TypeA', sizeDelta: 50000, countDelta: 50, nodeType: 'object', currentSize: 50000, currentCount: 50 },
+      { name: 'TypeB', sizeDelta: 50000, countDelta: 50, nodeType: 'object', currentSize: 50000, currentCount: 50 },
     ];
     const retainerResults = [
       { anomaly: 'TypeB', chains: [{ reachesRoot: true, score: 50, depth: 2, nodes: [] }] },
@@ -716,9 +729,9 @@ describe('rankAnomalies', () => {
   });
 
   it('43. fallback to size delta when no user constructors exist', () => {
-    const diffs = [
-      { name: 'Object', sizeDelta: 10000, countDelta: 10, nodeType: 'object' },
-      { name: 'Array', sizeDelta: 50000, countDelta: 50, nodeType: 'object' },
+    const diffs: DiffEntry[] = [
+      { name: 'Object', sizeDelta: 10000, countDelta: 10, nodeType: 'object', currentSize: 10000, currentCount: 10 },
+      { name: 'Array', sizeDelta: 50000, countDelta: 50, nodeType: 'object', currentSize: 50000, currentCount: 50 },
     ];
     const ranked = rankAnomalies(diffs);
     // Both are generic, so raw size delta should determine order
@@ -727,17 +740,17 @@ describe('rankAnomalies', () => {
 
   it('44. computeActionabilityScore returns positive for growing user type', () => {
     const score = computeActionabilityScore(
-      { name: 'EventHandler', sizeDelta: 20000, countDelta: 20, nodeType: 'object' }
+      { name: 'EventHandler', sizeDelta: 20000, countDelta: 20, nodeType: 'object', currentSize: 20000, currentCount: 20 }
     );
     assert.ok(score > 50, 'user constructor with growth should score > 50');
   });
 
   it('45. computeActionabilityScore penalizes generic types', () => {
     const genericScore = computeActionabilityScore(
-      { name: 'Object', sizeDelta: 50000, countDelta: 50, nodeType: 'object' }
+      { name: 'Object', sizeDelta: 50000, countDelta: 50, nodeType: 'object', currentSize: 50000, currentCount: 50 }
     );
     const userScore = computeActionabilityScore(
-      { name: 'RequestContext', sizeDelta: 50000, countDelta: 50, nodeType: 'object' }
+      { name: 'RequestContext', sizeDelta: 50000, countDelta: 50, nodeType: 'object', currentSize: 50000, currentCount: 50 }
     );
     assert.ok(userScore > genericScore, 'user type should score higher than generic');
   });

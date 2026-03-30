@@ -1,18 +1,16 @@
-/* global console, process, Buffer, URL, setTimeout, clearTimeout */
 /**
- * @license
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  *
- * cdp.mjs — Minimal CDP WebSocket client for heap snapshot capture.
+ * cdp.ts — Minimal CDP WebSocket client for heap snapshot capture.
  *
  * Zero external dependencies. Uses node:net + node:http + node:crypto.
  * Connects to a running Node.js process via --inspect, sends HeapProfiler
  * commands, streams snapshot chunks to a file.
  *
  * Usage:
- *   node cdp.mjs --port 9229 --output ./snapshot_cdp.heapsnapshot
- *   node cdp.mjs --port 9229 --output ./snapshot_cdp.heapsnapshot --timeout 300
+ *   node cdp.js --port 9229 --output ./snapshot_cdp.heapsnapshot
+ *   node cdp.js --port 9229 --output ./snapshot_cdp.heapsnapshot --timeout 300
  *
  * Target process must be launched with:
  *   node --inspect=127.0.0.1:9229 your-script.js
@@ -36,10 +34,10 @@ const { values: args } = parseArgs({
   strict: true,
 });
 
-const PORT = parseInt(args.port, 10);
-const HOST = args.host;
-const OUTPUT = args.output;
-const TIMEOUT_S = parseInt(args.timeout, 10);
+const PORT = parseInt(args.port!, 10);
+const HOST = args.host!;
+const OUTPUT = args.output!;
+const TIMEOUT_S = parseInt(args.timeout!, 10);
 
 // ---------- Security: Loopback-only enforcement ----------------------------
 
@@ -62,14 +60,14 @@ if (PORT < 1024) {
 
 // ---------- Step 1: Resolve WebSocket URL from /json/list -------------------
 
-function resolveWsUrl(host, port) {
+function resolveWsUrl(host: string, port: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const req = request(`http://${host}:${port}/json/list`, (res) => {
       let data = '';
-      res.on('data', (chunk) => (data += chunk));
+      res.on('data', (chunk: Buffer) => (data += chunk));
       res.on('end', () => {
         try {
-          const targets = JSON.parse(data);
+          const targets = JSON.parse(data) as Array<{ type?: string; webSocketDebuggerUrl?: string }>;
           const target = targets.find((t) => t.type === 'node') ?? targets[0];
           if (!target?.webSocketDebuggerUrl) {
             reject(new Error('No debuggable Node.js target found on port ' + port));
@@ -77,21 +75,26 @@ function resolveWsUrl(host, port) {
           }
           resolve(target.webSocketDebuggerUrl);
         } catch (e) {
-          reject(new Error('Failed to parse /json/list: ' + e.message));
+          reject(new Error('Failed to parse /json/list: ' + (e as Error).message));
         }
       });
     });
-    req.on('error', (e) => reject(new Error(`Inspector not reachable at ${host}:${port} — ${e.message}`)));
+    req.on('error', (e: Error) => reject(new Error(`Inspector not reachable at ${host}:${port} — ${e.message}`)));
     req.end();
   });
 }
 
 // ---------- Step 2: Minimal WebSocket handshake (RFC 6455) ------------------
 
-function buildHandshake(host, port, path) {
+interface HandshakeResult {
+  handshake: string;
+  expectedAccept: string;
+}
+
+function buildHandshake(host: string, port: string, wsPath: string): HandshakeResult {
   const key = randomBytes(16).toString('base64');
   const handshake = [
-    `GET ${path} HTTP/1.1`,
+    `GET ${wsPath} HTTP/1.1`,
     `Host: ${host}:${port}`,
     'Upgrade: websocket',
     'Connection: Upgrade',
@@ -106,27 +109,26 @@ function buildHandshake(host, port, path) {
 }
 
 // ---------- Step 3: Robust WebSocket frame parser ---------------------------
-// Handles: text frames (opcode 1), continuation frames (opcode 0),
-// close frames (opcode 8), ping frames (opcode 9).
-// V8 inspector sends large payloads that may be fragmented across
-// multiple WebSocket frames AND multiple TCP packets.
+
+interface WsFrame {
+  opcode: number;
+  fin: boolean;
+  payload: Buffer;
+}
+
+interface ParseResult {
+  frames: WsFrame[];
+  remaining: Buffer;
+}
 
 /**
  * Parse one or more complete WebSocket frames from a buffer.
- *
- * Returns an object with:
- * - frames: array of { opcode, fin, payload } for each complete frame
- * - remaining: leftover bytes not yet forming a complete frame
- *
- * This is the low-level parser. Message assembly (handling fragmentation)
- * is done by the caller.
  */
-function parseFrames(buffer) {
-  const frames = [];
+function parseFrames(buffer: Buffer): ParseResult {
+  const frames: WsFrame[] = [];
   let offset = 0;
 
   while (offset < buffer.length) {
-    // Need at least 2 bytes for the frame header
     if (buffer.length - offset < 2) break;
 
     const byte0 = buffer[offset];
@@ -144,16 +146,13 @@ function parseFrames(buffer) {
     } else if (payloadLen === 127) {
       headerLen += 8;
       if (buffer.length - offset < headerLen) break;
-      // For safety, read as BigInt then convert
       const bigLen = buffer.readBigUInt64BE(offset + 2);
       if (bigLen > BigInt(Number.MAX_SAFE_INTEGER)) {
-        // Frame too large to handle - skip it
         break;
       }
       payloadLen = Number(bigLen);
     }
 
-    // If server sent a masked frame, account for the 4-byte mask key
     if (masked) {
       headerLen += 4;
     }
@@ -161,7 +160,7 @@ function parseFrames(buffer) {
     const totalFrameLen = headerLen + payloadLen;
     if (buffer.length - offset < totalFrameLen) break;
 
-    let payload;
+    let payload: Buffer;
     if (masked) {
       const maskKey = buffer.slice(offset + headerLen - 4, offset + headerLen);
       payload = Buffer.alloc(payloadLen);
@@ -179,44 +178,45 @@ function parseFrames(buffer) {
   return { frames, remaining: buffer.slice(offset) };
 }
 
+// ---------- Message assembler -----------------------------------------------
+
+interface WsMessage {
+  _type: 'text' | 'close' | 'ping';
+  data?: string;
+  payload?: Buffer;
+}
+
 /**
  * Assembles complete WebSocket messages from a stream of frames.
  * Handles continuation frames (opcode 0) for fragmented messages.
  */
 class MessageAssembler {
-  constructor() {
-    this._fragments = [];
-    this._currentOpcode = -1;
-  }
+  private _fragments: Buffer[] = [];
+  private _currentOpcode = -1;
 
   /**
-   * Feed a parsed frame. Returns an array of complete text messages (strings).
+   * Feed a parsed frame. Returns an array of complete messages.
    */
-  feed(frame) {
-    const messages = [];
+  feed(frame: WsFrame): WsMessage[] {
+    const messages: WsMessage[] = [];
 
     if (frame.opcode >= 0x8) {
-      // Control frame (close=8, ping=9, pong=10) — handle inline
       if (frame.opcode === 8) {
         messages.push({ _type: 'close' });
       } else if (frame.opcode === 9) {
         messages.push({ _type: 'ping', payload: frame.payload });
       }
-      // Control frames don't affect fragmentation state
       return messages;
     }
 
     if (frame.opcode !== 0) {
-      // New data frame (text=1, binary=2)
       this._currentOpcode = frame.opcode;
       this._fragments = [frame.payload];
     } else {
-      // Continuation frame
       this._fragments.push(frame.payload);
     }
 
     if (frame.fin) {
-      // Message complete — assemble
       if (this._currentOpcode === 1) {
         const fullPayload = Buffer.concat(this._fragments);
         messages.push({ _type: 'text', data: fullPayload.toString('utf8') });
@@ -231,15 +231,15 @@ class MessageAssembler {
 
 // ---------- Step 4: Send MASKED WS text frame (RFC 6455 Section 5.1) --------
 
-function buildTextFrame(text) {
+function buildTextFrame(text: string): Buffer {
   const payload = Buffer.from(text, 'utf8');
   const len = payload.length;
   const maskKey = randomBytes(4);
-  let header;
+  let header: Buffer;
   if (len < 126) {
     header = Buffer.alloc(2);
-    header[0] = 0x81; // FIN + opcode=text
-    header[1] = 0x80 | len; // MASK bit set + payload length
+    header[0] = 0x81;
+    header[1] = 0x80 | len;
   } else if (len < 65536) {
     header = Buffer.alloc(4);
     header[0] = 0x81;
@@ -260,7 +260,7 @@ function buildTextFrame(text) {
 
 // ---------- Step 5: Build Pong frame for keep-alive -------------------------
 
-function buildPongFrame(payload) {
+function buildPongFrame(payload?: Buffer): Buffer {
   const len = payload ? payload.length : 0;
   const maskKey = randomBytes(4);
   const header = Buffer.alloc(2);
@@ -269,14 +269,14 @@ function buildPongFrame(payload) {
   if (len === 0) return Buffer.concat([header, maskKey]);
   const masked = Buffer.alloc(len);
   for (let i = 0; i < len; i++) {
-    masked[i] = payload[i] ^ maskKey[i & 3];
+    masked[i] = payload![i] ^ maskKey[i & 3];
   }
   return Buffer.concat([header, maskKey, masked]);
 }
 
 // ---------- Main capture flow -----------------------------------------------
 
-async function captureCdpSnapshot() {
+async function captureCdpSnapshot(): Promise<void> {
   console.log(`[cdp] Connecting to ${HOST}:${PORT}...`);
   console.log(`[cdp] Timeout: ${TIMEOUT_S}s`);
 
@@ -285,7 +285,7 @@ async function captureCdpSnapshot() {
 
   console.log(`[cdp] Target: ${urlObj.pathname}`);
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const sock = createConnection({ host: urlObj.hostname, port: parseInt(urlObj.port, 10) });
     const { handshake, expectedAccept } = buildHandshake(urlObj.hostname, urlObj.port, urlObj.pathname);
 
@@ -297,12 +297,12 @@ async function captureCdpSnapshot() {
     let chunkCount = 0;
     let totalBytes = 0;
 
-    function send(method, params = {}) {
+    function send(method: string, params: Record<string, unknown> = {}): void {
       const msg = JSON.stringify({ id: msgId++, method, params });
       sock.write(buildTextFrame(msg));
     }
 
-    function cleanup() {
+    function cleanup(): void {
       clearTimeout(timeoutHandle);
       sock.destroy();
     }
@@ -317,7 +317,7 @@ async function captureCdpSnapshot() {
 
     sock.on('connect', () => sock.write(handshake));
 
-    sock.on('data', (chunk) => {
+    sock.on('data', (chunk: Buffer) => {
       if (!handshakeDone) {
         const text = chunk.toString();
         if (!text.includes('101')) { cleanup(); reject(new Error('WS upgrade failed')); return; }
@@ -350,8 +350,8 @@ async function captureCdpSnapshot() {
           }
           if (m._type !== 'text') continue;
 
-          let msg;
-          try { msg = JSON.parse(m.data); } catch { continue; }
+          let msg: Record<string, unknown>;
+          try { msg = JSON.parse(m.data!) as Record<string, unknown>; } catch { continue; }
 
           // HeapProfiler.enable ack → take snapshot
           if (msg.id === 1 && !msg.error) {
@@ -362,14 +362,14 @@ async function captureCdpSnapshot() {
           // HeapProfiler.enable error
           if (msg.id === 1 && msg.error) {
             cleanup();
-            reject(new Error('HeapProfiler.enable failed: ' + msg.error.message));
+            reject(new Error('HeapProfiler.enable failed: ' + (msg.error as { message: string }).message));
             return;
           }
 
           // Snapshot chunk events
           if (msg.method === 'HeapProfiler.addHeapSnapshotChunk') {
             chunkCount++;
-            const chunkData = msg.params.chunk;
+            const chunkData = (msg.params as { chunk: string }).chunk;
             totalBytes += chunkData.length;
             writer.write(chunkData);
             if (chunkCount % 200 === 0) {
@@ -379,20 +379,19 @@ async function captureCdpSnapshot() {
 
           // Progress events (informational)
           if (msg.method === 'HeapProfiler.reportHeapSnapshotProgress') {
-            if (msg.params?.finished) {
+            const params = msg.params as { finished?: boolean } | undefined;
+            if (params?.finished) {
               process.stdout.write(`\r[cdp] Snapshot generation complete.                    \n`);
             }
           }
 
-          // takeHeapSnapshot response (id=2) — this is the authoritative completion signal
+          // takeHeapSnapshot response (id=2)
           if (msg.id === 2) {
             if (msg.error) {
               cleanup();
-              reject(new Error('CDP error: ' + msg.error.message));
+              reject(new Error('CDP error: ' + (msg.error as { message: string }).message));
               return;
             }
-            // The response with id=2 means V8 has finished sending all chunks.
-            // No need to wait for a progress event.
             process.stdout.write(`\r[cdp] Total: ${chunkCount} chunks, ${(totalBytes / 1024 / 1024).toFixed(1)} MB\n`);
             writer.end(() => {
               console.log(`[cdp] Snapshot written to ${OUTPUT}`);
@@ -405,19 +404,18 @@ async function captureCdpSnapshot() {
       }
     });
 
-    sock.on('error', (e) => {
+    sock.on('error', (e: Error) => {
       cleanup();
       reject(new Error('[cdp] Socket error: ' + e.message));
     });
 
     sock.on('close', () => {
-      // If we get here without resolving, the server closed unexpectedly
       clearTimeout(timeoutHandle);
     });
   });
 }
 
-captureCdpSnapshot().catch((e) => {
+captureCdpSnapshot().catch((e: Error) => {
   console.error('[cdp] FATAL:', e.message);
   process.exit(1);
 });

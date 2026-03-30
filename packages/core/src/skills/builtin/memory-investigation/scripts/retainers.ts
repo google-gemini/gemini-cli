@@ -1,6 +1,8 @@
-/* global console, process, URL */
 /**
- * retainers.mjs — Retainer Chain Walker for V8 Heap Snapshots
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * retainers.ts — Retainer Chain Walker for V8 Heap Snapshots
  *
  * Performs backward BFS from anomalous constructor instances through
  * the edge graph to identify why objects survive garbage collection.
@@ -9,12 +11,21 @@
  * hardcodes V8 offsets.
  *
  * Zero external dependencies. Requires Node.js >= 20.
- *
- * @license Apache-2.0
  */
 
+import path from 'node:path';
+import type {
+  HeapSnapshot,
+  NodeIndex,
+  RetainerChain,
+  RetainerResult,
+  RetainerStep,
+  ReverseEdge,
+  WalkRetainersOptions,
+} from './types.js';
+
 // ── Edge type priority for traversal ordering ──
-const EDGE_PRIORITY = {
+const EDGE_PRIORITY: Record<string, number> = {
   context: 0,
   property: 1,
   element: 2,
@@ -24,7 +35,7 @@ const EDGE_PRIORITY = {
 };
 
 // ── Heuristic patterns for user-code names ──
-const USER_CODE_PATTERNS = [
+const USER_CODE_PATTERNS: RegExp[] = [
   /^[A-Z][a-z]/, // PascalCase constructors
   /Handler$/,
   /Manager$/,
@@ -39,18 +50,8 @@ const USER_CODE_PATTERNS = [
 
 /**
  * Build a node index from a raw V8 heap snapshot.
- *
- * Returns an object with:
- * - nodeCount: total number of nodes
- * - stride: fields per node
- * - field offsets for type, name, id, self_size, edge_count
- * - nodeTypes: array of type name strings
- * - the raw arrays (nodes, edges, strings) for downstream use
- *
- * @param {Object} snapshot - Parsed V8 .heapsnapshot JSON
- * @returns {Object} nodeIndex
  */
-export function buildNodeIndex(snapshot) {
+export function buildNodeIndex(snapshot: HeapSnapshot): NodeIndex {
   const meta = snapshot.snapshot?.meta;
   if (!meta?.node_fields) {
     throw new Error('Invalid snapshot: missing snapshot.meta.node_fields');
@@ -88,8 +89,8 @@ export function buildNodeIndex(snapshot) {
   }
 
   // Resolve type name arrays
-  const nodeTypes = Array.isArray(meta.node_types?.[0]) ? meta.node_types[0] : [];
-  const edgeTypes = Array.isArray(meta.edge_types?.[0]) ? meta.edge_types[0] : [];
+  const nodeTypes: string[] = Array.isArray(meta.node_types?.[0]) ? meta.node_types![0] as string[] : [];
+  const edgeTypes: string[] = Array.isArray(meta.edge_types?.[0]) ? meta.edge_types![0] as string[] : [];
 
   const nodes = snapshot.nodes;
   const edges = snapshot.edges;
@@ -97,9 +98,7 @@ export function buildNodeIndex(snapshot) {
   const nodeCount = nodes.length / nodeStride;
 
   // Build per-node metadata: firstEdgeOffset
-  // V8 stores edges contiguously; each node's edges start right after
-  // the previous node's edges.
-  const firstEdgeOffsets = new Array(nodeCount);
+  const firstEdgeOffsets: number[] = new Array(nodeCount);
   let edgeCursor = 0;
   for (let i = 0; i < nodeCount; i++) {
     firstEdgeOffsets[i] = edgeCursor;
@@ -130,12 +129,8 @@ export function buildNodeIndex(snapshot) {
 
 /**
  * Resolve a human-readable name for a node at a given ordinal.
- *
- * @param {Object} nodeIndex
- * @param {number} ordinal
- * @returns {string}
  */
-function resolveNodeName(nodeIndex, ordinal) {
+function resolveNodeName(nodeIndex: NodeIndex, ordinal: number): string {
   const { nodes, strings, nodeStride, nameOff, typeOff, nodeTypes } = nodeIndex;
   const offset = ordinal * nodeStride;
   const name = strings[nodes[offset + nameOff]] || '';
@@ -148,28 +143,9 @@ function resolveNodeName(nodeIndex, ordinal) {
 }
 
 /**
- * Get the self_size of a node at a given ordinal.
- *
- * @param {Object} nodeIndex
- * @param {number} ordinal
- * @returns {number}
- */
-function getNodeSelfSize(nodeIndex, ordinal) {
-  const { nodes, nodeStride, selfSizeOff } = nodeIndex;
-  return nodes[ordinal * nodeStride + selfSizeOff];
-}
-
-/**
  * Check if a node looks like a GC root or synthetic root.
- *
- * Node ordinal 0 is typically the synthetic root in V8 snapshots.
- * Nodes with type "synthetic" are also roots.
- *
- * @param {Object} nodeIndex
- * @param {number} ordinal
- * @returns {boolean}
  */
-function isRootLike(nodeIndex, ordinal) {
+function isRootLike(nodeIndex: NodeIndex, ordinal: number): boolean {
   if (ordinal === 0) return true;
 
   const { nodes, nodeStride, typeOff, nodeTypes } = nodeIndex;
@@ -184,19 +160,18 @@ function isRootLike(nodeIndex, ordinal) {
 /**
  * Build a reverse edge map: for each target node ordinal, store
  * the list of edges that point TO it.
- *
- * @param {Object} snapshot - Parsed V8 .heapsnapshot JSON
- * @param {Object} nodeIndex - Output of buildNodeIndex()
- * @returns {Map<number, Array<{fromOrdinal: number, toOrdinal: number, edgeType: string, edgeName: string}>>}
  */
-export function buildReverseEdgeMap(snapshot, nodeIndex) {
+export function buildReverseEdgeMap(
+  snapshot: HeapSnapshot,
+  nodeIndex: NodeIndex,
+): Map<number, ReverseEdge[]> {
   const {
     nodeCount, nodeStride, edgeStride,
     edgeCountOff, edgeTypeOff, edgeNameOrIndexOff, edgeToNodeOff,
     edgeTypes, nodes, edges, strings, firstEdgeOffsets,
   } = nodeIndex;
 
-  const reverseMap = new Map();
+  const reverseMap = new Map<number, ReverseEdge[]>();
 
   for (let fromOrdinal = 0; fromOrdinal < nodeCount; fromOrdinal++) {
     const nodeOffset = fromOrdinal * nodeStride;
@@ -210,8 +185,7 @@ export function buildReverseEdgeMap(snapshot, nodeIndex) {
       const edgeType = edgeTypeId >= 0 && edgeTypeId < edgeTypes.length
         ? edgeTypes[edgeTypeId] : 'unknown';
 
-      // to_node is stored as a byte offset into the nodes array;
-      // convert to ordinal by dividing by nodeStride
+      // to_node is stored as a byte offset into the nodes array
       const toNodeByteOffset = edges[edgeOffset + edgeToNodeOff];
       const toOrdinal = toNodeByteOffset / nodeStride;
 
@@ -219,8 +193,6 @@ export function buildReverseEdgeMap(snapshot, nodeIndex) {
       let edgeName = '';
       if (edgeNameOrIndexOff !== -1) {
         const nameOrIndex = edges[edgeOffset + edgeNameOrIndexOff];
-        // For element edges, nameOrIndex is the array index number
-        // For named edges, nameOrIndex is a string table index
         if (edgeType === 'element' || edgeType === 'hidden') {
           edgeName = String(nameOrIndex);
         } else {
@@ -228,7 +200,7 @@ export function buildReverseEdgeMap(snapshot, nodeIndex) {
         }
       }
 
-      const entry = {
+      const entry: ReverseEdge = {
         fromOrdinal,
         toOrdinal,
         edgeType,
@@ -238,7 +210,7 @@ export function buildReverseEdgeMap(snapshot, nodeIndex) {
       if (!reverseMap.has(toOrdinal)) {
         reverseMap.set(toOrdinal, []);
       }
-      reverseMap.get(toOrdinal).push(entry);
+      reverseMap.get(toOrdinal)!.push(entry);
     }
   }
 
@@ -247,20 +219,16 @@ export function buildReverseEdgeMap(snapshot, nodeIndex) {
 
 /**
  * Find representative node ordinals for a set of constructor names.
- *
- * For each constructor, finds all matching nodes and returns the top
- * `limitPerType` by selfSize descending.
- *
- * @param {Object} snapshot - Parsed V8 .heapsnapshot JSON
- * @param {string[]} constructorNames - Constructor names to find
- * @param {Object} nodeIndex - Output of buildNodeIndex()
- * @param {number} [limitPerType=3] - Max nodes per constructor
- * @returns {Map<string, number[]>} Map of constructor -> ordinal[]
  */
-export function findRepresentativeNodes(snapshot, constructorNames, nodeIndex, limitPerType = 3) {
+export function findRepresentativeNodes(
+  snapshot: HeapSnapshot,
+  constructorNames: string[],
+  nodeIndex: NodeIndex,
+  limitPerType: number = 3,
+): Map<string, number[]> {
   const { nodeCount, nodeStride, nameOff, selfSizeOff, nodes, strings } = nodeIndex;
   const targetSet = new Set(constructorNames);
-  const candidates = new Map(); // name -> [{ordinal, selfSize}]
+  const candidates = new Map<string, { ordinal: number; selfSize: number }[]>();
 
   for (let ordinal = 0; ordinal < nodeCount; ordinal++) {
     const offset = ordinal * nodeStride;
@@ -273,14 +241,14 @@ export function findRepresentativeNodes(snapshot, constructorNames, nodeIndex, l
     if (!candidates.has(name)) {
       candidates.set(name, []);
     }
-    candidates.get(name).push({ ordinal, selfSize });
+    candidates.get(name)!.push({ ordinal, selfSize });
   }
 
-  const result = new Map();
-  for (const [name, nodes_list] of candidates) {
+  const result = new Map<string, number[]>();
+  for (const [name, nodesList] of candidates) {
     // Sort by selfSize descending, take top limitPerType
-    nodes_list.sort((a, b) => b.selfSize - a.selfSize);
-    result.set(name, nodes_list.slice(0, limitPerType).map(n => n.ordinal));
+    nodesList.sort((a, b) => b.selfSize - a.selfSize);
+    result.set(name, nodesList.slice(0, limitPerType).map(n => n.ordinal));
   }
 
   return result;
@@ -288,20 +256,8 @@ export function findRepresentativeNodes(snapshot, constructorNames, nodeIndex, l
 
 /**
  * Score a retainer chain using a deterministic heuristic.
- *
- * Scoring:
- *   +40 if chain reaches root
- *   +20 if contains 'context' edge
- *   +15 if contains 'property' edge
- *   +10 if path names look like user-code names
- *   -20 if mostly internal/hidden edges
- *   -10 per extra hop after depth 3
- *
- * @param {Object} chain
- * @param {boolean} reachesRoot
- * @returns {number}
  */
-function scoreChain(chain, reachesRoot) {
+function scoreChain(chain: RetainerStep[], reachesRoot: boolean): number {
   let score = 0;
 
   if (reachesRoot) score += 40;
@@ -336,22 +292,24 @@ function scoreChain(chain, reachesRoot) {
   return score;
 }
 
+/** BFS queue entry for retainer chain walking. */
+interface BfsEntry {
+  ordinal: number;
+  path: RetainerStep[];
+  visited: Set<number>;
+}
+
 /**
  * Walk retainer chains for a set of anomaly constructor names.
  *
  * Performs backward BFS from representative instances of each
  * constructor, building reference paths from GC root to leaked object.
- *
- * @param {Object} snapshot - Parsed V8 .heapsnapshot JSON
- * @param {string[]} constructorNames - Anomaly constructor names
- * @param {Object} [options]
- * @param {number} [options.maxDepth=5] - Maximum chain depth
- * @param {number} [options.maxChainsPerType=3] - Max chains per anomaly
- * @param {number} [options.limitPerType=3] - Max representative nodes
- * @param {boolean} [options.skipWeakEdges=true] - Skip weak reference edges
- * @returns {Array<{anomaly: string, chains: Array}>}
  */
-export function walkRetainers(snapshot, constructorNames, options = {}) {
+export function walkRetainers(
+  snapshot: HeapSnapshot,
+  constructorNames: string[],
+  options: WalkRetainersOptions = {},
+): RetainerResult[] {
   const {
     maxDepth = 5,
     maxChainsPerType = 3,
@@ -367,7 +325,7 @@ export function walkRetainers(snapshot, constructorNames, options = {}) {
   const reverseMap = buildReverseEdgeMap(snapshot, nodeIndex);
   const representatives = findRepresentativeNodes(snapshot, constructorNames, nodeIndex, limitPerType);
 
-  const results = [];
+  const results: RetainerResult[] = [];
 
   for (const constructorName of constructorNames) {
     const ordinals = representatives.get(constructorName);
@@ -379,27 +337,24 @@ export function walkRetainers(snapshot, constructorNames, options = {}) {
       continue;
     }
 
-    const allChains = [];
+    const allChains: RetainerChain[] = [];
 
     for (const startOrdinal of ordinals) {
-      // BFS backward from this node toward roots
-      // Each queue entry: { ordinal, path: [{from, edgeType, edgeName, to}], visited: Set }
-      const queue = [{
+      const queue: BfsEntry[] = [{
         ordinal: startOrdinal,
         path: [],
         visited: new Set([startOrdinal]),
       }];
 
-      // Safety bounds to prevent combinatorial explosion on large graphs
+      // Safety bounds to prevent combinatorial explosion
       const MAX_QUEUE_SIZE = 10000;
       const MAX_BRANCHES_PER_NODE = 3;
       let iterations = 0;
 
       while (queue.length > 0) {
-        // Hard stop if queue or iteration count grows too large
         if (iterations++ > MAX_QUEUE_SIZE || allChains.length >= maxChainsPerType * 3) break;
 
-        const current = queue.shift();
+        const current = queue.shift()!;
 
         // Check if we reached a root
         if (current.path.length > 0 && isRootLike(nodeIndex, current.ordinal)) {
@@ -416,7 +371,6 @@ export function walkRetainers(snapshot, constructorNames, options = {}) {
 
         // Check depth limit
         if (current.path.length >= maxDepth) {
-          // Record a truncated chain
           const reachesRoot = false;
           const score = scoreChain(current.path, reachesRoot);
           allChains.push({
@@ -441,7 +395,6 @@ export function walkRetainers(snapshot, constructorNames, options = {}) {
         let expanded = false;
         let branchCount = 0;
         for (const edge of sortedEdges) {
-          // Limit branches per node to prevent explosion
           if (branchCount >= MAX_BRANCHES_PER_NODE) break;
 
           // Skip weak edges if configured
@@ -453,7 +406,7 @@ export function walkRetainers(snapshot, constructorNames, options = {}) {
           const fromName = resolveNodeName(nodeIndex, edge.fromOrdinal);
           const toName = resolveNodeName(nodeIndex, current.ordinal);
 
-          const step = {
+          const step: RetainerStep = {
             from: fromName,
             edgeType: edge.edgeType,
             edgeName: edge.edgeName,
@@ -499,12 +452,10 @@ export function walkRetainers(snapshot, constructorNames, options = {}) {
 }
 
 // ── CLI entry point ──
-import path from 'node:path';
-
 const scriptPath = process.argv[1];
 const modulePath = new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1');
 if (scriptPath && path.resolve(scriptPath) === path.resolve(modulePath)) {
-  console.log('retainers.mjs — Retainer Chain Walker');
+  console.log('retainers.ts — Retainer Chain Walker');
   console.log('This module is designed to be imported, not run directly.');
   console.log('');
   console.log('Exports:');

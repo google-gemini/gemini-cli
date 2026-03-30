@@ -1,17 +1,18 @@
-/* global console, process, URL */
 /**
- * render.mjs — Terminal Table Renderer for Heap Diff Output
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Takes diff results (from diff.mjs) and renders a formatted, color-coded
+ * render.ts — Terminal Table Renderer for Heap Diff Output
+ *
+ * Takes diff results (from diff.ts) and renders a formatted, color-coded
  * table in the terminal using ANSI escape codes.
  *
  * Zero external dependencies.
- *
- * @license Apache-2.0
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import type { DiffEntry, RenderMeta, RetainerResult } from './types.js';
 
 // ANSI color codes
 const RESET = '\x1b[0m';
@@ -25,10 +26,8 @@ const WHITE = '\x1b[37m';
 
 /**
  * Format bytes to human-readable string with consistent width.
- * @param {number} bytes
- * @returns {string}
  */
-function formatSize(bytes) {
+export function formatSize(bytes: number): string {
   const abs = Math.abs(bytes);
   const sign = bytes >= 0 ? '+' : '-';
   if (abs === 0) return '     0 B';
@@ -39,10 +38,8 @@ function formatSize(bytes) {
 
 /**
  * Format absolute size (no sign prefix).
- * @param {number} bytes
- * @returns {string}
  */
-function formatAbsSize(bytes) {
+export function formatAbsSize(bytes: number): string {
   if (bytes === 0) return '0 B';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -51,20 +48,16 @@ function formatAbsSize(bytes) {
 
 /**
  * Format count with comma separators.
- * @param {number} n
- * @returns {string}
  */
-function formatCount(n) {
+export function formatCount(n: number): string {
   const sign = n >= 0 ? '+' : '';
   return sign + n.toLocaleString('en-US');
 }
 
 /**
  * Get color code based on size delta magnitude.
- * @param {number} sizeDelta
- * @returns {string}
  */
-function getColor(sizeDelta) {
+export function getColor(sizeDelta: number): string {
   if (sizeDelta > 1024 * 1024) return RED;      // > 1 MB growth = red
   if (sizeDelta > 100 * 1024) return YELLOW;     // > 100 KB growth = yellow
   if (sizeDelta < 0) return GREEN;               // shrinkage = green
@@ -73,34 +66,24 @@ function getColor(sizeDelta) {
 
 /**
  * Pad or truncate a string to a fixed width.
- * @param {string} str
- * @param {number} width
- * @returns {string}
  */
-function pad(str, width) {
+export function pad(str: string, width: number): string {
   if (str.length > width) return str.substring(0, width - 2) + '..';
   return str.padEnd(width);
 }
 
 /**
  * Right-align a string to a fixed width.
- * @param {string} str
- * @param {number} width
- * @returns {string}
  */
-function rpad(str, width) {
+export function rpad(str: string, width: number): string {
   if (str.length > width) return str.substring(0, width);
   return str.padStart(width);
 }
 
 /**
  * Render diff results as a formatted terminal table.
- *
- * @param {Array} diffs - Array of diff objects from diffSnapshots()
- * @param {Object} [meta] - Optional metadata (snapshot paths, timestamp)
  */
-export { formatSize, formatAbsSize, formatCount, getColor, pad, rpad };
-export function renderTable(diffs, meta = {}) {
+export function renderTable(diffs: DiffEntry[], meta: RenderMeta = {}): void {
   const {
     snapshot1 = 'snapshot_0',
     snapshot2 = 'snapshot_2',
@@ -176,15 +159,8 @@ export function renderTable(diffs, meta = {}) {
 
 /**
  * Render retainer chain paths as compact terminal output.
- *
- * Display rules:
- * - Top 2 anomaly types only
- * - Top 2 chains per anomaly
- * - Each chain as one compact path line
- *
- * @param {Array} retainerResults - Output from walkRetainers()
  */
-export function renderRetainerPaths(retainerResults) {
+export function renderRetainerPaths(retainerResults: RetainerResult[]): void {
   if (!retainerResults || retainerResults.length === 0) return;
 
   const hasAnyChains = retainerResults.some(r => r.chains && r.chains.length > 0);
@@ -203,8 +179,7 @@ export function renderRetainerPaths(retainerResults) {
     console.log(`${BOLD}${YELLOW}${result.anomaly}${RESET}`);
     const displayChains = result.chains.slice(0, 2);
 
-    for (let i = 0; i < displayChains.length; i++) {
-      const chain = displayChains[i];
+    for (const chain of displayChains) {
       const rootTag = chain.reachesRoot ? `${GREEN}[root]${RESET} ` : '';
       const scoreTag = `${DIM}(score: ${chain.score})${RESET}`;
 
@@ -229,21 +204,19 @@ export function renderRetainerPaths(retainerResults) {
 
 /**
  * Run as standalone CLI: reads JSON diff from file.
- *
- * Usage: node render.mjs <diff.json>
  */
-function main() {
+function main(): void {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error('Usage: node render.mjs <diff.json>');
+    console.error('Usage: node render.js <diff.json>');
     process.exit(1);
   }
 
   const diffPath = args[0];
   const raw = JSON.parse(fs.readFileSync(diffPath, 'utf-8'));
 
-  const diffs = raw.anomalies || raw;
-  const meta = {
+  const diffs: DiffEntry[] = raw.anomalies || raw;
+  const meta: RenderMeta = {
     snapshot1: raw.snapshot1 || 'snapshot_0',
     snapshot2: raw.snapshot2 || 'snapshot_2',
   };

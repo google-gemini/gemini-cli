@@ -1,38 +1,35 @@
 /**
- * capture.mjs — CDP Heap Snapshot Capturer
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * capture.ts — CDP Heap Snapshot Capturer
  *
  * Connects to the current Node.js process via inspector.Session,
  * triggers HeapProfiler.takeHeapSnapshot at timed intervals,
  * and streams snapshot data to disk.
  *
  * Zero external dependencies. Uses built-in node:inspector/promises.
- *
- * @license Apache-2.0
  */
 
 import inspector from 'node:inspector';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { CaptureOptions, SnapshotResult } from './types.js';
 
 /**
  * Capture a single heap snapshot from the current process.
- *
- * Uses the inspector.Session API to trigger HeapProfiler.takeHeapSnapshot.
- * Snapshot data arrives in chunks via HeapProfiler.addHeapSnapshotChunk events,
- * which are concatenated and written to disk.
- *
- * @param {inspector.Session} session - Connected inspector session
- * @param {string} outputPath - Path to write the .heapsnapshot file
- * @returns {Promise<{ path: string, sizeBytes: number }>}
  */
-export function takeSnapshot(session, outputPath) {
+export function takeSnapshot(
+  session: inspector.Session,
+  outputPath: string,
+): Promise<SnapshotResult> {
   return new Promise((resolve, reject) => {
-    let chunks = [];
+    let chunks: string[] | null = [];
     let totalSize = 0;
 
-    const onChunk = (message) => {
+    const onChunk = (message: inspector.InspectorNotification<{ chunk: string }>): void => {
       const chunk = message.params.chunk;
-      chunks.push(chunk);
+      chunks!.push(chunk);
       totalSize += chunk.length;
     };
 
@@ -42,7 +39,7 @@ export function takeSnapshot(session, outputPath) {
       reportProgress: false,
       treatGlobalObjectsAsRoots: true,
       captureNumericValue: false,
-    }, (err) => {
+    }, (err: Error | null) => {
       session.removeListener('HeapProfiler.addHeapSnapshotChunk', onChunk);
 
       if (err) {
@@ -51,7 +48,7 @@ export function takeSnapshot(session, outputPath) {
       }
 
       try {
-        const snapshotData = chunks.join('');
+        const snapshotData = chunks!.join('');
         chunks = null; // free memory
         fs.writeFileSync(outputPath, snapshotData);
         resolve({
@@ -59,7 +56,7 @@ export function takeSnapshot(session, outputPath) {
           sizeBytes: totalSize,
         });
       } catch (writeErr) {
-        reject(new Error(`Failed to write snapshot: ${writeErr.message}`));
+        reject(new Error(`Failed to write snapshot: ${(writeErr as Error).message}`));
       }
     });
   });
@@ -67,19 +64,15 @@ export function takeSnapshot(session, outputPath) {
 
 /**
  * Sleep for the specified number of milliseconds.
- * @param {number} ms
- * @returns {Promise<void>}
  */
-function sleep(ms) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
  * Format bytes to human-readable string.
- * @param {number} bytes
- * @returns {string}
  */
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -87,14 +80,8 @@ function formatBytes(bytes) {
 
 /**
  * Capture multiple heap snapshots at timed intervals.
- *
- * @param {Object} options
- * @param {number} [options.count=3] - Number of snapshots to capture
- * @param {number} [options.intervalMs=5000] - Milliseconds between captures
- * @param {string} [options.outputDir='./snapshots'] - Directory to save snapshots
- * @returns {Promise<string[]>} Array of snapshot file paths
  */
-export async function captureSnapshots(options = {}) {
+export async function captureSnapshots(options: CaptureOptions = {}): Promise<string[]> {
   const {
     count = 3,
     intervalMs = 5000,
@@ -111,7 +98,7 @@ export async function captureSnapshots(options = {}) {
   // Enable HeapProfiler domain
   session.post('HeapProfiler.enable');
 
-  const snapshotPaths = [];
+  const snapshotPaths: string[] = [];
 
   try {
     for (let i = 0; i < count; i++) {
@@ -139,10 +126,8 @@ export async function captureSnapshots(options = {}) {
 
 /**
  * Run as standalone CLI tool.
- *
- * Usage: node capture.mjs [--count N] [--interval MS] [--output DIR]
  */
-async function main() {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   let count = 3;
@@ -154,7 +139,7 @@ async function main() {
     else if (args[i] === '--interval' && args[i + 1]) intervalMs = parseInt(args[++i], 10);
     else if (args[i] === '--output' && args[i + 1]) outputDir = args[++i];
     else if (args[i] === '--help') {
-      console.log('Usage: node capture.mjs [--count N] [--interval MS] [--output DIR]');
+      console.log('Usage: node capture.js [--count N] [--interval MS] [--output DIR]');
       process.exit(0);
     }
   }
@@ -168,7 +153,7 @@ async function main() {
 const scriptPath = process.argv[1];
 const modulePath = new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1');
 if (scriptPath && path.resolve(scriptPath) === path.resolve(modulePath)) {
-  main().catch((err) => {
+  main().catch((err: Error) => {
     console.error(`Error: ${err.message}`);
     process.exit(1);
   });
