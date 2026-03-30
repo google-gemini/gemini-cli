@@ -439,7 +439,10 @@ The Gemini CLI ships with a set of default policies to provide a safe
 out-of-the-box experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
-- **MCP Read-only tools**: MCP tools that explicitly declare themselves as read-only via the `readOnlyHint` annotation are automatically allowed, but **only if tool sandboxing is enabled**. If sandboxing is disabled, they default to `ask_user`.
+- **MCP Read-only tools**: MCP tools that explicitly declare themselves as
+  read-only via the `readOnlyHint` annotation are automatically allowed, but
+  **only if tool sandboxing is enabled**. If sandboxing is disabled, they
+  default to `ask_user`.
 - **Agent delegation** defaults to **`ask_user`** to ensure remote agents can
   prompt for confirmation, but local sub-agent actions are executed silently and
   checked individually.

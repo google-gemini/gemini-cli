@@ -153,7 +153,8 @@ async function addMcpServer(
       sanitizationConfig: {
         enableEnvironmentVariableRedaction: true,
         allowedEnvironmentVariables: [],
-        blockedEnvironmentVariables: settings.merged.advanced?.excludedEnvVars ?? [],
+        blockedEnvironmentVariables:
+          settings.merged.advanced?.excludedEnvVars ?? [],
       },
       emitMcpDiagnostic: () => {},
       isTrustedFolder: () => true,

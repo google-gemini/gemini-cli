@@ -113,7 +113,9 @@ describe('mcp add command', () => {
         },
       });
 
-      const debugLoggerWarnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+      const debugLoggerWarnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
 
       await parser.parseAsync('add sandbox-server /path/to/server');
 
