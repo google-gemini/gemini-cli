@@ -89,8 +89,11 @@ export interface HookPayload {
  */
 export interface HookStartPayload extends HookPayload {
   /**
+   * The source of the hook configuration.
+   */
+  source?: string;
+  /**
    * The 1-based index of the current hook in the execution sequence.
-   * Used for progress indication (e.g. "Hook 1/3").
    */
   hookIndex?: number;
   /**

@@ -266,6 +266,7 @@ describe('BuiltinCommandLoader', () => {
 
   it('should include policies command when message bus integration is enabled', async () => {
     const mockConfigWithMessageBus = {
+      // eslint-disable-next-line @typescript-eslint/no-misused-spread
       ...mockConfig,
       getEnableHooks: () => false,
       getMcpEnabled: () => true,

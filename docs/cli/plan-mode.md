@@ -35,19 +35,19 @@ To launch Gemini CLI in Plan Mode once:
 To start Plan Mode while using Gemini CLI:
 
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle through approval modes
-  (`Default` -> `Auto-Edit` -> `Plan`).
+  (`Default` -> `Auto-Edit` -> `Plan`). Plan Mode is automatically removed from
+  the rotation when Gemini CLI is actively processing or showing confirmation
+  dialogs.
 
-  > **Note:** Plan Mode is automatically removed from the rotation when Gemini
-  > CLI is actively processing or showing confirmation dialogs.
-
-- **Command:** Type `/plan` in the input box.
+- **Command:** Type `/plan [goal]` in the input box. The `[goal]` is optional;
+  for example, `/plan implement authentication` will switch to Plan Mode and
+  immediately submit the prompt to the model.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
   calls the
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode) tool
-  to switch modes.
-  > **Note:** This tool is not available when Gemini CLI is in
-  > [YOLO mode](../reference/configuration.md#command-line-arguments).
+  to switch modes. This tool is not available when Gemini CLI is in
+  [YOLO mode](../reference/configuration.md#command-line-arguments).
 
 ## How to use Plan Mode
 
@@ -120,7 +120,8 @@ These are the only allowed tools:
   [`list_directory`](../tools/file-system.md#1-list_directory-readfolder),
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
-  [`google_web_search`](../tools/web-search.md)
+  [`google_web_search`](../tools/web-search.md),
+  [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),
   [`cli_help`](../core/subagents.md#cli-help-agent)
@@ -201,6 +202,7 @@ your specific environment.
 
 ```toml
 [[rule]]
+toolName = "*"
 mcpName = "*"
 toolAnnotations = { readOnlyHint = true }
 decision = "allow"
@@ -406,7 +408,9 @@ To build a custom planning workflow, you can use:
   [custom plan directories](#custom-plan-directory-and-policies) and
   [custom policies](#custom-policies).
 
-> **Note:** Use [Conductor] as a reference when building your own custom
+<!-- prettier-ignore -->
+> [!TIP]
+> Use [Conductor] as a reference when building your own custom
 > planning workflow.
 
 By using Plan Mode as its execution environment, your custom methodology can
@@ -458,6 +462,26 @@ Manual deletion also removes all associated artifacts:
 
 If you use a [custom plans directory](#custom-plan-directory-and-policies),
 those files are not automatically deleted and must be managed manually.
+
+## Non-interactive execution
+
+When running Gemini CLI in non-interactive environments (such as headless
+scripts or CI/CD pipelines), Plan Mode optimizes for automated workflows:
+
+- **Automatic transitions:** The policy engine automatically approves the
+  `enter_plan_mode` and `exit_plan_mode` tools without prompting for user
+  confirmation.
+- **Automated implementation:** When exiting Plan Mode to execute the plan,
+  Gemini CLI automatically switches to
+  [YOLO mode](../reference/policy-engine.md#approval-modes) instead of the
+  standard Default mode. This allows the CLI to execute the implementation steps
+  automatically without hanging on interactive tool approvals.
+
+**Example:**
+
+```bash
+gemini --approval-mode plan -p "Analyze telemetry and suggest improvements"
+```
 
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml

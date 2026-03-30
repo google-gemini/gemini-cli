@@ -125,9 +125,11 @@ You must complete several setup steps before enabling Google Cloud telemetry.
       }
       ```
 
-      > **Note:** This setting requires **Direct export** (in-process exporters)
-      > and cannot be used when `useCollector` is `true`. If both are enabled,
-      > telemetry will be disabled.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This setting requires **Direct export** (in-process exporters)
+> and cannot be used when `useCollector` is `true`. If both are enabled,
+> telemetry will be disabled.
 
 3.  Ensure your account or service account has these IAM roles:
     - Cloud Trace Agent
@@ -304,6 +306,7 @@ Emitted at startup with the CLI configuration.
 - `extension_ids` (string)
 - `extensions_count` (int)
 - `auth_type` (string)
+- `worktree_active` (boolean)
 - `github_workflow_name` (string, optional)
 - `github_repository_hash` (string, optional)
 - `github_event_name` (string, optional)
@@ -901,6 +904,20 @@ Logs keychain availability checks.
 
 - `available` (boolean)
 
+##### `gemini_cli.startup_stats`
+
+Logs detailed startup performance statistics.
+
+<details>
+<summary>Attributes</summary>
+
+- `phases` (json array of startup phases)
+- `os_platform` (string)
+- `os_release` (string)
+- `is_docker` (boolean)
+
+</details>
+
 </details>
 
 ### Metrics
@@ -916,6 +933,20 @@ Gemini CLI exports several custom metrics.
 ##### `gemini_cli.session.count`
 
 Incremented once per CLI startup.
+
+##### Onboarding
+
+Tracks onboarding flow from authentication to the user
+
+- `gemini_cli.onboarding.start` (Counter, Int): Incremented when the
+  authentication flow begins.
+
+- `gemini_cli.onboarding.success` (Counter, Int): Incremented when the user
+onboarding flow completes successfully.
+<details>
+<summary>Attributes (Success)</summary>
+
+- `user_tier` (string)
 
 ##### Tools
 

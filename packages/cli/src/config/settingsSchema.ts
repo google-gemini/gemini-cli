@@ -12,7 +12,9 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  AuthProviderType,
   type MCPServerConfig,
+  type RequiredMcpServerConfig,
   type BugCommandSettings,
   type TelemetrySettings,
   type AuthType,
@@ -259,7 +261,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+          'Enable run-event notifications for action-required prompts and session completion.',
         showInDialog: true,
       },
       checkpointing: {
@@ -298,7 +300,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description:
-              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory. A custom directory requires a policy to allow write access in Plan Mode.',
             showInDialog: true,
           },
           modelRouting: {
@@ -654,6 +656,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Hide the footer from the UI',
         showInDialog: true,
+      },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to collapse the UI drawer when a tool is awaiting confirmation.',
+        showInDialog: false,
       },
       showMemoryUsage: {
         type: 'boolean',
@@ -1039,6 +1051,62 @@ const SETTINGS_SCHEMA = {
           'Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.',
         showInDialog: false,
       },
+      modelDefinitions: {
+        type: 'object',
+        label: 'Model Definitions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        description:
+          'Registry of model metadata, including tier, family, and features.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelDefinition',
+        },
+      },
+      modelIdResolutions: {
+        type: 'object',
+        label: 'Model ID Resolutions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelIdResolutions,
+        description:
+          'Rules for resolving requested model names to concrete model IDs based on context.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelResolution',
+        },
+      },
+      classifierIdResolutions: {
+        type: 'object',
+        label: 'Classifier ID Resolutions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
+        description:
+          'Rules for resolving classifier tiers (flash, pro) to concrete model IDs.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelResolution',
+        },
+      },
+      modelChains: {
+        type: 'object',
+        label: 'Model Chains',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelChains,
+        description:
+          'Availability policy chains defining fallback behavior for models.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'array',
+          ref: 'ModelPolicyChain',
+        },
+      },
     },
   },
 
@@ -1117,6 +1185,19 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          allowedDomains: {
+            type: 'array',
+            label: 'Allowed Domains',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: ['github.com', '*.google.com', 'localhost'] as string[],
+            description: oneLine`
+              A list of allowed domains for the browser agent
+              (e.g., ["github.com", "*.google.com"]).
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
           disableUserInput: {
             type: 'boolean',
             label: 'Disable User Input',
@@ -1126,6 +1207,36 @@ const SETTINGS_SCHEMA = {
             description:
               'Disable user input on browser window during automation.',
             showInDialog: false,
+          },
+          maxActionsPerTask: {
+            type: 'number',
+            label: 'Max Actions Per Task',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 100,
+            description:
+              'The maximum number of tool calls allowed per browser task. Enforcement is hard: the agent will be terminated when the limit is reached.',
+            showInDialog: false,
+          },
+          confirmSensitiveActions: {
+            type: 'boolean',
+            label: 'Confirm Sensitive Actions',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Require manual confirmation for sensitive browser actions (e.g., fill_form, evaluate_script).',
+            showInDialog: true,
+          },
+          blockFileUploads: {
+            type: 'boolean',
+            label: 'Block File Uploads',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Hard-block file upload requests from the browser agent.',
+            showInDialog: true,
           },
         },
       },
@@ -1179,6 +1290,19 @@ const SETTINGS_SCHEMA = {
         default: 200,
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
+      },
+      memoryBoundaryMarkers: {
+        type: 'array',
+        label: 'Memory Boundary Markers',
+        category: 'Context',
+        requiresRestart: true,
+        default: ['.git'] as string[],
+        description:
+          'File or directory names that mark the boundary for GEMINI.md discovery. ' +
+          'The upward traversal stops at the first directory containing any of these markers. ' +
+          'An empty array disables parent traversal.',
+        showInDialog: false,
+        items: { type: 'string' },
       },
       includeDirectories: {
         type: 'array',
@@ -1287,11 +1411,31 @@ const SETTINGS_SCHEMA = {
         default: undefined as boolean | string | SandboxConfig | undefined,
         ref: 'BooleanOrStringOrObject',
         description: oneLine`
-          Sandbox execution environment.
+          Legacy full-process sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
-          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc", "windows-native").
         `,
         showInDialog: false,
+      },
+      sandboxAllowedPaths: {
+        type: 'array',
+        label: 'Sandbox Allowed Paths',
+        category: 'Tools',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of additional paths that the sandbox is allowed to access.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
+      sandboxNetworkAccess: {
+        type: 'boolean',
+        label: 'Sandbox Network Access',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: 'Whether the sandbox is allowed to access the network.',
+        showInDialog: true,
       },
       shell: {
         type: 'object',
@@ -1313,6 +1457,21 @@ const SETTINGS_SCHEMA = {
               Fallback to child_process still applies.
             `,
             showInDialog: true,
+          },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
           },
           pager: {
             type: 'string',
@@ -1509,6 +1668,16 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      toolSandboxing: {
+        type: 'boolean',
+        label: 'Tool Sandboxing',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Experimental tool-level sandboxing (implementation in progress).',
+        showInDialog: true,
+      },
       disableYoloMode: {
         type: 'boolean',
         label: 'Disable YOLO Mode',
@@ -1516,6 +1685,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
+      disableAlwaysAllow: {
+        type: 'boolean',
+        label: 'Disable Always Allow',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable "Always allow" options in tool confirmation dialogs.',
         showInDialog: true,
       },
       enablePermanentToolApproval: {
@@ -1791,10 +1970,19 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Agents',
         category: 'Experimental',
         requiresRestart: true,
+        default: true,
+        description: 'Enable local and remote subagents.',
+        showInDialog: false,
+      },
+      worktrees: {
+        type: 'boolean',
+        label: 'Enable Git Worktrees',
+        category: 'Experimental',
+        requiresRestart: true,
         default: false,
         description:
-          'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
-        showInDialog: false,
+          'Enable automated Git worktree management for parallel work.',
+        showInDialog: true,
       },
       extensionManagement: {
         type: 'boolean',
@@ -1848,7 +2036,7 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
@@ -1910,6 +2098,16 @@ const SETTINGS_SCHEMA = {
           'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
+      dynamicModelConfiguration: {
+        type: 'boolean',
+        label: 'Dynamic Model Configuration',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable dynamic model configuration (definitions, resolutions, and chains) via settings.',
+        showInDialog: false,
+      },
       gemmaModelRouter: {
         type: 'object',
         label: 'Gemma Model Router',
@@ -1961,9 +2159,68 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      memoryManager: {
+        type: 'boolean',
+        label: 'Memory Manager Agent',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.',
+        showInDialog: true,
+      },
+      agentHistoryTruncation: {
+        type: 'boolean',
+        label: 'Agent History Truncation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable truncation window logic for the Agent History Provider.',
+        showInDialog: true,
+      },
+      agentHistoryTruncationThreshold: {
+        type: 'number',
+        label: 'Agent History Truncation Threshold',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 30,
+        description:
+          'The maximum number of messages before history is truncated.',
+        showInDialog: true,
+      },
+      agentHistoryRetainedMessages: {
+        type: 'number',
+        label: 'Agent History Retained Messages',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 15,
+        description:
+          'The number of recent messages to retain after truncation.',
+        showInDialog: true,
+      },
+      agentHistorySummarization: {
+        type: 'boolean',
+        label: 'Agent History Summarization',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable summarization of truncated content via a small model for the Agent History Provider.',
+        showInDialog: true,
+      },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
-
   extensions: {
     type: 'object',
     label: 'Extensions',
@@ -2244,7 +2501,8 @@ const SETTINGS_SCHEMA = {
         category: 'Admin',
         requiresRestart: false,
         default: false,
-        description: 'If true, disallows yolo mode from being used.',
+        description:
+          'If true, disallows YOLO mode and "Always allow" options from being used.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
       },
@@ -2297,12 +2555,26 @@ const SETTINGS_SCHEMA = {
             category: 'Admin',
             requiresRestart: false,
             default: {} as Record<string, MCPServerConfig>,
-            description: 'Admin-configured MCP servers.',
+            description: 'Admin-configured MCP servers (allowlist).',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
             additionalProperties: {
               type: 'object',
               ref: 'MCPServerConfig',
+            },
+          },
+          requiredConfig: {
+            type: 'object',
+            label: 'Required MCP Config',
+            category: 'Admin',
+            requiresRestart: false,
+            default: {} as Record<string, RequiredMcpServerConfig>,
+            description: 'Admin-required MCP servers that are always injected.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+            additionalProperties: {
+              type: 'object',
+              ref: 'RequiredMcpServerConfig',
             },
           },
         },
@@ -2429,11 +2701,72 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         type: 'string',
         description:
           'Authentication provider used for acquiring credentials (for example `dynamic_discovery`).',
-        enum: [
-          'dynamic_discovery',
-          'google_credentials',
-          'service_account_impersonation',
-        ],
+        enum: Object.values(AuthProviderType),
+      },
+      targetAudience: {
+        type: 'string',
+        description:
+          'OAuth target audience (CLIENT_ID.apps.googleusercontent.com).',
+      },
+      targetServiceAccount: {
+        type: 'string',
+        description:
+          'Service account email to impersonate (name@project.iam.gserviceaccount.com).',
+      },
+    },
+  },
+  RequiredMcpServerConfig: {
+    type: 'object',
+    description:
+      'Admin-required MCP server configuration (remote transports only).',
+    additionalProperties: false,
+    properties: {
+      url: {
+        type: 'string',
+        description: 'URL for the required MCP server.',
+      },
+      type: {
+        type: 'string',
+        description: 'Transport type for the required server.',
+        enum: ['sse', 'http'],
+      },
+      headers: {
+        type: 'object',
+        description: 'Additional HTTP headers sent to the server.',
+        additionalProperties: { type: 'string' },
+      },
+      timeout: {
+        type: 'number',
+        description: 'Timeout in milliseconds for MCP requests.',
+      },
+      trust: {
+        type: 'boolean',
+        description:
+          'Marks the server as trusted. Defaults to true for admin-required servers.',
+      },
+      description: {
+        type: 'string',
+        description: 'Human-readable description of the server.',
+      },
+      includeTools: {
+        type: 'array',
+        description: 'Subset of tools enabled for this server.',
+        items: { type: 'string' },
+      },
+      excludeTools: {
+        type: 'array',
+        description: 'Tools disabled for this server.',
+        items: { type: 'string' },
+      },
+      oauth: {
+        type: 'object',
+        description: 'OAuth configuration for authenticating with the server.',
+        additionalProperties: true,
+      },
+      authProviderType: {
+        type: 'string',
+        description: 'Authentication provider used for acquiring credentials.',
+        enum: Object.values(AuthProviderType),
       },
       targetAudience: {
         type: 'string',
@@ -2725,6 +3058,90 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         },
       },
     },
+  },
+  ModelDefinition: {
+    type: 'object',
+    description: 'Model metadata registry entry.',
+    properties: {
+      displayName: { type: 'string' },
+      tier: { enum: ['pro', 'flash', 'flash-lite', 'custom', 'auto'] },
+      family: { type: 'string' },
+      isPreview: { type: 'boolean' },
+      isVisible: { type: 'boolean' },
+      dialogDescription: { type: 'string' },
+      features: {
+        type: 'object',
+        properties: {
+          thinking: { type: 'boolean' },
+          multimodalToolUse: { type: 'boolean' },
+        },
+      },
+    },
+  },
+  ModelResolution: {
+    type: 'object',
+    description: 'Model resolution rule.',
+    properties: {
+      default: { type: 'string' },
+      contexts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            condition: {
+              type: 'object',
+              properties: {
+                useGemini3_1: { type: 'boolean' },
+                useGemini3_1FlashLite: { type: 'boolean' },
+                useCustomTools: { type: 'boolean' },
+                hasAccessToPreview: { type: 'boolean' },
+                requestedModels: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+            },
+            target: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  ModelPolicyChain: {
+    type: 'array',
+    description: 'A chain of model policies for fallback behavior.',
+    items: {
+      type: 'object',
+      ref: 'ModelPolicy',
+    },
+  },
+  ModelPolicy: {
+    type: 'object',
+    description:
+      'Defines the policy for a single model in the availability chain.',
+    properties: {
+      model: { type: 'string' },
+      isLastResort: { type: 'boolean' },
+      actions: {
+        type: 'object',
+        properties: {
+          terminal: { type: 'string', enum: ['silent', 'prompt'] },
+          transient: { type: 'string', enum: ['silent', 'prompt'] },
+          not_found: { type: 'string', enum: ['silent', 'prompt'] },
+          unknown: { type: 'string', enum: ['silent', 'prompt'] },
+        },
+      },
+      stateTransitions: {
+        type: 'object',
+        properties: {
+          terminal: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          transient: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          not_found: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          unknown: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+        },
+      },
+    },
+    required: ['model'],
   },
 };
 
