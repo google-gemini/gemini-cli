@@ -538,7 +538,7 @@ const SETTINGS_SCHEMA = {
         label: 'Hide Tips',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },

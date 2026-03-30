@@ -246,7 +246,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.escapePastedAtSymbols`** (boolean):
   - **Description:** When enabled, @ symbols in pasted text are escaped to
@@ -1933,7 +1933,7 @@ of v0.3.0:
   "ui": {
     "theme": "GitHub",
     "hideBanner": true,
-    "hideTips": false,
+    "hideTips": true,
     "customWittyPhrases": [
       "You forget a thousand things every day. Make sure this is one of ’em",
       "Connecting to AGI"

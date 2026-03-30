@@ -8,6 +8,7 @@ import {
   renderWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi } from 'vitest';
@@ -33,6 +34,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -55,6 +57,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -76,6 +79,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -106,6 +110,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -160,6 +165,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -183,6 +189,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -205,6 +212,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         uiState,
+        settings: createMockSettings({ ui: { hideTips: false } }),
       },
     );
 
@@ -227,6 +235,7 @@ describe('<AppHeader />', () => {
     // First session
     const session1 = await renderWithProviders(<AppHeader version="1.0.0" />, {
       uiState,
+      settings: createMockSettings({ ui: { hideTips: false } }),
     });
 
     expect(session1.lastFrame()).toContain('Tips');
@@ -234,10 +243,9 @@ describe('<AppHeader />', () => {
     session1.unmount();
 
     // Second session - state is persisted in the fake
-    const session2 = await renderWithProviders(
-      <AppHeader version="1.0.0" />,
-      {},
-    );
+    const session2 = await renderWithProviders(<AppHeader version="1.0.0" />, {
+      settings: createMockSettings({ ui: { hideTips: false } }),
+    });
 
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();

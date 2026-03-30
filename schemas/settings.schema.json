@@ -299,8 +299,8 @@
         "hideTips": {
           "title": "Hide Tips",
           "description": "Hide helpful tips in the UI",
-          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "escapePastedAtSymbols": {
