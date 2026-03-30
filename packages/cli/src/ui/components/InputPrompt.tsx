@@ -117,6 +117,7 @@ export interface InputPromptProps {
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
   popAllMessages?: () => string | undefined;
+  onQueueMessage?: (message: string) => void;
   suggestionsPosition?: 'above' | 'below';
   setBannerVisible: (visible: boolean) => void;
   copyModeEnabled?: boolean;
@@ -211,6 +212,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setQueueErrorMessage,
   streamingState,
   popAllMessages,
+  onQueueMessage,
   suggestionsPosition = 'below',
   setBannerVisible,
   copyModeEnabled = false,
@@ -230,8 +232,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     terminalWidth,
     activePtyId,
     history,
-    backgroundShells,
-    backgroundShellHeight,
+    backgroundTasks,
+    backgroundTaskHeight,
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
@@ -690,6 +692,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation;
 
+      const isQueueMessageKey = keyMatchers[Command.QUEUE_MESSAGE](key);
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
       const hasTabCompletionInteraction =
@@ -697,6 +700,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         Boolean(completion.promptCompletion.text) ||
         reverseSearchActive ||
         commandSearchActive;
+
+      if (
+        isGenerating &&
+        isQueueMessageKey &&
+        !hasTabCompletionInteraction &&
+        buffer.text.trim().length > 0
+      ) {
+        const trimmedMessage = buffer.text.trim();
+        const isSlash = isSlashCommand(trimmedMessage);
+
+        if (isSlash || shellModeActive) {
+          setQueueErrorMessage(
+            `${shellModeActive ? 'Shell' : 'Slash'} commands cannot be queued`,
+          );
+        } else if (onQueueMessage) {
+          onQueueMessage(buffer.text);
+          buffer.setText('');
+          resetCompletionState();
+          resetReverseSearchCompletionState();
+        }
+        resetPlainTabPress();
+        return true;
+      }
 
       if (isPlainTab && shellModeActive) {
         resetPlainTabPress();
@@ -1236,7 +1262,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
         if (
           activePtyId ||
-          (backgroundShells.size > 0 && backgroundShellHeight > 0)
+          (backgroundTasks.size > 0 && backgroundTaskHeight > 0)
         ) {
           setEmbeddedShellFocused(true);
           return true;
@@ -1293,11 +1319,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shortcutsHelpVisible,
       setShortcutsHelpVisible,
       tryLoadQueuedMessages,
+      onQueueMessage,
+      setQueueErrorMessage,
+      resetReverseSearchCompletionState,
       setBannerVisible,
       activePtyId,
       setEmbeddedShellFocused,
-      backgroundShells.size,
-      backgroundShellHeight,
+      backgroundTasks.size,
+      backgroundTaskHeight,
       streamingState,
       handleEscPress,
       registerPlainTabPress,
