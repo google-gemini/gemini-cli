@@ -9,7 +9,7 @@ if (process.env['NO_COLOR'] !== undefined) {
   delete process.env['NO_COLOR'];
 }
 
-import { mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canUseRipgrep } from '../packages/core/src/tools/ripGrep.js';
@@ -21,8 +21,8 @@ const integrationTestsDir = join(rootDir, '.integration-tests');
 let runDir = ''; // Make runDir accessible in teardown
 
 export async function setup() {
-  runDir = join(integrationTestsDir, `${Date.now()}`);
-  await mkdir(runDir, { recursive: true });
+  await mkdir(integrationTestsDir, { recursive: true });
+  runDir = await mkdtemp(join(integrationTestsDir, `${Date.now()}-`));
 
   // Set the home directory to the test run directory to avoid conflicts
   // with the user's local config.
