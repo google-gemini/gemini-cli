@@ -57,3 +57,6 @@ vi.mock('./src/config/storage.js', async (importOriginal) => {
   );
   return actual;
 });
+
+vi.spyOn(console, 'warn').mockImplementation(() => {});
+vi.spyOn(console, 'error').mockImplementation(() => {});
