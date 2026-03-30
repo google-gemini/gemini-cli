@@ -1,6 +1,6 @@
 # Terminal-Integrated Performance & Memory Investigation Companion
 
-> **GSoC 2026 Prototype** | [Google Issue #23365](https://github.com/nicolo-ribaudo/tc39-proposal-structs/issues/23365) | Author: [@SUNDRAM07](https://github.com/SUNDRAM07)
+> **GSoC 2026 Prototype** | [Google Issue #23365](https://github.com/google-gemini/gemini-cli/issues/23365) | Author: [@SUNDRAM07](https://github.com/SUNDRAM07)
 
 A comprehensive V8 memory investigation toolkit for the Gemini CLI that transforms opaque heap snapshots into structured, LLM-ready diagnostics. The module provides zero-config memory leak detection, allocation profiling, GC pressure analysis, and regression guarding — all from within the terminal.
 
@@ -9,7 +9,7 @@ A comprehensive V8 memory investigation toolkit for the Gemini CLI that transfor
 ## Architecture
 
 <p align="center">
-  <img src="../../../../../images/architecture-diagram-v2.png" alt="System Architecture" width="700"/>
+  <img src="./docs/images/architecture-diagram-v2.png" alt="System Architecture" width="700"/>
 </p>
 
 The system follows a layered pipeline design:
@@ -64,7 +64,7 @@ PerfettoExporter ──> Chrome Trace Events ──> Perfetto UI / SQL
 The CDP client captures three heap snapshots with forced GC between each, then cross-references surviving objects to eliminate false positives.
 
 <p align="center">
-  <img src="../../../../../images/screenshot-3snapshot.png" alt="3-Snapshot Leak Detection" width="680"/>
+  <img src="./docs/images/screenshot-3snapshot.png" alt="3-Snapshot Leak Detection" width="680"/>
 </p>
 
 ```typescript
@@ -87,7 +87,7 @@ const leakReport = HeapSnapshotAnalyzer.detectLeaks(
 Each detector returns a confidence score (0-1) and structured evidence:
 
 <p align="center">
-  <img src="../../../../../images/screenshot-rootcause.png" alt="Root Cause Analysis" width="680"/>
+  <img src="./docs/images/screenshot-rootcause.png" alt="Root Cause Analysis" width="680"/>
 </p>
 
 ```typescript
@@ -110,7 +110,7 @@ const causes = rca.analyzeSnapshot(classSummaries, snapshot.nodeCount);
 Export investigation data as Chrome Trace Events and query with SQL:
 
 <p align="center">
-  <img src="../../../../../images/screenshot-perfetto.png" alt="Perfetto Integration" width="680"/>
+  <img src="./docs/images/screenshot-perfetto.png" alt="Perfetto Integration" width="680"/>
 </p>
 
 ```typescript
@@ -128,7 +128,7 @@ const results = await sql.query('SELECT name, size FROM heap_classes ORDER BY si
 ### CDP Client with Live Debugging
 
 <p align="center">
-  <img src="../../../../../images/screenshot-cdp.png" alt="CDP Client" width="680"/>
+  <img src="./docs/images/screenshot-cdp.png" alt="CDP Client" width="680"/>
 </p>
 
 ```typescript
@@ -194,7 +194,7 @@ const ciReport = guard.toCIReport(result);
 All 15 test files pass with **410+ tests** covering every public API:
 
 <p align="center">
-  <img src="../../../../../images/screenshot-tests-v3.png" alt="Test Results" width="680"/>
+  <img src="./docs/images/screenshot-tests-v3.png" alt="Test Results" width="680"/>
 </p>
 
 ```bash
@@ -261,19 +261,19 @@ console.log(report);
 
 | PR | Title | Status |
 |----|-------|--------|
-| [#23506](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23506) | feat(investigation): heap snapshot analyzer | Closed |
-| [#23552](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23552) | feat(investigation): CDP client | Closed |
-| [#23601](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23601) | feat(investigation): root cause analyzer | Closed |
-| [#23651](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23651) | feat(investigation): LLM explainer | Closed |
-| [#23700](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23700) | feat(investigation): smart diff | Closed |
-| [#23745](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23745) | feat(investigation): trend forecaster | Closed |
-| [#23801](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23801) | feat(investigation): perfetto exporter | Closed |
-| [#23856](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23856) | feat(investigation): GC pressure analyzer | Closed |
-| [#23912](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23912) | feat(investigation): allocation hotspot profiler | Closed |
-| [#23965](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/23965) | feat(investigation): flame graph generator | Closed |
-| [#24005](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/24005) | feat(investigation): investigation tool orchestrator | Closed |
-| [#20004](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/20004) | feat(investigation): memory regression guard | Open |
-| [#24121](https://github.com/nicolo-ribaudo/tc39-proposal-structs/pull/24121) | feat(investigation): token efficiency benchmarks + PerfettoSQL | Open |
+| [#24121](https://github.com/google-gemini/gemini-cli/pull/24121) | [GSoC 2026] Terminal-Integrated Performance & Memory Investigation Companion — Prototype | Open |
+| [#20004](https://github.com/google-gemini/gemini-cli/pull/20004) | fix: trap SIGHUP in shell execution to prevent WSL2 signal 1 termination | Open |
+| [#24119](https://github.com/google-gemini/gemini-cli/pull/24119) | [GSoC 2026] Terminal-Integrated Performance & Memory Investigation Companion — Prototype | Closed |
+| [#22472](https://github.com/google-gemini/gemini-cli/pull/22472) | feat(debug): add Debug Companion — AI-powered debugging for Gemini CLI | Closed |
+| [#22469](https://github.com/google-gemini/gemini-cli/pull/22469) | feat(debug): add Debug Companion — AI-powered debugging for Gemini CLI | Closed |
+| [#21262](https://github.com/google-gemini/gemini-cli/pull/21262) | feat(telemetry): performance monitoring dashboard with cost estimation and export | Closed |
+| [#21074](https://github.com/google-gemini/gemini-cli/pull/21074) | fix(core): generalize structuredContent fix for all MCP servers | Closed |
+| [#20954](https://github.com/google-gemini/gemini-cli/pull/20954) | fix(core): use platform-aware command separator in git prompt | Closed |
+| [#20862](https://github.com/google-gemini/gemini-cli/pull/20862) | fix(cli): emit STREAM_JSON event for AgentExecutionBlocked in non-interactive mode | Closed |
+| [#20699](https://github.com/google-gemini/gemini-cli/pull/20699) | fix(policy): reject policy entries with unknown fields | Closed |
+| [#20454](https://github.com/google-gemini/gemini-cli/pull/20454) | fix: add missing JSON output for AgentExecutionStopped in non-interactive mode | Closed |
+| [#20185](https://github.com/google-gemini/gemini-cli/pull/20185) | fix: handle STREAM_JSON output format in validateNonInteractiveAuth | Closed |
+| [#19935](https://github.com/google-gemini/gemini-cli/pull/19935) | fix(core): parse callCommand with shell-quote matching discoveryCommand | Closed |
 
 ---
 
