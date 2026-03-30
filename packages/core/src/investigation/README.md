@@ -83,13 +83,19 @@ import { CDPClient, HeapSnapshotAnalyzer } from './investigation';
 const client = new CDPClient();
 await client.connect('ws://localhost:9229');
 
-// Captures 3 snapshots with GC between each
-const { snapshots, leaks } = await client.threeSnapshotCapture();
+// Captures 3 snapshots with GC between each — returns [string, string, string]
+const [snap1, snap2, snap3] = await client.threeSnapshotCapture();
 
-// Objects surviving all 3 snapshots are true leaks
-const leakReport = HeapSnapshotAnalyzer.detectLeaks(
-  snapshots[0], snapshots[1], snapshots[2]
-);
+// Parse each in-memory JSON string into a RawHeapSnapshot
+const parsed1 = JSON.parse(snap1);
+const parsed2 = JSON.parse(snap2);
+const parsed3 = JSON.parse(snap3);
+
+// Wrap each in an analyzer, then detect leaks across all 3
+const a1 = new HeapSnapshotAnalyzer(parsed1);
+const a2 = new HeapSnapshotAnalyzer(parsed2);
+const a3 = new HeapSnapshotAnalyzer(parsed3);
+const leakReport = HeapSnapshotAnalyzer.detectLeaks(a1, a2, a3);
 ```
 
 ### 9 Root-Cause Pattern Detectors
@@ -308,18 +314,18 @@ npx vitest run packages/core/src/investigation/heapSnapshotAnalyzer.test.ts
 ## Quick Start
 
 ```typescript
-import { InvestigationTool } from './investigation';
+import { InvestigationExecutor } from './investigation';
 
-const tool = new InvestigationTool();
+const executor = new InvestigationExecutor();
 
-// Full investigation from a heap snapshot file
-const report = await tool.investigate({
-  snapshotPath: './heap-snapshot.heapsnapshot',
-  previousSnapshotPath: './baseline.heapsnapshot', // optional
-  format: 'terminal', // or 'json', 'perfetto'
+// Analyze a heap snapshot file
+const result = await executor.execute({
+  action: 'analyze_heap_snapshot',
+  file_path: './heap-snapshot.heapsnapshot',
 });
 
-console.log(report);
+console.log(result.summary);
+console.log(result.data);
 ```
 
 ---

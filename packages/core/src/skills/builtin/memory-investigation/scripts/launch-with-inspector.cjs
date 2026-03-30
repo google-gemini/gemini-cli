@@ -29,7 +29,12 @@ const scriptArgs = [];
 
 for (const arg of rawArgs) {
   if (arg.startsWith('--port=')) {
-    port = parseInt(arg.slice(7), 10);
+    const parsed = parseInt(arg.slice(7), 10);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 65535) {
+      console.error(`Invalid port: ${arg.slice(7)}, using default 9229`);
+    } else {
+      port = parsed;
+    }
   } else if (arg === '--break') {
     breakOnStart = true;
   } else {

@@ -174,7 +174,10 @@ function feedStringChunk(state: StringParserState, chunk: string): void {
           // Unicode escape: \uXXXX
           if (i + 4 < chunk.length) {
             const hex = chunk.substring(i + 1, i + 5);
-            state.current += String.fromCharCode(parseInt(hex, 16));
+            const code = parseInt(hex, 16);
+            if (!Number.isNaN(code)) {
+              state.current += String.fromCharCode(code);
+            }
             i += 4;
           }
           break;
