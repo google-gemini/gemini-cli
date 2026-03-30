@@ -91,6 +91,14 @@ describe('GeminiAgent Session Resume', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
+      getPolicyEngine: vi.fn().mockReturnValue({
+        addRule: vi.fn(),
+      }),
+      messageBus: {
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
+      },
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue('gemini-pro'),

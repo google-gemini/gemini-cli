@@ -7,12 +7,47 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { quote } from 'shell-quote';
+import { quote, type ParseEntry } from 'shell-quote';
 import {
   spawn,
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+
+/**
+ * Extracts the primary command name from a potentially wrapped shell command.
+ * Strips shell wrappers and handles shopt/set/etc.
+ *
+ * @param command - The full command string.
+ * @param args - The arguments for the command.
+ * @returns The primary command name.
+ */
+export async function getCommandName(
+  command: string,
+  args: string[],
+): Promise<string> {
+  await initializeShellParsers();
+  const fullCmd = [command, ...args].join(' ');
+  const stripped = stripShellWrapper(fullCmd);
+  const roots = getCommandRoots(stripped).filter(
+    (r) => r !== 'shopt' && r !== 'set',
+  );
+  if (roots.length > 0) {
+    return roots[0];
+  }
+  return path.basename(command);
+}
+
+/**
+ * Extracts a string representation from a shell-quote ParseEntry.
+ */
+export function extractStringFromParseEntry(entry: ParseEntry): string {
+  if (typeof entry === 'string') return entry;
+  if ('pattern' in entry) return entry.pattern;
+  if ('op' in entry) return entry.op;
+  if ('comment' in entry) return ''; // We can typically ignore comments for safety checks
+  return '';
+}
 import * as readline from 'node:readline';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
@@ -264,11 +299,7 @@ function normalizeCommandName(raw: string): string {
       return raw.slice(1, -1);
     }
   }
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-  return trimmed.split(/[\\/]/).pop() ?? trimmed;
+  return raw.trim();
 }
 
 function extractNameFromNode(node: Node): string | null {
@@ -377,7 +408,9 @@ function hasPromptCommandTransform(root: Node): boolean {
   return false;
 }
 
-function parseBashCommandDetails(command: string): CommandParseResult | null {
+export function parseBashCommandDetails(
+  command: string,
+): CommandParseResult | null {
   if (treeSitterInitializationError) {
     debugLogger.debug(
       'Bash parser not initialized:',
@@ -526,7 +559,19 @@ export function parseCommandDetails(
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
-    return parsePowerShellCommandDetails(command, configuration.executable);
+    const result = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    if (!result || result.hasError) {
+      // Fallback to bash parser which is usually good enough for simple commands
+      // and doesn't rely on the host PowerShell environment restrictions (e.g., ConstrainedLanguage)
+      const bashResult = parseBashCommandDetails(command);
+      if (bashResult && !bashResult.hasError) {
+        return bashResult;
+      }
+    }
+    return result;
   }
 
   if (configuration.shell === 'bash') {
@@ -667,7 +712,10 @@ export function splitCommands(command: string): string[] {
     return [];
   }
 
-  return parsed.details.map((detail) => detail.text).filter(Boolean);
+  return parsed.details
+    .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+    .map((detail) => detail.text)
+    .filter(Boolean);
 }
 
 /**
@@ -705,7 +753,7 @@ export function getCommandRoots(command: string): string[] {
 
 export function stripShellWrapper(command: string): string {
   const pattern =
-    /^\s*(?:(?:sh|bash|zsh)\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
+    /^\s*(?:(?:(?:\S+\/)?(?:sh|bash|zsh))\s+-c|cmd\.exe\s+\/c|powershell(?:\.exe)?\s+(?:-NoProfile\s+)?-Command|pwsh(?:\.exe)?\s+(?:-NoProfile\s+)?-Command)\s+/i;
   const match = command.match(pattern);
   if (match) {
     let newCommand = command.substring(match[0].length).trim();
