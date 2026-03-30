@@ -1,107 +1,131 @@
 # Get started with Agent Skills
 
-Agent Skills provide Gemini CLI with specialized expertise on demand. Unlike
-general instructions, a "skill" is a self-contained capability that the agent
-activates only when needed.
+Agent Skills extend Gemini CLI with specialized expertise. In this tutorial,
+you'll learn how to create your first skill, bundle custom logic, and activate
+it during a session.
 
-This tutorial walks you through how to discover, activate, and install skills in
-your environment.
+## Create your first skill
 
-## Prerequisites
+A skill is defined by a directory containing a `SKILL.md` file. Let's create an
+**API Auditor** skill that helps you verify if local or remote endpoints are
+responding correctly.
 
-- Gemini CLI installed and authenticated.
+### 1. Create the directory structure
 
-## Step 1: Discover available skills
+The first step is to create the necessary folders for your skill and its
+scripts.
 
-Before you can use a skill, you need to know what is available in your
-environment. Gemini CLI automatically discovers skills from several "tiers":
-built-in, extensions, your user profile, and your current workspace.
+**macOS/Linux**
 
-To see all skills discovered in your current session, use the `/skills list`
-command:
+```bash
+mkdir -p .gemini/skills/api-auditor/scripts
+```
+
+**Windows (PowerShell)**
+
+```powershell
+New-Item -ItemType Directory -Force -Path ".gemini\skills\api-auditor\scripts"
+```
+
+### 2. Create the definition (`SKILL.md`)
+
+The `SKILL.md` file defines the skill's purpose and instructions for the agent.
+Create a file at `.gemini/skills/api-auditor/SKILL.md`. This tells the agent
+_when_ to use the skill and _how_ to behave.
+
+```markdown
+---
+name: api-auditor
+description:
+  Expertise in auditing and testing API endpoints. Use when the user asks to
+  "check", "test", or "audit" a URL or API.
+---
+
+# API Auditor Instructions
+
+You act as a QA engineer specialized in API reliability. When this skill is
+active, you MUST:
+
+1.  **Audit**: Use the bundled `scripts/audit.js` utility to check the status of
+    the provided URL.
+2.  **Report**: Analyze the output (status codes, latency) and explain any
+    failures in plain English.
+3.  **Secure**: Remind the user if they are testing a sensitive endpoint without
+    an `https://` protocol.
+```
+
+### 3. Add the tool logic
+
+Skills can bundle resources like scripts to perform deterministic tasks. Create
+a file at `.gemini/skills/api-auditor/scripts/audit.js`. This is the code the
+agent will run.
+
+```javascript
+// .gemini/skills/api-auditor/scripts/audit.js
+const url = process.argv[2];
+
+if (!url) {
+  console.error('Usage: node audit.js <url>');
+  process.exit(1);
+}
+
+console.log(`Auditing ${url}...`);
+fetch(url, { method: 'HEAD' })
+  .then((r) => console.log(`Result: Success (Status ${r.status})`))
+  .catch((e) => console.error(`Result: Failed (${e.message})`));
+```
+
+## Verify discovery
+
+Gemini CLI automatically discovers skills in the `.gemini/skills` directory (as
+well as the `.agents/skills` alias).
+
+To check if Gemini CLI found your new skill, use the `/skills list` command
+within an interactive session:
 
 ```bash
 /skills list
 ```
 
-This will display a list of skills, their current status (Enabled/Disabled), and
-a brief description of what they do.
+You should see `api-auditor` in the list of available skills. If you just added
+the files, you can run `/skills reload` to refresh the list without restarting
+the session.
 
-> **Tip:** Use `/skills list all` to include internal built-in skills in the
-> output.
+## Use the skill
 
-## Step 2: Trigger and activate a skill
+Now that the skill is discovered, you can trigger its activation by asking a
+relevant question.
 
-You don't "run" a skill like a command. Instead, you trigger it naturally by
-asking the agent to perform a task that falls within a skill's expertise.
+1.  **Trigger**: Start a new session and ask: "Can you audit https://google.com"
+2.  **Activation**: Gemini identifies that the request matches the `api-auditor`
+    description and calls the `activate_skill` tool.
+3.  **Consent**: You will see a confirmation prompt. Type **y** to approve.
+4.  **Execution**: Once activated, Gemini uses the `run_shell_command` tool to
+    execute your bundled script:
+    `node .gemini/skills/api-auditor/scripts/audit.js https://google.com`
 
-1.  **Trigger**: Ask a question or give a command. For example, "Review my
-    latest changes."
-2.  **Identification**: Gemini CLI identifies that a skill (e.g.,
-    `code-reviewer`) matches your request.
-3.  **Activation**: The agent calls the `activate_skill` tool.
-4.  **Consent**: You will see a confirmation prompt. Type **y** to approve.
+## Pro tip: Use the skill-creator
 
-Once activated, the skill's specific instructions and bundled resources are
-injected into the session. The agent will follow that specialized guidance for
-the rest of the conversation.
+If you don't want to create the files manually, you can use the built-in
+`skill-creator` skill. Simply ask Gemini:
 
-## Step 3: Install new skills
+> "Create a new skill called 'api-auditor' that tests if URLs are responding."
 
-You can add new capabilities to your CLI by installing skills shared by others
-or linking to local directories.
+The `skill-creator` will handle the directory structure and boilerplate for you.
 
-### Install from a Git repository
+## Manage skills
 
-To install a skill from a remote repository, use the `gemini skills install`
-terminal command:
+You can also manage skills using the `gemini skills` command from your terminal:
 
-```bash
-gemini skills install https://github.com/user/my-awesome-skill
-```
-
-By default, this installs the skill to your **user profile**
-(`~/.gemini/skills`), making it available across all your projects.
-
-### Link a local skill
-
-If you have a skill directory on your machine (for example, one you are
-developing), you can "link" it instead of installing it:
-
-```bash
-gemini skills link ./path/to/my-skill
-```
-
-Linking creates a reference to the directory, so any changes you make to the
-skill's files are immediately available in the CLI.
-
-## Step 4: Manage skill status
-
-If you want to prevent a specific skill from being triggered, you can disable
-it.
-
-- **Disable**: `/skills disable <name>`
-- **Enable**: `/skills enable <name>`
-
-Disabling a skill removes its description from the agent's system prompt,
-ensuring it won't be accidentally activated during your session.
-
-## Step 5: Uninstall a skill
-
-To completely remove an installed or linked skill, use the `uninstall` command:
-
-```bash
-gemini skills uninstall <name>
-```
+- **Install**: `gemini skills install <url-or-path>`
+- **Link**: `gemini skills link <path>` (useful for local development)
+- **Uninstall**: `gemini skills uninstall <name>`
 
 ## Next steps
 
-Now that you know how to use and manage skills, try building your own to
-automate your specific workflows:
-
-- [Creating Agent Skills](../creating-skills.md): Create your first skill and
-  bundle custom logic.
-- [Using Agent Skills](../using-agent-skills.md): Detailed guide on installation
-  and management.
+- [Creating Agent Skills](../creating-skills.md): Detailed guide on advanced
+  skill features and metadata.
+- [Using Agent Skills](../using-agent-skills.md): More ways to discover and
+  manage your skill library.
 - [Skill best practices](../skills-best-practices.md): Learn how to design
   reliable and effective expertise.

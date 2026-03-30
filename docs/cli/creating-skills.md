@@ -201,7 +201,7 @@ gemini skills link .
 
 - [Skill best practices](./skills-best-practices.md): Learn strategies for
   building reliable and effective skills.
-- [Use and manage Agent Skills](./using-agent-skills.md): Learn how to discover
-  and install skills.
-- [Extension developer guide](../extensions/writing-extensions.md): Learn how to
-  bundle your skills into shareable extensions.
+- [Agent Skills overview](./skills.md): Deep dive into discovery tiers and the
+  skill lifecycle.
+- [Get started with Agent Skills](./tutorials/skills-getting-started.md): A
+  quick walkthrough of triggering and using skills.
