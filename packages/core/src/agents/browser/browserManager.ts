@@ -222,14 +222,14 @@ export class BrowserManager {
     toolName: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
-    isInternal: boolean = true,
+    isInternal: boolean = false,
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
     // Hard enforcement of per-action rate limit
-    if (isInternal) {
+    if (!isInternal) {
       if (this.actionCounter >= this.maxActionsPerTask) {
         const error = new Error(
           `Browser agent reached maximum action limit (${this.maxActionsPerTask}). ` +

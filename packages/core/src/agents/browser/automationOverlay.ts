@@ -94,7 +94,7 @@ export async function injectAutomationOverlay(
       'evaluate_script',
       { function: buildInjectionScript() },
       signal,
-      false,
+      true,
     );
 
     if (result.isError) {
@@ -121,7 +121,7 @@ export async function removeAutomationOverlay(
       'evaluate_script',
       { function: buildRemovalScript() },
       signal,
-      false,
+      true,
     );
 
     if (result.isError) {
