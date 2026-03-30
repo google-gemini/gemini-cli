@@ -247,7 +247,7 @@ ${strippedScreen}
       }
 
       if (responseText) {
-        const keys = responseText.replace(/\\n/g, '\r').replace(/\\r/g, '\r');
+        const keys = responseText.replace(/\\n|\n/g, '\r').replace(/\\r/g, '\r');
 
         debugLogger.log(
           `[SIMULATOR] Sending to stdin: ${JSON.stringify(keys)}`,
@@ -280,6 +280,9 @@ ${strippedScreen}
         }
 
         for (const char of keys) {
+          if (char === '\r' || char === '\n') {
+            await new Promise((resolve) => setTimeout(resolve, 40));
+          }
           this.stdinBuffer.write(char);
           await new Promise((resolve) => setTimeout(resolve, 20));
         }
