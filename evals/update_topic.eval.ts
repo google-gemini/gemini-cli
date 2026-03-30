@@ -53,7 +53,7 @@ describe('update_topic_behavior', () => {
       // 1. Assert that update_topic is called at least 3 times (start, middle, end)
       expect(
         topicCalls.length,
-        `Expected at least 3 update_topic calls, but found \${topicCalls.length}`,
+        `Expected at least 3 update_topic calls, but found ${topicCalls.length}`,
       ).toBeGreaterThanOrEqual(3);
 
       // 2. Assert update_topic is called at the very beginning (first tool call)
@@ -101,13 +101,13 @@ describe('update_topic_behavior', () => {
 
         expect(
           ratio,
-          `update_topic was used in \${topicTurnCount} out of \${totalTurns} turns (\${(ratio * 100).toFixed(1)}%). Expected <= 50%.`,
+          `update_topic was used in ${topicTurnCount} out of ${totalTurns} turns (${(ratio * 100).toFixed(1)}%). Expected <= 50%.`,
         ).toBeLessThanOrEqual(0.5);
 
         // Ideal ratio is closer to 1/5 (20%). We log high usage as a warning.
         if (ratio > 0.25) {
           console.warn(
-            `[Efficiency Warning] update_topic usage is high: \${(ratio * 100).toFixed(1)}% (Goal: ~20%)`,
+            `[Efficiency Warning] update_topic usage is high: ${(ratio * 100).toFixed(1)}% (Goal: ~20%)`,
           );
         }
       }
