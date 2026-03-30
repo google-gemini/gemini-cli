@@ -6,8 +6,6 @@
 
 import { render, Box, Text, useApp } from 'ink';
 import { useState, useEffect, useReducer, useRef, useCallback } from 'react';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
@@ -15,10 +13,11 @@ import { SettingsContext } from '../contexts/SettingsContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { loadSettings } from '../../config/settings.js';
 import { loadCliConfig } from '../../config/config.js';
-
 import { ConsolePatcher } from '../utils/ConsolePatcher.js';
+
 import { 
-  createWorkingStdio
+  createWorkingStdio,
+  PromptWatcherService
 } from '@google/gemini-cli-core';
 
 const EVAL_CASES = [
@@ -33,10 +32,20 @@ function selectedIndexReducer(state: number, action: 'UP' | 'DOWN'): number {
   return state;
 }
 
-export const PlaygroundApp = () => {
+export interface PlaygroundAppProps {
+  promptWatcherService: PromptWatcherService;
+  promptPath: string;
+  initialPromptContent: string;
+}
+
+export const PlaygroundApp = ({ 
+  promptWatcherService, 
+  promptPath,
+  initialPromptContent 
+}: PlaygroundAppProps) => {
   const { exit } = useApp();
   const { rows } = useTerminalSize();
-  const [promptContent, setPromptContent] = useState<string>('Loading prompt...');
+  const [promptContent, setPromptContent] = useState<string>(initialPromptContent);
   const [executionStream, setExecutionStream] = useState<string[]>([]);
   const [selectedIndex, dispatchIndex] = useReducer(selectedIndexReducer, 0);
   const [activeCase, setActiveCase] = useState<string | null>(null);
@@ -71,30 +80,10 @@ export const PlaygroundApp = () => {
   useKeypress(handleKeypress, { isActive: true });
 
   useEffect(() => {
-    const fileToWatch = path.resolve(process.cwd(), 'packages/core/src/prompts/snippets.ts');
-    try {
-      if (fs.existsSync(fileToWatch)) {
-        setPromptContent(fs.readFileSync(fileToWatch, 'utf8'));
-      } else {
-        setPromptContent(`File not found: ${fileToWatch}`);
-      }
-    } catch (e) {
-      setPromptContent(`Error reading file: ${e}`);
-    }
-
-    let watcher: fs.FSWatcher;
-    try {
-      watcher = fs.watch(fileToWatch, (eventType) => {
-        if (eventType === 'change') {
-          setPromptContent(fs.readFileSync(fileToWatch, 'utf8'));
-        }
-      });
-    } catch (e) {}
-
-    return () => {
-      if (watcher) watcher.close();
-    };
-  }, []);
+    return promptWatcherService.watchPrompt(promptPath, (newContent) => {
+      setPromptContent(newContent);
+    });
+  }, [promptWatcherService, promptPath]);
 
   useEffect(() => {
     if (!activeCase) return;
@@ -201,13 +190,27 @@ export async function startPlayground() {
   // Stabilization window to prevent flicker during buffer swap.
   await new Promise(resolve => setTimeout(resolve, 200));
 
+  const promptPath = (await import('node:path')).resolve(workspaceDir, 'packages/core/src/prompts/snippets.ts');
+  const promptWatcherService = new PromptWatcherService();
+  
+  let initialPromptContent = '';
+  try {
+    initialPromptContent = await promptWatcherService.readPrompt(promptPath);
+  } catch (e) {
+    initialPromptContent = `Error loading prompt: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
   let inkInstance: any;
 
   try {
     inkInstance = render(
       <SettingsContext.Provider value={settings}>
         <KeypressProvider config={config}>
-          <PlaygroundApp />
+          <PlaygroundApp 
+            promptWatcherService={promptWatcherService} 
+            promptPath={promptPath} 
+            initialPromptContent={initialPromptContent}
+          />
         </KeypressProvider>
       </SettingsContext.Provider>,
       {
