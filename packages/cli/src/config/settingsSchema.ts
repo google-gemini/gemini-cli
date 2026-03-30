@@ -676,6 +676,16 @@ const SETTINGS_SCHEMA = {
         description: 'Display memory usage information in the UI',
         showInDialog: true,
       },
+      truncateToolDescriptions: {
+        type: 'boolean',
+        label: 'Truncate Tool Descriptions',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to truncate long tool descriptions to a single line in the UI.',
+        showInDialog: true,
+      },
       showLineNumbers: {
         type: 'boolean',
         label: 'Show Line Numbers',

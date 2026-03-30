@@ -406,6 +406,13 @@
           "default": false,
           "type": "boolean"
         },
+        "truncateToolDescriptions": {
+          "title": "Truncate Tool Descriptions",
+          "description": "Whether to truncate long tool descriptions to a single line in the UI.",
+          "markdownDescription": "Whether to truncate long tool descriptions to a single line in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showLineNumbers": {
           "title": "Show Line Numbers",
           "description": "Show line numbers in the chat.",

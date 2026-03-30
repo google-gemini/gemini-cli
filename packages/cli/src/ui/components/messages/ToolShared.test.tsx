@@ -5,9 +5,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '../../../test-utils/render.js';
+import { render, renderWithProviders } from '../../../test-utils/render.js';
 import { Text } from 'ink';
-import { McpProgressIndicator } from './ToolShared.js';
+import { McpProgressIndicator, ToolInfo } from './ToolShared.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: () => <Text>MockSpinner</Text>,
@@ -63,5 +65,42 @@ describe('McpProgressIndicator', () => {
     const output = lastFrame();
     expect(output).toContain('100%');
     expect(output).not.toContain('150%');
+  });
+});
+
+describe('ToolInfo', () => {
+  const baseProps = {
+    name: 'test-tool',
+    description:
+      'A very long description that might need to be truncated to fit on a single line for display purposes',
+    status: CoreToolCallStatus.Success,
+    emphasis: 'medium' as const,
+  };
+
+  it('renders correctly', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <ToolInfo {...baseProps} />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+  });
+
+  it('honors truncateToolDescriptions=false', async () => {
+    const settings = createMockSettings({
+      merged: {
+        ui: {
+          truncateToolDescriptions: false,
+        },
+      },
+    });
+
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <ToolInfo {...baseProps} />,
+      { settings },
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
   });
 });
