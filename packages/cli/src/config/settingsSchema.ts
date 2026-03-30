@@ -1468,6 +1468,21 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
+          backgroundCompletionBehavior: {
+            type: 'enum',
+            label: 'Background Completion Behavior',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'silent',
+            description:
+              "Controls what happens when a background shell command finishes. 'silent' (default): quietly exits in background. 'inject': automatically returns output to agent. 'notify': shows brief message in chat.",
+            showInDialog: false,
+            options: [
+              { label: 'Silent', value: 'silent' },
+              { label: 'Inject', value: 'inject' },
+              { label: 'Notify', value: 'notify' },
+            ],
+          },
           pager: {
             type: 'string',
             label: 'Pager',

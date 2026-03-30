@@ -128,6 +128,7 @@ export const PARAM_ADDITIONAL_PERMISSIONS = 'additional_permissions';
 
 // -- update_topic --
 export const UPDATE_TOPIC_TOOL_NAME = 'update_topic';
+export const UPDATE_TOPIC_DISPLAY_NAME = 'Update Topic Context';
 export const TOPIC_PARAM_TITLE = 'title';
 export const TOPIC_PARAM_SUMMARY = 'summary';
 export const TOPIC_PARAM_STRATEGIC_INTENT = 'strategic_intent';
