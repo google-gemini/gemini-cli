@@ -92,6 +92,7 @@ describe('mcp-client', () => {
   let testWorkspace: string;
 
   beforeEach(() => {
+    activeChannels.clear();
     MOCK_CONTEXT = {
       sanitizationConfig: EMPTY_CONFIG,
       emitMcpDiagnostic: vi.fn(),
@@ -108,6 +109,7 @@ describe('mcp-client', () => {
   });
 
   afterEach(() => {
+    activeChannels.clear();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
