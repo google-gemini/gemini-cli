@@ -96,6 +96,10 @@ export async function getInitialChatHistory(
       role: 'user',
       parts: [{ text: envContextString }],
     },
+    {
+      role: 'model',
+      parts: [{ text: 'Understood. I am ready.' }],
+    },
     ...(extraHistory ?? []),
   ];
 }

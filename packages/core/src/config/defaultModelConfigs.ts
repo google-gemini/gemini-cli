@@ -21,16 +21,23 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
-    'chat-base': {
+    'chat-base-no-thinking': {
       extends: 'base',
+      modelConfig: {
+        generateContentConfig: {
+          temperature: 1,
+          topP: 0.95,
+          topK: 64,
+        },
+      },
+    },
+    'chat-base': {
+      extends: 'chat-base-no-thinking',
       modelConfig: {
         generateContentConfig: {
           thinkingConfig: {
             includeThoughts: true,
           },
-          temperature: 1,
-          topP: 0.95,
-          topK: 64,
         },
       },
     },
@@ -66,7 +73,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'gemini-3-flash-preview': {
-      extends: 'chat-base-3',
+      extends: 'chat-base-no-thinking',
       modelConfig: {
         model: 'gemini-3-flash-preview',
       },
@@ -78,13 +85,13 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'gemini-2.5-flash': {
-      extends: 'chat-base-2.5',
+      extends: 'chat-base-no-thinking',
       modelConfig: {
         model: 'gemini-2.5-flash',
       },
     },
     'gemini-2.5-flash-lite': {
-      extends: 'chat-base-2.5',
+      extends: 'chat-base-no-thinking',
       modelConfig: {
         model: 'gemini-2.5-flash-lite',
       },

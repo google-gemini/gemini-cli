@@ -132,7 +132,7 @@ describe('file-system', () => {
       'Expected to find a write_file tool call',
     ).toBeTruthy();
 
-    const newFileContent = rig.readFile(fileName);
+    const newFileContent = rig.readFile(fileName).trim();
     expect(newFileContent).toBe('hello');
   });
 
