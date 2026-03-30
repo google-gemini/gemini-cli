@@ -33,14 +33,13 @@ import {
 import { verifySandboxOverrides } from '../utils/commandUtils.js';
 import { parsePosixSandboxDenials } from '../utils/sandboxDenialUtils.js';
 
-let registeredCleanup = false;
-const filesToCleanup: string[] = [];
-
-/**
- * A SandboxManager implementation for macOS that uses Seatbelt.
- */
 export class MacOsSandboxManager implements SandboxManager {
-  constructor(private readonly options: GlobalSandboxOptions) {}
+  private profileTempDir?: string;
+  private readonly exitCleanupHandler: () => void;
+
+  constructor(private readonly options: GlobalSandboxOptions) {
+    this.exitCleanupHandler = () => this.cleanup();
+  }
 
   isKnownSafeCommand(args: string[]): boolean {
     const toolName = args[0];
@@ -111,7 +110,7 @@ export class MacOsSandboxManager implements SandboxManager {
         false,
     };
 
-    const profile = buildSeatbeltProfile({
+    const sandboxArgs = buildSeatbeltProfile({
       workspace: this.options.workspace,
       allowedPaths: [...(req.policy?.allowedPaths || [])],
       forbiddenPaths: this.options.forbiddenPaths,
@@ -120,25 +119,7 @@ export class MacOsSandboxManager implements SandboxManager {
       additionalPermissions: mergedAdditional,
     });
 
-    const tempFile = path.join(
-      os.tmpdir(),
-      `gemini-seatbelt-${Date.now()}-${Math.random().toString(36).slice(2)}.sb`,
-    );
-    fs.writeFileSync(tempFile, profile);
-    filesToCleanup.push(tempFile);
-
-    if (!registeredCleanup) {
-      process.on('exit', () => {
-        for (const file of filesToCleanup) {
-          try {
-            fs.rmSync(file, { force: true });
-          } catch {
-            // Ignore cleanup errors
-          }
-        }
-      });
-      registeredCleanup = true;
-    }
+    const tempFile = this.writeProfileToTempFile(sandboxArgs);
 
     return {
       program: '/usr/bin/sandbox-exec',
@@ -146,5 +127,33 @@ export class MacOsSandboxManager implements SandboxManager {
       env: sanitizedEnv,
       cwd: req.cwd,
     };
+  }
+
+  private writeProfileToTempFile(profile: string): string {
+    if (!this.profileTempDir) {
+      this.profileTempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-seatbelt-'),
+      );
+      process.on('exit', this.exitCleanupHandler);
+    }
+
+    const tempFile = path.join(
+      this.profileTempDir,
+      `profile-${Date.now()}-${Math.random().toString(36).slice(2)}.sb`,
+    );
+    fs.writeFileSync(tempFile, profile);
+    return tempFile;
+  }
+
+  cleanup(): void {
+    if (this.profileTempDir) {
+      try {
+        fs.rmSync(this.profileTempDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+      this.profileTempDir = undefined;
+    }
+    process.removeListener('exit', this.exitCleanupHandler);
   }
 }
