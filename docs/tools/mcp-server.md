@@ -653,7 +653,10 @@ When confirmation is required, users can choose:
 
 #### Read-only bypass
 
-If an MCP tool provides a `readOnlyHint` in its metadata (annotations), the Gemini CLI will automatically execute it without prompting for confirmation, regardless of the configured approval mode. This ensures a seamless experience for safe, data-fetching operations.
+If an MCP tool provides a `readOnlyHint` in its metadata (annotations), the
+Gemini CLI will automatically execute it without prompting for confirmation,
+regardless of the configured approval mode. This ensures a seamless experience
+for safe, data-fetching operations.
 
 ### 3. Execution
 
