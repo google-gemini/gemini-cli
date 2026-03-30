@@ -1070,15 +1070,35 @@ Logging in with Google... Restarting Gemini CLI to continue.
   >([]);
   const [pendingInjectionCount, setPendingInjectionCount] = useState(0);
 
-  const consumePendingInjections = useCallback(() => {
-    if (pendingInjectionsRef.current.length === 0) {
-      return [];
-    }
-    const injections = [...pendingInjectionsRef.current];
-    pendingInjectionsRef.current = [];
-    setPendingInjectionCount(0);
-    return injections;
-  }, []);
+  const consumePendingInjections = useCallback(
+    (source?: InjectionSource) => {
+      if (pendingInjectionsRef.current.length === 0) {
+        return [];
+      }
+
+      if (!source) {
+        const injections = [...pendingInjectionsRef.current];
+        pendingInjectionsRef.current = [];
+        setPendingInjectionCount(0);
+        return injections;
+      }
+
+      const matching = pendingInjectionsRef.current.filter(
+        (inj) => inj.source === source,
+      );
+      pendingInjectionsRef.current = pendingInjectionsRef.current.filter(
+        (inj) => inj.source !== source,
+      );
+      setPendingInjectionCount(pendingInjectionsRef.current.length);
+      return matching;
+    },
+    [pendingInjectionsRef],
+  );
+
+  const consumeUserHints = useCallback(() => {
+    const hints = consumePendingInjections('user_steering');
+    return hints.length > 0 ? hints.map((h) => h.text).join('\n') : null;
+  }, [consumePendingInjections]);
 
   useEffect(() => {
     const injectionListener = (text: string, source: InjectionSource) => {
@@ -1129,7 +1149,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
-    consumePendingHints,
+    consumeUserHints,
   );
 
   const pendingHistoryItems = useMemo(
