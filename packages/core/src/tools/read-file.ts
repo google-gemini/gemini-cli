@@ -41,11 +41,25 @@ import {
 } from './jit-context.js';
 
 /**
+ * Regex to detect YouTube URLs.
+ * Matches youtube.com/watch, youtu.be/, youtube.com/shorts/, youtube.com/live/, etc.
+ */
+const YOUTUBE_URL_REGEX =
+  /^https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?.*v=|shorts\/|live\/|embed\/)|youtu\.be\/)/i;
+
+/**
+ * Returns true if the given string is a YouTube URL.
+ */
+export function isYouTubeUrl(input: string): boolean {
+  return YOUTUBE_URL_REGEX.test(input.trim());
+}
+
+/**
  * Parameters for the ReadFile tool
  */
 export interface ReadFileToolParams {
   /**
-   * The path to the file to read
+   * The path to the file to read, or a YouTube URL
    */
   file_path: string;
 
@@ -65,6 +79,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private readonly resolvedPath: string;
+  private readonly isYouTube: boolean;
   constructor(
     private config: Config,
     params: ReadFileToolParams,
@@ -73,13 +88,16 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
-    );
+    this.isYouTube = isYouTubeUrl(this.params.file_path);
+    this.resolvedPath = this.isYouTube
+      ? this.params.file_path.trim()
+      : path.resolve(this.config.getTargetDir(), this.params.file_path);
   }
 
   getDescription(): string {
+    if (this.isYouTube) {
+      return this.params.file_path.trim();
+    }
     const relativePath = makeRelative(
       this.resolvedPath,
       this.config.getTargetDir(),
@@ -88,6 +106,9 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   override toolLocations(): ToolLocation[] {
+    if (this.isYouTube) {
+      return [];
+    }
     return [
       {
         path: this.resolvedPath,
@@ -105,6 +126,20 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
+    // YouTube URL: send as fileData for the Gemini API to process directly
+    if (this.isYouTube) {
+      const url = this.params.file_path.trim();
+      return {
+        llmContent: {
+          fileData: {
+            fileUri: url,
+            mimeType: 'video/*',
+          },
+        },
+        returnDisplay: `Reading YouTube video: ${url}`,
+      };
+    }
+
     const validationError = this.config.validatePathAccess(
       this.resolvedPath,
       'read',
@@ -227,6 +262,11 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ): string | null {
     if (params.file_path.trim() === '') {
       return "The 'file_path' parameter must be non-empty.";
+    }
+
+    // YouTube URLs bypass local file validation
+    if (isYouTubeUrl(params.file_path)) {
+      return null;
     }
 
     const resolvedPath = path.resolve(
