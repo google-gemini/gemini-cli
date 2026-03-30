@@ -10,7 +10,7 @@ if (process.env.NO_COLOR !== undefined) {
 }
 
 import { setSimulate429 } from './src/utils/testUtils.js';
-import { vi, afterEach } from 'vitest';
+import { vi, beforeEach, afterEach } from 'vitest';
 import { coreEvents } from './src/utils/events.js';
 
 // Increase max listeners to avoid warnings in large test suites
@@ -19,7 +19,59 @@ coreEvents.setMaxListeners(100);
 // Disable 429 simulation globally for all tests
 setSimulate429(false);
 
+// Known expected console messages that are safe to suppress.
+// These appear during normal test execution of error-handling paths.
+const EXPECTED_WARN_PATTERNS = [
+  'deprecated',
+  'ExperimentalWarning',
+  'punycode',
+];
+
+const EXPECTED_ERROR_PATTERNS = [
+  'API key not valid',
+  'PERMISSION_DENIED',
+  'fetch failed',
+  'ECONNREFUSED',
+  'socket hang up',
+  'RetryError',
+];
+
+let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+beforeEach(() => {
+  consoleWarnSpy = vi
+    .spyOn(console, 'warn')
+    .mockImplementation((...args: unknown[]) => {
+      const message = args.map(String).join(' ');
+      const isExpected = EXPECTED_WARN_PATTERNS.some((pattern) =>
+        message.includes(pattern),
+      );
+      if (!isExpected) {
+        // Pass through unexpected warnings so they remain visible for debugging
+        originalWarn.apply(console, args);
+      }
+    });
+
+  consoleErrorSpy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      const message = args.map(String).join(' ');
+      const isExpected = EXPECTED_ERROR_PATTERNS.some((pattern) =>
+        message.includes(pattern),
+      );
+      if (!isExpected) {
+        // Pass through unexpected errors so they remain visible for debugging
+        originalError.apply(console, args);
+      }
+    });
+});
+
 afterEach(() => {
+  consoleWarnSpy?.mockRestore();
+  consoleErrorSpy?.mockRestore();
   vi.unstubAllEnvs();
 });
 
@@ -57,6 +109,3 @@ vi.mock('./src/config/storage.js', async (importOriginal) => {
   );
   return actual;
 });
-
-vi.spyOn(console, 'warn').mockImplementation(() => {});
-vi.spyOn(console, 'error').mockImplementation(() => {});
