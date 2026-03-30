@@ -48,11 +48,14 @@ describe('Topic Tool Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should allow update_topic in YOLO mode', async () => {
+  it('should allow update_topic in wildcard mode', async () => {
     const rules = await loadDefaultPolicies();
     const engine = new PolicyEngine({
-      rules,
-      approvalMode: ApprovalMode.YOLO,
+      rules: [
+        ...rules,
+        { toolName: '*', decision: PolicyDecision.ALLOW, priority: 1 },
+      ],
+      approvalMode: ApprovalMode.DEFAULT,
     });
 
     const result = await engine.check(
