@@ -98,7 +98,7 @@ export interface CliArgs {
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
   simulateUser: boolean | undefined;
-  knowledgeSources: string[] | undefined;
+  knowledgeSource: string | undefined;
 }
 
 /**
@@ -306,13 +306,10 @@ export async function parseArguments(
           description:
             'Run the user simulation agent in the background for evaluation purposes.',
         })
-        .option('knowledge-sources', {
-          type: 'array',
-          string: true,
-          nargs: 1,
+        .option('knowledge-source', {
+          type: 'string',
           description:
-            'List of files or folders to load into the user simulator context (comma-separated or multiple --knowledge-sources)',
-          coerce: coerceCommaSeparated,
+            'A file path to load into the user simulator context and update with new knowledge',
         }),
     )
     // Register MCP subcommands
@@ -815,7 +812,7 @@ export async function loadCliConfig(
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     simulateUser: !!argv.simulateUser,
-    knowledgeSources: argv.knowledgeSources,
+    knowledgeSource: argv.knowledgeSource,
     disableAlwaysAllow:
       settings.security?.disableAlwaysAllow ||
       settings.admin?.secureModeEnabled,
