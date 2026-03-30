@@ -386,7 +386,7 @@ export function renderUserMemory(
   if (typeof memory === 'string') {
     const trimmed = memory.trim();
     if (trimmed.length === 0) return '';
-    const filenames = contextFilenames ?? ['GEMINI.md'];
+    const filenames = (contextFilenames && contextFilenames.length > 0) ? contextFilenames : ['GEMINI.md'];
     const formattedHeader = filenames.join(', ');
     return `
 # Contextual Instructions (${formattedHeader})
