@@ -751,16 +751,32 @@ export function detectCommandSubstitution(command: string): boolean {
       continue;
     }
 
-    if (char === '\\' && !inSingleQuote) {
-      i += 2;
-      continue;
+    if (char === '\\') {
+      if (inSingleQuote) {
+        i++;
+        continue;
+      }
+      if (inDoubleQuote) {
+        const next = command[i + 1];
+        if (['$', '`', '"', '\\', '\n'].includes(next)) {
+          i += 2;
+          continue;
+        }
+      } else if (!inDoubleQuote) {
+        i += 2;
+        continue;
+      }
     }
 
     if (char === '$' && command[i + 1] === '(') {
       return true;
     }
 
-    if ((char === '<' || char === '>') && command[i + 1] === '(') {
+    if (
+      !inDoubleQuote &&
+      (char === '<' || char === '>') &&
+      command[i + 1] === '('
+    ) {
       return true;
     }
 
