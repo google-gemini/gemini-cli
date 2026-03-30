@@ -13,6 +13,6 @@ export const shellsCommand: SlashCommand = {
   description: 'Toggle background shells view',
   autoExecute: true,
   action: async (context) => {
-    context.ui.toggleBackgroundShell();
+    context.ui.toggleBackgroundTasks();
   },
 };

@@ -24,6 +24,9 @@ vi.mock('../contexts/UIActionsContext.js', () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
+    dismissBackgroundTask: mockDismissBackgroundShell,
+    setActiveBackgroundTaskPid: mockSetActiveBackgroundShellPid,
+    setIsBackgroundTaskListOpen: mockSetIsBackgroundShellListOpen,
   }),
 }));
 

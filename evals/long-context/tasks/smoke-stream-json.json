@@ -19,5 +19,15 @@
     "finalOutputIncludes": ["FINAL_SMOKE_SUCCESS"],
     "requiredResultStatus": "success"
   },
-  "tags": ["smoke", "runner"]
+  "tags": ["smoke", "runner"],
+  "taskType": "architectural_bug_fix",
+  "difficulty": {
+    "filesInvolved": 1,
+    "directoriesCrossed": 0,
+    "architecturalReasoningDepth": 1
+  },
+  "expectedScope": {
+    "criticalFiles": ["original.txt"],
+    "minFilesTouched": 1
+  }
 }

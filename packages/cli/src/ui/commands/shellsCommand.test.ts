@@ -9,11 +9,11 @@ import { shellsCommand } from './shellsCommand.js';
 import type { CommandContext } from './types.js';
 
 describe('shellsCommand', () => {
-  it('should call toggleBackgroundShell', async () => {
-    const toggleBackgroundShell = vi.fn();
+  it('should call toggleBackgroundTasks', async () => {
+    const toggleBackgroundTasks = vi.fn();
     const context = {
       ui: {
-        toggleBackgroundShell,
+        toggleBackgroundTasks,
       },
     } as unknown as CommandContext;
 
@@ -21,7 +21,7 @@ describe('shellsCommand', () => {
       await shellsCommand.action(context, '');
     }
 
-    expect(toggleBackgroundShell).toHaveBeenCalled();
+    expect(toggleBackgroundTasks).toHaveBeenCalled();
   });
 
   it('should have correct name and altNames', () => {

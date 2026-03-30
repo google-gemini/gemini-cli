@@ -15,6 +15,12 @@ export const ApprovalModeSchema = z.enum([
   'yolo',
   'plan',
 ]);
+export const TaskTypeSchema = z.enum([
+  'architectural_bug_fix',
+  'cross_component_feature',
+  'dependency_chain_resolution',
+  'configuration_aware_refactor',
+]);
 
 export const RepositorySchema = z
   .object({
@@ -24,6 +30,10 @@ export const RepositorySchema = z
     url: z.string().min(1).optional(),
     commitSha: z.string().min(1).optional(),
     description: z.string().optional(),
+    languages: z.array(z.string().min(1)).default([]),
+    license: z.string().min(1).optional(),
+    buildCommand: z.string().min(1).optional(),
+    testCommand: z.string().min(1).optional(),
   })
   .strict();
 
@@ -113,6 +123,30 @@ export const TaskValidationSchema = z.discriminatedUnion('type', [
   ExecutableOracleValidationSchema,
 ]);
 
+export const TaskDifficultySchema = z
+  .object({
+    filesInvolved: z.number().int().positive().optional(),
+    directoriesCrossed: z.number().int().nonnegative().optional(),
+    architecturalReasoningDepth: z.number().int().min(1).max(5).optional(),
+  })
+  .strict();
+
+export const AntiContaminationSchema = z
+  .object({
+    sourceCommitDate: z.string().datetime().optional(),
+    promptMutated: z.boolean().optional(),
+    humanValidated: z.boolean().optional(),
+    reviewers: z.array(z.string().min(1)).default([]),
+  })
+  .strict();
+
+export const ExpectedScopeSchema = z
+  .object({
+    criticalFiles: z.array(z.string().min(1)).default([]),
+    minFilesTouched: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+
 export const TaskSchema = z
   .object({
     id: z.string().min(1),
@@ -127,6 +161,12 @@ export const TaskSchema = z
     ]),
     validation: TaskValidationSchema,
     tags: z.array(z.string()).default([]),
+    taskType: TaskTypeSchema.optional(),
+    difficulty: TaskDifficultySchema.optional(),
+    goldenPatchPath: z.string().min(1).optional(),
+    antiContamination: AntiContaminationSchema.optional(),
+    expectedScope: ExpectedScopeSchema.optional(),
+    retired: z.boolean().default(false),
   })
   .strict();
 
@@ -139,10 +179,31 @@ export const ProcessMetricsSchema = z
     chatCompressionCount: z.number().int().nonnegative().default(0),
     compressionTokensSavedTotal: z.number().int().nonnegative().default(0),
     assistantMessageCount: z.number().int().nonnegative().default(0),
+    delegationCount: z.number().int().nonnegative().default(0),
+    delegatedAgentNames: z.array(z.string()).default([]),
+    filesRead: z.array(z.string()).default([]),
+    filesEdited: z.array(z.string()).default([]),
+    filesWritten: z.array(z.string()).default([]),
+    fileReadCount: z.number().int().nonnegative().default(0),
+    fileEditCount: z.number().int().nonnegative().default(0),
+    fileWriteCount: z.number().int().nonnegative().default(0),
+    searchToolCallCount: z.number().int().nonnegative().default(0),
     totalTokens: z.number().int().nonnegative().optional(),
     inputTokens: z.number().int().nonnegative().optional(),
     outputTokens: z.number().int().nonnegative().optional(),
     durationMs: z.number().int().nonnegative().default(0),
+  })
+  .strict();
+
+export const ValidationBreakdownSchema = z
+  .object({
+    failToPassPassed: z.number().int().nonnegative().optional(),
+    failToPassTotal: z.number().int().nonnegative().optional(),
+    passToPassPassed: z.number().int().nonnegative().optional(),
+    passToPassTotal: z.number().int().nonnegative().optional(),
+    augmentedPassed: z.number().int().nonnegative().optional(),
+    augmentedTotal: z.number().int().nonnegative().optional(),
+    buildPassed: z.boolean().optional(),
   })
   .strict();
 
@@ -168,9 +229,39 @@ export const RunResultSchema = z
     durationMs: z.number().int().nonnegative(),
     prompt: z.string().min(1),
     validationSummary: z.array(z.string()),
+    validationBreakdown: ValidationBreakdownSchema.optional(),
+    failureCategory: z.string().min(1).optional(),
     errorMessage: z.string().optional(),
     artifacts: RunArtifactsSchema,
     processMetrics: ProcessMetricsSchema,
+  })
+  .strict();
+
+export const ManifestRunTaskSummarySchema = z
+  .object({
+    taskId: z.string().min(1),
+    title: z.string().min(1),
+    repositoryId: z.string().min(1),
+    status: z.enum(['passed', 'failed']),
+    failureCategory: z.string().min(1).optional(),
+    runResultPath: z.string().min(1),
+    reportPath: z.string().min(1),
+  })
+  .strict();
+
+export const ManifestRunSummarySchema = z
+  .object({
+    manifestPath: z.string().min(1),
+    runDirectory: z.string().min(1),
+    startedAt: z.string().datetime(),
+    finishedAt: z.string().datetime(),
+    durationMs: z.number().int().nonnegative(),
+    totalTasks: z.number().int().nonnegative(),
+    passedTasks: z.number().int().nonnegative(),
+    failedTasks: z.number().int().nonnegative(),
+    taskResults: z.array(ManifestRunTaskSummarySchema),
+    aggregatedMetrics: ProcessMetricsSchema,
+    failureCategoryCounts: z.record(z.string(), z.number().int().nonnegative()),
   })
   .strict();
 
@@ -180,8 +271,13 @@ export type ManifestTaskEntry = z.infer<typeof ManifestTaskEntrySchema>;
 export type LongContextTask = z.infer<typeof TaskSchema>;
 export type TaskValidation = z.infer<typeof TaskValidationSchema>;
 export type ProcessMetrics = z.infer<typeof ProcessMetricsSchema>;
+export type ValidationBreakdown = z.infer<typeof ValidationBreakdownSchema>;
 export type RunArtifacts = z.infer<typeof RunArtifactsSchema>;
 export type RunResult = z.infer<typeof RunResultSchema>;
+export type ManifestRunTaskSummary = z.infer<
+  typeof ManifestRunTaskSummarySchema
+>;
+export type ManifestRunSummary = z.infer<typeof ManifestRunSummarySchema>;
 
 function toJsonSchema(schema: z.ZodTypeAny, name: string) {
   return zodToJsonSchema(schema, name);
@@ -202,6 +298,10 @@ export const ProcessMetricsJsonSchema = toJsonSchema(
   'ProcessMetrics',
 );
 export const RunResultJsonSchema = toJsonSchema(RunResultSchema, 'RunResult');
+export const ManifestRunSummaryJsonSchema = toJsonSchema(
+  ManifestRunSummarySchema,
+  'ManifestRunSummary',
+);
 
 export const LongContextJsonSchemas = {
   repository: RepositoryJsonSchema,
@@ -210,4 +310,5 @@ export const LongContextJsonSchemas = {
   task: TaskJsonSchema,
   processMetrics: ProcessMetricsJsonSchema,
   runResult: RunResultJsonSchema,
+  manifestRunSummary: ManifestRunSummaryJsonSchema,
 } as const;

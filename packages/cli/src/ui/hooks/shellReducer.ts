@@ -17,11 +17,15 @@ export interface BackgroundTask {
   completionBehavior?: CompletionBehavior;
 }
 
+export type BackgroundShell = BackgroundTask;
+
 export interface ShellState {
   activeShellPtyId: number | null;
   lastShellOutputTime: number;
   backgroundTasks: Map<number, BackgroundTask>;
+  backgroundShells: Map<number, BackgroundShell>;
   isBackgroundTaskVisible: boolean;
+  isBackgroundShellVisible: boolean;
 }
 
 export type ShellAction =
@@ -30,22 +34,47 @@ export type ShellAction =
   | { type: 'SET_VISIBILITY'; visible: boolean }
   | { type: 'TOGGLE_VISIBILITY' }
   | {
-      type: 'REGISTER_TASK';
+      type: 'REGISTER_TASK' | 'REGISTER_SHELL';
       pid: number;
       command: string;
       initialOutput: string | AnsiOutput;
       completionBehavior?: CompletionBehavior;
     }
-  | { type: 'UPDATE_TASK'; pid: number; update: Partial<BackgroundTask> }
-  | { type: 'APPEND_TASK_OUTPUT'; pid: number; chunk: string | AnsiOutput }
-  | { type: 'SYNC_BACKGROUND_TASKS' }
-  | { type: 'DISMISS_TASK'; pid: number };
+  | {
+      type: 'UPDATE_TASK' | 'UPDATE_SHELL';
+      pid: number;
+      update: Partial<BackgroundTask>;
+    }
+  | {
+      type: 'APPEND_TASK_OUTPUT' | 'APPEND_SHELL_OUTPUT';
+      pid: number;
+      chunk: string | AnsiOutput;
+    }
+  | { type: 'SYNC_BACKGROUND_TASKS' | 'SYNC_BACKGROUND_SHELLS' }
+  | { type: 'DISMISS_TASK' | 'DISMISS_SHELL'; pid: number };
+
+function withAliases(state: {
+  activeShellPtyId: number | null;
+  lastShellOutputTime: number;
+  backgroundTasks: Map<number, BackgroundTask>;
+  isBackgroundTaskVisible: boolean;
+}): ShellState {
+  return {
+    ...state,
+    backgroundShells: state.backgroundTasks,
+    isBackgroundShellVisible: state.isBackgroundTaskVisible,
+  };
+}
+
+const initialBackgroundTasks = new Map<number, BackgroundTask>();
 
 export const initialState: ShellState = {
   activeShellPtyId: null,
   lastShellOutputTime: 0,
-  backgroundTasks: new Map(),
+  backgroundTasks: initialBackgroundTasks,
+  backgroundShells: initialBackgroundTasks,
   isBackgroundTaskVisible: false,
+  isBackgroundShellVisible: false,
 };
 
 export function shellReducer(
@@ -54,17 +83,21 @@ export function shellReducer(
 ): ShellState {
   switch (action.type) {
     case 'SET_ACTIVE_PTY':
-      return { ...state, activeShellPtyId: action.pid };
+      return withAliases({ ...state, activeShellPtyId: action.pid });
     case 'SET_OUTPUT_TIME':
-      return { ...state, lastShellOutputTime: action.time };
+      return withAliases({ ...state, lastShellOutputTime: action.time });
     case 'SET_VISIBILITY':
-      return { ...state, isBackgroundTaskVisible: action.visible };
+      return withAliases({
+        ...state,
+        isBackgroundTaskVisible: action.visible,
+      });
     case 'TOGGLE_VISIBILITY':
-      return {
+      return withAliases({
         ...state,
         isBackgroundTaskVisible: !state.isBackgroundTaskVisible,
-      };
-    case 'REGISTER_TASK': {
+      });
+    case 'REGISTER_TASK':
+    case 'REGISTER_SHELL': {
       if (state.backgroundTasks.has(action.pid)) return state;
       const nextTasks = new Map(state.backgroundTasks);
       nextTasks.set(action.pid, {
@@ -76,26 +109,25 @@ export function shellReducer(
         status: 'running',
         completionBehavior: action.completionBehavior,
       });
-      return { ...state, backgroundTasks: nextTasks };
+      return withAliases({ ...state, backgroundTasks: nextTasks });
     }
-    case 'UPDATE_TASK': {
+    case 'UPDATE_TASK':
+    case 'UPDATE_SHELL': {
       const task = state.backgroundTasks.get(action.pid);
       if (!task) return state;
       const nextTasks = new Map(state.backgroundTasks);
       const updatedTask = { ...task, ...action.update };
-      // Maintain insertion order, move to end if status changed to exited
       if (action.update.status === 'exited') {
         nextTasks.delete(action.pid);
       }
       nextTasks.set(action.pid, updatedTask);
-      return { ...state, backgroundTasks: nextTasks };
+      return withAliases({ ...state, backgroundTasks: nextTasks });
     }
-    case 'APPEND_TASK_OUTPUT': {
+    case 'APPEND_TASK_OUTPUT':
+    case 'APPEND_SHELL_OUTPUT': {
       const task = state.backgroundTasks.get(action.pid);
       if (!task) return state;
-      // Note: we mutate the task object in the map for background updates
-      // to avoid re-rendering if the drawer is not visible.
-      // This is an intentional performance optimization for the CLI.
+
       let newOutput = task.output;
       if (typeof action.chunk === 'string') {
         newOutput =
@@ -107,28 +139,37 @@ export function shellReducer(
       }
       task.output = newOutput;
 
-      const nextState = { ...state, lastShellOutputTime: Date.now() };
+      const nextState = withAliases({
+        ...state,
+        lastShellOutputTime: Date.now(),
+      });
 
       if (state.isBackgroundTaskVisible) {
-        return {
+        const nextTasks = new Map(state.backgroundTasks);
+        return withAliases({
           ...nextState,
-          backgroundTasks: new Map(state.backgroundTasks),
-        };
+          backgroundTasks: nextTasks,
+        });
       }
       return nextState;
     }
-    case 'SYNC_BACKGROUND_TASKS': {
-      return { ...state, backgroundTasks: new Map(state.backgroundTasks) };
+    case 'SYNC_BACKGROUND_TASKS':
+    case 'SYNC_BACKGROUND_SHELLS': {
+      return withAliases({
+        ...state,
+        backgroundTasks: new Map(state.backgroundTasks),
+      });
     }
-    case 'DISMISS_TASK': {
+    case 'DISMISS_TASK':
+    case 'DISMISS_SHELL': {
       const nextTasks = new Map(state.backgroundTasks);
       nextTasks.delete(action.pid);
-      return {
+      return withAliases({
         ...state,
         backgroundTasks: nextTasks,
         isBackgroundTaskVisible:
           nextTasks.size === 0 ? false : state.isBackgroundTaskVisible,
-      };
+      });
     }
     default:
       return state;

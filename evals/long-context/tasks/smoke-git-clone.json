@@ -24,5 +24,19 @@
     "stdoutIncludes": ["CLONE_SMOKE_SUCCESS"],
     "stderrIncludes": []
   },
-  "tags": ["smoke", "git-clone"]
+  "tags": ["smoke", "git-clone"],
+  "taskType": "configuration_aware_refactor",
+  "difficulty": {
+    "filesInvolved": 1,
+    "directoriesCrossed": 0,
+    "architecturalReasoningDepth": 1
+  },
+  "antiContamination": {
+    "humanValidated": true,
+    "reviewers": ["long-context-scaffold"]
+  },
+  "expectedScope": {
+    "criticalFiles": ["clone-output.txt"],
+    "minFilesTouched": 1
+  }
 }

@@ -11,7 +11,7 @@ import {
 } from './useBackgroundShellManager.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
-import { type BackgroundShell } from './shellReducer.js';
+import { type BackgroundTask as BackgroundShell } from './useExecutionLifecycle.js';
 
 describe('useBackgroundShellManager', () => {
   const setEmbeddedShellFocused = vi.fn();

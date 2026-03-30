@@ -24,5 +24,15 @@
     "stdoutIncludes": ["COMMAND_SMOKE_SUCCESS"],
     "stderrIncludes": []
   },
-  "tags": ["smoke", "command-validation"]
+  "tags": ["smoke", "command-validation"],
+  "taskType": "cross_component_feature",
+  "difficulty": {
+    "filesInvolved": 1,
+    "directoriesCrossed": 0,
+    "architecturalReasoningDepth": 1
+  },
+  "expectedScope": {
+    "criticalFiles": ["output.txt"],
+    "minFilesTouched": 1
+  }
 }

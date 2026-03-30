@@ -9,15 +9,20 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
+  ManifestRunSummarySchema,
   ManifestSchema,
   RunResultSchema,
   TaskSchema,
   type LongContextTask,
   type Manifest,
+  type ManifestRunSummary,
+  type ManifestRunTaskSummary,
+  type ProcessMetrics,
   type Repository,
   type RunArtifacts,
   type RunResult,
   type TaskValidation,
+  type ValidationBreakdown,
 } from './schema.js';
 import { parseActivityLog } from './activity-log-parser.js';
 
@@ -54,9 +59,15 @@ interface CommandValidationResult {
   stderr: string;
 }
 
+interface ValidationOutcome {
+  summary: string[];
+  breakdown?: ValidationBreakdown;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
+const SUMMARY_FILE_NAME = 'summary.json';
 
 function parseArgs(argv: string[]): RunnerOptions {
   let manifestPath = path.join(__dirname, 'manifest.json');
@@ -65,6 +76,24 @@ function parseArgs(argv: string[]): RunnerOptions {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (arg.startsWith('--manifest=')) {
+      manifestPath = path.resolve(arg.slice('--manifest='.length));
+      continue;
+    }
+    if (arg.startsWith('--task-id=')) {
+      taskId = arg.slice('--task-id='.length);
+      continue;
+    }
+    if (arg.startsWith('--task=')) {
+      taskId = arg.slice('--task='.length);
+      continue;
+    }
+    if (arg.startsWith('--output-dir=')) {
+      outputDir = path.resolve(arg.slice('--output-dir='.length));
+      continue;
+    }
+
     if (arg === '--manifest') {
       manifestPath = path.resolve(argv[index + 1] ?? manifestPath);
       index += 1;
@@ -96,6 +125,14 @@ function loadManifest(manifestPath: string): Manifest {
   return readJsonFile(manifestPath, ManifestSchema);
 }
 
+function loadTaskByEntry(
+  manifestPath: string,
+  taskEntry: Manifest['tasks'][number],
+): LongContextTask {
+  const taskPath = path.resolve(path.dirname(manifestPath), taskEntry.file);
+  return readJsonFile(taskPath, TaskSchema);
+}
+
 function loadTask(
   manifest: Manifest,
   manifestPath: string,
@@ -113,8 +150,21 @@ function loadTask(
     );
   }
 
-  const taskPath = path.resolve(path.dirname(manifestPath), selectedTask.file);
-  return readJsonFile(taskPath, TaskSchema);
+  return loadTaskByEntry(manifestPath, selectedTask);
+}
+
+function loadTasksToRun(
+  manifest: Manifest,
+  manifestPath: string,
+  taskId?: string,
+): LongContextTask[] {
+  if (taskId) {
+    return [loadTask(manifest, manifestPath, taskId)];
+  }
+
+  return manifest.tasks
+    .map((taskEntry) => loadTaskByEntry(manifestPath, taskEntry))
+    .filter((task) => !task.retired);
 }
 
 function getRepository(manifest: Manifest, repositoryId: string): Repository {
@@ -130,6 +180,11 @@ function getRepository(manifest: Manifest, repositoryId: string): Repository {
 function makeRunId(taskId: string): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   return `${taskId}-${timestamp}`;
+}
+
+function makeManifestRunId(): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `manifest-${timestamp}`;
 }
 
 function ensureDir(dirPath: string): void {
@@ -378,13 +433,28 @@ function parseStreamJsonLines(stdout: string): StreamJsonEvent[] {
     .map((line) => JSON.parse(line) as StreamJsonEvent);
 }
 
+function summarizeExecutableOracleBreakdown(
+  validation: Extract<TaskValidation, { type: 'executable_oracle' }>,
+): ValidationBreakdown {
+  return {
+    failToPassPassed: validation.failToPass.length,
+    failToPassTotal: validation.failToPass.length,
+    passToPassPassed: validation.passToPass.length,
+    passToPassTotal: validation.passToPass.length,
+    augmentedPassed: validation.augmented.length,
+    augmentedTotal: validation.augmented.length,
+    buildPassed: validation.build ? true : undefined,
+  };
+}
+
 async function validateTaskOutput(
   task: LongContextTask,
   stdout: string,
   exitCode: number,
   cwd: string,
-): Promise<string[]> {
+): Promise<ValidationOutcome> {
   const validations: string[] = [];
+  let validationBreakdown: ValidationBreakdown | undefined;
 
   if (task.validation.type === 'stream_json') {
     const events = parseStreamJsonLines(stdout);
@@ -452,6 +522,7 @@ async function validateTaskOutput(
     for (const check of task.validation.augmented) {
       validations.push(...(await runValidationCheck(check, cwd)));
     }
+    validationBreakdown = summarizeExecutableOracleBreakdown(task.validation);
   }
 
   if (task.validation.type === 'final_output_contains') {
@@ -467,7 +538,10 @@ async function validateTaskOutput(
   }
   validations.push('cli exited successfully');
 
-  return validations;
+  return {
+    summary: validations,
+    breakdown: validationBreakdown,
+  };
 }
 
 function buildVitestCompatibleReport(
@@ -512,10 +586,14 @@ function mergeMetricValue(
   return Math.max(primary, secondary);
 }
 
+function mergePathLists(primary: string[], secondary: string[]): string[] {
+  return Array.from(new Set([...primary, ...secondary]));
+}
+
 function mergeProcessMetrics(
-  primary: RunResult['processMetrics'],
-  secondary: RunResult['processMetrics'],
-): RunResult['processMetrics'] {
+  primary: ProcessMetrics,
+  secondary: ProcessMetrics,
+): ProcessMetrics {
   return {
     toolCallCount: Math.max(primary.toolCallCount, secondary.toolCallCount),
     toolNames: Array.from(
@@ -538,6 +616,24 @@ function mergeProcessMetrics(
       primary.assistantMessageCount,
       secondary.assistantMessageCount,
     ),
+    delegationCount: Math.max(
+      primary.delegationCount,
+      secondary.delegationCount,
+    ),
+    delegatedAgentNames: mergePathLists(
+      primary.delegatedAgentNames,
+      secondary.delegatedAgentNames,
+    ),
+    filesRead: mergePathLists(primary.filesRead, secondary.filesRead),
+    filesEdited: mergePathLists(primary.filesEdited, secondary.filesEdited),
+    filesWritten: mergePathLists(primary.filesWritten, secondary.filesWritten),
+    fileReadCount: Math.max(primary.fileReadCount, secondary.fileReadCount),
+    fileEditCount: Math.max(primary.fileEditCount, secondary.fileEditCount),
+    fileWriteCount: Math.max(primary.fileWriteCount, secondary.fileWriteCount),
+    searchToolCallCount: Math.max(
+      primary.searchToolCallCount,
+      secondary.searchToolCallCount,
+    ),
     totalTokens: mergeMetricValue(primary.totalTokens, secondary.totalTokens),
     inputTokens: mergeMetricValue(primary.inputTokens, secondary.inputTokens),
     outputTokens: mergeMetricValue(
@@ -548,62 +644,195 @@ function mergeProcessMetrics(
   };
 }
 
-export async function runTask(options: RunnerOptions): Promise<RunResult> {
-  const manifest = loadManifest(options.manifestPath);
-  const task = loadTask(manifest, options.manifestPath, options.taskId);
+function sumMetricValue(
+  primary: number | undefined,
+  secondary: number | undefined,
+): number | undefined {
+  if (primary === undefined && secondary === undefined) {
+    return undefined;
+  }
+  return (primary ?? 0) + (secondary ?? 0);
+}
+
+function aggregateProcessMetrics(
+  metricsList: ProcessMetrics[],
+): ProcessMetrics {
+  return metricsList.reduce<ProcessMetrics>(
+    (aggregate, metrics) => ({
+      toolCallCount: aggregate.toolCallCount + metrics.toolCallCount,
+      toolNames: Array.from(
+        new Set([...aggregate.toolNames, ...metrics.toolNames]),
+      ),
+      apiRequestCount: aggregate.apiRequestCount + metrics.apiRequestCount,
+      apiErrorCount: aggregate.apiErrorCount + metrics.apiErrorCount,
+      chatCompressionCount:
+        aggregate.chatCompressionCount + metrics.chatCompressionCount,
+      compressionTokensSavedTotal:
+        aggregate.compressionTokensSavedTotal +
+        metrics.compressionTokensSavedTotal,
+      assistantMessageCount:
+        aggregate.assistantMessageCount + metrics.assistantMessageCount,
+      delegationCount: aggregate.delegationCount + metrics.delegationCount,
+      delegatedAgentNames: mergePathLists(
+        aggregate.delegatedAgentNames,
+        metrics.delegatedAgentNames,
+      ),
+      filesRead: mergePathLists(aggregate.filesRead, metrics.filesRead),
+      filesEdited: mergePathLists(aggregate.filesEdited, metrics.filesEdited),
+      filesWritten: mergePathLists(
+        aggregate.filesWritten,
+        metrics.filesWritten,
+      ),
+      fileReadCount: aggregate.fileReadCount + metrics.fileReadCount,
+      fileEditCount: aggregate.fileEditCount + metrics.fileEditCount,
+      fileWriteCount: aggregate.fileWriteCount + metrics.fileWriteCount,
+      searchToolCallCount:
+        aggregate.searchToolCallCount + metrics.searchToolCallCount,
+      totalTokens: sumMetricValue(aggregate.totalTokens, metrics.totalTokens),
+      inputTokens: sumMetricValue(aggregate.inputTokens, metrics.inputTokens),
+      outputTokens: sumMetricValue(
+        aggregate.outputTokens,
+        metrics.outputTokens,
+      ),
+      durationMs: aggregate.durationMs + metrics.durationMs,
+    }),
+    {
+      toolCallCount: 0,
+      toolNames: [],
+      apiRequestCount: 0,
+      apiErrorCount: 0,
+      chatCompressionCount: 0,
+      compressionTokensSavedTotal: 0,
+      assistantMessageCount: 0,
+      delegationCount: 0,
+      delegatedAgentNames: [],
+      filesRead: [],
+      filesEdited: [],
+      filesWritten: [],
+      fileReadCount: 0,
+      fileEditCount: 0,
+      fileWriteCount: 0,
+      searchToolCallCount: 0,
+      durationMs: 0,
+    },
+  );
+}
+
+function classifyFailure(
+  task: LongContextTask,
+  metrics: ProcessMetrics,
+  status: RunResult['status'],
+): string | undefined {
+  if (status !== 'failed') {
+    return undefined;
+  }
+
+  const touchedFileCount =
+    metrics.filesRead.length +
+    metrics.filesEdited.length +
+    metrics.filesWritten.length;
+
+  if (metrics.chatCompressionCount > 0) {
+    return 'context_loss_after_compression';
+  }
+
+  if (
+    (metrics.fileEditCount > 0 || metrics.fileWriteCount > 0) &&
+    metrics.fileReadCount <= 1 &&
+    metrics.searchToolCallCount === 0
+  ) {
+    return 'premature_commitment';
+  }
+
+  if (metrics.fileReadCount >= 3 && metrics.searchToolCallCount === 0) {
+    return 'tool_mismatch';
+  }
+
+  if (
+    task.expectedScope?.minFilesTouched !== undefined &&
+    touchedFileCount < task.expectedScope.minFilesTouched
+  ) {
+    return 'scope_under_estimation';
+  }
+
+  return 'unclassified';
+}
+
+function createRunArtifacts(runDirectory: string): RunArtifacts {
+  return {
+    runDirectory,
+    stdoutPath: path.join(runDirectory, 'stdout.log'),
+    stderrPath: path.join(runDirectory, 'stderr.log'),
+    activityLogPath: path.join(runDirectory, 'activity.jsonl'),
+    reportPath: path.join(runDirectory, 'report.json'),
+    runResultPath: path.join(runDirectory, 'run-result.json'),
+  };
+}
+
+function createTaskRunDirectory(
+  baseRunDirectory: string,
+  taskId: string,
+): string {
+  return path.join(baseRunDirectory, taskId);
+}
+
+export async function runSingleTask(
+  manifest: Manifest,
+  task: LongContextTask,
+  baseRunDirectory?: string,
+): Promise<RunResult> {
   const repository = getRepository(manifest, task.repositoryId);
 
-  const runId = makeRunId(task.id);
   const runDirectory =
-    options.outputDir ??
-    path.join(repoRoot, 'evals', 'logs', 'long-context', runId);
+    baseRunDirectory ??
+    path.join(repoRoot, 'evals', 'logs', 'long-context', makeRunId(task.id));
   ensureDir(runDirectory);
 
-  const stdoutPath = path.join(runDirectory, 'stdout.log');
-  const stderrPath = path.join(runDirectory, 'stderr.log');
-  const activityLogPath = path.join(runDirectory, 'activity.jsonl');
-  const reportPath = path.join(runDirectory, 'report.json');
-  const runResultPath = path.join(runDirectory, 'run-result.json');
-
-  const artifacts: RunArtifacts = {
-    runDirectory,
-    stdoutPath,
-    stderrPath,
-    activityLogPath,
-    reportPath,
-    runResultPath,
-  };
-
+  const artifacts = createRunArtifacts(runDirectory);
   const startedAt = new Date();
   const cwd = resolveRunnerCwd(repository, task, runDirectory);
   let validationSummary: string[] = [];
+  let validationBreakdown: ValidationBreakdown | undefined;
   let errorMessage: string | undefined;
   let status: 'passed' | 'failed' = 'passed';
 
-  const spawnResult = await runCli(task, cwd, activityLogPath, runDirectory);
-  fs.writeFileSync(stdoutPath, spawnResult.stdout);
-  fs.writeFileSync(stderrPath, spawnResult.stderr);
+  const spawnResult = await runCli(
+    task,
+    cwd,
+    artifacts.activityLogPath,
+    runDirectory,
+  );
+  fs.writeFileSync(artifacts.stdoutPath, spawnResult.stdout);
+  fs.writeFileSync(artifacts.stderrPath, spawnResult.stderr);
 
   const finishedAt = new Date();
   const durationMs = finishedAt.getTime() - startedAt.getTime();
 
   try {
-    validationSummary = await validateTaskOutput(
+    const validationOutcome = await validateTaskOutput(
       task,
       spawnResult.stdout,
       spawnResult.exitCode,
       cwd,
     );
+    validationSummary = validationOutcome.summary;
+    validationBreakdown = validationOutcome.breakdown;
   } catch (error) {
     status = 'failed';
     errorMessage = error instanceof Error ? error.message : String(error);
     validationSummary = errorMessage ? [errorMessage] : [];
   }
 
-  const { metrics } = await parseActivityLog(activityLogPath, durationMs);
-  const stdoutMetrics = (await parseActivityLog(stdoutPath, durationMs))
-    .metrics;
+  const { metrics } = await parseActivityLog(
+    artifacts.activityLogPath,
+    durationMs,
+  );
+  const stdoutMetrics = (
+    await parseActivityLog(artifacts.stdoutPath, durationMs)
+  ).metrics;
   const mergedMetrics = mergeProcessMetrics(metrics, stdoutMetrics);
+  const failureCategory = classifyFailure(task, mergedMetrics, status);
+
   const runResult = RunResultSchema.parse({
     taskId: task.id,
     title: task.title,
@@ -614,23 +843,114 @@ export async function runTask(options: RunnerOptions): Promise<RunResult> {
     durationMs,
     prompt: task.prompt,
     validationSummary,
+    validationBreakdown,
+    failureCategory,
     errorMessage,
     artifacts,
     processMetrics: mergedMetrics,
   });
 
   const report = buildVitestCompatibleReport(task, status);
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  fs.writeFileSync(runResultPath, JSON.stringify(runResult, null, 2));
+  fs.writeFileSync(artifacts.reportPath, JSON.stringify(report, null, 2));
+  fs.writeFileSync(artifacts.runResultPath, JSON.stringify(runResult, null, 2));
 
   return runResult;
 }
 
+export async function runTask(options: RunnerOptions): Promise<RunResult> {
+  const manifest = loadManifest(options.manifestPath);
+  const task = loadTask(manifest, options.manifestPath, options.taskId);
+  return await runSingleTask(manifest, task, options.outputDir);
+}
+
+export async function runManifest(
+  options: RunnerOptions,
+): Promise<ManifestRunSummary> {
+  const manifest = loadManifest(options.manifestPath);
+  const tasks = loadTasksToRun(manifest, options.manifestPath, options.taskId);
+
+  if (tasks.length === 0) {
+    throw new Error('Manifest contains no runnable tasks');
+  }
+
+  const startedAt = new Date();
+  const runDirectory =
+    options.outputDir ??
+    path.join(repoRoot, 'evals', 'logs', 'long-context', makeManifestRunId());
+  ensureDir(runDirectory);
+
+  const taskResults: RunResult[] = [];
+  for (const task of tasks) {
+    const taskRunDirectory = createTaskRunDirectory(runDirectory, task.id);
+    const taskResult = await runSingleTask(manifest, task, taskRunDirectory);
+    taskResults.push(taskResult);
+  }
+
+  const finishedAt = new Date();
+  const durationMs = finishedAt.getTime() - startedAt.getTime();
+  const passedTasks = taskResults.filter(
+    (result) => result.status === 'passed',
+  ).length;
+  const failedTasks = taskResults.length - passedTasks;
+  const aggregatedMetrics = aggregateProcessMetrics(
+    taskResults.map((result) => result.processMetrics),
+  );
+  const failureCategoryCounts = taskResults.reduce<Record<string, number>>(
+    (counts, result) => {
+      if (!result.failureCategory) {
+        return counts;
+      }
+      counts[result.failureCategory] =
+        (counts[result.failureCategory] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
+
+  const manifestSummary = ManifestRunSummarySchema.parse({
+    manifestPath: options.manifestPath,
+    runDirectory,
+    startedAt: startedAt.toISOString(),
+    finishedAt: finishedAt.toISOString(),
+    durationMs,
+    totalTasks: taskResults.length,
+    passedTasks,
+    failedTasks,
+    taskResults: taskResults.map<ManifestRunTaskSummary>((result) => ({
+      taskId: result.taskId,
+      title: result.title,
+      repositoryId: result.repositoryId,
+      status: result.status,
+      failureCategory: result.failureCategory,
+      runResultPath: result.artifacts.runResultPath,
+      reportPath: result.artifacts.reportPath,
+    })),
+    aggregatedMetrics,
+    failureCategoryCounts,
+  });
+
+  fs.writeFileSync(
+    path.join(runDirectory, SUMMARY_FILE_NAME),
+    JSON.stringify(manifestSummary, null, 2),
+  );
+
+  return manifestSummary;
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const runResult = await runTask(options);
-  process.stdout.write(JSON.stringify(runResult, null, 2) + '\n');
-  if (runResult.status === 'failed') {
+  if (options.taskId) {
+    const runResult = await runTask(options);
+    process.stdout.write(JSON.stringify(runResult, null, 2) + '\n');
+    if (runResult.status === 'failed') {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  const summary = await runManifest(options);
+  process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+  if (summary.failedTasks > 0) {
     process.exitCode = 1;
   }
 }

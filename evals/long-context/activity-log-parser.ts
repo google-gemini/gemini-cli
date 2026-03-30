@@ -15,6 +15,7 @@ interface ActivityLogEntry {
   role?: 'user' | 'assistant';
   content?: string;
   tool_name?: string;
+  parameters?: Record<string, unknown>;
   stats?: {
     total_tokens?: number;
     input_tokens?: number;
@@ -27,7 +28,9 @@ interface StreamJsonEvent {
   type?: string;
   role?: 'user' | 'assistant';
   tool_name?: string;
+  tool_id?: string;
   status?: 'success' | 'error';
+  parameters?: Record<string, unknown>;
   stats?: {
     total_tokens?: number;
     input_tokens?: number;
@@ -52,6 +55,15 @@ interface ParsedActivityLog {
   metrics: ProcessMetrics;
   entries: ActivityLogEntry[];
 }
+
+const SEARCH_TOOL_NAMES = new Set([
+  'glob',
+  'grep',
+  'glob_search',
+  'grep_search',
+  'search_file_content',
+]);
+const MAX_TRACKED_PATHS = 50;
 
 function parseJsonLine(line: string): ActivityLogEntry | null {
   if (!line.trim()) {
@@ -134,6 +146,111 @@ function tryGetCompressionTokens(payload: unknown): number | null {
   return null;
 }
 
+function addPath(target: Set<string>, pathValue: unknown) {
+  if (typeof pathValue !== 'string' || pathValue.length === 0) {
+    return;
+  }
+  if (target.size >= MAX_TRACKED_PATHS) {
+    return;
+  }
+  target.add(pathValue);
+}
+
+function maybeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function recordToolParameters(
+  toolName: string,
+  parameters: unknown,
+  filesRead: Set<string>,
+  filesEdited: Set<string>,
+  filesWritten: Set<string>,
+  delegatedAgentNames: Set<string>,
+): {
+  delegationIncrement: number;
+  fileReadIncrement: number;
+  fileEditIncrement: number;
+  fileWriteIncrement: number;
+  searchToolIncrement: number;
+} {
+  let delegationIncrement = 0;
+  let fileReadIncrement = 0;
+  let fileEditIncrement = 0;
+  let fileWriteIncrement = 0;
+  let searchToolIncrement = 0;
+
+  if (SEARCH_TOOL_NAMES.has(toolName)) {
+    searchToolIncrement = 1;
+  }
+
+  if (!parameters || typeof parameters !== 'object') {
+    return {
+      delegationIncrement,
+      fileReadIncrement,
+      fileEditIncrement,
+      fileWriteIncrement,
+      searchToolIncrement,
+    };
+  }
+
+  if (toolName === 'read_file') {
+    addPath(
+      filesRead,
+      'file_path' in parameters ? parameters.file_path : undefined,
+    );
+    fileReadIncrement = 1;
+  }
+
+  if (toolName === 'edit') {
+    addPath(
+      filesEdited,
+      'file_path' in parameters ? parameters.file_path : undefined,
+    );
+    fileEditIncrement = 1;
+  }
+
+  if (toolName === 'write' || toolName === 'write_file') {
+    addPath(
+      filesWritten,
+      'file_path' in parameters ? parameters.file_path : undefined,
+    );
+    fileWriteIncrement = 1;
+  }
+
+  if (toolName === 'Agent') {
+    const agentName =
+      'subagent_type' in parameters &&
+      typeof parameters.subagent_type === 'string'
+        ? parameters.subagent_type
+        : 'description' in parameters &&
+            typeof parameters.description === 'string'
+          ? parameters.description
+          : undefined;
+    if (agentName) {
+      delegatedAgentNames.add(agentName);
+    }
+    delegationIncrement = 1;
+  }
+
+  for (const extraReadPath of maybeStringArray(
+    'file_paths' in parameters ? parameters.file_paths : undefined,
+  )) {
+    addPath(filesRead, extraReadPath);
+  }
+
+  return {
+    delegationIncrement,
+    fileReadIncrement,
+    fileEditIncrement,
+    fileWriteIncrement,
+    searchToolIncrement,
+  };
+}
+
 export async function parseActivityLog(
   activityLogPath: string,
   baseDurationMs = 0,
@@ -152,6 +269,15 @@ export async function parseActivityLog(
         chatCompressionCount: 0,
         compressionTokensSavedTotal: 0,
         assistantMessageCount: 0,
+        delegationCount: 0,
+        delegatedAgentNames: [],
+        filesRead: [],
+        filesEdited: [],
+        filesWritten: [],
+        fileReadCount: 0,
+        fileEditCount: 0,
+        fileWriteCount: 0,
+        searchToolCallCount: 0,
         durationMs: baseDurationMs,
       },
     };
@@ -163,6 +289,10 @@ export async function parseActivityLog(
     .filter((entry): entry is ActivityLogEntry => entry !== null);
 
   const toolNames = new Set<string>();
+  const delegatedAgentNames = new Set<string>();
+  const filesRead = new Set<string>();
+  const filesEdited = new Set<string>();
+  const filesWritten = new Set<string>();
   let toolCallCount = 0;
   let apiRequestCount = 0;
   let apiErrorCount = 0;
@@ -170,6 +300,11 @@ export async function parseActivityLog(
   let chatCompressionCount = 0;
   let compressionTokensSavedTotal = 0;
   let assistantMessageCount = 0;
+  let delegationCount = 0;
+  let fileReadCount = 0;
+  let fileEditCount = 0;
+  let fileWriteCount = 0;
+  let searchToolCallCount = 0;
   let totalTokens: number | undefined;
   let inputTokens: number | undefined;
   let outputTokens: number | undefined;
@@ -179,6 +314,19 @@ export async function parseActivityLog(
     if (entry.type === 'tool_use' && typeof entry.tool_name === 'string') {
       toolCallCount += 1;
       toolNames.add(entry.tool_name);
+      const increments = recordToolParameters(
+        entry.tool_name,
+        entry.parameters,
+        filesRead,
+        filesEdited,
+        filesWritten,
+        delegatedAgentNames,
+      );
+      delegationCount += increments.delegationIncrement;
+      fileReadCount += increments.fileReadIncrement;
+      fileEditCount += increments.fileEditIncrement;
+      fileWriteCount += increments.fileWriteIncrement;
+      searchToolCallCount += increments.searchToolIncrement;
       continue;
     }
 
@@ -235,6 +383,19 @@ export async function parseActivityLog(
       if (streamEvent.type === 'tool_use' && streamEvent.tool_name) {
         toolCallCount += 1;
         toolNames.add(streamEvent.tool_name);
+        const increments = recordToolParameters(
+          streamEvent.tool_name,
+          streamEvent.parameters,
+          filesRead,
+          filesEdited,
+          filesWritten,
+          delegatedAgentNames,
+        );
+        delegationCount += increments.delegationIncrement;
+        fileReadCount += increments.fileReadIncrement;
+        fileEditCount += increments.fileEditIncrement;
+        fileWriteCount += increments.fileWriteIncrement;
+        searchToolCallCount += increments.searchToolIncrement;
       }
       if (streamEvent.type === 'message' && streamEvent.role === 'assistant') {
         assistantMessageCount += 1;
@@ -254,6 +415,19 @@ export async function parseActivityLog(
         if (event.type === 'tool_use' && event.tool_name) {
           toolCallCount += 1;
           toolNames.add(event.tool_name);
+          const increments = recordToolParameters(
+            event.tool_name,
+            event.parameters,
+            filesRead,
+            filesEdited,
+            filesWritten,
+            delegatedAgentNames,
+          );
+          delegationCount += increments.delegationIncrement;
+          fileReadCount += increments.fileReadIncrement;
+          fileEditCount += increments.fileEditIncrement;
+          fileWriteCount += increments.fileWriteIncrement;
+          searchToolCallCount += increments.searchToolIncrement;
         }
         if (event.type === 'message' && event.role === 'assistant') {
           assistantMessageCount += 1;
@@ -292,6 +466,15 @@ export async function parseActivityLog(
       chatCompressionCount,
       compressionTokensSavedTotal,
       assistantMessageCount,
+      delegationCount,
+      delegatedAgentNames: Array.from(delegatedAgentNames),
+      filesRead: Array.from(filesRead),
+      filesEdited: Array.from(filesEdited),
+      filesWritten: Array.from(filesWritten),
+      fileReadCount,
+      fileEditCount,
+      fileWriteCount,
+      searchToolCallCount,
       totalTokens,
       inputTokens,
       outputTokens,

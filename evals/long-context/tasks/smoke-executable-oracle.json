@@ -54,5 +54,15 @@
     },
     "augmented": []
   },
-  "tags": ["smoke", "executable-oracle"]
+  "tags": ["smoke", "executable-oracle"],
+  "taskType": "dependency_chain_resolution",
+  "difficulty": {
+    "filesInvolved": 2,
+    "directoriesCrossed": 0,
+    "architecturalReasoningDepth": 1
+  },
+  "expectedScope": {
+    "criticalFiles": ["oracle-output.txt", "original.txt"],
+    "minFilesTouched": 1
+  }
 }
