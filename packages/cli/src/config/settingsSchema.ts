@@ -2472,34 +2472,23 @@ const SETTINGS_SCHEMA = {
         default: {},
         showInDialog: false,
         properties: {
-          truncationThreshold: {
+          maxTokens: {
             type: 'number',
-            label: 'Truncation Threshold',
+            label: 'Max Tokens',
             category: 'Context Management',
             requiresRestart: true,
-            default: 25,
+            default: 150_000,
             description:
-              'The maximum number of messages before history is truncated.',
+              'The number of tokens to allow before triggering compression.',
             showInDialog: false,
           },
-          retainedMessages: {
+          retainedTokens: {
             type: 'number',
-            label: 'Retained Messages',
+            label: 'Retained Tokens',
             category: 'Context Management',
             requiresRestart: true,
-            default: 20,
-            description:
-              'The number of recent messages to retain after truncation.',
-            showInDialog: false,
-          },
-          targetRetainedTokens: {
-            type: 'number',
-            label: 'Target Retained Tokens',
-            category: 'Context Management',
-            requiresRestart: true,
-            default: 40000,
-            description:
-              'The target number of tokens to retain in the session history.',
+            default: 40_000,
+            description: 'The number of tokens to always retain.',
             showInDialog: false,
           },
         },
@@ -2512,9 +2501,9 @@ const SETTINGS_SCHEMA = {
         default: {},
         showInDialog: false,
         properties: {
-          normalTokenLimit: {
+          normalMaxTokens: {
             type: 'number',
-            label: 'Normal Token Limit',
+            label: 'Normal Maximum Tokens',
             category: 'Context Management',
             requiresRestart: true,
             default: 2500,
@@ -2522,9 +2511,9 @@ const SETTINGS_SCHEMA = {
               'The target number of tokens to budget for a normal conversation turn.',
             showInDialog: false,
           },
-          maximumTokenLimit: {
+          retainedMaxTokens: {
             type: 'number',
-            label: 'Maximum Token Limit',
+            label: 'Retained Maximum Tokens',
             category: 'Context Management',
             requiresRestart: true,
             default: 12000,
@@ -2552,22 +2541,22 @@ const SETTINGS_SCHEMA = {
         default: {},
         showInDialog: false,
         properties: {
-          truncationThreshold: {
+          maxOutputTokens: {
             type: 'number',
-            label: 'Tool Truncation Threshold',
+            label: 'Max Output Tokens',
             category: 'Context Management',
             requiresRestart: true,
-            default: 40000,
+            default: 10_000,
             description:
-              'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
+              'Maximum tokens to show when truncating large tool outputs.',
             showInDialog: false,
           },
-          summarizationThreshold: {
+          summarizationThresholdTokens: {
             type: 'number',
             label: 'Tool Summarization Threshold',
             category: 'Context Management',
             requiresRestart: true,
-            default: 80000,
+            default: 20_000,
             description:
               'Threshold above which truncated tool outputs will be summarized by an LLM.',
             showInDialog: false,

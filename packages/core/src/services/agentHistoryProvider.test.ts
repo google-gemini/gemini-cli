@@ -5,12 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  AgentHistoryProvider,
-  truncateProportionally,
-  TEXT_TRUNCATION_PREFIX,
-  TOOL_TRUNCATION_PREFIX,
-} from './agentHistoryProvider.js';
+import { AgentHistoryProvider } from './agentHistoryProvider.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 
 vi.mock('../utils/tokenCalculation.js', () => ({
@@ -23,6 +18,11 @@ import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import type { Config, ContextManagementConfig } from '../config/config.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { AgentHistoryProviderConfig } from './types.js';
+import {
+  TEXT_TRUNCATION_PREFIX,
+  TOOL_TRUNCATION_PREFIX,
+  truncateProportionally,
+} from 'src/utils/truncation.js';
 
 describe('AgentHistoryProvider', () => {
   let config: Config;
@@ -40,8 +40,9 @@ describe('AgentHistoryProvider', () => {
     } as unknown as Config;
 
     // By default, messages are small
-    vi.mocked(estimateTokenCountSync).mockReturnValue(100);
-
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 100,
+    );
     generateContentMock = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: 'Mock intent summary' }] } }],
     } as unknown as GenerateContentResponse);
@@ -50,9 +51,8 @@ describe('AgentHistoryProvider', () => {
       generateContent: generateContentMock,
     } as unknown as BaseLlmClient);
     providerConfig = {
-      truncationThreshold: 30,
-      retainedMessages: 15,
-      targetRetainedTokens: 60000,
+      maxTokens: 60000,
+      retainedTokens: 40000,
       normalMessageTokens: 2500,
       maximumMessageTokens: 10000,
       normalizationHeadRatio: 0.2,
@@ -90,16 +90,18 @@ describe('AgentHistoryProvider', () => {
 
   it('should truncate when total tokens exceed budget, preserving structural integrity', async () => {
     providerConfig.isTruncationEnabled = true;
+    providerConfig.maxTokens = 60000;
+    providerConfig.retainedTokens = 60000;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: false,
     } as unknown as ContextManagementConfig);
 
     // Make each message cost 4000 tokens
-    vi.mocked(estimateTokenCountSync).mockReturnValue(4000);
-
-    const history = createMockHistory(35); // Above 30 threshold
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 4000,
+    );
+    const history = createMockHistory(35); // 35 * 4000 = 140,000 total tokens > maxTokens
     const result = await provider.manageHistory(history);
-
     // Budget = 60000. Each message costs 4000. 60000 / 4000 = 15.
     // However, some messages get normalized.
     // The grace period is 15 messages. Their target is MAXIMUM_MESSAGE_TOKENS (10000).
@@ -122,12 +124,15 @@ describe('AgentHistoryProvider', () => {
   it('should call summarizer and prepend summary when summarization is enabled', async () => {
     providerConfig.isTruncationEnabled = true;
     providerConfig.isSummarizationEnabled = true;
+    providerConfig.maxTokens = 60000;
+    providerConfig.retainedTokens = 60000;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: true,
     } as unknown as ContextManagementConfig);
 
-    vi.mocked(estimateTokenCountSync).mockReturnValue(4000);
-
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 4000,
+    );
     const history = createMockHistory(35);
     const result = await provider.manageHistory(history);
 
@@ -141,11 +146,14 @@ describe('AgentHistoryProvider', () => {
   it('should handle summarizer failures gracefully', async () => {
     providerConfig.isTruncationEnabled = true;
     providerConfig.isSummarizationEnabled = true;
+    providerConfig.maxTokens = 60000;
+    providerConfig.retainedTokens = 60000;
     vi.spyOn(config, 'getContextManagementConfig').mockReturnValue({
       enabled: true,
     } as unknown as ContextManagementConfig);
-    vi.mocked(estimateTokenCountSync).mockReturnValue(4000);
-
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 4000,
+    );
     generateContentMock.mockRejectedValue(new Error('API Error'));
 
     const history = createMockHistory(35);
@@ -166,15 +174,14 @@ describe('AgentHistoryProvider', () => {
       enabled: true,
     } as unknown as ContextManagementConfig);
 
-    // Threshold 2 means if length > 2, it WILL truncate.
-    providerConfig.truncationThreshold = 2;
-    // budget 10 tokens means it will only keep 1 message if they are 10 each.
-    providerConfig.targetRetainedTokens = 10;
-    // But we have a grace zone of 2, so it will keep 2.
-    providerConfig.retainedMessages = 2;
+    // Max tokens 30 means if total tokens > 30, it WILL truncate.
+    providerConfig.maxTokens = 30;
+    // budget 20 tokens means it will keep 2 messages if they are 10 each.
+    providerConfig.retainedTokens = 20;
 
-    vi.mocked(estimateTokenCountSync).mockReturnValue(10);
-
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 10,
+    );
     const history: Content[] = [
       { role: 'user', parts: [{ text: 'Old Message' }] },
       { role: 'model', parts: [{ text: 'Old Response' }] },
@@ -200,12 +207,12 @@ describe('AgentHistoryProvider', () => {
       enabled: true,
     } as unknown as ContextManagementConfig);
 
-    providerConfig.truncationThreshold = 1;
-    providerConfig.targetRetainedTokens = 10;
-    providerConfig.retainedMessages = 1;
+    providerConfig.maxTokens = 20;
+    providerConfig.retainedTokens = 10;
 
-    vi.mocked(estimateTokenCountSync).mockReturnValue(10);
-
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 10,
+    );
     const history: Content[] = [
       {
         role: 'user',
@@ -232,12 +239,12 @@ describe('AgentHistoryProvider', () => {
       enabled: true,
     } as unknown as ContextManagementConfig);
 
-    providerConfig.truncationThreshold = 1;
-    providerConfig.targetRetainedTokens = 10;
-    providerConfig.retainedMessages = 1;
+    providerConfig.maxTokens = 20;
+    providerConfig.retainedTokens = 10;
 
-    vi.mocked(estimateTokenCountSync).mockReturnValue(10);
-
+    vi.mocked(estimateTokenCountSync).mockImplementation(
+      (parts: Part[]) => parts.length * 10,
+    );
     const history: Content[] = [
       {
         role: 'model',
@@ -262,11 +269,9 @@ describe('AgentHistoryProvider', () => {
   describe('Tiered Normalization Logic', () => {
     it('normalizes large messages incrementally: newest and exit-grace', async () => {
       providerConfig.isTruncationEnabled = true;
-      providerConfig.retainedMessages = 15;
+      providerConfig.retainedTokens = 30000;
       providerConfig.maximumMessageTokens = 10000;
-      providerConfig.normalMessageTokens = 2500;
-
-      // History of 35 messages.
+      providerConfig.normalMessageTokens = 2500; // History of 35 messages.
       // Index 34: Newest (Grace Zone) -> Target 10000 tokens (~40000 chars)
       // Index 19: Exit Grace (35-1-15=19) -> Target 2500 tokens (~10000 chars)
       // Index 10: Archived -> Should NOT be normalized in this turn (Incremental optimization)

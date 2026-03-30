@@ -1800,29 +1800,24 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `contextManagement`
 
-- **`contextManagement.historyWindow.truncationThreshold`** (number):
-  - **Description:** The maximum number of messages before history is truncated.
-  - **Default:** `25`
+- **`contextManagement.historyWindow.maxTokens`** (number):
+  - **Description:** The number of tokens to allow before triggering
+    compression.
+  - **Default:** `150000`
   - **Requires restart:** Yes
 
-- **`contextManagement.historyWindow.retainedMessages`** (number):
-  - **Description:** The number of recent messages to retain after truncation.
-  - **Default:** `20`
-  - **Requires restart:** Yes
-
-- **`contextManagement.historyWindow.targetRetainedTokens`** (number):
-  - **Description:** The target number of tokens to retain in the session
-    history.
+- **`contextManagement.historyWindow.retainedTokens`** (number):
+  - **Description:** The number of tokens to always retain.
   - **Default:** `40000`
   - **Requires restart:** Yes
 
-- **`contextManagement.messageLimits.normalTokenLimit`** (number):
+- **`contextManagement.messageLimits.normalMaxTokens`** (number):
   - **Description:** The target number of tokens to budget for a normal
     conversation turn.
   - **Default:** `2500`
   - **Requires restart:** Yes
 
-- **`contextManagement.messageLimits.maximumTokenLimit`** (number):
+- **`contextManagement.messageLimits.retainedMaxTokens`** (number):
   - **Description:** The maximum number of tokens a single conversation turn can
     consume before truncation.
   - **Default:** `12000`
@@ -1834,16 +1829,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.25`
   - **Requires restart:** Yes
 
-- **`contextManagement.toolDistillation.truncationThreshold`** (number):
-  - **Description:** Maximum characters to show when truncating large tool
-    outputs. Set to 0 or negative to disable truncation.
-  - **Default:** `40000`
+- **`contextManagement.toolDistillation.maxOutputTokens`** (number):
+  - **Description:** Maximum tokens to show when truncating large tool outputs.
+  - **Default:** `10000`
   - **Requires restart:** Yes
 
-- **`contextManagement.toolDistillation.summarizationThreshold`** (number):
+- **`contextManagement.toolDistillation.summarizationThresholdTokens`**
+  (number):
   - **Description:** Threshold above which truncated tool outputs will be
     summarized by an LLM.
-  - **Default:** `80000`
+  - **Default:** `20000`
   - **Requires restart:** Yes
 
 #### `admin`

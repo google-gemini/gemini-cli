@@ -6,78 +6,19 @@
 
 import type { Content, Part } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
-import {
-  estimateTokenCountSync,
-  ASCII_TOKENS_PER_CHAR,
-  NON_ASCII_TOKENS_PER_CHAR,
-} from '../utils/tokenCalculation.js';
+import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AgentHistoryProviderConfig } from './types.js';
 import type { Config } from '../config/config.js';
-
-export const MIN_TARGET_TOKENS = 10;
-export const MIN_CHARS_FOR_TRUNCATION = 100;
-export const TEXT_TRUNCATION_PREFIX =
-  '[Message Normalized: Exceeded size limit]';
-export const TOOL_TRUNCATION_PREFIX =
-  '[Message Normalized: Tool output exceeded size limit]';
-
-/**
- * Estimates the character limit for a target token count, accounting for ASCII vs Non-ASCII.
- * Uses a weighted average based on the provided text to decide how many characters
- * fit into the target token budget.
- */
-export function estimateCharsFromTokens(
-  text: string,
-  targetTokens: number,
-): number {
-  if (text.length === 0) return 0;
-
-  // Count ASCII vs Non-ASCII in a sample of the text.
-  let asciiCount = 0;
-  const sampleLen = Math.min(text.length, 1000);
-  for (let i = 0; i < sampleLen; i++) {
-    if (text.charCodeAt(i) <= 127) {
-      asciiCount++;
-    }
-  }
-
-  const asciiRatio = asciiCount / sampleLen;
-  // Weighted tokens per character:
-  const avgTokensPerChar =
-    asciiRatio * ASCII_TOKENS_PER_CHAR +
-    (1 - asciiRatio) * NON_ASCII_TOKENS_PER_CHAR;
-
-  // Characters = Tokens / (Tokens per Character)
-  return Math.floor(targetTokens / avgTokensPerChar);
-}
-
-/**
- * Truncates a string to a target length, keeping a proportional amount of the head and tail,
- * and prepending a prefix.
- */
-export function truncateProportionally(
-  str: string,
-  targetChars: number,
-  prefix: string,
-  headRatio: number = 0.2,
-): string {
-  if (str.length <= targetChars) return str;
-
-  const ellipsis = '\n...\n';
-  const overhead = prefix.length + ellipsis.length + 1; // +1 for the newline after prefix
-  const availableChars = Math.max(0, targetChars - overhead);
-
-  if (availableChars <= 0) {
-    return prefix; // Safe fallback if target is extremely small
-  }
-
-  const headChars = Math.floor(availableChars * headRatio);
-  const tailChars = availableChars - headChars;
-
-  return `${prefix}\n${str.substring(0, headChars)}${ellipsis}${str.substring(str.length - tailChars)}`;
-}
+import {
+  MIN_TARGET_TOKENS,
+  MIN_CHARS_FOR_TRUNCATION,
+  TEXT_TRUNCATION_PREFIX,
+  estimateCharsFromTokens,
+  truncateProportionally,
+  normalizeFunctionResponse,
+} from '../utils/truncation.js';
 
 export class AgentHistoryProvider {
   // TODO(joshualitt): just pass the BaseLlmClient instead of the whole Config.
@@ -101,8 +42,12 @@ export class AgentHistoryProvider {
     // Step 1: Normalize newest messages.
     const normalizedHistory = this.enforceMessageSizeLimits(history);
 
-    // Step 2: Check if truncation is needed based on the threshold
-    if (normalizedHistory.length <= this.providerConfig.truncationThreshold) {
+    const totalTokens = estimateTokenCountSync(
+      normalizedHistory.flatMap((c) => c.parts || []),
+    );
+
+    // Step 2: Check if truncation is needed based on the token threshold (High Watermark)
+    if (totalTokens <= this.providerConfig.maxTokens) {
       return normalizedHistory;
     }
 
@@ -140,10 +85,18 @@ export class AgentHistoryProvider {
     if (history.length === 0) return history;
 
     let hasChanges = false;
-    const graceStartIndex = Math.max(
-      0,
-      history.length - this.providerConfig.retainedMessages,
-    );
+    let accumulatedTokens = 0;
+
+    // Scan backwards to find the index where the token budget is exhausted
+    let graceStartIndex = 0;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msgTokens = estimateTokenCountSync(history[i].parts || []);
+      accumulatedTokens += msgTokens;
+      if (accumulatedTokens > this.providerConfig.retainedTokens) {
+        graceStartIndex = i + 1;
+        break;
+      }
+    }
 
     const newHistory = history.map((msg, i) => {
       const targetTokens =
@@ -204,69 +157,19 @@ export class AgentHistoryProvider {
           newParts.push(part);
         }
       } else if (part.functionResponse) {
-        newParts.push(this.normalizeFunctionResponse(part, ratio));
+        newParts.push(
+          normalizeFunctionResponse(
+            part,
+            ratio,
+            this.providerConfig.normalizationHeadRatio,
+          ),
+        );
       } else {
         newParts.push(part);
       }
     }
 
     return { ...msg, parts: newParts };
-  }
-
-  /**
-   * Safely normalizes a function response by truncating large string values
-   * within the response object while maintaining its JSON structure.
-   */
-  private normalizeFunctionResponse(part: Part, ratio: number): Part {
-    const fr = part.functionResponse;
-    if (!fr || !fr.response) return part;
-
-    const responseObj = fr.response;
-    if (!responseObj || typeof responseObj !== 'object') return part;
-
-    let hasChanges = false;
-    const newResponse: Record<string, unknown> = {};
-
-    // For function responses, we truncate individual string values that are large.
-    // This preserves the schema keys (stdout, stderr, etc).
-    const entries = Object.entries(responseObj);
-    for (const [key, value] of entries) {
-      if (
-        typeof value === 'string' &&
-        value.length > MIN_CHARS_FOR_TRUNCATION
-      ) {
-        const valueTokens = estimateTokenCountSync([{ text: value }]);
-        const targetValueTokens = Math.max(
-          MIN_TARGET_TOKENS,
-          Math.floor(valueTokens * ratio),
-        );
-        const targetChars = estimateCharsFromTokens(value, targetValueTokens);
-
-        if (value.length > targetChars) {
-          newResponse[key] = truncateProportionally(
-            value,
-            targetChars,
-            TOOL_TRUNCATION_PREFIX,
-            this.providerConfig.normalizationHeadRatio,
-          );
-          hasChanges = true;
-          continue;
-        }
-      }
-      newResponse[key] = value;
-    }
-
-    if (!hasChanges) return part;
-
-    const newFr = {
-      // eslint-disable-next-line @typescript-eslint/no-misused-spread
-      ...fr,
-      response: newResponse,
-    };
-
-    return {
-      functionResponse: newFr,
-    } as Part;
   }
 
   /**
@@ -281,19 +184,13 @@ export class AgentHistoryProvider {
     let accumulatedTokens = 0;
     let truncationBoundary = 0; // The index of the first message to keep
 
-    const graceTurns = this.providerConfig.retainedMessages;
-
     // Scan backwards to calculate the boundary based on token budget
     for (let i = history.length - 1; i >= 0; i--) {
       const msg = history[i];
-      const isGraceZone = history.length - 1 - i < graceTurns;
       const msgTokens = estimateTokenCountSync(msg.parts || []);
 
-      // 2. Archive Zone / Token Budget
-      if (
-        !isGraceZone &&
-        accumulatedTokens + msgTokens > this.providerConfig.targetRetainedTokens
-      ) {
+      // Token Budget
+      if (accumulatedTokens + msgTokens > this.providerConfig.retainedTokens) {
         // Exceeded budget, stop retaining messages here.
         truncationBoundary = i + 1;
         break;
@@ -302,7 +199,7 @@ export class AgentHistoryProvider {
       accumulatedTokens += msgTokens;
     }
 
-    // 3. Ensure structural integrity of the boundary
+    // Ensure structural integrity of the boundary
     truncationBoundary = this.adjustBoundaryForIntegrity(
       history,
       truncationBoundary,

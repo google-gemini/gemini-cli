@@ -208,18 +208,17 @@ export interface OutputSettings {
 export interface ContextManagementConfig {
   enabled: boolean;
   historyWindow: {
-    truncationThreshold: number;
-    retainedMessages: number;
-    targetRetainedTokens: number;
+    maxTokens: number;
+    retainedTokens: number;
   };
   messageLimits: {
-    normalTokenLimit: number;
-    maximumTokenLimit: number;
+    normalMaxTokens: number;
+    retainedMaxTokens: number;
     normalizationHeadRatio: number;
   };
   toolDistillation: {
-    truncationThreshold: number;
-    summarizationThreshold: number;
+    maxOutputTokens: number;
+    summarizationThresholdTokens: number;
   };
 }
 
@@ -1155,32 +1154,27 @@ export class Config implements McpContext, AgentLoopContext {
     this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.memoryBoundaryMarkers = params.memoryBoundaryMarkers ?? ['.git'];
     this.contextManagement = {
-      enabled: params.contextManagement?.enabled ?? true,
+      enabled: params.contextManagement?.enabled ?? false,
       historyWindow: {
-        truncationThreshold:
-          params.contextManagement?.historyWindow?.truncationThreshold ?? 25,
-        retainedMessages:
-          params.contextManagement?.historyWindow?.retainedMessages ?? 20,
-        targetRetainedTokens:
-          params.contextManagement?.historyWindow?.targetRetainedTokens ??
-          40000,
+        maxTokens: params.contextManagement?.historyWindow?.maxTokens ?? 150000,
+        retainedTokens:
+          params.contextManagement?.historyWindow?.retainedTokens ?? 40000,
       },
       messageLimits: {
-        normalTokenLimit:
-          params.contextManagement?.messageLimits?.normalTokenLimit ?? 2500,
-        maximumTokenLimit:
-          params.contextManagement?.messageLimits?.maximumTokenLimit ?? 12000,
+        normalMaxTokens:
+          params.contextManagement?.messageLimits?.normalMaxTokens ?? 2500,
+        retainedMaxTokens:
+          params.contextManagement?.messageLimits?.retainedMaxTokens ?? 12000,
         normalizationHeadRatio:
           params.contextManagement?.messageLimits?.normalizationHeadRatio ??
           0.25,
       },
       toolDistillation: {
-        truncationThreshold:
-          params.contextManagement?.toolDistillation?.truncationThreshold ??
-          40000,
-        summarizationThreshold:
-          params.contextManagement?.toolDistillation?.summarizationThreshold ??
-          80000,
+        maxOutputTokens:
+          params.contextManagement?.toolDistillation?.maxOutputTokens ?? 10000,
+        summarizationThresholdTokens:
+          params.contextManagement?.toolDistillation
+            ?.summarizationThresholdTokens ?? 20000,
       },
     };
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
@@ -2388,15 +2382,11 @@ export class Config implements McpContext, AgentLoopContext {
     return {
       isTruncationEnabled: this.contextManagement.enabled,
       isSummarizationEnabled: this.contextManagement.enabled,
-      truncationThreshold:
-        this.contextManagement.historyWindow.truncationThreshold,
-      retainedMessages: this.contextManagement.historyWindow.retainedMessages,
-      targetRetainedTokens:
-        this.contextManagement.historyWindow.targetRetainedTokens,
-      normalMessageTokens:
-        this.contextManagement.messageLimits.normalTokenLimit,
+      maxTokens: this.contextManagement.historyWindow.maxTokens,
+      retainedTokens: this.contextManagement.historyWindow.retainedTokens,
+      normalMessageTokens: this.contextManagement.messageLimits.normalMaxTokens,
       maximumMessageTokens:
-        this.contextManagement.messageLimits.maximumTokenLimit,
+        this.contextManagement.messageLimits.retainedMaxTokens,
       normalizationHeadRatio:
         this.contextManagement.messageLimits.normalizationHeadRatio,
     };
@@ -3289,12 +3279,12 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
-  getToolTruncationThreshold(): number {
-    return this.contextManagement.toolDistillation.truncationThreshold;
+  getToolMaxOutputTokens(): number {
+    return this.contextManagement.toolDistillation.maxOutputTokens;
   }
 
-  getToolSummarizationThreshold(): number {
-    return this.contextManagement.toolDistillation.summarizationThreshold;
+  getToolSummarizationThresholdTokens(): number {
+    return this.contextManagement.toolDistillation.summarizationThresholdTokens;
   }
 
   getNextCompressionTruncationId(): number {

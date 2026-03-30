@@ -16,8 +16,8 @@ describe('ToolOutputDistillationService', () => {
 
   beforeEach(() => {
     mockConfig = {
-      getToolTruncationThreshold: vi.fn().mockReturnValue(100),
-      getToolSummarizationThreshold: vi.fn().mockReturnValue(200),
+      getToolMaxOutputTokens: vi.fn().mockReturnValue(100),
+      getToolSummarizationThresholdTokens: vi.fn().mockReturnValue(100),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini'),

@@ -5,9 +5,8 @@
  */
 
 export interface AgentHistoryProviderConfig {
-  truncationThreshold: number;
-  retainedMessages: number;
-  targetRetainedTokens: number;
+  maxTokens: number;
+  retainedTokens: number;
   normalMessageTokens: number;
   maximumMessageTokens: number;
   normalizationHeadRatio: number;
