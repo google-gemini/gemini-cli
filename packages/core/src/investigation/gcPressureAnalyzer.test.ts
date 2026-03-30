@@ -316,7 +316,7 @@ describe('GCPressureAnalyzer', () => {
       const perfetto = GCPressureAnalyzer.toPerfettoEvents(events);
       expect(perfetto.length).toBeGreaterThan(0);
       // First event may be metadata (ph: 'M') without ts — find a real event
-      const realEvent = perfetto.find((e: Record<string, unknown>) => e.ph !== 'M') as Record<string, unknown> | undefined;
+      const realEvent = perfetto.find((e: Record<string, unknown>) => e['ph'] !== 'M') as Record<string, unknown> | undefined;
       if (realEvent) {
         expect(realEvent).toHaveProperty('ts');
         expect(realEvent).toHaveProperty('name');

@@ -662,6 +662,4 @@ export class PerfettoSqlIntegration {
   }
 }
 
-// ─── Exports ────────────────────────────────────────────────────────────────
-
-export { SqlParser, QueryExecutor };
+// ─── Note: SqlParser and QueryExecutor are exported at their class declarations ──

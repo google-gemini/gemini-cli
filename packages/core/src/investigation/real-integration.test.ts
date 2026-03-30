@@ -233,7 +233,8 @@ describe('REAL Integration Tests', () => {
       const f = new TrendForecaster();
       const base = a1.getTotalSize();
       for (let i = 0; i < 10; i++) {
-        f.addDataPoint({ timestamp: Date.now() - (10-i)*60000, totalSize: base + i*base*0.05, nodeCount: a1.nodeCount + i*500 });
+        const heapSize = base + i*base*0.05;
+        f.addDataPoint({ timestamp: Date.now() - (10-i)*60000, totalHeapSize: heapSize, usedHeapSize: heapSize * 0.9, objectCount: a1.nodeCount + i*500 });
       }
       expect(f.getDataPointCount()).toBe(10);
       const t = f.analyze();
@@ -246,7 +247,8 @@ describe('REAL Integration Tests', () => {
       const f = new TrendForecaster();
       const base = a1.getTotalSize();
       for (let i = 0; i < 10; i++) {
-        f.addDataPoint({ timestamp: Date.now() - (10-i)*60000, totalSize: base + i*base*0.1, nodeCount: 1000 + i*500 });
+        const heapSize = base + i*base*0.1;
+        f.addDataPoint({ timestamp: Date.now() - (10-i)*60000, totalHeapSize: heapSize, usedHeapSize: heapSize * 0.9, objectCount: 1000 + i*500 });
       }
       // isGrowing() should reflect upward trend
       const trend = f.analyze();
@@ -254,7 +256,7 @@ describe('REAL Integration Tests', () => {
     });
     it('perfetto counters', () => {
       const f = new TrendForecaster();
-      for (let i = 0; i < 5; i++) f.addDataPoint({ timestamp: Date.now()-i*60000, totalSize: 1e6+i*5e4, nodeCount: 5000+i*100 });
+      for (let i = 0; i < 5; i++) f.addDataPoint({ timestamp: Date.now()-i*60000, totalHeapSize: 1e6+i*5e4, usedHeapSize: (1e6+i*5e4)*0.9, objectCount: 5000+i*100 });
       expect(Array.isArray(f.toPerfettoCounters())).toBe(true);
     });
   });
@@ -263,10 +265,13 @@ describe('REAL Integration Tests', () => {
   describe('11. GCPressureAnalyzer', () => {
     it('analyze GC events', () => {
       const gc = new GCPressureAnalyzer();
-      const types = ['Scavenge', 'Mark-Compact', 'MinorGC', 'IncrementalMarking'];
+      const types: GCEvent['type'][] = ['scavenge', 'mark-compact', 'minor-gc', 'incremental-marking'];
       const evts: GCEvent[] = [];
       for (let i = 0; i < 50; i++) {
-        evts.push({ type: types[i%4], timestamp: Date.now()-(50-i)*1000, duration: Math.random()*50 + (i%4===1?100:5), heapBefore: 1e7+i*1e4, heapAfter: 1e7+i*5e3 });
+        const hBefore = 1e7+i*1e4;
+        const hAfter = 1e7+i*5e3;
+        const gen: GCEvent['generation'] = i%4 < 2 ? 'young' : 'old';
+        evts.push({ type: types[i%4], startUs: (Date.now()-(50-i)*1000)*1000, durationUs: (Math.random()*50 + (i%4===1?100:5))*1000, heapBefore: hBefore, heapAfter: hAfter, freedBytes: Math.max(0, hBefore - hAfter), forced: false, generation: gen });
       }
       const r = gc.analyze(evts, 50000);
       // GCHealthReport: { gcTimePercent, healthScore, categories[], recommendations[], ... }
@@ -277,7 +282,7 @@ describe('REAL Integration Tests', () => {
     });
     it('format for terminal', () => {
       const gc = new GCPressureAnalyzer();
-      const r = gc.analyze([{ type:'Scavenge', timestamp:Date.now(), duration:5, heapBefore:1e6, heapAfter:9e5 }], 10000);
+      const r = gc.analyze([{ type:'scavenge', startUs:Date.now()*1000, durationUs:5000, heapBefore:1e6, heapAfter:9e5, freedBytes:1e5, forced:false, generation:'young' }], 10000);
       expect(typeof GCPressureAnalyzer.formatForTerminal(r)).toBe('string');
     });
   });
@@ -318,7 +323,7 @@ describe('REAL Integration Tests', () => {
       const p = new AllocationHotspotProfiler();
       const s: AllocationSample[] = [];
       for (let i = 0; i < 200; i++) {
-        s.push({ size: Math.floor(Math.random()*1e4)+100, count: Math.floor(Math.random()*50)+1, stack: [{ functionName:'alloc', scriptName:'w.js', lineNumber:i%10+1, columnNumber:0 }] });
+        s.push({ nodeId: i+1, size: Math.floor(Math.random()*1e4)+100, count: Math.floor(Math.random()*50)+1, stack: [{ functionName:'alloc', scriptName:'w.js', lineNumber:i%10+1, columnNumber:0 }] });
       }
       const r = p.analyze(s);
       // AllocationProfileReport: { totalAllocatedBytes, totalAllocationCount, hotspots[], recommendations[], ... }
@@ -328,7 +333,7 @@ describe('REAL Integration Tests', () => {
       expect(Array.isArray(r.recommendations)).toBe(true);
     });
     it('from class summaries', () => {
-      const cls = cs1.slice(0,5).map(c => ({ className:c.name, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
+      const cls = cs1.slice(0,5).map(c => ({ className:c.className, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
       expect(Array.isArray(AllocationHotspotProfiler.fromClassSummaries(cls))).toBe(true);
     });
   });
@@ -365,7 +370,7 @@ describe('REAL Integration Tests', () => {
   describe('15. MemoryRegressionGuard', () => {
     it('create fingerprint', () => {
       const g = new MemoryRegressionGuard();
-      const cls = cs1.map(c => ({ className:c.name, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
+      const cls = cs1.map(c => ({ className:c.className, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
       const fp = g.createFingerprint(cls, { label:'snap1' });
       // MemoryFingerprint: { id, timestamp, totalHeapSize, ... }
       expect(typeof fp.totalHeapSize).toBe('number');
@@ -373,7 +378,7 @@ describe('REAL Integration Tests', () => {
     });
     it('set baseline and check regression', () => {
       const g = new MemoryRegressionGuard();
-      const mk = (s: ClassSummary[]) => s.map(c => ({ className:c.name, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
+      const mk = (s: ClassSummary[]) => s.map(c => ({ className:c.className, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
       const fp1 = g.createFingerprint(mk(cs1));
       const fp2 = g.createFingerprint(mk(cs2));
       g.setBaseline('k', fp1);
@@ -385,7 +390,7 @@ describe('REAL Integration Tests', () => {
     });
     it('export/import baselines', () => {
       const g = new MemoryRegressionGuard();
-      const cls = cs1.map(c => ({ className:c.name, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
+      const cls = cs1.map(c => ({ className:c.className, count:c.count, shallowSize:c.shallowSize, retainedSize:c.retainedSize }));
       g.setBaseline('k1', g.createFingerprint(cls));
       const exp = g.exportBaselines();
       const g2 = new MemoryRegressionGuard();
