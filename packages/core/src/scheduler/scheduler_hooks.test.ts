@@ -75,6 +75,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       ({
         check: async () => ({ decision: 'allow' }),
       }) as unknown as PolicyEngine,
+    isAutoDistillationEnabled: () => false,
   } as unknown as Config;
 
   const mockConfig = Object.assign({}, baseConfig, overrides) as Config;

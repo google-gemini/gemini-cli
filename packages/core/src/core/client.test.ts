@@ -279,16 +279,9 @@ describe('Gemini Client (client.ts)', () => {
       getActiveModel: vi.fn().mockReturnValue('test-model'),
       setActiveModel: vi.fn(),
       resetTurn: vi.fn(),
-      isExperimentalAgentHistoryTruncationEnabled: vi
-        .fn()
-        .mockReturnValue(false),
-      getExperimentalAgentHistoryTruncationThreshold: vi
-        .fn()
-        .mockReturnValue(30),
-      getExperimentalAgentHistoryRetainedMessages: vi.fn().mockReturnValue(15),
-      isExperimentalAgentHistorySummarizationEnabled: vi
-        .fn()
-        .mockReturnValue(false),
+
+      isAutoDistillationEnabled: vi.fn().mockReturnValue(false),
+      getContextManagementConfig: vi.fn().mockReturnValue({ enabled: false }),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -716,9 +709,9 @@ describe('Gemini Client (client.ts)', () => {
   describe('sendMessageStream', () => {
     it('calls AgentHistoryProvider.manageHistory when history truncation is enabled', async () => {
       // Arrange
-      mockConfig.isExperimentalAgentHistoryTruncationEnabled = vi
+      mockConfig.getContextManagementConfig = vi
         .fn()
-        .mockReturnValue(true);
+        .mockReturnValue({ enabled: true });
       const manageHistorySpy = vi
         .spyOn(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
