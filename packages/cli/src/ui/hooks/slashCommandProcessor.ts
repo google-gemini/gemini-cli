@@ -8,6 +8,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   useState,
   createElement,
 } from 'react';
@@ -47,7 +48,11 @@ import type {
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { type CommandContext, type SlashCommand } from '../commands/types.js';
+import {
+  type CommandContext,
+  type SlashCommand,
+  type LastOutput,
+} from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
@@ -144,6 +149,10 @@ export const useSlashCommandProcessor = (
   const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
     null,
   );
+
+  // Tracks the most recent visible output (either from a slash command or an AI
+  // response) so that /copy can accurately capture the latest information.
+  const lastOutputRef = useRef<LastOutput | undefined>(undefined);
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
@@ -244,6 +253,11 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundTasks: actions.toggleBackgroundTasks,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        getLastOutput: () => lastOutputRef.current,
+        setLastOutput: (output) => {
+          const trimmed = output?.content?.trim();
+          lastOutputRef.current = trimmed ? { content: trimmed } : undefined;
+        },
       },
       session: {
         stats: session.stats,
@@ -450,6 +464,10 @@ export const useSlashCommandProcessor = (
                     postSubmitPrompt: result.postSubmitPrompt,
                   };
                 case 'message':
+                  // Store the output text so /copy can retrieve it later.
+                  commandContext.ui.setLastOutput({
+                    content: result.content,
+                  });
                   addItem(
                     {
                       type:
