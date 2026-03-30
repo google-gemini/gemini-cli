@@ -184,6 +184,8 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export type ModelThinkingLevel = 'LOW' | 'HIGH';
+
 export interface PlanSettings {
   directory?: string;
   modelRouting?: boolean;
@@ -614,6 +616,13 @@ export interface ConfigParameters {
   bugCommand?: BugCommandSettings;
   model: string;
   disableLoopDetection?: boolean;
+  modelSeed?: number;
+  modelTemperature?: number;
+  modelTopK?: number;
+  modelTopP?: number;
+  modelThinkingLevel?: ModelThinkingLevel;
+  modelIncludeThoughts?: boolean;
+  modelThinkingBudget?: number;
   maxSessionTurns?: number;
   acpMode?: boolean;
   listSessions?: boolean;
@@ -787,6 +796,13 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private readonly modelSeed: number | undefined;
+  private readonly modelTemperature: number | undefined;
+  private readonly modelTopK: number | undefined;
+  private readonly modelTopP: number | undefined;
+  private readonly modelThinkingLevel: ModelThinkingLevel | undefined;
+  private readonly modelIncludeThoughts: boolean | undefined;
+  private readonly modelThinkingBudget: number | undefined;
   private readonly disableLoopDetection: boolean;
   // null = unknown (quota not fetched); true = has access; false = definitively no access
   private hasAccessToPreviewModel: boolean | null = null;
@@ -1072,6 +1088,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.modelSeed = params.modelSeed;
+    this.modelTemperature = params.modelTemperature;
+    this.modelTopK = params.modelTopK;
+    this.modelTopP = params.modelTopP;
+    this.modelThinkingLevel = params.modelThinkingLevel;
+    this.modelIncludeThoughts = params.modelIncludeThoughts;
+    this.modelThinkingBudget = params.modelThinkingBudget;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? true;
@@ -1737,6 +1760,34 @@ export class Config implements McpContext, AgentLoopContext {
 
   getModel(): string {
     return this.model;
+  }
+
+  getModelSeed(): number | undefined {
+    return this.modelSeed;
+  }
+
+  getModelTemperature(): number | undefined {
+    return this.modelTemperature;
+  }
+
+  getModelTopK(): number | undefined {
+    return this.modelTopK;
+  }
+
+  getModelTopP(): number | undefined {
+    return this.modelTopP;
+  }
+
+  getModelThinkingLevel(): ModelThinkingLevel | undefined {
+    return this.modelThinkingLevel;
+  }
+
+  getModelIncludeThoughts(): boolean | undefined {
+    return this.modelIncludeThoughts;
+  }
+
+  getModelThinkingBudget(): number | undefined {
+    return this.modelThinkingBudget;
   }
 
   getDisableLoopDetection(): boolean {

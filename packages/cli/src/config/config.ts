@@ -46,6 +46,7 @@ import {
   type HookEventName,
   type OutputFormat,
   detectIdeFromEnv,
+  type ModelThinkingLevel,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -76,6 +77,13 @@ import { runExitCleanup } from '../utils/cleanup.js';
 export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
+  modelSeed: number | undefined;
+  modelTemperature: number | undefined;
+  modelTopK: number | undefined;
+  modelTopP: number | undefined;
+  modelThinkingLevel: ModelThinkingLevel | undefined;
+  modelIncludeThoughts: boolean | undefined;
+  modelThinkingBudget: number | undefined;
   sandbox: boolean | string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
@@ -252,6 +260,59 @@ export async function parseArguments(
       if (argv['worktree'] && !settings.experimental?.worktrees) {
         return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
       }
+
+      const modelIncludeThoughts = argv['model-include-thoughts'];
+      if (
+        modelIncludeThoughts !== undefined &&
+        typeof modelIncludeThoughts !== 'boolean'
+      ) {
+        return 'Invalid value for model-include-thoughts. Must be a boolean-like value (true, false, 1, 0).';
+      }
+
+      const modelTemperature = argv['model-temperature'];
+      if (
+        modelTemperature !== undefined &&
+        typeof modelTemperature === 'number' &&
+        (modelTemperature < 0 || modelTemperature > 2)
+      ) {
+        return 'model-temperature must be between 0.0 and 2.0';
+      }
+
+      const modelTopP = argv['model-top-p'];
+      if (
+        modelTopP !== undefined &&
+        typeof modelTopP === 'number' &&
+        (modelTopP < 0 || modelTopP > 1)
+      ) {
+        return 'model-top-p must be between 0.0 and 1.0';
+      }
+
+      const modelSeed = argv['model-seed'];
+      if (
+        modelSeed !== undefined &&
+        typeof modelSeed === 'number' &&
+        !Number.isInteger(modelSeed)
+      ) {
+        return 'model-seed must be an integer';
+      }
+
+      const modelTopK = argv['model-top-k'];
+      if (
+        modelTopK !== undefined &&
+        typeof modelTopK === 'number' &&
+        (!Number.isInteger(modelTopK) || modelTopK < 0)
+      ) {
+        return 'model-top-k must be 0 or a positive integer';
+      }
+
+      const modelThinkingBudget = argv['model-thinking-budget'];
+      if (
+        modelThinkingBudget !== undefined &&
+        typeof modelThinkingBudget === 'number' &&
+        (!Number.isInteger(modelThinkingBudget) || modelThinkingBudget < 0)
+      ) {
+        return 'model-thinking-budget must be 0 or a positive integer';
+      }
       return true;
     });
 
@@ -272,6 +333,51 @@ export async function parseArguments(
           type: 'string',
           nargs: 1,
           description: `Model`,
+        })
+        .option('model-seed', {
+          type: 'number',
+          nargs: 1,
+          description: 'Seed for the model (integer).',
+        })
+        .option('model-temperature', {
+          type: 'number',
+          nargs: 1,
+          description: 'Temperature for the model (0.0 - 2.0).',
+        })
+        .option('model-top-k', {
+          type: 'number',
+          nargs: 1,
+          description: 'Top K for the model (integer).',
+        })
+        .option('model-top-p', {
+          type: 'number',
+          nargs: 1,
+          description: 'Top P for the model.',
+        })
+        .option('model-thinking-level', {
+          type: 'string',
+          nargs: 1,
+          choices: ['LOW', 'HIGH'],
+          description: 'Thinking level for the model.',
+        })
+        .option('model-include-thoughts', {
+          type: 'boolean',
+          description:
+            'Indicates whether to include thoughts in the response. If true, thoughts are returned only when available.',
+          coerce: (value: unknown) => {
+            if (value === 'false' || value === '0' || value === 0) {
+              return false;
+            }
+            if (value === 'true' || value === '1' || value === 1) {
+              return true;
+            }
+            return value;
+          },
+        })
+        .option('model-thinking-budget', {
+          type: 'number',
+          nargs: 1,
+          description: 'Thinking budget for the model (integer).',
         })
         .option('prompt', {
           alias: 'p',
@@ -956,6 +1062,16 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
+    modelSeed: argv.modelSeed ?? settings.model?.seed,
+    modelTemperature: argv.modelTemperature ?? settings.model?.temperature,
+    modelTopK: argv.modelTopK ?? settings.model?.topK,
+    modelTopP: argv.modelTopP ?? settings.model?.topP,
+    modelThinkingLevel: (argv.modelThinkingLevel ??
+      settings.model?.thinkingLevel) as ModelThinkingLevel | undefined,
+    modelIncludeThoughts:
+      argv.modelIncludeThoughts ?? settings.model?.includeThoughts,
+    modelThinkingBudget:
+      argv.modelThinkingBudget ?? settings.model?.thinkingBudget,
     maxSessionTurns: settings.model?.maxSessionTurns,
 
     listExtensions: argv.listExtensions || false,
