@@ -561,7 +561,7 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(invalidConfig);
       await expect(manager.ensureConnection()).rejects.toThrow(
-        /browserUrl is only supported when sessionMode is "existing"/,
+        /browserUrl requires sessionMode "existing"/,
       );
     });
 
@@ -582,7 +582,7 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(invalidConfig);
       await expect(manager.ensureConnection()).rejects.toThrow(
-        /Invalid browserUrl: not-a-url/,
+        /Invalid browserUrl\./,
       );
     });
 
@@ -603,7 +603,7 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(invalidConfig);
       await expect(manager.ensureConnection()).rejects.toThrow(
-        /headless is not supported when sessionMode is "existing"/,
+        /headless is not supported with existing sessions/,
       );
     });
 
@@ -624,7 +624,7 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(invalidConfig);
       await expect(manager.ensureConnection()).rejects.toThrow(
-        /profilePath is not supported when sessionMode is "existing"/,
+        /profilePath is not supported with existing sessions/,
       );
     });
 
@@ -692,11 +692,11 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(remoteConfig);
       await expect(manager.ensureConnection()).rejects.toThrow(
-        /Failed to connect to browserUrl http:\/\/remote-browser:9222/,
+        /Failed to connect to remote Chrome at http:\/\/remote-browser:9222/,
       );
       const manager2 = new BrowserManager(remoteConfig);
       await expect(manager2.ensureConnection()).rejects.toThrow(
-        /remote debugging enabled/,
+        /remote debugging is enabled and the URL is reachable/,
       );
     });
 

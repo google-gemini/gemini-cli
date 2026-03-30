@@ -638,51 +638,35 @@ export class BrowserManager {
     headless: boolean | undefined,
     profilePath: string | undefined,
   ): void {
-    if (!browserUrl) {
-      if (sessionMode === 'existing') {
-        if (headless) {
-          throw new Error(
-            'headless is not supported when sessionMode is "existing". Configure headless on the remote browser instance instead.',
-          );
-        }
-        if (profilePath) {
-          throw new Error(
-            'profilePath is not supported when sessionMode is "existing". Remove profilePath or switch to "persistent".',
-          );
-        }
+    if (sessionMode === 'existing') {
+      if (headless) {
+        throw new Error('headless is not supported with existing sessions.');
       }
+      if (profilePath) {
+        throw new Error('profilePath is not supported with existing sessions.');
+      }
+    }
+
+    if (!browserUrl) {
       return;
     }
 
     if (sessionMode !== 'existing') {
-      throw new Error(
-        'browserUrl is only supported when sessionMode is "existing".',
-      );
-    }
-
-    if (headless) {
-      throw new Error(
-        'headless is not supported when sessionMode is "existing". Configure headless on the remote browser instance instead.',
-      );
-    }
-
-    if (profilePath) {
-      throw new Error(
-        'profilePath is not supported when sessionMode is "existing". Remove profilePath or switch to "persistent".',
-      );
+      throw new Error('browserUrl requires sessionMode "existing".');
     }
 
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(browserUrl);
-    } catch {
-      throw new Error(`Invalid browserUrl: ${browserUrl}`);
+    } catch (error) {
+      debugLogger.error(
+        `Failed to parse browserUrl: ${browserUrl}. ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error('Invalid browserUrl.');
     }
 
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      throw new Error(
-        `Invalid browserUrl protocol: ${parsedUrl.protocol}. Expected http: or https:.`,
-      );
+      throw new Error('Invalid browserUrl protocol.');
     }
   }
 
@@ -722,11 +706,7 @@ export class BrowserManager {
       if (sessionMode === 'existing') {
         if (browserUrl) {
           return new Error(
-            `Timed out connecting to Chrome at ${browserUrl}: ${message}\n\n` +
-              `To use browserUrl with sessionMode "existing", make sure:\n` +
-              `  1. The remote browser has remote debugging enabled\n` +
-              `  2. ${browserUrl} is reachable from this machine\n` +
-              `  3. Any required port forwarding or container port exposure is configured`,
+            `Timed out connecting to remote Chrome at ${browserUrl}. Check that remote debugging is enabled and the URL is reachable.`,
           );
         }
         return new Error(
@@ -750,11 +730,7 @@ export class BrowserManager {
     if (sessionMode === 'existing') {
       if (browserUrl) {
         return new Error(
-          `Failed to connect to browserUrl ${browserUrl}: ${message}\n\n` +
-            `To use browserUrl with sessionMode "existing", make sure:\n` +
-            `  1. The remote browser has remote debugging enabled\n` +
-            `  2. ${browserUrl} is reachable from this machine\n` +
-            `  3. Any required port forwarding or container port exposure is configured`,
+          `Failed to connect to remote Chrome at ${browserUrl}. Check that remote debugging is enabled and the URL is reachable.`,
         );
       }
       return new Error(
