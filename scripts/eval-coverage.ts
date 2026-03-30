@@ -13,13 +13,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EVALS_DIR = path.resolve(__dirname, '../evals');
 
 // A rudimentary regex to find imported/used tool names in the eval files
-const TOOL_NAME_REGEX = /([A-Z_]+_TOOL_NAME)/g;
+const TOOL_NAME_REGEX = /\b([A-Z0-9_]+_TOOL_NAME)\b/g;
 
 async function scanEvalsForCoverage() {
   console.log('🔍 Scanning behavioral evals for tool coverage...\n');
 
   try {
-    const files = await fs.readdir(EVALS_DIR);
+    const files = await fs.readdir(EVALS_DIR, { recursive: true });
     const evalFiles = files.filter((f) => f.endsWith('.eval.ts'));
 
     // Set to collect all unique *_TOOL_NAME variables used in tests
