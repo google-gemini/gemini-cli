@@ -991,10 +991,10 @@ describe('BrowserManager', () => {
       });
       const manager = new BrowserManager(limitedConfig);
 
-      // Multiple calls with shouldCount: false should NOT exhaust the limit
-      await manager.callTool('evaluate_script', {}, undefined, false);
-      await manager.callTool('evaluate_script', {}, undefined, false);
-      await manager.callTool('evaluate_script', {}, undefined, false);
+      // Multiple calls with isInternal: true should NOT exhaust the limit
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
+      await manager.callTool('evaluate_script', {}, undefined, true);
 
       // This should still work
       await manager.callTool('take_snapshot', {});
