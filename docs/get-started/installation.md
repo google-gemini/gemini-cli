@@ -81,7 +81,7 @@ You can also run Gemini CLI using one of the following advanced methods:
 ### Run instantly with npx
 
 ```bash
-# Using npx (no installation required)
+# Using  npx (no installation required)
 npx @google/gemini-cli
 ```
 
