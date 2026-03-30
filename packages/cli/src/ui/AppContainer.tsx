@@ -83,9 +83,9 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
-
   cronSchedulerService,
-  type ScheduledTask} from '@google/gemini-cli-core';
+  type ScheduledTask,
+} from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
@@ -1199,6 +1199,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const { isMcpReady } = useMcpStatus(config);
+
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+
+  useEffect(() => {
+    const updateTasks = () => {
+      setScheduledTasks(cronSchedulerService.listTasks());
+    };
+    updateTasks();
+    // Poor man's sync: polling for list updates since it's mostly local
+    const interval = setInterval(updateTasks, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const {
     messageQueue,
@@ -2337,6 +2349,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
       backgroundTasks,
+      scheduledTasks,
       activeBackgroundTaskPid,
       backgroundTaskHeight,
       isBackgroundTaskListOpen,
@@ -2464,6 +2477,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settingsNonce,
       backgroundTaskHeight,
       isBackgroundTaskListOpen,
+      scheduledTasks,
       activeBackgroundTaskPid,
       backgroundTasks,
       adminSettingsChanged,

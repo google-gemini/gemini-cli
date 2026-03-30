@@ -149,6 +149,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -169,6 +170,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -189,6 +191,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -209,6 +212,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -229,6 +233,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={100}
           height={30}
@@ -252,6 +257,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -272,6 +278,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -303,6 +310,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -335,6 +343,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell1.pid}
           width={width}
           height={24}
@@ -360,6 +369,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={shell2.pid}
           width={width}
           height={24}
@@ -391,6 +401,7 @@ describe('<BackgroundTaskDisplay />', () => {
       <ScrollProvider>
         <BackgroundTaskDisplay
           shells={mockShells}
+          scheduledTasks={[]}
           activePid={exitedShell.pid}
           width={width}
           height={24}

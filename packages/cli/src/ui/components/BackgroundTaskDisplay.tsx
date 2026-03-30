@@ -15,6 +15,7 @@ import {
   type AnsiOutput,
   type AnsiLine,
   type AnsiToken,
+  type ScheduledTask,
 } from '@google/gemini-cli-core';
 import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
 import { type BackgroundTask } from '../hooks/useExecutionLifecycle.js';
@@ -36,6 +37,7 @@ import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 interface BackgroundTaskDisplayProps {
   shells: Map<number, BackgroundTask>;
+  scheduledTasks: ScheduledTask[];
   activePid: number;
   width: number;
   height: number;
@@ -63,6 +65,7 @@ const formatShellCommandForDisplay = (command: string, maxWidth: number) => {
 
 export const BackgroundTaskDisplay = ({
   shells,
+  scheduledTasks,
   activePid,
   width,
   height,
@@ -335,60 +338,74 @@ export const BackgroundTaskDisplay = ({
           </Text>
         </Box>
         <Box flexGrow={1} width="100%">
-          <RadioButtonSelect
-            items={items}
-            initialIndex={initialIndex >= 0 ? initialIndex : 0}
-            onSelect={(pid) => {
-              setActiveBackgroundTaskPid(pid);
-              setIsBackgroundTaskListOpen(false);
-            }}
-            onHighlight={(pid) => setHighlightedPid(pid)}
-            isFocused={isFocused}
-            maxItemsToShow={Math.max(
-              1,
-              height - TOTAL_OVERHEAD_HEIGHT - PROCESS_LIST_HEADER_HEIGHT,
-            )}
-            renderItem={(
-              item,
-              { isSelected: _isSelected, titleColor: _titleColor },
-            ) => {
-              // Custom render to handle exit code coloring if needed,
-              // or just use default. The default RadioButtonSelect renderer
-              // handles standard label.
-              // But we want to color exit code differently?
-              // The previous implementation colored exit code green/red.
-              // Let's reimplement that.
+          {shells.size > 0 && (
+            <RadioButtonSelect
+              items={items}
+              initialIndex={initialIndex >= 0 ? initialIndex : 0}
+              onSelect={(pid) => {
+                setActiveBackgroundTaskPid(pid);
+                setIsBackgroundTaskListOpen(false);
+              }}
+              onHighlight={(pid) => setHighlightedPid(pid)}
+              isFocused={isFocused}
+              maxItemsToShow={Math.max(
+                1,
+                height -
+                  TOTAL_OVERHEAD_HEIGHT -
+                  PROCESS_LIST_HEADER_HEIGHT -
+                  (scheduledTasks.length > 0 ? scheduledTasks.length + 2 : 0),
+              )}
+              renderItem={(
+                item,
+                { isSelected: _isSelected, titleColor: _titleColor },
+              ) => {
+                const shell = shells.get(item.value);
+                if (!shell) return <Text>{item.label}</Text>;
 
-              // We need access to shell details here.
-              // We can put shell details in the item or lookup.
-              // Lookup from shells map.
-              const shell = shells.get(item.value);
-              if (!shell) return <Text>{item.label}</Text>;
+                const truncatedCommand = formatShellCommandForDisplay(
+                  shell.command,
+                  maxCommandLength,
+                );
 
-              const truncatedCommand = formatShellCommandForDisplay(
-                shell.command,
-                maxCommandLength,
-              );
-
-              return (
-                <Text>
-                  {truncatedCommand} (PID: {shell.pid})
-                  {shell.status === 'exited' ? (
-                    <Text
-                      color={
-                        shell.exitCode === 0
-                          ? theme.status.success
-                          : theme.status.error
-                      }
-                    >
-                      {' '}
-                      (Exit Code: {shell.exitCode})
-                    </Text>
-                  ) : null}
+                return (
+                  <Text>
+                    {truncatedCommand} (PID: {shell.pid})
+                    {shell.status === 'exited' ? (
+                      <Text
+                        color={
+                          shell.exitCode === 0
+                            ? theme.status.success
+                            : theme.status.error
+                        }
+                      >
+                        {' '}
+                        (Exit Code: {shell.exitCode})
+                      </Text>
+                    ) : null}
+                  </Text>
+                );
+              }}
+            />
+          )}
+          {scheduledTasks.length > 0 && (
+            <Box flexDirection="column" marginTop={shells.size > 0 ? 1 : 0}>
+              <Box
+                borderStyle="single"
+                borderBottom={false}
+                borderLeft={false}
+                borderRight={false}
+                paddingTop={1}
+                marginBottom={1}
+              >
+                <Text bold>Scheduled Loops</Text>
+              </Box>
+              {scheduledTasks.map((task) => (
+                <Text key={task.id}>
+                  {` ● [${task.id}] every ${task.intervalMs! / 1000}s: "${task.prompt}"`}
                 </Text>
-              );
-            }}
-          />
+              ))}
+            </Box>
+          )}
         </Box>
       </Box>
     );

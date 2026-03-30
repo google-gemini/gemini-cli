@@ -40,14 +40,15 @@ export const DefaultAppLayout: React.FC = () => {
       <MainContent />
 
       {uiState.isBackgroundTaskVisible &&
-        uiState.backgroundTasks.size > 0 &&
-        uiState.activeBackgroundTaskPid &&
+        (uiState.backgroundTasks.size > 0 ||
+          uiState.scheduledTasks.length > 0) &&
         uiState.backgroundTaskHeight > 0 &&
         uiState.streamingState !== StreamingState.WaitingForConfirmation && (
           <Box height={uiState.backgroundTaskHeight} flexShrink={0}>
             <BackgroundTaskDisplay
               shells={uiState.backgroundTasks}
-              activePid={uiState.activeBackgroundTaskPid}
+              scheduledTasks={uiState.scheduledTasks}
+              activePid={uiState.activeBackgroundTaskPid ?? 0}
               width={uiState.terminalWidth}
               height={uiState.backgroundTaskHeight}
               isFocused={

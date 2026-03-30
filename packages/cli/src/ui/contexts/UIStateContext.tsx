@@ -29,7 +29,7 @@ import type {
   AgentDefinition,
   FolderDiscoveryResults,
   PolicyUpdateConfirmationRequest,
-} from '@google/gemini-cli-core';
+ type ScheduledTask } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -216,6 +216,7 @@ export interface UIState {
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
   backgroundTasks: Map<number, BackgroundTask>;
+  scheduledTasks: ScheduledTask[];
   activeBackgroundTaskPid: number | null;
   backgroundTaskHeight: number;
   isBackgroundTaskListOpen: boolean;

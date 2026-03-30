@@ -38,6 +38,7 @@ These commands are available within the interactive REPL.
 | `/mcp reload`        | Restart and reload MCP servers           |
 | `/extensions reload` | Reload all active extensions             |
 | `/help`              | Show help for all commands               |
+| `/loop`              | Schedule a recurring task                |
 | `/quit`              | Exit the interactive session             |
 
 ## CLI Options
