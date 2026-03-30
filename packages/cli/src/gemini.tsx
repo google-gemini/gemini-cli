@@ -680,8 +680,6 @@ export async function main() {
       // Exit gracefully if we've already handled a subcommand (playground, mcp, etc.)
       if (argv.isCommand) {
         await runExitCleanup();
-        // Restore TTY state and exit alternate buffer before shell prompt
-        process.stdout.write('\x1b[?1049l\x1b[1G\x1b[2K\x1b[?25h');
         process.exit(ExitCodes.SUCCESS);
       }
 
