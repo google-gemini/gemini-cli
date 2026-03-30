@@ -308,7 +308,7 @@ in the project's `package.json`.
 
 _ProTip_
 
-after cloning create a git precommit hook file to ensure your commits are always
+After cloning, create a git pre-commit hook file to ensure your commits are always
 clean.
 
 ```bash
